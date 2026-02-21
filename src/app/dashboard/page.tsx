@@ -16,6 +16,11 @@ export default async function DashboardPage() {
     .eq('id', user.id)
     .single()
 
+  console.log('DEBUG user.id:', user.id)
+  console.log('DEBUG user.email:', user.email)
+  console.log('DEBUG profile:', JSON.stringify(profile))
+  console.log('DEBUG profileError:', JSON.stringify(profileError))
+
   if (profileError) {
     console.error('Profile fetch error:', profileError.message, profileError.code)
   }
