@@ -36,7 +36,7 @@ It generates 6-week shift schedules, lets staff submit availability, and handles
 - `src/app/auth/signout/route.ts` - signout handler
 - `src/lib/supabase/client.ts` - browser Supabase client
 - `src/lib/supabase/server.ts` - server Supabase client
-- `src/middleware.ts` - route protection (redirects to /login if not authed)
+- `src/proxy.ts` - route protection (redirects to /login if not authed)
 
 ## Milestones
 - [x] Step 1 - Repo scaffold
