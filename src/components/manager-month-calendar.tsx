@@ -109,20 +109,21 @@ function buildMonthOptions(startDate: string, endDate: string): string[] {
   return options
 }
 
-function buildCalendarGrid(month: string): Date[] {
+function buildVisibleMonthDays(month: string, startDate: string, endDate: string): Date[] {
   const [year, rawMonth] = month.split('-').map(Number)
-  const firstDay = new Date(year, rawMonth - 1, 1)
-  const lastDay = new Date(year, rawMonth, 0)
+  const monthStart = new Date(year, rawMonth - 1, 1)
+  const monthEnd = new Date(year, rawMonth, 0)
+  const cycleStart = dateFromKey(startDate)
+  const cycleEnd = dateFromKey(endDate)
 
-  const gridStart = new Date(firstDay)
-  gridStart.setDate(firstDay.getDate() - firstDay.getDay())
+  const firstVisible = monthStart < cycleStart ? cycleStart : monthStart
+  const lastVisible = monthEnd > cycleEnd ? cycleEnd : monthEnd
 
-  const gridEnd = new Date(lastDay)
-  gridEnd.setDate(lastDay.getDate() + (6 - lastDay.getDay()))
+  if (firstVisible > lastVisible) return []
 
   const days: Date[] = []
-  const cursor = new Date(gridStart)
-  while (cursor <= gridEnd) {
+  const cursor = new Date(firstVisible)
+  while (cursor <= lastVisible) {
     days.push(new Date(cursor))
     cursor.setDate(cursor.getDate() + 1)
   }
@@ -144,13 +145,13 @@ export function ManagerMonthCalendar({
   const [overrideWeeklyRules, setOverrideWeeklyRules] = useState(false)
 
   const monthOptions = useMemo(() => buildMonthOptions(startDate, endDate), [startDate, endDate])
-  const [selectedMonth, setSelectedMonth] = useState(monthOptions[0] ?? monthKey(new Date()))
-
-  const days = useMemo(() => buildCalendarGrid(selectedMonth), [selectedMonth])
-  const selectedMonthDate = useMemo(() => {
-    const [year, month] = selectedMonth.split('-').map(Number)
-    return new Date(year, month - 1, 1)
-  }, [selectedMonth])
+  const monthDaysByKey = useMemo(() => {
+    const map = new Map<string, Date[]>()
+    for (const month of monthOptions) {
+      map.set(month, buildVisibleMonthDays(month, startDate, endDate))
+    }
+    return map
+  }, [monthOptions, startDate, endDate])
 
   const shiftsByDate = useMemo(() => {
     const map = new Map<string, Shift[]>()
@@ -279,7 +280,8 @@ export function ManagerMonthCalendar({
     })
   }
 
-  function renderCalendarForShift(shiftType: 'day' | 'night') {
+  function renderCalendarForShift(shiftType: 'day' | 'night', month: string) {
+    const days = monthDaysByKey.get(month) ?? []
     const palette =
       shiftType === 'day'
         ? {
@@ -302,16 +304,11 @@ export function ManagerMonthCalendar({
         </div>
         <div className="grid min-w-[760px] grid-cols-7 gap-2">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-            <div key={`${shiftType}-${day}`} className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <div key={`${month}-${shiftType}-${day}`} className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {day}
             </div>
           ))}
-          {days
-            .filter((day) => {
-              const date = keyFromDate(day)
-              return day.getMonth() === selectedMonthDate.getMonth() && isInCycle(date)
-            })
-            .map((day, index) => {
+          {days.map((day, index) => {
             const date = keyFromDate(day)
             const dayShifts = (shiftsByDate.get(date) ?? []).filter((shift) => shift.shift_type === shiftType)
             const coverageCount = dayShifts.filter((shift) => countsTowardCoverage(shift.status)).length
@@ -379,23 +376,10 @@ export function ManagerMonthCalendar({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <label htmlFor="month-select" className="text-sm font-medium text-foreground">
-            Month
-          </label>
-          <select
-            id="month-select"
-            className="h-10 rounded-xl border border-border bg-card px-3 text-sm"
-            value={selectedMonth}
-            onChange={(event) => setSelectedMonth(event.target.value)}
-          >
-            {monthOptions.map((month) => (
-              <option key={month} value={month}>
-                {monthLabel(month)}
-              </option>
-            ))}
-          </select>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Showing all months in cycle range: {monthLabel(monthOptions[0] ?? monthKey(new Date()))}
+          {monthOptions.length > 1 ? ` to ${monthLabel(monthOptions[monthOptions.length - 1])}` : ''}
+        </p>
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
           <input
             type="checkbox"
@@ -498,12 +482,13 @@ export function ManagerMonthCalendar({
         </div>
 
         <div className="space-y-4 overflow-auto rounded-2xl border-2 border-border bg-card p-2">
-          <div className="px-2 text-sm font-semibold text-foreground">
-            {selectedMonthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-          </div>
-
-          {renderCalendarForShift('day')}
-          {renderCalendarForShift('night')}
+          {monthOptions.map((month) => (
+            <div key={month} className="space-y-4">
+              <div className="px-2 text-sm font-semibold text-foreground">{monthLabel(month)}</div>
+              {renderCalendarForShift('day', month)}
+              {renderCalendarForShift('night', month)}
+            </div>
+          ))}
         </div>
       </div>
 
