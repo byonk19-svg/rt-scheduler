@@ -2,29 +2,34 @@ import Link from 'next/link'
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-8">
+    <main className="flex min-h-screen items-center justify-center bg-background p-8">
       <div className="w-full max-w-2xl space-y-6 text-center">
         <div className="space-y-2">
-          <h1 className="text-4xl font-bold text-slate-800">RT Scheduler</h1>
-          <p className="text-slate-500">
-            Respiratory therapy scheduling, availability requests, and shift board workflows.
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            Teamwise Scheduling
+          </p>
+          <h1 className="text-4xl font-bold text-foreground">Team scheduling, without the chaos.</h1>
+          <p className="text-muted-foreground">
+            Collect availability, manage requests, and keep coverage clear in one place.
           </p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-sm text-slate-600">App is live. Sign in to access your dashboard.</p>
+        <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+          <p className="text-sm text-muted-foreground">
+            Sign in to view your schedule and requests.
+          </p>
           <div className="mt-4 flex justify-center gap-3">
             <Link
               href="/login"
-              className="rounded-md bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700"
+              className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:opacity-90"
             >
               Sign in
             </Link>
             <Link
               href="/signup"
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"
+              className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-accent/20"
             >
-              Create account
+              Request access
             </Link>
           </div>
         </div>

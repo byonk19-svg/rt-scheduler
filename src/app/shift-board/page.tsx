@@ -210,12 +210,12 @@ export default async function ShiftBoardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6 md:p-8">
+    <main className="min-h-screen bg-background p-6 md:p-8">
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-800">Shift Board</h1>
-            <p className="text-slate-500">
+            <h1 className="text-3xl font-bold text-foreground">Shift Board</h1>
+            <p className="text-muted-foreground">
               {role === 'manager'
                 ? 'Review and approve posted swap and pickup requests.'
                 : 'Post swap or pickup requests for your shifts.'}
@@ -233,7 +233,7 @@ export default async function ShiftBoardPage() {
           </CardHeader>
           <CardContent>
             {shiftOptions.length === 0 ? (
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-muted-foreground">
                 No eligible shifts found for your account yet. Ask a manager to assign shifts first.
               </p>
             ) : (
@@ -243,7 +243,7 @@ export default async function ShiftBoardPage() {
                   <select
                     id="shift_id"
                     name="shift_id"
-                    className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                    className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
                     defaultValue=""
                     required
                   >
@@ -266,7 +266,7 @@ export default async function ShiftBoardPage() {
                   <select
                     id="type"
                     name="type"
-                    className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                    className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
                     defaultValue="swap"
                   >
                     <option value="swap">Swap</option>
@@ -280,7 +280,7 @@ export default async function ShiftBoardPage() {
                     name="message"
                     rows={3}
                     required
-                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm"
                     placeholder="Example: Need coverage for family event."
                   />
                 </div>
@@ -318,7 +318,7 @@ export default async function ShiftBoardPage() {
               <TableBody>
                 {posts.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-6 text-center text-slate-500">
+                    <TableCell colSpan={8} className="py-6 text-center text-muted-foreground">
                       No shift posts yet.
                     </TableCell>
                   </TableRow>
@@ -340,12 +340,12 @@ export default async function ShiftBoardPage() {
                         {shift ? (
                           <>
                             <div className="capitalize">{shift.shift_type}</div>
-                            <div className="text-xs text-slate-500">
+                            <div className="text-xs text-muted-foreground">
                               {cycle ? cycle.label : 'No cycle'} - {shift.status}
                             </div>
                           </>
                         ) : (
-                          <span className="text-slate-400">Shift details unavailable</span>
+                          <span className="text-muted-foreground">Shift details unavailable</span>
                         )}
                       </TableCell>
                       <TableCell className="capitalize">{post.type}</TableCell>

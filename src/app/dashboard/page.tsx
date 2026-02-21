@@ -58,15 +58,15 @@ export default async function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-8">
+    <main className="min-h-screen bg-background p-8">
       <div className="mx-auto max-w-4xl space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-800">Welcome, {profile.full_name}</h1>
-            <p className="text-slate-500 capitalize">
+            <h1 className="text-3xl font-bold text-foreground">Welcome, {profile.full_name}</h1>
+            <p className="text-muted-foreground capitalize">
               {profile.role} - {profile.shift_type} shift
             </p>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-muted-foreground">
               {profile.role === 'manager'
                 ? 'Manager tools are available below.'
                 : 'Therapist tools are available below.'}
@@ -75,7 +75,7 @@ export default async function DashboardPage() {
           <form action="/auth/signout" method="post">
             <button
               type="submit"
-              className="text-sm text-slate-500 underline hover:text-slate-800"
+              className="text-sm text-muted-foreground underline hover:text-foreground"
             >
               Sign out
             </button>
@@ -85,38 +85,38 @@ export default async function DashboardPage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {profile.role === 'manager' ? (
             <>
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="font-semibold text-slate-700">Schedule Management</h2>
-                <p className="mt-1 text-sm text-slate-400">
+              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+                <h2 className="font-semibold text-foreground">Schedule Management</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
                   Create cycles, assign shifts, and publish schedules.
                 </p>
                 <Link
                   href="/schedule"
-                  className="mt-4 inline-block text-sm text-blue-600 hover:underline"
+                  className="mt-4 inline-block text-sm text-[var(--highlight)] hover:underline"
                 >
                   Open manager schedule tools
                 </Link>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="font-semibold text-slate-700">Availability Review</h2>
-                <p className="mt-1 text-sm text-slate-400">
+              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+                <h2 className="font-semibold text-foreground">Availability Review</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
                   View all therapist requests and blackout dates.
                 </p>
                 <Link
                   href="/availability"
-                  className="mt-4 inline-block text-sm text-blue-600 hover:underline"
+                  className="mt-4 inline-block text-sm text-[var(--highlight)] hover:underline"
                 >
                   Review availability requests
                 </Link>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="font-semibold text-slate-700">Shift Board</h2>
-                <p className="mt-1 text-sm text-slate-400">
+              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+                <h2 className="font-semibold text-foreground">Shift Board</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
                   Approve or deny swap and pickup requests.
                 </p>
                 <Link
                   href="/shift-board"
-                  className="mt-4 inline-block text-sm text-blue-600 hover:underline"
+                  className="mt-4 inline-block text-sm text-[var(--highlight)] hover:underline"
                 >
                   Review shift board
                 </Link>
@@ -124,32 +124,32 @@ export default async function DashboardPage() {
             </>
           ) : (
             <>
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="font-semibold text-slate-700">My Schedule</h2>
-                <p className="mt-1 text-sm text-slate-400">View your upcoming shifts.</p>
+              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+                <h2 className="font-semibold text-foreground">My Schedule</h2>
+                <p className="mt-1 text-sm text-muted-foreground">View your upcoming shifts.</p>
                 <Link
                   href="/schedule"
-                  className="mt-4 inline-block text-sm text-blue-600 hover:underline"
+                  className="mt-4 inline-block text-sm text-[var(--highlight)] hover:underline"
                 >
                   Open schedule grid
                 </Link>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="font-semibold text-slate-700">Availability</h2>
-                <p className="mt-1 text-sm text-slate-400">Submit days you cannot work.</p>
+              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+                <h2 className="font-semibold text-foreground">Availability</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Submit days you cannot work.</p>
                 <Link
                   href="/availability"
-                  className="mt-4 inline-block text-sm text-blue-600 hover:underline"
+                  className="mt-4 inline-block text-sm text-[var(--highlight)] hover:underline"
                 >
                   Open availability requests
                 </Link>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="font-semibold text-slate-700">Shift Board</h2>
-                <p className="mt-1 text-sm text-slate-400">Post swap or pickup requests.</p>
+              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+                <h2 className="font-semibold text-foreground">Shift Board</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Post swap or pickup requests.</p>
                 <Link
                   href="/shift-board"
-                  className="mt-4 inline-block text-sm text-blue-600 hover:underline"
+                  className="mt-4 inline-block text-sm text-[var(--highlight)] hover:underline"
                 >
                   Open shift board
                 </Link>

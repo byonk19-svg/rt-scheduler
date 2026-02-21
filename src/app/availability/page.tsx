@@ -158,12 +158,12 @@ export default async function AvailabilityPage() {
   const emptyColSpan = role === 'manager' ? 6 : 5
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6 md:p-8">
+    <main className="min-h-screen bg-background p-6 md:p-8">
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-800">Availability Requests</h1>
-            <p className="text-slate-500">
+            <h1 className="text-3xl font-bold text-foreground">Availability Requests</h1>
+            <p className="text-muted-foreground">
               {role === 'manager'
                 ? 'Review all submitted blackout dates.'
                 : 'Submit days you cannot work for upcoming schedules.'}
@@ -191,7 +191,7 @@ export default async function AvailabilityPage() {
                 <select
                   id="cycle_id"
                   name="cycle_id"
-                  className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                  className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
                   defaultValue=""
                 >
                   <option value="">No specific cycle</option>
@@ -203,7 +203,7 @@ export default async function AvailabilityPage() {
                   ))}
                 </select>
                 {!hasCycles && (
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-muted-foreground">
                     No schedule cycles found yet. You can still submit requests.
                   </p>
                 )}
@@ -215,7 +215,7 @@ export default async function AvailabilityPage() {
                   id="reason"
                   name="reason"
                   rows={3}
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm"
                   placeholder="Family event, appointment, vacation, etc."
                 />
               </div>
@@ -251,7 +251,7 @@ export default async function AvailabilityPage() {
               <TableBody>
                 {requests.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={emptyColSpan} className="py-6 text-center text-slate-500">
+                    <TableCell colSpan={emptyColSpan} className="py-6 text-center text-muted-foreground">
                       No availability requests yet.
                     </TableCell>
                   </TableRow>
@@ -279,7 +279,7 @@ export default async function AvailabilityPage() {
                             </Button>
                           </form>
                         ) : (
-                          <span className="text-xs text-slate-400">-</span>
+                          <span className="text-xs text-muted-foreground">-</span>
                         )}
                       </TableCell>
                     </TableRow>

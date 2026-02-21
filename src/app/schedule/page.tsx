@@ -323,12 +323,12 @@ export default async function SchedulePage({
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6 md:p-8">
+    <main className="min-h-screen bg-background p-6 md:p-8">
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-800">Schedule Grid</h1>
-            <p className="text-slate-500">
+            <h1 className="text-3xl font-bold text-foreground">Schedule Grid</h1>
+            <p className="text-muted-foreground">
               {role === 'manager'
                 ? 'Build and publish 6-week schedules for the department.'
                 : 'View your shifts in published schedule cycles.'}
@@ -346,7 +346,7 @@ export default async function SchedulePage({
           </CardHeader>
           <CardContent className="space-y-4">
             {cycles.length === 0 && (
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-muted-foreground">
                 {role === 'manager'
                   ? 'No schedule cycles yet. Create one below to start building the grid.'
                   : 'No published schedule cycles are available yet.'}
@@ -416,7 +416,7 @@ export default async function SchedulePage({
                       <Input id="end_date" name="end_date" type="date" required />
                     </div>
                   </div>
-                  <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground">
                     <input type="checkbox" name="published" />
                     Publish immediately
                   </label>
@@ -432,7 +432,7 @@ export default async function SchedulePage({
               </CardHeader>
               <CardContent>
                 {!activeCycle ? (
-                  <p className="text-sm text-slate-500">Create or select a cycle first.</p>
+                  <p className="text-sm text-muted-foreground">Create or select a cycle first.</p>
                 ) : (
                   <form action={addShiftAction} className="space-y-4">
                     <input type="hidden" name="cycle_id" value={activeCycle.id} />
@@ -442,7 +442,7 @@ export default async function SchedulePage({
                       <select
                         id="user_id"
                         name="user_id"
-                        className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                        className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
                         required
                         defaultValue=""
                       >
@@ -467,7 +467,7 @@ export default async function SchedulePage({
                         <select
                           id="shift_type"
                           name="shift_type"
-                          className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                          className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
                           defaultValue="day"
                         >
                           <option value="day">Day</option>
@@ -479,7 +479,7 @@ export default async function SchedulePage({
                         <select
                           id="status"
                           name="status"
-                          className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                          className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
                           defaultValue="scheduled"
                         >
                           <option value="scheduled">Scheduled</option>
@@ -508,7 +508,7 @@ export default async function SchedulePage({
           </CardHeader>
           <CardContent>
             {!activeCycle && (
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-muted-foreground">
                 {role === 'manager'
                   ? 'Create a cycle or select one above to start building the grid.'
                   : 'No published cycle selected.'}
@@ -543,7 +543,7 @@ export default async function SchedulePage({
                           <TableCell>{formatDate(date)}</TableCell>
                           <TableCell>
                             {row.day.length === 0 ? (
-                              <span className="text-slate-400">-</span>
+                              <span className="text-muted-foreground">-</span>
                             ) : (
                               <div className="space-y-1">
                                 {row.day.map((shift) => (
@@ -556,7 +556,7 @@ export default async function SchedulePage({
                           </TableCell>
                           <TableCell>
                             {row.night.length === 0 ? (
-                              <span className="text-slate-400">-</span>
+                              <span className="text-muted-foreground">-</span>
                             ) : (
                               <div className="space-y-1">
                                 {row.night.map((shift) => (
@@ -608,7 +608,7 @@ export default async function SchedulePage({
                 <TableBody>
                   {shifts.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="py-6 text-center text-slate-500">
+                      <TableCell colSpan={5} className="py-6 text-center text-muted-foreground">
                         No shifts in this cycle yet.
                       </TableCell>
                     </TableRow>
