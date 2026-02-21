@@ -47,6 +47,13 @@ type DragActionBody =
       cycleId: string
       shiftId: string
     }
+  | {
+      action: 'remove'
+      cycleId: string
+      userId: string
+      date: string
+      shiftType: 'day' | 'night'
+    }
 
 const MIN_SHIFT_COVERAGE_PER_DAY = 3
 const MAX_SHIFT_COVERAGE_PER_DAY = 5

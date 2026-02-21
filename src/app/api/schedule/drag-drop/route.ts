@@ -28,6 +28,13 @@ type DragAction =
       cycleId: string
       shiftId: string
     }
+  | {
+      action: 'remove'
+      cycleId: string
+      userId: string
+      date: string
+      shiftType: 'day' | 'night'
+    }
 
 function getWeekBoundsForDate(value: string): { weekStart: string; weekEnd: string } | null {
   const parsed = new Date(`${value}T00:00:00`)
@@ -201,19 +208,15 @@ export async function POST(request: Request) {
       }
     }
 
-    const { data: insertedShift, error } = await supabase
-      .from('shifts')
-      .insert({
-        cycle_id: payload.cycleId,
-        user_id: payload.userId,
-        date: payload.date,
-        shift_type: payload.shiftType,
-        status: 'scheduled',
-      })
-      .select('id')
-      .single()
+    const { error } = await supabase.from('shifts').insert({
+      cycle_id: payload.cycleId,
+      user_id: payload.userId,
+      date: payload.date,
+      shift_type: payload.shiftType,
+      status: 'scheduled',
+    })
 
-    if (error || !insertedShift) {
+    if (error) {
       if (error?.code === '23505') {
         return NextResponse.json({ error: 'That therapist already has a shift on this date.' }, { status: 409 })
       }
@@ -223,7 +226,9 @@ export async function POST(request: Request) {
     const undoAction: DragAction = {
       action: 'remove',
       cycleId: payload.cycleId,
-      shiftId: insertedShift.id as string,
+      userId: payload.userId,
+      date: payload.date,
+      shiftType: payload.shiftType,
     }
 
     return NextResponse.json({ message: 'Shift assigned.', undoAction })
@@ -306,15 +311,33 @@ export async function POST(request: Request) {
   }
 
   if (payload.action === 'remove') {
-    if (!payload.shiftId) {
+    let shift:
+      | { id: string; cycle_id: string; user_id: string; date: string; shift_type: 'day' | 'night' }
+      | null = null
+    let shiftError: { message: string } | null = null
+
+    if (payload.shiftId) {
+      const result = await supabase
+        .from('shifts')
+        .select('id, cycle_id, user_id, date, shift_type')
+        .eq('id', payload.shiftId)
+        .maybeSingle()
+      shift = (result.data as typeof shift) ?? null
+      shiftError = result.error ? { message: result.error.message } : null
+    } else if (payload.userId && payload.date && payload.shiftType) {
+      const result = await supabase
+        .from('shifts')
+        .select('id, cycle_id, user_id, date, shift_type')
+        .eq('cycle_id', payload.cycleId)
+        .eq('user_id', payload.userId)
+        .eq('date', payload.date)
+        .eq('shift_type', payload.shiftType)
+        .maybeSingle()
+      shift = (result.data as typeof shift) ?? null
+      shiftError = result.error ? { message: result.error.message } : null
+    } else {
       return NextResponse.json({ error: 'Missing remove data' }, { status: 400 })
     }
-
-    const { data: shift, error: shiftError } = await supabase
-      .from('shifts')
-      .select('id, cycle_id, user_id, date, shift_type')
-      .eq('id', payload.shiftId)
-      .maybeSingle()
 
     if (shiftError || !shift || shift.cycle_id !== payload.cycleId) {
       return NextResponse.json({ error: 'Shift not found in this cycle' }, { status: 404 })
