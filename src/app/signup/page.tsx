@@ -23,7 +23,7 @@ export default function SignupPage() {
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -35,10 +35,24 @@ export default function SignupPage() {
       },
     })
 
-    if (error) {
-      setError(error.message)
+    if (signUpError) {
+      setError(signUpError.message)
       setLoading(false)
       return
+    }
+
+    if (data.user) {
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: data.user.id,
+        full_name: fullName,
+        email,
+        role: 'therapist',
+        shift_type: shiftType,
+      })
+
+      if (profileError) {
+        console.error('Profile insert error:', profileError.message)
+      }
     }
 
     router.push('/dashboard')

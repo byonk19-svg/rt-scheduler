@@ -10,11 +10,18 @@ export default async function DashboardPage() {
     redirect('/login')
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
     .single()
+
+  if (profileError) {
+    console.error('Profile fetch error:', profileError.message, profileError.code)
+  }
+
+  const displayName = profile?.full_name ?? user.email ?? 'there'
+  const isManager = profile?.role === 'manager'
 
   return (
     <main className="min-h-screen bg-slate-50 p-8">
@@ -22,11 +29,17 @@ export default async function DashboardPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-slate-800">
-              Welcome, {profile?.full_name} 👋
+              Welcome, {displayName}
             </h1>
-            <p className="text-slate-500 capitalize">
-              {profile?.role} · {profile?.shift_type} shift
-            </p>
+            {profile ? (
+              <p className="text-slate-500 capitalize">
+                {profile.role} · {profile.shift_type} shift
+              </p>
+            ) : (
+              <p className="text-sm text-amber-600 mt-1">
+                Profile not found — your account may still be setting up.
+              </p>
+            )}
           </div>
           <form action="/auth/signout" method="post">
             <button
@@ -45,12 +58,18 @@ export default async function DashboardPage() {
           </div>
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
             <h2 className="font-semibold text-slate-700">Availability</h2>
-            <p className="text-sm text-slate-400 mt-1">Submit days you can't work</p>
+            <p className="text-sm text-slate-400 mt-1">Submit days you can&apos;t work</p>
           </div>
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
             <h2 className="font-semibold text-slate-700">Shift Board</h2>
             <p className="text-sm text-slate-400 mt-1">Swap or pick up shifts</p>
           </div>
+          {isManager && (
+            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm md:col-span-3">
+              <h2 className="font-semibold text-slate-700">Manage Schedules</h2>
+              <p className="text-sm text-slate-400 mt-1">Build and publish 6-week schedule cycles</p>
+            </div>
+          )}
         </div>
       </div>
     </main>
