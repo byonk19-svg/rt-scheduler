@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 type Profile = {
@@ -84,6 +85,9 @@ export default async function DashboardPage() {
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="font-semibold text-slate-700">Availability</h2>
             <p className="mt-1 text-sm text-slate-400">Submit days you cannot work</p>
+            <Link href="/availability" className="mt-4 inline-block text-sm text-blue-600 hover:underline">
+              Open availability requests
+            </Link>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="font-semibold text-slate-700">Shift Board</h2>
