@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { createClient } from '@/lib/supabase/server'
 
 type Role = 'manager' | 'therapist'
+type ViewMode = 'grid' | 'list'
 
 type Cycle = {
   id: string
@@ -72,6 +73,18 @@ function buildDateRange(startDate: string, endDate: string): string[] {
   return dates
 }
 
+function normalizeViewMode(value: string | undefined): ViewMode {
+  return value === 'list' ? 'list' : 'grid'
+}
+
+function buildScheduleUrl(cycleId?: string, view?: string): string {
+  const params = new URLSearchParams()
+  if (cycleId) params.set('cycle', cycleId)
+  const normalizedView = normalizeViewMode(view)
+  params.set('view', normalizedView)
+  return `/schedule?${params.toString()}`
+}
+
 async function getRoleForUser(userId: string): Promise<Role> {
   const supabase = await createClient()
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
@@ -99,6 +112,7 @@ async function createCycleAction(formData: FormData) {
   const startDate = String(formData.get('start_date') ?? '').trim()
   const endDate = String(formData.get('end_date') ?? '').trim()
   const published = String(formData.get('published') ?? '') === 'on'
+  const view = String(formData.get('view') ?? '').trim()
 
   if (!label || !startDate || !endDate) {
     redirect('/schedule')
@@ -121,7 +135,7 @@ async function createCycleAction(formData: FormData) {
   }
 
   revalidatePath('/schedule')
-  redirect(`/schedule?cycle=${data.id}`)
+  redirect(buildScheduleUrl(data.id, view))
 }
 
 async function toggleCyclePublishedAction(formData: FormData) {
@@ -143,6 +157,7 @@ async function toggleCyclePublishedAction(formData: FormData) {
 
   const cycleId = String(formData.get('cycle_id') ?? '').trim()
   const currentlyPublished = String(formData.get('currently_published') ?? '').trim() === 'true'
+  const view = String(formData.get('view') ?? '').trim()
 
   if (!cycleId) {
     redirect('/schedule')
@@ -158,7 +173,7 @@ async function toggleCyclePublishedAction(formData: FormData) {
   }
 
   revalidatePath('/schedule')
-  redirect(`/schedule?cycle=${cycleId}`)
+  redirect(buildScheduleUrl(cycleId, view))
 }
 
 async function addShiftAction(formData: FormData) {
@@ -183,6 +198,7 @@ async function addShiftAction(formData: FormData) {
   const date = String(formData.get('date') ?? '').trim()
   const shiftType = String(formData.get('shift_type') ?? '').trim()
   const status = String(formData.get('status') ?? '').trim()
+  const view = String(formData.get('view') ?? '').trim()
 
   if (!cycleId || !userId || !date || !shiftType || !status) {
     redirect('/schedule')
@@ -201,7 +217,7 @@ async function addShiftAction(formData: FormData) {
   }
 
   revalidatePath('/schedule')
-  redirect(`/schedule?cycle=${cycleId}`)
+  redirect(buildScheduleUrl(cycleId, view))
 }
 
 async function deleteShiftAction(formData: FormData) {
@@ -223,6 +239,7 @@ async function deleteShiftAction(formData: FormData) {
 
   const shiftId = String(formData.get('shift_id') ?? '').trim()
   const cycleId = String(formData.get('cycle_id') ?? '').trim()
+  const view = String(formData.get('view') ?? '').trim()
 
   if (!shiftId || !cycleId) {
     redirect('/schedule')
@@ -234,13 +251,13 @@ async function deleteShiftAction(formData: FormData) {
   }
 
   revalidatePath('/schedule')
-  redirect(`/schedule?cycle=${cycleId}`)
+  redirect(buildScheduleUrl(cycleId, view))
 }
 
 export default async function SchedulePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ cycle?: string }>
+  searchParams?: Promise<{ cycle?: string; view?: string }>
 }) {
   const supabase = await createClient()
   const {
@@ -253,6 +270,7 @@ export default async function SchedulePage({
 
   const params = searchParams ? await searchParams : undefined
   const selectedCycleId = params?.cycle
+  const viewMode: ViewMode = normalizeViewMode(params?.view)
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -277,6 +295,7 @@ export default async function SchedulePage({
     cycles.find((cycle) => cycle.id === selectedCycleId) ??
     cycles[0] ??
     null
+  const activeCycleId = activeCycle?.id
 
   let shifts: ShiftRow[] = []
 
@@ -327,11 +346,13 @@ export default async function SchedulePage({
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Schedule Grid</h1>
+            <h1 className="text-3xl font-bold text-foreground">
+              {viewMode === 'grid' ? 'Schedule Grid' : 'Schedule List'}
+            </h1>
             <p className="text-muted-foreground">
               {role === 'manager'
-                ? 'Build and publish 6-week schedules for the department.'
-                : 'View your shifts in published schedule cycles.'}
+                ? 'Build and publish 6-week schedules, then switch between grid and list formats.'
+                : 'View your shifts in published schedule cycles using grid or list format.'}
             </p>
           </div>
           <Button asChild variant="outline">
@@ -345,6 +366,23 @@ export default async function SchedulePage({
             <CardDescription>Pick a cycle to view the schedule.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                asChild
+                size="sm"
+                variant={viewMode === 'grid' ? 'default' : 'outline'}
+              >
+                <Link href={buildScheduleUrl(activeCycleId, 'grid')}>Grid View</Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant={viewMode === 'list' ? 'default' : 'outline'}
+              >
+                <Link href={buildScheduleUrl(activeCycleId, 'list')}>List View</Link>
+              </Button>
+            </div>
+
             {cycles.length === 0 && (
               <p className="text-sm text-muted-foreground">
                 {role === 'manager'
@@ -362,7 +400,7 @@ export default async function SchedulePage({
                     variant={activeCycle?.id === cycle.id ? 'default' : 'outline'}
                     size="sm"
                   >
-                    <Link href={`/schedule?cycle=${cycle.id}`}>
+                    <Link href={buildScheduleUrl(cycle.id, viewMode)}>
                       {cycle.label} ({cycle.start_date} to {cycle.end_date})
                     </Link>
                   </Button>
@@ -378,6 +416,7 @@ export default async function SchedulePage({
                 {role === 'manager' && (
                   <form action={toggleCyclePublishedAction}>
                     <input type="hidden" name="cycle_id" value={activeCycle.id} />
+                    <input type="hidden" name="view" value={viewMode} />
                     <input
                       type="hidden"
                       name="currently_published"
@@ -402,6 +441,7 @@ export default async function SchedulePage({
               </CardHeader>
               <CardContent>
                 <form action={createCycleAction} className="space-y-4">
+                  <input type="hidden" name="view" value={viewMode} />
                   <div className="space-y-2">
                     <Label htmlFor="label">Label</Label>
                     <Input id="label" name="label" placeholder="Mar 1 - Apr 12" required />
@@ -436,6 +476,7 @@ export default async function SchedulePage({
                 ) : (
                   <form action={addShiftAction} className="space-y-4">
                     <input type="hidden" name="cycle_id" value={activeCycle.id} />
+                    <input type="hidden" name="view" value={viewMode} />
 
                     <div className="space-y-2">
                       <Label htmlFor="user_id">Therapist</Label>
@@ -499,7 +540,15 @@ export default async function SchedulePage({
 
         <Card>
           <CardHeader>
-            <CardTitle>{role === 'manager' ? 'Cycle Grid' : 'My Shift Calendar'}</CardTitle>
+            <CardTitle>
+              {viewMode === 'grid'
+                ? role === 'manager'
+                  ? 'Cycle Grid'
+                  : 'My Shift Calendar'
+                : role === 'manager'
+                  ? 'Shift List'
+                  : 'My Shift List'}
+            </CardTitle>
             <CardDescription>
               {activeCycle
                 ? `${activeCycle.label} (${activeCycle.start_date} to ${activeCycle.end_date})`
@@ -515,7 +564,7 @@ export default async function SchedulePage({
               </p>
             )}
 
-            {activeCycle && (
+            {activeCycle && viewMode === 'grid' && (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -585,10 +634,79 @@ export default async function SchedulePage({
                 </TableBody>
               </Table>
             )}
+
+            {activeCycle && viewMode === 'list' && role === 'manager' && (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Therapist</TableHead>
+                    <TableHead>Shift Type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {shifts.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="py-6 text-center text-muted-foreground">
+                        No shifts in this cycle yet.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {shifts.map((shift) => (
+                    <TableRow key={shift.id}>
+                      <TableCell>{formatDate(shift.date)}</TableCell>
+                      <TableCell>{getOne(shift.profiles)?.full_name ?? 'Unknown'}</TableCell>
+                      <TableCell className="capitalize">{shift.shift_type}</TableCell>
+                      <TableCell>{shift.status}</TableCell>
+                      <TableCell>
+                        <form action={deleteShiftAction}>
+                          <input type="hidden" name="shift_id" value={shift.id} />
+                          <input type="hidden" name="cycle_id" value={activeCycle.id} />
+                          <input type="hidden" name="view" value={viewMode} />
+                          <Button type="submit" variant="outline" size="sm">
+                            Delete
+                          </Button>
+                        </form>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+
+            {activeCycle && viewMode === 'list' && role !== 'manager' && (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Shift Type</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {shifts.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={3} className="py-6 text-center text-muted-foreground">
+                        No assigned shifts in this cycle yet.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {shifts.map((shift) => (
+                    <TableRow key={shift.id}>
+                      <TableCell>{formatDate(shift.date)}</TableCell>
+                      <TableCell className="capitalize">{shift.shift_type}</TableCell>
+                      <TableCell>{shift.status}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
 
-        {role === 'manager' && activeCycle && (
+        {role === 'manager' && activeCycle && viewMode === 'grid' && (
           <Card>
             <CardHeader>
               <CardTitle>Shift Entries</CardTitle>
@@ -623,6 +741,7 @@ export default async function SchedulePage({
                         <form action={deleteShiftAction}>
                           <input type="hidden" name="shift_id" value={shift.id} />
                           <input type="hidden" name="cycle_id" value={activeCycle.id} />
+                          <input type="hidden" name="view" value={viewMode} />
                           <Button type="submit" variant="outline" size="sm">
                             Delete
                           </Button>
