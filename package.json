@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed:demo": "node scripts/seed-demo.mjs",
-    "seed:users": "node scripts/seed-users.mjs",
+    "seed:demo": "node --env-file=.env.local scripts/seed-demo.mjs",
+    "seed:users": "node --env-file=.env.local scripts/seed-users.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {
