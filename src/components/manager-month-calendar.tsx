@@ -225,9 +225,17 @@ export function ManagerMonthCalendar({
     })
   }
 
+  function allowDrop(event: DragEvent<HTMLElement>) {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+  }
+
   function onDropDate(event: DragEvent<HTMLDivElement>, date: string, targetShiftType: 'day' | 'night') {
     event.preventDefault()
-    if (!isInCycle(date)) return
+    if (!isInCycle(date)) {
+      setError('That date is outside the selected schedule cycle.')
+      return
+    }
 
     const payload = readDragPayload(event)
     if (!payload) return
@@ -314,9 +322,8 @@ export function ManagerMonthCalendar({
             return (
               <div
                 key={`${shiftType}-${date}`}
-                onDragOver={(event) => {
-                  if (inCycle) event.preventDefault()
-                }}
+                onDragEnter={allowDrop}
+                onDragOver={allowDrop}
                 onDrop={(event) => onDropDate(event, date, shiftType)}
                 className={cn(
                   'min-h-40 rounded-xl border p-2',
