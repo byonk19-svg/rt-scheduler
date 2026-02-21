@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
+import { FeedbackToast } from '@/components/feedback-toast'
+import { TeamwiseLogo } from '@/components/teamwise-logo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -10,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { createClient } from '@/lib/supabase/server'
 
 type Role = 'manager' | 'therapist'
+type ToastVariant = 'success' | 'error'
 
 type Cycle = {
   id: string
@@ -30,6 +33,47 @@ type AvailabilityRow = {
     | { label: string; start_date: string; end_date: string }
     | { label: string; start_date: string; end_date: string }[]
     | null
+}
+
+type AvailabilityPageSearchParams = {
+  error?: string | string[]
+  success?: string | string[]
+}
+
+function getSearchParam(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) return value[0]
+  return value
+}
+
+function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
+  message: string
+  variant: ToastVariant
+} | null {
+  const error = getSearchParam(params?.error)
+  const success = getSearchParam(params?.success)
+
+  if (error === 'duplicate_request') {
+    return {
+      message: 'You already submitted that availability request.',
+      variant: 'error',
+    }
+  }
+
+  if (error === 'submit_failed') {
+    return {
+      message: 'Could not submit availability request. Please try again.',
+      variant: 'error',
+    }
+  }
+
+  if (success === 'request_submitted') {
+    return {
+      message: 'Availability request submitted.',
+      variant: 'success',
+    }
+  }
+
+  return null
 }
 
 function getOne<T>(value: T | T[] | null | undefined): T | null {
@@ -66,7 +110,7 @@ async function submitAvailabilityRequest(formData: FormData) {
   const reason = String(formData.get('reason') ?? '').trim()
 
   if (!date) {
-    redirect('/availability')
+    redirect('/availability?error=submit_failed')
   }
 
   const { error } = await supabase.from('availability_requests').insert({
@@ -78,10 +122,14 @@ async function submitAvailabilityRequest(formData: FormData) {
 
   if (error) {
     console.error('Failed to create availability request:', error)
+    if (error.code === '23505') {
+      redirect('/availability?error=duplicate_request')
+    }
+    redirect('/availability?error=submit_failed')
   }
 
   revalidatePath('/availability')
-  redirect('/availability')
+  redirect('/availability?success=request_submitted')
 }
 
 async function deleteAvailabilityRequest(formData: FormData) {
@@ -115,7 +163,11 @@ async function deleteAvailabilityRequest(formData: FormData) {
   redirect('/availability')
 }
 
-export default async function AvailabilityPage() {
+export default async function AvailabilityPage({
+  searchParams,
+}: {
+  searchParams?: Promise<AvailabilityPageSearchParams>
+}) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -124,6 +176,9 @@ export default async function AvailabilityPage() {
   if (!user) {
     redirect('/login')
   }
+
+  const params = searchParams ? await searchParams : undefined
+  const feedback = getAvailabilityFeedback(params)
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -160,8 +215,11 @@ export default async function AvailabilityPage() {
   return (
     <main className="min-h-screen bg-background p-6 md:p-8">
       <div className="mx-auto max-w-5xl space-y-6">
+        {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
+
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
+            <TeamwiseLogo size="small" className="mb-2" />
             <h1 className="text-3xl font-bold text-foreground">Availability Requests</h1>
             <p className="text-muted-foreground">
               {role === 'manager'

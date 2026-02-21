@@ -5,6 +5,9 @@ import { redirect } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { FeedbackToast } from '@/components/feedback-toast'
+import { ManagerMonthCalendar } from '@/components/manager-month-calendar'
+import { TeamwiseLogo } from '@/components/teamwise-logo'
 import { PrintButton } from '@/components/print-button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,7 +15,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { createClient } from '@/lib/supabase/server'
 
 type Role = 'manager' | 'therapist'
-type ViewMode = 'grid' | 'list'
+type ViewMode = 'grid' | 'list' | 'calendar'
+type ToastVariant = 'success' | 'error'
+
+const MAX_WORK_DAYS_PER_WEEK = 3
+const MIN_SHIFT_COVERAGE_PER_DAY = 3
+const MAX_SHIFT_COVERAGE_PER_DAY = 5
 
 type Cycle = {
   id: string
@@ -35,6 +43,49 @@ type ShiftRow = {
   status: 'scheduled' | 'on_call' | 'sick' | 'called_off'
   user_id: string
   profiles: { full_name: string } | { full_name: string }[] | null
+}
+
+type ScheduleSearchParams = {
+  cycle?: string
+  view?: string
+  auto?: string
+  added?: string
+  unfilled?: string
+  error?: string
+  week_start?: string
+  week_end?: string
+  violations?: string
+  under?: string
+  over?: string
+  under_coverage?: string
+  over_coverage?: string
+}
+
+type AutoScheduleShiftRow = {
+  user_id: string
+  date: string
+  shift_type: 'day' | 'night'
+  status: ShiftRow['status']
+}
+
+type ShiftLimitRow = {
+  user_id: string
+  date: string
+  status: ShiftRow['status']
+}
+
+type AvailabilityDateRow = {
+  user_id: string
+  date: string
+}
+
+type CalendarShift = {
+  id: string
+  date: string
+  shift_type: 'day' | 'night'
+  status: ShiftRow['status']
+  user_id: string
+  full_name: string
 }
 
 function getOne<T>(value: T | T[] | null | undefined): T | null {
@@ -67,6 +118,34 @@ function formatWeekdayShort(value: string): string {
   return parsed.toLocaleDateString('en-US', { weekday: 'short' }).charAt(0)
 }
 
+function getWeekBoundsForDate(value: string): { weekStart: string; weekEnd: string } | null {
+  const parsed = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return null
+
+  const weekStartDate = new Date(parsed)
+  weekStartDate.setDate(parsed.getDate() - parsed.getDay())
+
+  const weekEndDate = new Date(weekStartDate)
+  weekEndDate.setDate(weekStartDate.getDate() + 6)
+
+  return {
+    weekStart: dateKeyFromDate(weekStartDate),
+    weekEnd: dateKeyFromDate(weekEndDate),
+  }
+}
+
+function weeklyCountKey(userId: string, weekStart: string): string {
+  return `${userId}:${weekStart}`
+}
+
+function countsTowardWeeklyLimit(status: string): boolean {
+  return status === 'scheduled' || status === 'on_call'
+}
+
+function coverageSlotKey(date: string, shiftType: 'day' | 'night'): string {
+  return `${date}:${shiftType}`
+}
+
 function getPrintShiftCode(status: ShiftRow['status']): string {
   if (status === 'on_call') return 'OC'
   if (status === 'sick') return 'S'
@@ -94,15 +173,164 @@ function buildDateRange(startDate: string, endDate: string): string[] {
 }
 
 function normalizeViewMode(value: string | undefined): ViewMode {
-  return value === 'list' ? 'list' : 'grid'
+  if (value === 'list') return 'list'
+  if (value === 'calendar') return 'calendar'
+  return 'grid'
 }
 
-function buildScheduleUrl(cycleId?: string, view?: string): string {
+function buildScheduleUrl(
+  cycleId?: string,
+  view?: string,
+  extraParams?: Record<string, string | undefined>
+): string {
   const params = new URLSearchParams()
   if (cycleId) params.set('cycle', cycleId)
   const normalizedView = normalizeViewMode(view)
   params.set('view', normalizedView)
+  if (extraParams) {
+    for (const [key, value] of Object.entries(extraParams)) {
+      if (value) params.set(key, value)
+    }
+  }
   return `/schedule?${params.toString()}`
+}
+
+function getSearchParam(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) return value[0]
+  return value
+}
+
+function parseCount(value: string | undefined): number {
+  const parsed = Number.parseInt(value ?? '', 10)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
+}
+
+function getScheduleFeedback(params?: ScheduleSearchParams): {
+  message: string
+  variant: ToastVariant
+} | null {
+  const error = getSearchParam(params?.error)
+  const auto = getSearchParam(params?.auto)
+
+  if (error === 'auto_generate_failed') {
+    return { message: 'Could not auto-generate draft schedule. Please try again.', variant: 'error' }
+  }
+  if (error === 'auto_missing_cycle') {
+    return { message: 'Select a schedule cycle first.', variant: 'error' }
+  }
+  if (error === 'auto_cycle_published') {
+    return { message: 'Move this cycle to draft before auto-generating.', variant: 'error' }
+  }
+  if (error === 'auto_no_therapists') {
+    return { message: 'No therapists found to schedule.', variant: 'error' }
+  }
+  if (error === 'weekly_limit_exceeded') {
+    const weekStart = getSearchParam(params?.week_start)
+    const weekEnd = getSearchParam(params?.week_end)
+    const weekLabel =
+      weekStart && weekEnd ? ` (${formatDate(weekStart)} to ${formatDate(weekEnd)})` : ''
+    return {
+      message: `Therapists can only work ${MAX_WORK_DAYS_PER_WEEK} days per week (Sun-Sat)${weekLabel}.`,
+      variant: 'error',
+    }
+  }
+  if (error === 'duplicate_shift') {
+    return { message: 'That therapist is already assigned on that date in this cycle.', variant: 'error' }
+  }
+  if (error === 'add_shift_failed') {
+    return { message: 'Could not add shift. Please try again.', variant: 'error' }
+  }
+  if (error === 'coverage_max_exceeded') {
+    return {
+      message: `Each shift can have at most ${MAX_SHIFT_COVERAGE_PER_DAY} scheduled team members per day.`,
+      variant: 'error',
+    }
+  }
+  if (error === 'publish_weekly_rule_violation') {
+    const violations = parseCount(getSearchParam(params?.violations))
+    const under = parseCount(getSearchParam(params?.under))
+    const over = parseCount(getSearchParam(params?.over))
+    return {
+      message: `Weekly 3-day rule failed (${violations} therapist-weeks: ${under} under, ${over} over). Use Publish with Override if needed.`,
+      variant: 'error',
+    }
+  }
+  if (error === 'publish_validation_failed') {
+    return { message: 'Could not validate weekly rules before publishing.', variant: 'error' }
+  }
+  if (error === 'publish_coverage_rule_violation') {
+    const underCoverage = parseCount(getSearchParam(params?.under_coverage))
+    const overCoverage = parseCount(getSearchParam(params?.over_coverage))
+    const violations = underCoverage + overCoverage
+    return {
+      message: `Daily coverage rule failed (${violations} day/shift slots: ${underCoverage} under, ${overCoverage} over). Target is ${MIN_SHIFT_COVERAGE_PER_DAY}-${MAX_SHIFT_COVERAGE_PER_DAY}.`,
+      variant: 'error',
+    }
+  }
+
+  if (auto === 'generated') {
+    const added = parseCount(getSearchParam(params?.added))
+    const unfilled = parseCount(getSearchParam(params?.unfilled))
+
+    if (added === 0 && unfilled === 0) {
+      return { message: 'Draft schedule was already filled. No changes made.', variant: 'success' }
+    }
+    if (unfilled > 0) {
+      return {
+        message: `Draft generated with ${added} new shifts. ${unfilled} slots still need manual fill.`,
+        variant: 'error',
+      }
+    }
+    return { message: `Draft generated with ${added} new shifts.`, variant: 'success' }
+  }
+
+  return null
+}
+
+function pickTherapistForDate(
+  therapists: Therapist[],
+  cursor: number,
+  date: string,
+  unavailableDatesByUser: Map<string, Set<string>>,
+  assignedUserIdsForDate: Set<string>,
+  weeklyWorkedDatesByUserWeek: Map<string, Set<string>>
+): { therapist: Therapist | null; nextCursor: number } {
+  if (therapists.length === 0) {
+    return { therapist: null, nextCursor: cursor }
+  }
+
+  const bounds = getWeekBoundsForDate(date)
+  if (!bounds) {
+    return { therapist: null, nextCursor: cursor }
+  }
+
+  let best: { therapist: Therapist; index: number; weeklyCount: number; offset: number } | null = null
+
+  for (let i = 0; i < therapists.length; i += 1) {
+    const index = (cursor + i) % therapists.length
+    const therapist = therapists[index]
+    if (assignedUserIdsForDate.has(therapist.id)) continue
+    const unavailableDates = unavailableDatesByUser.get(therapist.id)
+    if (unavailableDates?.has(date)) continue
+    const weeklyDates =
+      weeklyWorkedDatesByUserWeek.get(weeklyCountKey(therapist.id, bounds.weekStart)) ?? new Set<string>()
+    if (!weeklyDates.has(date) && weeklyDates.size >= MAX_WORK_DAYS_PER_WEEK) continue
+
+    const weeklyCount = weeklyDates.size
+    if (
+      !best ||
+      weeklyCount < best.weeklyCount ||
+      (weeklyCount === best.weeklyCount && i < best.offset)
+    ) {
+      best = { therapist, index, weeklyCount, offset: i }
+    }
+  }
+
+  if (!best) {
+    return { therapist: null, nextCursor: cursor }
+  }
+
+  return { therapist: best.therapist, nextCursor: (best.index + 1) % therapists.length }
 }
 
 async function getRoleForUser(userId: string): Promise<Role> {
@@ -178,9 +406,141 @@ async function toggleCyclePublishedAction(formData: FormData) {
   const cycleId = String(formData.get('cycle_id') ?? '').trim()
   const currentlyPublished = String(formData.get('currently_published') ?? '').trim() === 'true'
   const view = String(formData.get('view') ?? '').trim()
+  const overrideWeeklyRules = String(formData.get('override_weekly_rules') ?? '').trim() === 'true'
 
   if (!cycleId) {
     redirect('/schedule')
+  }
+
+  if (!currentlyPublished && !overrideWeeklyRules) {
+    const { data: cycle, error: cycleError } = await supabase
+      .from('schedule_cycles')
+      .select('start_date, end_date')
+      .eq('id', cycleId)
+      .maybeSingle()
+
+    if (cycleError || !cycle) {
+      console.error('Failed to load cycle for publish validation:', cycleError)
+      redirect(buildScheduleUrl(cycleId, view, { error: 'publish_validation_failed' }))
+    }
+
+    const cycleDates = buildDateRange(cycle.start_date, cycle.end_date)
+    const cycleWeekDates = new Map<string, Set<string>>()
+    const cycleWeekEnds = new Map<string, string>()
+    for (const date of cycleDates) {
+      const bounds = getWeekBoundsForDate(date)
+      if (!bounds) continue
+      const dates = cycleWeekDates.get(bounds.weekStart) ?? new Set<string>()
+      dates.add(date)
+      cycleWeekDates.set(bounds.weekStart, dates)
+      cycleWeekEnds.set(bounds.weekStart, bounds.weekEnd)
+    }
+
+    const { data: therapistsData, error: therapistsError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('role', 'therapist')
+
+    if (therapistsError) {
+      console.error('Failed to load therapists for publish validation:', therapistsError)
+      redirect(buildScheduleUrl(cycleId, view, { error: 'publish_validation_failed' }))
+    }
+
+    const therapistIds = (therapistsData ?? []).map((row) => row.id)
+    if (therapistIds.length > 0 && cycleWeekDates.size > 0) {
+      const weekStarts = Array.from(cycleWeekDates.keys()).sort()
+      const minWeekStart = weekStarts[0]
+      const maxWeekEnd = cycleWeekEnds.get(weekStarts[weekStarts.length - 1]) ?? minWeekStart
+
+      const { data: shiftsData, error: shiftsError } = await supabase
+        .from('shifts')
+        .select('user_id, date, status')
+        .in('user_id', therapistIds)
+        .gte('date', minWeekStart)
+        .lte('date', maxWeekEnd)
+
+      if (shiftsError) {
+        console.error('Failed to load shifts for publish validation:', shiftsError)
+        redirect(buildScheduleUrl(cycleId, view, { error: 'publish_validation_failed' }))
+      }
+
+      const weeklyWorkedDatesByUserWeek = new Map<string, Set<string>>()
+      for (const row of (shiftsData ?? []) as ShiftLimitRow[]) {
+        if (!countsTowardWeeklyLimit(row.status)) continue
+        const bounds = getWeekBoundsForDate(row.date)
+        if (!bounds) continue
+        const key = weeklyCountKey(row.user_id, bounds.weekStart)
+        const workedDates = weeklyWorkedDatesByUserWeek.get(key) ?? new Set<string>()
+        workedDates.add(row.date)
+        weeklyWorkedDatesByUserWeek.set(key, workedDates)
+      }
+
+      let underCount = 0
+      let overCount = 0
+      for (const therapistId of therapistIds) {
+        for (const [weekStart, weekDatesInCycle] of cycleWeekDates) {
+          const requiredDays = Math.min(MAX_WORK_DAYS_PER_WEEK, weekDatesInCycle.size)
+          const workedDates =
+            weeklyWorkedDatesByUserWeek.get(weeklyCountKey(therapistId, weekStart)) ?? new Set<string>()
+          const workedCount = workedDates.size
+
+          if (workedCount < requiredDays) underCount += 1
+          if (workedCount > requiredDays) overCount += 1
+        }
+      }
+
+      const violations = underCount + overCount
+      if (violations > 0) {
+        redirect(
+          buildScheduleUrl(cycleId, view, {
+            error: 'publish_weekly_rule_violation',
+            violations: String(violations),
+            under: String(underCount),
+            over: String(overCount),
+          })
+        )
+      }
+    }
+
+    const { data: shiftCoverageData, error: shiftCoverageError } = await supabase
+      .from('shifts')
+      .select('date, shift_type, status')
+      .eq('cycle_id', cycleId)
+      .gte('date', cycle.start_date)
+      .lte('date', cycle.end_date)
+
+    if (shiftCoverageError) {
+      console.error('Failed to load shifts for coverage validation:', shiftCoverageError)
+      redirect(buildScheduleUrl(cycleId, view, { error: 'publish_validation_failed' }))
+    }
+
+    const coverageBySlot = new Map<string, number>()
+    for (const row of shiftCoverageData ?? []) {
+      if (!countsTowardWeeklyLimit(row.status)) continue
+      const key = coverageSlotKey(row.date, row.shift_type as 'day' | 'night')
+      const count = coverageBySlot.get(key) ?? 0
+      coverageBySlot.set(key, count + 1)
+    }
+
+    let underCoverage = 0
+    let overCoverage = 0
+    for (const date of cycleDates) {
+      for (const shiftType of ['day', 'night'] as const) {
+        const count = coverageBySlot.get(coverageSlotKey(date, shiftType)) ?? 0
+        if (count < MIN_SHIFT_COVERAGE_PER_DAY) underCoverage += 1
+        if (count > MAX_SHIFT_COVERAGE_PER_DAY) overCoverage += 1
+      }
+    }
+
+    if (underCoverage > 0 || overCoverage > 0) {
+      redirect(
+        buildScheduleUrl(cycleId, view, {
+          error: 'publish_coverage_rule_violation',
+          under_coverage: String(underCoverage),
+          over_coverage: String(overCoverage),
+        })
+      )
+    }
   }
 
   const { error } = await supabase
@@ -219,9 +579,64 @@ async function addShiftAction(formData: FormData) {
   const shiftType = String(formData.get('shift_type') ?? '').trim()
   const status = String(formData.get('status') ?? '').trim()
   const view = String(formData.get('view') ?? '').trim()
+  const overrideWeeklyRules = String(formData.get('override_weekly_rules') ?? '').trim() === 'on'
 
   if (!cycleId || !userId || !date || !shiftType || !status) {
     redirect('/schedule')
+  }
+
+  if (countsTowardWeeklyLimit(status) && !overrideWeeklyRules) {
+    const { data: sameSlotShifts, error: sameSlotError } = await supabase
+      .from('shifts')
+      .select('status')
+      .eq('cycle_id', cycleId)
+      .eq('date', date)
+      .eq('shift_type', shiftType)
+
+    if (sameSlotError) {
+      console.error('Failed to load slot coverage for limit check:', sameSlotError)
+      redirect(buildScheduleUrl(cycleId, view, { error: 'add_shift_failed' }))
+    }
+
+    const activeCoverage = (sameSlotShifts ?? []).filter((row) => countsTowardWeeklyLimit(row.status)).length
+    if (activeCoverage >= MAX_SHIFT_COVERAGE_PER_DAY) {
+      redirect(buildScheduleUrl(cycleId, view, { error: 'coverage_max_exceeded' }))
+    }
+  }
+
+  if (countsTowardWeeklyLimit(status) && !overrideWeeklyRules) {
+    const bounds = getWeekBoundsForDate(date)
+    if (!bounds) {
+      redirect(buildScheduleUrl(cycleId, view, { error: 'add_shift_failed' }))
+    }
+
+    const { data: weeklyShiftsData, error: weeklyShiftsError } = await supabase
+      .from('shifts')
+      .select('date, status')
+      .eq('user_id', userId)
+      .gte('date', bounds.weekStart)
+      .lte('date', bounds.weekEnd)
+
+    if (weeklyShiftsError) {
+      console.error('Failed to load weekly shifts for limit check:', weeklyShiftsError)
+      redirect(buildScheduleUrl(cycleId, view, { error: 'add_shift_failed' }))
+    }
+
+    const workedDates = new Set<string>()
+    for (const row of (weeklyShiftsData ?? []) as Array<{ date: string; status: ShiftRow['status'] }>) {
+      if (!countsTowardWeeklyLimit(row.status)) continue
+      workedDates.add(row.date)
+    }
+
+    if (!workedDates.has(date) && workedDates.size >= MAX_WORK_DAYS_PER_WEEK) {
+      redirect(
+        buildScheduleUrl(cycleId, view, {
+          error: 'weekly_limit_exceeded',
+          week_start: bounds.weekStart,
+          week_end: bounds.weekEnd,
+        })
+      )
+    }
   }
 
   const { error } = await supabase.from('shifts').insert({
@@ -234,10 +649,274 @@ async function addShiftAction(formData: FormData) {
 
   if (error) {
     console.error('Failed to insert shift:', error)
+    if (error.code === '23505') {
+      redirect(buildScheduleUrl(cycleId, view, { error: 'duplicate_shift' }))
+    }
+    redirect(buildScheduleUrl(cycleId, view, { error: 'add_shift_failed' }))
   }
 
   revalidatePath('/schedule')
   redirect(buildScheduleUrl(cycleId, view))
+}
+
+async function generateDraftScheduleAction(formData: FormData) {
+  'use server'
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  const role = await getRoleForUser(user.id)
+  if (role !== 'manager') {
+    redirect('/schedule')
+  }
+
+  const cycleId = String(formData.get('cycle_id') ?? '').trim()
+  const view = String(formData.get('view') ?? '').trim()
+
+  if (!cycleId) {
+    redirect(buildScheduleUrl(undefined, view, { error: 'auto_missing_cycle' }))
+  }
+
+  const { data: cycle, error: cycleError } = await supabase
+    .from('schedule_cycles')
+    .select('id, start_date, end_date, published')
+    .eq('id', cycleId)
+    .maybeSingle()
+
+  if (cycleError || !cycle) {
+    console.error('Failed to load cycle for auto-generation:', cycleError)
+    redirect(buildScheduleUrl(cycleId, view, { error: 'auto_generate_failed' }))
+  }
+
+  if (cycle.published) {
+    redirect(buildScheduleUrl(cycleId, view, { error: 'auto_cycle_published' }))
+  }
+
+  const { data: therapistsData, error: therapistsError } = await supabase
+    .from('profiles')
+    .select('id, full_name, shift_type')
+    .eq('role', 'therapist')
+    .order('full_name', { ascending: true })
+
+  if (therapistsError) {
+    console.error('Failed to load therapists for auto-generation:', therapistsError)
+    redirect(buildScheduleUrl(cycleId, view, { error: 'auto_generate_failed' }))
+  }
+
+  const therapists = (therapistsData ?? []) as Therapist[]
+  if (therapists.length === 0) {
+    redirect(buildScheduleUrl(cycleId, view, { error: 'auto_no_therapists' }))
+  }
+
+  const cycleDates = buildDateRange(cycle.start_date, cycle.end_date)
+  if (cycleDates.length === 0) {
+    redirect(buildScheduleUrl(cycleId, view, { error: 'auto_generate_failed' }))
+  }
+
+  const firstWeekBounds = getWeekBoundsForDate(cycle.start_date)
+  const lastWeekBounds = getWeekBoundsForDate(cycle.end_date)
+  if (!firstWeekBounds || !lastWeekBounds) {
+    redirect(buildScheduleUrl(cycleId, view, { error: 'auto_generate_failed' }))
+  }
+
+  const therapistIds = therapists.map((therapist) => therapist.id)
+
+  const [existingShiftsResult, cycleAvailabilityResult, globalAvailabilityResult, weeklyShiftsResult] =
+    await Promise.all([
+      supabase
+        .from('shifts')
+        .select('user_id, date, shift_type, status')
+        .eq('cycle_id', cycleId),
+      supabase
+        .from('availability_requests')
+        .select('user_id, date')
+        .eq('cycle_id', cycleId)
+        .gte('date', cycle.start_date)
+        .lte('date', cycle.end_date),
+      supabase
+        .from('availability_requests')
+        .select('user_id, date')
+        .is('cycle_id', null)
+        .gte('date', cycle.start_date)
+        .lte('date', cycle.end_date),
+      supabase
+        .from('shifts')
+        .select('user_id, date, status')
+        .in('user_id', therapistIds)
+        .gte('date', firstWeekBounds.weekStart)
+        .lte('date', lastWeekBounds.weekEnd),
+    ])
+
+  if (
+    existingShiftsResult.error ||
+    cycleAvailabilityResult.error ||
+    globalAvailabilityResult.error ||
+    weeklyShiftsResult.error
+  ) {
+    console.error('Failed to load scheduling data for auto-generation:', {
+      existingShiftsError: existingShiftsResult.error,
+      cycleAvailabilityError: cycleAvailabilityResult.error,
+      globalAvailabilityError: globalAvailabilityResult.error,
+      weeklyShiftsError: weeklyShiftsResult.error,
+    })
+    redirect(buildScheduleUrl(cycleId, view, { error: 'auto_generate_failed' }))
+  }
+
+  const existingShifts = (existingShiftsResult.data ?? []) as AutoScheduleShiftRow[]
+  const blockedRows = [
+    ...((cycleAvailabilityResult.data ?? []) as AvailabilityDateRow[]),
+    ...((globalAvailabilityResult.data ?? []) as AvailabilityDateRow[]),
+  ]
+
+  const unavailableDatesByUser = new Map<string, Set<string>>()
+  for (const row of blockedRows) {
+    const unavailableDates = unavailableDatesByUser.get(row.user_id) ?? new Set<string>()
+    unavailableDates.add(row.date)
+    unavailableDatesByUser.set(row.user_id, unavailableDates)
+  }
+
+  const weeklyWorkedDatesByUserWeek = new Map<string, Set<string>>()
+  for (const row of (weeklyShiftsResult.data ?? []) as ShiftLimitRow[]) {
+    if (!countsTowardWeeklyLimit(row.status)) continue
+    const bounds = getWeekBoundsForDate(row.date)
+    if (!bounds) continue
+
+    const key = weeklyCountKey(row.user_id, bounds.weekStart)
+    const workedDates = weeklyWorkedDatesByUserWeek.get(key) ?? new Set<string>()
+    workedDates.add(row.date)
+    weeklyWorkedDatesByUserWeek.set(key, workedDates)
+  }
+
+  const coverageBySlot = new Map<string, number>()
+  const assignedUserIdsByDate = new Map<string, Set<string>>()
+  for (const shift of existingShifts) {
+    if (countsTowardWeeklyLimit(shift.status)) {
+      const slotKey = coverageSlotKey(shift.date, shift.shift_type)
+      const coverage = coverageBySlot.get(slotKey) ?? 0
+      coverageBySlot.set(slotKey, coverage + 1)
+    }
+    const assignedForDate = assignedUserIdsByDate.get(shift.date) ?? new Set<string>()
+    assignedForDate.add(shift.user_id)
+    assignedUserIdsByDate.set(shift.date, assignedForDate)
+  }
+
+  const dayTherapists = therapists.filter((therapist) => therapist.shift_type === 'day')
+  const nightTherapists = therapists.filter((therapist) => therapist.shift_type === 'night')
+
+  let dayCursor = 0
+  let nightCursor = 0
+  let unfilledSlots = 0
+
+  const draftShiftsToInsert: Array<{
+    cycle_id: string
+    user_id: string
+    date: string
+    shift_type: 'day' | 'night'
+    status: 'scheduled'
+  }> = []
+
+  for (const date of cycleDates) {
+    const assignedForDate = assignedUserIdsByDate.get(date) ?? new Set<string>()
+    assignedUserIdsByDate.set(date, assignedForDate)
+
+    let dayCoverage = coverageBySlot.get(coverageSlotKey(date, 'day')) ?? 0
+    while (dayCoverage < MIN_SHIFT_COVERAGE_PER_DAY) {
+      const dayPick = pickTherapistForDate(
+        dayTherapists,
+        dayCursor,
+        date,
+        unavailableDatesByUser,
+        assignedForDate,
+        weeklyWorkedDatesByUserWeek
+      )
+      dayCursor = dayPick.nextCursor
+
+      if (dayPick.therapist) {
+        draftShiftsToInsert.push({
+          cycle_id: cycleId,
+          user_id: dayPick.therapist.id,
+          date,
+          shift_type: 'day',
+          status: 'scheduled',
+        })
+        assignedForDate.add(dayPick.therapist.id)
+        const weekBounds = getWeekBoundsForDate(date)
+        if (weekBounds) {
+          const key = weeklyCountKey(dayPick.therapist.id, weekBounds.weekStart)
+          const workedDates = weeklyWorkedDatesByUserWeek.get(key) ?? new Set<string>()
+          workedDates.add(date)
+          weeklyWorkedDatesByUserWeek.set(key, workedDates)
+        }
+        dayCoverage += 1
+        coverageBySlot.set(coverageSlotKey(date, 'day'), dayCoverage)
+      } else {
+        unfilledSlots += MIN_SHIFT_COVERAGE_PER_DAY - dayCoverage
+        break
+      }
+    }
+
+    let nightCoverage = coverageBySlot.get(coverageSlotKey(date, 'night')) ?? 0
+    while (nightCoverage < MIN_SHIFT_COVERAGE_PER_DAY) {
+      const nightPick = pickTherapistForDate(
+        nightTherapists,
+        nightCursor,
+        date,
+        unavailableDatesByUser,
+        assignedForDate,
+        weeklyWorkedDatesByUserWeek
+      )
+      nightCursor = nightPick.nextCursor
+
+      if (nightPick.therapist) {
+        draftShiftsToInsert.push({
+          cycle_id: cycleId,
+          user_id: nightPick.therapist.id,
+          date,
+          shift_type: 'night',
+          status: 'scheduled',
+        })
+        assignedForDate.add(nightPick.therapist.id)
+        const weekBounds = getWeekBoundsForDate(date)
+        if (weekBounds) {
+          const key = weeklyCountKey(nightPick.therapist.id, weekBounds.weekStart)
+          const workedDates = weeklyWorkedDatesByUserWeek.get(key) ?? new Set<string>()
+          workedDates.add(date)
+          weeklyWorkedDatesByUserWeek.set(key, workedDates)
+        }
+        nightCoverage += 1
+        coverageBySlot.set(coverageSlotKey(date, 'night'), nightCoverage)
+      } else {
+        unfilledSlots += MIN_SHIFT_COVERAGE_PER_DAY - nightCoverage
+        break
+      }
+    }
+  }
+
+  if (draftShiftsToInsert.length > 0) {
+    const { error: insertError } = await supabase
+      .from('shifts')
+      .upsert(draftShiftsToInsert, { onConflict: 'cycle_id,user_id,date', ignoreDuplicates: true })
+
+    if (insertError) {
+      console.error('Failed to insert auto-generated shifts:', insertError)
+      redirect(buildScheduleUrl(cycleId, view, { error: 'auto_generate_failed' }))
+    }
+  }
+
+  revalidatePath('/schedule')
+  redirect(
+    buildScheduleUrl(cycleId, view, {
+      auto: 'generated',
+      added: String(draftShiftsToInsert.length),
+      unfilled: String(unfilledSlots),
+    })
+  )
 }
 
 async function deleteShiftAction(formData: FormData) {
@@ -277,7 +956,7 @@ async function deleteShiftAction(formData: FormData) {
 export default async function SchedulePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ cycle?: string; view?: string }>
+  searchParams?: Promise<ScheduleSearchParams>
 }) {
   const supabase = await createClient()
   const {
@@ -290,7 +969,8 @@ export default async function SchedulePage({
 
   const params = searchParams ? await searchParams : undefined
   const selectedCycleId = params?.cycle
-  const viewMode: ViewMode = normalizeViewMode(params?.view)
+  let viewMode: ViewMode = normalizeViewMode(params?.view)
+  const feedback = getScheduleFeedback(params)
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -299,6 +979,9 @@ export default async function SchedulePage({
     .maybeSingle()
 
   const role: Role = profile?.role === 'manager' ? 'manager' : 'therapist'
+  if (role !== 'manager' && viewMode === 'calendar') {
+    viewMode = 'grid'
+  }
 
   let cyclesQuery = supabase
     .from('schedule_cycles')
@@ -366,6 +1049,15 @@ export default async function SchedulePage({
     shiftByUserDate.set(`${shift.user_id}:${shift.date}`, shift)
   }
 
+  const calendarShifts: CalendarShift[] = shifts.map((shift) => ({
+    id: shift.id,
+    date: shift.date,
+    shift_type: shift.shift_type,
+    status: shift.status,
+    user_id: shift.user_id,
+    full_name: getOne(shift.profiles)?.full_name ?? 'Unknown',
+  }))
+
   const namesFromShiftRows = new Map<string, string>()
   for (const shift of shifts) {
     namesFromShiftRows.set(shift.user_id, getOne(shift.profiles)?.full_name ?? 'Unknown')
@@ -417,14 +1109,21 @@ export default async function SchedulePage({
   return (
     <main className="min-h-screen bg-background p-6 md:p-8">
       <div className="mx-auto max-w-6xl space-y-6">
+        {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
+
         <div className="no-print flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
+            <TeamwiseLogo size="small" className="mb-2" />
             <h1 className="text-3xl font-bold text-foreground">
-              {viewMode === 'grid' ? 'Schedule Grid' : 'Schedule List'}
+              {viewMode === 'calendar'
+                ? 'Month Calendar'
+                : viewMode === 'grid'
+                  ? 'Schedule Grid'
+                  : 'Schedule List'}
             </h1>
             <p className="text-muted-foreground">
               {role === 'manager'
-                ? 'Build and publish 6-week schedules, then switch between grid and list formats.'
+                ? 'Auto-generate draft schedules first, then use day/night calendars to fill holes. Target coverage is 3-5 per shift per day.'
                 : 'View your shifts in published schedule cycles using grid or list format.'}
             </p>
           </div>
@@ -457,6 +1156,15 @@ export default async function SchedulePage({
               >
                 <Link href={buildScheduleUrl(activeCycleId, 'list')}>List View</Link>
               </Button>
+              {role === 'manager' && (
+                <Button
+                  asChild
+                  size="sm"
+                  variant={viewMode === 'calendar' ? 'default' : 'outline'}
+                >
+                  <Link href={buildScheduleUrl(activeCycleId, 'calendar')}>Month Calendar</Link>
+                </Button>
+              )}
             </div>
 
             {cycles.length === 0 && (
@@ -490,18 +1198,49 @@ export default async function SchedulePage({
                   {activeCycle.published ? 'Published' : 'Draft'}
                 </Badge>
                 {role === 'manager' && (
-                  <form action={toggleCyclePublishedAction}>
-                    <input type="hidden" name="cycle_id" value={activeCycle.id} />
-                    <input type="hidden" name="view" value={viewMode} />
-                    <input
-                      type="hidden"
-                      name="currently_published"
-                      value={String(activeCycle.published)}
-                    />
-                    <Button type="submit" size="sm" variant="outline">
-                      {activeCycle.published ? 'Move to Draft' : 'Publish Cycle'}
-                    </Button>
-                  </form>
+                  <>
+                    {activeCycle.published ? (
+                      <form action={toggleCyclePublishedAction}>
+                        <input type="hidden" name="cycle_id" value={activeCycle.id} />
+                        <input type="hidden" name="view" value={viewMode} />
+                        <input type="hidden" name="currently_published" value="true" />
+                        <input type="hidden" name="override_weekly_rules" value="false" />
+                        <Button type="submit" size="sm" variant="outline">
+                          Move to Draft
+                        </Button>
+                      </form>
+                    ) : (
+                      <>
+                        <form action={toggleCyclePublishedAction}>
+                          <input type="hidden" name="cycle_id" value={activeCycle.id} />
+                          <input type="hidden" name="view" value={viewMode} />
+                          <input type="hidden" name="currently_published" value="false" />
+                          <input type="hidden" name="override_weekly_rules" value="false" />
+                          <Button type="submit" size="sm" variant="outline">
+                            Publish Cycle
+                          </Button>
+                        </form>
+
+                        <form action={toggleCyclePublishedAction}>
+                          <input type="hidden" name="cycle_id" value={activeCycle.id} />
+                          <input type="hidden" name="view" value={viewMode} />
+                          <input type="hidden" name="currently_published" value="false" />
+                          <input type="hidden" name="override_weekly_rules" value="true" />
+                          <Button type="submit" size="sm">
+                            Publish with Override
+                          </Button>
+                        </form>
+                      </>
+                    )}
+
+                    <form action={generateDraftScheduleAction}>
+                      <input type="hidden" name="cycle_id" value={activeCycle.id} />
+                      <input type="hidden" name="view" value={viewMode} />
+                      <Button type="submit" size="sm" disabled={activeCycle.published}>
+                        Auto-Generate Draft
+                      </Button>
+                    </form>
+                  </>
                 )}
               </div>
             )}
@@ -544,7 +1283,9 @@ export default async function SchedulePage({
             <Card>
               <CardHeader>
                 <CardTitle>Add Shift</CardTitle>
-                <CardDescription>Assign therapists to day or night coverage.</CardDescription>
+                <CardDescription>
+                  Assign therapists to day or night coverage. Coverage target is 3-5 per shift/day.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {!activeCycle ? (
@@ -606,6 +1347,10 @@ export default async function SchedulePage({
                         </select>
                       </div>
                     </div>
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <input type="checkbox" name="override_weekly_rules" />
+                      Override weekly 3-day rule for this shift
+                    </label>
                     <Button type="submit">Add Shift</Button>
                   </form>
                 )}
@@ -617,7 +1362,9 @@ export default async function SchedulePage({
         <Card className="no-print">
           <CardHeader>
             <CardTitle>
-              {viewMode === 'grid'
+              {viewMode === 'calendar' && role === 'manager'
+                ? 'Month Calendar'
+                : viewMode === 'grid'
                 ? role === 'manager'
                   ? 'Cycle Grid'
                   : 'My Shift Calendar'
@@ -635,9 +1382,19 @@ export default async function SchedulePage({
             {!activeCycle && (
               <p className="text-sm text-muted-foreground">
                 {role === 'manager'
-                  ? 'Create a cycle or select one above to start building the grid.'
+                  ? 'Create a cycle or select one above to start building the schedule.'
                   : 'No published cycle selected.'}
               </p>
+            )}
+
+            {activeCycle && viewMode === 'calendar' && role === 'manager' && (
+              <ManagerMonthCalendar
+                cycleId={activeCycle.id}
+                startDate={activeCycle.start_date}
+                endDate={activeCycle.end_date}
+                therapists={assignableTherapists}
+                shifts={calendarShifts}
+              />
             )}
 
             {activeCycle && viewMode === 'grid' && (

@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { createClient } from '@/lib/supabase/client'
+import { TeamwiseLogo } from '@/components/teamwise-logo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -36,11 +37,14 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md shadow-sm">
-        <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold text-foreground">Teamwise Scheduling</CardTitle>
-          <CardDescription>The schedule your team trusts.</CardDescription>
+    <main className="teamwise-grid-bg flex min-h-screen items-center justify-center p-4">
+      <Card className="w-full max-w-md bg-card/95 backdrop-blur">
+        <CardHeader className="space-y-3 text-center">
+          <TeamwiseLogo className="justify-center" />
+          <div className="space-y-1">
+            <CardTitle className="text-2xl font-semibold text-foreground">Welcome back</CardTitle>
+            <CardDescription>The schedule your team trusts.</CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">

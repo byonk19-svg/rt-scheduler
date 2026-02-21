@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Teamwise Scheduling",
-  description: "Schedules, requests, and coverage together.",
+  title: "Teamwise",
+  description: "Team scheduling, availability, and coverage together.",
 };
 
 export default function RootLayout({

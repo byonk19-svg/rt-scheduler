@@ -1,6 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { TeamwiseLogo } from '@/components/teamwise-logo'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 
 type Profile = {
   id: string
@@ -58,10 +61,11 @@ export default async function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background p-8">
-      <div className="mx-auto max-w-4xl space-y-6">
-        <div className="flex items-center justify-between">
+    <main className="min-h-screen bg-background p-6 md:p-8">
+      <div className="mx-auto max-w-5xl space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-4 rounded-2xl border-2 border-border bg-card p-5 shadow-sm">
           <div>
+            <TeamwiseLogo size="small" />
             <h1 className="text-3xl font-bold text-foreground">Welcome, {profile.full_name}</h1>
             <p className="text-muted-foreground capitalize">
               {profile.role} - {profile.shift_type} shift
@@ -73,87 +77,76 @@ export default async function DashboardPage() {
             </p>
           </div>
           <form action="/auth/signout" method="post">
-            <button
-              type="submit"
-              className="text-sm text-muted-foreground underline hover:text-foreground"
-            >
-              Sign out
-            </button>
+            <Button type="submit" variant="outline" size="sm">Sign out</Button>
           </form>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {profile.role === 'manager' ? (
             <>
-              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-                <h2 className="font-semibold text-foreground">Schedule Management</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Create cycles, assign shifts, and publish schedules.
-                </p>
-                <Link
-                  href="/schedule"
-                  className="mt-4 inline-block text-sm text-[var(--highlight)] hover:underline"
-                >
-                  Open manager schedule tools
-                </Link>
-              </div>
-              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-                <h2 className="font-semibold text-foreground">Availability Review</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  View all therapist requests and blackout dates.
-                </p>
-                <Link
-                  href="/availability"
-                  className="mt-4 inline-block text-sm text-[var(--highlight)] hover:underline"
-                >
-                  Review availability requests
-                </Link>
-              </div>
-              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-                <h2 className="font-semibold text-foreground">Shift Board</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Approve or deny swap and pickup requests.
-                </p>
-                <Link
-                  href="/shift-board"
-                  className="mt-4 inline-block text-sm text-[var(--highlight)] hover:underline"
-                >
-                  Review shift board
-                </Link>
-              </div>
+              <Card>
+                <CardContent className="space-y-3 pt-6">
+                  <h2 className="font-semibold text-foreground">Schedule Management</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Auto-generate drafts, fill holes with drag-and-drop, and publish schedules.
+                  </p>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/schedule">Open manager schedule tools</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="space-y-3 pt-6">
+                  <h2 className="font-semibold text-foreground">Availability Review</h2>
+                  <p className="text-sm text-muted-foreground">
+                    View all therapist requests and blackout dates.
+                  </p>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/availability">Review availability requests</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="space-y-3 pt-6">
+                  <h2 className="font-semibold text-foreground">Shift Board</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Approve or deny swap and pickup requests.
+                  </p>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/shift-board">Review shift board</Link>
+                  </Button>
+                </CardContent>
+              </Card>
             </>
           ) : (
             <>
-              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-                <h2 className="font-semibold text-foreground">My Schedule</h2>
-                <p className="mt-1 text-sm text-muted-foreground">View your upcoming shifts.</p>
-                <Link
-                  href="/schedule"
-                  className="mt-4 inline-block text-sm text-[var(--highlight)] hover:underline"
-                >
-                  Open schedule grid
-                </Link>
-              </div>
-              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-                <h2 className="font-semibold text-foreground">Availability</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Submit days you cannot work.</p>
-                <Link
-                  href="/availability"
-                  className="mt-4 inline-block text-sm text-[var(--highlight)] hover:underline"
-                >
-                  Open availability requests
-                </Link>
-              </div>
-              <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-                <h2 className="font-semibold text-foreground">Shift Board</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Post swap or pickup requests.</p>
-                <Link
-                  href="/shift-board"
-                  className="mt-4 inline-block text-sm text-[var(--highlight)] hover:underline"
-                >
-                  Open shift board
-                </Link>
-              </div>
+              <Card>
+                <CardContent className="space-y-3 pt-6">
+                  <h2 className="font-semibold text-foreground">My Schedule</h2>
+                  <p className="text-sm text-muted-foreground">View your upcoming shifts.</p>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/schedule">Open schedule grid</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="space-y-3 pt-6">
+                  <h2 className="font-semibold text-foreground">Availability</h2>
+                  <p className="text-sm text-muted-foreground">Submit days you cannot work.</p>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/availability">Open availability requests</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="space-y-3 pt-6">
+                  <h2 className="font-semibold text-foreground">Shift Board</h2>
+                  <p className="text-sm text-muted-foreground">Post swap or pickup requests.</p>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/shift-board">Open shift board</Link>
+                  </Button>
+                </CardContent>
+              </Card>
             </>
           )}
         </div>

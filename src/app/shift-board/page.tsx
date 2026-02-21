@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { TeamwiseLogo } from '@/components/teamwise-logo'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { createClient } from '@/lib/supabase/server'
@@ -214,6 +215,7 @@ export default async function ShiftBoardPage() {
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
+            <TeamwiseLogo size="small" className="mb-2" />
             <h1 className="text-3xl font-bold text-foreground">Shift Board</h1>
             <p className="text-muted-foreground">
               {role === 'manager'

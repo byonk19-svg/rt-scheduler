@@ -126,7 +126,26 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-image:
+      radial-gradient(circle at 10% 0%, rgba(20, 184, 166, 0.1), transparent 35%),
+      radial-gradient(circle at 90% 0%, rgba(74, 163, 255, 0.14), transparent 40%);
+    min-height: 100vh;
   }
+
+  a {
+    color: #0ea5e9;
+  }
+
+  a:hover {
+    color: #0284c7;
+  }
+}
+
+.teamwise-grid-bg {
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
 .print-only {
