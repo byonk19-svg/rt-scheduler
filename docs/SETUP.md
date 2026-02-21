@@ -32,6 +32,12 @@ For app runtime:
 
 For demo seed script:
 - `SUPABASE_SERVICE_ROLE_KEY`
+- optional user seeding knobs:
+  - `SEED_USERS_COUNT`
+  - `SEED_USERS_DOMAIN`
+  - `SEED_USERS_PREFIX`
+  - `SEED_USERS_PASSWORD`
+  - `SEED_INCLUDE_MANAGER`
 
 For optional authenticated e2e test:
 - `E2E_USER_EMAIL`
@@ -44,6 +50,18 @@ npm run seed:demo
 ```
 
 This script is idempotent and creates demo cycles, shifts, availability requests, and one shift board post.
+
+## Seed Fake Employees
+Run:
+```bash
+npm run seed:users
+```
+
+Default generated users:
+- `employee01@teamwise.test` through `employee08@teamwise.test`
+- password: `Teamwise123!`
+
+Set `SEED_INCLUDE_MANAGER=true` to also create `manager@teamwise.test`.
 
 ## E2E Tests
 Run Playwright tests:

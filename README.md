@@ -38,6 +38,27 @@ Run:
 npm run seed:demo
 ```
 
+## Seed Fake Employees
+Creates idempotent test Auth users and matching `profiles` rows.
+
+Run:
+```bash
+npm run seed:users
+```
+
+Defaults:
+- users: `employee01@teamwise.test` ... `employee08@teamwise.test`
+- password: `Teamwise123!`
+- roles: therapist
+- shift types: alternating day/night
+
+Optional env overrides:
+- `SEED_USERS_COUNT`
+- `SEED_USERS_DOMAIN`
+- `SEED_USERS_PREFIX`
+- `SEED_USERS_PASSWORD`
+- `SEED_INCLUDE_MANAGER` (`true` creates `manager@<domain>`)
+
 ## E2E Tests
 Playwright smoke tests are in `e2e/`.
 
@@ -63,5 +84,6 @@ Workflow: `.github/workflows/ci.yml`
 ```bash
 npm run lint
 npm run build
+npm run seed:users
 npm run test:e2e
 ```
