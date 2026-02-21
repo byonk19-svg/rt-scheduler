@@ -11,6 +11,23 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   process.exit(1)
 }
 
+let urlRef = ''
+let keyRef = ''
+try {
+  urlRef = new URL(SUPABASE_URL).hostname.split('.')[0]
+  const payload = JSON.parse(Buffer.from(SUPABASE_SERVICE_ROLE_KEY.split('.')[1], 'base64url').toString('utf8'))
+  keyRef = payload.ref ?? ''
+} catch {
+  // Ignore parsing issues here; Supabase client will still report invalid API key.
+}
+
+if (urlRef && keyRef && urlRef !== keyRef) {
+  console.error(
+    `SUPABASE_SERVICE_ROLE_KEY project ref (${keyRef}) does not match NEXT_PUBLIC_SUPABASE_URL ref (${urlRef})`
+  )
+  process.exit(1)
+}
+
 const count = Number(process.env.SEED_USERS_COUNT ?? '8')
 const domain = String(process.env.SEED_USERS_DOMAIN ?? 'teamwise.test').trim()
 const prefix = String(process.env.SEED_USERS_PREFIX ?? 'employee').trim()
