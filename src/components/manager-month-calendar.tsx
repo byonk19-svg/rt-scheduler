@@ -312,12 +312,17 @@ export function ManagerMonthCalendar({
             const coverageCount = dayShifts.filter((shift) => countsTowardCoverage(shift.status)).length
             const inSelectedMonth = day.getMonth() === selectedMonthDate.getMonth()
             const inCycle = isInCycle(date)
+            const shouldRenderDate = inSelectedMonth && inCycle
             const coverageTone =
               coverageCount < MIN_SHIFT_COVERAGE_PER_DAY
                 ? 'text-amber-700'
                 : coverageCount > MAX_SHIFT_COVERAGE_PER_DAY
                 ? 'text-red-700'
                 : 'text-emerald-700'
+
+            if (!shouldRenderDate) {
+              return <div key={`${shiftType}-${date}`} className="min-h-40" aria-hidden="true" />
+            }
 
             return (
               <div
@@ -326,21 +331,14 @@ export function ManagerMonthCalendar({
                 onDragOver={allowDrop}
                 onDrop={(event) => onDropDate(event, date, shiftType)}
                 className={cn(
-                  'min-h-40 rounded-xl border p-2',
-                  inCycle ? 'border-border bg-white' : 'border-border/60 bg-muted/30',
-                  inSelectedMonth ? 'opacity-100' : 'opacity-60'
+                  'min-h-40 rounded-xl border border-border bg-white p-2'
                 )}
               >
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-sm font-semibold text-foreground">{day.getDate()}</span>
-                  <div className="flex items-center gap-2">
-                    {inCycle && (
-                      <span className={cn('text-[10px] font-semibold uppercase', coverageTone)}>
-                        {coverageCount}/{MIN_SHIFT_COVERAGE_PER_DAY}-{MAX_SHIFT_COVERAGE_PER_DAY}
-                      </span>
-                    )}
-                    {!inCycle && <span className="text-[10px] uppercase text-muted-foreground">out</span>}
-                  </div>
+                  <span className={cn('text-[10px] font-semibold uppercase', coverageTone)}>
+                    {coverageCount}/{MIN_SHIFT_COVERAGE_PER_DAY}-{MAX_SHIFT_COVERAGE_PER_DAY}
+                  </span>
                 </div>
                 <div className="space-y-1">
                   {dayShifts.map((shift) => (
