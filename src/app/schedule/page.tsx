@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { PrintButton } from '@/components/print-button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -52,6 +53,25 @@ function formatDate(value: string): string {
   const parsed = new Date(`${value}T00:00:00`)
   if (Number.isNaN(parsed.getTime())) return value
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function formatDayNumber(value: string): string {
+  const parsed = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return value
+  return String(parsed.getDate())
+}
+
+function formatWeekdayShort(value: string): string {
+  const parsed = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return '-'
+  return parsed.toLocaleDateString('en-US', { weekday: 'short' }).charAt(0)
+}
+
+function getPrintShiftCode(status: ShiftRow['status']): string {
+  if (status === 'on_call') return 'OC'
+  if (status === 'sick') return 'S'
+  if (status === 'called_off') return 'OFF'
+  return '1'
 }
 
 function buildDateRange(startDate: string, endDate: string): string[] {
@@ -274,7 +294,7 @@ export default async function SchedulePage({
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, full_name')
+    .select('role, full_name, shift_type')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -341,10 +361,63 @@ export default async function SchedulePage({
     shiftsByDate.set(shift.date, row)
   }
 
+  const shiftByUserDate = new Map<string, ShiftRow>()
+  for (const shift of shifts) {
+    shiftByUserDate.set(`${shift.user_id}:${shift.date}`, shift)
+  }
+
+  const namesFromShiftRows = new Map<string, string>()
+  for (const shift of shifts) {
+    namesFromShiftRows.set(shift.user_id, getOne(shift.profiles)?.full_name ?? 'Unknown')
+  }
+
+  const therapistById = new Map(assignableTherapists.map((therapist) => [therapist.id, therapist]))
+  const printUsers: Therapist[] =
+    role === 'manager'
+      ? Array.from(
+          new Set([
+            ...assignableTherapists.map((therapist) => therapist.id),
+            ...shifts.map((shift) => shift.user_id),
+          ])
+        )
+          .map((id) => {
+            const existing = therapistById.get(id)
+            if (existing) return existing
+            return {
+              id,
+              full_name: namesFromShiftRows.get(id) ?? 'Unknown',
+              shift_type: 'day',
+            } satisfies Therapist
+          })
+          .sort((a, b) => {
+            if (a.shift_type === b.shift_type) return a.full_name.localeCompare(b.full_name)
+            return a.shift_type === 'day' ? -1 : 1
+          })
+      : [
+          {
+            id: user.id,
+            full_name: profile?.full_name ?? 'You',
+            shift_type: profile?.shift_type === 'night' ? 'night' : 'day',
+          },
+        ]
+
+  const dayTeam = printUsers.filter((member) => member.shift_type === 'day')
+  const nightTeam = printUsers.filter((member) => member.shift_type === 'night')
+
+  const coverageTotalsByDate = new Map<string, number>()
+  if (role === 'manager') {
+    for (const date of cycleDates) {
+      const total = shifts.filter(
+        (shift) => shift.date === date && (shift.status === 'scheduled' || shift.status === 'on_call')
+      ).length
+      coverageTotalsByDate.set(date, total)
+    }
+  }
+
   return (
     <main className="min-h-screen bg-background p-6 md:p-8">
       <div className="mx-auto max-w-6xl space-y-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="no-print flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">
               {viewMode === 'grid' ? 'Schedule Grid' : 'Schedule List'}
@@ -355,12 +428,15 @@ export default async function SchedulePage({
                 : 'View your shifts in published schedule cycles using grid or list format.'}
             </p>
           </div>
-          <Button asChild variant="outline">
-            <Link href="/dashboard">Back to Dashboard</Link>
-          </Button>
+          <div className="no-print flex items-center gap-2">
+            <PrintButton />
+            <Button asChild variant="outline">
+              <Link href="/dashboard">Back to Dashboard</Link>
+            </Button>
+          </div>
         </div>
 
-        <Card>
+        <Card className="no-print">
           <CardHeader>
             <CardTitle>Cycle Selection</CardTitle>
             <CardDescription>Pick a cycle to view the schedule.</CardDescription>
@@ -433,7 +509,7 @@ export default async function SchedulePage({
         </Card>
 
         {role === 'manager' && (
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="no-print grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle>Create Schedule Cycle</CardTitle>
@@ -538,7 +614,7 @@ export default async function SchedulePage({
           </div>
         )}
 
-        <Card>
+        <Card className="no-print">
           <CardHeader>
             <CardTitle>
               {viewMode === 'grid'
@@ -707,7 +783,7 @@ export default async function SchedulePage({
         </Card>
 
         {role === 'manager' && activeCycle && viewMode === 'grid' && (
-          <Card>
+          <Card className="no-print">
             <CardHeader>
               <CardTitle>Shift Entries</CardTitle>
               <CardDescription>Detailed entries for {activeCycle.label}.</CardDescription>
@@ -754,6 +830,81 @@ export default async function SchedulePage({
             </CardContent>
           </Card>
         )}
+
+        <div className="print-only print-page">
+          {activeCycle ? (
+            <div className="space-y-2">
+              <div className="text-center">
+                <h1 className="text-xl font-bold">Teamwise Scheduling</h1>
+                <p className="text-sm">
+                  Final Schedule: {activeCycle.label} ({activeCycle.start_date} to {activeCycle.end_date})
+                </p>
+              </div>
+
+              <table className="print-matrix">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    {cycleDates.map((date) => (
+                      <th key={`day-number-${date}`}>{formatDayNumber(date)}</th>
+                    ))}
+                  </tr>
+                  <tr>
+                    <th>Shift</th>
+                    {cycleDates.map((date) => (
+                      <th key={`day-week-${date}`}>{formatWeekdayShort(date)}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {role === 'manager' && dayTeam.length > 0 && (
+                    <tr className="print-shift-header">
+                      <td colSpan={cycleDates.length + 1}>Day Shift Team</td>
+                    </tr>
+                  )}
+                  {(role === 'manager' ? dayTeam : printUsers).map((member) => (
+                    <tr key={`day-${member.id}`}>
+                      <td>{member.full_name}</td>
+                      {cycleDates.map((date) => {
+                        const shift = shiftByUserDate.get(`${member.id}:${date}`)
+                        return <td key={`${member.id}-${date}`}>{shift ? getPrintShiftCode(shift.status) : ''}</td>
+                      })}
+                    </tr>
+                  ))}
+
+                  {role === 'manager' && nightTeam.length > 0 && (
+                    <tr className="print-shift-header">
+                      <td colSpan={cycleDates.length + 1}>Night Shift Team</td>
+                    </tr>
+                  )}
+                  {role === 'manager' &&
+                    nightTeam.map((member) => (
+                      <tr key={`night-${member.id}`}>
+                        <td>{member.full_name}</td>
+                        {cycleDates.map((date) => {
+                          const shift = shiftByUserDate.get(`${member.id}:${date}`)
+                          return <td key={`${member.id}-${date}`}>{shift ? getPrintShiftCode(shift.status) : ''}</td>
+                        })}
+                      </tr>
+                    ))}
+
+                  {role === 'manager' && (
+                    <tr>
+                      <td>Total Coverage</td>
+                      {cycleDates.map((date) => (
+                        <td key={`total-${date}`}>{coverageTotalsByDate.get(date) ?? 0}</td>
+                      ))}
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+
+              <p className="text-xs text-center">Codes: 1 = scheduled, OC = on call, S = sick, OFF = called off</p>
+            </div>
+          ) : (
+            <p>No schedule cycle selected for printing.</p>
+          )}
+        </div>
       </div>
     </main>
   )
