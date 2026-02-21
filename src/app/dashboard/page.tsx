@@ -81,6 +81,9 @@ export default async function DashboardPage() {
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="font-semibold text-slate-700">My Schedule</h2>
             <p className="mt-1 text-sm text-slate-400">View your upcoming shifts</p>
+            <Link href="/schedule" className="mt-4 inline-block text-sm text-blue-600 hover:underline">
+              Open schedule grid
+            </Link>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="font-semibold text-slate-700">Availability</h2>
