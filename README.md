@@ -50,6 +50,15 @@ Optional auth flow test uses:
 - `E2E_USER_EMAIL`
 - `E2E_USER_PASSWORD`
 
+## CI (GitHub Actions)
+Workflow: `.github/workflows/ci.yml`
+
+- `Lint and Build` runs on every push and pull request.
+- `Playwright E2E` runs when the following repository secrets are set:
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - optional: `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`
+
 ## Useful Commands
 ```bash
 npm run lint
