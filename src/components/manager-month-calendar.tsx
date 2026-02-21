@@ -306,13 +306,15 @@ export function ManagerMonthCalendar({
               {day}
             </div>
           ))}
-          {days.map((day) => {
+          {days
+            .filter((day) => {
+              const date = keyFromDate(day)
+              return day.getMonth() === selectedMonthDate.getMonth() && isInCycle(date)
+            })
+            .map((day, index) => {
             const date = keyFromDate(day)
             const dayShifts = (shiftsByDate.get(date) ?? []).filter((shift) => shift.shift_type === shiftType)
             const coverageCount = dayShifts.filter((shift) => countsTowardCoverage(shift.status)).length
-            const inSelectedMonth = day.getMonth() === selectedMonthDate.getMonth()
-            const inCycle = isInCycle(date)
-            const shouldRenderDate = inSelectedMonth && inCycle
             const coverageTone =
               coverageCount < MIN_SHIFT_COVERAGE_PER_DAY
                 ? 'text-amber-700'
@@ -320,13 +322,10 @@ export function ManagerMonthCalendar({
                 ? 'text-red-700'
                 : 'text-emerald-700'
 
-            if (!shouldRenderDate) {
-              return <div key={`${shiftType}-${date}`} className="min-h-40" aria-hidden="true" />
-            }
-
             return (
               <div
                 key={`${shiftType}-${date}`}
+                style={index === 0 ? { gridColumnStart: day.getDay() + 1 } : undefined}
                 onDragEnter={allowDrop}
                 onDragOver={allowDrop}
                 onDrop={(event) => onDropDate(event, date, shiftType)}
