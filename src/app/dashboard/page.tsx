@@ -111,7 +111,15 @@ export default async function DashboardPage() {
               </div>
               <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                 <h2 className="font-semibold text-slate-700">Shift Board</h2>
-                <p className="mt-1 text-sm text-slate-400">Swap board setup is coming in Step 6.</p>
+                <p className="mt-1 text-sm text-slate-400">
+                  Approve or deny swap and pickup requests.
+                </p>
+                <Link
+                  href="/shift-board"
+                  className="mt-4 inline-block text-sm text-blue-600 hover:underline"
+                >
+                  Review shift board
+                </Link>
               </div>
             </>
           ) : (
@@ -138,7 +146,13 @@ export default async function DashboardPage() {
               </div>
               <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                 <h2 className="font-semibold text-slate-700">Shift Board</h2>
-                <p className="mt-1 text-sm text-slate-400">Swap board setup is coming in Step 6.</p>
+                <p className="mt-1 text-sm text-slate-400">Post swap or pickup requests.</p>
+                <Link
+                  href="/shift-board"
+                  className="mt-4 inline-block text-sm text-blue-600 hover:underline"
+                >
+                  Open shift board
+                </Link>
               </div>
             </>
           )}
