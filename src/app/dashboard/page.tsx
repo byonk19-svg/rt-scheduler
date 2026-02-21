@@ -7,6 +7,11 @@ type Profile = {
   shift_type: string | null
 }
 
+function getNameFromEmail(email?: string) {
+  if (!email) return 'Therapist'
+  return email.split('@')[0] || 'Therapist'
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient()
 
@@ -24,36 +29,14 @@ export default async function DashboardPage() {
     .eq('id', user.id)
     .maybeSingle<Profile>()
 
-  let resolvedProfile = profile
-
-  // If no profile row exists yet, create one from auth metadata.
-  if (!resolvedProfile) {
-    const profileToCreate = {
-      id: user.id,
-      email: user.email,
-      full_name: user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? 'Therapist',
-      role: user.user_metadata?.role ?? 'therapist',
-      shift_type: user.user_metadata?.shift_type ?? 'day',
-    }
-
-    const { data: insertedProfile } = await supabase
-      .from('profiles')
-      .upsert(profileToCreate, { onConflict: 'id' })
-      .select('full_name, role, shift_type')
-      .maybeSingle<Profile>()
-
-    resolvedProfile = insertedProfile
-  }
-
-  // Fallback keeps dashboard usable even if profile query is blocked by RLS.
+  // Keep dashboard readable even if profile row is missing or blocked by RLS.
   const displayName =
-    resolvedProfile?.full_name ??
-    user.user_metadata?.full_name ??
-    user.email?.split('@')[0] ??
-    'Therapist'
+    profile?.full_name ?? (user.user_metadata?.full_name as string | undefined) ?? getNameFromEmail(user.email)
 
-  const displayRole = resolvedProfile?.role ?? user.user_metadata?.role ?? 'therapist'
-  const displayShiftType = resolvedProfile?.shift_type ?? user.user_metadata?.shift_type ?? 'day'
+  const displayRole = profile?.role ?? (user.user_metadata?.role as string | undefined) ?? 'therapist'
+
+  const displayShiftType =
+    profile?.shift_type ?? (user.user_metadata?.shift_type as string | undefined) ?? 'day'
 
   return (
     <main className="min-h-screen bg-slate-50 p-8">
@@ -66,8 +49,7 @@ export default async function DashboardPage() {
             </p>
             {profileError && (
               <p className="text-xs text-amber-600 mt-2">
-                Profile sync issue detected. Showing account metadata while you finish database
-                policies.
+                We could not read your profile yet. Showing account info for now.
               </p>
             )}
           </div>
