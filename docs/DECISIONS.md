@@ -1,7 +1,7 @@
 # Architecture Decisions
 
 ## Stack
-- **Frontend:** Next.js 14 (App Router) + TypeScript + Tailwind + shadcn/ui
+- **Frontend:** Next.js 16.1.6 (App Router) + TypeScript + Tailwind + shadcn/ui
 - **Backend/DB:** Supabase (Postgres + Auth)
 - **Deploy:** Vercel (frontend) + Supabase (backend)
 

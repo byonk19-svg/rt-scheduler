@@ -1,14 +1,17 @@
-import Link from 'next/link'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
+import { AvailabilityRequestsTable, type AvailabilityRequestTableRow } from '@/app/availability/availability-requests-table'
+import { ManagerAttentionPanel } from '@/components/ManagerAttentionPanel'
+import type { TableToolbarFilters } from '@/components/TableToolbar'
 import { FeedbackToast } from '@/components/feedback-toast'
-import { TeamwiseLogo } from '@/components/teamwise-logo'
+import { MoreActionsMenu } from '@/components/more-actions-menu'
+import { PrintMenuItem } from '@/components/print-menu-item'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { getManagerAttentionSnapshot } from '@/lib/manager-workflow'
 import { createClient } from '@/lib/supabase/server'
 
 type Role = 'manager' | 'therapist'
@@ -38,6 +41,11 @@ type AvailabilityRow = {
 type AvailabilityPageSearchParams = {
   error?: string | string[]
   success?: string | string[]
+  search?: string | string[]
+  status?: string | string[]
+  startDate?: string | string[]
+  endDate?: string | string[]
+  sort?: string | string[]
 }
 
 function getSearchParam(value: string | string[] | undefined): string | undefined {
@@ -79,18 +87,6 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
 function getOne<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null
   return value ?? null
-}
-
-function formatDate(value: string): string {
-  const parsed = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return value
-  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function formatDateTime(value: string): string {
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return value
-  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 async function submitAvailabilityRequest(formData: FormData) {
@@ -179,6 +175,15 @@ export default async function AvailabilityPage({
 
   const params = searchParams ? await searchParams : undefined
   const feedback = getAvailabilityFeedback(params)
+  const initialStatus = getSearchParam(params?.status)
+  const initialSort = getSearchParam(params?.sort)
+  const initialFilters: Partial<TableToolbarFilters> = {
+    search: getSearchParam(params?.search) ?? '',
+    status: initialStatus ?? undefined,
+    startDate: getSearchParam(params?.startDate) ?? '',
+    endDate: getSearchParam(params?.endDate) ?? '',
+    sort: initialSort === 'oldest' ? 'oldest' : 'newest',
+  }
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -187,6 +192,7 @@ export default async function AvailabilityPage({
     .maybeSingle()
 
   const role: Role = profile?.role === 'manager' ? 'manager' : 'therapist'
+  const managerAttention = role === 'manager' ? await getManagerAttentionSnapshot(supabase) : null
 
   const { data: cyclesData } = await supabase
     .from('schedule_cycles')
@@ -210,144 +216,119 @@ export default async function AvailabilityPage({
   const { data: requestsData } = await requestsQuery
   const requests = (requestsData ?? []) as AvailabilityRow[]
   const hasCycles = cycles.length > 0
-  const emptyColSpan = role === 'manager' ? 6 : 5
+  const availabilityRows: AvailabilityRequestTableRow[] = requests.map((request) => {
+    const cycle = getOne(request.schedule_cycles)
+    const requester = getOne(request.profiles)
+    return {
+      id: request.id,
+      date: request.date,
+      reason: request.reason,
+      createdAt: request.created_at,
+      requestedBy: requester?.full_name ?? 'Unknown user',
+      cycleLabel: cycle ? `${cycle.label} (${cycle.start_date} to ${cycle.end_date})` : 'Unassigned',
+      status: 'pending',
+      canDelete: request.user_id === user.id,
+    }
+  })
+  const requestsCard = (
+    <AvailabilityRequestsTable
+      role={role}
+      rows={availabilityRows}
+      deleteAvailabilityRequestAction={deleteAvailabilityRequest}
+      initialFilters={initialFilters}
+    />
+  )
+  const submitRequestCard = (
+    <Card id="submit-request">
+      <CardHeader>
+        <CardTitle>Submit Request</CardTitle>
+        <CardDescription>Select a date and optional cycle.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form action={submitAvailabilityRequest} className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <div className="space-y-2 xl:col-span-3">
+            <Label htmlFor="date">Date</Label>
+            <Input id="date" name="date" type="date" required />
+          </div>
+
+          <div className="space-y-2 xl:col-span-4">
+            <Label htmlFor="cycle_id">Schedule Cycle</Label>
+            <select
+              id="cycle_id"
+              name="cycle_id"
+              className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+              defaultValue=""
+            >
+              <option value="">No specific cycle</option>
+              {cycles.map((cycle) => (
+                <option key={cycle.id} value={cycle.id}>
+                  {cycle.label} ({cycle.start_date} to {cycle.end_date})
+                  {cycle.published ? '' : ' [draft]'}
+                </option>
+              ))}
+            </select>
+            {!hasCycles && (
+              <p className="text-xs text-muted-foreground">
+                No schedule cycles found yet. You can still submit requests.
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2 xl:col-span-5">
+            <Label htmlFor="reason">Reason (optional)</Label>
+            <Input
+              id="reason"
+              name="reason"
+              placeholder="Family event, appointment, vacation, etc."
+            />
+          </div>
+
+          <div className="xl:col-span-12">
+            <Button type="submit">Submit availability request</Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  )
 
   return (
-    <main className="min-h-screen bg-background p-6 md:p-8">
-      <div className="mx-auto max-w-5xl space-y-6">
-        {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
+    <div className="space-y-6">
+      {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <TeamwiseLogo size="small" className="mb-2" />
-            <h1 className="text-3xl font-bold text-foreground">Availability Requests</h1>
-            <p className="text-muted-foreground">
-              {role === 'manager'
-                ? 'Review all submitted blackout dates.'
-                : 'Submit days you cannot work for upcoming schedules.'}
-            </p>
-          </div>
-          <Button asChild variant="outline">
-            <Link href="/dashboard">Back to Dashboard</Link>
-          </Button>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Submit Request</CardTitle>
-            <CardDescription>Select a date and optional cycle.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action={submitAvailabilityRequest} className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="date">Date</Label>
-                <Input id="date" name="date" type="date" required />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="cycle_id">Schedule Cycle</Label>
-                <select
-                  id="cycle_id"
-                  name="cycle_id"
-                  className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
-                  defaultValue=""
-                >
-                  <option value="">No specific cycle</option>
-                  {cycles.map((cycle) => (
-                    <option key={cycle.id} value={cycle.id}>
-                      {cycle.label} ({cycle.start_date} to {cycle.end_date})
-                      {cycle.published ? '' : ' [draft]'}
-                    </option>
-                  ))}
-                </select>
-                {!hasCycles && (
-                  <p className="text-xs text-muted-foreground">
-                    No schedule cycles found yet. You can still submit requests.
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2 md:col-span-3">
-                <Label htmlFor="reason">Reason (optional)</Label>
-                <textarea
-                  id="reason"
-                  name="reason"
-                  rows={3}
-                  className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm"
-                  placeholder="Family event, appointment, vacation, etc."
-                />
-              </div>
-
-              <div className="md:col-span-3">
-                <Button type="submit">Submit availability request</Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>{role === 'manager' ? 'All Requests' : 'My Requests'}</CardTitle>
-            <CardDescription>
-              {role === 'manager'
-                ? 'Therapist blackout dates by cycle and date.'
-                : 'Your submitted blackout dates.'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Cycle</TableHead>
-                  <TableHead>Reason</TableHead>
-                  {role === 'manager' && <TableHead>Requested By</TableHead>}
-                  <TableHead>Submitted</TableHead>
-                  <TableHead>Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {requests.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={emptyColSpan} className="py-6 text-center text-muted-foreground">
-                      No availability requests yet.
-                    </TableCell>
-                  </TableRow>
-                )}
-                {requests.map((request) => {
-                  const cycle = getOne(request.schedule_cycles)
-                  const requester = getOne(request.profiles)
-                  const canDelete = request.user_id === user.id
-
-                  return (
-                    <TableRow key={request.id}>
-                      <TableCell>{formatDate(request.date)}</TableCell>
-                      <TableCell>
-                        {cycle ? `${cycle.label} (${cycle.start_date} to ${cycle.end_date})` : 'Unassigned'}
-                      </TableCell>
-                      <TableCell>{request.reason ?? '-'}</TableCell>
-                      {role === 'manager' && <TableCell>{requester?.full_name ?? 'Unknown user'}</TableCell>}
-                      <TableCell>{formatDateTime(request.created_at)}</TableCell>
-                      <TableCell>
-                        {canDelete ? (
-                          <form action={deleteAvailabilityRequest}>
-                            <input type="hidden" name="request_id" value={request.id} />
-                            <Button type="submit" variant="outline" size="sm">
-                              Delete
-                            </Button>
-                          </form>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+      <div>
+        <h1 className="app-page-title">Availability Requests</h1>
+        <p className="text-muted-foreground">
+          {role === 'manager'
+            ? 'Review all submitted blackout dates.'
+            : 'Submit days you cannot work for upcoming schedules.'}
+        </p>
       </div>
-    </main>
+
+      {role === 'manager' && managerAttention && <ManagerAttentionPanel snapshot={managerAttention} />}
+
+      <div className="flex items-center gap-2">
+        <Button asChild>
+          <a href="#submit-request">Submit Request</a>
+        </Button>
+        <MoreActionsMenu>
+          <a href="/api/availability/export" className="block rounded-sm px-3 py-2 text-sm hover:bg-secondary">
+            Export CSV
+          </a>
+          <PrintMenuItem />
+        </MoreActionsMenu>
+      </div>
+
+      {role === 'manager' ? (
+        <>
+          {requestsCard}
+          {submitRequestCard}
+        </>
+      ) : (
+        <>
+          {submitRequestCard}
+          {requestsCard}
+        </>
+      )}
+    </div>
   )
 }

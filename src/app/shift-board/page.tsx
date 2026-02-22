@@ -2,12 +2,14 @@ import Link from 'next/link'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
-import { Badge } from '@/components/ui/badge'
+import { ShiftPostsTable, type ShiftPostTableRow } from '@/app/shift-board/shift-posts-table'
+import { EmptyState } from '@/components/EmptyState'
+import { ManagerAttentionPanel } from '@/components/ManagerAttentionPanel'
+import { MoreActionsMenu } from '@/components/more-actions-menu'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { TeamwiseLogo } from '@/components/teamwise-logo'
 import { Label } from '@/components/ui/label'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { getManagerAttentionSnapshot } from '@/lib/manager-workflow'
 import { createClient } from '@/lib/supabase/server'
 
 type Role = 'manager' | 'therapist'
@@ -58,12 +60,6 @@ function getOne<T>(value: T | T[] | null | undefined): T | null {
 
 function formatDate(value: string): string {
   const parsed = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return value
-  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function formatDateTime(value: string): string {
-  const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return value
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
@@ -303,6 +299,7 @@ async function updateShiftPostStatusAction(formData: FormData) {
 
 export default async function ShiftBoardPage() {
   const { supabase, user, role } = await getAuthContext()
+  const managerAttention = role === 'manager' ? await getManagerAttentionSnapshot(supabase) : null
 
   const { data: shiftOptionsData } = await supabase
     .from('shifts')
@@ -352,264 +349,177 @@ export default async function ShiftBoardPage() {
       profileNamesById.set(profile.id, profile.full_name)
     }
   }
+  const shiftOptionsForClaims = shiftOptions.map((shift) => ({
+    id: shift.id,
+    label: `${formatDate(shift.date)} (${shift.shift_type})`,
+  }))
+  const postRows: ShiftPostTableRow[] = posts.map((post) => {
+    const shift = shiftDetailsById.get(post.shift_id)
+    const cycle = shift ? getOne(shift.schedule_cycles) : null
+    const offeredShift = post.swap_shift_id ? shiftDetailsById.get(post.swap_shift_id) : null
+    const postedBy =
+      post.posted_by === user.id ? 'You' : profileNamesById.get(post.posted_by) ?? 'Another therapist'
+    const claimerName = post.claimed_by
+      ? post.claimed_by === user.id
+        ? 'You'
+        : (profileNamesById.get(post.claimed_by) ?? 'Another therapist')
+      : null
+    const isOwnPost = post.posted_by === user.id
+    const isClaimedByMe = post.claimed_by === user.id
+    const canClaim = !isOwnPost && post.status === 'pending' && !post.claimed_by && role === 'therapist'
 
-  return (
-    <main className="min-h-screen bg-background p-6 md:p-8">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <TeamwiseLogo size="small" className="mb-2" />
-            <h1 className="text-3xl font-bold text-foreground">Shift Board</h1>
-            <p className="text-muted-foreground">
-              {role === 'manager'
-                ? 'Review and approve posted swap and pickup requests.'
-                : 'Post swap or pickup requests for your shifts.'}
-            </p>
-          </div>
-          <Button asChild variant="outline">
-            <Link href="/dashboard">Back to Dashboard</Link>
-          </Button>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Create Post</CardTitle>
-            <CardDescription>Choose one of your assigned shifts and post a request.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {shiftOptions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No eligible shifts found for your account yet. Ask a manager to assign shifts first.
-              </p>
-            ) : (
-              <form action={createShiftPostAction} className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="shift_id">Shift</Label>
-                  <select
-                    id="shift_id"
-                    name="shift_id"
-                    className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
-                    defaultValue=""
-                    required
-                  >
-                    <option value="" disabled>
-                      Select shift
-                    </option>
-                    {shiftOptions.map((shift) => {
-                      const cycle = getOne(shift.schedule_cycles)
-                      return (
-                        <option key={shift.id} value={shift.id}>
-                          {formatDate(shift.date)} - {shift.shift_type} - {shift.status}
-                          {cycle ? ` (${cycle.label}${cycle.published ? '' : ', draft'})` : ''}
-                        </option>
-                      )
-                    })}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="type">Request Type</Label>
-                  <select
-                    id="type"
-                    name="type"
-                    className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
-                    defaultValue="swap"
-                  >
-                    <option value="swap">Swap</option>
-                    <option value="pickup">Pickup</option>
-                  </select>
-                </div>
-                <div className="space-y-2 md:col-span-3">
-                  <Label htmlFor="message">Message</Label>
-                  <textarea
-                    id="message"
-                    name="message"
-                    rows={3}
-                    required
-                    className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm"
-                    placeholder="Example: Need coverage for family event."
-                  />
-                </div>
-                <div className="md:col-span-3">
-                  <Button type="submit">Post to Shift Board</Button>
-                </div>
-              </form>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Open Posts</CardTitle>
-            <CardDescription>
-              {role === 'manager'
-                ? 'Approve or deny requests from the team.'
-                : 'Track active requests and your own submissions.'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Shift</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Posted By</TableHead>
-                  <TableHead>Message</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead>Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {posts.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={8} className="py-6 text-center text-muted-foreground">
-                      No shift posts yet.
-                    </TableCell>
-                  </TableRow>
-                )}
-
-                {posts.map((post) => {
-                  const shift = shiftDetailsById.get(post.shift_id)
-                  const cycle = shift ? getOne(shift.schedule_cycles) : null
-                  const offeredShift = post.swap_shift_id ? shiftDetailsById.get(post.swap_shift_id) : null
-                  const submittedBy =
-                    post.posted_by === user.id
-                      ? 'You'
-                      : profileNamesById.get(post.posted_by) ?? 'Another therapist'
-                  const claimerName = post.claimed_by
-                    ? post.claimed_by === user.id
-                      ? 'You'
-                      : (profileNamesById.get(post.claimed_by) ?? 'Another therapist')
-                    : null
-                  const isOwnPost = post.posted_by === user.id
-                  const isClaimedByMe = post.claimed_by === user.id
-                  const canClaim =
-                    !isOwnPost && post.status === 'pending' && !post.claimed_by && role === 'therapist'
-
+    return {
+      id: post.id,
+      hasShiftDetails: Boolean(shift),
+      shiftDate: shift?.date ?? '',
+      shiftType: shift?.shift_type ?? 'day',
+      shiftStatus: shift?.status ?? 'scheduled',
+      cycleLabel: cycle ? cycle.label : 'No cycle',
+      offeredShiftLabel: offeredShift ? `${formatDate(offeredShift.date)} (${offeredShift.shift_type})` : null,
+      type: post.type,
+      postedBy,
+      message: post.message,
+      status: post.status,
+      createdAt: post.created_at,
+      claimerName,
+      isOwnPost,
+      isClaimedByMe,
+      canClaim,
+    }
+  })
+  const createPostCard = (
+    <Card id="create-post">
+      <CardHeader>
+        <CardTitle>Create Post</CardTitle>
+        <CardDescription>Choose one of your assigned shifts and post a request.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {shiftOptions.length === 0 ? (
+          <EmptyState
+            title="No shifts available to post yet"
+            description="Ask your manager to assign shifts, or view your schedule."
+            actions={
+              <Button asChild variant="outline" size="sm">
+                <Link href="/schedule">View my schedule</Link>
+              </Button>
+            }
+          />
+        ) : (
+          <form action={createShiftPostAction} className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="shift_id">Shift</Label>
+              <select
+                id="shift_id"
+                name="shift_id"
+                className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                defaultValue=""
+                required
+              >
+                <option value="" disabled>
+                  Select shift
+                </option>
+                {shiftOptions.map((shift) => {
+                  const cycle = getOne(shift.schedule_cycles)
                   return (
-                    <TableRow key={post.id}>
-                      <TableCell>{shift ? formatDate(shift.date) : 'Unavailable'}</TableCell>
-                      <TableCell>
-                        {shift ? (
-                          <>
-                            <div className="capitalize">{shift.shift_type}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {cycle ? cycle.label : 'No cycle'} - {shift.status}
-                            </div>
-                            {offeredShift && (
-                              <div className="mt-1 text-xs text-muted-foreground">
-                                Offered: {formatDate(offeredShift.date)} ({offeredShift.shift_type})
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <span className="text-muted-foreground">Shift details unavailable</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="capitalize">{post.type}</TableCell>
-                      <TableCell>{submittedBy}</TableCell>
-                      <TableCell>{post.message}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            post.status === 'approved'
-                              ? 'default'
-                              : post.status === 'denied'
-                                ? 'destructive'
-                                : 'outline'
-                          }
-                        >
-                          {post.status}
-                        </Badge>
-                        {claimerName && post.status === 'pending' && (
-                          <div className="mt-1 text-xs text-muted-foreground">Claimed by {claimerName}</div>
-                        )}
-                      </TableCell>
-                      <TableCell>{formatDateTime(post.created_at)}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2">
-                          {isOwnPost && post.status === 'pending' && (
-                            <form action={deleteShiftPostAction}>
-                              <input type="hidden" name="post_id" value={post.id} />
-                              <Button type="submit" variant="outline" size="sm">
-                                Delete
-                              </Button>
-                            </form>
-                          )}
-
-                          {/* Therapist claim actions */}
-                          {canClaim && post.type === 'pickup' && (
-                            <form action={claimShiftPostAction}>
-                              <input type="hidden" name="post_id" value={post.id} />
-                              <Button type="submit" variant="outline" size="sm">
-                                Claim shift
-                              </Button>
-                            </form>
-                          )}
-
-                          {canClaim && post.type === 'swap' && shiftOptions.length > 0 && (
-                            <form action={claimShiftPostAction} className="flex items-center gap-2">
-                              <input type="hidden" name="post_id" value={post.id} />
-                              <select
-                                name="swap_shift_id"
-                                required
-                                className="h-8 rounded-md border border-border bg-white px-2 text-xs"
-                              >
-                                <option value="">My shift…</option>
-                                {shiftOptions.map((s) => (
-                                  <option key={s.id} value={s.id}>
-                                    {formatDate(s.date)} ({s.shift_type})
-                                  </option>
-                                ))}
-                              </select>
-                              <Button type="submit" variant="outline" size="sm">
-                                Offer swap
-                              </Button>
-                            </form>
-                          )}
-
-                          {isClaimedByMe && post.status === 'pending' && (
-                            <form action={unclaimShiftPostAction}>
-                              <input type="hidden" name="post_id" value={post.id} />
-                              <Button type="submit" variant="outline" size="sm">
-                                Unclaim
-                              </Button>
-                            </form>
-                          )}
-
-                          {role === 'manager' && (
-                            <>
-                              {post.status !== 'approved' && (
-                                <form action={updateShiftPostStatusAction}>
-                                  <input type="hidden" name="post_id" value={post.id} />
-                                  <input type="hidden" name="status" value="approved" />
-                                  <Button type="submit" size="sm">
-                                    Approve
-                                  </Button>
-                                </form>
-                              )}
-                              {post.status !== 'denied' && (
-                                <form action={updateShiftPostStatusAction}>
-                                  <input type="hidden" name="post_id" value={post.id} />
-                                  <input type="hidden" name="status" value="denied" />
-                                  <Button type="submit" variant="destructive" size="sm">
-                                    Deny
-                                  </Button>
-                                </form>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                    <option key={shift.id} value={shift.id}>
+                      {formatDate(shift.date)} - {shift.shift_type} - {shift.status}
+                      {cycle ? ` (${cycle.label}${cycle.published ? '' : ', draft'})` : ''}
+                    </option>
                   )
                 })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="type">Request Type</Label>
+              <select
+                id="type"
+                name="type"
+                className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                defaultValue="swap"
+              >
+                <option value="swap">Swap</option>
+                <option value="pickup">Pickup</option>
+              </select>
+            </div>
+            <div className="space-y-2 md:col-span-3">
+              <Label htmlFor="message">Message</Label>
+              <textarea
+                id="message"
+                name="message"
+                rows={3}
+                required
+                className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm"
+                placeholder="Example: Need coverage for family event."
+              />
+            </div>
+            <div className="md:col-span-3">
+              <Button type="submit">Post to Shift Board</Button>
+            </div>
+          </form>
+        )}
+      </CardContent>
+    </Card>
+  )
+  const openPostsCard = (
+    <ShiftPostsTable
+      role={role}
+      rows={postRows}
+      shiftOptions={shiftOptionsForClaims}
+      deleteShiftPostAction={deleteShiftPostAction}
+      claimShiftPostAction={claimShiftPostAction}
+      unclaimShiftPostAction={unclaimShiftPostAction}
+      updateShiftPostStatusAction={updateShiftPostStatusAction}
+    />
+  )
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="app-page-title">Shift Board</h1>
+        <p className="text-muted-foreground">
+          {role === 'manager'
+            ? 'Review and approve posted swap and pickup requests.'
+            : 'Post swap or pickup requests for your shifts.'}
+        </p>
       </div>
-    </main>
+
+      {role === 'manager' && managerAttention && <ManagerAttentionPanel snapshot={managerAttention} />}
+
+      <div className="flex items-center gap-2">
+        {role === 'manager' ? (
+          <Button asChild>
+            <a href="#open-posts">Approve Requests</a>
+          </Button>
+        ) : (
+          <Button asChild>
+            <a href="#create-post">Create Post</a>
+          </Button>
+        )}
+
+        <MoreActionsMenu>
+          {role === 'manager' ? (
+            <a href="#create-post" className="block rounded-sm px-3 py-2 text-sm hover:bg-secondary">
+              Create Post
+            </a>
+          ) : (
+            <a href="#open-posts" className="block rounded-sm px-3 py-2 text-sm hover:bg-secondary">
+              Review Open Posts
+            </a>
+          )}
+        </MoreActionsMenu>
+      </div>
+
+      {role === 'manager' ? (
+        <>
+          {openPostsCard}
+          {createPostCard}
+        </>
+      ) : (
+        <>
+          {createPostCard}
+          {openPostsCard}
+        </>
+      )}
+    </div>
   )
 }

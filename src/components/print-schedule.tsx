@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useSyncExternalStore } from 'react'
+import type { ShiftStatus } from '@/app/schedule/types'
+import { formatDayNumber, formatWeekdayShort, getPrintShiftCode } from '@/lib/schedule-helpers'
 
 type Therapist = {
   id: string
@@ -17,28 +19,9 @@ type PrintScheduleProps = {
   dayTeam: Therapist[]
   nightTeam: Therapist[]
   printUsers: Therapist[]
-  shiftByUserDate: Record<string, 'scheduled' | 'on_call' | 'sick' | 'called_off'>
+  shiftByUserDate: Record<string, ShiftStatus>
   coverageTotalsByDate: Record<string, number>
   isManager: boolean
-}
-
-function formatDayNumber(value: string): string {
-  const parsed = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return value
-  return String(parsed.getDate())
-}
-
-function formatWeekdayShort(value: string): string {
-  const parsed = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return '-'
-  return parsed.toLocaleDateString('en-US', { weekday: 'short' }).charAt(0)
-}
-
-function getPrintShiftCode(status: string): string {
-  if (status === 'on_call') return 'OC'
-  if (status === 'sick') return 'S'
-  if (status === 'called_off') return 'OFF'
-  return '1'
 }
 
 export function PrintSchedule({
@@ -51,11 +34,11 @@ export function PrintSchedule({
   coverageTotalsByDate,
   isManager,
 }: PrintScheduleProps) {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  )
 
   if (!mounted) return null
 
