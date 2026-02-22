@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -107,9 +108,9 @@ export default function SignupPage() {
             </Button>
             <p className="text-center text-sm text-slate-500">
               Already have an account?{' '}
-              <a href="/login" className="text-blue-600 hover:underline">
+              <Link href="/login" className="text-blue-600 hover:underline">
                 Sign in
-              </a>
+              </Link>
             </p>
           </form>
         </CardContent>
