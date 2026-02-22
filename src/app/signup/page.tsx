@@ -1,8 +1,11 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+
+import { createClient } from '@/lib/supabase/client'
+import { TeamwiseLogo } from '@/components/teamwise-logo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -46,11 +49,14 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="text-center space-y-1">
-          <CardTitle className="text-2xl font-bold text-slate-800">Create Account</CardTitle>
-          <CardDescription>Join the RT Scheduler</CardDescription>
+    <main className="teamwise-grid-bg flex min-h-screen items-center justify-center p-4">
+      <Card className="w-full max-w-md bg-card/95 backdrop-blur">
+        <CardHeader className="space-y-3 text-center">
+          <TeamwiseLogo className="justify-center" />
+          <div className="space-y-1">
+            <CardTitle className="text-2xl font-semibold text-foreground">Request Access</CardTitle>
+            <CardDescription>Join Teamwise to manage schedules and coverage.</CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignup} className="space-y-4">
@@ -81,7 +87,7 @@ export default function SignupPage() {
               <Input
                 id="password"
                 type="password"
-                placeholder="••••••••"
+                placeholder="Create a password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -93,23 +99,21 @@ export default function SignupPage() {
                 id="shiftType"
                 value={shiftType}
                 onChange={(e) => setShiftType(e.target.value)}
-                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+                className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--highlight)]"
               >
                 <option value="day">Day Shift</option>
                 <option value="night">Night Shift</option>
               </select>
             </div>
-            {error && (
-              <p className="text-sm text-red-500">{error}</p>
-            )}
+            {error && <p className="text-sm text-red-600">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Creating account...' : 'Create Account'}
+              {loading ? 'Creating account...' : 'Request Access'}
             </Button>
-            <p className="text-center text-sm text-slate-500">
+            <p className="text-center text-sm text-muted-foreground">
               Already have an account?{' '}
-              <a href="/login" className="text-blue-600 hover:underline">
+              <Link href="/login" className="text-[var(--highlight)] hover:underline">
                 Sign in
-              </a>
+              </Link>
             </p>
           </form>
         </CardContent>

@@ -1,8 +1,11 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+
+import { createClient } from '@/lib/supabase/client'
+import { TeamwiseLogo } from '@/components/teamwise-logo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -34,11 +37,14 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="text-center space-y-1">
-          <CardTitle className="text-2xl font-bold text-slate-800">RT Scheduler</CardTitle>
-          <CardDescription>Sign in to your account</CardDescription>
+    <main className="teamwise-grid-bg flex min-h-screen items-center justify-center p-4">
+      <Card className="w-full max-w-md bg-card/95 backdrop-blur">
+        <CardHeader className="space-y-3 text-center">
+          <TeamwiseLogo className="justify-center" />
+          <div className="space-y-1">
+            <CardTitle className="text-2xl font-semibold text-foreground">Welcome back</CardTitle>
+            <CardDescription>The schedule your team trusts.</CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
@@ -58,23 +64,21 @@ export default function LoginPage() {
               <Input
                 id="password"
                 type="password"
-                placeholder="••••••••"
+                placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
             </div>
-            {error && (
-              <p className="text-sm text-red-500">{error}</p>
-            )}
+            {error && <p className="text-sm text-red-600">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Signing in...' : 'Sign In'}
             </Button>
-            <p className="text-center text-sm text-slate-500">
+            <p className="text-center text-sm text-muted-foreground">
               No account yet?{' '}
-              <a href="/signup" className="text-blue-600 hover:underline">
-                Sign up
-              </a>
+              <Link href="/signup" className="text-[var(--highlight)] hover:underline">
+                Request access
+              </Link>
             </p>
           </form>
         </CardContent>

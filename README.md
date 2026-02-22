@@ -1,36 +1,89 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RT Scheduler
 
-## Getting Started
+Web app for respiratory therapy scheduling with role-based workflows:
+- Auth + role-aware dashboard
+- Availability requests
+- 6-week schedule cycle management
+- Shift board (swap/pickup posts with manager approval)
 
-First, run the development server:
+## Tech Stack
+- Next.js App Router + TypeScript + Tailwind + shadcn/ui
+- Supabase (Postgres + Auth + RLS)
 
+## Local Setup
+1. Install dependencies:
+```bash
+npm install
+```
+2. Create `.env.local` from `.env.example` and fill values.
+3. Run app:
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+4. Open `http://localhost:3000`.
+
+## Seed Demo Data
+The demo seed script is idempotent and creates:
+- one published cycle + one draft cycle
+- sample shifts for therapist profiles
+- sample availability requests
+- one sample shift board post
+
+Required env vars:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Run:
+```bash
+npm run seed:demo
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Seed Fake Employees
+Creates idempotent test Auth users and matching `profiles` rows.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Run:
+```bash
+npm run seed:users
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Defaults:
+- users: `employee01@teamwise.test` ... `employee08@teamwise.test`
+- password: `Teamwise123!`
+- roles: therapist
+- shift types: alternating day/night
 
-## Learn More
+Optional env overrides:
+- `SEED_USERS_COUNT`
+- `SEED_USERS_DOMAIN`
+- `SEED_USERS_PREFIX`
+- `SEED_USERS_PASSWORD`
+- `SEED_INCLUDE_MANAGER` (`true` creates `manager@<domain>`)
 
-To learn more about Next.js, take a look at the following resources:
+## E2E Tests
+Playwright smoke tests are in `e2e/`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Run:
+```bash
+npm run test:e2e
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Optional auth flow test uses:
+- `E2E_USER_EMAIL`
+- `E2E_USER_PASSWORD`
 
-## Deploy on Vercel
+## CI (GitHub Actions)
+Workflow: `.github/workflows/ci.yml`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `Lint and Build` runs on every push and pull request.
+- `Playwright E2E` runs when the following repository secrets are set:
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - optional: `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Useful Commands
+```bash
+npm run lint
+npm run build
+npm run seed:users
+npm run test:e2e
+```
