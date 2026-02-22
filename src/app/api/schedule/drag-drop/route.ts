@@ -4,6 +4,13 @@ import { createClient } from '@/lib/supabase/server'
 import { MAX_WORK_DAYS_PER_WEEK, MAX_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
 
 type ShiftStatus = 'scheduled' | 'on_call' | 'sick' | 'called_off'
+type RemovableShift = {
+  id: string
+  cycle_id: string
+  user_id: string
+  date: string
+  shift_type: 'day' | 'night'
+}
 type DragAction =
   | {
       action: 'assign'
@@ -309,10 +316,8 @@ export async function POST(request: Request) {
   }
 
   if (payload.action === 'remove') {
-    let shift:
-      | { id: string; cycle_id: string; user_id: string; date: string; shift_type: 'day' | 'night' }
-      | null = null
-    let shiftError: { message: string } | null = null
+    let shift: RemovableShift | null = null
+    let shiftError: string | null = null
 
     if (payload.shiftId) {
       const result = await supabase
@@ -320,8 +325,8 @@ export async function POST(request: Request) {
         .select('id, cycle_id, user_id, date, shift_type')
         .eq('id', payload.shiftId)
         .maybeSingle()
-      shift = (result.data as typeof shift) ?? null
-      shiftError = result.error ? { message: result.error.message } : null
+      shift = (result.data as RemovableShift | null) ?? null
+      shiftError = result.error?.message ?? null
     } else if (payload.userId && payload.date && payload.shiftType) {
       const result = await supabase
         .from('shifts')
@@ -331,8 +336,8 @@ export async function POST(request: Request) {
         .eq('date', payload.date)
         .eq('shift_type', payload.shiftType)
         .maybeSingle()
-      shift = (result.data as typeof shift) ?? null
-      shiftError = result.error ? { message: result.error.message } : null
+      shift = (result.data as RemovableShift | null) ?? null
+      shiftError = result.error?.message ?? null
     } else {
       return NextResponse.json({ error: 'Missing remove data' }, { status: 400 })
     }
@@ -341,7 +346,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Shift not found in this cycle' }, { status: 404 })
     }
 
-    const { error } = await supabase.from('shifts').delete().eq('id', payload.shiftId)
+    const { error } = await supabase.from('shifts').delete().eq('id', shift.id)
     if (error) {
       return NextResponse.json({ error: 'Could not remove shift' }, { status: 500 })
     }

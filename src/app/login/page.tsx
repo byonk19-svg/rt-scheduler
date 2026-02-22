@@ -37,51 +37,70 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="teamwise-grid-bg flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-md bg-card/95 backdrop-blur">
-        <CardHeader className="space-y-3 text-center">
-          <TeamwiseLogo className="justify-center" />
-          <div className="space-y-1">
-            <CardTitle className="text-2xl font-semibold text-foreground">Welcome back</CardTitle>
-            <CardDescription>The schedule your team trusts.</CardDescription>
+    <main className="teamwise-aurora-bg flex min-h-screen items-center justify-center p-4">
+      <Card className="w-full max-w-4xl overflow-hidden p-0">
+        <div className="grid md:grid-cols-2">
+          <div className="teamwise-grid-bg hidden border-r border-border p-8 md:block">
+            <TeamwiseLogo />
+            <div className="mt-10 space-y-3">
+              <p className="inline-flex w-fit rounded-md border border-[var(--primary)]/20 bg-secondary px-3 py-1 text-xs font-semibold text-[var(--tw-deep-blue)]">
+                Teamwise Scheduling
+              </p>
+              <h2 className="text-3xl font-bold tracking-tight text-foreground">
+                Welcome back to your scheduling center.
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Review coverage, publish cycles, and keep your team aligned without spreadsheet chaos.
+              </p>
+            </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Signing in...' : 'Sign In'}
-            </Button>
-            <p className="text-center text-sm text-muted-foreground">
-              No account yet?{' '}
-              <Link href="/signup" className="text-[var(--highlight)] hover:underline">
-                Request access
-              </Link>
-            </p>
-          </form>
-        </CardContent>
+
+          <div className="p-6 md:p-8">
+            <CardHeader className="space-y-3 px-0 text-center md:text-left">
+              <TeamwiseLogo className="justify-center md:justify-start" size="small" />
+              <div className="space-y-1">
+                <CardTitle className="text-2xl font-semibold text-foreground">Sign in</CardTitle>
+                <CardDescription>The schedule your team trusts.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="px-0">
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                {error && <p className="rounded-lg border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]">{error}</p>}
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Signing in...' : 'Sign In'}
+                </Button>
+                <p className="text-center text-sm text-muted-foreground">
+                  No account yet?{' '}
+                  <Link href="/signup" className="font-medium text-primary hover:underline">
+                    Request access
+                  </Link>
+                </p>
+              </form>
+            </CardContent>
+          </div>
+        </div>
       </Card>
     </main>
   )
