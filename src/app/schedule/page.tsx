@@ -9,6 +9,7 @@ import { FeedbackToast } from '@/components/feedback-toast'
 import { ManagerMonthCalendar } from '@/components/manager-month-calendar'
 import { TeamwiseLogo } from '@/components/teamwise-logo'
 import { PrintButton } from '@/components/print-button'
+import { PrintSchedule } from '@/components/print-schedule'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -1585,80 +1586,18 @@ export default async function SchedulePage({
           </Card>
         )}
 
-        <div className="print-only print-page">
-          {activeCycle ? (
-            <div className="space-y-2">
-              <div className="text-center">
-                <h1 className="text-xl font-bold">Teamwise Scheduling</h1>
-                <p className="text-sm">
-                  Final Schedule: {activeCycle.label} ({activeCycle.start_date} to {activeCycle.end_date})
-                </p>
-              </div>
-
-              <table className="print-matrix">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    {cycleDates.map((date) => (
-                      <th key={`day-number-${date}`}>{formatDayNumber(date)}</th>
-                    ))}
-                  </tr>
-                  <tr>
-                    <th>Shift</th>
-                    {cycleDates.map((date) => (
-                      <th key={`day-week-${date}`}>{formatWeekdayShort(date)}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {role === 'manager' && dayTeam.length > 0 && (
-                    <tr className="print-shift-header">
-                      <td colSpan={cycleDates.length + 1}>Day Shift Team</td>
-                    </tr>
-                  )}
-                  {(role === 'manager' ? dayTeam : printUsers).map((member) => (
-                    <tr key={`day-${member.id}`}>
-                      <td>{member.full_name}</td>
-                      {cycleDates.map((date) => {
-                        const shift = shiftByUserDate.get(`${member.id}:${date}`)
-                        return <td key={`${member.id}-${date}`}>{shift ? getPrintShiftCode(shift.status) : ''}</td>
-                      })}
-                    </tr>
-                  ))}
-
-                  {role === 'manager' && nightTeam.length > 0 && (
-                    <tr className="print-shift-header">
-                      <td colSpan={cycleDates.length + 1}>Night Shift Team</td>
-                    </tr>
-                  )}
-                  {role === 'manager' &&
-                    nightTeam.map((member) => (
-                      <tr key={`night-${member.id}`}>
-                        <td>{member.full_name}</td>
-                        {cycleDates.map((date) => {
-                          const shift = shiftByUserDate.get(`${member.id}:${date}`)
-                          return <td key={`${member.id}-${date}`}>{shift ? getPrintShiftCode(shift.status) : ''}</td>
-                        })}
-                      </tr>
-                    ))}
-
-                  {role === 'manager' && (
-                    <tr>
-                      <td>Total Coverage</td>
-                      {cycleDates.map((date) => (
-                        <td key={`total-${date}`}>{coverageTotalsByDate.get(date) ?? 0}</td>
-                      ))}
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-
-              <p className="text-xs text-center">Codes: 1 = scheduled, OC = on call, S = sick, OFF = called off</p>
-            </div>
-          ) : (
-            <p>No schedule cycle selected for printing.</p>
+        <PrintSchedule
+          activeCycle={activeCycle ? { label: activeCycle.label, start_date: activeCycle.start_date, end_date: activeCycle.end_date } : null}
+          cycleDates={cycleDates}
+          dayTeam={dayTeam}
+          nightTeam={nightTeam}
+          printUsers={printUsers}
+          shiftByUserDate={Object.fromEntries(
+            Array.from(shiftByUserDate.entries()).map(([key, shift]) => [key, shift.status])
           )}
-        </div>
+          coverageTotalsByDate={Object.fromEntries(coverageTotalsByDate.entries())}
+          isManager={role === 'manager'}
+        />
       </div>
     </main>
   )
