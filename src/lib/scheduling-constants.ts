@@ -1,0 +1,3 @@
+export const MAX_WORK_DAYS_PER_WEEK = 3
+export const MIN_SHIFT_COVERAGE_PER_DAY = 3
+export const MAX_SHIFT_COVERAGE_PER_DAY = 5

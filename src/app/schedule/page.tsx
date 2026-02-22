@@ -13,14 +13,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { createClient } from '@/lib/supabase/server'
+import { MAX_WORK_DAYS_PER_WEEK, MIN_SHIFT_COVERAGE_PER_DAY, MAX_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
 
 type Role = 'manager' | 'therapist'
 type ViewMode = 'grid' | 'list' | 'calendar'
 type ToastVariant = 'success' | 'error'
-
-const MAX_WORK_DAYS_PER_WEEK = 3
-const MIN_SHIFT_COVERAGE_PER_DAY = 3
-const MAX_SHIFT_COVERAGE_PER_DAY = 5
 
 type Cycle = {
   id: string

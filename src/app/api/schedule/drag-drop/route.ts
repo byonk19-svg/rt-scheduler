@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { createClient } from '@/lib/supabase/server'
-
-const MAX_WORK_DAYS_PER_WEEK = 3
-const MAX_SHIFT_COVERAGE_PER_DAY = 5
+import { MAX_WORK_DAYS_PER_WEEK, MAX_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
 
 type ShiftStatus = 'scheduled' | 'on_call' | 'sick' | 'called_off'
 type DragAction =
