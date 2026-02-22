@@ -6,12 +6,14 @@ import { MAX_WORK_DAYS_PER_WEEK, MAX_SHIFT_COVERAGE_PER_DAY } from '@/lib/schedu
 import { countsTowardWeeklyLimit, getWeekBoundsForDate, isDateWithinRange } from '@/lib/schedule-helpers'
 
 type ShiftStatus = 'scheduled' | 'on_call' | 'sick' | 'called_off'
+type ShiftRole = 'lead' | 'staff'
 type RemovableShift = {
   id: string
   cycle_id: string
   user_id: string
   date: string
   shift_type: 'day' | 'night'
+  role: ShiftRole
 }
 type DragAction =
   | {
@@ -190,6 +192,7 @@ export async function POST(request: Request) {
       date: payload.date,
       shift_type: payload.shiftType,
       status: 'scheduled',
+      role: 'staff',
     })
 
     if (error) {
@@ -220,7 +223,7 @@ export async function POST(request: Request) {
 
     const { data: shift, error: shiftError } = await supabase
       .from('shifts')
-      .select('id, cycle_id, user_id, date, shift_type, status')
+      .select('id, cycle_id, user_id, date, shift_type, status, role')
       .eq('id', payload.shiftId)
       .maybeSingle()
 
@@ -293,7 +296,7 @@ export async function POST(request: Request) {
     if (payload.shiftId) {
       const result = await supabase
         .from('shifts')
-        .select('id, cycle_id, user_id, date, shift_type')
+        .select('id, cycle_id, user_id, date, shift_type, role')
         .eq('id', payload.shiftId)
         .maybeSingle()
       shift = (result.data as RemovableShift | null) ?? null
@@ -301,7 +304,7 @@ export async function POST(request: Request) {
     } else if (payload.userId && payload.date && payload.shiftType) {
       const result = await supabase
         .from('shifts')
-        .select('id, cycle_id, user_id, date, shift_type')
+        .select('id, cycle_id, user_id, date, shift_type, role')
         .eq('cycle_id', payload.cycleId)
         .eq('user_id', payload.userId)
         .eq('date', payload.date)

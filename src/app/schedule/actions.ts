@@ -11,10 +11,11 @@ import {
 import {
   exceedsCoverageLimit,
   exceedsWeeklyLimit,
-  summarizeCoverageViolations,
   summarizePublishWeeklyViolations,
+  summarizeShiftSlotViolations,
 } from '@/lib/schedule-rule-validation'
 import { createClient } from '@/lib/supabase/server'
+import { setDesignatedLeadMutation } from '@/lib/set-designated-lead'
 import {
   buildDateRange,
   buildScheduleUrl,
@@ -28,10 +29,28 @@ import type {
   AutoScheduleShiftRow,
   AvailabilityDateRow,
   Role,
+  ShiftRole,
   ShiftLimitRow,
   ShiftStatus,
   Therapist,
 } from '@/app/schedule/types'
+
+type ShiftPublishValidationRow = {
+  date: string
+  shift_type: 'day' | 'night'
+  status: ShiftStatus
+  role: ShiftRole
+  user_id: string
+  profiles:
+    | { full_name: string; is_lead_eligible: boolean }
+    | { full_name: string; is_lead_eligible: boolean }[]
+    | null
+}
+
+function getOne<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null
+  return value ?? null
+}
 
 async function getRoleForUser(userId: string): Promise<Role> {
   const supabase = await createClient()
@@ -108,7 +127,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
     redirect('/schedule')
   }
 
-  if (!currentlyPublished && !overrideWeeklyRules) {
+  if (!currentlyPublished) {
     const { data: cycle, error: cycleError } = await supabase
       .from('schedule_cycles')
       .select('start_date, end_date')
@@ -132,66 +151,68 @@ export async function toggleCyclePublishedAction(formData: FormData) {
       cycleWeekEnds.set(bounds.weekStart, bounds.weekEnd)
     }
 
-    const { data: therapistsData, error: therapistsError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('role', 'therapist')
+    if (!overrideWeeklyRules) {
+      const { data: therapistsData, error: therapistsError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('role', 'therapist')
 
-    if (therapistsError) {
-      console.error('Failed to load therapists for publish validation:', therapistsError)
-      redirect(buildScheduleUrl(cycleId, view, { error: 'publish_validation_failed' }))
-    }
-
-    const therapistIds = (therapistsData ?? []).map((row) => row.id)
-    if (therapistIds.length > 0 && cycleWeekDates.size > 0) {
-      const weekStarts = Array.from(cycleWeekDates.keys()).sort()
-      const minWeekStart = weekStarts[0]
-      const maxWeekEnd = cycleWeekEnds.get(weekStarts[weekStarts.length - 1]) ?? minWeekStart
-
-      const { data: shiftsData, error: shiftsError } = await supabase
-        .from('shifts')
-        .select('user_id, date, status')
-        .in('user_id', therapistIds)
-        .gte('date', minWeekStart)
-        .lte('date', maxWeekEnd)
-
-      if (shiftsError) {
-        console.error('Failed to load shifts for publish validation:', shiftsError)
+      if (therapistsError) {
+        console.error('Failed to load therapists for publish validation:', therapistsError)
         redirect(buildScheduleUrl(cycleId, view, { error: 'publish_validation_failed' }))
       }
 
-      const weeklyWorkedDatesByUserWeek = new Map<string, Set<string>>()
-      for (const row of (shiftsData ?? []) as ShiftLimitRow[]) {
-        if (!countsTowardWeeklyLimit(row.status)) continue
-        const bounds = getWeekBoundsForDate(row.date)
-        if (!bounds) continue
-        const key = weeklyCountKey(row.user_id, bounds.weekStart)
-        const workedDates = weeklyWorkedDatesByUserWeek.get(key) ?? new Set<string>()
-        workedDates.add(row.date)
-        weeklyWorkedDatesByUserWeek.set(key, workedDates)
-      }
+      const therapistIds = (therapistsData ?? []).map((row) => row.id)
+      if (therapistIds.length > 0 && cycleWeekDates.size > 0) {
+        const weekStarts = Array.from(cycleWeekDates.keys()).sort()
+        const minWeekStart = weekStarts[0]
+        const maxWeekEnd = cycleWeekEnds.get(weekStarts[weekStarts.length - 1]) ?? minWeekStart
 
-      const { underCount, overCount, violations } = summarizePublishWeeklyViolations({
-        therapistIds,
-        cycleWeekDates,
-        weeklyWorkedDatesByUserWeek,
-        maxWorkDaysPerWeek: MAX_WORK_DAYS_PER_WEEK,
-      })
-      if (violations > 0) {
-        redirect(
-          buildScheduleUrl(cycleId, view, {
-            error: 'publish_weekly_rule_violation',
-            violations: String(violations),
-            under: String(underCount),
-            over: String(overCount),
-          })
-        )
+        const { data: shiftsData, error: shiftsError } = await supabase
+          .from('shifts')
+          .select('user_id, date, status')
+          .in('user_id', therapistIds)
+          .gte('date', minWeekStart)
+          .lte('date', maxWeekEnd)
+
+        if (shiftsError) {
+          console.error('Failed to load shifts for publish validation:', shiftsError)
+          redirect(buildScheduleUrl(cycleId, view, { error: 'publish_validation_failed' }))
+        }
+
+        const weeklyWorkedDatesByUserWeek = new Map<string, Set<string>>()
+        for (const row of (shiftsData ?? []) as ShiftLimitRow[]) {
+          if (!countsTowardWeeklyLimit(row.status)) continue
+          const bounds = getWeekBoundsForDate(row.date)
+          if (!bounds) continue
+          const key = weeklyCountKey(row.user_id, bounds.weekStart)
+          const workedDates = weeklyWorkedDatesByUserWeek.get(key) ?? new Set<string>()
+          workedDates.add(row.date)
+          weeklyWorkedDatesByUserWeek.set(key, workedDates)
+        }
+
+        const { underCount, overCount, violations } = summarizePublishWeeklyViolations({
+          therapistIds,
+          cycleWeekDates,
+          weeklyWorkedDatesByUserWeek,
+          maxWorkDaysPerWeek: MAX_WORK_DAYS_PER_WEEK,
+        })
+        if (violations > 0) {
+          redirect(
+            buildScheduleUrl(cycleId, view, {
+              error: 'publish_weekly_rule_violation',
+              violations: String(violations),
+              under: String(underCount),
+              over: String(overCount),
+            })
+          )
+        }
       }
     }
 
     const { data: shiftCoverageData, error: shiftCoverageError } = await supabase
       .from('shifts')
-      .select('date, shift_type, status')
+      .select('date, shift_type, status, role, user_id, profiles(full_name, is_lead_eligible)')
       .eq('cycle_id', cycleId)
       .gte('date', cycle.start_date)
       .lte('date', cycle.end_date)
@@ -201,27 +222,39 @@ export async function toggleCyclePublishedAction(formData: FormData) {
       redirect(buildScheduleUrl(cycleId, view, { error: 'publish_validation_failed' }))
     }
 
-    const coverageBySlot = new Map<string, number>()
-    for (const row of shiftCoverageData ?? []) {
-      if (!countsTowardWeeklyLimit(row.status)) continue
-      const key = coverageSlotKey(row.date, row.shift_type as 'day' | 'night')
-      const count = coverageBySlot.get(key) ?? 0
-      coverageBySlot.set(key, count + 1)
-    }
-
-    const { underCoverage, overCoverage } = summarizeCoverageViolations({
+    const slotValidation = summarizeShiftSlotViolations({
       cycleDates,
-      coverageBySlot,
+      assignments: ((shiftCoverageData ?? []) as ShiftPublishValidationRow[]).map((row) => ({
+        date: row.date,
+        shiftType: row.shift_type,
+        status: row.status,
+        role: row.role,
+        therapistId: row.user_id,
+        therapistName: getOne(row.profiles)?.full_name ?? 'Unknown',
+        isLeadEligible: Boolean(getOne(row.profiles)?.is_lead_eligible),
+      })),
       minCoveragePerShift: MIN_SHIFT_COVERAGE_PER_DAY,
       maxCoveragePerShift: MAX_SHIFT_COVERAGE_PER_DAY,
     })
 
-    if (underCoverage > 0 || overCoverage > 0) {
+    if (slotValidation.violations > 0) {
+      const affectedList = slotValidation.issues
+        .slice(0, 8)
+        .map((issue) => `${issue.date} ${issue.shiftType}`)
+        .join(', ')
+      const truncatedCount = Math.max(slotValidation.issues.length - 8, 0)
+      const affectedSummary =
+        truncatedCount > 0 ? `${affectedList}, +${truncatedCount} more` : affectedList
+
       redirect(
         buildScheduleUrl(cycleId, view, {
-          error: 'publish_coverage_rule_violation',
-          under_coverage: String(underCoverage),
-          over_coverage: String(overCoverage),
+          error: 'publish_shift_rule_violation',
+          under_coverage: String(slotValidation.underCoverage),
+          over_coverage: String(slotValidation.overCoverage),
+          lead_missing: String(slotValidation.missingLead),
+          lead_multiple: String(slotValidation.multipleLeads),
+          lead_ineligible: String(slotValidation.ineligibleLead),
+          affected: affectedSummary || undefined,
         })
       )
     }
@@ -327,6 +360,7 @@ export async function addShiftAction(formData: FormData) {
     date,
     shift_type: shiftType,
     status,
+    role: 'staff',
   })
 
   if (error) {
@@ -380,7 +414,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
 
   const { data: therapistsData, error: therapistsError } = await supabase
     .from('profiles')
-    .select('id, full_name, shift_type')
+    .select('id, full_name, shift_type, is_lead_eligible')
     .eq('role', 'therapist')
     .order('full_name', { ascending: true })
 
@@ -411,7 +445,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
     await Promise.all([
       supabase
         .from('shifts')
-        .select('user_id, date, shift_type, status')
+        .select('user_id, date, shift_type, status, role')
         .eq('cycle_id', cycleId),
       supabase
         .from('availability_requests')
@@ -499,6 +533,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
     date: string
     shift_type: 'day' | 'night'
     status: 'scheduled'
+    role: 'staff'
   }> = []
 
   for (const date of cycleDates) {
@@ -524,6 +559,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
           date,
           shift_type: 'day',
           status: 'scheduled',
+          role: 'staff',
         })
         assignedForDate.add(dayPick.therapist.id)
         const weekBounds = getWeekBoundsForDate(date)
@@ -560,6 +596,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
           date,
           shift_type: 'night',
           status: 'scheduled',
+          role: 'staff',
         })
         assignedForDate.add(nightPick.therapist.id)
         const weekBounds = getWeekBoundsForDate(date)
@@ -625,6 +662,122 @@ export async function deleteShiftAction(formData: FormData) {
   const { error } = await supabase.from('shifts').delete().eq('id', shiftId)
   if (error) {
     console.error('Failed to delete shift:', error)
+  }
+
+  revalidatePath('/schedule')
+  redirect(buildScheduleUrl(cycleId, view))
+}
+
+export async function setDesignatedLeadAction(formData: FormData) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  const role = await getRoleForUser(user.id)
+  if (role !== 'manager') {
+    redirect('/schedule')
+  }
+
+  const cycleId = String(formData.get('cycle_id') ?? '').trim()
+  const therapistId = String(formData.get('therapist_id') ?? '').trim()
+  const date = String(formData.get('date') ?? '').trim()
+  const shiftType = String(formData.get('shift_type') ?? '').trim() as 'day' | 'night'
+  const view = String(formData.get('view') ?? '').trim()
+
+  if (!cycleId || !therapistId || !date || (shiftType !== 'day' && shiftType !== 'night')) {
+    redirect(buildScheduleUrl(cycleId || undefined, view, { error: 'set_lead_failed' }))
+  }
+
+  const { data: therapist, error: therapistError } = await supabase
+    .from('profiles')
+    .select('id, role, is_lead_eligible')
+    .eq('id', therapistId)
+    .maybeSingle()
+
+  if (therapistError || !therapist || therapist.role !== 'therapist' || !therapist.is_lead_eligible) {
+    redirect(buildScheduleUrl(cycleId, view, { error: 'set_lead_not_eligible' }))
+  }
+
+  const { data: existingShift, error: existingShiftError } = await supabase
+    .from('shifts')
+    .select('id, status')
+    .eq('cycle_id', cycleId)
+    .eq('user_id', therapistId)
+    .eq('date', date)
+    .eq('shift_type', shiftType)
+    .maybeSingle()
+
+  if (existingShiftError) {
+    console.error('Failed to load existing shift for designated lead action:', existingShiftError)
+    redirect(buildScheduleUrl(cycleId, view, { error: 'set_lead_failed' }))
+  }
+
+  if (!existingShift) {
+    const { data: sameSlotShifts, error: sameSlotError } = await supabase
+      .from('shifts')
+      .select('status')
+      .eq('cycle_id', cycleId)
+      .eq('date', date)
+      .eq('shift_type', shiftType)
+
+    if (sameSlotError) {
+      console.error('Failed to load slot coverage for designated lead action:', sameSlotError)
+      redirect(buildScheduleUrl(cycleId, view, { error: 'set_lead_failed' }))
+    }
+
+    const activeCoverage = (sameSlotShifts ?? []).filter((row) => countsTowardWeeklyLimit(row.status)).length
+    if (exceedsCoverageLimit(activeCoverage, MAX_SHIFT_COVERAGE_PER_DAY)) {
+      redirect(buildScheduleUrl(cycleId, view, { error: 'set_lead_coverage_max' }))
+    }
+
+    const bounds = getWeekBoundsForDate(date)
+    if (!bounds) {
+      redirect(buildScheduleUrl(cycleId, view, { error: 'set_lead_failed' }))
+    }
+
+    const { data: weeklyShiftsData, error: weeklyShiftsError } = await supabase
+      .from('shifts')
+      .select('date, status')
+      .eq('user_id', therapistId)
+      .gte('date', bounds.weekStart)
+      .lte('date', bounds.weekEnd)
+
+    if (weeklyShiftsError) {
+      console.error('Failed to load weekly shifts for designated lead action:', weeklyShiftsError)
+      redirect(buildScheduleUrl(cycleId, view, { error: 'set_lead_failed' }))
+    }
+
+    const workedDates = new Set<string>()
+    for (const row of (weeklyShiftsData ?? []) as Array<{ date: string; status: ShiftStatus }>) {
+      if (!countsTowardWeeklyLimit(row.status)) continue
+      workedDates.add(row.date)
+    }
+
+    if (exceedsWeeklyLimit(workedDates, date, MAX_WORK_DAYS_PER_WEEK)) {
+      redirect(buildScheduleUrl(cycleId, view, { error: 'set_lead_weekly_limit' }))
+    }
+  }
+
+  const mutationResult = await setDesignatedLeadMutation(supabase, {
+    cycleId,
+    therapistId,
+    date,
+    shiftType,
+  })
+
+  if (!mutationResult.ok) {
+    if (mutationResult.reason === 'lead_not_eligible') {
+      redirect(buildScheduleUrl(cycleId, view, { error: 'set_lead_not_eligible' }))
+    }
+    if (mutationResult.reason === 'multiple_leads_prevented') {
+      redirect(buildScheduleUrl(cycleId, view, { error: 'set_lead_multiple' }))
+    }
+    redirect(buildScheduleUrl(cycleId, view, { error: 'set_lead_failed' }))
   }
 
   revalidatePath('/schedule')

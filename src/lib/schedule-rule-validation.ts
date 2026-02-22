@@ -1,4 +1,5 @@
 import { coverageSlotKey, weeklyCountKey } from '@/lib/schedule-helpers'
+import type { ShiftRole, ShiftStatus } from '@/app/schedule/types'
 
 type PublishWeeklyInput = {
   therapistIds: string[]
@@ -24,6 +25,41 @@ type CoverageValidationResult = {
   underCoverage: number
   overCoverage: number
   violations: number
+}
+
+export type SlotAssignment = {
+  date: string
+  shiftType: 'day' | 'night'
+  status: ShiftStatus
+  role: ShiftRole
+  therapistId: string
+  therapistName: string
+  isLeadEligible: boolean
+}
+
+type ShiftSlotValidationInput = {
+  cycleDates: string[]
+  assignments: SlotAssignment[]
+  minCoveragePerShift: number
+  maxCoveragePerShift: number
+}
+
+export type ShiftSlotValidationIssue = {
+  slotKey: string
+  date: string
+  shiftType: 'day' | 'night'
+  reasons: Array<'under_coverage' | 'over_coverage' | 'missing_lead' | 'multiple_leads' | 'ineligible_lead'>
+  leadName: string | null
+}
+
+export type ShiftSlotValidationSummary = {
+  underCoverage: number
+  overCoverage: number
+  missingLead: number
+  multipleLeads: number
+  ineligibleLead: number
+  violations: number
+  issues: ShiftSlotValidationIssue[]
 }
 
 export function exceedsCoverageLimit(activeCoverage: number, maxCoveragePerShift: number): boolean {
@@ -80,4 +116,80 @@ export function summarizeCoverageViolations({
   }
 
   return { underCoverage, overCoverage, violations: underCoverage + overCoverage }
+}
+
+export function summarizeShiftSlotViolations({
+  cycleDates,
+  assignments,
+  minCoveragePerShift,
+  maxCoveragePerShift,
+}: ShiftSlotValidationInput): ShiftSlotValidationSummary {
+  const assignmentsBySlot = new Map<string, SlotAssignment[]>()
+  for (const assignment of assignments) {
+    const slotKey = coverageSlotKey(assignment.date, assignment.shiftType)
+    const slotAssignments = assignmentsBySlot.get(slotKey) ?? []
+    slotAssignments.push(assignment)
+    assignmentsBySlot.set(slotKey, slotAssignments)
+  }
+
+  const issues: ShiftSlotValidationIssue[] = []
+  let underCoverage = 0
+  let overCoverage = 0
+  let missingLead = 0
+  let multipleLeads = 0
+  let ineligibleLead = 0
+
+  for (const date of cycleDates) {
+    for (const shiftType of ['day', 'night'] as const) {
+      const slotKey = coverageSlotKey(date, shiftType)
+      const slotAssignments = assignmentsBySlot.get(slotKey) ?? []
+      const activeAssignments = slotAssignments.filter((assignment) => assignment.status === 'scheduled' || assignment.status === 'on_call')
+      const activeCoverage = activeAssignments.length
+      const leadAssignments = slotAssignments.filter((assignment) => assignment.role === 'lead')
+      const hasEligibleCoverage = activeAssignments.some((assignment) => assignment.isLeadEligible)
+      const leadName = leadAssignments[0]?.therapistName ?? null
+
+      const reasons: ShiftSlotValidationIssue['reasons'] = []
+      if (activeCoverage < minCoveragePerShift) {
+        underCoverage += 1
+        reasons.push('under_coverage')
+      }
+      if (activeCoverage > maxCoveragePerShift) {
+        overCoverage += 1
+        reasons.push('over_coverage')
+      }
+      if (leadAssignments.length === 0 || !hasEligibleCoverage) {
+        missingLead += 1
+        reasons.push('missing_lead')
+      }
+      if (leadAssignments.length > 1) {
+        multipleLeads += 1
+        reasons.push('multiple_leads')
+      }
+      if (leadAssignments.length > 0 && leadAssignments.some((assignment) => !assignment.isLeadEligible)) {
+        ineligibleLead += 1
+        reasons.push('ineligible_lead')
+      }
+
+      if (reasons.length > 0) {
+        issues.push({
+          slotKey,
+          date,
+          shiftType,
+          reasons,
+          leadName,
+        })
+      }
+    }
+  }
+
+  return {
+    underCoverage,
+    overCoverage,
+    missingLead,
+    multipleLeads,
+    ineligibleLead,
+    violations: underCoverage + overCoverage + missingLead + multipleLeads + ineligibleLead,
+    issues,
+  }
 }

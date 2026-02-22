@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import type { DragEvent } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -19,8 +19,10 @@ type Shift = {
   date: string
   shift_type: 'day' | 'night'
   status: 'scheduled' | 'on_call' | 'sick' | 'called_off'
+  role: 'lead' | 'staff'
   user_id: string
   full_name: string
+  isLeadEligible: boolean
 }
 
 type DragPayload =
@@ -70,6 +72,9 @@ type ManagerMonthCalendarProps = {
   cyclePublished: boolean
   therapists: Therapist[]
   shifts: Shift[]
+  issueFilter?: 'all' | 'missing_lead' | 'under_coverage' | 'over_coverage'
+  focusFirst?: boolean
+  focusSlotKey?: string | null
 }
 
 function dateFromKey(value: string): Date {
@@ -137,6 +142,9 @@ export function ManagerMonthCalendar({
   cyclePublished,
   therapists,
   shifts,
+  issueFilter = 'all',
+  focusFirst = false,
+  focusSlotKey = null,
 }: ManagerMonthCalendarProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -189,6 +197,20 @@ export function ManagerMonthCalendar({
   const isInCycle = (date: string): boolean => date >= startDate && date <= endDate
   const countsTowardCoverage = (status: Shift['status']): boolean =>
     status === 'scheduled' || status === 'on_call'
+
+  useEffect(() => {
+    if (!focusFirst || !focusSlotKey) return
+    const [focusDate, focusShiftType] = focusSlotKey.split(':')
+    const targetId = `slot-card-${focusDate}-${focusShiftType}`
+    const element = document.getElementById(targetId)
+    if (!element) return
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    element.classList.add('ring-2', 'ring-primary')
+    const timer = window.setTimeout(() => {
+      element.classList.remove('ring-2', 'ring-primary')
+    }, 2200)
+    return () => window.clearTimeout(timer)
+  }, [focusFirst, focusSlotKey])
 
   function setDragData(event: DragEvent<HTMLElement>, payload: DragPayload) {
     event.dataTransfer.setData('application/json', JSON.stringify(payload))
@@ -320,10 +342,20 @@ export function ManagerMonthCalendar({
             const date = keyFromDate(day)
             const dayShifts = (shiftsByDate.get(date) ?? []).filter((shift) => shift.shift_type === shiftType)
             const coverageCount = dayShifts.filter((shift) => countsTowardCoverage(shift.status)).length
+            const leadAssignments = dayShifts.filter((shift) => shift.role === 'lead')
+            const leadName = leadAssignments[0]?.full_name ?? null
+            const missingLead = leadAssignments.length === 0
+            const underCoverage = coverageCount < MIN_SHIFT_COVERAGE_PER_DAY
+            const overCoverage = coverageCount > MAX_SHIFT_COVERAGE_PER_DAY
+            const filterMatch =
+              issueFilter === 'all' ||
+              (issueFilter === 'missing_lead' && missingLead) ||
+              (issueFilter === 'under_coverage' && underCoverage) ||
+              (issueFilter === 'over_coverage' && overCoverage)
             const coverageTone =
-              coverageCount < MIN_SHIFT_COVERAGE_PER_DAY
+              underCoverage
                 ? 'text-amber-700'
-                : coverageCount > MAX_SHIFT_COVERAGE_PER_DAY
+                : overCoverage
                 ? 'text-red-700'
                 : 'text-emerald-700'
 
@@ -334,8 +366,10 @@ export function ManagerMonthCalendar({
                 onDragEnter={allowDrop}
                 onDragOver={allowDrop}
                 onDrop={(event) => onDropDate(event, date, shiftType)}
+                id={`slot-card-${date}-${shiftType}`}
                 className={cn(
-                  'min-h-40 rounded-xl border border-border bg-white p-2'
+                  'min-h-40 rounded-xl border border-border bg-white p-2',
+                  issueFilter !== 'all' && !filterMatch ? 'opacity-45' : ''
                 )}
               >
                 <div className="mb-2 flex items-center justify-between">
@@ -343,6 +377,15 @@ export function ManagerMonthCalendar({
                   <span className={cn('text-[10px] font-semibold uppercase', coverageTone)}>
                     {coverageCount}/{MIN_SHIFT_COVERAGE_PER_DAY}-{MAX_SHIFT_COVERAGE_PER_DAY}
                   </span>
+                </div>
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Lead:</span>
+                  {leadName ? (
+                    <span className="text-[11px] font-medium text-foreground">{leadName}</span>
+                  ) : (
+                    <span className="text-[11px] font-medium text-[var(--warning-text)]">Missing</span>
+                  )}
+                  {missingLead && <span className="text-[10px] text-[var(--warning-text)]">!</span>}
                 </div>
                 <div className="space-y-1">
                   {dayShifts.map((shift) => (
@@ -363,7 +406,14 @@ export function ManagerMonthCalendar({
                         palette.text
                       )}
                     >
-                      <div className="font-medium">{shift.full_name}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{shift.full_name}</span>
+                        {shift.role === 'lead' && (
+                          <span className="rounded border border-current/35 px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                            Lead
+                          </span>
+                        )}
+                      </div>
                       <div className="capitalize opacity-80">
                         {shift.shift_type} - {shift.status}
                       </div>
@@ -489,6 +539,7 @@ export function ManagerMonthCalendar({
             rangeLabel={rangeLabel}
             minCoverage={MIN_SHIFT_COVERAGE_PER_DAY}
             maxCoverage={MAX_SHIFT_COVERAGE_PER_DAY}
+            issueFilter={issueFilter}
             showDayTeam={showDayTeam}
             showNightTeam={showNightTeam}
             overrideWeeklyRules={overrideWeeklyRules}

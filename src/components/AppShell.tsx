@@ -44,7 +44,7 @@ const MANAGER_NAV_ITEMS: readonly NavItem[] = [
   },
   {
     href: MANAGER_WORKFLOW_LINKS.coverage,
-    label: 'Coverage gaps',
+    label: 'Coverage',
     isActive: (pathname, searchParams) => pathname === '/schedule' && searchParams.get('view') === 'calendar',
   },
   {

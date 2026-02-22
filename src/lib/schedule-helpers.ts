@@ -193,6 +193,37 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
       variant: 'error',
     }
   }
+  if (error === 'publish_shift_rule_violation') {
+    const underCoverage = parseCount(getSearchParam(params?.under_coverage))
+    const overCoverage = parseCount(getSearchParam(params?.over_coverage))
+    const missingLead = parseCount(getSearchParam(params?.lead_missing))
+    const multipleLeads = parseCount(getSearchParam(params?.lead_multiple))
+    const ineligibleLead = parseCount(getSearchParam(params?.lead_ineligible))
+    const affected = getSearchParam(params?.affected)
+    const affectedSummary = affected ? ` Affected: ${affected}.` : ''
+    return {
+      message: `Publish blocked. Coverage under: ${underCoverage}, coverage over: ${overCoverage}, missing lead: ${missingLead}, multiple leads: ${multipleLeads}, ineligible lead: ${ineligibleLead}.${affectedSummary}`,
+      variant: 'error',
+    }
+  }
+  if (error === 'set_lead_not_eligible') {
+    return { message: 'Only lead-eligible therapists can be designated as lead.', variant: 'error' }
+  }
+  if (error === 'set_lead_weekly_limit') {
+    return { message: `Designated lead would exceed the ${MAX_WORK_DAYS_PER_WEEK}-day weekly rule.`, variant: 'error' }
+  }
+  if (error === 'set_lead_coverage_max') {
+    return {
+      message: `Designated lead would exceed max coverage (${MAX_SHIFT_COVERAGE_PER_DAY}) for that shift.`,
+      variant: 'error',
+    }
+  }
+  if (error === 'set_lead_failed') {
+    return { message: 'Could not set designated lead for that shift. Please try again.', variant: 'error' }
+  }
+  if (error === 'set_lead_multiple') {
+    return { message: 'A designated lead already exists for that shift. Refresh and try again.', variant: 'error' }
+  }
 
   if (auto === 'generated') {
     const added = parseCount(getSearchParam(params?.added))

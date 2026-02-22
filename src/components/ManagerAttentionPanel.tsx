@@ -1,6 +1,5 @@
 import Link from 'next/link'
 
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import type { ManagerAttentionSnapshot } from '@/lib/manager-workflow'
@@ -12,40 +11,46 @@ type ManagerAttentionPanelProps = {
 }
 
 export function ManagerAttentionPanel({ snapshot, className }: ManagerAttentionPanelProps) {
-  const hasAttention = snapshot.attentionItems > 0
-
   return (
     <Card className={cn('no-print', className)}>
-      <CardContent className="flex flex-col gap-4 py-4 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Needs attention</p>
-            <Badge variant={hasAttention ? 'destructive' : 'outline'}>
-              {hasAttention ? `${snapshot.attentionItems} open item${snapshot.attentionItems === 1 ? '' : 's'}` : 'All clear'}
-            </Badge>
+      <CardContent className="space-y-3 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span className="font-semibold text-foreground">Pending approvals: {snapshot.pendingApprovals}</span>
+            <span className="text-foreground">Unfilled shifts: {snapshot.unfilledShiftSlots}</span>
+            <span className="text-foreground">Missing lead: {snapshot.missingLeadShifts}</span>
           </div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-            <Link href={snapshot.links.approvals} className="text-foreground underline-offset-4 hover:underline">
-              Pending approvals: <span className="font-semibold">{snapshot.pendingApprovals}</span>
-            </Link>
-            <Link href={snapshot.links.coverage} className="text-foreground underline-offset-4 hover:underline">
-              Unfilled shifts: <span className="font-semibold">{snapshot.unfilledShiftSlots}</span>
-            </Link>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {snapshot.coverageConfirmed
-              ? 'Coverage is currently at target for the active cycle.'
-              : 'Coverage still has open gaps in the active cycle.'}
-          </p>
+          <details className="group">
+            <summary className="cursor-pointer list-none rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-secondary">
+              Attention: {snapshot.attentionItems}
+            </summary>
+            <div className="mt-2 rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+              <p>Missing lead: {snapshot.missingLeadShifts}</p>
+              <p>Under coverage: {snapshot.underCoverageSlots}</p>
+              <p>Over coverage: {snapshot.overCoverageSlots}</p>
+              <p>Pending approvals: {snapshot.pendingApprovals}</p>
+            </div>
+          </details>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <Button asChild size="sm">
-            <Link href={snapshot.links.approvals}>Review approvals</Link>
+            <Link href={snapshot.links.fixCoverage}>Fix coverage</Link>
           </Button>
           <Button asChild size="sm" variant="outline">
-            <Link href={snapshot.links.coverage}>Review coverage</Link>
+            <Link href={snapshot.links.approvalsPending}>Review approvals</Link>
           </Button>
+          {snapshot.publishReady ? (
+            <Button asChild size="sm" variant="ghost">
+              <Link href={snapshot.links.publish}>Go to publish</Link>
+            </Button>
+          ) : (
+            <span title="Publishing is blocked until approvals and coverage issues are resolved.">
+              <Button size="sm" variant="ghost" disabled>
+                Go to publish
+              </Button>
+            </span>
+          )}
         </div>
       </CardContent>
     </Card>
