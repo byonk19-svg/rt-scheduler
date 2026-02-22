@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 
 import { createClient } from '@/lib/supabase/server'
+import { exceedsCoverageLimit, exceedsWeeklyLimit } from '@/lib/schedule-rule-validation'
 import { MAX_WORK_DAYS_PER_WEEK, MAX_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
+import { countsTowardWeeklyLimit, getWeekBoundsForDate, isDateWithinRange } from '@/lib/schedule-helpers'
 
 type ShiftStatus = 'scheduled' | 'on_call' | 'sick' | 'called_off'
 type RemovableShift = {
@@ -40,37 +42,6 @@ type DragAction =
       date: string
       shiftType: 'day' | 'night'
     }
-
-function getWeekBoundsForDate(value: string): { weekStart: string; weekEnd: string } | null {
-  const parsed = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return null
-
-  const weekStartDate = new Date(parsed)
-  weekStartDate.setDate(parsed.getDate() - parsed.getDay())
-
-  const weekEndDate = new Date(weekStartDate)
-  weekEndDate.setDate(weekStartDate.getDate() + 6)
-
-  const yearStart = weekStartDate.getFullYear()
-  const monthStart = String(weekStartDate.getMonth() + 1).padStart(2, '0')
-  const dayStart = String(weekStartDate.getDate()).padStart(2, '0')
-  const yearEnd = weekEndDate.getFullYear()
-  const monthEnd = String(weekEndDate.getMonth() + 1).padStart(2, '0')
-  const dayEnd = String(weekEndDate.getDate()).padStart(2, '0')
-
-  return {
-    weekStart: `${yearStart}-${monthStart}-${dayStart}`,
-    weekEnd: `${yearEnd}-${monthEnd}-${dayEnd}`,
-  }
-}
-
-function countsTowardWeeklyLimit(status: string): boolean {
-  return status === 'scheduled' || status === 'on_call'
-}
-
-function isDateWithinRange(date: string, startDate: string, endDate: string): boolean {
-  return date >= startDate && date <= endDate
-}
 
 async function getCoverageCountForSlot(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -194,7 +165,7 @@ export async function POST(request: Request) {
       if (coverage.error) {
         return NextResponse.json({ error: 'Failed to validate daily coverage limit.' }, { status: 500 })
       }
-      if (coverage.count >= MAX_SHIFT_COVERAGE_PER_DAY) {
+      if (exceedsCoverageLimit(coverage.count, MAX_SHIFT_COVERAGE_PER_DAY)) {
         return NextResponse.json(
           { error: `Each shift can have at most ${MAX_SHIFT_COVERAGE_PER_DAY} scheduled team members.` },
           { status: 409 }
@@ -205,7 +176,7 @@ export async function POST(request: Request) {
       if (weekly.error) {
         return NextResponse.json({ error: 'Failed to validate weekly rule' }, { status: 500 })
       }
-      if (!weekly.dates.has(payload.date) && weekly.dates.size >= MAX_WORK_DAYS_PER_WEEK) {
+      if (exceedsWeeklyLimit(weekly.dates, payload.date, MAX_WORK_DAYS_PER_WEEK)) {
         return NextResponse.json(
           { error: 'Therapists are limited to 3 days per week unless override is enabled.' },
           { status: 409 }
@@ -272,7 +243,7 @@ export async function POST(request: Request) {
       if (coverage.error) {
         return NextResponse.json({ error: 'Failed to validate daily coverage limit.' }, { status: 500 })
       }
-      if (coverage.count >= MAX_SHIFT_COVERAGE_PER_DAY) {
+      if (exceedsCoverageLimit(coverage.count, MAX_SHIFT_COVERAGE_PER_DAY)) {
         return NextResponse.json(
           { error: `Each shift can have at most ${MAX_SHIFT_COVERAGE_PER_DAY} scheduled team members.` },
           { status: 409 }
@@ -283,7 +254,7 @@ export async function POST(request: Request) {
       if (weekly.error) {
         return NextResponse.json({ error: 'Failed to validate weekly rule' }, { status: 500 })
       }
-      if (!weekly.dates.has(payload.targetDate) && weekly.dates.size >= MAX_WORK_DAYS_PER_WEEK) {
+      if (exceedsWeeklyLimit(weekly.dates, payload.targetDate, MAX_WORK_DAYS_PER_WEEK)) {
         return NextResponse.json(
           { error: 'Therapists are limited to 3 days per week unless override is enabled.' },
           { status: 409 }

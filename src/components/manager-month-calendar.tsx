@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from 'react'
 import type { DragEvent } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { CalendarToolbar } from '@/components/CalendarToolbar'
 import { cn } from '@/lib/utils'
 import { MIN_SHIFT_COVERAGE_PER_DAY, MAX_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
 
@@ -66,6 +67,7 @@ type ManagerMonthCalendarProps = {
   cycleId: string
   startDate: string
   endDate: string
+  cyclePublished: boolean
   therapists: Therapist[]
   shifts: Shift[]
 }
@@ -132,6 +134,7 @@ export function ManagerMonthCalendar({
   cycleId,
   startDate,
   endDate,
+  cyclePublished,
   therapists,
   shifts,
 }: ManagerMonthCalendarProps) {
@@ -141,8 +144,15 @@ export function ManagerMonthCalendar({
   const [success, setSuccess] = useState('')
   const [undoAction, setUndoAction] = useState<DragActionBody | null>(null)
   const [overrideWeeklyRules, setOverrideWeeklyRules] = useState(false)
+  const [showDayTeam, setShowDayTeam] = useState(true)
+  const [showNightTeam, setShowNightTeam] = useState(true)
 
   const monthOptions = useMemo(() => buildMonthOptions(startDate, endDate), [startDate, endDate])
+  const rangeLabel = useMemo(() => {
+    if (monthOptions.length === 0) return 'No visible months for this cycle.'
+    if (monthOptions.length === 1) return `Showing month: ${monthLabel(monthOptions[0])}`
+    return `Showing months: ${monthLabel(monthOptions[0])} to ${monthLabel(monthOptions[monthOptions.length - 1])}`
+  }, [monthOptions])
   const monthDaysByKey = useMemo(() => {
     const map = new Map<string, Date[]>()
     for (const month of monthOptions) {
@@ -373,21 +383,6 @@ export function ManagerMonthCalendar({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          Showing all months in cycle range: {monthLabel(monthOptions[0] ?? monthKey(new Date()))}
-          {monthOptions.length > 1 ? ` to ${monthLabel(monthOptions[monthOptions.length - 1])}` : ''}
-        </p>
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          <input
-            type="checkbox"
-            checked={overrideWeeklyRules}
-            onChange={(event) => setOverrideWeeklyRules(event.target.checked)}
-          />
-          Override scheduling limits while dragging
-        </label>
-      </div>
-
       {error && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       {success && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
@@ -411,61 +406,71 @@ export function ManagerMonthCalendar({
             Drop any therapist onto either calendar to schedule or switch shifts.
           </p>
 
-          <div className="mt-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Day Team</p>
-            <div className="space-y-2">
-              {dayTherapists.map((therapist) => (
-                <div
-                  key={therapist.id}
-                  draggable
-                  onDragStart={(event) =>
-                    setDragData(event, {
-                      type: 'therapist',
-                      userId: therapist.id,
-                      shiftType: therapist.shift_type,
-                    })
-                  }
-                  className="cursor-grab rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm active:cursor-grabbing"
-                >
-                  <div className="font-medium text-sky-900">{therapist.full_name}</div>
-                  <div className="text-xs capitalize text-sky-700">{therapist.shift_type} shift</div>
-                </div>
-              ))}
-              {dayTherapists.length === 0 && (
-                <p className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                  No day therapists available.
-                </p>
-              )}
+          {showDayTeam && (
+            <div className="mt-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Day Team</p>
+              <div className="space-y-2">
+                {dayTherapists.map((therapist) => (
+                  <div
+                    key={therapist.id}
+                    draggable
+                    onDragStart={(event) =>
+                      setDragData(event, {
+                        type: 'therapist',
+                        userId: therapist.id,
+                        shiftType: therapist.shift_type,
+                      })
+                    }
+                    className="cursor-grab rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm active:cursor-grabbing"
+                  >
+                    <div className="font-medium text-sky-900">{therapist.full_name}</div>
+                    <div className="text-xs capitalize text-sky-700">{therapist.shift_type} shift</div>
+                  </div>
+                ))}
+                {dayTherapists.length === 0 && (
+                  <p className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                    No day therapists available.
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="mt-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Night Team</p>
-            <div className="space-y-2">
-              {nightTherapists.map((therapist) => (
-                <div
-                  key={therapist.id}
-                  draggable
-                  onDragStart={(event) =>
-                    setDragData(event, {
-                      type: 'therapist',
-                      userId: therapist.id,
-                      shiftType: therapist.shift_type,
-                    })
-                  }
-                  className="cursor-grab rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm active:cursor-grabbing"
-                >
-                  <div className="font-medium text-indigo-900">{therapist.full_name}</div>
-                  <div className="text-xs capitalize text-indigo-700">{therapist.shift_type} shift</div>
-                </div>
-              ))}
-              {nightTherapists.length === 0 && (
-                <p className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                  No night therapists available.
-                </p>
-              )}
+          {showNightTeam && (
+            <div className="mt-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Night Team</p>
+              <div className="space-y-2">
+                {nightTherapists.map((therapist) => (
+                  <div
+                    key={therapist.id}
+                    draggable
+                    onDragStart={(event) =>
+                      setDragData(event, {
+                        type: 'therapist',
+                        userId: therapist.id,
+                        shiftType: therapist.shift_type,
+                      })
+                    }
+                    className="cursor-grab rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm active:cursor-grabbing"
+                  >
+                    <div className="font-medium text-indigo-900">{therapist.full_name}</div>
+                    <div className="text-xs capitalize text-indigo-700">{therapist.shift_type} shift</div>
+                  </div>
+                ))}
+                {nightTherapists.length === 0 && (
+                  <p className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                    No night therapists available.
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {!showDayTeam && !showNightTeam && (
+            <p className="mt-4 rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              Enable Day team or Night team filters to see draggable staff.
+            </p>
+          )}
 
           <div
             onDragOver={(event) => event.preventDefault()}
@@ -479,12 +484,46 @@ export function ManagerMonthCalendar({
           </div>
         </div>
 
-        <div className="space-y-4 overflow-auto rounded-2xl border-2 border-border bg-card p-2">
+        <div className="space-y-4 overflow-auto rounded-2xl border-2 border-border bg-card p-2 md:max-h-[72vh]">
+          <CalendarToolbar
+            rangeLabel={rangeLabel}
+            minCoverage={MIN_SHIFT_COVERAGE_PER_DAY}
+            maxCoverage={MAX_SHIFT_COVERAGE_PER_DAY}
+            showDayTeam={showDayTeam}
+            showNightTeam={showNightTeam}
+            overrideWeeklyRules={overrideWeeklyRules}
+            onToggleDayTeam={() => setShowDayTeam((current) => !current)}
+            onToggleNightTeam={() => setShowNightTeam((current) => !current)}
+            onOverrideWeeklyRulesChange={setOverrideWeeklyRules}
+          />
+
           {monthOptions.map((month) => (
             <div key={month} className="space-y-4">
-              <div className="px-2 text-sm font-semibold text-foreground">{monthLabel(month)}</div>
-              {renderCalendarForShift('day', month)}
-              {renderCalendarForShift('night', month)}
+              <div className="flex flex-wrap items-center gap-2 px-2 text-sm font-semibold text-foreground">
+                <span>{monthLabel(month)}</span>
+                <span
+                  className={cn(
+                    'rounded-md border px-2 py-0.5 text-[11px] font-medium',
+                    cyclePublished
+                      ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
+                      : 'border-border bg-muted text-muted-foreground'
+                  )}
+                >
+                  {cyclePublished ? 'Published' : 'Draft'}
+                </span>
+                {overrideWeeklyRules && (
+                  <span className="rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[11px] font-medium text-[var(--warning-text)]">
+                    Override
+                  </span>
+                )}
+              </div>
+              {showDayTeam && renderCalendarForShift('day', month)}
+              {showNightTeam && renderCalendarForShift('night', month)}
+              {!showDayTeam && !showNightTeam && (
+                <p className="px-2 text-sm text-muted-foreground">
+                  No team filters selected. Enable Day team or Night team in the toolbar.
+                </p>
+              )}
             </div>
           ))}
         </div>

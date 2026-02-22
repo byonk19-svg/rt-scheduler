@@ -14,6 +14,7 @@ test('authenticated user can login and sign out', async ({ page }) => {
   await expect(page).toHaveURL(/\/dashboard/)
   await expect(page.getByText('Welcome,')).toBeVisible()
 
+  await page.getByLabel('Open user menu').click()
   await page.getByRole('button', { name: 'Sign out' }).click()
   await expect(page).toHaveURL(/\/login/)
 })
