@@ -127,7 +127,7 @@ export default function Home() {
               </span>
               <h2 className="text-xl font-semibold text-foreground">Keep staffing safe</h2>
               <p className="text-sm text-muted-foreground">
-                Enforce 3-day weekly therapist targets and 3-5 shift coverage with manager override.
+                Enforce per-therapist weekly limits and 3-5 shift coverage with manager override.
               </p>
             </CardContent>
           </Card>

@@ -7,6 +7,8 @@ import {
   MAX_SHIFT_COVERAGE_PER_DAY,
   MAX_WORK_DAYS_PER_WEEK,
   MIN_SHIFT_COVERAGE_PER_DAY,
+  getDefaultWeeklyLimitForEmploymentType,
+  sanitizeWeeklyLimit,
 } from '@/lib/scheduling-constants'
 import {
   exceedsCoverageLimit,
@@ -56,6 +58,31 @@ async function getRoleForUser(userId: string): Promise<Role> {
   const supabase = await createClient()
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
   return profile?.role === 'manager' ? 'manager' : 'therapist'
+}
+
+type TherapistWeeklyLimitProfile = {
+  max_work_days_per_week: number | null
+  employment_type: string | null
+}
+
+function getWeeklyLimitFromProfile(profile: TherapistWeeklyLimitProfile | null | undefined): number {
+  const employmentDefault = getDefaultWeeklyLimitForEmploymentType(profile?.employment_type)
+  return sanitizeWeeklyLimit(profile?.max_work_days_per_week, employmentDefault)
+}
+
+async function getTherapistWeeklyLimit(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  therapistId: string
+): Promise<number> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('max_work_days_per_week, employment_type')
+    .eq('id', therapistId)
+    .maybeSingle()
+
+  if (error) return MAX_WORK_DAYS_PER_WEEK
+
+  return getWeeklyLimitFromProfile((data ?? null) as TherapistWeeklyLimitProfile | null)
 }
 
 export async function createCycleAction(formData: FormData) {
@@ -121,10 +148,12 @@ export async function toggleCyclePublishedAction(formData: FormData) {
   const cycleId = String(formData.get('cycle_id') ?? '').trim()
   const currentlyPublished = String(formData.get('currently_published') ?? '').trim() === 'true'
   const view = String(formData.get('view') ?? '').trim()
+  const showUnavailable = String(formData.get('show_unavailable') ?? '').trim() === 'true'
   const overrideWeeklyRules = String(formData.get('override_weekly_rules') ?? '').trim() === 'true'
+  const viewParams = showUnavailable ? { show_unavailable: 'true' } : undefined
 
   if (!cycleId) {
-    redirect('/schedule')
+    redirect(buildScheduleUrl(undefined, view, viewParams))
   }
 
   if (!currentlyPublished) {
@@ -136,7 +165,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
 
     if (cycleError || !cycle) {
       console.error('Failed to load cycle for publish validation:', cycleError)
-      redirect(buildScheduleUrl(cycleId, view, { error: 'publish_validation_failed' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'publish_validation_failed' }))
     }
 
     const cycleDates = buildDateRange(cycle.start_date, cycle.end_date)
@@ -154,15 +183,31 @@ export async function toggleCyclePublishedAction(formData: FormData) {
     if (!overrideWeeklyRules) {
       const { data: therapistsData, error: therapistsError } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id, max_work_days_per_week, employment_type')
         .eq('role', 'therapist')
+        .eq('is_active', true)
+        .eq('on_fmla', false)
 
       if (therapistsError) {
         console.error('Failed to load therapists for publish validation:', therapistsError)
-        redirect(buildScheduleUrl(cycleId, view, { error: 'publish_validation_failed' }))
+        redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'publish_validation_failed' }))
       }
 
-      const therapistIds = (therapistsData ?? []).map((row) => row.id)
+      const therapists = (therapistsData ?? []) as Array<{
+        id: string
+        max_work_days_per_week: number | null
+        employment_type: string | null
+      }>
+      const therapistIds = therapists.map((row) => row.id)
+      const maxWorkDaysByTherapist = new Map<string, number>(
+        therapists.map((therapist) => [
+          therapist.id,
+          getWeeklyLimitFromProfile({
+            max_work_days_per_week: therapist.max_work_days_per_week,
+            employment_type: therapist.employment_type,
+          }),
+        ])
+      )
       if (therapistIds.length > 0 && cycleWeekDates.size > 0) {
         const weekStarts = Array.from(cycleWeekDates.keys()).sort()
         const minWeekStart = weekStarts[0]
@@ -177,7 +222,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
 
         if (shiftsError) {
           console.error('Failed to load shifts for publish validation:', shiftsError)
-          redirect(buildScheduleUrl(cycleId, view, { error: 'publish_validation_failed' }))
+          redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'publish_validation_failed' }))
         }
 
         const weeklyWorkedDatesByUserWeek = new Map<string, Set<string>>()
@@ -195,11 +240,12 @@ export async function toggleCyclePublishedAction(formData: FormData) {
           therapistIds,
           cycleWeekDates,
           weeklyWorkedDatesByUserWeek,
-          maxWorkDaysPerWeek: MAX_WORK_DAYS_PER_WEEK,
+          maxWorkDaysByTherapist,
         })
         if (violations > 0) {
           redirect(
             buildScheduleUrl(cycleId, view, {
+              ...viewParams,
               error: 'publish_weekly_rule_violation',
               violations: String(violations),
               under: String(underCount),
@@ -219,7 +265,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
 
     if (shiftCoverageError) {
       console.error('Failed to load shifts for coverage validation:', shiftCoverageError)
-      redirect(buildScheduleUrl(cycleId, view, { error: 'publish_validation_failed' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'publish_validation_failed' }))
     }
 
     const slotValidation = summarizeShiftSlotViolations({
@@ -248,6 +294,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
 
       redirect(
         buildScheduleUrl(cycleId, view, {
+          ...viewParams,
           error: 'publish_shift_rule_violation',
           under_coverage: String(slotValidation.underCoverage),
           over_coverage: String(slotValidation.overCoverage),
@@ -270,7 +317,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
   }
 
   revalidatePath('/schedule')
-  redirect(buildScheduleUrl(cycleId, view))
+  redirect(buildScheduleUrl(cycleId, view, viewParams))
 }
 
 export async function addShiftAction(formData: FormData) {
@@ -294,11 +341,18 @@ export async function addShiftAction(formData: FormData) {
   const shiftType = String(formData.get('shift_type') ?? '').trim()
   const status = String(formData.get('status') ?? '').trim()
   const view = String(formData.get('view') ?? '').trim()
+  const showUnavailable = String(formData.get('show_unavailable') ?? '').trim() === 'true'
   const overrideWeeklyRules = String(formData.get('override_weekly_rules') ?? '').trim() === 'on'
+  const viewParams = showUnavailable ? { show_unavailable: 'true' } : undefined
 
   if (!cycleId || !userId || !date || !shiftType || !status) {
-    redirect('/schedule')
+    redirect(buildScheduleUrl(undefined, view, viewParams))
   }
+
+  const therapistWeeklyLimit =
+    countsTowardWeeklyLimit(status) && !overrideWeeklyRules
+      ? await getTherapistWeeklyLimit(supabase, userId)
+      : MAX_WORK_DAYS_PER_WEEK
 
   if (countsTowardWeeklyLimit(status) && !overrideWeeklyRules) {
     const { data: sameSlotShifts, error: sameSlotError } = await supabase
@@ -310,19 +364,19 @@ export async function addShiftAction(formData: FormData) {
 
     if (sameSlotError) {
       console.error('Failed to load slot coverage for limit check:', sameSlotError)
-      redirect(buildScheduleUrl(cycleId, view, { error: 'add_shift_failed' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'add_shift_failed' }))
     }
 
     const activeCoverage = (sameSlotShifts ?? []).filter((row) => countsTowardWeeklyLimit(row.status)).length
     if (exceedsCoverageLimit(activeCoverage, MAX_SHIFT_COVERAGE_PER_DAY)) {
-      redirect(buildScheduleUrl(cycleId, view, { error: 'coverage_max_exceeded' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'coverage_max_exceeded' }))
     }
   }
 
   if (countsTowardWeeklyLimit(status) && !overrideWeeklyRules) {
     const bounds = getWeekBoundsForDate(date)
     if (!bounds) {
-      redirect(buildScheduleUrl(cycleId, view, { error: 'add_shift_failed' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'add_shift_failed' }))
     }
 
     const { data: weeklyShiftsData, error: weeklyShiftsError } = await supabase
@@ -334,7 +388,7 @@ export async function addShiftAction(formData: FormData) {
 
     if (weeklyShiftsError) {
       console.error('Failed to load weekly shifts for limit check:', weeklyShiftsError)
-      redirect(buildScheduleUrl(cycleId, view, { error: 'add_shift_failed' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'add_shift_failed' }))
     }
 
     const workedDates = new Set<string>()
@@ -343,9 +397,10 @@ export async function addShiftAction(formData: FormData) {
       workedDates.add(row.date)
     }
 
-    if (exceedsWeeklyLimit(workedDates, date, MAX_WORK_DAYS_PER_WEEK)) {
+    if (exceedsWeeklyLimit(workedDates, date, therapistWeeklyLimit)) {
       redirect(
         buildScheduleUrl(cycleId, view, {
+          ...viewParams,
           error: 'weekly_limit_exceeded',
           week_start: bounds.weekStart,
           week_end: bounds.weekEnd,
@@ -366,13 +421,13 @@ export async function addShiftAction(formData: FormData) {
   if (error) {
     console.error('Failed to insert shift:', error)
     if (error.code === '23505') {
-      redirect(buildScheduleUrl(cycleId, view, { error: 'duplicate_shift' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'duplicate_shift' }))
     }
-    redirect(buildScheduleUrl(cycleId, view, { error: 'add_shift_failed' }))
+    redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'add_shift_failed' }))
   }
 
   revalidatePath('/schedule')
-  redirect(buildScheduleUrl(cycleId, view))
+  redirect(buildScheduleUrl(cycleId, view, viewParams))
 }
 
 export async function generateDraftScheduleAction(formData: FormData) {
@@ -392,9 +447,11 @@ export async function generateDraftScheduleAction(formData: FormData) {
 
   const cycleId = String(formData.get('cycle_id') ?? '').trim()
   const view = String(formData.get('view') ?? '').trim()
+  const showUnavailable = String(formData.get('show_unavailable') ?? '').trim() === 'true'
+  const viewParams = showUnavailable ? { show_unavailable: 'true' } : undefined
 
   if (!cycleId) {
-    redirect(buildScheduleUrl(undefined, view, { error: 'auto_missing_cycle' }))
+    redirect(buildScheduleUrl(undefined, view, { ...viewParams, error: 'auto_missing_cycle' }))
   }
 
   const { data: cycle, error: cycleError } = await supabase
@@ -405,38 +462,58 @@ export async function generateDraftScheduleAction(formData: FormData) {
 
   if (cycleError || !cycle) {
     console.error('Failed to load cycle for auto-generation:', cycleError)
-    redirect(buildScheduleUrl(cycleId, view, { error: 'auto_generate_failed' }))
+    redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'auto_generate_failed' }))
   }
 
   if (cycle.published) {
-    redirect(buildScheduleUrl(cycleId, view, { error: 'auto_cycle_published' }))
+    redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'auto_cycle_published' }))
   }
 
   const { data: therapistsData, error: therapistsError } = await supabase
     .from('profiles')
-    .select('id, full_name, shift_type, is_lead_eligible')
+    .select(
+      'id, full_name, shift_type, is_lead_eligible, employment_type, max_work_days_per_week, preferred_work_days, on_fmla, fmla_return_date, is_active'
+    )
     .eq('role', 'therapist')
+    .eq('is_active', true)
+    .eq('on_fmla', false)
     .order('full_name', { ascending: true })
 
   if (therapistsError) {
     console.error('Failed to load therapists for auto-generation:', therapistsError)
-    redirect(buildScheduleUrl(cycleId, view, { error: 'auto_generate_failed' }))
+    redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'auto_generate_failed' }))
   }
 
-  const therapists = (therapistsData ?? []) as Therapist[]
+  const therapists = ((therapistsData ?? []) as Therapist[]).map((therapist) => ({
+    ...therapist,
+    preferred_work_days: Array.isArray(therapist.preferred_work_days)
+      ? therapist.preferred_work_days
+          .map((day) => Number(day))
+          .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+      : [],
+  }))
+  const weeklyLimitByTherapist = new Map<string, number>(
+    therapists.map((therapist) => [
+      therapist.id,
+      sanitizeWeeklyLimit(
+        therapist.max_work_days_per_week,
+        getDefaultWeeklyLimitForEmploymentType(therapist.employment_type)
+      ),
+    ])
+  )
   if (therapists.length === 0) {
-    redirect(buildScheduleUrl(cycleId, view, { error: 'auto_no_therapists' }))
+    redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'auto_no_therapists' }))
   }
 
   const cycleDates = buildDateRange(cycle.start_date, cycle.end_date)
   if (cycleDates.length === 0) {
-    redirect(buildScheduleUrl(cycleId, view, { error: 'auto_generate_failed' }))
+    redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'auto_generate_failed' }))
   }
 
   const firstWeekBounds = getWeekBoundsForDate(cycle.start_date)
   const lastWeekBounds = getWeekBoundsForDate(cycle.end_date)
   if (!firstWeekBounds || !lastWeekBounds) {
-    redirect(buildScheduleUrl(cycleId, view, { error: 'auto_generate_failed' }))
+    redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'auto_generate_failed' }))
   }
 
   const therapistIds = therapists.map((therapist) => therapist.id)
@@ -479,7 +556,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
       globalAvailabilityError: globalAvailabilityResult.error,
       weeklyShiftsError: weeklyShiftsResult.error,
     })
-    redirect(buildScheduleUrl(cycleId, view, { error: 'auto_generate_failed' }))
+    redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'auto_generate_failed' }))
   }
 
   const existingShifts = (existingShiftsResult.data ?? []) as AutoScheduleShiftRow[]
@@ -548,7 +625,8 @@ export async function generateDraftScheduleAction(formData: FormData) {
         date,
         unavailableDatesByUser,
         assignedForDate,
-        weeklyWorkedDatesByUserWeek
+        weeklyWorkedDatesByUserWeek,
+        weeklyLimitByTherapist
       )
       dayCursor = dayPick.nextCursor
 
@@ -585,7 +663,8 @@ export async function generateDraftScheduleAction(formData: FormData) {
         date,
         unavailableDatesByUser,
         assignedForDate,
-        weeklyWorkedDatesByUserWeek
+        weeklyWorkedDatesByUserWeek,
+        weeklyLimitByTherapist
       )
       nightCursor = nightPick.nextCursor
 
@@ -622,16 +701,79 @@ export async function generateDraftScheduleAction(formData: FormData) {
 
     if (insertError) {
       console.error('Failed to insert auto-generated shifts:', insertError)
-      redirect(buildScheduleUrl(cycleId, view, { error: 'auto_generate_failed' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'auto_generate_failed' }))
     }
   }
 
   revalidatePath('/schedule')
   redirect(
     buildScheduleUrl(cycleId, view, {
+      ...viewParams,
       auto: 'generated',
       added: String(draftShiftsToInsert.length),
       unfilled: String(unfilledSlots),
+    })
+  )
+}
+
+export async function resetDraftScheduleAction(formData: FormData) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  const role = await getRoleForUser(user.id)
+  if (role !== 'manager') {
+    redirect('/schedule')
+  }
+
+  const cycleId = String(formData.get('cycle_id') ?? '').trim()
+  const view = String(formData.get('view') ?? '').trim()
+  const showUnavailable = String(formData.get('show_unavailable') ?? '').trim() === 'true'
+  const viewParams = showUnavailable ? { show_unavailable: 'true' } : undefined
+
+  if (!cycleId) {
+    redirect(buildScheduleUrl(undefined, view, { ...viewParams, error: 'reset_missing_cycle' }))
+  }
+
+  const { data: cycle, error: cycleError } = await supabase
+    .from('schedule_cycles')
+    .select('id, published')
+    .eq('id', cycleId)
+    .maybeSingle()
+
+  if (cycleError || !cycle) {
+    console.error('Failed to load cycle for reset:', cycleError)
+    redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'reset_failed' }))
+  }
+
+  if (cycle.published) {
+    redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'reset_cycle_published' }))
+  }
+
+  const { data: deletedRows, error: deleteError } = await supabase
+    .from('shifts')
+    .delete()
+    .eq('cycle_id', cycleId)
+    .select('id')
+
+  if (deleteError) {
+    console.error('Failed to reset draft shifts:', deleteError)
+    redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'reset_failed' }))
+  }
+
+  const removedCount = deletedRows?.length ?? 0
+
+  revalidatePath('/schedule')
+  redirect(
+    buildScheduleUrl(cycleId, view, {
+      ...viewParams,
+      draft: 'reset',
+      removed: String(removedCount),
     })
   )
 }
@@ -688,20 +830,27 @@ export async function setDesignatedLeadAction(formData: FormData) {
   const date = String(formData.get('date') ?? '').trim()
   const shiftType = String(formData.get('shift_type') ?? '').trim() as 'day' | 'night'
   const view = String(formData.get('view') ?? '').trim()
+  const showUnavailable = String(formData.get('show_unavailable') ?? '').trim() === 'true'
+  const viewParams = showUnavailable ? { show_unavailable: 'true' } : undefined
 
   if (!cycleId || !therapistId || !date || (shiftType !== 'day' && shiftType !== 'night')) {
-    redirect(buildScheduleUrl(cycleId || undefined, view, { error: 'set_lead_failed' }))
+    redirect(buildScheduleUrl(cycleId || undefined, view, { ...viewParams, error: 'set_lead_failed' }))
   }
 
   const { data: therapist, error: therapistError } = await supabase
     .from('profiles')
-    .select('id, role, is_lead_eligible')
+    .select('id, role, is_lead_eligible, max_work_days_per_week, employment_type')
     .eq('id', therapistId)
     .maybeSingle()
 
   if (therapistError || !therapist || therapist.role !== 'therapist' || !therapist.is_lead_eligible) {
-    redirect(buildScheduleUrl(cycleId, view, { error: 'set_lead_not_eligible' }))
+    redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'set_lead_not_eligible' }))
   }
+
+  const therapistWeeklyLimit = getWeeklyLimitFromProfile({
+    max_work_days_per_week: therapist.max_work_days_per_week,
+    employment_type: therapist.employment_type,
+  })
 
   const { data: existingShift, error: existingShiftError } = await supabase
     .from('shifts')
@@ -714,7 +863,7 @@ export async function setDesignatedLeadAction(formData: FormData) {
 
   if (existingShiftError) {
     console.error('Failed to load existing shift for designated lead action:', existingShiftError)
-    redirect(buildScheduleUrl(cycleId, view, { error: 'set_lead_failed' }))
+    redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'set_lead_failed' }))
   }
 
   if (!existingShift) {
@@ -727,17 +876,17 @@ export async function setDesignatedLeadAction(formData: FormData) {
 
     if (sameSlotError) {
       console.error('Failed to load slot coverage for designated lead action:', sameSlotError)
-      redirect(buildScheduleUrl(cycleId, view, { error: 'set_lead_failed' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'set_lead_failed' }))
     }
 
     const activeCoverage = (sameSlotShifts ?? []).filter((row) => countsTowardWeeklyLimit(row.status)).length
     if (exceedsCoverageLimit(activeCoverage, MAX_SHIFT_COVERAGE_PER_DAY)) {
-      redirect(buildScheduleUrl(cycleId, view, { error: 'set_lead_coverage_max' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'set_lead_coverage_max' }))
     }
 
     const bounds = getWeekBoundsForDate(date)
     if (!bounds) {
-      redirect(buildScheduleUrl(cycleId, view, { error: 'set_lead_failed' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'set_lead_failed' }))
     }
 
     const { data: weeklyShiftsData, error: weeklyShiftsError } = await supabase
@@ -749,7 +898,7 @@ export async function setDesignatedLeadAction(formData: FormData) {
 
     if (weeklyShiftsError) {
       console.error('Failed to load weekly shifts for designated lead action:', weeklyShiftsError)
-      redirect(buildScheduleUrl(cycleId, view, { error: 'set_lead_failed' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'set_lead_failed' }))
     }
 
     const workedDates = new Set<string>()
@@ -758,8 +907,8 @@ export async function setDesignatedLeadAction(formData: FormData) {
       workedDates.add(row.date)
     }
 
-    if (exceedsWeeklyLimit(workedDates, date, MAX_WORK_DAYS_PER_WEEK)) {
-      redirect(buildScheduleUrl(cycleId, view, { error: 'set_lead_weekly_limit' }))
+    if (exceedsWeeklyLimit(workedDates, date, therapistWeeklyLimit)) {
+      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'set_lead_weekly_limit' }))
     }
   }
 
@@ -772,14 +921,14 @@ export async function setDesignatedLeadAction(formData: FormData) {
 
   if (!mutationResult.ok) {
     if (mutationResult.reason === 'lead_not_eligible') {
-      redirect(buildScheduleUrl(cycleId, view, { error: 'set_lead_not_eligible' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'set_lead_not_eligible' }))
     }
     if (mutationResult.reason === 'multiple_leads_prevented') {
-      redirect(buildScheduleUrl(cycleId, view, { error: 'set_lead_multiple' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'set_lead_multiple' }))
     }
-    redirect(buildScheduleUrl(cycleId, view, { error: 'set_lead_failed' }))
+    redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'set_lead_failed' }))
   }
 
   revalidatePath('/schedule')
-  redirect(buildScheduleUrl(cycleId, view))
+  redirect(buildScheduleUrl(cycleId, view, viewParams))
 }

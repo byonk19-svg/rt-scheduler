@@ -2,11 +2,17 @@ import { NextResponse } from 'next/server'
 
 import { createClient } from '@/lib/supabase/server'
 import { exceedsCoverageLimit, exceedsWeeklyLimit } from '@/lib/schedule-rule-validation'
-import { MAX_WORK_DAYS_PER_WEEK, MAX_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
+import {
+  MAX_WORK_DAYS_PER_WEEK,
+  MAX_SHIFT_COVERAGE_PER_DAY,
+  getDefaultWeeklyLimitForEmploymentType,
+  sanitizeWeeklyLimit,
+} from '@/lib/scheduling-constants'
 import { countsTowardWeeklyLimit, getWeekBoundsForDate, isDateWithinRange } from '@/lib/schedule-helpers'
 
 type ShiftStatus = 'scheduled' | 'on_call' | 'sick' | 'called_off'
 type ShiftRole = 'lead' | 'staff'
+type EmploymentType = 'full_time' | 'part_time' | 'prn'
 type RemovableShift = {
   id: string
   cycle_id: string
@@ -101,6 +107,23 @@ async function getWorkedDatesInWeek(
   return { dates: workedDates }
 }
 
+async function getTherapistWeeklyLimit(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  therapistId: string
+): Promise<number> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('max_work_days_per_week, employment_type')
+    .eq('id', therapistId)
+    .maybeSingle()
+
+  if (error) return MAX_WORK_DAYS_PER_WEEK
+
+  const profile = data as { max_work_days_per_week: number | null; employment_type: EmploymentType | null } | null
+  const fallback = getDefaultWeeklyLimitForEmploymentType(profile?.employment_type)
+  return sanitizeWeeklyLimit(profile?.max_work_days_per_week, fallback)
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient()
   const {
@@ -178,9 +201,10 @@ export async function POST(request: Request) {
       if (weekly.error) {
         return NextResponse.json({ error: 'Failed to validate weekly rule' }, { status: 500 })
       }
-      if (exceedsWeeklyLimit(weekly.dates, payload.date, MAX_WORK_DAYS_PER_WEEK)) {
+      const weeklyLimit = await getTherapistWeeklyLimit(supabase, payload.userId)
+      if (exceedsWeeklyLimit(weekly.dates, payload.date, weeklyLimit)) {
         return NextResponse.json(
-          { error: 'Therapists are limited to 3 days per week unless override is enabled.' },
+          { error: `Therapists are limited to ${weeklyLimit} day(s) per week unless override is enabled.` },
           { status: 409 }
         )
       }
@@ -257,9 +281,10 @@ export async function POST(request: Request) {
       if (weekly.error) {
         return NextResponse.json({ error: 'Failed to validate weekly rule' }, { status: 500 })
       }
-      if (exceedsWeeklyLimit(weekly.dates, payload.targetDate, MAX_WORK_DAYS_PER_WEEK)) {
+      const weeklyLimit = await getTherapistWeeklyLimit(supabase, shift.user_id)
+      if (exceedsWeeklyLimit(weekly.dates, payload.targetDate, weeklyLimit)) {
         return NextResponse.json(
-          { error: 'Therapists are limited to 3 days per week unless override is enabled.' },
+          { error: `Therapists are limited to ${weeklyLimit} day(s) per week unless override is enabled.` },
           { status: 409 }
         )
       }

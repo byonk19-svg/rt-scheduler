@@ -32,7 +32,10 @@ function makeSupabaseMock(scenario: Scenario) {
 
     const resolveSelect = (single: boolean) => {
       if (table === 'profiles') {
-        return { data: { role: 'manager' }, error: null }
+        if (state.filters.id === 'manager-1') {
+          return { data: { role: 'manager' }, error: null }
+        }
+        return { data: { max_work_days_per_week: 3, employment_type: 'full_time' }, error: null }
       }
 
       if (table === 'schedule_cycles') {
@@ -167,7 +170,7 @@ describe('drag-drop API limit handling', () => {
     })
   })
 
-  it('returns 409 when assign would exceed weekly 3-day limit', async () => {
+  it('returns 409 when assign would exceed weekly therapist limit', async () => {
     vi.mocked(createClient).mockResolvedValue(
       makeSupabaseMock({
         coverageStatuses: ['scheduled', 'scheduled'],
@@ -196,7 +199,7 @@ describe('drag-drop API limit handling', () => {
 
     expect(response.status).toBe(409)
     await expect(response.json()).resolves.toMatchObject({
-      error: 'Therapists are limited to 3 days per week unless override is enabled.',
+      error: 'Therapists are limited to 3 day(s) per week unless override is enabled.',
     })
   })
 })

@@ -53,7 +53,10 @@ describe('schedule rule validation', () => {
       therapistIds: ['t1', 't2'],
       cycleWeekDates,
       weeklyWorkedDatesByUserWeek,
-      maxWorkDaysPerWeek: 3,
+      maxWorkDaysByTherapist: new Map([
+        ['t1', 3],
+        ['t2', 3],
+      ]),
     })
 
     expect(result).toEqual({

@@ -6,6 +6,7 @@ export type ToastVariant = 'success' | 'error'
 
 export type ShiftStatus = 'scheduled' | 'on_call' | 'sick' | 'called_off'
 export type ShiftRole = 'lead' | 'staff'
+export type EmploymentType = 'full_time' | 'part_time' | 'prn'
 
 export type Cycle = {
   id: string
@@ -20,6 +21,12 @@ export type Therapist = {
   full_name: string
   shift_type: 'day' | 'night'
   is_lead_eligible: boolean
+  employment_type: EmploymentType
+  max_work_days_per_week: number
+  preferred_work_days: number[]
+  on_fmla: boolean
+  fmla_return_date: string | null
+  is_active: boolean
 }
 
 export type ShiftRow = {
@@ -56,6 +63,9 @@ export type ScheduleSearchParams = {
   set_lead_error?: string
   filter?: string
   focus?: string
+  show_unavailable?: string
+  draft?: string
+  removed?: string
 }
 
 export type AutoScheduleShiftRow = {

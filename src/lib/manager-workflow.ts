@@ -31,6 +31,9 @@ type DashboardLinks = {
   approvalsPending: string
   coverage: string
   fixCoverage: string
+  coverageMissingLead: string
+  coverageUnfilled: string
+  coverageNeedsAttention: string
   publish: string
 }
 
@@ -61,6 +64,9 @@ function getLinks(activeCycle: CycleRow | null): DashboardLinks {
       approvalsPending: '/shift-board?status=pending#open-posts',
       coverage: MANAGER_WORKFLOW_LINKS.coverage,
       fixCoverage: '/schedule?view=calendar&filter=missing_lead&focus=first',
+      coverageMissingLead: '/schedule?view=calendar&filter=missing_lead&focus=first',
+      coverageUnfilled: '/schedule?view=calendar&filter=under_coverage&focus=first',
+      coverageNeedsAttention: '/schedule?view=calendar&filter=needs_attention&focus=first',
       publish: MANAGER_WORKFLOW_LINKS.publish,
     }
   }
@@ -71,6 +77,9 @@ function getLinks(activeCycle: CycleRow | null): DashboardLinks {
     approvalsPending: `/shift-board?status=pending#open-posts`,
     coverage: `/schedule?${cycleParam}&view=calendar`,
     fixCoverage: `/schedule?${cycleParam}&view=calendar&filter=missing_lead&focus=first`,
+    coverageMissingLead: `/schedule?${cycleParam}&view=calendar&filter=missing_lead&focus=first`,
+    coverageUnfilled: `/schedule?${cycleParam}&view=calendar&filter=under_coverage&focus=first`,
+    coverageNeedsAttention: `/schedule?${cycleParam}&view=calendar&filter=needs_attention&focus=first`,
     publish: `/schedule?${cycleParam}&view=grid`,
   }
 }

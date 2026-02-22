@@ -1,11 +1,12 @@
 import { coverageSlotKey, weeklyCountKey } from '@/lib/schedule-helpers'
 import type { ShiftRole, ShiftStatus } from '@/app/schedule/types'
+import { MAX_WORK_DAYS_PER_WEEK } from '@/lib/scheduling-constants'
 
 type PublishWeeklyInput = {
   therapistIds: string[]
   cycleWeekDates: Map<string, Set<string>>
   weeklyWorkedDatesByUserWeek: Map<string, Set<string>>
-  maxWorkDaysPerWeek: number
+  maxWorkDaysByTherapist: Map<string, number>
 }
 
 type PublishWeeklyResult = {
@@ -78,14 +79,15 @@ export function summarizePublishWeeklyViolations({
   therapistIds,
   cycleWeekDates,
   weeklyWorkedDatesByUserWeek,
-  maxWorkDaysPerWeek,
+  maxWorkDaysByTherapist,
 }: PublishWeeklyInput): PublishWeeklyResult {
   let underCount = 0
   let overCount = 0
 
   for (const therapistId of therapistIds) {
+    const therapistMaxWorkDays = maxWorkDaysByTherapist.get(therapistId) ?? MAX_WORK_DAYS_PER_WEEK
     for (const [weekStart, weekDatesInCycle] of cycleWeekDates) {
-      const requiredDays = Math.min(maxWorkDaysPerWeek, weekDatesInCycle.size)
+      const requiredDays = Math.min(therapistMaxWorkDays, weekDatesInCycle.size)
       const workedDates =
         weeklyWorkedDatesByUserWeek.get(weeklyCountKey(therapistId, weekStart)) ?? new Set<string>()
       const workedCount = workedDates.size

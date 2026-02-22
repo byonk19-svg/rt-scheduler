@@ -2,27 +2,43 @@ import Link from 'next/link'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
+import { EmployeeDirectory } from '@/components/EmployeeDirectory'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { ManagerAttentionPanel } from '@/components/ManagerAttentionPanel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import {
+  normalizeEmploymentType,
+  normalizeFmlaReturnDate,
+  normalizeShiftType,
+  normalizeActiveValue,
+  type EmployeeDirectoryRecord,
+} from '@/lib/employee-directory'
 import { getManagerAttentionSnapshot } from '@/lib/manager-workflow'
+import { getDefaultWeeklyLimitForEmploymentType, sanitizeWeeklyLimit } from '@/lib/scheduling-constants'
 import { createClient } from '@/lib/supabase/server'
-
-type TherapistDirectoryRow = {
-  id: string
-  full_name: string
-  email: string
-  phone_number: string | null
-  shift_type: 'day' | 'night'
-}
 
 type ManagerDashboardSearchParams = {
   success?: string | string[]
   error?: string | string[]
+  realigned?: string | string[]
+}
+
+type ProfileRoleRow = { role: 'manager' | 'therapist' }
+
+type DirectoryProfileRow = {
+  id: string
+  full_name: string
+  email: string
+  phone_number: string | null
+  shift_type: string
+  is_lead_eligible: boolean | null
+  employment_type: string | null
+  max_work_days_per_week: number | null
+  on_fmla: boolean | null
+  fmla_return_date: string | null
+  is_active: boolean | null
 }
 
 function getSearchParam(value: string | string[] | undefined): string | undefined {
@@ -33,21 +49,58 @@ function getSearchParam(value: string | string[] | undefined): string | undefine
 function getFeedback(params?: ManagerDashboardSearchParams): { message: string; variant: 'success' | 'error' } | null {
   const success = getSearchParam(params?.success)
   const error = getSearchParam(params?.error)
+  const realignedRaw = getSearchParam(params?.realigned)
+  const realignedCount = Number.parseInt(realignedRaw ?? '', 10)
 
-  if (success === 'employee_contact_updated') {
-    return { message: 'Employee contact information updated.', variant: 'success' }
+  if (success === 'employee_updated') {
+    return { message: 'Employee directory updated.', variant: 'success' }
   }
-  if (error === 'employee_contact_update_failed') {
-    return { message: 'Could not update employee contact information.', variant: 'error' }
+  if (success === 'employee_updated_and_realigned') {
+    const safeCount = Number.isFinite(realignedCount) && realignedCount > 0 ? realignedCount : 0
+    return {
+      message:
+        safeCount > 0
+          ? `Employee updated. ${safeCount} future draft shift(s) realigned to the selected team.`
+          : 'Employee updated and draft shifts realigned.',
+      variant: 'success',
+    }
+  }
+  if (success === 'employee_deactivated') {
+    return { message: 'Employee deactivated.', variant: 'success' }
+  }
+  if (success === 'employee_reactivated') {
+    return { message: 'Employee reactivated.', variant: 'success' }
+  }
+
+  if (error === 'employee_update_failed') {
+    return { message: 'Could not update employee profile.', variant: 'error' }
+  }
+  if (error === 'employee_status_update_failed') {
+    return { message: 'Could not update employee status.', variant: 'error' }
   }
   if (error === 'employee_contact_validation') {
-    return { message: 'Name and email are required to save employee contact details.', variant: 'error' }
+    return { message: 'Name and email are required.', variant: 'error' }
   }
   if (error === 'employee_contact_unauthorized') {
-    return { message: 'Manager access is required to edit employee contacts.', variant: 'error' }
+    return { message: 'Manager access is required to edit employee profiles.', variant: 'error' }
   }
   if (error === 'employee_contact_phone_invalid') {
     return { message: 'Phone number must be 10 digits (US format).', variant: 'error' }
+  }
+  if (error === 'employee_contact_shift_invalid') {
+    return { message: 'Shift type must be day or night.', variant: 'error' }
+  }
+  if (error === 'employee_contact_employment_invalid') {
+    return { message: 'Employment type must be full-time, part-time, or PRN.', variant: 'error' }
+  }
+  if (error === 'employee_contact_weekly_limit_invalid') {
+    return { message: 'Weekly shift limit must be between 1 and 7.', variant: 'error' }
+  }
+  if (error === 'employee_fmla_return_date_invalid') {
+    return { message: 'Potential return date must be a valid date.', variant: 'error' }
+  }
+  if (error === 'employee_realign_failed') {
+    return { message: 'Employee saved, but future draft shifts could not be realigned.', variant: 'error' }
   }
 
   return null
@@ -67,26 +120,7 @@ function normalizePhoneNumber(raw: string): string | null {
   return `(${normalizedDigits.slice(0, 3)}) ${normalizedDigits.slice(3, 6)}-${normalizedDigits.slice(6)}`
 }
 
-function formatPhoneForDisplay(value: string | null): string {
-  if (!value) return ''
-  const normalized = normalizePhoneNumber(value)
-  return normalized && normalized !== 'INVALID' ? normalized : value
-}
-
-function checklistItem(label: string, passed: boolean, detail: string) {
-  return (
-    <div className="flex items-center justify-between gap-3 text-sm">
-      <span className="text-foreground">{label}</span>
-      <span className={passed ? 'text-[var(--success-text)]' : 'text-[var(--warning-text)]'}>
-        {passed ? `\u2705 ${detail}` : `\u274c ${detail}`}
-      </span>
-    </div>
-  )
-}
-
-async function updateEmployeeContactAction(formData: FormData) {
-  'use server'
-
+async function assertManagerSession() {
   const supabase = await createClient()
   const {
     data: { user },
@@ -102,9 +136,17 @@ async function updateEmployeeContactAction(formData: FormData) {
     .eq('id', user.id)
     .maybeSingle()
 
-  if (profile?.role !== 'manager') {
+  if ((profile as ProfileRoleRow | null)?.role !== 'manager') {
     redirect('/dashboard/manager?error=employee_contact_unauthorized')
   }
+
+  return { supabase, user }
+}
+
+async function saveEmployeeDirectoryAction(formData: FormData) {
+  'use server'
+
+  const { supabase } = await assertManagerSession()
 
   const profileId = String(formData.get('profile_id') ?? '').trim()
   const fullName = String(formData.get('full_name') ?? '').trim()
@@ -112,16 +154,47 @@ async function updateEmployeeContactAction(formData: FormData) {
     .trim()
     .toLowerCase()
   const phoneNumber = String(formData.get('phone_number') ?? '').trim()
-  const shiftType = String(formData.get('shift_type') ?? '').trim()
+  const shiftTypeRaw = String(formData.get('shift_type') ?? '').trim()
+  const realignFutureShifts = String(formData.get('realign_future_shifts') ?? '').trim() === 'true'
+  const employmentTypeRaw = String(formData.get('employment_type') ?? '').trim()
+  const maxWorkDaysRaw = Number.parseInt(String(formData.get('max_work_days_per_week') ?? '').trim(), 10)
+  const isLeadEligible = String(formData.get('is_lead_eligible') ?? '').trim() === 'on'
+  const onFmla = String(formData.get('on_fmla') ?? '').trim() === 'on'
+  const isActive = String(formData.get('is_active') ?? '').trim() === 'on'
+  const fmlaReturnDateRaw = String(formData.get('fmla_return_date') ?? '').trim()
 
   if (!profileId || !fullName || !email) {
-    redirect('/dashboard/manager?error=employee_contact_validation')
+    redirect('/dashboard/manager?error=employee_contact_validation#employee-directory')
+  }
+  if (shiftTypeRaw !== 'day' && shiftTypeRaw !== 'night') {
+    redirect('/dashboard/manager?error=employee_contact_shift_invalid#employee-directory')
+  }
+  if (!['full_time', 'part_time', 'prn'].includes(employmentTypeRaw)) {
+    redirect('/dashboard/manager?error=employee_contact_employment_invalid#employee-directory')
   }
 
   const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber)
   if (normalizedPhoneNumber === 'INVALID') {
-    redirect('/dashboard/manager?error=employee_contact_phone_invalid')
+    redirect('/dashboard/manager?error=employee_contact_phone_invalid#employee-directory')
   }
+
+  if (onFmla && fmlaReturnDateRaw && !/^\d{4}-\d{2}-\d{2}$/.test(fmlaReturnDateRaw)) {
+    redirect('/dashboard/manager?error=employee_fmla_return_date_invalid#employee-directory')
+  }
+
+  const employmentType = normalizeEmploymentType(employmentTypeRaw)
+  const normalizedShiftType = normalizeShiftType(shiftTypeRaw)
+  const weeklyLimit = sanitizeWeeklyLimit(maxWorkDaysRaw, getDefaultWeeklyLimitForEmploymentType(employmentType))
+  if (!Number.isFinite(maxWorkDaysRaw) || maxWorkDaysRaw < 1 || maxWorkDaysRaw > 7) {
+    redirect('/dashboard/manager?error=employee_contact_weekly_limit_invalid#employee-directory')
+  }
+
+  const { data: currentProfile } = await supabase
+    .from('profiles')
+    .select('shift_type')
+    .eq('id', profileId)
+    .eq('role', 'therapist')
+    .maybeSingle()
 
   const { error } = await supabase
     .from('profiles')
@@ -129,75 +202,109 @@ async function updateEmployeeContactAction(formData: FormData) {
       full_name: fullName,
       email,
       phone_number: normalizedPhoneNumber,
+      shift_type: normalizedShiftType,
+      employment_type: employmentType,
+      max_work_days_per_week: weeklyLimit,
+      is_lead_eligible: isLeadEligible,
+      on_fmla: onFmla,
+      fmla_return_date: normalizeFmlaReturnDate(fmlaReturnDateRaw, onFmla),
+      is_active: isActive,
     })
     .eq('id', profileId)
     .eq('role', 'therapist')
 
   if (error) {
-    console.error('Failed to update employee contact:', error)
-    redirect('/dashboard/manager?error=employee_contact_update_failed')
+    console.error('Failed to update employee profile:', error)
+    redirect('/dashboard/manager?error=employee_update_failed#employee-directory')
+  }
+
+  let realignedCount = 0
+  const previousShiftType = currentProfile?.shift_type === 'night' ? 'night' : 'day'
+  if (realignFutureShifts && previousShiftType !== normalizedShiftType) {
+    const now = new Date()
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+
+    const { data: futureShifts, error: futureShiftsError } = await supabase
+      .from('shifts')
+      .select('id, shift_type, date, schedule_cycles(published)')
+      .eq('user_id', profileId)
+      .gte('date', todayKey)
+
+    if (futureShiftsError) {
+      console.error('Failed to load future shifts for realignment:', futureShiftsError)
+      redirect('/dashboard/manager?error=employee_realign_failed#employee-directory')
+    }
+
+    const shiftsToRealign = (futureShifts ?? []).filter((row) => {
+      const cycle = Array.isArray(row.schedule_cycles) ? row.schedule_cycles[0] : row.schedule_cycles
+      if (cycle?.published) return false
+      return row.shift_type !== normalizedShiftType
+    })
+
+    if (shiftsToRealign.length > 0) {
+      const { error: realignError } = await supabase
+        .from('shifts')
+        .update({ shift_type: normalizedShiftType })
+        .in('id', shiftsToRealign.map((row) => row.id))
+
+      if (realignError) {
+        console.error('Failed to realign draft shifts:', realignError)
+        redirect('/dashboard/manager?error=employee_realign_failed#employee-directory')
+      }
+
+      realignedCount = shiftsToRealign.length
+    }
+  }
+
+  if (realignedCount > 0) {
+    revalidatePath('/dashboard/manager')
+    revalidatePath('/schedule')
+    redirect(`/dashboard/manager?success=employee_updated_and_realigned&realigned=${realignedCount}#employee-directory`)
   }
 
   revalidatePath('/dashboard/manager')
-  redirect(`/dashboard/manager?success=employee_contact_updated#${shiftType === 'night' ? 'night-team' : 'day-team'}`)
+  revalidatePath('/schedule')
+  redirect('/dashboard/manager?success=employee_updated#employee-directory')
 }
 
-function TeamDirectorySection({
-  title,
-  anchorId,
-  rows,
-}: {
-  title: string
-  anchorId: string
-  rows: TherapistDirectoryRow[]
-}) {
-  return (
-    <Card id={anchorId}>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>Edit contact information if profile data needs correction.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {rows.length === 0 && (
-          <p className="text-sm text-muted-foreground">No signed-up employees in this shift yet.</p>
-        )}
+async function setEmployeeActiveAction(formData: FormData) {
+  'use server'
 
-        {rows.map((employee) => (
-          <form key={employee.id} action={updateEmployeeContactAction} className="rounded-md border border-border p-3">
-            <input type="hidden" name="profile_id" value={employee.id} />
-            <input type="hidden" name="shift_type" value={employee.shift_type} />
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <div className="space-y-1">
-                <Label htmlFor={`full_name_${employee.id}`}>Name</Label>
-                <Input id={`full_name_${employee.id}`} name="full_name" defaultValue={employee.full_name} required />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor={`email_${employee.id}`}>Email</Label>
-                <Input id={`email_${employee.id}`} name="email" type="email" defaultValue={employee.email} required />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor={`phone_${employee.id}`}>Phone</Label>
-                <Input
-                  id={`phone_${employee.id}`}
-                  name="phone_number"
-                  type="tel"
-                  inputMode="numeric"
-                  autoComplete="tel"
-                  defaultValue={formatPhoneForDisplay(employee.phone_number)}
-                  placeholder="(555) 123-4567"
-                  title="Enter a 10-digit phone number"
-                />
-              </div>
-            </div>
-            <div className="mt-3 flex justify-end">
-              <Button type="submit" size="sm" variant="outline">
-                Save
-              </Button>
-            </div>
-          </form>
-        ))}
-      </CardContent>
-    </Card>
+  const { supabase } = await assertManagerSession()
+
+  const profileId = String(formData.get('profile_id') ?? '').trim()
+  const setActiveRaw = String(formData.get('set_active') ?? '').trim()
+
+  if (!profileId || (setActiveRaw !== 'true' && setActiveRaw !== 'false')) {
+    redirect('/dashboard/manager?error=employee_status_update_failed#employee-directory')
+  }
+
+  const targetActive = normalizeActiveValue(setActiveRaw)
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ is_active: targetActive })
+    .eq('id', profileId)
+    .eq('role', 'therapist')
+
+  if (error) {
+    console.error('Failed to update employee active status:', error)
+    redirect('/dashboard/manager?error=employee_status_update_failed#employee-directory')
+  }
+
+  revalidatePath('/dashboard/manager')
+  revalidatePath('/schedule')
+  redirect(`/dashboard/manager?success=${targetActive ? 'employee_reactivated' : 'employee_deactivated'}#employee-directory`)
+}
+
+function checklistItem(label: string, passed: boolean, detail: string) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-sm">
+      <span className="text-foreground">{label}</span>
+      <span className={passed ? 'text-[var(--success-text)]' : 'text-[var(--warning-text)]'}>
+        {passed ? `\u2705 ${detail}` : `\u274c ${detail}`}
+      </span>
+    </div>
   )
 }
 
@@ -231,14 +338,32 @@ export default async function ManagerDashboardPage({
 
   const { data: therapistsData } = await supabase
     .from('profiles')
-    .select('id, full_name, email, phone_number, shift_type')
+    .select(
+      'id, full_name, email, phone_number, shift_type, is_lead_eligible, employment_type, max_work_days_per_week, on_fmla, fmla_return_date, is_active'
+    )
     .eq('role', 'therapist')
     .order('shift_type', { ascending: true })
     .order('full_name', { ascending: true })
 
-  const therapists = (therapistsData ?? []) as TherapistDirectoryRow[]
-  const dayTherapists = therapists.filter((employee) => employee.shift_type === 'day')
-  const nightTherapists = therapists.filter((employee) => employee.shift_type === 'night')
+  const therapists = ((therapistsData ?? []) as DirectoryProfileRow[]).map((row) => {
+    const employmentType = normalizeEmploymentType(String(row.employment_type ?? ''))
+    return {
+      id: row.id,
+      full_name: row.full_name,
+      email: row.email,
+      phone_number: row.phone_number,
+      shift_type: normalizeShiftType(row.shift_type),
+      employment_type: employmentType,
+      max_work_days_per_week: sanitizeWeeklyLimit(
+        row.max_work_days_per_week,
+        getDefaultWeeklyLimitForEmploymentType(employmentType)
+      ),
+      is_lead_eligible: Boolean(row.is_lead_eligible),
+      on_fmla: Boolean(row.on_fmla),
+      fmla_return_date: row.fmla_return_date,
+      is_active: row.is_active !== false,
+    } satisfies EmployeeDirectoryRecord
+  })
 
   const fullName = profile?.full_name ?? user.user_metadata?.full_name ?? 'Manager'
   const summary = await getManagerAttentionSnapshot(supabase)
@@ -289,7 +414,7 @@ export default async function ManagerDashboardPage({
             <p className="text-sm text-muted-foreground">Under coverage: {summary.underCoverageSlots}</p>
             <p className="text-sm text-muted-foreground">Over coverage: {summary.overCoverageSlots}</p>
             <Button asChild variant="outline" size="sm">
-              <Link href={summary.links.fixCoverage}>Assign coverage</Link>
+              <Link href={summary.links.coverageNeedsAttention}>Go to coverage</Link>
             </Button>
           </CardContent>
         </Card>
@@ -301,8 +426,12 @@ export default async function ManagerDashboardPage({
           </CardHeader>
           <CardContent className="space-y-3">
             {checklistItem('Approvals', approvalsClear, approvalsClear ? 'clear' : `${summary.pendingApprovals} pending`)}
-            {checklistItem('Coverage', coverageClear, coverageClear ? 'clear' : `${summary.coverageIssues} issues`)}
-            {checklistItem('Lead', leadClear, leadClear ? 'clear' : `${summary.missingLeadShifts} missing`)}
+            {checklistItem(
+              'Coverage',
+              coverageClear,
+              coverageClear ? 'clear' : `${summary.coverageIssues} issues (includes lead)`
+            )}
+            {checklistItem('Lead', leadClear, leadClear ? 'clear' : `${summary.missingLeadShifts} shifts missing lead`)}
 
             {publishBlocked ? (
               <Button asChild size="sm">
@@ -342,10 +471,11 @@ export default async function ManagerDashboardPage({
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <TeamDirectorySection title="Day Shift Directory" anchorId="day-team" rows={dayTherapists} />
-        <TeamDirectorySection title="Night Shift Directory" anchorId="night-team" rows={nightTherapists} />
-      </div>
+      <EmployeeDirectory
+        employees={therapists}
+        saveEmployeeAction={saveEmployeeDirectoryAction}
+        setEmployeeActiveAction={setEmployeeActiveAction}
+      />
     </div>
   )
 }

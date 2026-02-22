@@ -17,11 +17,13 @@ import { getManagerAttentionSnapshot } from '@/lib/manager-workflow'
 import { summarizeShiftSlotViolations } from '@/lib/schedule-rule-validation'
 import { MIN_SHIFT_COVERAGE_PER_DAY, MAX_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
 import { createClient } from '@/lib/supabase/server'
+import { getSchedulingEligibleEmployees } from '@/lib/employee-directory'
 import {
   addShiftAction,
   createCycleAction,
   deleteShiftAction,
   generateDraftScheduleAction,
+  resetDraftScheduleAction,
   setDesignatedLeadAction,
   toggleCyclePublishedAction,
 } from './actions'
@@ -47,11 +49,14 @@ export default async function SchedulePage({
   let viewMode: ViewMode = normalizeViewMode(params?.view)
   const issueFilter = params?.filter
   const focusMode = params?.focus
+  const showUnavailable = params?.show_unavailable === 'true'
   const feedback = getScheduleFeedback(params)
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, full_name, shift_type, is_lead_eligible')
+    .select(
+      'role, full_name, shift_type, is_lead_eligible, employment_type, max_work_days_per_week, preferred_work_days, on_fmla, fmla_return_date, is_active'
+    )
     .eq('id', user.id)
     .maybeSingle()
 
@@ -98,12 +103,30 @@ export default async function SchedulePage({
 
   let assignableTherapists: Therapist[] = []
   if (role === 'manager') {
-    const { data: therapistData } = await supabase
+    let therapistQuery = supabase
       .from('profiles')
-      .select('id, full_name, shift_type, is_lead_eligible')
+      .select(
+        'id, full_name, shift_type, is_lead_eligible, employment_type, max_work_days_per_week, preferred_work_days, on_fmla, fmla_return_date, is_active'
+      )
       .eq('role', 'therapist')
       .order('full_name', { ascending: true })
-    assignableTherapists = (therapistData ?? []) as Therapist[]
+
+    if (!showUnavailable) {
+      therapistQuery = therapistQuery.eq('is_active', true).eq('on_fmla', false)
+    }
+
+    const { data: therapistData } = await therapistQuery
+    const normalizedTherapists = ((therapistData ?? []) as Therapist[]).map((therapist) => ({
+      ...therapist,
+      preferred_work_days: Array.isArray(therapist.preferred_work_days)
+        ? therapist.preferred_work_days
+            .map((day) => Number(day))
+            .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+        : [],
+    }))
+    assignableTherapists = showUnavailable
+      ? normalizedTherapists
+      : getSchedulingEligibleEmployees(normalizedTherapists)
   }
   const leadEligibleTherapists = assignableTherapists.filter((therapist) => therapist.is_lead_eligible)
 
@@ -161,6 +184,12 @@ export default async function SchedulePage({
               full_name: namesFromShiftRows.get(id) ?? 'Unknown',
               shift_type: 'day',
               is_lead_eligible: false,
+              employment_type: 'full_time',
+              max_work_days_per_week: 3,
+              preferred_work_days: [],
+              on_fmla: false,
+              fmla_return_date: null,
+              is_active: true,
             } satisfies Therapist
           })
           .sort((a, b) => {
@@ -173,6 +202,15 @@ export default async function SchedulePage({
             full_name: profile?.full_name ?? 'You',
             shift_type: profile?.shift_type === 'night' ? 'night' : 'day',
             is_lead_eligible: Boolean(profile?.is_lead_eligible),
+            employment_type: profile?.employment_type === 'part_time' || profile?.employment_type === 'prn' ? profile.employment_type : 'full_time',
+            max_work_days_per_week:
+              typeof profile?.max_work_days_per_week === 'number' ? profile.max_work_days_per_week : 3,
+            preferred_work_days: Array.isArray(profile?.preferred_work_days)
+              ? profile.preferred_work_days
+              : [],
+            on_fmla: Boolean(profile?.on_fmla),
+            fmla_return_date: profile?.fmla_return_date ?? null,
+            is_active: profile?.is_active !== false,
           },
         ]
 
@@ -217,12 +255,16 @@ export default async function SchedulePage({
         })
       : null
 
+  const normalizedIssueFilter = issueFilter === 'unfilled' ? 'under_coverage' : issueFilter
+  const isNeedsAttentionFilter = normalizedIssueFilter === 'needs_attention'
   const activeIssueFilter =
-    issueFilter === 'missing_lead' || issueFilter === 'under_coverage' || issueFilter === 'over_coverage'
-      ? issueFilter
+    normalizedIssueFilter === 'missing_lead' ||
+    normalizedIssueFilter === 'under_coverage' ||
+    normalizedIssueFilter === 'over_coverage'
+      ? normalizedIssueFilter
       : 'all'
   const filteredSlotIssues =
-    activeIssueFilter === 'all'
+    isNeedsAttentionFilter || activeIssueFilter === 'all'
       ? slotValidation?.issues ?? []
       : (slotValidation?.issues ?? []).filter((issue) => issue.reasons.includes(activeIssueFilter))
   const focusSlotKey = focusMode === 'first' ? filteredSlotIssues[0]?.slotKey ?? null : null
@@ -263,6 +305,8 @@ export default async function SchedulePage({
         }
         toggleCyclePublishedAction={toggleCyclePublishedAction}
         generateDraftScheduleAction={generateDraftScheduleAction}
+        resetDraftScheduleAction={resetDraftScheduleAction}
+        showUnavailable={showUnavailable}
       />
 
       {role === 'manager' && managerAttention && <ManagerAttentionPanel snapshot={managerAttention} />}
@@ -397,6 +441,30 @@ export default async function SchedulePage({
                     <form action={addShiftAction} className="space-y-4">
                       <input type="hidden" name="cycle_id" value={activeCycle.id} />
                       <input type="hidden" name="view" value={viewMode} />
+                      <input type="hidden" name="show_unavailable" value={showUnavailable ? 'true' : 'false'} />
+
+                      <div className="flex items-center justify-between rounded-md border border-border bg-secondary/30 px-3 py-2 text-xs text-muted-foreground">
+                        <span>
+                          {showUnavailable
+                            ? 'Showing unavailable employees (FMLA/inactive).'
+                            : 'FMLA and inactive employees are hidden by default.'}
+                        </span>
+                        <Button asChild size="xs" variant="ghost">
+                          <Link
+                            href={
+                              activeCycle
+                                ? buildScheduleUrl(activeCycle.id, viewMode, {
+                                    show_unavailable: showUnavailable ? 'false' : 'true',
+                                  })
+                                : buildScheduleUrl(undefined, viewMode, {
+                                    show_unavailable: showUnavailable ? 'false' : 'true',
+                                  })
+                            }
+                          >
+                            {showUnavailable ? 'Hide unavailable' : 'Show unavailable'}
+                          </Link>
+                        </Button>
+                      </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="user_id">Therapist</Label>
@@ -412,7 +480,8 @@ export default async function SchedulePage({
                           </option>
                           {assignableTherapists.map((therapist) => (
                             <option key={therapist.id} value={therapist.id}>
-                              {therapist.full_name} ({therapist.shift_type})
+                              {therapist.full_name} ({therapist.shift_type}
+                              {therapist.on_fmla || !therapist.is_active ? ', unavailable' : ''})
                             </option>
                           ))}
                         </select>
@@ -452,7 +521,7 @@ export default async function SchedulePage({
                       </div>
                       <label className="flex items-center gap-2 text-sm text-muted-foreground">
                         <input type="checkbox" name="override_weekly_rules" />
-                        Override weekly 3-day rule for this shift
+                        Override weekly limit for this shift
                       </label>
                       <Button type="submit">Add Shift</Button>
                     </form>
@@ -462,6 +531,7 @@ export default async function SchedulePage({
                     <form action={setDesignatedLeadAction} className="space-y-4">
                       <input type="hidden" name="cycle_id" value={activeCycle.id} />
                       <input type="hidden" name="view" value={viewMode} />
+                      <input type="hidden" name="show_unavailable" value={showUnavailable ? 'true' : 'false'} />
                       <div>
                         <h4 className="text-sm font-semibold text-foreground">Designated Lead</h4>
                         <p className="text-xs text-muted-foreground">
@@ -499,7 +569,8 @@ export default async function SchedulePage({
                             </option>
                             {leadEligibleTherapists.map((therapist) => (
                               <option key={therapist.id} value={therapist.id}>
-                                {therapist.full_name} ({therapist.shift_type})
+                                {therapist.full_name} ({therapist.shift_type}
+                                {therapist.on_fmla || !therapist.is_active ? ', unavailable' : ''})
                               </option>
                             ))}
                           </select>
