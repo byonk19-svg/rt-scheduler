@@ -5,6 +5,7 @@ import type { DragEvent } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { cn } from '@/lib/utils'
+import { MIN_SHIFT_COVERAGE_PER_DAY, MAX_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
 
 type Therapist = {
   id: string
@@ -54,9 +55,6 @@ type DragActionBody =
       date: string
       shiftType: 'day' | 'night'
     }
-
-const MIN_SHIFT_COVERAGE_PER_DAY = 3
-const MAX_SHIFT_COVERAGE_PER_DAY = 5
 
 type DragActionResponse = {
   message?: string

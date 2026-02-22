@@ -34,6 +34,8 @@ type ShiftPost = {
   type: PostType
   status: PostStatus
   created_at: string
+  claimed_by: string | null
+  swap_shift_id: string | null
 }
 
 type ShiftDetails = {
@@ -144,6 +146,79 @@ async function deleteShiftPostAction(formData: FormData) {
   redirect('/shift-board')
 }
 
+async function claimShiftPostAction(formData: FormData) {
+  'use server'
+
+  const { supabase, user } = await getAuthContext()
+
+  const postId = String(formData.get('post_id') ?? '').trim()
+  const swapShiftId = String(formData.get('swap_shift_id') ?? '').trim() || null
+
+  if (!postId) redirect('/shift-board')
+
+  const { data: post } = await supabase
+    .from('shift_posts')
+    .select('id, posted_by, type, claimed_by, status')
+    .eq('id', postId)
+    .maybeSingle()
+
+  // Only pending, unclaimed posts that the user didn't create can be claimed
+  if (!post || post.status !== 'pending' || post.claimed_by || post.posted_by === user.id) {
+    redirect('/shift-board')
+  }
+
+  // Swap claims require the claimer to nominate one of their own shifts
+  if (post.type === 'swap') {
+    if (!swapShiftId) redirect('/shift-board')
+    const { data: swapShift } = await supabase
+      .from('shifts')
+      .select('id, user_id')
+      .eq('id', swapShiftId)
+      .maybeSingle()
+    if (!swapShift || swapShift.user_id !== user.id) redirect('/shift-board')
+  }
+
+  const { error } = await supabase
+    .from('shift_posts')
+    .update({ claimed_by: user.id, swap_shift_id: swapShiftId })
+    .eq('id', postId)
+
+  if (error) console.error('Failed to claim shift post:', error)
+
+  revalidatePath('/shift-board')
+  redirect('/shift-board')
+}
+
+async function unclaimShiftPostAction(formData: FormData) {
+  'use server'
+
+  const { supabase, user } = await getAuthContext()
+  const postId = String(formData.get('post_id') ?? '').trim()
+
+  if (!postId) redirect('/shift-board')
+
+  // Only the claimer can unclaim, and only while still pending
+  const { data: post } = await supabase
+    .from('shift_posts')
+    .select('id, claimed_by, status')
+    .eq('id', postId)
+    .maybeSingle()
+
+  if (!post || post.claimed_by !== user.id || post.status !== 'pending') {
+    redirect('/shift-board')
+  }
+
+  const { error } = await supabase
+    .from('shift_posts')
+    .update({ claimed_by: null, swap_shift_id: null })
+    .eq('id', postId)
+
+  if (error) console.error('Failed to unclaim shift post:', error)
+
+  revalidatePath('/shift-board')
+  redirect('/shift-board')
+}
+
 async function updateShiftPostStatusAction(formData: FormData) {
   'use server'
 
@@ -158,6 +233,63 @@ async function updateShiftPostStatusAction(formData: FormData) {
 
   if (!postId || (status !== 'pending' && status !== 'approved' && status !== 'denied')) {
     redirect('/shift-board')
+  }
+
+  if (status === 'approved') {
+    const { data: post } = await supabase
+      .from('shift_posts')
+      .select('shift_id, type, claimed_by, swap_shift_id')
+      .eq('id', postId)
+      .maybeSingle()
+
+    if (post?.claimed_by) {
+      if (post.type === 'pickup') {
+        // Transfer the shift to the claimer
+        const { error: transferError } = await supabase
+          .from('shifts')
+          .update({ user_id: post.claimed_by })
+          .eq('id', post.shift_id)
+
+        if (transferError) {
+          console.error('Failed to transfer shift on pickup approval:', transferError)
+          redirect('/shift-board')
+        }
+      } else if (post.type === 'swap' && post.swap_shift_id) {
+        // Fetch both shifts to get current owners
+        const { data: originalShift } = await supabase
+          .from('shifts')
+          .select('id, user_id')
+          .eq('id', post.shift_id)
+          .maybeSingle()
+
+        const { data: offeredShift } = await supabase
+          .from('shifts')
+          .select('id, user_id')
+          .eq('id', post.swap_shift_id)
+          .maybeSingle()
+
+        if (!originalShift || !offeredShift) {
+          console.error('Could not load shifts for swap approval')
+          redirect('/shift-board')
+        }
+
+        // Swap user_ids on both shifts
+        const { error: e1 } = await supabase
+          .from('shifts')
+          .update({ user_id: offeredShift.user_id })
+          .eq('id', post.shift_id)
+
+        const { error: e2 } = await supabase
+          .from('shifts')
+          .update({ user_id: originalShift.user_id })
+          .eq('id', post.swap_shift_id)
+
+        if (e1 || e2) {
+          console.error('Failed to swap shifts on approval:', e1 ?? e2)
+          redirect('/shift-board')
+        }
+      }
+    }
   }
 
   const { error } = await supabase.from('shift_posts').update({ status }).eq('id', postId)
@@ -182,31 +314,42 @@ export default async function ShiftBoardPage() {
 
   const { data: postsData } = await supabase
     .from('shift_posts')
-    .select('id, shift_id, posted_by, message, type, status, created_at')
+    .select('id, shift_id, posted_by, message, type, status, created_at, claimed_by, swap_shift_id')
     .order('created_at', { ascending: false })
 
   const posts = (postsData ?? []) as ShiftPost[]
 
   const shiftIds = [...new Set(posts.map((post) => post.shift_id))]
-  const posterIds = [...new Set(posts.map((post) => post.posted_by))]
+
+  // Collect all profile IDs we need names for: posters + claimers
+  const profileIds = [
+    ...new Set([
+      ...posts.map((post) => post.posted_by),
+      ...posts.filter((p) => p.claimed_by).map((p) => p.claimed_by as string),
+    ]),
+  ]
+
+  // Collect swap shift IDs for display
+  const swapShiftIds = [...new Set(posts.filter((p) => p.swap_shift_id).map((p) => p.swap_shift_id as string))]
 
   const shiftDetailsById = new Map<string, ShiftDetails>()
-  if (shiftIds.length > 0) {
+  const allShiftIds = [...new Set([...shiftIds, ...swapShiftIds])]
+  if (allShiftIds.length > 0) {
     const { data: shiftDetailsData } = await supabase
       .from('shifts')
       .select('id, date, shift_type, status, user_id, profiles(full_name), schedule_cycles(label, published)')
-      .in('id', shiftIds)
+      .in('id', allShiftIds)
 
     for (const shift of (shiftDetailsData ?? []) as ShiftDetails[]) {
       shiftDetailsById.set(shift.id, shift)
     }
   }
 
-  const posterNamesById = new Map<string, string>()
-  if (posterIds.length > 0) {
-    const { data: postersData } = await supabase.from('profiles').select('id, full_name').in('id', posterIds)
-    for (const profile of postersData ?? []) {
-      posterNamesById.set(profile.id, profile.full_name)
+  const profileNamesById = new Map<string, string>()
+  if (profileIds.length > 0) {
+    const { data: profilesData } = await supabase.from('profiles').select('id, full_name').in('id', profileIds)
+    for (const profile of profilesData ?? []) {
+      profileNamesById.set(profile.id, profile.full_name)
     }
   }
 
@@ -329,11 +472,20 @@ export default async function ShiftBoardPage() {
                 {posts.map((post) => {
                   const shift = shiftDetailsById.get(post.shift_id)
                   const cycle = shift ? getOne(shift.schedule_cycles) : null
+                  const offeredShift = post.swap_shift_id ? shiftDetailsById.get(post.swap_shift_id) : null
                   const submittedBy =
                     post.posted_by === user.id
                       ? 'You'
-                      : posterNamesById.get(post.posted_by) ?? 'Another therapist'
+                      : profileNamesById.get(post.posted_by) ?? 'Another therapist'
+                  const claimerName = post.claimed_by
+                    ? post.claimed_by === user.id
+                      ? 'You'
+                      : (profileNamesById.get(post.claimed_by) ?? 'Another therapist')
+                    : null
                   const isOwnPost = post.posted_by === user.id
+                  const isClaimedByMe = post.claimed_by === user.id
+                  const canClaim =
+                    !isOwnPost && post.status === 'pending' && !post.claimed_by && role === 'therapist'
 
                   return (
                     <TableRow key={post.id}>
@@ -345,6 +497,11 @@ export default async function ShiftBoardPage() {
                             <div className="text-xs text-muted-foreground">
                               {cycle ? cycle.label : 'No cycle'} - {shift.status}
                             </div>
+                            {offeredShift && (
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                Offered: {formatDate(offeredShift.date)} ({offeredShift.shift_type})
+                              </div>
+                            )}
                           </>
                         ) : (
                           <span className="text-muted-foreground">Shift details unavailable</span>
@@ -365,15 +522,58 @@ export default async function ShiftBoardPage() {
                         >
                           {post.status}
                         </Badge>
+                        {claimerName && post.status === 'pending' && (
+                          <div className="mt-1 text-xs text-muted-foreground">Claimed by {claimerName}</div>
+                        )}
                       </TableCell>
                       <TableCell>{formatDateTime(post.created_at)}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-2">
-                          {isOwnPost && (
+                          {isOwnPost && post.status === 'pending' && (
                             <form action={deleteShiftPostAction}>
                               <input type="hidden" name="post_id" value={post.id} />
                               <Button type="submit" variant="outline" size="sm">
                                 Delete
+                              </Button>
+                            </form>
+                          )}
+
+                          {/* Therapist claim actions */}
+                          {canClaim && post.type === 'pickup' && (
+                            <form action={claimShiftPostAction}>
+                              <input type="hidden" name="post_id" value={post.id} />
+                              <Button type="submit" variant="outline" size="sm">
+                                Claim shift
+                              </Button>
+                            </form>
+                          )}
+
+                          {canClaim && post.type === 'swap' && shiftOptions.length > 0 && (
+                            <form action={claimShiftPostAction} className="flex items-center gap-2">
+                              <input type="hidden" name="post_id" value={post.id} />
+                              <select
+                                name="swap_shift_id"
+                                required
+                                className="h-8 rounded-md border border-border bg-white px-2 text-xs"
+                              >
+                                <option value="">My shift…</option>
+                                {shiftOptions.map((s) => (
+                                  <option key={s.id} value={s.id}>
+                                    {formatDate(s.date)} ({s.shift_type})
+                                  </option>
+                                ))}
+                              </select>
+                              <Button type="submit" variant="outline" size="sm">
+                                Offer swap
+                              </Button>
+                            </form>
+                          )}
+
+                          {isClaimedByMe && post.status === 'pending' && (
+                            <form action={unclaimShiftPostAction}>
+                              <input type="hidden" name="post_id" value={post.id} />
+                              <Button type="submit" variant="outline" size="sm">
+                                Unclaim
                               </Button>
                             </form>
                           )}

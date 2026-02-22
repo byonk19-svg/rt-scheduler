@@ -47,6 +47,8 @@ Swap or pickup requests on the board.
 - message (text)
 - type (text) — 'swap' or 'pickup'
 - status (text) — 'pending', 'approved', 'denied'
+- claimed_by (uuid, nullable) → profiles — therapist volunteering to take the shift
+- swap_shift_id (uuid, nullable) → shifts — for swaps, the shift the claimer is offering
 - created_at (timestamp)
 
 ## RLS Rules (plain English)
