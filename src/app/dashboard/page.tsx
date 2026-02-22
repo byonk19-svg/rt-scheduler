@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { TeamwiseLogo } from '@/components/teamwise-logo'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 
 type Profile = {
@@ -61,15 +62,16 @@ export default async function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background p-6 md:p-8">
+    <main className="teamwise-aurora-bg min-h-screen bg-background p-4 md:p-8">
       <div className="mx-auto max-w-5xl space-y-6">
-        <div className="flex flex-wrap items-start justify-between gap-4 rounded-2xl border-2 border-border bg-card p-5 shadow-sm">
+        <div className="teamwise-surface flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-border p-5 shadow-sm">
           <div>
             <TeamwiseLogo size="small" />
-            <h1 className="text-3xl font-bold text-foreground">Welcome, {profile.full_name}</h1>
-            <p className="text-muted-foreground capitalize">
-              {profile.role} - {profile.shift_type} shift
-            </p>
+            <h1 className="mt-2 text-3xl font-bold text-foreground">Welcome, {profile.full_name}</h1>
+            <div className="mt-2 flex items-center gap-2">
+              <Badge className="capitalize">{profile.role}</Badge>
+              <Badge variant="outline" className="capitalize">{profile.shift_type} shift</Badge>
+            </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {profile.role === 'manager'
                 ? 'Manager tools are available below.'

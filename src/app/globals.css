@@ -48,76 +48,101 @@
 }
 
 :root {
-  --radius: 0.875rem;
-  --background: #F6F8FB;
+  --radius: 0.5rem;
+  --tw-primary-blue: #0667A9;
+  --tw-deep-blue: #1D608E;
+  --tw-light-blue: #6AA5C8;
+  --tw-accent-orange: #E27F3F;
+  --tw-soft-tint: #CEDFE3;
+  --tw-background: #F8FAFC;
+  --tw-surface: #FFFFFF;
+  --tw-text: #0F172A;
+  --tw-muted-text: #475569;
+  --tw-border: #E2E8F0;
+  --background: #F8FAFB;
   --foreground: #0F172A;
   --card: #FFFFFF;
   --card-foreground: #0F172A;
   --popover: #FFFFFF;
   --popover-foreground: #0F172A;
-  --primary: #0B1F3B;
+  --primary: #0667A9;
   --primary-foreground: #FFFFFF;
-  --secondary: #EAF2FF;
-  --secondary-foreground: #0B1F3B;
-  --muted: #EDF2F7;
+  --secondary: #CEDFE3;
+  --secondary-foreground: #0F172A;
+  --muted: #F8FAFC;
   --muted-foreground: #475569;
-  --accent: #1FB6A6;
-  --accent-foreground: #052E2B;
-  --destructive: #DC2626;
+  --accent: #E27F3F;
+  --accent-foreground: #FFFFFF;
+  --destructive: #EF4444;
   --border: #E2E8F0;
-  --input: #E2E8F0;
-  --ring: #4AA3FF;
-  --chart-1: #0B1F3B;
-  --chart-2: #1FB6A6;
-  --chart-3: #4AA3FF;
-  --chart-4: #16A34A;
-  --chart-5: #F59E0B;
+  --input: transparent;
+  --input-background: #FFFFFF;
+  --ring: #0667A9;
+  --chart-1: #0667A9;
+  --chart-2: #6AA5C8;
+  --chart-3: #E27F3F;
+  --chart-4: #1D608E;
+  --chart-5: #CEDFE3;
   --sidebar: #FFFFFF;
   --sidebar-foreground: #0F172A;
-  --sidebar-primary: #0B1F3B;
+  --sidebar-primary: #0667A9;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #EAF2FF;
-  --sidebar-accent-foreground: #0B1F3B;
+  --sidebar-accent: #F8FAFC;
+  --sidebar-accent-foreground: #0F172A;
   --sidebar-border: #E2E8F0;
-  --sidebar-ring: #4AA3FF;
-  --highlight: #4AA3FF;
-  --success: #16A34A;
+  --sidebar-ring: #0667A9;
+  --highlight: #0667A9;
+  --success: #22C55E;
+  --success-subtle: #DCFCE7;
+  --success-border: #BBF7D0;
+  --success-text: #15803D;
   --warning: #F59E0B;
-  --error: #DC2626;
+  --warning-subtle: #FEF3C7;
+  --warning-border: #FDE68A;
+  --warning-text: #B45309;
+  --error: #EF4444;
+  --error-subtle: #FEE2E2;
+  --error-border: #FECACA;
+  --error-text: #B91C1C;
+  --info: #0EA5E9;
+  --info-subtle: #E0F2FE;
+  --info-border: #BAE6FD;
+  --info-text: #0369A1;
 }
 
 .dark {
-  --background: #F6F8FB;
+  --background: #F8FAFB;
   --foreground: #0F172A;
   --card: #FFFFFF;
   --card-foreground: #0F172A;
   --popover: #FFFFFF;
   --popover-foreground: #0F172A;
-  --primary: #0B1F3B;
+  --primary: #0667A9;
   --primary-foreground: #FFFFFF;
-  --secondary: #EAF2FF;
-  --secondary-foreground: #0B1F3B;
-  --muted: #EDF2F7;
+  --secondary: #CEDFE3;
+  --secondary-foreground: #0F172A;
+  --muted: #F8FAFC;
   --muted-foreground: #475569;
-  --accent: #1FB6A6;
-  --accent-foreground: #052E2B;
-  --destructive: #DC2626;
+  --accent: #E27F3F;
+  --accent-foreground: #FFFFFF;
+  --destructive: #EF4444;
   --border: #E2E8F0;
-  --input: #E2E8F0;
-  --ring: #4AA3FF;
-  --chart-1: #0B1F3B;
-  --chart-2: #1FB6A6;
-  --chart-3: #4AA3FF;
-  --chart-4: #16A34A;
-  --chart-5: #F59E0B;
+  --input: transparent;
+  --input-background: #FFFFFF;
+  --ring: #0667A9;
+  --chart-1: #0667A9;
+  --chart-2: #6AA5C8;
+  --chart-3: #E27F3F;
+  --chart-4: #1D608E;
+  --chart-5: #CEDFE3;
   --sidebar: #FFFFFF;
   --sidebar-foreground: #0F172A;
-  --sidebar-primary: #0B1F3B;
+  --sidebar-primary: #0667A9;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #EAF2FF;
-  --sidebar-accent-foreground: #0B1F3B;
+  --sidebar-accent: #F8FAFC;
+  --sidebar-accent-foreground: #0F172A;
   --sidebar-border: #E2E8F0;
-  --sidebar-ring: #4AA3FF;
+  --sidebar-ring: #0667A9;
 }
 
 @layer base {
@@ -127,25 +152,38 @@
   body {
     @apply bg-background text-foreground;
     background-image:
-      radial-gradient(circle at 10% 0%, rgba(20, 184, 166, 0.1), transparent 35%),
-      radial-gradient(circle at 90% 0%, rgba(74, 163, 255, 0.14), transparent 40%);
+      radial-gradient(circle at 14% 2%, rgba(102, 165, 200, 0.18), transparent 36%),
+      radial-gradient(circle at 88% 4%, rgba(206, 223, 227, 0.26), transparent 42%),
+      linear-gradient(rgba(15, 23, 42, 0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(15, 23, 42, 0.02) 1px, transparent 1px);
+    background-size: auto, auto, 36px 36px, 36px 36px;
     min-height: 100vh;
   }
 
   a {
-    color: #0ea5e9;
+    color: var(--primary);
   }
 
   a:hover {
-    color: #0284c7;
+    color: var(--tw-deep-blue);
   }
 }
 
 .teamwise-grid-bg {
   background-image:
-    linear-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
-  background-size: 24px 24px;
+    linear-gradient(rgba(106, 165, 200, 0.2) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(106, 165, 200, 0.2) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.teamwise-surface {
+  background: var(--tw-surface);
+}
+
+.teamwise-aurora-bg {
+  background-image:
+    radial-gradient(circle at 12% 10%, rgba(106, 165, 200, 0.18), transparent 36%),
+    radial-gradient(circle at 90% 2%, rgba(206, 223, 227, 0.3), transparent 42%);
 }
 
 .print-only {
