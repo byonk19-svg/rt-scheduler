@@ -14,10 +14,12 @@ type ScheduleHeaderProps = {
   viewMode: ViewMode
   activeCycleId?: string
   activeCyclePublished: boolean
+  showUnavailable?: boolean
   title: string
   description: string
   toggleCyclePublishedAction: (formData: FormData) => void | Promise<void>
   generateDraftScheduleAction: (formData: FormData) => void | Promise<void>
+  resetDraftScheduleAction: (formData: FormData) => void | Promise<void>
 }
 
 const menuActionClass = 'block w-full rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary disabled:opacity-50'
@@ -35,10 +37,12 @@ export function ScheduleHeader({
   viewMode,
   activeCycleId,
   activeCyclePublished,
+  showUnavailable = false,
   title,
   description,
   toggleCyclePublishedAction,
   generateDraftScheduleAction,
+  resetDraftScheduleAction,
 }: ScheduleHeaderProps) {
   const hasActiveCycle = Boolean(activeCycleId)
   const canPublish = hasActiveCycle && !activeCyclePublished
@@ -57,6 +61,7 @@ export function ScheduleHeader({
               <form action={toggleCyclePublishedAction}>
                 <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
                 <input type="hidden" name="view" value={viewMode} />
+                <input type="hidden" name="show_unavailable" value={showUnavailable ? 'true' : 'false'} />
                 <input type="hidden" name="currently_published" value="false" />
                 <input type="hidden" name="override_weekly_rules" value="false" />
                 <Button type="submit" disabled={!canPublish}>
@@ -75,6 +80,7 @@ export function ScheduleHeader({
                   <form action={toggleCyclePublishedAction}>
                     <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
                     <input type="hidden" name="view" value={viewMode} />
+                    <input type="hidden" name="show_unavailable" value={showUnavailable ? 'true' : 'false'} />
                     <input type="hidden" name="currently_published" value="false" />
                     <input type="hidden" name="override_weekly_rules" value="true" />
                     <button type="submit" className={menuActionClass} disabled={!canPublish}>
@@ -84,6 +90,7 @@ export function ScheduleHeader({
                   <form action={toggleCyclePublishedAction}>
                     <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
                     <input type="hidden" name="view" value={viewMode} />
+                    <input type="hidden" name="show_unavailable" value={showUnavailable ? 'true' : 'false'} />
                     <input type="hidden" name="currently_published" value="false" />
                     <input type="hidden" name="override_weekly_rules" value="false" />
                     <button type="submit" className={menuActionClass} disabled={!canPublish}>
@@ -100,8 +107,23 @@ export function ScheduleHeader({
               <form action={generateDraftScheduleAction}>
                 <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
                 <input type="hidden" name="view" value={viewMode} />
+                <input type="hidden" name="show_unavailable" value={showUnavailable ? 'true' : 'false'} />
                 <button type="submit" className={menuActionClass} disabled={!hasActiveCycle || activeCyclePublished}>
                   Auto-generate draft
+                </button>
+              </form>
+            )}
+            {role === 'manager' && (
+              <form action={resetDraftScheduleAction}>
+                <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+                <input type="hidden" name="view" value={viewMode} />
+                <input type="hidden" name="show_unavailable" value={showUnavailable ? 'true' : 'false'} />
+                <button
+                  type="submit"
+                  className={`${menuActionClass} text-[var(--warning-text)]`}
+                  disabled={!hasActiveCycle || activeCyclePublished}
+                >
+                  Clear draft and start over
                 </button>
               </form>
             )}

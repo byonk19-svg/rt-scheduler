@@ -34,6 +34,33 @@ const prefix = String(process.env.SEED_USERS_PREFIX ?? 'employee').trim()
 const defaultPassword = String(process.env.SEED_USERS_PASSWORD ?? 'Teamwise123!').trim()
 const includeManager = String(process.env.SEED_INCLUDE_MANAGER ?? 'false').toLowerCase() === 'true'
 
+const rosterNames = [
+  'Julie D.',
+  'Jannie B.',
+  'Julie C.',
+  'Barbara C.',
+  'Nicole G.',
+  'Ruth G.',
+  'Roy H.',
+  'Denise H.',
+  'Mark J.',
+  'Gayle K.',
+  'Aleyce L.',
+  'Kristine M.',
+  'Lisa M.',
+  'Keturah S.',
+  'Lynn S.',
+  'Adrienne S.',
+  'Kim S.',
+  'Rosa V.',
+  'Audbriana W.',
+  'Matthew W.',
+  'Sarah W.',
+  'Layne W.',
+  'Irene Y.',
+  'Brianna Y.',
+]
+
 if (!Number.isFinite(count) || count < 1) {
   console.error('SEED_USERS_COUNT must be a positive integer')
   process.exit(1)
@@ -104,7 +131,7 @@ async function main() {
 
   for (let i = 1; i <= count; i += 1) {
     const email = `${prefix}${pad(i)}@${domain}`.toLowerCase()
-    const fullName = `Test Employee ${i}`
+    const fullName = rosterNames[i - 1] ?? `Test Employee ${i}`
     const role = 'therapist'
     const shiftType = i % 2 === 0 ? 'night' : 'day'
 

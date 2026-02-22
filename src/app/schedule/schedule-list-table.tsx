@@ -21,6 +21,9 @@ export type ScheduleListRow = {
   therapistName: string
   shiftType: 'day' | 'night'
   status: 'scheduled' | 'on_call' | 'sick' | 'called_off'
+  role: 'lead' | 'staff'
+  slotLeadName: string | null
+  slotMissingLead: boolean
 }
 
 type ScheduleListTableProps = {
@@ -53,7 +56,7 @@ export function ScheduleListTable({
   const filteredRows = useMemo(() => {
     const mappedRows: Array<ScheduleListRow & FilterableRow> = rows.map((row) => ({
       ...row,
-      searchText: `${row.therapistName} ${row.shiftType} ${row.status} ${formatDate(row.date)}`,
+      searchText: `${row.therapistName} ${row.shiftType} ${row.status} ${row.role} ${row.slotLeadName ?? ''} ${formatDate(row.date)}`,
       date: row.date,
       sortDate: row.date,
     }))
@@ -62,7 +65,7 @@ export function ScheduleListTable({
   }, [rows, filters])
 
   const showActions = role === 'manager' && Boolean(deleteShiftAction)
-  const emptyColSpan = role === 'manager' ? (showActions ? 5 : 4) : 3
+  const dataColSpan = role === 'manager' ? (showActions ? 6 : 5) : 4
 
   return (
     <div className="space-y-4">
@@ -80,13 +83,14 @@ export function ScheduleListTable({
             {role === 'manager' && <TableHead>Therapist</TableHead>}
             <TableHead>Shift Type</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead>Lead</TableHead>
             {showActions && <TableHead>Action</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
           {filteredRows.length === 0 && (
             <TableRow>
-              <TableCell colSpan={emptyColSpan} className="py-6 text-center text-muted-foreground">
+              <TableCell colSpan={dataColSpan} className="py-6 text-center text-muted-foreground">
                 {emptyMessage}
               </TableCell>
             </TableRow>
@@ -98,6 +102,21 @@ export function ScheduleListTable({
               {role === 'manager' && <TableCell>{row.therapistName}</TableCell>}
               <TableCell className="capitalize">{row.shiftType}</TableCell>
               <TableCell>{row.status}</TableCell>
+              <TableCell>
+                <div className="flex flex-wrap items-center gap-2">
+                  {row.role === 'lead' && (
+                    <span className="rounded border border-border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                      Lead
+                    </span>
+                  )}
+                  <span className="text-xs text-muted-foreground">
+                    {row.slotLeadName ? `Lead: ${row.slotLeadName}` : 'Lead: Unassigned'}
+                  </span>
+                  {row.slotMissingLead && (
+                    <span className="text-xs font-medium text-[var(--warning-text)]">Missing lead</span>
+                  )}
+                </div>
+              </TableCell>
               {showActions && (
                 <TableCell>
                   <form action={deleteShiftAction}>

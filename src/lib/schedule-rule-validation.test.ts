@@ -6,6 +6,7 @@ import {
   exceedsWeeklyLimit,
   summarizeCoverageViolations,
   summarizePublishWeeklyViolations,
+  summarizeShiftSlotViolations,
 } from '@/lib/schedule-rule-validation'
 
 describe('schedule rule validation', () => {
@@ -52,7 +53,10 @@ describe('schedule rule validation', () => {
       therapistIds: ['t1', 't2'],
       cycleWeekDates,
       weeklyWorkedDatesByUserWeek,
-      maxWorkDaysPerWeek: 3,
+      maxWorkDaysByTherapist: new Map([
+        ['t1', 3],
+        ['t2', 3],
+      ]),
     })
 
     expect(result).toEqual({
@@ -82,5 +86,166 @@ describe('schedule rule validation', () => {
       overCoverage: 1,
       violations: 2,
     })
+  })
+
+  it('flags missing designated lead as a slot violation', () => {
+    const result = summarizeShiftSlotViolations({
+      cycleDates: ['2026-03-01'],
+      assignments: [
+        {
+          date: '2026-03-01',
+          shiftType: 'day',
+          status: 'scheduled',
+          role: 'staff',
+          therapistId: 't1',
+          therapistName: 'Ava Patel',
+          isLeadEligible: true,
+        },
+        {
+          date: '2026-03-01',
+          shiftType: 'day',
+          status: 'scheduled',
+          role: 'staff',
+          therapistId: 't2',
+          therapistName: 'Marcus Reed',
+          isLeadEligible: false,
+        },
+        {
+          date: '2026-03-01',
+          shiftType: 'day',
+          status: 'scheduled',
+          role: 'staff',
+          therapistId: 't3',
+          therapistName: 'Nina Lopez',
+          isLeadEligible: false,
+        },
+      ],
+      minCoveragePerShift: 3,
+      maxCoveragePerShift: 5,
+    })
+
+    expect(result.missingLead).toBe(2)
+    expect(result.issues.some((issue) => issue.reasons.includes('missing_lead'))).toBe(true)
+  })
+
+  it('flags designated lead assignments for ineligible therapists', () => {
+    const result = summarizeShiftSlotViolations({
+      cycleDates: ['2026-03-01'],
+      assignments: [
+        {
+          date: '2026-03-01',
+          shiftType: 'night',
+          status: 'scheduled',
+          role: 'lead',
+          therapistId: 't4',
+          therapistName: 'Chris Allen',
+          isLeadEligible: false,
+        },
+        {
+          date: '2026-03-01',
+          shiftType: 'night',
+          status: 'scheduled',
+          role: 'staff',
+          therapistId: 't5',
+          therapistName: 'Maya Chen',
+          isLeadEligible: true,
+        },
+        {
+          date: '2026-03-01',
+          shiftType: 'night',
+          status: 'scheduled',
+          role: 'staff',
+          therapistId: 't6',
+          therapistName: 'Noah Rivera',
+          isLeadEligible: true,
+        },
+      ],
+      minCoveragePerShift: 3,
+      maxCoveragePerShift: 5,
+    })
+
+    expect(result.ineligibleLead).toBe(1)
+    expect(result.issues.some((issue) => issue.reasons.includes('ineligible_lead'))).toBe(true)
+  })
+
+  it('allows lead-eligible therapists to remain staff without errors', () => {
+    const result = summarizeShiftSlotViolations({
+      cycleDates: ['2026-03-01'],
+      assignments: [
+        {
+          date: '2026-03-01',
+          shiftType: 'day',
+          status: 'scheduled',
+          role: 'lead',
+          therapistId: 't1',
+          therapistName: 'Ava Patel',
+          isLeadEligible: true,
+        },
+        {
+          date: '2026-03-01',
+          shiftType: 'day',
+          status: 'scheduled',
+          role: 'staff',
+          therapistId: 't2',
+          therapistName: 'Marcus Reed',
+          isLeadEligible: true,
+        },
+        {
+          date: '2026-03-01',
+          shiftType: 'day',
+          status: 'scheduled',
+          role: 'staff',
+          therapistId: 't3',
+          therapistName: 'Nina Lopez',
+          isLeadEligible: false,
+        },
+      ],
+      minCoveragePerShift: 3,
+      maxCoveragePerShift: 5,
+    })
+
+    expect(result.missingLead).toBe(1)
+    expect(result.ineligibleLead).toBe(0)
+    expect(result.multipleLeads).toBe(0)
+  })
+
+  it('flags multiple designated leads on the same shift slot', () => {
+    const result = summarizeShiftSlotViolations({
+      cycleDates: ['2026-03-01'],
+      assignments: [
+        {
+          date: '2026-03-01',
+          shiftType: 'day',
+          status: 'scheduled',
+          role: 'lead',
+          therapistId: 't1',
+          therapistName: 'Lead One',
+          isLeadEligible: true,
+        },
+        {
+          date: '2026-03-01',
+          shiftType: 'day',
+          status: 'scheduled',
+          role: 'lead',
+          therapistId: 't2',
+          therapistName: 'Lead Two',
+          isLeadEligible: true,
+        },
+        {
+          date: '2026-03-01',
+          shiftType: 'day',
+          status: 'scheduled',
+          role: 'staff',
+          therapistId: 't3',
+          therapistName: 'Staff',
+          isLeadEligible: false,
+        },
+      ],
+      minCoveragePerShift: 3,
+      maxCoveragePerShift: 5,
+    })
+
+    expect(result.multipleLeads).toBe(1)
+    expect(result.issues.some((issue) => issue.reasons.includes('multiple_leads'))).toBe(true)
   })
 })

@@ -1,5 +1,6 @@
-import { buildDateRange, countsTowardWeeklyLimit, coverageSlotKey, dateKeyFromDate } from '@/lib/schedule-helpers'
-import { MIN_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
+import { buildDateRange, dateKeyFromDate } from '@/lib/schedule-helpers'
+import { MAX_SHIFT_COVERAGE_PER_DAY, MIN_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
+import { summarizeShiftSlotViolations } from '@/lib/schedule-rule-validation'
 import { createClient } from '@/lib/supabase/server'
 import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 
@@ -16,20 +17,70 @@ type CycleRow = {
 type ShiftCoverageRow = {
   date: string
   shift_type: 'day' | 'night'
-  status: string
+  status: 'scheduled' | 'on_call' | 'sick' | 'called_off'
+  role: 'lead' | 'staff'
+  user_id: string
+  profiles:
+    | { is_lead_eligible: boolean }
+    | { is_lead_eligible: boolean }[]
+    | null
+}
+
+type DashboardLinks = {
+  approvals: string
+  approvalsPending: string
+  coverage: string
+  fixCoverage: string
+  coverageMissingLead: string
+  coverageUnfilled: string
+  coverageNeedsAttention: string
+  publish: string
 }
 
 export type ManagerAttentionSnapshot = {
   pendingApprovals: number
   unfilledShiftSlots: number
+  missingLeadShifts: number
+  underCoverageSlots: number
+  overCoverageSlots: number
+  coverageIssues: number
   attentionItems: number
   coverageConfirmed: boolean
   publishReady: boolean
+  resolveBlockersLink: string
   activeCycle: CycleRow | null
-  links: {
-    approvals: string
-    coverage: string
-    publish: string
+  links: DashboardLinks
+}
+
+function getOne<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null
+  return value ?? null
+}
+
+function getLinks(activeCycle: CycleRow | null): DashboardLinks {
+  if (!activeCycle) {
+    return {
+      approvals: MANAGER_WORKFLOW_LINKS.approvals,
+      approvalsPending: '/shift-board?status=pending#open-posts',
+      coverage: MANAGER_WORKFLOW_LINKS.coverage,
+      fixCoverage: '/schedule?view=calendar&filter=missing_lead&focus=first',
+      coverageMissingLead: '/schedule?view=calendar&filter=missing_lead&focus=first',
+      coverageUnfilled: '/schedule?view=calendar&filter=under_coverage&focus=first',
+      coverageNeedsAttention: '/schedule?view=calendar&filter=needs_attention&focus=first',
+      publish: MANAGER_WORKFLOW_LINKS.publish,
+    }
+  }
+
+  const cycleParam = `cycle=${activeCycle.id}`
+  return {
+    approvals: MANAGER_WORKFLOW_LINKS.approvals,
+    approvalsPending: `/shift-board?status=pending#open-posts`,
+    coverage: `/schedule?${cycleParam}&view=calendar`,
+    fixCoverage: `/schedule?${cycleParam}&view=calendar&filter=missing_lead&focus=first`,
+    coverageMissingLead: `/schedule?${cycleParam}&view=calendar&filter=missing_lead&focus=first`,
+    coverageUnfilled: `/schedule?${cycleParam}&view=calendar&filter=under_coverage&focus=first`,
+    coverageNeedsAttention: `/schedule?${cycleParam}&view=calendar&filter=needs_attention&focus=first`,
+    publish: `/schedule?${cycleParam}&view=grid`,
   }
 }
 
@@ -48,12 +99,14 @@ export async function getManagerAttentionSnapshot(supabase: SupabaseServerClient
     cycles[0] ??
     null
 
+  const links = getLinks(activeCycle)
+
   const [pendingApprovalsResult, cycleShiftsResult] = await Promise.all([
     supabase.from('shift_posts').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     activeCycle
       ? supabase
           .from('shifts')
-          .select('date, shift_type, status')
+          .select('date, shift_type, status, role, user_id, profiles(is_lead_eligible)')
           .eq('cycle_id', activeCycle.id)
           .gte('date', activeCycle.start_date)
           .lte('date', activeCycle.end_date)
@@ -62,39 +115,55 @@ export async function getManagerAttentionSnapshot(supabase: SupabaseServerClient
 
   const pendingApprovals = pendingApprovalsResult.count ?? 0
 
-  let unfilledShiftSlots = 0
+  let underCoverageSlots = 0
+  let overCoverageSlots = 0
+  let missingLeadShifts = 0
+
   if (activeCycle) {
     const cycleDates = buildDateRange(activeCycle.start_date, activeCycle.end_date)
-    const coverageBySlot = new Map<string, number>()
+    const validation = summarizeShiftSlotViolations({
+      cycleDates,
+      assignments: ((cycleShiftsResult.data ?? []) as ShiftCoverageRow[]).map((shift) => ({
+        date: shift.date,
+        shiftType: shift.shift_type,
+        status: shift.status,
+        role: shift.role,
+        therapistId: shift.user_id,
+        therapistName: shift.user_id,
+        isLeadEligible: Boolean(getOne(shift.profiles)?.is_lead_eligible),
+      })),
+      minCoveragePerShift: MIN_SHIFT_COVERAGE_PER_DAY,
+      maxCoveragePerShift: MAX_SHIFT_COVERAGE_PER_DAY,
+    })
 
-    for (const shift of (cycleShiftsResult.data ?? []) as ShiftCoverageRow[]) {
-      if (!countsTowardWeeklyLimit(shift.status)) continue
-      const slotKey = coverageSlotKey(shift.date, shift.shift_type)
-      coverageBySlot.set(slotKey, (coverageBySlot.get(slotKey) ?? 0) + 1)
-    }
-
-    for (const date of cycleDates) {
-      for (const shiftType of ['day', 'night'] as const) {
-        const slotCoverage = coverageBySlot.get(coverageSlotKey(date, shiftType)) ?? 0
-        if (slotCoverage < MIN_SHIFT_COVERAGE_PER_DAY) {
-          unfilledShiftSlots += 1
-        }
-      }
-    }
+    underCoverageSlots = validation.underCoverage
+    overCoverageSlots = validation.overCoverage
+    missingLeadShifts = validation.missingLead
   }
 
-  const links = {
-    approvals: MANAGER_WORKFLOW_LINKS.approvals,
-    coverage: activeCycle ? `/schedule?cycle=${activeCycle.id}&view=calendar` : MANAGER_WORKFLOW_LINKS.coverage,
-    publish: activeCycle ? `/schedule?cycle=${activeCycle.id}&view=grid` : MANAGER_WORKFLOW_LINKS.publish,
-  }
+  const coverageIssues = missingLeadShifts + underCoverageSlots + overCoverageSlots
+  const unfilledShiftSlots = underCoverageSlots
+  const attentionItems = pendingApprovals + coverageIssues
+  const publishReady = Boolean(activeCycle) && !activeCycle.published && pendingApprovals === 0 && coverageIssues === 0
+
+  const resolveBlockersLink =
+    coverageIssues > 0
+      ? links.fixCoverage
+      : pendingApprovals > 0
+        ? links.approvalsPending
+        : links.publish
 
   return {
     pendingApprovals,
     unfilledShiftSlots,
-    attentionItems: pendingApprovals + unfilledShiftSlots,
-    coverageConfirmed: Boolean(activeCycle) && unfilledShiftSlots === 0,
-    publishReady: Boolean(activeCycle) && !activeCycle.published && pendingApprovals === 0 && unfilledShiftSlots === 0,
+    missingLeadShifts,
+    underCoverageSlots,
+    overCoverageSlots,
+    coverageIssues,
+    attentionItems,
+    coverageConfirmed: coverageIssues === 0,
+    publishReady,
+    resolveBlockersLink,
     activeCycle,
     links,
   }

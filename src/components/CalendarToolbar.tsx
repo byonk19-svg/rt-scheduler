@@ -10,6 +10,7 @@ type CalendarToolbarProps = {
   rangeLabel: string
   minCoverage: number
   maxCoverage: number
+  issueFilter: 'all' | 'missing_lead' | 'under_coverage' | 'over_coverage'
   showDayTeam: boolean
   showNightTeam: boolean
   overrideWeeklyRules: boolean
@@ -36,6 +37,7 @@ export function CalendarToolbar({
   rangeLabel,
   minCoverage,
   maxCoverage,
+  issueFilter,
   showDayTeam,
   showNightTeam,
   overrideWeeklyRules,
@@ -68,6 +70,16 @@ export function CalendarToolbar({
 
       <div className={cn('mt-3 space-y-3', mobileOpen ? 'block' : 'hidden md:block')}>
         <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">
+            Filter:{' '}
+            {issueFilter === 'missing_lead'
+              ? 'Missing lead'
+              : issueFilter === 'under_coverage'
+                ? 'Under coverage'
+                : issueFilter === 'over_coverage'
+                  ? 'Over coverage'
+                  : 'All'}
+          </span>
           <Button
             type="button"
             size="sm"

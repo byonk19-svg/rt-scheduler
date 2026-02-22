@@ -1,7 +1,8 @@
 import {
   MAX_SHIFT_COVERAGE_PER_DAY,
-  MAX_WORK_DAYS_PER_WEEK,
   MIN_SHIFT_COVERAGE_PER_DAY,
+  getDefaultWeeklyLimitForEmploymentType,
+  sanitizeWeeklyLimit,
 } from '@/lib/scheduling-constants'
 import type {
   ScheduleSearchParams,
@@ -54,6 +55,12 @@ export function getWeekBoundsForDate(value: string): { weekStart: string; weekEn
     weekStart: dateKeyFromDate(weekStartDate),
     weekEnd: dateKeyFromDate(weekEndDate),
   }
+}
+
+export function getWeekdayIndex(value: string): number | null {
+  const parsed = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.getDay()
 }
 
 export function weeklyCountKey(userId: string, weekStart: string): string {
@@ -137,6 +144,7 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
 } | null {
   const error = getSearchParam(params?.error)
   const auto = getSearchParam(params?.auto)
+  const draft = getSearchParam(params?.draft)
 
   if (error === 'auto_generate_failed') {
     return { message: 'Could not auto-generate draft schedule. Please try again.', variant: 'error' }
@@ -150,13 +158,22 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
   if (error === 'auto_no_therapists') {
     return { message: 'No therapists found to schedule.', variant: 'error' }
   }
+  if (error === 'reset_missing_cycle') {
+    return { message: 'Select a schedule cycle first.', variant: 'error' }
+  }
+  if (error === 'reset_cycle_published') {
+    return { message: 'Only draft cycles can be reset.', variant: 'error' }
+  }
+  if (error === 'reset_failed') {
+    return { message: 'Could not clear the draft schedule. Please try again.', variant: 'error' }
+  }
   if (error === 'weekly_limit_exceeded') {
     const weekStart = getSearchParam(params?.week_start)
     const weekEnd = getSearchParam(params?.week_end)
     const weekLabel =
       weekStart && weekEnd ? ` (${formatDate(weekStart)} to ${formatDate(weekEnd)})` : ''
     return {
-      message: `Therapists can only work ${MAX_WORK_DAYS_PER_WEEK} days per week (Sun-Sat)${weekLabel}.`,
+      message: `This assignment exceeds that therapist's weekly limit (Sun-Sat)${weekLabel}.`,
       variant: 'error',
     }
   }
@@ -177,7 +194,7 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
     const under = parseCount(getSearchParam(params?.under))
     const over = parseCount(getSearchParam(params?.over))
     return {
-      message: `Weekly 3-day rule failed (${violations} therapist-weeks: ${under} under, ${over} over). Use Publish with Override if needed.`,
+      message: `Weekly workload rule failed (${violations} therapist-weeks: ${under} under, ${over} over). Use Publish with Override if needed.`,
       variant: 'error',
     }
   }
@@ -192,6 +209,37 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
       message: `Daily coverage rule failed (${violations} day/shift slots: ${underCoverage} under, ${overCoverage} over). Target is ${MIN_SHIFT_COVERAGE_PER_DAY}-${MAX_SHIFT_COVERAGE_PER_DAY}.`,
       variant: 'error',
     }
+  }
+  if (error === 'publish_shift_rule_violation') {
+    const underCoverage = parseCount(getSearchParam(params?.under_coverage))
+    const overCoverage = parseCount(getSearchParam(params?.over_coverage))
+    const missingLead = parseCount(getSearchParam(params?.lead_missing))
+    const multipleLeads = parseCount(getSearchParam(params?.lead_multiple))
+    const ineligibleLead = parseCount(getSearchParam(params?.lead_ineligible))
+    const affected = getSearchParam(params?.affected)
+    const affectedSummary = affected ? ` Affected: ${affected}.` : ''
+    return {
+      message: `Publish blocked. Coverage under: ${underCoverage}, coverage over: ${overCoverage}, missing lead: ${missingLead}, multiple leads: ${multipleLeads}, ineligible lead: ${ineligibleLead}.${affectedSummary}`,
+      variant: 'error',
+    }
+  }
+  if (error === 'set_lead_not_eligible') {
+    return { message: 'Only lead-eligible therapists can be designated as lead.', variant: 'error' }
+  }
+  if (error === 'set_lead_weekly_limit') {
+    return { message: "Designated lead would exceed that therapist's weekly limit.", variant: 'error' }
+  }
+  if (error === 'set_lead_coverage_max') {
+    return {
+      message: `Designated lead would exceed max coverage (${MAX_SHIFT_COVERAGE_PER_DAY}) for that shift.`,
+      variant: 'error',
+    }
+  }
+  if (error === 'set_lead_failed') {
+    return { message: 'Could not set designated lead for that shift. Please try again.', variant: 'error' }
+  }
+  if (error === 'set_lead_multiple') {
+    return { message: 'A designated lead already exists for that shift. Refresh and try again.', variant: 'error' }
   }
 
   if (auto === 'generated') {
@@ -210,6 +258,14 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
     return { message: `Draft generated with ${added} new shifts.`, variant: 'success' }
   }
 
+  if (draft === 'reset') {
+    const removed = parseCount(getSearchParam(params?.removed))
+    if (removed === 0) {
+      return { message: 'Draft cleared. There were no assigned shifts to remove.', variant: 'success' }
+    }
+    return { message: `Draft cleared. Removed ${removed} shift assignments.`, variant: 'success' }
+  }
+
   return null
 }
 
@@ -219,18 +275,26 @@ export function pickTherapistForDate(
   date: string,
   unavailableDatesByUser: Map<string, Set<string>>,
   assignedUserIdsForDate: Set<string>,
-  weeklyWorkedDatesByUserWeek: Map<string, Set<string>>
+  weeklyWorkedDatesByUserWeek: Map<string, Set<string>>,
+  weeklyLimitByTherapist: Map<string, number>
 ): { therapist: Therapist | null; nextCursor: number } {
   if (therapists.length === 0) {
     return { therapist: null, nextCursor: cursor }
   }
 
   const bounds = getWeekBoundsForDate(date)
+  const weekday = getWeekdayIndex(date)
   if (!bounds) {
     return { therapist: null, nextCursor: cursor }
   }
 
-  let best: { therapist: Therapist; index: number; weeklyCount: number; offset: number } | null = null
+  let best: {
+    therapist: Therapist
+    index: number
+    weeklyCount: number
+    offset: number
+    prefersDay: boolean
+  } | null = null
 
   for (let i = 0; i < therapists.length; i += 1) {
     const index = (cursor + i) % therapists.length
@@ -240,15 +304,28 @@ export function pickTherapistForDate(
     if (unavailableDates?.has(date)) continue
     const weeklyDates =
       weeklyWorkedDatesByUserWeek.get(weeklyCountKey(therapist.id, bounds.weekStart)) ?? new Set<string>()
-    if (!weeklyDates.has(date) && weeklyDates.size >= MAX_WORK_DAYS_PER_WEEK) continue
+    const weeklyLimit = sanitizeWeeklyLimit(
+      weeklyLimitByTherapist.get(therapist.id),
+      getDefaultWeeklyLimitForEmploymentType(therapist.employment_type)
+    )
+    if (!weeklyDates.has(date) && weeklyDates.size >= weeklyLimit) continue
+
+    const preferredDays = Array.isArray(therapist.preferred_work_days)
+      ? therapist.preferred_work_days
+      : []
+    const prefersDay =
+      weekday === null || preferredDays.length === 0 || preferredDays.includes(weekday)
 
     const weeklyCount = weeklyDates.size
     if (
       !best ||
-      weeklyCount < best.weeklyCount ||
-      (weeklyCount === best.weeklyCount && i < best.offset)
+      (prefersDay && !best.prefersDay) ||
+      (prefersDay === best.prefersDay && weeklyCount < best.weeklyCount) ||
+      (prefersDay === best.prefersDay &&
+        weeklyCount === best.weeklyCount &&
+        i < best.offset)
     ) {
-      best = { therapist, index, weeklyCount, offset: i }
+      best = { therapist, index, weeklyCount, offset: i, prefersDay }
     }
   }
 

@@ -5,6 +5,8 @@ export type ViewMode = 'grid' | 'list' | 'calendar'
 export type ToastVariant = 'success' | 'error'
 
 export type ShiftStatus = 'scheduled' | 'on_call' | 'sick' | 'called_off'
+export type ShiftRole = 'lead' | 'staff'
+export type EmploymentType = 'full_time' | 'part_time' | 'prn'
 
 export type Cycle = {
   id: string
@@ -18,6 +20,13 @@ export type Therapist = {
   id: string
   full_name: string
   shift_type: 'day' | 'night'
+  is_lead_eligible: boolean
+  employment_type: EmploymentType
+  max_work_days_per_week: number
+  preferred_work_days: number[]
+  on_fmla: boolean
+  fmla_return_date: string | null
+  is_active: boolean
 }
 
 export type ShiftRow = {
@@ -25,8 +34,12 @@ export type ShiftRow = {
   date: string
   shift_type: 'day' | 'night'
   status: ShiftStatus
+  role: ShiftRole
   user_id: string
-  profiles: { full_name: string } | { full_name: string }[] | null
+  profiles:
+    | { full_name: string; is_lead_eligible: boolean }
+    | { full_name: string; is_lead_eligible: boolean }[]
+    | null
 }
 
 export type ScheduleSearchParams = {
@@ -43,6 +56,16 @@ export type ScheduleSearchParams = {
   over?: string
   under_coverage?: string
   over_coverage?: string
+  lead_missing?: string
+  lead_ineligible?: string
+  lead_multiple?: string
+  affected?: string
+  set_lead_error?: string
+  filter?: string
+  focus?: string
+  show_unavailable?: string
+  draft?: string
+  removed?: string
 }
 
 export type AutoScheduleShiftRow = {
@@ -50,6 +73,7 @@ export type AutoScheduleShiftRow = {
   date: string
   shift_type: 'day' | 'night'
   status: ShiftStatus
+  role: ShiftRole
 }
 
 export type ShiftLimitRow = {
@@ -68,6 +92,8 @@ export type CalendarShift = {
   date: string
   shift_type: 'day' | 'night'
   status: ShiftStatus
+  role: ShiftRole
   user_id: string
   full_name: string
+  isLeadEligible: boolean
 }

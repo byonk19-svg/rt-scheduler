@@ -14,8 +14,19 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { getManagerAttentionSnapshot } from '@/lib/manager-workflow'
+import { summarizeShiftSlotViolations } from '@/lib/schedule-rule-validation'
+import { MIN_SHIFT_COVERAGE_PER_DAY, MAX_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
 import { createClient } from '@/lib/supabase/server'
-import { addShiftAction, createCycleAction, deleteShiftAction, generateDraftScheduleAction, toggleCyclePublishedAction } from './actions'
+import { getSchedulingEligibleEmployees } from '@/lib/employee-directory'
+import {
+  addShiftAction,
+  createCycleAction,
+  deleteShiftAction,
+  generateDraftScheduleAction,
+  resetDraftScheduleAction,
+  setDesignatedLeadAction,
+  toggleCyclePublishedAction,
+} from './actions'
 import type { CalendarShift, Cycle, Role, ScheduleSearchParams, ShiftRow, Therapist, ViewMode } from './types'
 import { buildDateRange, buildScheduleUrl, formatDate, getOne, getScheduleFeedback, normalizeViewMode } from '@/lib/schedule-helpers'
 
@@ -36,11 +47,16 @@ export default async function SchedulePage({
   const params = searchParams ? await searchParams : undefined
   const selectedCycleId = params?.cycle
   let viewMode: ViewMode = normalizeViewMode(params?.view)
+  const issueFilter = params?.filter
+  const focusMode = params?.focus
+  const showUnavailable = params?.show_unavailable === 'true'
   const feedback = getScheduleFeedback(params)
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, full_name, shift_type')
+    .select(
+      'role, full_name, shift_type, is_lead_eligible, employment_type, max_work_days_per_week, preferred_work_days, on_fmla, fmla_return_date, is_active'
+    )
     .eq('id', user.id)
     .maybeSingle()
 
@@ -72,7 +88,7 @@ export default async function SchedulePage({
   if (activeCycle) {
     let shiftsQuery = supabase
       .from('shifts')
-      .select('id, date, shift_type, status, user_id, profiles(full_name)')
+      .select('id, date, shift_type, status, role, user_id, profiles(full_name, is_lead_eligible)')
       .eq('cycle_id', activeCycle.id)
       .order('date', { ascending: true })
       .order('shift_type', { ascending: true })
@@ -87,13 +103,32 @@ export default async function SchedulePage({
 
   let assignableTherapists: Therapist[] = []
   if (role === 'manager') {
-    const { data: therapistData } = await supabase
+    let therapistQuery = supabase
       .from('profiles')
-      .select('id, full_name, shift_type')
+      .select(
+        'id, full_name, shift_type, is_lead_eligible, employment_type, max_work_days_per_week, preferred_work_days, on_fmla, fmla_return_date, is_active'
+      )
       .eq('role', 'therapist')
       .order('full_name', { ascending: true })
-    assignableTherapists = (therapistData ?? []) as Therapist[]
+
+    if (!showUnavailable) {
+      therapistQuery = therapistQuery.eq('is_active', true).eq('on_fmla', false)
+    }
+
+    const { data: therapistData } = await therapistQuery
+    const normalizedTherapists = ((therapistData ?? []) as Therapist[]).map((therapist) => ({
+      ...therapist,
+      preferred_work_days: Array.isArray(therapist.preferred_work_days)
+        ? therapist.preferred_work_days
+            .map((day) => Number(day))
+            .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+        : [],
+    }))
+    assignableTherapists = showUnavailable
+      ? normalizedTherapists
+      : getSchedulingEligibleEmployees(normalizedTherapists)
   }
+  const leadEligibleTherapists = assignableTherapists.filter((therapist) => therapist.is_lead_eligible)
 
   const cycleDates = activeCycle ? buildDateRange(activeCycle.start_date, activeCycle.end_date) : []
   const shiftsByDate = new Map<string, { day: ShiftRow[]; night: ShiftRow[] }>()
@@ -121,8 +156,10 @@ export default async function SchedulePage({
     date: shift.date,
     shift_type: shift.shift_type,
     status: shift.status,
+    role: shift.role,
     user_id: shift.user_id,
     full_name: getOne(shift.profiles)?.full_name ?? 'Unknown',
+    isLeadEligible: Boolean(getOne(shift.profiles)?.is_lead_eligible),
   }))
 
   const namesFromShiftRows = new Map<string, string>()
@@ -146,6 +183,13 @@ export default async function SchedulePage({
               id,
               full_name: namesFromShiftRows.get(id) ?? 'Unknown',
               shift_type: 'day',
+              is_lead_eligible: false,
+              employment_type: 'full_time',
+              max_work_days_per_week: 3,
+              preferred_work_days: [],
+              on_fmla: false,
+              fmla_return_date: null,
+              is_active: true,
             } satisfies Therapist
           })
           .sort((a, b) => {
@@ -157,6 +201,16 @@ export default async function SchedulePage({
             id: user.id,
             full_name: profile?.full_name ?? 'You',
             shift_type: profile?.shift_type === 'night' ? 'night' : 'day',
+            is_lead_eligible: Boolean(profile?.is_lead_eligible),
+            employment_type: profile?.employment_type === 'part_time' || profile?.employment_type === 'prn' ? profile.employment_type : 'full_time',
+            max_work_days_per_week:
+              typeof profile?.max_work_days_per_week === 'number' ? profile.max_work_days_per_week : 3,
+            preferred_work_days: Array.isArray(profile?.preferred_work_days)
+              ? profile.preferred_work_days
+              : [],
+            on_fmla: Boolean(profile?.on_fmla),
+            fmla_return_date: profile?.fmla_return_date ?? null,
+            is_active: profile?.is_active !== false,
           },
         ]
 
@@ -172,12 +226,60 @@ export default async function SchedulePage({
       coverageTotalsByDate.set(date, total)
     }
   }
+
+  const leadNameBySlot = new Map<string, string | null>()
+  for (const shift of shifts) {
+    const slotKey = `${shift.date}:${shift.shift_type}`
+    if (shift.role === 'lead') {
+      leadNameBySlot.set(slotKey, getOne(shift.profiles)?.full_name ?? 'Unknown')
+    } else if (!leadNameBySlot.has(slotKey)) {
+      leadNameBySlot.set(slotKey, null)
+    }
+  }
+
+  const slotValidation =
+    role === 'manager'
+      ? summarizeShiftSlotViolations({
+          cycleDates,
+          assignments: shifts.map((shift) => ({
+            date: shift.date,
+            shiftType: shift.shift_type,
+            status: shift.status,
+            role: shift.role,
+            therapistId: shift.user_id,
+            therapistName: getOne(shift.profiles)?.full_name ?? 'Unknown',
+            isLeadEligible: Boolean(getOne(shift.profiles)?.is_lead_eligible),
+          })),
+          minCoveragePerShift: MIN_SHIFT_COVERAGE_PER_DAY,
+          maxCoveragePerShift: MAX_SHIFT_COVERAGE_PER_DAY,
+        })
+      : null
+
+  const normalizedIssueFilter = issueFilter === 'unfilled' ? 'under_coverage' : issueFilter
+  const isNeedsAttentionFilter = normalizedIssueFilter === 'needs_attention'
+  const activeIssueFilter =
+    normalizedIssueFilter === 'missing_lead' ||
+    normalizedIssueFilter === 'under_coverage' ||
+    normalizedIssueFilter === 'over_coverage'
+      ? normalizedIssueFilter
+      : 'all'
+  const filteredSlotIssues =
+    isNeedsAttentionFilter || activeIssueFilter === 'all'
+      ? slotValidation?.issues ?? []
+      : (slotValidation?.issues ?? []).filter((issue) => issue.reasons.includes(activeIssueFilter))
+  const focusSlotKey = focusMode === 'first' ? filteredSlotIssues[0]?.slotKey ?? null : null
+
+  const slotIssuesByKey = new Map((slotValidation?.issues ?? []).map((issue) => [issue.slotKey, issue]))
+
   const scheduleListRows: ScheduleListRow[] = shifts.map((shift) => ({
     id: shift.id,
     date: shift.date,
     therapistName: getOne(shift.profiles)?.full_name ?? 'Unknown',
     shiftType: shift.shift_type,
     status: shift.status,
+    role: shift.role,
+    slotLeadName: leadNameBySlot.get(`${shift.date}:${shift.shift_type}`) ?? null,
+    slotMissingLead: Boolean(slotIssuesByKey.get(`${shift.date}:${shift.shift_type}`)?.reasons.includes('missing_lead')),
   }))
 
   return (
@@ -203,9 +305,50 @@ export default async function SchedulePage({
         }
         toggleCyclePublishedAction={toggleCyclePublishedAction}
         generateDraftScheduleAction={generateDraftScheduleAction}
+        resetDraftScheduleAction={resetDraftScheduleAction}
+        showUnavailable={showUnavailable}
       />
 
       {role === 'manager' && managerAttention && <ManagerAttentionPanel snapshot={managerAttention} />}
+      {role === 'manager' && activeCycle && slotValidation && (
+        <Card className="no-print">
+          <CardHeader>
+            <CardTitle>Draft Rule Warnings</CardTitle>
+            <CardDescription>
+              Coverage target is {MIN_SHIFT_COVERAGE_PER_DAY}-{MAX_SHIFT_COVERAGE_PER_DAY} and each shift needs one designated lead.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap gap-2 text-sm">
+              <Badge variant={slotValidation.missingLead > 0 ? 'destructive' : 'outline'}>
+                Missing lead: {slotValidation.missingLead}
+              </Badge>
+              <Badge variant={slotValidation.ineligibleLead > 0 ? 'destructive' : 'outline'}>
+                Ineligible lead: {slotValidation.ineligibleLead}
+              </Badge>
+              <Badge variant={slotValidation.multipleLeads > 0 ? 'destructive' : 'outline'}>
+                Multiple leads: {slotValidation.multipleLeads}
+              </Badge>
+              <Badge variant={slotValidation.underCoverage > 0 ? 'destructive' : 'outline'}>
+                Under coverage: {slotValidation.underCoverage}
+              </Badge>
+              <Badge variant={slotValidation.overCoverage > 0 ? 'destructive' : 'outline'}>
+                Over coverage: {slotValidation.overCoverage}
+              </Badge>
+            </div>
+            {slotValidation.issues.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Affected shifts:{' '}
+                {slotValidation.issues
+                  .slice(0, 8)
+                  .map((issue) => `${issue.date} ${issue.shiftType}`)
+                  .join(', ')}
+                {slotValidation.issues.length > 8 ? `, +${slotValidation.issues.length - 8} more` : ''}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="no-print">
           <CardHeader>
@@ -294,68 +437,155 @@ export default async function SchedulePage({
                 {!activeCycle ? (
                   <p className="text-sm text-muted-foreground">Create or select a cycle first.</p>
                 ) : (
-                  <form action={addShiftAction} className="space-y-4">
-                    <input type="hidden" name="cycle_id" value={activeCycle.id} />
-                    <input type="hidden" name="view" value={viewMode} />
+                  <>
+                    <form action={addShiftAction} className="space-y-4">
+                      <input type="hidden" name="cycle_id" value={activeCycle.id} />
+                      <input type="hidden" name="view" value={viewMode} />
+                      <input type="hidden" name="show_unavailable" value={showUnavailable ? 'true' : 'false'} />
 
-                    <div className="space-y-2">
-                      <Label htmlFor="user_id">Therapist</Label>
-                      <select
-                        id="user_id"
-                        name="user_id"
-                        className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
-                        required
-                        defaultValue=""
-                      >
-                        <option value="" disabled>
-                          Select therapist
-                        </option>
-                        {assignableTherapists.map((therapist) => (
-                          <option key={therapist.id} value={therapist.id}>
-                            {therapist.full_name} ({therapist.shift_type})
+                      <div className="flex items-center justify-between rounded-md border border-border bg-secondary/30 px-3 py-2 text-xs text-muted-foreground">
+                        <span>
+                          {showUnavailable
+                            ? 'Showing unavailable employees (FMLA/inactive).'
+                            : 'FMLA and inactive employees are hidden by default.'}
+                        </span>
+                        <Button asChild size="xs" variant="ghost">
+                          <Link
+                            href={
+                              activeCycle
+                                ? buildScheduleUrl(activeCycle.id, viewMode, {
+                                    show_unavailable: showUnavailable ? 'false' : 'true',
+                                  })
+                                : buildScheduleUrl(undefined, viewMode, {
+                                    show_unavailable: showUnavailable ? 'false' : 'true',
+                                  })
+                            }
+                          >
+                            {showUnavailable ? 'Hide unavailable' : 'Show unavailable'}
+                          </Link>
+                        </Button>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="user_id">Therapist</Label>
+                        <select
+                          id="user_id"
+                          name="user_id"
+                          className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                          required
+                          defaultValue=""
+                        >
+                          <option value="" disabled>
+                            Select therapist
                           </option>
-                        ))}
-                      </select>
-                    </div>
+                          {assignableTherapists.map((therapist) => (
+                            <option key={therapist.id} value={therapist.id}>
+                              {therapist.full_name} ({therapist.shift_type}
+                              {therapist.on_fmla || !therapist.is_active ? ', unavailable' : ''})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="date">Date</Label>
-                        <Input id="date" name="date" type="date" required />
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="date">Date</Label>
+                          <Input id="date" name="date" type="date" required />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="shift_type">Shift Type</Label>
+                          <select
+                            id="shift_type"
+                            name="shift_type"
+                            className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                            defaultValue="day"
+                          >
+                            <option value="day">Day</option>
+                            <option value="night">Night</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="status">Status</Label>
+                          <select
+                            id="status"
+                            name="status"
+                            className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                            defaultValue="scheduled"
+                          >
+                            <option value="scheduled">Scheduled</option>
+                            <option value="on_call">On Call</option>
+                            <option value="sick">Sick</option>
+                            <option value="called_off">Called Off</option>
+                          </select>
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="shift_type">Shift Type</Label>
-                        <select
-                          id="shift_type"
-                          name="shift_type"
-                          className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
-                          defaultValue="day"
-                        >
-                          <option value="day">Day</option>
-                          <option value="night">Night</option>
-                        </select>
+                      <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <input type="checkbox" name="override_weekly_rules" />
+                        Override weekly limit for this shift
+                      </label>
+                      <Button type="submit">Add Shift</Button>
+                    </form>
+
+                    <div className="my-5 border-t border-border" />
+
+                    <form action={setDesignatedLeadAction} className="space-y-4">
+                      <input type="hidden" name="cycle_id" value={activeCycle.id} />
+                      <input type="hidden" name="view" value={viewMode} />
+                      <input type="hidden" name="show_unavailable" value={showUnavailable ? 'true' : 'false'} />
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground">Designated Lead</h4>
+                        <p className="text-xs text-muted-foreground">
+                          Select exactly one lead for each day/night shift. Only lead-eligible therapists are listed.
+                        </p>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="status">Status</Label>
-                        <select
-                          id="status"
-                          name="status"
-                          className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
-                          defaultValue="scheduled"
-                        >
-                          <option value="scheduled">Scheduled</option>
-                          <option value="on_call">On Call</option>
-                          <option value="sick">Sick</option>
-                          <option value="called_off">Called Off</option>
-                        </select>
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="lead_date">Date</Label>
+                          <Input id="lead_date" name="date" type="date" required />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="lead_shift_type">Shift Type</Label>
+                          <select
+                            id="lead_shift_type"
+                            name="shift_type"
+                            className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                            defaultValue="day"
+                          >
+                            <option value="day">Day</option>
+                            <option value="night">Night</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="therapist_id_lead">Designated Lead</Label>
+                          <select
+                            id="therapist_id_lead"
+                            name="therapist_id"
+                            className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                            defaultValue=""
+                            required
+                          >
+                            <option value="" disabled>
+                              Select lead-eligible therapist
+                            </option>
+                            {leadEligibleTherapists.map((therapist) => (
+                              <option key={therapist.id} value={therapist.id}>
+                                {therapist.full_name} ({therapist.shift_type}
+                                {therapist.on_fmla || !therapist.is_active ? ', unavailable' : ''})
+                              </option>
+                            ))}
+                          </select>
+                          {leadEligibleTherapists.length === 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              No lead-eligible therapists found. Update profile eligibility first.
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <input type="checkbox" name="override_weekly_rules" />
-                      Override weekly 3-day rule for this shift
-                    </label>
-                    <Button type="submit">Add Shift</Button>
-                  </form>
+                      <Button type="submit" variant="outline" disabled={leadEligibleTherapists.length === 0}>
+                        Set designated lead
+                      </Button>
+                    </form>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -398,6 +628,9 @@ export default async function SchedulePage({
                 cyclePublished={activeCycle.published}
                 therapists={assignableTherapists}
                 shifts={calendarShifts}
+                issueFilter={activeIssueFilter}
+                focusSlotKey={focusSlotKey}
+                focusFirst={focusMode === 'first'}
               />
             )}
 
@@ -424,34 +657,77 @@ export default async function SchedulePage({
                     const row = shiftsByDate.get(date) ?? { day: [], night: [] }
 
                     if (role === 'manager') {
+                      const daySlotKey = `${date}:day`
+                      const nightSlotKey = `${date}:night`
+                      const dayLeadName = leadNameBySlot.get(daySlotKey)
+                      const nightLeadName = leadNameBySlot.get(nightSlotKey)
+                      const dayIssue = slotIssuesByKey.get(daySlotKey)
+                      const nightIssue = slotIssuesByKey.get(nightSlotKey)
+
                       return (
                         <TableRow key={date}>
                           <TableCell>{formatDate(date)}</TableCell>
                           <TableCell>
-                            {row.day.length === 0 ? (
-                              <span className="text-muted-foreground">-</span>
-                            ) : (
-                              <div className="space-y-1">
-                                {row.day.map((shift) => (
-                                  <div key={shift.id} className="text-sm">
-                                    {getOne(shift.profiles)?.full_name ?? 'Unknown'} ({shift.status})
-                                  </div>
-                                ))}
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-muted-foreground">Lead:</span>
+                                {dayLeadName ? (
+                                  <span className="text-xs font-semibold text-foreground">{dayLeadName}</span>
+                                ) : (
+                                  <span className="text-xs font-semibold text-[var(--warning-text)]">Missing lead</span>
+                                )}
+                                {dayIssue?.reasons.includes('missing_lead') && (
+                                  <span className="text-xs text-[var(--warning-text)]">!</span>
+                                )}
                               </div>
-                            )}
+                              {row.day.length === 0 ? (
+                                <span className="text-muted-foreground">-</span>
+                              ) : (
+                                <div className="space-y-1">
+                                  {row.day.map((shift) => (
+                                    <div key={shift.id} className="flex items-center gap-2 text-sm">
+                                      <span>{getOne(shift.profiles)?.full_name ?? 'Unknown'} ({shift.status})</span>
+                                      {shift.role === 'lead' && (
+                                        <Badge variant="outline" className="h-5 px-1.5 text-[10px] uppercase tracking-wide">
+                                          Lead
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>
-                            {row.night.length === 0 ? (
-                              <span className="text-muted-foreground">-</span>
-                            ) : (
-                              <div className="space-y-1">
-                                {row.night.map((shift) => (
-                                  <div key={shift.id} className="text-sm">
-                                    {getOne(shift.profiles)?.full_name ?? 'Unknown'} ({shift.status})
-                                  </div>
-                                ))}
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-muted-foreground">Lead:</span>
+                                {nightLeadName ? (
+                                  <span className="text-xs font-semibold text-foreground">{nightLeadName}</span>
+                                ) : (
+                                  <span className="text-xs font-semibold text-[var(--warning-text)]">Missing lead</span>
+                                )}
+                                {nightIssue?.reasons.includes('missing_lead') && (
+                                  <span className="text-xs text-[var(--warning-text)]">!</span>
+                                )}
                               </div>
-                            )}
+                              {row.night.length === 0 ? (
+                                <span className="text-muted-foreground">-</span>
+                              ) : (
+                                <div className="space-y-1">
+                                  {row.night.map((shift) => (
+                                    <div key={shift.id} className="flex items-center gap-2 text-sm">
+                                      <span>{getOne(shift.profiles)?.full_name ?? 'Unknown'} ({shift.status})</span>
+                                      {shift.role === 'lead' && (
+                                        <Badge variant="outline" className="h-5 px-1.5 text-[10px] uppercase tracking-wide">
+                                          Lead
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       )
