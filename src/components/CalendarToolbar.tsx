@@ -11,11 +11,9 @@ type CalendarToolbarProps = {
   minCoverage: number
   maxCoverage: number
   issueFilter: 'all' | 'missing_lead' | 'under_coverage' | 'over_coverage'
-  showDayTeam: boolean
-  showNightTeam: boolean
+  selectedShiftType: 'day' | 'night'
   overrideWeeklyRules: boolean
-  onToggleDayTeam: () => void
-  onToggleNightTeam: () => void
+  onShiftTypeChange: (shiftType: 'day' | 'night') => void
   onOverrideWeeklyRulesChange: (next: boolean) => void
 }
 
@@ -38,11 +36,9 @@ export function CalendarToolbar({
   minCoverage,
   maxCoverage,
   issueFilter,
-  showDayTeam,
-  showNightTeam,
+  selectedShiftType,
   overrideWeeklyRules,
-  onToggleDayTeam,
-  onToggleNightTeam,
+  onShiftTypeChange,
   onOverrideWeeklyRulesChange,
 }: CalendarToolbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -80,24 +76,27 @@ export function CalendarToolbar({
                   ? 'Over coverage'
                   : 'All'}
           </span>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className={filterButtonClass(showDayTeam)}
-            onClick={onToggleDayTeam}
-          >
-            Day team
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className={filterButtonClass(showNightTeam)}
-            onClick={onToggleNightTeam}
-          >
-            Night team
-          </Button>
+          <span className="text-xs font-medium text-muted-foreground">View:</span>
+          <div className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 p-1">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className={filterButtonClass(selectedShiftType === 'day')}
+              onClick={() => onShiftTypeChange('day')}
+            >
+              Day
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className={filterButtonClass(selectedShiftType === 'night')}
+              onClick={() => onShiftTypeChange('night')}
+            >
+              Night
+            </Button>
+          </div>
           <label className="ml-0 flex items-center gap-2 text-xs text-muted-foreground md:ml-2">
             <input
               type="checkbox"

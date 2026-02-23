@@ -9,6 +9,7 @@ import {
   sanitizeWeeklyLimit,
 } from '@/lib/scheduling-constants'
 import { countsTowardWeeklyLimit, getWeekBoundsForDate, isDateWithinRange } from '@/lib/schedule-helpers'
+import { setDesignatedLeadMutation } from '@/lib/set-designated-lead'
 
 type ShiftStatus = 'scheduled' | 'on_call' | 'sick' | 'called_off'
 type ShiftRole = 'lead' | 'staff'
@@ -49,6 +50,14 @@ type DragAction =
       userId: string
       date: string
       shiftType: 'day' | 'night'
+    }
+  | {
+      action: 'set_lead'
+      cycleId: string
+      therapistId: string
+      date: string
+      shiftType: 'day' | 'night'
+      overrideWeeklyRules: boolean
     }
 
 async function getCoverageCountForSlot(
@@ -146,9 +155,10 @@ export async function POST(request: Request) {
 
   const payload = (await request.json().catch(() => null)) as
     | {
-        action?: 'assign' | 'move' | 'remove'
+        action?: 'assign' | 'move' | 'remove' | 'set_lead'
         cycleId?: string
         userId?: string
+        therapistId?: string
         shiftType?: 'day' | 'night'
         date?: string
         shiftId?: string
@@ -360,6 +370,116 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ message: 'Shift removed from schedule.', undoAction })
+  }
+
+  if (payload.action === 'set_lead') {
+    if (!payload.therapistId || !payload.shiftType || !payload.date) {
+      return NextResponse.json({ error: 'Missing designated lead data' }, { status: 400 })
+    }
+    if (!isDateWithinRange(payload.date, cycle.start_date, cycle.end_date)) {
+      return NextResponse.json({ error: 'Date is outside this cycle' }, { status: 400 })
+    }
+
+    const { data: therapist, error: therapistError } = await supabase
+      .from('profiles')
+      .select('id, role, is_lead_eligible')
+      .eq('id', payload.therapistId)
+      .maybeSingle()
+
+    if (
+      therapistError ||
+      !therapist ||
+      therapist.role !== 'therapist' ||
+      !therapist.is_lead_eligible
+    ) {
+      return NextResponse.json(
+        { error: 'Only lead-eligible therapists can be designated as lead.' },
+        { status: 409 }
+      )
+    }
+
+    const { data: existingShift, error: existingShiftError } = await supabase
+      .from('shifts')
+      .select('id, status')
+      .eq('cycle_id', payload.cycleId)
+      .eq('user_id', payload.therapistId)
+      .eq('date', payload.date)
+      .eq('shift_type', payload.shiftType)
+      .maybeSingle()
+
+    if (existingShiftError) {
+      return NextResponse.json(
+        { error: 'Failed to load existing shift for lead validation.' },
+        { status: 500 }
+      )
+    }
+
+    if (!existingShift) {
+      if (!payload.overrideWeeklyRules) {
+        const coverage = await getCoverageCountForSlot(
+          supabase,
+          payload.cycleId,
+          payload.date,
+          payload.shiftType
+        )
+        if (coverage.error) {
+          return NextResponse.json(
+            { error: 'Failed to validate daily coverage limit.' },
+            { status: 500 }
+          )
+        }
+        if (exceedsCoverageLimit(coverage.count, MAX_SHIFT_COVERAGE_PER_DAY)) {
+          return NextResponse.json(
+            { error: `Each shift can have at most ${MAX_SHIFT_COVERAGE_PER_DAY} scheduled team members.` },
+            { status: 409 }
+          )
+        }
+
+        const weekly = await getWorkedDatesInWeek(
+          supabase,
+          payload.therapistId,
+          payload.date
+        )
+        if (weekly.error) {
+          return NextResponse.json({ error: 'Failed to validate weekly rule' }, { status: 500 })
+        }
+        const weeklyLimit = await getTherapistWeeklyLimit(supabase, payload.therapistId)
+        if (exceedsWeeklyLimit(weekly.dates, payload.date, weeklyLimit)) {
+          return NextResponse.json(
+            { error: `Therapists are limited to ${weeklyLimit} day(s) per week unless override is enabled.` },
+            { status: 409 }
+          )
+        }
+      }
+    }
+
+    const mutationResult = await setDesignatedLeadMutation(supabase, {
+      cycleId: payload.cycleId,
+      therapistId: payload.therapistId,
+      date: payload.date,
+      shiftType: payload.shiftType,
+    })
+
+    if (!mutationResult.ok) {
+      if (mutationResult.reason === 'lead_not_eligible') {
+        return NextResponse.json(
+          { error: 'Only lead-eligible therapists can be designated as lead.' },
+          { status: 409 }
+        )
+      }
+      if (mutationResult.reason === 'multiple_leads_prevented') {
+        return NextResponse.json(
+          { error: 'A designated lead already exists for that shift.' },
+          { status: 409 }
+        )
+      }
+      return NextResponse.json(
+        { error: 'Could not set designated lead.' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({ message: 'Designated lead updated.' })
   }
 
   return NextResponse.json({ error: 'Unsupported action' }, { status: 400 })

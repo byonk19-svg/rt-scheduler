@@ -5,6 +5,15 @@ import type { DragEvent } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { CalendarToolbar } from '@/components/CalendarToolbar'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { MIN_SHIFT_COVERAGE_PER_DAY, MAX_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
 
@@ -12,6 +21,7 @@ type Therapist = {
   id: string
   full_name: string
   shift_type: 'day' | 'night'
+  is_lead_eligible?: boolean
 }
 
 type Shift = {
@@ -59,6 +69,15 @@ type DragActionBody =
       shiftType: 'day' | 'night'
     }
 
+type SetLeadActionBody = {
+  action: 'set_lead'
+  cycleId: string
+  therapistId: string
+  date: string
+  shiftType: 'day' | 'night'
+  overrideWeeklyRules: boolean
+}
+
 type DragActionResponse = {
   message?: string
   error?: string
@@ -98,6 +117,11 @@ function monthKey(value: Date): string {
 function monthLabel(value: string): string {
   const [year, month] = value.split('-').map(Number)
   return new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+}
+
+function formatCellDate(value: string): string {
+  const parsed = dateFromKey(value)
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function buildMonthOptions(startDate: string, endDate: string): string[] {
@@ -152,8 +176,14 @@ export function ManagerMonthCalendar({
   const [success, setSuccess] = useState('')
   const [undoAction, setUndoAction] = useState<DragActionBody | null>(null)
   const [overrideWeeklyRules, setOverrideWeeklyRules] = useState(false)
-  const [showDayTeam, setShowDayTeam] = useState(true)
-  const [showNightTeam, setShowNightTeam] = useState(true)
+  const [selectedShiftType, setSelectedShiftType] = useState<'day' | 'night'>(() => {
+    const focusShiftType = focusSlotKey?.split(':')[1]
+    return focusShiftType === 'night' ? 'night' : 'day'
+  })
+  const [staffingPoolOpen, setStaffingPoolOpen] = useState(false)
+  const [drawerSlot, setDrawerSlot] = useState<{ date: string; shiftType: 'day' | 'night' } | null>(null)
+  const [drawerAddTherapistId, setDrawerAddTherapistId] = useState('')
+  const [drawerLeadTherapistId, setDrawerLeadTherapistId] = useState('')
 
   const monthOptions = useMemo(() => buildMonthOptions(startDate, endDate), [startDate, endDate])
   const rangeLabel = useMemo(() => {
@@ -193,10 +223,62 @@ export function ManagerMonthCalendar({
     () => therapists.filter((therapist) => therapist.shift_type === 'night'),
     [therapists]
   )
+  const therapistsForPool = selectedShiftType === 'day' ? dayTherapists : nightTherapists
 
-  const isInCycle = (date: string): boolean => date >= startDate && date <= endDate
-  const countsTowardCoverage = (status: Shift['status']): boolean =>
-    status === 'scheduled' || status === 'on_call'
+  const drawerShifts = useMemo(() => {
+    if (!drawerSlot) return []
+    return (shiftsByDate.get(drawerSlot.date) ?? [])
+      .filter((shift) => shift.shift_type === drawerSlot.shiftType)
+      .slice()
+      .sort((a, b) => {
+        if (a.role !== b.role) return a.role === 'lead' ? -1 : 1
+        return a.full_name.localeCompare(b.full_name)
+      })
+  }, [drawerSlot, shiftsByDate])
+
+  const drawerCoverageCount = useMemo(
+    () => drawerShifts.filter((shift) => shift.status === 'scheduled' || shift.status === 'on_call').length,
+    [drawerShifts]
+  )
+  const drawerLeadCount = useMemo(
+    () => drawerShifts.filter((shift) => shift.role === 'lead').length,
+    [drawerShifts]
+  )
+  const drawerMissingLead = drawerLeadCount === 0
+  const drawerUnderCoverage = drawerCoverageCount < MIN_SHIFT_COVERAGE_PER_DAY
+  const drawerOverCoverage = drawerCoverageCount > MAX_SHIFT_COVERAGE_PER_DAY
+
+  const drawerAssignedOnDate = useMemo(() => {
+    if (!drawerSlot) return new Set<string>()
+    return new Set((shiftsByDate.get(drawerSlot.date) ?? []).map((shift) => shift.user_id))
+  }, [drawerSlot, shiftsByDate])
+
+  const drawerStaffAddOptions = useMemo(() => {
+    if (!drawerSlot) return []
+    const currentShiftIds = new Set(drawerShifts.map((shift) => shift.user_id))
+    return therapists
+      .filter(
+        (therapist) =>
+          therapist.shift_type === drawerSlot.shiftType &&
+          !currentShiftIds.has(therapist.id) &&
+          !drawerAssignedOnDate.has(therapist.id)
+      )
+      .sort((a, b) => a.full_name.localeCompare(b.full_name))
+  }, [drawerSlot, drawerShifts, therapists, drawerAssignedOnDate])
+
+  const drawerLeadOptions = useMemo(() => {
+    if (!drawerSlot) return []
+    const currentShiftIds = new Set(drawerShifts.map((shift) => shift.user_id))
+    return therapists
+      .filter((therapist) => {
+        const leadEligible = Boolean(therapist.is_lead_eligible)
+        const sameShiftTeam = therapist.shift_type === drawerSlot.shiftType
+        const alreadyInShift = currentShiftIds.has(therapist.id)
+        const availableOnDate = !drawerAssignedOnDate.has(therapist.id)
+        return leadEligible && sameShiftTeam && (alreadyInShift || availableOnDate)
+      })
+      .sort((a, b) => a.full_name.localeCompare(b.full_name))
+  }, [drawerSlot, drawerShifts, therapists, drawerAssignedOnDate])
 
   useEffect(() => {
     if (!focusFirst || !focusSlotKey) return
@@ -211,6 +293,20 @@ export function ManagerMonthCalendar({
     }, 2200)
     return () => window.clearTimeout(timer)
   }, [focusFirst, focusSlotKey])
+
+  function openShiftDrawer(date: string, shiftType: 'day' | 'night') {
+    const slotShifts = (shiftsByDate.get(date) ?? []).filter((shift) => shift.shift_type === shiftType)
+    const currentLead = slotShifts.find((shift) => shift.role === 'lead')
+    setDrawerSlot({ date, shiftType })
+    setDrawerLeadTherapistId(currentLead?.user_id ?? '')
+    setDrawerAddTherapistId('')
+  }
+
+  function closeShiftDrawer() {
+    setDrawerSlot(null)
+    setDrawerAddTherapistId('')
+    setDrawerLeadTherapistId('')
+  }
 
   function setDragData(event: DragEvent<HTMLElement>, payload: DragPayload) {
     event.dataTransfer.setData('application/json', JSON.stringify(payload))
@@ -256,6 +352,30 @@ export function ManagerMonthCalendar({
     })
   }
 
+  function runSetLeadAction(body: SetLeadActionBody) {
+    setError('')
+    setSuccess('')
+    startTransition(() => {
+      void (async () => {
+        const response = await fetch('/api/schedule/drag-drop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+
+        const result = (await response.json().catch(() => null)) as DragActionResponse | null
+
+        if (!response.ok) {
+          setError(result?.error ?? 'Could not update designated lead.')
+          return
+        }
+
+        setSuccess(result?.message ?? 'Designated lead updated.')
+        router.refresh()
+      })()
+    })
+  }
+
   function allowDrop(event: DragEvent<HTMLElement>) {
     event.preventDefault()
     event.dataTransfer.dropEffect = 'move'
@@ -263,10 +383,6 @@ export function ManagerMonthCalendar({
 
   function onDropDate(event: DragEvent<HTMLDivElement>, date: string, targetShiftType: 'day' | 'night') {
     event.preventDefault()
-    if (!isInCycle(date)) {
-      setError('That date is outside the selected schedule cycle.')
-      return
-    }
 
     const payload = readDragPayload(event)
     if (!payload) return
@@ -340,11 +456,19 @@ export function ManagerMonthCalendar({
           ))}
           {days.map((day, index) => {
             const date = keyFromDate(day)
-            const dayShifts = (shiftsByDate.get(date) ?? []).filter((shift) => shift.shift_type === shiftType)
-            const coverageCount = dayShifts.filter((shift) => countsTowardCoverage(shift.status)).length
-            const leadAssignments = dayShifts.filter((shift) => shift.role === 'lead')
-            const leadName = leadAssignments[0]?.full_name ?? null
-            const missingLead = leadAssignments.length === 0
+            const dayShifts = (shiftsByDate.get(date) ?? [])
+              .filter((shift) => shift.shift_type === shiftType)
+              .slice()
+              .sort((a, b) => {
+                if (a.role !== b.role) return a.role === 'lead' ? -1 : 1
+                return a.full_name.localeCompare(b.full_name)
+              })
+            const coverageCount = dayShifts.filter(
+              (shift) => shift.status === 'scheduled' || shift.status === 'on_call'
+            ).length
+            const leadAssignment = dayShifts.find((shift) => shift.role === 'lead')
+            const leadName = leadAssignment?.full_name ?? null
+            const missingLead = !leadAssignment
             const underCoverage = coverageCount < MIN_SHIFT_COVERAGE_PER_DAY
             const overCoverage = coverageCount > MAX_SHIFT_COVERAGE_PER_DAY
             const filterMatch =
@@ -358,6 +482,8 @@ export function ManagerMonthCalendar({
                 : overCoverage
                 ? 'text-red-700'
                 : 'text-emerald-700'
+            const visibleShifts = dayShifts.slice(0, 3)
+            const hiddenCount = Math.max(dayShifts.length - 3, 0)
 
             return (
               <div
@@ -366,16 +492,18 @@ export function ManagerMonthCalendar({
                 onDragEnter={allowDrop}
                 onDragOver={allowDrop}
                 onDrop={(event) => onDropDate(event, date, shiftType)}
+                onClick={() => openShiftDrawer(date, shiftType)}
                 id={`slot-card-${date}-${shiftType}`}
                 className={cn(
-                  'min-h-40 rounded-xl border border-border bg-white p-2',
+                  'min-h-36 cursor-pointer rounded-xl border border-border bg-white p-2 transition-colors hover:bg-secondary/20',
                   issueFilter !== 'all' && !filterMatch ? 'opacity-45' : ''
                 )}
+                aria-label={`Open ${shiftType} shift details for ${formatCellDate(date)}`}
               >
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-sm font-semibold text-foreground">{day.getDate()}</span>
                   <span className={cn('text-[10px] font-semibold uppercase', coverageTone)}>
-                    {coverageCount}/{MIN_SHIFT_COVERAGE_PER_DAY}-{MAX_SHIFT_COVERAGE_PER_DAY}
+                    {coverageCount}/{MAX_SHIFT_COVERAGE_PER_DAY}
                   </span>
                 </div>
                 <div className="mb-2 flex items-center gap-2">
@@ -383,15 +511,15 @@ export function ManagerMonthCalendar({
                   {leadName ? (
                     <span className="text-[11px] font-medium text-foreground">{leadName}</span>
                   ) : (
-                    <span className="text-[11px] font-medium text-[var(--warning-text)]">Missing</span>
+                    <span className="text-[11px] font-medium text-[var(--warning-text)]">Lead missing</span>
                   )}
-                  {missingLead && <span className="text-[10px] text-[var(--warning-text)]">!</span>}
                 </div>
                 <div className="space-y-1">
-                  {dayShifts.map((shift) => (
+                  {visibleShifts.map((shift) => (
                     <div
                       key={shift.id}
                       draggable
+                      onClick={(event) => event.stopPropagation()}
                       onDragStart={(event) =>
                         setDragData(event, {
                           type: 'shift',
@@ -400,7 +528,7 @@ export function ManagerMonthCalendar({
                         })
                       }
                       className={cn(
-                        'cursor-grab rounded-lg border px-2 py-1 text-xs active:cursor-grabbing',
+                        'cursor-grab rounded-md border px-2 py-1 text-xs active:cursor-grabbing',
                         palette.border,
                         palette.bg,
                         palette.text
@@ -414,13 +542,22 @@ export function ManagerMonthCalendar({
                           </span>
                         )}
                       </div>
-                      <div className="capitalize opacity-80">
-                        {shift.shift_type} - {shift.status}
-                      </div>
                     </div>
                   ))}
+                  {hiddenCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        openShiftDrawer(date, shiftType)
+                      }}
+                      className="text-xs font-medium text-muted-foreground underline-offset-2 hover:underline"
+                    >
+                      +{hiddenCount} more
+                    </button>
+                  )}
                   {dayShifts.length === 0 && (
-                    <div className="text-xs text-muted-foreground">No {shiftType} shifts</div>
+                    <div className="text-xs text-muted-foreground">No therapists assigned</div>
                   )}
                 </div>
               </div>
@@ -449,90 +586,74 @@ export function ManagerMonthCalendar({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[250px_1fr]">
-        <div className="rounded-2xl border-2 border-border bg-card p-3">
-          <h3 className="text-sm font-semibold text-foreground">Drag therapists onto calendars</h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Drop any therapist onto either calendar to schedule or switch shifts.
-          </p>
+      <div className="flex items-center justify-end">
+        <Button type="button" size="sm" variant="outline" onClick={() => setStaffingPoolOpen((open) => !open)}>
+          {staffingPoolOpen ? 'Hide staffing pool' : 'Show staffing pool'}
+        </Button>
+      </div>
 
-          {showDayTeam && (
-            <div className="mt-3">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Day Team</p>
-              <div className="space-y-2">
-                {dayTherapists.map((therapist) => (
-                  <div
-                    key={therapist.id}
-                    draggable
-                    onDragStart={(event) =>
-                      setDragData(event, {
-                        type: 'therapist',
-                        userId: therapist.id,
-                        shiftType: therapist.shift_type,
-                      })
-                    }
-                    className="cursor-grab rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm active:cursor-grabbing"
-                  >
-                    <div className="font-medium text-sky-900">{therapist.full_name}</div>
-                    <div className="text-xs capitalize text-sky-700">{therapist.shift_type} shift</div>
-                  </div>
-                ))}
-                {dayTherapists.length === 0 && (
-                  <p className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                    No day therapists available.
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {showNightTeam && (
-            <div className="mt-4">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Night Team</p>
-              <div className="space-y-2">
-                {nightTherapists.map((therapist) => (
-                  <div
-                    key={therapist.id}
-                    draggable
-                    onDragStart={(event) =>
-                      setDragData(event, {
-                        type: 'therapist',
-                        userId: therapist.id,
-                        shiftType: therapist.shift_type,
-                      })
-                    }
-                    className="cursor-grab rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm active:cursor-grabbing"
-                  >
-                    <div className="font-medium text-indigo-900">{therapist.full_name}</div>
-                    <div className="text-xs capitalize text-indigo-700">{therapist.shift_type} shift</div>
-                  </div>
-                ))}
-                {nightTherapists.length === 0 && (
-                  <p className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                    No night therapists available.
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {!showDayTeam && !showNightTeam && (
-            <p className="mt-4 rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-              Enable Day team or Night team filters to see draggable staff.
+      <div className={cn('grid grid-cols-1 gap-4', staffingPoolOpen ? 'xl:grid-cols-[250px_1fr]' : 'xl:grid-cols-1')}>
+        {staffingPoolOpen && (
+          <div className="rounded-2xl border-2 border-border bg-card p-3">
+            <h3 className="text-sm font-semibold text-foreground">Staffing pool ({selectedShiftType})</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Drag therapists onto the {selectedShiftType} calendar cells.
             </p>
-          )}
 
-          <div
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={onDropRemove}
-            className="mt-4 rounded-xl border-2 border-dashed border-red-300 bg-red-50 px-3 py-3"
-          >
-            <div className="text-sm font-semibold text-red-700">Remove from day</div>
-            <p className="mt-1 text-xs text-red-600">
-              Drag a shift card here to pull that employee off that day.
-            </p>
+            <div className="mt-3 space-y-2">
+              {therapistsForPool.map((therapist) => (
+                <div
+                  key={therapist.id}
+                  draggable
+                  onDragStart={(event) =>
+                    setDragData(event, {
+                      type: 'therapist',
+                      userId: therapist.id,
+                      shiftType: therapist.shift_type,
+                    })
+                  }
+                  className={cn(
+                    'cursor-grab rounded-xl border px-3 py-2 text-sm active:cursor-grabbing',
+                    selectedShiftType === 'day' ? 'border-sky-200 bg-sky-50' : 'border-indigo-200 bg-indigo-50'
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'font-medium',
+                      selectedShiftType === 'day' ? 'text-sky-900' : 'text-indigo-900'
+                    )}
+                  >
+                    {therapist.full_name}
+                  </div>
+                  <div
+                    className={cn(
+                      'text-xs capitalize',
+                      selectedShiftType === 'day' ? 'text-sky-700' : 'text-indigo-700'
+                    )}
+                  >
+                    {therapist.shift_type} shift
+                  </div>
+                </div>
+              ))}
+              {therapistsForPool.length === 0 && (
+                <p className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                  No {selectedShiftType} therapists available.
+                </p>
+              )}
+            </div>
+
+            <div
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={onDropRemove}
+              className="mt-4 rounded-xl border-2 border-dashed border-red-300 bg-red-50 px-3 py-3"
+            >
+              <div className="text-sm font-semibold text-red-700">Remove from schedule</div>
+              <p className="mt-1 text-xs text-red-600">
+                Drag a therapist chip here to remove that assignment.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="space-y-4 overflow-auto rounded-2xl border-2 border-border bg-card p-2 md:max-h-[72vh]">
           <CalendarToolbar
@@ -540,11 +661,9 @@ export function ManagerMonthCalendar({
             minCoverage={MIN_SHIFT_COVERAGE_PER_DAY}
             maxCoverage={MAX_SHIFT_COVERAGE_PER_DAY}
             issueFilter={issueFilter}
-            showDayTeam={showDayTeam}
-            showNightTeam={showNightTeam}
+            selectedShiftType={selectedShiftType}
             overrideWeeklyRules={overrideWeeklyRules}
-            onToggleDayTeam={() => setShowDayTeam((current) => !current)}
-            onToggleNightTeam={() => setShowNightTeam((current) => !current)}
+            onShiftTypeChange={setSelectedShiftType}
             onOverrideWeeklyRulesChange={setOverrideWeeklyRules}
           />
 
@@ -568,17 +687,181 @@ export function ManagerMonthCalendar({
                   </span>
                 )}
               </div>
-              {showDayTeam && renderCalendarForShift('day', month)}
-              {showNightTeam && renderCalendarForShift('night', month)}
-              {!showDayTeam && !showNightTeam && (
-                <p className="px-2 text-sm text-muted-foreground">
-                  No team filters selected. Enable Day team or Night team in the toolbar.
-                </p>
-              )}
+              {renderCalendarForShift(selectedShiftType, month)}
             </div>
           ))}
         </div>
       </div>
+
+      <Dialog open={Boolean(drawerSlot)} onOpenChange={(open) => !open && closeShiftDrawer()}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {drawerSlot ? `${drawerSlot.shiftType === 'day' ? 'Day' : 'Night'} Shift` : 'Shift'}
+            </DialogTitle>
+            <DialogDescription>
+              {drawerSlot ? `${formatCellDate(drawerSlot.date)} - full roster and lead controls` : ''}
+            </DialogDescription>
+          </DialogHeader>
+
+          {drawerSlot && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span
+                  className={cn(
+                    'rounded-md border px-2 py-1',
+                    drawerMissingLead
+                      ? 'border-amber-300 bg-amber-50 text-amber-800'
+                      : 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                  )}
+                >
+                  {drawerMissingLead ? 'Lead missing' : 'Lead assigned'}
+                </span>
+                <span
+                  className={cn(
+                    'rounded-md border px-2 py-1',
+                    drawerUnderCoverage
+                      ? 'border-amber-300 bg-amber-50 text-amber-800'
+                      : 'border-border bg-muted text-muted-foreground'
+                  )}
+                >
+                  Under coverage: {drawerUnderCoverage ? 'Yes' : 'No'}
+                </span>
+                <span
+                  className={cn(
+                    'rounded-md border px-2 py-1',
+                    drawerOverCoverage
+                      ? 'border-red-300 bg-red-50 text-red-800'
+                      : 'border-border bg-muted text-muted-foreground'
+                  )}
+                >
+                  Over coverage: {drawerOverCoverage ? 'Yes' : 'No'}
+                </span>
+                <span className="rounded-md border border-border bg-muted px-2 py-1 text-muted-foreground">
+                  Coverage: {drawerCoverageCount}/{MAX_SHIFT_COVERAGE_PER_DAY}
+                </span>
+              </div>
+
+              <div className="rounded-md border border-border p-3">
+                <p className="text-sm font-semibold text-foreground">Designated Lead</p>
+                <p className="text-xs text-muted-foreground">
+                  Select one lead-eligible therapist for this shift.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <select
+                    value={drawerLeadTherapistId}
+                    onChange={(event) => setDrawerLeadTherapistId(event.target.value)}
+                    className="h-9 min-w-64 rounded-md border border-border bg-white px-3 text-sm"
+                  >
+                    <option value="">Select designated lead</option>
+                    {drawerLeadOptions.map((therapist) => (
+                      <option key={therapist.id} value={therapist.id}>
+                        {therapist.full_name}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!drawerLeadTherapistId || isPending}
+                    onClick={() =>
+                      runSetLeadAction({
+                        action: 'set_lead',
+                        cycleId,
+                        therapistId: drawerLeadTherapistId,
+                        date: drawerSlot.date,
+                        shiftType: drawerSlot.shiftType,
+                        overrideWeeklyRules,
+                      })
+                    }
+                  >
+                    Save lead
+                  </Button>
+                </div>
+              </div>
+
+              <div className="rounded-md border border-border p-3">
+                <p className="text-sm font-semibold text-foreground">Staff roster</p>
+                <div className="mt-2 space-y-2">
+                  {drawerShifts.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No therapists assigned yet.</p>
+                  )}
+                  {drawerShifts.map((shift) => (
+                    <div
+                      key={shift.id}
+                      className="flex items-center justify-between rounded-md border border-border px-3 py-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-foreground">{shift.full_name}</span>
+                        {shift.role === 'lead' && (
+                          <span className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Lead
+                          </span>
+                        )}
+                        <span className="text-xs capitalize text-muted-foreground">{shift.status}</span>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="text-[var(--warning-text)]"
+                        onClick={() =>
+                          runDragAction({
+                            action: 'remove',
+                            cycleId,
+                            shiftId: shift.id,
+                          })
+                        }
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <select
+                    value={drawerAddTherapistId}
+                    onChange={(event) => setDrawerAddTherapistId(event.target.value)}
+                    className="h-9 min-w-64 rounded-md border border-border bg-white px-3 text-sm"
+                  >
+                    <option value="">Add therapist</option>
+                    {drawerStaffAddOptions.map((therapist) => (
+                      <option key={therapist.id} value={therapist.id}>
+                        {therapist.full_name}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!drawerAddTherapistId || isPending}
+                    onClick={() => {
+                      runDragAction({
+                        action: 'assign',
+                        cycleId,
+                        userId: drawerAddTherapistId,
+                        shiftType: drawerSlot.shiftType,
+                        date: drawerSlot.date,
+                        overrideWeeklyRules,
+                      })
+                      setDrawerAddTherapistId('')
+                    }}
+                  >
+                    Add staff
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closeShiftDrawer}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {isPending && <p className="text-sm text-muted-foreground">Saving changes...</p>}
     </div>
