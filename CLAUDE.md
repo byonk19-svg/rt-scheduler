@@ -1,6 +1,6 @@
 # Teamwise Scheduler - Codex Handoff Context
 
-Updated: 2026-02-22
+Updated: 2026-02-23
 
 ## What This App Is
 Teamwise is a respiratory therapy scheduling app replacing manual paper workflows.
@@ -8,8 +8,8 @@ Core modules: schedule cycles, availability requests, shift board swaps/pickups,
 
 ## Current Branch Snapshot
 - Active branch: `claude/write-claude-md-YSz8m`
-- Latest pushed commit before this doc refresh: `ea0fac6`
-- `repomix-output.xml` is intentionally untracked and not pushed.
+- Latest pushed commit before this doc refresh: `3c5d0b5`
+- `repomix-output.xml` was removed from workspace and git state is clean except active in-progress feature edits.
 
 ## What Was Completed Today
 - Implemented lead eligibility + designated lead workflow in scheduling (Option A on shift assignments).
@@ -30,6 +30,12 @@ Core modules: schedule cycles, availability requests, shift board swaps/pickups,
   - auto-generate prioritizes preferred weekdays when possible without violating constraints.
 - Added cross-platform repo normalization:
   - `.gitattributes` + `.editorconfig` with LF defaults and Windows script exceptions.
+- Implemented manager month-calendar visibility overhaul:
+  - Day/Night calendar view toggle (single active view).
+  - cells always show lead state, coverage count, and scheduled names (up to 3 + `+N`).
+  - optional staffing pool can be collapsed; visibility no longer depends on pool expansion.
+  - click cell to open shift drawer with full roster editing.
+- Extended drag-drop API with `set_lead` action for drawer-driven designated lead updates.
 
 ## Product Status
 Core routes:
@@ -75,6 +81,19 @@ Role model:
   - tertiary: `Go to publish` (disabled when blocked)
 - Publish checklist uses explicit blocker labels and counts.
 
+## Manager Calendar UX (Current)
+- Month view supports Day/Night toggle with one calendar visible at a time.
+- For each date cell in selected shift:
+  - shows lead status (`Lead: Name` or `Lead missing`)
+  - shows coverage count (`X/5`)
+  - shows assigned therapists inline (up to 3) with overflow indicator (`+N`)
+  - lead appears first and is labeled.
+- Clicking a cell opens shift drawer:
+  - designated lead selector (lead-eligible only)
+  - full staff roster with add/remove controls
+  - inline warnings for missing lead, under coverage, over coverage.
+- Staffing pool remains optional and collapsible.
+
 ## Employee Directory (Current)
 - Single directory component on manager dashboard:
   - tabs: All / Day / Night
@@ -109,7 +128,7 @@ Key profile fields currently used:
 - identity/contact: `full_name`, `email`, `phone_number`
 - staffing: `shift_type`, `employment_type`, `max_work_days_per_week`, `is_lead_eligible`
 - leave/status: `on_fmla`, `fmla_return_date`, `is_active`
-- new preference: `preferred_work_days` (`smallint[]`, values `0..6`)
+- preferences: `preferred_work_days` (`smallint[]`, values `0..6`)
 
 Key shift fields currently used:
 - `status` (`scheduled|on_call|sick|called_off`)
@@ -129,7 +148,7 @@ Key shift fields currently used:
 - `20260222233000_add_profile_preferred_work_days.sql`
   - preferred weekday array + validity constraint.
 
-Rollback scripts exist under `supabase/rollback/` for these recent additions.
+Rollback scripts exist under `supabase/rollback/` for recent additions.
 
 ## Technical Stack
 - Next.js 16 App Router + TypeScript
@@ -154,19 +173,23 @@ Quality scripts:
 - `npm run build`
 
 ## Realigned Goals (Next Priorities)
-1. Hardening and reliability
-- apply all pending migrations in shared environments (`supabase db push`) and verify RLS behavior in production-like settings.
-- add/expand tests around auto-generate with preferred days + lead constraints + weekly limits together.
+1. Calendar workflow hardening
+- add focused tests for Day/Night toggle, `+N` overflow, drawer add/remove, and drawer lead updates.
+- confirm accessibility for cell buttons, toggle controls, and drawer actions.
 
-2. Manager workflow clarity
+2. Scheduling reliability
+- apply all pending migrations in shared environments (`supabase db push`) and verify RLS behavior in production-like settings.
+- expand tests around auto-generate with preferred days + lead constraints + weekly limits together.
+
+3. Manager workflow clarity
 - keep counts deduplicated between dashboard and detail pages.
 - ensure `/shift-board` approvals filters and coverage deep links remain consistent with dashboard labels.
 
-3. Scheduling quality
-- optionally add “same pattern week-over-week” support as a stronger preference mode (still override-safe).
-- add transparent “why assigned” hints in manager views (preferred day / fallback / rule override).
+4. Scheduling transparency
+- optionally add "same pattern week-over-week" support as a stronger preference mode (still override-safe).
+- add "why assigned" hints in manager views (preferred day / fallback / rule override).
 
-4. Data hygiene
+5. Data hygiene
 - finalize realistic seeded users and keep test data scripts idempotent.
 
 ## Quick Resume Checklist
@@ -182,4 +205,5 @@ Quality scripts:
    - employee directory edits + deactivate/reactivate + FMLA behavior
    - profile preferred weekdays save flow
    - auto-generate using preferred weekdays while respecting constraints
+   - Day/Night calendar toggle + visible names + drawer edits + lead updates
    - designated lead flow and publish blocking behavior
