@@ -149,6 +149,17 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
   if (error === 'auto_generate_failed') {
     return { message: 'Could not auto-generate draft schedule. Please try again.', variant: 'error' }
   }
+  if (error === 'auto_generate_db_error') {
+    return { message: 'Database error while saving auto-generated shifts. Please try again.', variant: 'error' }
+  }
+  if (error === 'auto_generate_coverage_incomplete') {
+    const dropped = parseCount(getSearchParam(params?.dropped))
+    const detail = dropped > 0 ? ` (${dropped} shift${dropped !== 1 ? 's' : ''} skipped due to conflicts)` : ''
+    return {
+      message: `Auto-generate completed but coverage may be incomplete${detail}. Verify shifts and retry if needed.`,
+      variant: 'error',
+    }
+  }
   if (error === 'auto_missing_cycle') {
     return { message: 'Select a schedule cycle first.', variant: 'error' }
   }

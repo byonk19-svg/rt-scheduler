@@ -51,7 +51,7 @@ export async function setDesignatedLeadMutation(
     return { ok: false, reason: 'invalid_input', error }
   }
 
-  if ((error.message ?? '').toLowerCase().includes('not lead-eligible')) {
+  if (error.code === 'P0001') {
     return { ok: false, reason: 'lead_not_eligible', error }
   }
 
