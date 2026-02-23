@@ -9,11 +9,7 @@ import {
   sanitizeWeeklyLimit,
 } from '@/lib/scheduling-constants'
 import { countsTowardWeeklyLimit, getWeekBoundsForDate, isDateWithinRange } from '@/lib/schedule-helpers'
-import { setDesignatedLeadMutation } from '@/lib/set-designated-lead'
-
-type ShiftStatus = 'scheduled' | 'on_call' | 'sick' | 'called_off'
-type ShiftRole = 'lead' | 'staff'
-type EmploymentType = 'full_time' | 'part_time' | 'prn'
+import type { ShiftStatus, ShiftRole, EmploymentType } from '@/app/schedule/types'
 type RemovableShift = {
   id: string
   cycle_id: string
@@ -312,11 +308,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Could not move shift' }, { status: 500 })
     }
 
+    if (!shift.date || !shift.shift_type) {
+      return NextResponse.json({ error: 'Incomplete shift data' }, { status: 422 })
+    }
+
     const undoAction: DragAction = {
       action: 'move',
       cycleId: payload.cycleId,
       shiftId: payload.shiftId,
-      targetDate: shift.date as string,
+      targetDate: shift.date,
       targetShiftType: shift.shift_type as 'day' | 'night',
       overrideWeeklyRules: true,
     }

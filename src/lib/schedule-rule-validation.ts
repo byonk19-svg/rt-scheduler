@@ -85,11 +85,18 @@ export function summarizePublishWeeklyViolations({
   let overCount = 0
 
   for (const therapistId of therapistIds) {
-    const therapistMaxWorkDays = maxWorkDaysByTherapist.get(therapistId) ?? MAX_WORK_DAYS_PER_WEEK
+    const maxFromMap = maxWorkDaysByTherapist.get(therapistId)
+    if (maxFromMap === undefined && process.env.NODE_ENV !== 'production') {
+      console.warn(`summarizePublishWeeklyViolations: no max_work_days entry for therapist ${therapistId}, using default`)
+    }
+    const therapistMaxWorkDays = maxFromMap ?? MAX_WORK_DAYS_PER_WEEK
     for (const [weekStart, weekDatesInCycle] of cycleWeekDates) {
       const requiredDays = Math.min(therapistMaxWorkDays, weekDatesInCycle.size)
-      const workedDates =
-        weeklyWorkedDatesByUserWeek.get(weeklyCountKey(therapistId, weekStart)) ?? new Set<string>()
+      const workedDatesFromMap = weeklyWorkedDatesByUserWeek.get(weeklyCountKey(therapistId, weekStart))
+      if (workedDatesFromMap === undefined && process.env.NODE_ENV !== 'production') {
+        console.warn(`summarizePublishWeeklyViolations: no worked-dates entry for therapist ${therapistId} week ${weekStart}, assuming 0`)
+      }
+      const workedDates = workedDatesFromMap ?? new Set<string>()
       const workedCount = workedDates.size
 
       if (workedCount < requiredDays) underCount += 1

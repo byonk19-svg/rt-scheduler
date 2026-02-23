@@ -66,6 +66,7 @@ export type ScheduleSearchParams = {
   show_unavailable?: string
   draft?: string
   removed?: string
+  dropped?: string
 }
 
 export type AutoScheduleShiftRow = {

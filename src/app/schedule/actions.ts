@@ -695,13 +695,26 @@ export async function generateDraftScheduleAction(formData: FormData) {
   }
 
   if (draftShiftsToInsert.length > 0) {
-    const { error: insertError } = await supabase
+    const { data: inserted, error: insertError } = await supabase
       .from('shifts')
       .upsert(draftShiftsToInsert, { onConflict: 'cycle_id,user_id,date', ignoreDuplicates: true })
+      .select('id')
 
     if (insertError) {
       console.error('Failed to insert auto-generated shifts:', insertError)
-      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'auto_generate_failed' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'auto_generate_db_error' }))
+    }
+
+    const silentlyDropped = draftShiftsToInsert.length - (inserted?.length ?? 0)
+    if (silentlyDropped > 0) {
+      console.warn(`Auto-generate: ${silentlyDropped} shift(s) skipped due to concurrent conflicts.`)
+      redirect(
+        buildScheduleUrl(cycleId, view, {
+          ...viewParams,
+          error: 'auto_generate_coverage_incomplete',
+          dropped: String(silentlyDropped),
+        })
+      )
     }
   }
 
