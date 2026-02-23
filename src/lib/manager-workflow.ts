@@ -1,4 +1,4 @@
-import { buildDateRange, dateKeyFromDate } from '@/lib/schedule-helpers'
+import { buildDateRange, dateKeyFromDate, getOne } from '@/lib/schedule-helpers'
 import { MAX_SHIFT_COVERAGE_PER_DAY, MIN_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
 import { summarizeShiftSlotViolations } from '@/lib/schedule-rule-validation'
 import { createClient } from '@/lib/supabase/server'
@@ -51,11 +51,6 @@ export type ManagerAttentionSnapshot = {
   resolveBlockersLink: string
   activeCycle: CycleRow | null
   links: DashboardLinks
-}
-
-function getOne<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null
-  return value ?? null
 }
 
 function getLinks(activeCycle: CycleRow | null): DashboardLinks {

@@ -38,10 +38,18 @@ function isAllowedAssignmentStatus(value: string): value is AssignmentStatus {
   return ASSIGNMENT_STATUS_VALUES.includes(value as AssignmentStatus)
 }
 
+function isValidTimeString(value: string): boolean {
+  if (!/^\d{2}:\d{2}(:\d{2})?$/.test(value)) return false
+  const [hh, mm, ss] = value.split(':').map(Number)
+  if (hh > 23 || mm > 59) return false
+  if (ss !== undefined && ss > 59) return false
+  return true
+}
+
 function canUpdateAssignmentStatus(profile: ActorProfile | null): boolean {
   if (!profile) return false
-  if (profile.role === 'manager' || profile.role === 'lead') return true
-  return (profile.role === 'therapist' || profile.role === 'staff') && profile.is_lead_eligible === true
+  if (profile.role === 'manager') return true
+  return profile.role === 'therapist' && profile.is_lead_eligible === true
 }
 
 export async function POST(request: Request) {
@@ -64,7 +72,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid status update payload.' }, { status: 400 })
   }
 
-  if (leftEarlyTimeRaw && !/^\d{2}:\d{2}(:\d{2})?$/.test(leftEarlyTimeRaw)) {
+  if (leftEarlyTimeRaw && !isValidTimeString(leftEarlyTimeRaw)) {
     return NextResponse.json({ error: 'Left early time must be HH:MM or HH:MM:SS.' }, { status: 400 })
   }
 
