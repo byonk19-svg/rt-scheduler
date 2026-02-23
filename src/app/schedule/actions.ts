@@ -18,6 +18,8 @@ import {
 } from '@/lib/schedule-rule-validation'
 import { createClient } from '@/lib/supabase/server'
 import { setDesignatedLeadMutation } from '@/lib/set-designated-lead'
+import { notifyUsers } from '@/lib/notifications'
+import { writeAuditLog } from '@/lib/audit-log'
 import {
   buildDateRange,
   buildScheduleUrl,
@@ -37,6 +39,11 @@ import type {
   Therapist,
 } from '@/app/schedule/types'
 
+const AUTO_GENERATE_TARGET_COVERAGE_PER_SHIFT = Math.min(
+  MAX_SHIFT_COVERAGE_PER_DAY,
+  Math.max(MIN_SHIFT_COVERAGE_PER_DAY, 4)
+)
+
 type ShiftPublishValidationRow = {
   date: string
   shift_type: 'day' | 'night'
@@ -49,9 +56,30 @@ type ShiftPublishValidationRow = {
     | null
 }
 
+type CycleImportSourceRow = {
+  id: string
+  start_date: string
+  end_date: string
+}
+
+type ImportedShiftRow = {
+  user_id: string
+  date: string
+  shift_type: 'day' | 'night'
+  status: ShiftStatus
+  role: ShiftRole
+}
+
 function getOne<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null
   return value ?? null
+}
+
+function getPanelParam(formData: FormData): 'setup' | 'new-cycle' | 'add-shift' | undefined {
+  const panel = String(formData.get('panel') ?? '').trim()
+  if (panel === 'setup') return panel
+  if (panel === 'new-cycle' || panel === 'add-shift') return panel
+  return undefined
 }
 
 async function getRoleForUser(userId: string): Promise<Role> {
@@ -103,11 +131,15 @@ export async function createCycleAction(formData: FormData) {
   const label = String(formData.get('label') ?? '').trim()
   const startDate = String(formData.get('start_date') ?? '').trim()
   const endDate = String(formData.get('end_date') ?? '').trim()
-  const published = String(formData.get('published') ?? '') === 'on'
+  const copyFromLastCycle = String(formData.get('copy_from_last_cycle') ?? '') === 'on'
+  const publishedRequested = String(formData.get('published') ?? '') === 'on'
+  const published = copyFromLastCycle ? false : publishedRequested
   const view = String(formData.get('view') ?? '').trim()
+  const panel = getPanelParam(formData)
+  const errorViewParams = panel ? { panel } : undefined
 
   if (!label || !startDate || !endDate) {
-    redirect('/schedule')
+    redirect(buildScheduleUrl(undefined, view, { ...errorViewParams, error: 'create_cycle_failed' }))
   }
 
   const { data, error } = await supabase
@@ -123,11 +155,140 @@ export async function createCycleAction(formData: FormData) {
 
   if (error) {
     console.error('Failed to create schedule cycle:', error)
-    redirect('/schedule')
+    redirect(buildScheduleUrl(undefined, view, { ...errorViewParams, error: 'create_cycle_failed' }))
+  }
+
+  if (copyFromLastCycle) {
+    const [sourceCycleResult, importedShiftsResult] = await Promise.all([
+      supabase
+        .from('schedule_cycles')
+        .select('id, start_date, end_date')
+        .eq('published', true)
+        .neq('id', data.id)
+        .order('end_date', { ascending: false })
+        .order('start_date', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('schedule_cycles')
+        .select('id')
+        .eq('id', data.id)
+        .single(),
+    ])
+
+    if (sourceCycleResult.error || importedShiftsResult.error) {
+      console.error('Failed to prepare import from previous cycle:', {
+        sourceCycleError: sourceCycleResult.error,
+        importedCycleError: importedShiftsResult.error,
+      })
+      revalidatePath('/schedule')
+      redirect(buildScheduleUrl(data.id, view, { ...errorViewParams, error: 'copy_from_last_cycle_failed' }))
+    }
+
+    const sourceCycle = sourceCycleResult.data as CycleImportSourceRow | null
+    if (sourceCycle) {
+      const { data: sourceShiftsData, error: sourceShiftsError } = await supabase
+        .from('shifts')
+        .select('user_id, date, shift_type, status, role')
+        .eq('cycle_id', sourceCycle.id)
+
+      if (sourceShiftsError) {
+        console.error('Failed to load source shifts for cycle import:', sourceShiftsError)
+        revalidatePath('/schedule')
+        redirect(buildScheduleUrl(data.id, view, { ...errorViewParams, error: 'copy_from_last_cycle_failed' }))
+      }
+
+      const sourceShifts = (sourceShiftsData ?? []) as ImportedShiftRow[]
+      if (sourceShifts.length > 0) {
+        const sourceDates = buildDateRange(sourceCycle.start_date, sourceCycle.end_date)
+        const sourceIndexByDate = new Map(sourceDates.map((date, index) => [date, index]))
+        const targetDates = buildDateRange(startDate, endDate)
+        const sourceTherapistIds = Array.from(new Set(sourceShifts.map((shift) => shift.user_id)))
+
+        const { data: eligibleProfilesData, error: eligibleProfilesError } = await supabase
+          .from('profiles')
+          .select('id')
+          .in('id', sourceTherapistIds)
+          .eq('role', 'therapist')
+          .eq('is_active', true)
+          .eq('on_fmla', false)
+
+        if (eligibleProfilesError) {
+          console.error('Failed to load eligible therapists for cycle import:', eligibleProfilesError)
+          revalidatePath('/schedule')
+          redirect(buildScheduleUrl(data.id, view, { ...errorViewParams, error: 'copy_from_last_cycle_failed' }))
+        }
+
+        const eligibleTherapistIds = new Set((eligibleProfilesData ?? []).map((row) => row.id as string))
+        let skippedAssignments = 0
+        const shiftsToInsert = sourceShifts
+          .map((shift) => {
+            if (!eligibleTherapistIds.has(shift.user_id)) {
+              skippedAssignments += 1
+              return null
+            }
+
+            const sourceIndex = sourceIndexByDate.get(shift.date)
+            if (sourceIndex === undefined) {
+              skippedAssignments += 1
+              return null
+            }
+
+            const targetDate = targetDates[sourceIndex]
+            if (!targetDate) {
+              skippedAssignments += 1
+              return null
+            }
+
+            return {
+              cycle_id: data.id,
+              user_id: shift.user_id,
+              date: targetDate,
+              shift_type: shift.shift_type,
+              status: shift.status,
+              role: shift.role,
+            }
+          })
+          .filter((shift): shift is NonNullable<typeof shift> => Boolean(shift))
+
+        let copiedAssignments = 0
+        if (shiftsToInsert.length > 0) {
+          const { data: insertedShifts, error: insertedShiftsError } = await supabase
+            .from('shifts')
+            .upsert(shiftsToInsert, { onConflict: 'cycle_id,user_id,date', ignoreDuplicates: true })
+            .select('id')
+
+          if (insertedShiftsError) {
+            console.error('Failed to insert imported shifts:', insertedShiftsError)
+            revalidatePath('/schedule')
+            redirect(buildScheduleUrl(data.id, view, { ...errorViewParams, error: 'copy_from_last_cycle_failed' }))
+          }
+
+          copiedAssignments = insertedShifts?.length ?? 0
+        }
+
+        revalidatePath('/schedule')
+        redirect(
+          buildScheduleUrl(data.id, view, {
+            success: 'cycle_created',
+            copied: String(copiedAssignments),
+            skipped: String(skippedAssignments),
+          })
+        )
+      }
+    }
+
+    revalidatePath('/schedule')
+    redirect(
+      buildScheduleUrl(data.id, view, {
+        success: 'cycle_created',
+        copied: '0',
+      })
+    )
   }
 
   revalidatePath('/schedule')
-  redirect(buildScheduleUrl(data.id, view))
+  redirect(buildScheduleUrl(data.id, view, { success: 'cycle_created' }))
 }
 
 export async function toggleCyclePublishedAction(formData: FormData) {
@@ -151,6 +312,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
   const showUnavailable = String(formData.get('show_unavailable') ?? '').trim() === 'true'
   const overrideWeeklyRules = String(formData.get('override_weekly_rules') ?? '').trim() === 'true'
   const viewParams = showUnavailable ? { show_unavailable: 'true' } : undefined
+  let publishCycleDetails: { label: string; startDate: string; endDate: string } | null = null
 
   if (!cycleId) {
     redirect(buildScheduleUrl(undefined, view, viewParams))
@@ -159,13 +321,18 @@ export async function toggleCyclePublishedAction(formData: FormData) {
   if (!currentlyPublished) {
     const { data: cycle, error: cycleError } = await supabase
       .from('schedule_cycles')
-      .select('start_date, end_date')
+      .select('label, start_date, end_date')
       .eq('id', cycleId)
       .maybeSingle()
 
     if (cycleError || !cycle) {
       console.error('Failed to load cycle for publish validation:', cycleError)
       redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'publish_validation_failed' }))
+    }
+    publishCycleDetails = {
+      label: cycle.label,
+      startDate: cycle.start_date,
+      endDate: cycle.end_date,
     }
 
     const cycleDates = buildDateRange(cycle.start_date, cycle.end_date)
@@ -258,7 +425,9 @@ export async function toggleCyclePublishedAction(formData: FormData) {
 
     const { data: shiftCoverageData, error: shiftCoverageError } = await supabase
       .from('shifts')
-      .select('date, shift_type, status, role, user_id, profiles(full_name, is_lead_eligible)')
+      .select(
+        'date, shift_type, status, role, user_id, profiles:profiles!shifts_user_id_fkey(full_name, is_lead_eligible)'
+      )
       .eq('cycle_id', cycleId)
       .gte('date', cycle.start_date)
       .lte('date', cycle.end_date)
@@ -284,14 +453,6 @@ export async function toggleCyclePublishedAction(formData: FormData) {
     })
 
     if (slotValidation.violations > 0) {
-      const affectedList = slotValidation.issues
-        .slice(0, 8)
-        .map((issue) => `${issue.date} ${issue.shiftType}`)
-        .join(', ')
-      const truncatedCount = Math.max(slotValidation.issues.length - 8, 0)
-      const affectedSummary =
-        truncatedCount > 0 ? `${affectedList}, +${truncatedCount} more` : affectedList
-
       redirect(
         buildScheduleUrl(cycleId, view, {
           ...viewParams,
@@ -301,7 +462,6 @@ export async function toggleCyclePublishedAction(formData: FormData) {
           lead_missing: String(slotValidation.missingLead),
           lead_multiple: String(slotValidation.multipleLeads),
           lead_ineligible: String(slotValidation.ineligibleLead),
-          affected: affectedSummary || undefined,
         })
       )
     }
@@ -316,8 +476,44 @@ export async function toggleCyclePublishedAction(formData: FormData) {
     console.error('Failed to toggle schedule publication state:', error)
   }
 
+  if (!currentlyPublished && !error) {
+    await writeAuditLog(supabase, {
+      userId: user.id,
+      action: 'cycle_published',
+      targetType: 'schedule_cycle',
+      targetId: cycleId,
+    })
+
+    const { data: therapistProfiles } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('role', 'therapist')
+      .eq('is_active', true)
+
+    const therapistIds = (therapistProfiles ?? []).map((profile) => profile.id as string)
+    const cycleLabel = publishCycleDetails?.label ?? 'Schedule cycle'
+    const cycleRange =
+      publishCycleDetails
+        ? `${publishCycleDetails.startDate} to ${publishCycleDetails.endDate}`
+        : 'the current date range'
+
+    await notifyUsers(supabase, {
+      userIds: therapistIds,
+      eventType: 'cycle_published',
+      title: 'Cycle published',
+      message: `${cycleLabel} (${cycleRange}) is now published.`,
+      targetType: 'schedule_cycle',
+      targetId: cycleId,
+    })
+  }
+
   revalidatePath('/schedule')
-  redirect(buildScheduleUrl(cycleId, view, viewParams))
+  redirect(
+    buildScheduleUrl(cycleId, view, {
+      ...viewParams,
+      success: currentlyPublished ? 'cycle_unpublished' : 'cycle_published',
+    })
+  )
 }
 
 export async function addShiftAction(formData: FormData) {
@@ -342,11 +538,23 @@ export async function addShiftAction(formData: FormData) {
   const status = String(formData.get('status') ?? '').trim()
   const view = String(formData.get('view') ?? '').trim()
   const showUnavailable = String(formData.get('show_unavailable') ?? '').trim() === 'true'
+  const panel = getPanelParam(formData)
   const overrideWeeklyRules = String(formData.get('override_weekly_rules') ?? '').trim() === 'on'
   const viewParams = showUnavailable ? { show_unavailable: 'true' } : undefined
+  const panelParams =
+    panel === 'add-shift'
+      ? {
+          panel,
+          add_date: date || undefined,
+          add_shift_type: shiftType === 'night' ? 'night' : 'day',
+        }
+      : panel
+        ? { panel }
+        : undefined
+  const errorViewParams = panelParams ? { ...viewParams, ...panelParams } : viewParams
 
   if (!cycleId || !userId || !date || !shiftType || !status) {
-    redirect(buildScheduleUrl(undefined, view, viewParams))
+    redirect(buildScheduleUrl(undefined, view, errorViewParams))
   }
 
   const therapistWeeklyLimit =
@@ -364,19 +572,19 @@ export async function addShiftAction(formData: FormData) {
 
     if (sameSlotError) {
       console.error('Failed to load slot coverage for limit check:', sameSlotError)
-      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'add_shift_failed' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'add_shift_failed' }))
     }
 
     const activeCoverage = (sameSlotShifts ?? []).filter((row) => countsTowardWeeklyLimit(row.status)).length
     if (exceedsCoverageLimit(activeCoverage, MAX_SHIFT_COVERAGE_PER_DAY)) {
-      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'coverage_max_exceeded' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'coverage_max_exceeded' }))
     }
   }
 
   if (countsTowardWeeklyLimit(status) && !overrideWeeklyRules) {
     const bounds = getWeekBoundsForDate(date)
     if (!bounds) {
-      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'add_shift_failed' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'add_shift_failed' }))
     }
 
     const { data: weeklyShiftsData, error: weeklyShiftsError } = await supabase
@@ -388,7 +596,7 @@ export async function addShiftAction(formData: FormData) {
 
     if (weeklyShiftsError) {
       console.error('Failed to load weekly shifts for limit check:', weeklyShiftsError)
-      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'add_shift_failed' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'add_shift_failed' }))
     }
 
     const workedDates = new Set<string>()
@@ -400,7 +608,7 @@ export async function addShiftAction(formData: FormData) {
     if (exceedsWeeklyLimit(workedDates, date, therapistWeeklyLimit)) {
       redirect(
         buildScheduleUrl(cycleId, view, {
-          ...viewParams,
+          ...errorViewParams,
           error: 'weekly_limit_exceeded',
           week_start: bounds.weekStart,
           week_end: bounds.weekEnd,
@@ -409,25 +617,47 @@ export async function addShiftAction(formData: FormData) {
     }
   }
 
-  const { error } = await supabase.from('shifts').insert({
-    cycle_id: cycleId,
-    user_id: userId,
-    date,
-    shift_type: shiftType,
-    status,
-    role: 'staff',
-  })
+  const { data: insertedShift, error } = await supabase
+    .from('shifts')
+    .insert({
+      cycle_id: cycleId,
+      user_id: userId,
+      date,
+      shift_type: shiftType,
+      status,
+      role: 'staff',
+    })
+    .select('id')
+    .single()
 
   if (error) {
     console.error('Failed to insert shift:', error)
     if (error.code === '23505') {
-      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'duplicate_shift' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'duplicate_shift' }))
     }
-    redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'add_shift_failed' }))
+    redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'add_shift_failed' }))
   }
 
+  if (insertedShift?.id) {
+    await writeAuditLog(supabase, {
+      userId: user.id,
+      action: 'shift_added',
+      targetType: 'shift',
+      targetId: insertedShift.id,
+    })
+  }
+
+  await notifyUsers(supabase, {
+    userIds: [userId],
+    eventType: 'shift_assigned',
+    title: 'New shift assigned',
+    message: `You were assigned a ${shiftType} shift on ${date}.`,
+    targetType: 'shift',
+    targetId: insertedShift?.id ?? `${cycleId}:${userId}:${date}`,
+  })
+
   revalidatePath('/schedule')
-  redirect(buildScheduleUrl(cycleId, view, viewParams))
+  redirect(buildScheduleUrl(cycleId, view, { ...viewParams, success: 'shift_added' }))
 }
 
 export async function generateDraftScheduleAction(formData: FormData) {
@@ -586,9 +816,20 @@ export async function generateDraftScheduleAction(formData: FormData) {
 
   const coverageBySlot = new Map<string, number>()
   const assignedUserIdsByDate = new Map<string, Set<string>>()
+  const leadAssignedBySlot = new Map<string, boolean>()
+  const shiftsBySlot = new Map<string, AutoScheduleShiftRow[]>()
+  const therapistById = new Map(therapists.map((therapist) => [therapist.id, therapist]))
   for (const shift of existingShifts) {
+    const slotKey = coverageSlotKey(shift.date, shift.shift_type)
+    const slotShifts = shiftsBySlot.get(slotKey) ?? []
+    slotShifts.push(shift)
+    shiftsBySlot.set(slotKey, slotShifts)
+
+    if (shift.role === 'lead') {
+      leadAssignedBySlot.set(slotKey, true)
+    }
+
     if (countsTowardWeeklyLimit(shift.status)) {
-      const slotKey = coverageSlotKey(shift.date, shift.shift_type)
       const coverage = coverageBySlot.get(slotKey) ?? 0
       coverageBySlot.set(slotKey, coverage + 1)
     }
@@ -599,10 +840,16 @@ export async function generateDraftScheduleAction(formData: FormData) {
 
   const dayTherapists = therapists.filter((therapist) => therapist.shift_type === 'day')
   const nightTherapists = therapists.filter((therapist) => therapist.shift_type === 'night')
+  const dayLeadTherapists = dayTherapists.filter((therapist) => therapist.is_lead_eligible)
+  const nightLeadTherapists = nightTherapists.filter((therapist) => therapist.is_lead_eligible)
 
   let dayCursor = 0
   let nightCursor = 0
+  let dayLeadCursor = 0
+  let nightLeadCursor = 0
   let unfilledSlots = 0
+  let missingLeadSlots = 0
+  const pendingLeadUpdates: Array<{ date: string; shiftType: 'day' | 'night'; therapistId: string }> = []
 
   const draftShiftsToInsert: Array<{
     cycle_id: string
@@ -610,15 +857,70 @@ export async function generateDraftScheduleAction(formData: FormData) {
     date: string
     shift_type: 'day' | 'night'
     status: 'scheduled'
-    role: 'staff'
+    role: ShiftRole
   }> = []
 
   for (const date of cycleDates) {
     const assignedForDate = assignedUserIdsByDate.get(date) ?? new Set<string>()
     assignedUserIdsByDate.set(date, assignedForDate)
 
-    let dayCoverage = coverageBySlot.get(coverageSlotKey(date, 'day')) ?? 0
-    while (dayCoverage < MIN_SHIFT_COVERAGE_PER_DAY) {
+    const daySlotKey = coverageSlotKey(date, 'day')
+    let dayCoverage = coverageBySlot.get(daySlotKey) ?? 0
+    let dayHasLead = leadAssignedBySlot.get(daySlotKey) === true
+
+    if (!dayHasLead) {
+      const existingDayLeadCandidate = (shiftsBySlot.get(daySlotKey) ?? []).find((shift) => {
+        if (!countsTowardWeeklyLimit(shift.status)) return false
+        return therapistById.get(shift.user_id)?.is_lead_eligible === true
+      })
+      if (existingDayLeadCandidate) {
+        pendingLeadUpdates.push({
+          date,
+          shiftType: 'day',
+          therapistId: existingDayLeadCandidate.user_id,
+        })
+        dayHasLead = true
+        leadAssignedBySlot.set(daySlotKey, true)
+      }
+    }
+
+    if (!dayHasLead) {
+      const dayLeadPick = pickTherapistForDate(
+        dayLeadTherapists,
+        dayLeadCursor,
+        date,
+        unavailableDatesByUser,
+        assignedForDate,
+        weeklyWorkedDatesByUserWeek,
+        weeklyLimitByTherapist
+      )
+      dayLeadCursor = dayLeadPick.nextCursor
+
+      if (dayLeadPick.therapist) {
+        draftShiftsToInsert.push({
+          cycle_id: cycleId,
+          user_id: dayLeadPick.therapist.id,
+          date,
+          shift_type: 'day',
+          status: 'scheduled',
+          role: 'lead',
+        })
+        assignedForDate.add(dayLeadPick.therapist.id)
+        const weekBounds = getWeekBoundsForDate(date)
+        if (weekBounds) {
+          const key = weeklyCountKey(dayLeadPick.therapist.id, weekBounds.weekStart)
+          const workedDates = weeklyWorkedDatesByUserWeek.get(key) ?? new Set<string>()
+          workedDates.add(date)
+          weeklyWorkedDatesByUserWeek.set(key, workedDates)
+        }
+        dayCoverage += 1
+        coverageBySlot.set(daySlotKey, dayCoverage)
+        dayHasLead = true
+        leadAssignedBySlot.set(daySlotKey, true)
+      }
+    }
+
+    while (dayCoverage < AUTO_GENERATE_TARGET_COVERAGE_PER_SHIFT) {
       const dayPick = pickTherapistForDate(
         dayTherapists,
         dayCursor,
@@ -631,13 +933,15 @@ export async function generateDraftScheduleAction(formData: FormData) {
       dayCursor = dayPick.nextCursor
 
       if (dayPick.therapist) {
+        const roleForDayShift: ShiftRole =
+          !dayHasLead && dayPick.therapist.is_lead_eligible ? 'lead' : 'staff'
         draftShiftsToInsert.push({
           cycle_id: cycleId,
           user_id: dayPick.therapist.id,
           date,
           shift_type: 'day',
           status: 'scheduled',
-          role: 'staff',
+          role: roleForDayShift,
         })
         assignedForDate.add(dayPick.therapist.id)
         const weekBounds = getWeekBoundsForDate(date)
@@ -648,15 +952,80 @@ export async function generateDraftScheduleAction(formData: FormData) {
           weeklyWorkedDatesByUserWeek.set(key, workedDates)
         }
         dayCoverage += 1
-        coverageBySlot.set(coverageSlotKey(date, 'day'), dayCoverage)
+        coverageBySlot.set(daySlotKey, dayCoverage)
+        if (roleForDayShift === 'lead') {
+          dayHasLead = true
+          leadAssignedBySlot.set(daySlotKey, true)
+        }
       } else {
-        unfilledSlots += MIN_SHIFT_COVERAGE_PER_DAY - dayCoverage
+        if (dayCoverage < MIN_SHIFT_COVERAGE_PER_DAY) {
+          unfilledSlots += MIN_SHIFT_COVERAGE_PER_DAY - dayCoverage
+        }
         break
       }
     }
 
-    let nightCoverage = coverageBySlot.get(coverageSlotKey(date, 'night')) ?? 0
-    while (nightCoverage < MIN_SHIFT_COVERAGE_PER_DAY) {
+    if (!dayHasLead) {
+      missingLeadSlots += 1
+    }
+
+    const nightSlotKey = coverageSlotKey(date, 'night')
+    let nightCoverage = coverageBySlot.get(nightSlotKey) ?? 0
+    let nightHasLead = leadAssignedBySlot.get(nightSlotKey) === true
+
+    if (!nightHasLead) {
+      const existingNightLeadCandidate = (shiftsBySlot.get(nightSlotKey) ?? []).find((shift) => {
+        if (!countsTowardWeeklyLimit(shift.status)) return false
+        return therapistById.get(shift.user_id)?.is_lead_eligible === true
+      })
+      if (existingNightLeadCandidate) {
+        pendingLeadUpdates.push({
+          date,
+          shiftType: 'night',
+          therapistId: existingNightLeadCandidate.user_id,
+        })
+        nightHasLead = true
+        leadAssignedBySlot.set(nightSlotKey, true)
+      }
+    }
+
+    if (!nightHasLead) {
+      const nightLeadPick = pickTherapistForDate(
+        nightLeadTherapists,
+        nightLeadCursor,
+        date,
+        unavailableDatesByUser,
+        assignedForDate,
+        weeklyWorkedDatesByUserWeek,
+        weeklyLimitByTherapist
+      )
+      nightLeadCursor = nightLeadPick.nextCursor
+
+      if (nightLeadPick.therapist) {
+        draftShiftsToInsert.push({
+          cycle_id: cycleId,
+          user_id: nightLeadPick.therapist.id,
+          date,
+          shift_type: 'night',
+          status: 'scheduled',
+          role: 'lead',
+        })
+        assignedForDate.add(nightLeadPick.therapist.id)
+        const weekBounds = getWeekBoundsForDate(date)
+        if (weekBounds) {
+          const key = weeklyCountKey(nightLeadPick.therapist.id, weekBounds.weekStart)
+          const workedDates = weeklyWorkedDatesByUserWeek.get(key) ?? new Set<string>()
+          workedDates.add(date)
+          weeklyWorkedDatesByUserWeek.set(key, workedDates)
+        }
+        nightCoverage += 1
+        coverageBySlot.set(nightSlotKey, nightCoverage)
+        nightHasLead = true
+        leadAssignedBySlot.set(nightSlotKey, true)
+      }
+    }
+
+    while (nightCoverage < AUTO_GENERATE_TARGET_COVERAGE_PER_SHIFT) {
       const nightPick = pickTherapistForDate(
         nightTherapists,
         nightCursor,
@@ -669,13 +1038,15 @@ export async function generateDraftScheduleAction(formData: FormData) {
       nightCursor = nightPick.nextCursor
 
       if (nightPick.therapist) {
+        const roleForNightShift: ShiftRole =
+          !nightHasLead && nightPick.therapist.is_lead_eligible ? 'lead' : 'staff'
         draftShiftsToInsert.push({
           cycle_id: cycleId,
           user_id: nightPick.therapist.id,
           date,
           shift_type: 'night',
           status: 'scheduled',
-          role: 'staff',
+          role: roleForNightShift,
         })
         assignedForDate.add(nightPick.therapist.id)
         const weekBounds = getWeekBoundsForDate(date)
@@ -686,11 +1057,21 @@ export async function generateDraftScheduleAction(formData: FormData) {
           weeklyWorkedDatesByUserWeek.set(key, workedDates)
         }
         nightCoverage += 1
-        coverageBySlot.set(coverageSlotKey(date, 'night'), nightCoverage)
+        coverageBySlot.set(nightSlotKey, nightCoverage)
+        if (roleForNightShift === 'lead') {
+          nightHasLead = true
+          leadAssignedBySlot.set(nightSlotKey, true)
+        }
       } else {
-        unfilledSlots += MIN_SHIFT_COVERAGE_PER_DAY - nightCoverage
+        if (nightCoverage < MIN_SHIFT_COVERAGE_PER_DAY) {
+          unfilledSlots += MIN_SHIFT_COVERAGE_PER_DAY - nightCoverage
+        }
         break
       }
+    }
+
+    if (!nightHasLead) {
+      missingLeadSlots += 1
     }
   }
 
@@ -718,6 +1099,21 @@ export async function generateDraftScheduleAction(formData: FormData) {
     }
   }
 
+  if (pendingLeadUpdates.length > 0) {
+    for (const update of pendingLeadUpdates) {
+      const leadResult = await setDesignatedLeadMutation(supabase, {
+        cycleId,
+        therapistId: update.therapistId,
+        date: update.date,
+        shiftType: update.shiftType,
+      })
+      if (!leadResult.ok) {
+        console.error('Auto-generate failed to designate lead for slot:', update, leadResult.error)
+        redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'auto_generate_lead_assignment_failed' }))
+      }
+    }
+  }
+
   revalidatePath('/schedule')
   redirect(
     buildScheduleUrl(cycleId, view, {
@@ -725,6 +1121,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
       auto: 'generated',
       added: String(draftShiftsToInsert.length),
       unfilled: String(unfilledSlots),
+      lead_missing: String(missingLeadSlots),
     })
   )
 }
@@ -811,16 +1208,24 @@ export async function deleteShiftAction(formData: FormData) {
   const view = String(formData.get('view') ?? '').trim()
 
   if (!shiftId || !cycleId) {
-    redirect('/schedule')
+    redirect('/schedule?error=delete_shift_failed')
   }
 
   const { error } = await supabase.from('shifts').delete().eq('id', shiftId)
   if (error) {
     console.error('Failed to delete shift:', error)
+    redirect(buildScheduleUrl(cycleId, view, { error: 'delete_shift_failed' }))
   }
 
+  await writeAuditLog(supabase, {
+    userId: user.id,
+    action: 'shift_removed',
+    targetType: 'shift',
+    targetId: shiftId,
+  })
+
   revalidatePath('/schedule')
-  redirect(buildScheduleUrl(cycleId, view))
+  redirect(buildScheduleUrl(cycleId, view, { success: 'shift_deleted' }))
 }
 
 export async function setDesignatedLeadAction(formData: FormData) {
@@ -844,10 +1249,22 @@ export async function setDesignatedLeadAction(formData: FormData) {
   const shiftType = String(formData.get('shift_type') ?? '').trim() as 'day' | 'night'
   const view = String(formData.get('view') ?? '').trim()
   const showUnavailable = String(formData.get('show_unavailable') ?? '').trim() === 'true'
+  const panel = getPanelParam(formData)
   const viewParams = showUnavailable ? { show_unavailable: 'true' } : undefined
+  const panelParams =
+    panel === 'add-shift'
+      ? {
+          panel,
+          add_date: date || undefined,
+          add_shift_type: shiftType === 'night' ? 'night' : 'day',
+        }
+      : panel
+        ? { panel }
+        : undefined
+  const errorViewParams = panelParams ? { ...viewParams, ...panelParams } : viewParams
 
   if (!cycleId || !therapistId || !date || (shiftType !== 'day' && shiftType !== 'night')) {
-    redirect(buildScheduleUrl(cycleId || undefined, view, { ...viewParams, error: 'set_lead_failed' }))
+    redirect(buildScheduleUrl(cycleId || undefined, view, { ...errorViewParams, error: 'set_lead_failed' }))
   }
 
   const { data: therapist, error: therapistError } = await supabase
@@ -857,7 +1274,7 @@ export async function setDesignatedLeadAction(formData: FormData) {
     .maybeSingle()
 
   if (therapistError || !therapist || therapist.role !== 'therapist' || !therapist.is_lead_eligible) {
-    redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'set_lead_not_eligible' }))
+    redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_not_eligible' }))
   }
 
   const therapistWeeklyLimit = getWeeklyLimitFromProfile({
@@ -876,7 +1293,7 @@ export async function setDesignatedLeadAction(formData: FormData) {
 
   if (existingShiftError) {
     console.error('Failed to load existing shift for designated lead action:', existingShiftError)
-    redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'set_lead_failed' }))
+    redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_failed' }))
   }
 
   if (!existingShift) {
@@ -889,17 +1306,17 @@ export async function setDesignatedLeadAction(formData: FormData) {
 
     if (sameSlotError) {
       console.error('Failed to load slot coverage for designated lead action:', sameSlotError)
-      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'set_lead_failed' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_failed' }))
     }
 
     const activeCoverage = (sameSlotShifts ?? []).filter((row) => countsTowardWeeklyLimit(row.status)).length
     if (exceedsCoverageLimit(activeCoverage, MAX_SHIFT_COVERAGE_PER_DAY)) {
-      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'set_lead_coverage_max' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_coverage_max' }))
     }
 
     const bounds = getWeekBoundsForDate(date)
     if (!bounds) {
-      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'set_lead_failed' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_failed' }))
     }
 
     const { data: weeklyShiftsData, error: weeklyShiftsError } = await supabase
@@ -911,7 +1328,7 @@ export async function setDesignatedLeadAction(formData: FormData) {
 
     if (weeklyShiftsError) {
       console.error('Failed to load weekly shifts for designated lead action:', weeklyShiftsError)
-      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'set_lead_failed' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_failed' }))
     }
 
     const workedDates = new Set<string>()
@@ -921,7 +1338,7 @@ export async function setDesignatedLeadAction(formData: FormData) {
     }
 
     if (exceedsWeeklyLimit(workedDates, date, therapistWeeklyLimit)) {
-      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'set_lead_weekly_limit' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_weekly_limit' }))
     }
   }
 
@@ -934,14 +1351,21 @@ export async function setDesignatedLeadAction(formData: FormData) {
 
   if (!mutationResult.ok) {
     if (mutationResult.reason === 'lead_not_eligible') {
-      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'set_lead_not_eligible' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_not_eligible' }))
     }
     if (mutationResult.reason === 'multiple_leads_prevented') {
-      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'set_lead_multiple' }))
+      redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_multiple' }))
     }
-    redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'set_lead_failed' }))
+    redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_failed' }))
   }
 
+  await writeAuditLog(supabase, {
+    userId: user.id,
+    action: 'designated_lead_assigned',
+    targetType: 'shift_slot',
+    targetId: `${cycleId}:${date}:${shiftType}`,
+  })
+
   revalidatePath('/schedule')
-  redirect(buildScheduleUrl(cycleId, view, viewParams))
+  redirect(buildScheduleUrl(cycleId, view, { ...viewParams, success: 'lead_updated' }))
 }

@@ -1,13 +1,30 @@
+'use client'
+
 import Link from 'next/link'
+import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 
 import { MoreActionsMenu } from '@/components/more-actions-menu'
 import { PrintMenuItem } from '@/components/print-menu-item'
-import { Button } from '@/components/ui/button'
+import { FormMenuSubmitButton, FormSubmitButton } from '@/components/form-submit-button'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { buildScheduleUrl } from '@/lib/schedule-helpers'
 
 type Role = 'manager' | 'therapist'
 type ViewMode = 'grid' | 'list' | 'calendar'
+
+type PublishSummary = {
+  cycleLabel: string
+  startDate: string
+  endDate: string
+  totalScheduledShifts: number
+  dayShifts: number
+  nightShifts: number
+  missingLead: number
+  underCoverage: number
+  overCoverage: number
+}
 
 type ScheduleHeaderProps = {
   role: Role
@@ -20,6 +37,8 @@ type ScheduleHeaderProps = {
   toggleCyclePublishedAction: (formData: FormData) => void | Promise<void>
   generateDraftScheduleAction: (formData: FormData) => void | Promise<void>
   resetDraftScheduleAction: (formData: FormData) => void | Promise<void>
+  publishSummary?: PublishSummary | null
+  canViewMonth?: boolean
 }
 
 const menuActionClass = 'block w-full rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary disabled:opacity-50'
@@ -43,9 +62,20 @@ export function ScheduleHeader({
   toggleCyclePublishedAction,
   generateDraftScheduleAction,
   resetDraftScheduleAction,
+  publishSummary = null,
+  canViewMonth = role === 'manager',
 }: ScheduleHeaderProps) {
   const hasActiveCycle = Boolean(activeCycleId)
   const canPublish = hasActiveCycle && !activeCyclePublished
+  const autoGenerateHelperMessage =
+    !hasActiveCycle
+      ? 'Select a cycle to auto-generate a draft.'
+      : activeCyclePublished
+        ? 'Draft actions are disabled for published cycles.'
+        : null
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false)
+  const [publishConfirmationText, setPublishConfirmationText] = useState('')
+  const publishConfirmEnabled = publishConfirmationText.trim().toUpperCase() === 'PUBLISH'
 
   return (
     <div className="no-print space-y-4">
@@ -58,16 +88,27 @@ export function ScheduleHeader({
         <div className="flex flex-wrap items-center gap-2">
           {role === 'manager' && (
             <>
-              <form action={toggleCyclePublishedAction}>
+              <form action={generateDraftScheduleAction}>
                 <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
                 <input type="hidden" name="view" value={viewMode} />
                 <input type="hidden" name="show_unavailable" value={showUnavailable ? 'true' : 'false'} />
-                <input type="hidden" name="currently_published" value="false" />
-                <input type="hidden" name="override_weekly_rules" value="false" />
-                <Button type="submit" disabled={!canPublish}>
-                  Publish
-                </Button>
+                <FormSubmitButton
+                  type="submit"
+                  variant="outline"
+                  disabled={!hasActiveCycle || activeCyclePublished}
+                  pendingText="Generating..."
+                >
+                  Auto-generate draft
+                </FormSubmitButton>
               </form>
+
+              <FormSubmitButton
+                type="button"
+                disabled={!canPublish}
+                onClick={() => setPublishDialogOpen(true)}
+              >
+                Publish
+              </FormSubmitButton>
 
               <details className="relative">
                 <summary className="list-none [&::-webkit-details-marker]:hidden">
@@ -83,9 +124,9 @@ export function ScheduleHeader({
                     <input type="hidden" name="show_unavailable" value={showUnavailable ? 'true' : 'false'} />
                     <input type="hidden" name="currently_published" value="false" />
                     <input type="hidden" name="override_weekly_rules" value="true" />
-                    <button type="submit" className={menuActionClass} disabled={!canPublish}>
+                    <FormMenuSubmitButton type="submit" className={menuActionClass} disabled={!canPublish} pendingText="Publishing...">
                       Publish with overrides
-                    </button>
+                    </FormMenuSubmitButton>
                   </form>
                   <form action={toggleCyclePublishedAction}>
                     <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
@@ -93,9 +134,9 @@ export function ScheduleHeader({
                     <input type="hidden" name="show_unavailable" value={showUnavailable ? 'true' : 'false'} />
                     <input type="hidden" name="currently_published" value="false" />
                     <input type="hidden" name="override_weekly_rules" value="false" />
-                    <button type="submit" className={menuActionClass} disabled={!canPublish}>
+                    <FormMenuSubmitButton type="submit" className={menuActionClass} disabled={!canPublish} pendingText="Publishing...">
                       Publish draft
-                    </button>
+                    </FormMenuSubmitButton>
                   </form>
                 </div>
               </details>
@@ -104,31 +145,26 @@ export function ScheduleHeader({
 
           <MoreActionsMenu>
             {role === 'manager' && (
-              <form action={generateDraftScheduleAction}>
-                <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
-                <input type="hidden" name="view" value={viewMode} />
-                <input type="hidden" name="show_unavailable" value={showUnavailable ? 'true' : 'false'} />
-                <button type="submit" className={menuActionClass} disabled={!hasActiveCycle || activeCyclePublished}>
-                  Auto-generate draft
-                </button>
-              </form>
-            )}
-            {role === 'manager' && (
               <form action={resetDraftScheduleAction}>
                 <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
                 <input type="hidden" name="view" value={viewMode} />
                 <input type="hidden" name="show_unavailable" value={showUnavailable ? 'true' : 'false'} />
-                <button
+                <FormMenuSubmitButton
                   type="submit"
                   className={`${menuActionClass} text-[var(--warning-text)]`}
                   disabled={!hasActiveCycle || activeCyclePublished}
+                  pendingText="Clearing..."
                 >
                   Clear draft and start over
-                </button>
+                </FormMenuSubmitButton>
               </form>
             )}
             <PrintMenuItem />
           </MoreActionsMenu>
+
+          {role === 'manager' && autoGenerateHelperMessage && (
+            <p className="w-full text-xs text-muted-foreground">{autoGenerateHelperMessage}</p>
+          )}
         </div>
       </div>
 
@@ -139,7 +175,7 @@ export function ScheduleHeader({
         <Link href={buildScheduleUrl(activeCycleId, 'list')} className={tabClass(viewMode === 'list')}>
           List
         </Link>
-        {role === 'manager' ? (
+        {canViewMonth ? (
           <Link href={buildScheduleUrl(activeCycleId, 'calendar')} className={tabClass(viewMode === 'calendar')}>
             Month
           </Link>
@@ -147,6 +183,84 @@ export function ScheduleHeader({
           <span className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground/70">Month</span>
         )}
       </nav>
+
+      <Dialog
+        open={publishDialogOpen}
+        onOpenChange={(open) => {
+          setPublishDialogOpen(open)
+          if (!open) setPublishConfirmationText('')
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Confirm publish</DialogTitle>
+            <DialogDescription>Review this summary before publishing the cycle.</DialogDescription>
+          </DialogHeader>
+
+          {publishSummary ? (
+            <div className="space-y-3 text-sm">
+              <div className="rounded-md border border-border bg-secondary/30 p-3">
+                <p className="font-medium text-foreground">{publishSummary.cycleLabel}</p>
+                <p className="text-xs text-muted-foreground">
+                  {publishSummary.startDate} to {publishSummary.endDate}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <p className="text-muted-foreground">Total scheduled shifts: <span className="font-medium text-foreground">{publishSummary.totalScheduledShifts}</span></p>
+                <p className="text-muted-foreground">Day shifts: <span className="font-medium text-foreground">{publishSummary.dayShifts}</span></p>
+                <p className="text-muted-foreground">Night shifts: <span className="font-medium text-foreground">{publishSummary.nightShifts}</span></p>
+              </div>
+
+              <div className="rounded-md border border-border p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Remaining warnings</p>
+                <p className="mt-1 text-muted-foreground">Missing leads: <span className="font-medium text-foreground">{publishSummary.missingLead}</span></p>
+                <p className="text-muted-foreground">Under coverage: <span className="font-medium text-foreground">{publishSummary.underCoverage}</span></p>
+                <p className="text-muted-foreground">Over coverage: <span className="font-medium text-foreground">{publishSummary.overCoverage}</span></p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Cycle summary unavailable.</p>
+          )}
+
+          <form action={toggleCyclePublishedAction} className="space-y-3">
+            <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+            <input type="hidden" name="view" value={viewMode} />
+            <input type="hidden" name="show_unavailable" value={showUnavailable ? 'true' : 'false'} />
+            <input type="hidden" name="currently_published" value="false" />
+            <input type="hidden" name="override_weekly_rules" value="false" />
+
+            <div className="space-y-1">
+              <label htmlFor="publish-confirmation" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Type PUBLISH to confirm
+              </label>
+              <Input
+                id="publish-confirmation"
+                value={publishConfirmationText}
+                onChange={(event) => setPublishConfirmationText(event.target.value)}
+                placeholder="PUBLISH"
+              />
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <FormSubmitButton
+                type="button"
+                variant="outline"
+                onClick={() => setPublishDialogOpen(false)}
+              >
+                Cancel
+              </FormSubmitButton>
+              <FormSubmitButton
+                type="submit"
+                disabled={!publishConfirmEnabled}
+                pendingText="Publishing..."
+              >
+                Confirm publish cycle
+              </FormSubmitButton>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

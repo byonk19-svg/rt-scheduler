@@ -2,10 +2,16 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 import { FeedbackToast } from '@/components/feedback-toast'
+import { FormSubmitButton } from '@/components/form-submit-button'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  EMPLOYEE_META_BADGE_CLASS,
+  LEAD_ELIGIBLE_BADGE_CLASS,
+  MANAGER_ROLE_BADGE_CLASS,
+} from '@/lib/employee-tag-badges'
 import { createClient } from '@/lib/supabase/server'
+import { cn } from '@/lib/utils'
 
 type ProfileSearchParams = {
   success?: string | string[]
@@ -46,9 +52,15 @@ function getFeedback(searchParams?: ProfileSearchParams): { message: string; var
   if (success === 'preferred_days_saved') {
     return { message: 'Preferred work days saved.', variant: 'success' }
   }
+  if (success === 'preferences_saved') {
+    return { message: 'Preferences saved.', variant: 'success' }
+  }
 
   if (error === 'preferred_days_failed') {
     return { message: 'Could not save preferred work days. Please try again.', variant: 'error' }
+  }
+  if (error === 'preferences_failed') {
+    return { message: 'Could not save preferences. Please try again.', variant: 'error' }
   }
 
   return null
@@ -85,6 +97,48 @@ async function savePreferredWorkDaysAction(formData: FormData) {
   redirect('/profile?success=preferred_days_saved')
 }
 
+async function savePreferencesAction(formData: FormData) {
+  'use server'
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  const defaultCalendarView = String(formData.get('default_calendar_view') ?? '').trim()
+  const defaultLandingPage = String(formData.get('default_landing_page') ?? '').trim()
+
+  if (
+    (defaultCalendarView !== 'day' && defaultCalendarView !== 'night') ||
+    (defaultLandingPage !== 'dashboard' && defaultLandingPage !== 'coverage')
+  ) {
+    redirect('/profile?error=preferences_failed')
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      default_calendar_view: defaultCalendarView,
+      default_landing_page: defaultLandingPage,
+    })
+    .eq('id', user.id)
+
+  if (error) {
+    console.error('Failed to update profile preferences:', error)
+    redirect('/profile?error=preferences_failed')
+  }
+
+  revalidatePath('/profile')
+  revalidatePath('/dashboard')
+  revalidatePath('/schedule')
+  revalidatePath('/coverage')
+  redirect('/profile?success=preferences_saved')
+}
+
 export default async function ProfilePage({
   searchParams,
 }: {
@@ -105,7 +159,7 @@ export default async function ProfilePage({
   const { data: profile } = await supabase
     .from('profiles')
     .select(
-      'full_name, email, role, shift_type, is_lead_eligible, employment_type, max_work_days_per_week, preferred_work_days'
+      'full_name, email, role, shift_type, is_lead_eligible, employment_type, max_work_days_per_week, preferred_work_days, default_calendar_view, default_landing_page'
     )
     .eq('id', user.id)
     .maybeSingle()
@@ -127,6 +181,8 @@ export default async function ProfilePage({
   const preferredDayLabels = WEEKDAY_OPTIONS.filter((option) => preferredWorkDays.includes(option.value)).map(
     (option) => option.label
   )
+  const defaultCalendarView = profile?.default_calendar_view === 'night' ? 'night' : 'day'
+  const defaultLandingPage = profile?.default_landing_page === 'coverage' ? 'coverage' : 'dashboard'
 
   return (
     <div className="space-y-6">
@@ -135,6 +191,11 @@ export default async function ProfilePage({
       <div>
         <h1 className="text-3xl font-bold text-foreground">Profile</h1>
         <p className="text-muted-foreground">Your account details and role configuration.</p>
+        {feedback?.variant === 'error' && (
+          <p className="mt-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]">
+            {feedback.message}
+          </p>
+        )}
       </div>
 
       <Card>
@@ -147,20 +208,64 @@ export default async function ProfilePage({
             <p className="font-medium text-foreground">{email}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Badge className="capitalize">{role}</Badge>
-            <Badge variant="outline" className="capitalize">
+            <Badge className={role === 'manager' ? cn('capitalize', MANAGER_ROLE_BADGE_CLASS) : 'capitalize'}>
+              {role}
+            </Badge>
+            <Badge variant="outline" className={cn('capitalize', EMPLOYEE_META_BADGE_CLASS)}>
               {shiftType} shift
             </Badge>
-            <Badge variant="outline" className="capitalize">
+            <Badge variant="outline" className={cn('capitalize', EMPLOYEE_META_BADGE_CLASS)}>
               {employmentType.replace('_', ' ')}
             </Badge>
             {role === 'therapist' && (
-              <Badge variant={profile?.is_lead_eligible ? 'default' : 'outline'}>
+              <Badge variant={profile?.is_lead_eligible ? 'default' : 'outline'} className={profile?.is_lead_eligible ? LEAD_ELIGIBLE_BADGE_CLASS : undefined}>
                 {profile?.is_lead_eligible ? 'Lead eligible' : 'Staff only'}
               </Badge>
             )}
             {role === 'therapist' && <Badge variant="outline">Max {weeklyLimit}/week</Badge>}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Preferences</CardTitle>
+          <CardDescription>Set your default calendar view and where you land after sign-in.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form action={savePreferencesAction} className="space-y-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label htmlFor="default_calendar_view" className="text-sm font-medium text-foreground">
+                  Default calendar view
+                </label>
+                <select
+                  id="default_calendar_view"
+                  name="default_calendar_view"
+                  defaultValue={defaultCalendarView}
+                  className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                >
+                  <option value="day">Day</option>
+                  <option value="night">Night</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="default_landing_page" className="text-sm font-medium text-foreground">
+                  Default landing page
+                </label>
+                <select
+                  id="default_landing_page"
+                  name="default_landing_page"
+                  defaultValue={defaultLandingPage}
+                  className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                >
+                  <option value="dashboard">Dashboard</option>
+                  <option value="coverage">Coverage</option>
+                </select>
+              </div>
+            </div>
+            <FormSubmitButton type="submit" pendingText="Saving...">Save preferences</FormSubmitButton>
+          </form>
         </CardContent>
       </Card>
 
@@ -192,7 +297,7 @@ export default async function ProfilePage({
                 ))}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Button type="submit">Save preferred days</Button>
+                <FormSubmitButton type="submit" pendingText="Saving...">Save preferred days</FormSubmitButton>
                 <p className="text-xs text-muted-foreground">
                   Current: {preferredDayLabels.length > 0 ? preferredDayLabels.join(', ') : 'No preference'}
                 </p>

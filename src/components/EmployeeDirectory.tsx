@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-react'
 
 import {
   filterEmployeeDirectoryRecords,
@@ -10,10 +11,12 @@ import {
   type EmployeeDirectoryRecord,
   type EmployeeDirectoryTab,
 } from '@/lib/employee-directory'
+import { EMPLOYEE_META_BADGE_CLASS, LEAD_ELIGIBLE_BADGE_CLASS } from '@/lib/employee-tag-badges'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { FormSubmitButton } from '@/components/form-submit-button'
 import {
   Dialog,
   DialogContent,
@@ -32,6 +35,10 @@ type EmployeeDirectoryProps = {
   setEmployeeActiveAction: (formData: FormData) => void | Promise<void>
 }
 
+type DirectorySortKey = 'employee' | 'shift' | 'type' | 'tags'
+type SortDirection = 'asc' | 'desc'
+type SortColumnLabel = 'Employee' | 'Shift/Team' | 'Type' | 'Tags'
+
 const TABS: Array<{ value: EmployeeDirectoryTab; label: string }> = [
   { value: 'all', label: 'All' },
   { value: 'day', label: 'Day' },
@@ -46,9 +53,50 @@ function employmentLabel(value: EmployeeDirectoryRecord['employment_type']): str
 
 function ShiftBadge({ shiftType }: { shiftType: EmployeeDirectoryRecord['shift_type'] }) {
   return (
-    <Badge variant="outline" className={cn('capitalize', shiftType === 'day' ? 'text-sky-700' : 'text-indigo-700')}>
+    <Badge variant="outline" className={cn('capitalize', EMPLOYEE_META_BADGE_CLASS)}>
       {shiftType}
     </Badge>
+  )
+}
+
+function SortHeaderButton({
+  label,
+  column,
+  sortKey,
+  sortDirection,
+  onSort,
+}: {
+  label: SortColumnLabel
+  column: DirectorySortKey
+  sortKey: DirectorySortKey
+  sortDirection: SortDirection
+  onSort: (key: DirectorySortKey) => void
+}) {
+  const isActive = sortKey === column
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-semibold transition-colors',
+        isActive
+          ? 'bg-secondary text-foreground shadow-[inset_0_0_0_1px_var(--border)]'
+          : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+      )}
+      onClick={() => onSort(column)}
+      aria-label={`Sort by ${label} ${isActive ? `(currently ${sortDirection})` : ''}`}
+    >
+      <span>{label}</span>
+      {isActive ? (
+        sortDirection === 'asc' ? (
+          <ChevronUp className="h-3.5 w-3.5 text-primary" />
+        ) : (
+          <ChevronDown className="h-3.5 w-3.5 text-primary" />
+        )
+      ) : (
+        <ArrowUpDown className="h-3.5 w-3.5 opacity-60" />
+      )}
+    </button>
   )
 }
 
@@ -94,12 +142,15 @@ function EmployeeActionsMenu({
           <form action={setEmployeeActiveAction}>
             <input type="hidden" name="profile_id" value={employee.id} />
             <input type="hidden" name="set_active" value="true" />
-            <button
+            <FormSubmitButton
               type="submit"
-              className="block w-full rounded px-2 py-1.5 text-left text-sm text-[var(--success-text)] hover:bg-secondary"
+              variant="ghost"
+              size="sm"
+              pendingText="Reactivating..."
+              className="block w-full justify-start rounded px-2 py-1.5 text-left text-sm text-[var(--success-text)] hover:bg-secondary"
             >
               Reactivate
-            </button>
+            </FormSubmitButton>
           </form>
         )}
         <div className="my-1 h-px bg-border" />
@@ -115,6 +166,8 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
   const [leadOnly, setLeadOnly] = useState(false)
   const [fmlaOnly, setFmlaOnly] = useState(false)
   const [includeInactive, setIncludeInactive] = useState(false)
+  const [sortKey, setSortKey] = useState<DirectorySortKey>('employee')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [editState, setEditState] = useState<{ employeeId: string; onFmla: boolean } | null>(null)
   const [deactivateEmployeeId, setDeactivateEmployeeId] = useState<string | null>(null)
 
@@ -129,6 +182,45 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
       }),
     [employees, tab, searchText, leadOnly, fmlaOnly, includeInactive]
   )
+
+  const sortedEmployees = useMemo(() => {
+    const direction = sortDirection === 'asc' ? 1 : -1
+    const shiftRank = (value: EmployeeDirectoryRecord['shift_type']) => (value === 'day' ? 0 : 1)
+    const typeRank = (value: EmployeeDirectoryRecord['employment_type']) => {
+      if (value === 'full_time') return 0
+      if (value === 'part_time') return 1
+      return 2
+    }
+    const tagsRank = (employee: EmployeeDirectoryRecord) => {
+      const hasLead = employee.is_lead_eligible ? 1 : 0
+      const hasFmla = employee.on_fmla ? 1 : 0
+      const isInactive = employee.is_active ? 0 : 1
+      return hasLead * 4 + hasFmla * 2 + isInactive
+    }
+
+    return filteredEmployees.slice().sort((a, b) => {
+      let result = 0
+      if (sortKey === 'employee') {
+        result = a.full_name.localeCompare(b.full_name) || a.email.localeCompare(b.email)
+      } else if (sortKey === 'shift') {
+        result = shiftRank(a.shift_type) - shiftRank(b.shift_type) || a.full_name.localeCompare(b.full_name)
+      } else if (sortKey === 'type') {
+        result = typeRank(a.employment_type) - typeRank(b.employment_type) || a.full_name.localeCompare(b.full_name)
+      } else {
+        result = tagsRank(a) - tagsRank(b) || a.full_name.localeCompare(b.full_name)
+      }
+      return result * direction
+    })
+  }, [filteredEmployees, sortDirection, sortKey])
+
+  function handleSort(nextKey: DirectorySortKey) {
+    if (sortKey === nextKey) {
+      setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setSortKey(nextKey)
+    setSortDirection('asc')
+  }
 
   const editEmployee = useMemo(
     () => employees.find((employee) => employee.id === editState?.employeeId) ?? null,
@@ -190,28 +282,60 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground">{filteredEmployees.length} employee(s)</p>
+        <p className="text-xs text-muted-foreground">{sortedEmployees.length} employee(s)</p>
 
         <div className="hidden rounded-md border border-border md:block">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Employee</TableHead>
-                <TableHead>Shift/Team</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Tags</TableHead>
+                <TableHead>
+                  <SortHeaderButton
+                    label="Employee"
+                    column="employee"
+                    sortKey={sortKey}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                </TableHead>
+                <TableHead>
+                  <SortHeaderButton
+                    label="Shift/Team"
+                    column="shift"
+                    sortKey={sortKey}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                </TableHead>
+                <TableHead>
+                  <SortHeaderButton
+                    label="Type"
+                    column="type"
+                    sortKey={sortKey}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                </TableHead>
+                <TableHead>
+                  <SortHeaderButton
+                    label="Tags"
+                    column="tags"
+                    sortKey={sortKey}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                </TableHead>
                 <TableHead className="w-[64px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredEmployees.length === 0 ? (
+              {sortedEmployees.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
                     No employees match the current filters.
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredEmployees.map((employee) => (
+                sortedEmployees.map((employee) => (
                   <TableRow
                     key={employee.id}
                     onClick={() => setEditState({ employeeId: employee.id, onFmla: employee.on_fmla })}
@@ -225,13 +349,17 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
                       <ShiftBadge shiftType={employee.shift_type} />
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{employmentLabel(employee.employment_type)}</Badge>
+                      <Badge variant="outline" className={EMPLOYEE_META_BADGE_CLASS}>
+                        {employmentLabel(employee.employment_type)}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       {employee.is_lead_eligible || employee.on_fmla || (includeInactive && !employee.is_active) ? (
                         <div className="space-y-1">
                           <div className="flex flex-wrap gap-1.5">
-                            {employee.is_lead_eligible && <Badge>Lead eligible</Badge>}
+                            {employee.is_lead_eligible && (
+                              <Badge className={LEAD_ELIGIBLE_BADGE_CLASS}>Lead eligible</Badge>
+                            )}
                             {employee.on_fmla && (
                               <Badge
                                 variant="outline"
@@ -270,10 +398,10 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
         </div>
 
         <div className="space-y-3 md:hidden">
-          {filteredEmployees.length === 0 ? (
+          {sortedEmployees.length === 0 ? (
             <p className="rounded-md border border-border p-3 text-sm text-muted-foreground">No employees match the current filters.</p>
           ) : (
-            filteredEmployees.map((employee) => (
+            sortedEmployees.map((employee) => (
               <div
                 key={employee.id}
                 className="rounded-md border border-border p-3"
@@ -294,8 +422,10 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
 
                 <div className="mt-2 flex flex-wrap gap-2">
                   <ShiftBadge shiftType={employee.shift_type} />
-                  <Badge variant="outline">{employmentLabel(employee.employment_type)}</Badge>
-                  {employee.is_lead_eligible && <Badge>Lead eligible</Badge>}
+                  <Badge variant="outline" className={EMPLOYEE_META_BADGE_CLASS}>
+                    {employmentLabel(employee.employment_type)}
+                  </Badge>
+                  {employee.is_lead_eligible && <Badge className={LEAD_ELIGIBLE_BADGE_CLASS}>Lead eligible</Badge>}
                   {includeInactive && !employee.is_active && <Badge variant="outline">Inactive</Badge>}
                   {employee.on_fmla && <Badge variant="outline">FMLA</Badge>}
                 </div>
@@ -426,10 +556,10 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
               )}
 
               <DialogFooter>
-                <Button type="submit">Save</Button>
-                <Button type="submit" variant="outline" name="realign_future_shifts" value="true">
+                <FormSubmitButton type="submit" pendingText="Saving...">Save</FormSubmitButton>
+                <FormSubmitButton type="submit" variant="outline" name="realign_future_shifts" value="true" pendingText="Saving...">
                   Save + realign shifts
-                </Button>
+                </FormSubmitButton>
               </DialogFooter>
             </form>
           )}
@@ -454,9 +584,9 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
                 <Button type="button" variant="outline" onClick={() => setDeactivateEmployeeId(null)}>
                   Cancel
                 </Button>
-                <Button type="submit" variant="destructive">
+                <FormSubmitButton type="submit" variant="destructive" pendingText="Deactivating...">
                   Deactivate
-                </Button>
+                </FormSubmitButton>
               </DialogFooter>
             </form>
           )}
@@ -465,4 +595,3 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
     </Card>
   )
 }
-

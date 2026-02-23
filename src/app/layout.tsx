@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { AppShell, type AppShellUser } from "@/components/AppShell";
+import { AppShell, type AppShellPublishCta, type AppShellUser } from "@/components/AppShell";
+import { getManagerAttentionSnapshot } from "@/lib/manager-workflow";
 import { createClient } from "@/lib/supabase/server";
 import "./globals.css";
 
@@ -19,6 +20,7 @@ export default async function RootLayout({
   } = await supabase.auth.getUser();
 
   let appShellUser: AppShellUser | null = null;
+  let appShellPublishCta: AppShellPublishCta | null = null;
 
   if (user) {
     const { data: profile } = await supabase
@@ -35,12 +37,24 @@ export default async function RootLayout({
         "Team member",
       role: profile?.role === "manager" ? "manager" : "therapist",
     };
+
+    if (profile?.role === "manager") {
+      const attention = await getManagerAttentionSnapshot(supabase);
+      if (attention.publishReady) {
+        appShellPublishCta = {
+          href: attention.links.publish,
+          label: "Publish cycle",
+        };
+      }
+    }
   }
 
   return (
     <html lang="en">
       <body className="antialiased">
-        <AppShell user={appShellUser}>{children}</AppShell>
+        <AppShell user={appShellUser} publishCta={appShellPublishCta}>
+          {children}
+        </AppShell>
       </body>
     </html>
   );

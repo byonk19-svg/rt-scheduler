@@ -2,12 +2,15 @@
 
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { Menu, ChevronDown } from 'lucide-react'
+import { Menu, ChevronDown, Loader2 } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 
 import { TeamwiseLogo } from '@/components/teamwise-logo'
+import { NotificationBell } from '@/components/NotificationBell'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { MANAGER_ROLE_BADGE_CLASS } from '@/lib/employee-tag-badges'
+import { cn } from '@/lib/utils'
 import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 
 export type AppShellUser = {
@@ -15,8 +18,14 @@ export type AppShellUser = {
   role: 'manager' | 'therapist'
 }
 
+export type AppShellPublishCta = {
+  href: string
+  label: string
+}
+
 type AppShellProps = {
   user: AppShellUser | null
+  publishCta?: AppShellPublishCta | null
   children: ReactNode
 }
 
@@ -30,7 +39,7 @@ type NavItem = {
 
 const STAFF_NAV_ITEMS: readonly NavItem[] = [
   { href: '/dashboard/staff', label: 'Dashboard' },
-  { href: '/schedule?view=grid', label: 'Schedule' },
+  { href: '/schedule?view=grid', label: 'My Schedule' },
   { href: '/availability', label: 'Requests' },
   { href: '/shift-board', label: 'Shift Board' },
 ]
@@ -47,14 +56,10 @@ const MANAGER_NAV_ITEMS: readonly NavItem[] = [
     label: 'Coverage',
     isActive: (pathname, searchParams) => pathname === '/schedule' && searchParams.get('view') === 'calendar',
   },
-  {
-    href: MANAGER_WORKFLOW_LINKS.publish,
-    label: 'Publish',
-    isActive: (pathname, searchParams) => pathname === '/schedule' && searchParams.get('view') !== 'calendar',
-  },
+  { href: MANAGER_WORKFLOW_LINKS.team, label: 'Team' },
 ]
 
-const SHELL_ROUTES = ['/dashboard', '/schedule', '/availability', '/shift-board', '/profile'] as const
+const SHELL_ROUTES = ['/dashboard', '/schedule', '/availability', '/shift-board', '/profile', '/directory'] as const
 
 function routeFromHref(href: string): string {
   return href.split('#')[0]?.split('?')[0] ?? href
@@ -83,11 +88,12 @@ function navLinkClass(isActive: boolean): string {
   return 'rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground'
 }
 
-export function AppShell({ user, children }: AppShellProps) {
+export function AppShell({ user, publishCta, children }: AppShellProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
 
   const shouldRenderShell = useMemo(() => Boolean(user) && usesAppShell(pathname), [pathname, user])
   const navItems = user?.role === 'manager' ? MANAGER_NAV_ITEMS : STAFF_NAV_ITEMS
@@ -121,6 +127,13 @@ export function AppShell({ user, children }: AppShellProps) {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
+            {user?.role === 'manager' && publishCta && (
+              <Button asChild size="sm" className="hidden md:inline-flex">
+                <Link href={publishCta.href}>{publishCta.label}</Link>
+              </Button>
+            )}
+            <NotificationBell />
+
             <div className="relative">
               <button
                 type="button"
@@ -131,7 +144,13 @@ export function AppShell({ user, children }: AppShellProps) {
                 aria-label="Open user menu"
               >
                 <span className="max-w-[9rem] truncate font-medium">{user?.fullName}</span>
-                <Badge variant="outline" className="hidden capitalize sm:inline-flex">
+                <Badge
+                  variant={user?.role === 'manager' ? 'default' : 'outline'}
+                  className={cn(
+                    'hidden capitalize sm:inline-flex',
+                    user?.role === 'manager' ? MANAGER_ROLE_BADGE_CLASS : undefined
+                  )}
+                >
                   {user?.role}
                 </Badge>
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -142,12 +161,14 @@ export function AppShell({ user, children }: AppShellProps) {
                   <Link href="/profile" className="block rounded-sm px-3 py-2 text-sm hover:bg-secondary">
                     Profile
                   </Link>
-                  <form action="/auth/signout" method="post">
+                  <form action="/auth/signout" method="post" onSubmit={() => setSigningOut(true)}>
                     <button
                       type="submit"
-                      className="block w-full rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
+                      disabled={signingOut}
+                      className="inline-flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary disabled:opacity-60"
                     >
-                      Sign out
+                      {signingOut && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                      {signingOut ? 'Signing out...' : 'Sign out'}
                     </button>
                   </form>
                 </div>
@@ -172,6 +193,11 @@ export function AppShell({ user, children }: AppShellProps) {
         {mobileMenuOpen && (
           <div id="app-shell-mobile-nav" className="border-t border-border md:hidden">
             <nav className="mx-auto flex w-full max-w-6xl flex-col gap-1 px-4 py-3">
+              {user?.role === 'manager' && publishCta && (
+                <Link href={publishCta.href} className="mb-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">
+                  {publishCta.label}
+                </Link>
+              )}
               {navItems.map((item) => {
                 const active = isNavItemActive(pathname, searchParams, item)
                 return (

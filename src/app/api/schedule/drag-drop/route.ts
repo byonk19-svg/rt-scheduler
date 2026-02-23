@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
 
 import { createClient } from '@/lib/supabase/server'
+import { setDesignatedLeadMutation } from '@/lib/set-designated-lead'
 import { exceedsCoverageLimit, exceedsWeeklyLimit } from '@/lib/schedule-rule-validation'
+import { notifyUsers } from '@/lib/notifications'
+import { writeAuditLog } from '@/lib/audit-log'
 import {
   MAX_WORK_DAYS_PER_WEEK,
   MAX_SHIFT_COVERAGE_PER_DAY,
@@ -216,14 +219,18 @@ export async function POST(request: Request) {
       }
     }
 
-    const { error } = await supabase.from('shifts').insert({
-      cycle_id: payload.cycleId,
-      user_id: payload.userId,
-      date: payload.date,
-      shift_type: payload.shiftType,
-      status: 'scheduled',
-      role: 'staff',
-    })
+    const { data: insertedShift, error } = await supabase
+      .from('shifts')
+      .insert({
+        cycle_id: payload.cycleId,
+        user_id: payload.userId,
+        date: payload.date,
+        shift_type: payload.shiftType,
+        status: 'scheduled',
+        role: 'staff',
+      })
+      .select('id')
+      .single()
 
     if (error) {
       if (error?.code === '23505') {
@@ -231,6 +238,24 @@ export async function POST(request: Request) {
       }
       return NextResponse.json({ error: 'Could not create shift' }, { status: 500 })
     }
+
+    if (insertedShift?.id) {
+      await writeAuditLog(supabase, {
+        userId: user.id,
+        action: 'shift_added',
+        targetType: 'shift',
+        targetId: insertedShift.id,
+      })
+    }
+
+    await notifyUsers(supabase, {
+      userIds: [payload.userId],
+      eventType: 'shift_assigned',
+      title: 'New shift assigned',
+      message: `You were assigned a ${payload.shiftType} shift on ${payload.date}.`,
+      targetType: 'shift',
+      targetId: insertedShift?.id ?? `${payload.cycleId}:${payload.userId}:${payload.date}`,
+    })
 
     const undoAction: DragAction = {
       action: 'remove',
@@ -360,6 +385,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Could not remove shift' }, { status: 500 })
     }
 
+    await writeAuditLog(supabase, {
+      userId: user.id,
+      action: 'shift_removed',
+      targetType: 'shift',
+      targetId: shift.id,
+    })
+
     const undoAction: DragAction = {
       action: 'assign',
       cycleId: payload.cycleId,
@@ -478,6 +510,13 @@ export async function POST(request: Request) {
         { status: 500 }
       )
     }
+
+    await writeAuditLog(supabase, {
+      userId: user.id,
+      action: 'designated_lead_assigned',
+      targetType: 'shift_slot',
+      targetId: `${payload.cycleId}:${payload.date}:${payload.shiftType}`,
+    })
 
     return NextResponse.json({ message: 'Designated lead updated.' })
   }

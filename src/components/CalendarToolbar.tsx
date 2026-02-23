@@ -10,10 +10,20 @@ type CalendarToolbarProps = {
   rangeLabel: string
   minCoverage: number
   maxCoverage: number
-  issueFilter: 'all' | 'missing_lead' | 'under_coverage' | 'over_coverage'
+  issueFilter:
+    | 'all'
+    | 'missing_lead'
+    | 'under_coverage'
+    | 'over_coverage'
+    | 'ineligible_lead'
+    | 'multiple_leads'
   selectedShiftType: 'day' | 'night'
+  statusFilter: 'all' | 'any_non_scheduled' | 'call_in' | 'on_call' | 'cancelled' | 'left_early'
   overrideWeeklyRules: boolean
   onShiftTypeChange: (shiftType: 'day' | 'night') => void
+  onStatusFilterChange: (
+    value: 'all' | 'any_non_scheduled' | 'call_in' | 'on_call' | 'cancelled' | 'left_early'
+  ) => void
   onOverrideWeeklyRulesChange: (next: boolean) => void
 }
 
@@ -37,8 +47,10 @@ export function CalendarToolbar({
   maxCoverage,
   issueFilter,
   selectedShiftType,
+  statusFilter,
   overrideWeeklyRules,
   onShiftTypeChange,
+  onStatusFilterChange,
   onOverrideWeeklyRulesChange,
 }: CalendarToolbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -74,6 +86,10 @@ export function CalendarToolbar({
                 ? 'Under coverage'
                 : issueFilter === 'over_coverage'
                   ? 'Over coverage'
+                  : issueFilter === 'ineligible_lead'
+                    ? 'Ineligible lead'
+                    : issueFilter === 'multiple_leads'
+                      ? 'Multiple leads'
                   : 'All'}
           </span>
           <span className="text-xs font-medium text-muted-foreground">View:</span>
@@ -105,6 +121,66 @@ export function CalendarToolbar({
             />
             Override drag limits
           </label>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">Status:</span>
+          <Button
+            type="button"
+            size="sm"
+            variant={statusFilter === 'all' ? 'default' : 'outline'}
+            onClick={() => onStatusFilterChange('all')}
+          >
+            All
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={statusFilter === 'any_non_scheduled' ? 'default' : 'outline'}
+            onClick={() => onStatusFilterChange('any_non_scheduled')}
+          >
+            Any non-scheduled
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={statusFilter === 'call_in' ? 'default' : 'outline'}
+            onClick={() => onStatusFilterChange('call_in')}
+            title="Call in"
+            aria-label="Filter call in"
+          >
+            CI
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={statusFilter === 'on_call' ? 'default' : 'outline'}
+            onClick={() => onStatusFilterChange('on_call')}
+            title="On call"
+            aria-label="Filter on call"
+          >
+            OC
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={statusFilter === 'cancelled' ? 'default' : 'outline'}
+            onClick={() => onStatusFilterChange('cancelled')}
+            title="Cancelled"
+            aria-label="Filter cancelled"
+          >
+            CX
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={statusFilter === 'left_early' ? 'default' : 'outline'}
+            onClick={() => onStatusFilterChange('left_early')}
+            title="Left early"
+            aria-label="Filter left early"
+          >
+            LE
+          </Button>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

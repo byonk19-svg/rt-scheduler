@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Loader2 } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase/client'
 import { TeamwiseLogo } from '@/components/teamwise-logo'
@@ -44,7 +45,7 @@ export default function SignupPage() {
       return
     }
 
-    router.push('/dashboard')
+    router.push('/dashboard?success=access_requested')
     router.refresh()
   }
 
@@ -124,6 +125,7 @@ export default function SignupPage() {
                 </div>
                 {error && <p className="rounded-lg border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]">{error}</p>}
                 <Button type="submit" className="w-full" disabled={loading}>
+                  {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
                   {loading ? 'Creating account...' : 'Request Access'}
                 </Button>
                 <p className="text-center text-sm text-muted-foreground">

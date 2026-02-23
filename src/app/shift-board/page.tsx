@@ -2,13 +2,17 @@ import Link from 'next/link'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
+import { StaffShiftPostComposer } from '@/app/shift-board/staff-shift-post-composer'
 import { ShiftPostsTable, type ShiftPostTableRow } from '@/app/shift-board/shift-posts-table'
+import { AttentionBar } from '@/components/AttentionBar'
 import { EmptyState } from '@/components/EmptyState'
-import { ManagerAttentionPanel } from '@/components/ManagerAttentionPanel'
+import { FeedbackToast } from '@/components/feedback-toast'
+import { FormSubmitButton } from '@/components/form-submit-button'
 import { MoreActionsMenu } from '@/components/more-actions-menu'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { notifyUsers } from '@/lib/notifications'
 import { getManagerAttentionSnapshot } from '@/lib/manager-workflow'
 import { createClient } from '@/lib/supabase/server'
 
@@ -53,6 +57,50 @@ type ShiftDetails = {
     | null
 }
 
+type ShiftBoardSearchParams = {
+  success?: string | string[]
+  error?: string | string[]
+}
+
+function getSearchParam(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) return value[0]
+  return value
+}
+
+function buildShiftBoardUrl(params?: Record<string, string | undefined>): string {
+  const search = new URLSearchParams()
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (value) search.set(key, value)
+    }
+  }
+  const query = search.toString()
+  return query ? `/shift-board?${query}` : '/shift-board'
+}
+
+function getShiftBoardFeedback(params?: ShiftBoardSearchParams): {
+  message: string
+  variant: 'success' | 'error'
+} | null {
+  const success = getSearchParam(params?.success)
+  const error = getSearchParam(params?.error)
+
+  if (success === 'post_created') return { message: 'Shift post created.', variant: 'success' }
+  if (success === 'post_deleted') return { message: 'Shift post deleted.', variant: 'success' }
+  if (success === 'post_claimed') return { message: 'Shift claim submitted.', variant: 'success' }
+  if (success === 'post_unclaimed') return { message: 'Shift claim removed.', variant: 'success' }
+  if (success === 'post_status_updated') return { message: 'Shift post status updated.', variant: 'success' }
+
+  if (error === 'post_invalid') return { message: 'Please complete all required shift post fields.', variant: 'error' }
+  if (error === 'post_create_failed') return { message: 'Could not create shift post.', variant: 'error' }
+  if (error === 'post_delete_failed') return { message: 'Could not delete shift post.', variant: 'error' }
+  if (error === 'post_claim_failed') return { message: 'Could not claim this shift post.', variant: 'error' }
+  if (error === 'post_unclaim_failed') return { message: 'Could not unclaim this shift post.', variant: 'error' }
+  if (error === 'post_update_failed') return { message: 'Could not update shift post status.', variant: 'error' }
+
+  return null
+}
+
 function getOne<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null
   return value ?? null
@@ -89,9 +137,11 @@ async function createShiftPostAction(formData: FormData) {
   const type = String(formData.get('type') ?? '').trim() as PostType
   const message = String(formData.get('message') ?? '').trim()
 
-  if (!shiftId || !message || (type !== 'swap' && type !== 'pickup')) {
-    redirect('/shift-board')
+  if (!shiftId || (type !== 'swap' && type !== 'pickup')) {
+    redirect(buildShiftBoardUrl({ error: 'post_invalid' }))
   }
+  const finalMessage =
+    message || (type === 'swap' ? 'Requesting a swap for this shift.' : 'Requesting pickup coverage for this shift.')
 
   const { data: shift } = await supabase
     .from('shifts')
@@ -100,26 +150,27 @@ async function createShiftPostAction(formData: FormData) {
     .maybeSingle()
 
   if (!shift) {
-    redirect('/shift-board')
+    redirect(buildShiftBoardUrl({ error: 'post_create_failed' }))
   }
 
   if (role !== 'manager' && shift.user_id !== user.id) {
-    redirect('/shift-board')
+    redirect(buildShiftBoardUrl({ error: 'post_create_failed' }))
   }
 
   const { error } = await supabase.from('shift_posts').insert({
     shift_id: shiftId,
     posted_by: user.id,
-    message,
+    message: finalMessage,
     type,
   })
 
   if (error) {
     console.error('Failed to create shift post:', error)
+    redirect(buildShiftBoardUrl({ error: 'post_create_failed' }))
   }
 
   revalidatePath('/shift-board')
-  redirect('/shift-board')
+  redirect(buildShiftBoardUrl({ success: 'post_created' }))
 }
 
 async function deleteShiftPostAction(formData: FormData) {
@@ -129,17 +180,18 @@ async function deleteShiftPostAction(formData: FormData) {
   const postId = String(formData.get('post_id') ?? '').trim()
 
   if (!postId) {
-    redirect('/shift-board')
+    redirect(buildShiftBoardUrl({ error: 'post_delete_failed' }))
   }
 
   const { error } = await supabase.from('shift_posts').delete().eq('id', postId).eq('posted_by', user.id)
 
   if (error) {
     console.error('Failed to delete shift post:', error)
+    redirect(buildShiftBoardUrl({ error: 'post_delete_failed' }))
   }
 
   revalidatePath('/shift-board')
-  redirect('/shift-board')
+  redirect(buildShiftBoardUrl({ success: 'post_deleted' }))
 }
 
 async function claimShiftPostAction(formData: FormData) {
@@ -150,7 +202,7 @@ async function claimShiftPostAction(formData: FormData) {
   const postId = String(formData.get('post_id') ?? '').trim()
   const swapShiftId = String(formData.get('swap_shift_id') ?? '').trim() || null
 
-  if (!postId) redirect('/shift-board')
+  if (!postId) redirect(buildShiftBoardUrl({ error: 'post_claim_failed' }))
 
   const { data: post } = await supabase
     .from('shift_posts')
@@ -160,18 +212,18 @@ async function claimShiftPostAction(formData: FormData) {
 
   // Only pending, unclaimed posts that the user didn't create can be claimed
   if (!post || post.status !== 'pending' || post.claimed_by || post.posted_by === user.id) {
-    redirect('/shift-board')
+    redirect(buildShiftBoardUrl({ error: 'post_claim_failed' }))
   }
 
   // Swap claims require the claimer to nominate one of their own shifts
   if (post.type === 'swap') {
-    if (!swapShiftId) redirect('/shift-board')
+    if (!swapShiftId) redirect(buildShiftBoardUrl({ error: 'post_claim_failed' }))
     const { data: swapShift } = await supabase
       .from('shifts')
       .select('id, user_id')
       .eq('id', swapShiftId)
       .maybeSingle()
-    if (!swapShift || swapShift.user_id !== user.id) redirect('/shift-board')
+    if (!swapShift || swapShift.user_id !== user.id) redirect(buildShiftBoardUrl({ error: 'post_claim_failed' }))
   }
 
   const { error } = await supabase
@@ -179,10 +231,13 @@ async function claimShiftPostAction(formData: FormData) {
     .update({ claimed_by: user.id, swap_shift_id: swapShiftId })
     .eq('id', postId)
 
-  if (error) console.error('Failed to claim shift post:', error)
+  if (error) {
+    console.error('Failed to claim shift post:', error)
+    redirect(buildShiftBoardUrl({ error: 'post_claim_failed' }))
+  }
 
   revalidatePath('/shift-board')
-  redirect('/shift-board')
+  redirect(buildShiftBoardUrl({ success: 'post_claimed' }))
 }
 
 async function unclaimShiftPostAction(formData: FormData) {
@@ -191,7 +246,7 @@ async function unclaimShiftPostAction(formData: FormData) {
   const { supabase, user } = await getAuthContext()
   const postId = String(formData.get('post_id') ?? '').trim()
 
-  if (!postId) redirect('/shift-board')
+  if (!postId) redirect(buildShiftBoardUrl({ error: 'post_unclaim_failed' }))
 
   // Only the claimer can unclaim, and only while still pending
   const { data: post } = await supabase
@@ -201,7 +256,7 @@ async function unclaimShiftPostAction(formData: FormData) {
     .maybeSingle()
 
   if (!post || post.claimed_by !== user.id || post.status !== 'pending') {
-    redirect('/shift-board')
+    redirect(buildShiftBoardUrl({ error: 'post_unclaim_failed' }))
   }
 
   const { error } = await supabase
@@ -209,10 +264,13 @@ async function unclaimShiftPostAction(formData: FormData) {
     .update({ claimed_by: null, swap_shift_id: null })
     .eq('id', postId)
 
-  if (error) console.error('Failed to unclaim shift post:', error)
+  if (error) {
+    console.error('Failed to unclaim shift post:', error)
+    redirect(buildShiftBoardUrl({ error: 'post_unclaim_failed' }))
+  }
 
   revalidatePath('/shift-board')
-  redirect('/shift-board')
+  redirect(buildShiftBoardUrl({ success: 'post_unclaimed' }))
 }
 
 async function updateShiftPostStatusAction(formData: FormData) {
@@ -221,23 +279,27 @@ async function updateShiftPostStatusAction(formData: FormData) {
   const { supabase, role } = await getAuthContext()
 
   if (role !== 'manager') {
-    redirect('/shift-board')
+    redirect(buildShiftBoardUrl({ error: 'post_update_failed' }))
   }
 
   const postId = String(formData.get('post_id') ?? '').trim()
   const status = String(formData.get('status') ?? '').trim() as PostStatus
 
   if (!postId || (status !== 'pending' && status !== 'approved' && status !== 'denied')) {
-    redirect('/shift-board')
+    redirect(buildShiftBoardUrl({ error: 'post_update_failed' }))
+  }
+
+  const { data: post } = await supabase
+    .from('shift_posts')
+    .select('id, shift_id, posted_by, type, claimed_by, swap_shift_id')
+    .eq('id', postId)
+    .maybeSingle()
+
+  if (!post) {
+    redirect(buildShiftBoardUrl({ error: 'post_update_failed' }))
   }
 
   if (status === 'approved') {
-    const { data: post } = await supabase
-      .from('shift_posts')
-      .select('shift_id, type, claimed_by, swap_shift_id')
-      .eq('id', postId)
-      .maybeSingle()
-
     if (post?.claimed_by) {
       if (post.type === 'pickup') {
         // Transfer the shift to the claimer
@@ -248,7 +310,7 @@ async function updateShiftPostStatusAction(formData: FormData) {
 
         if (transferError) {
           console.error('Failed to transfer shift on pickup approval:', transferError)
-          redirect('/shift-board')
+          redirect(buildShiftBoardUrl({ error: 'post_update_failed' }))
         }
       } else if (post.type === 'swap' && post.swap_shift_id) {
         // Fetch both shifts to get current owners
@@ -266,7 +328,7 @@ async function updateShiftPostStatusAction(formData: FormData) {
 
         if (!originalShift || !offeredShift) {
           console.error('Could not load shifts for swap approval')
-          redirect('/shift-board')
+          redirect(buildShiftBoardUrl({ error: 'post_update_failed' }))
         }
 
         // Swap user_ids on both shifts
@@ -282,7 +344,7 @@ async function updateShiftPostStatusAction(formData: FormData) {
 
         if (e1 || e2) {
           console.error('Failed to swap shifts on approval:', e1 ?? e2)
-          redirect('/shift-board')
+          redirect(buildShiftBoardUrl({ error: 'post_update_failed' }))
         }
       }
     }
@@ -291,21 +353,51 @@ async function updateShiftPostStatusAction(formData: FormData) {
   const { error } = await supabase.from('shift_posts').update({ status }).eq('id', postId)
   if (error) {
     console.error('Failed to update shift post status:', error)
+    redirect(buildShiftBoardUrl({ error: 'post_update_failed' }))
   }
 
+  const notificationTitle = status === 'approved' ? 'Shift request approved' : 'Shift request denied'
+  const notificationMessage = status === 'approved'
+    ? 'Your shift board request was approved by a manager.'
+    : 'Your shift board request was denied by a manager.'
+
+  await notifyUsers(supabase, {
+    userIds: [post.posted_by, post.claimed_by ?? ''].filter(Boolean),
+    eventType: status === 'approved' ? 'shift_request_approved' : 'shift_request_denied',
+    title: notificationTitle,
+    message: notificationMessage,
+    targetType: 'shift_post',
+    targetId: postId,
+  })
+
   revalidatePath('/shift-board')
-  redirect('/shift-board')
+  redirect(buildShiftBoardUrl({ success: 'post_status_updated' }))
 }
 
-export default async function ShiftBoardPage() {
+export default async function ShiftBoardPage({
+  searchParams,
+}: {
+  searchParams?: Promise<ShiftBoardSearchParams>
+}) {
   const { supabase, user, role } = await getAuthContext()
+  const params = searchParams ? await searchParams : undefined
+  const feedback = getShiftBoardFeedback(params)
   const managerAttention = role === 'manager' ? await getManagerAttentionSnapshot(supabase) : null
-
-  const { data: shiftOptionsData } = await supabase
+  const today = new Date()
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  let shiftOptionsQuery = supabase
     .from('shifts')
     .select('id, date, shift_type, status, user_id, schedule_cycles(label, published)')
     .eq('user_id', user.id)
     .order('date', { ascending: true })
+
+  if (role === 'therapist') {
+    shiftOptionsQuery = shiftOptionsQuery
+      .gte('date', todayKey)
+      .in('status', ['scheduled', 'on_call'])
+  }
+
+  const { data: shiftOptionsData } = await shiftOptionsQuery
 
   const shiftOptions = (shiftOptionsData ?? []) as ShiftOption[]
 
@@ -353,6 +445,16 @@ export default async function ShiftBoardPage() {
     id: shift.id,
     label: `${formatDate(shift.date)} (${shift.shift_type})`,
   }))
+  const staffPostShifts = shiftOptions.map((shift) => {
+    const cycle = getOne(shift.schedule_cycles)
+    return {
+      id: shift.id,
+      date: shift.date,
+      shiftType: shift.shift_type,
+      status: shift.status,
+      cycleLabel: cycle ? cycle.label : 'No cycle',
+    } as const
+  })
   const postRows: ShiftPostTableRow[] = posts.map((post) => {
     const shift = shiftDetailsById.get(post.shift_id)
     const cycle = shift ? getOne(shift.schedule_cycles) : null
@@ -387,79 +489,85 @@ export default async function ShiftBoardPage() {
       canClaim,
     }
   })
-  const createPostCard = (
-    <Card id="create-post">
-      <CardHeader>
-        <CardTitle>Create Post</CardTitle>
-        <CardDescription>Choose one of your assigned shifts and post a request.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {shiftOptions.length === 0 ? (
-          <EmptyState
-            title="No shifts available to post yet"
-            description="Ask your manager to assign shifts, or view your schedule."
-            actions={
-              <Button asChild variant="outline" size="sm">
-                <Link href="/schedule">View my schedule</Link>
-              </Button>
-            }
-          />
-        ) : (
-          <form action={createShiftPostAction} className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="shift_id">Shift</Label>
-              <select
-                id="shift_id"
-                name="shift_id"
-                className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
-                defaultValue=""
-                required
-              >
-                <option value="" disabled>
-                  Select shift
-                </option>
-                {shiftOptions.map((shift) => {
-                  const cycle = getOne(shift.schedule_cycles)
-                  return (
-                    <option key={shift.id} value={shift.id}>
-                      {formatDate(shift.date)} - {shift.shift_type} - {shift.status}
-                      {cycle ? ` (${cycle.label}${cycle.published ? '' : ', draft'})` : ''}
-                    </option>
-                  )
-                })}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="type">Request Type</Label>
-              <select
-                id="type"
-                name="type"
-                className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
-                defaultValue="swap"
-              >
-                <option value="swap">Swap</option>
-                <option value="pickup">Pickup</option>
-              </select>
-            </div>
-            <div className="space-y-2 md:col-span-3">
-              <Label htmlFor="message">Message</Label>
-              <textarea
-                id="message"
-                name="message"
-                rows={3}
-                required
-                className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm"
-                placeholder="Example: Need coverage for family event."
-              />
-            </div>
-            <div className="md:col-span-3">
-              <Button type="submit">Post to Shift Board</Button>
-            </div>
-          </form>
-        )}
-      </CardContent>
-    </Card>
-  )
+  const createPostCard =
+    role === 'manager' ? (
+      <Card id="create-post">
+        <CardHeader>
+          <CardTitle>Create Post</CardTitle>
+          <CardDescription>Choose one of your assigned shifts and post a request.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {shiftOptions.length === 0 ? (
+            <EmptyState
+              title="No shifts available to post yet"
+              description="Ask your manager to assign shifts, or view your schedule."
+              actions={
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/schedule">View my schedule</Link>
+                </Button>
+              }
+            />
+          ) : (
+            <form action={createShiftPostAction} className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="shift_id">Shift</Label>
+                <select
+                  id="shift_id"
+                  name="shift_id"
+                  className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                  defaultValue=""
+                  required
+                >
+                  <option value="" disabled>
+                    Select shift
+                  </option>
+                  {shiftOptions.map((shift) => {
+                    const cycle = getOne(shift.schedule_cycles)
+                    return (
+                      <option key={shift.id} value={shift.id}>
+                        {formatDate(shift.date)} - {shift.shift_type} - {shift.status}
+                        {cycle ? ` (${cycle.label}${cycle.published ? '' : ', draft'})` : ''}
+                      </option>
+                    )
+                  })}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="type">Request Type</Label>
+                <select
+                  id="type"
+                  name="type"
+                  className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                  defaultValue="swap"
+                >
+                  <option value="swap">Swap</option>
+                  <option value="pickup">Pickup</option>
+                </select>
+              </div>
+              <div className="space-y-2 md:col-span-3">
+                <Label htmlFor="message">Message</Label>
+                <textarea
+                  id="message"
+                  name="message"
+                  rows={3}
+                  required
+                  className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm"
+                  placeholder="Example: Need coverage for family event."
+                />
+              </div>
+              <div className="md:col-span-3">
+                <FormSubmitButton type="submit" pendingText="Posting...">Post to Shift Board</FormSubmitButton>
+              </div>
+            </form>
+          )}
+        </CardContent>
+      </Card>
+    ) : (
+      <StaffShiftPostComposer
+        shifts={staffPostShifts}
+        createShiftPostAction={createShiftPostAction}
+      />
+    )
   const openPostsCard = (
     <ShiftPostsTable
       role={role}
@@ -474,6 +582,8 @@ export default async function ShiftBoardPage() {
 
   return (
     <div className="space-y-6">
+      {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
+
       <div>
         <h1 className="app-page-title">Shift Board</h1>
         <p className="text-muted-foreground">
@@ -481,9 +591,16 @@ export default async function ShiftBoardPage() {
             ? 'Review and approve posted swap and pickup requests.'
             : 'Post swap or pickup requests for your shifts.'}
         </p>
+        {feedback?.variant === 'error' && (
+          <p className="mt-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]">
+            {feedback.message}
+          </p>
+        )}
       </div>
 
-      {role === 'manager' && managerAttention && <ManagerAttentionPanel snapshot={managerAttention} />}
+      {role === 'manager' && managerAttention && (
+        <AttentionBar snapshot={managerAttention} variant="compact" context="shiftboard" />
+      )}
 
       <div className="flex items-center gap-2">
         {role === 'manager' ? (
@@ -512,7 +629,12 @@ export default async function ShiftBoardPage() {
       {role === 'manager' ? (
         <>
           {openPostsCard}
-          {createPostCard}
+          <details className="rounded-md border border-border bg-card">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-muted-foreground">
+              Staff tools
+            </summary>
+            <div className="border-t border-border p-4">{createPostCard}</div>
+          </details>
         </>
       ) : (
         <>

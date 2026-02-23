@@ -10,6 +10,7 @@ import {
 } from '@/components/TableToolbar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { FormSubmitButton } from '@/components/form-submit-button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDate } from '@/lib/schedule-helpers'
@@ -250,9 +251,9 @@ export function AvailabilityRequestsTable({
                                 onClick={(event) => event.stopPropagation()}
                               >
                                 <input type="hidden" name="request_id" value={row.id} />
-                                <Button type="submit" variant="outline" size="sm">
+                                <FormSubmitButton type="submit" variant="outline" size="sm" pendingText="Deleting...">
                                   Delete request
-                                </Button>
+                                </FormSubmitButton>
                               </form>
                             ) : (
                               <span className="text-xs text-muted-foreground">No actions available.</span>

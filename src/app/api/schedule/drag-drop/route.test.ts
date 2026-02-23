@@ -2,14 +2,30 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { POST } from '@/app/api/schedule/drag-drop/route'
 import { createClient } from '@/lib/supabase/server'
+import { setDesignatedLeadMutation } from '@/lib/set-designated-lead'
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
 }))
 
+vi.mock('@/lib/set-designated-lead', () => ({
+  setDesignatedLeadMutation: vi.fn(),
+}))
+
 type Scenario = {
   coverageStatuses: Array<'scheduled' | 'on_call' | 'sick' | 'called_off'>
   weeklyShifts: Array<{ date: string; status: 'scheduled' | 'on_call' | 'sick' | 'called_off' }>
+  leadTherapistEligible?: boolean
+  leadTherapistRole?: 'therapist' | 'manager'
+  existingShiftForLead?: { id: string; status: 'scheduled' | 'on_call' | 'sick' | 'called_off' } | null
+  removableShift?: {
+    id: string
+    cycle_id: string
+    user_id: string
+    date: string
+    shift_type: 'day' | 'night'
+    role: 'lead' | 'staff'
+  } | null
 }
 
 function makeSupabaseMock(scenario: Scenario) {
@@ -35,6 +51,18 @@ function makeSupabaseMock(scenario: Scenario) {
         if (state.filters.id === 'manager-1') {
           return { data: { role: 'manager' }, error: null }
         }
+        if (state.filters.id === 'therapist-lead') {
+          return {
+            data: {
+              id: 'therapist-lead',
+              role: scenario.leadTherapistRole ?? 'therapist',
+              is_lead_eligible: scenario.leadTherapistEligible ?? true,
+              max_work_days_per_week: 3,
+              employment_type: 'full_time',
+            },
+            error: null,
+          }
+        }
         return { data: { max_work_days_per_week: 3, employment_type: 'full_time' }, error: null }
       }
 
@@ -47,12 +75,32 @@ function makeSupabaseMock(scenario: Scenario) {
           typeof state.filters.cycle_id === 'string' &&
           typeof state.filters.date === 'string' &&
           typeof state.filters.shift_type === 'string'
+        const hasUserIdFilter = typeof state.filters.user_id === 'string'
         const hasWeeklyFilters =
-          typeof state.filters.user_id === 'string' &&
+          hasUserIdFilter &&
           typeof state.filters['gte:date'] === 'string' &&
           typeof state.filters['lte:date'] === 'string'
 
-        if (hasCoverageFilters) {
+        if (single && state.filters.id === 'shift-1') {
+          return {
+            data:
+              scenario.removableShift ?? {
+                id: 'shift-1',
+                cycle_id: 'cycle-1',
+                user_id: 'therapist-1',
+                date: '2026-03-10',
+                shift_type: 'day',
+                role: 'staff',
+              },
+            error: null,
+          }
+        }
+
+        if (single && hasCoverageFilters && hasUserIdFilter) {
+          return { data: scenario.existingShiftForLead ?? null, error: null }
+        }
+
+        if (hasCoverageFilters && !hasUserIdFilter) {
           return {
             data: scenario.coverageStatuses.map((status, idx) => ({ id: `coverage-${idx}`, status })),
             error: null,
@@ -136,9 +184,10 @@ function makeSupabaseMock(scenario: Scenario) {
   return { auth, from }
 }
 
-describe('drag-drop API limit handling', () => {
+describe('drag-drop API behavior', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    vi.mocked(setDesignatedLeadMutation).mockResolvedValue({ ok: true })
   })
 
   it('returns 409 when assign would exceed daily coverage', async () => {
@@ -202,4 +251,150 @@ describe('drag-drop API limit handling', () => {
       error: 'Therapists are limited to 3 day(s) per week unless override is enabled.',
     })
   })
+
+  it('sets designated lead when therapist is eligible', async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      makeSupabaseMock({
+        coverageStatuses: ['scheduled', 'scheduled'],
+        weeklyShifts: [],
+        leadTherapistEligible: true,
+        existingShiftForLead: { id: 'shift-existing', status: 'scheduled' },
+      }) as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'set_lead',
+          cycleId: 'cycle-1',
+          therapistId: 'therapist-lead',
+          shiftType: 'day',
+          date: '2026-03-10',
+          overrideWeeklyRules: false,
+        }),
+      })
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      message: 'Designated lead updated.',
+    })
+    expect(setDesignatedLeadMutation).toHaveBeenCalledWith(expect.anything(), {
+      cycleId: 'cycle-1',
+      therapistId: 'therapist-lead',
+      date: '2026-03-10',
+      shiftType: 'day',
+    })
+  })
+
+  it('blocks designated lead when therapist is not eligible', async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      makeSupabaseMock({
+        coverageStatuses: ['scheduled'],
+        weeklyShifts: [],
+        leadTherapistEligible: false,
+      }) as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'set_lead',
+          cycleId: 'cycle-1',
+          therapistId: 'therapist-lead',
+          shiftType: 'day',
+          date: '2026-03-10',
+          overrideWeeklyRules: false,
+        }),
+      })
+    )
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Only lead-eligible therapists can be designated as lead.',
+    })
+    expect(setDesignatedLeadMutation).not.toHaveBeenCalled()
+  })
+
+  it('surfaces designated lead conflict from mutation', async () => {
+    vi.mocked(setDesignatedLeadMutation).mockResolvedValue({
+      ok: false,
+      reason: 'multiple_leads_prevented',
+    })
+    vi.mocked(createClient).mockResolvedValue(
+      makeSupabaseMock({
+        coverageStatuses: ['scheduled'],
+        weeklyShifts: [],
+        leadTherapistEligible: true,
+        existingShiftForLead: { id: 'shift-existing', status: 'scheduled' },
+      }) as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'set_lead',
+          cycleId: 'cycle-1',
+          therapistId: 'therapist-lead',
+          shiftType: 'day',
+          date: '2026-03-10',
+          overrideWeeklyRules: false,
+        }),
+      })
+    )
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'A designated lead already exists for that shift.',
+    })
+  })
+
+  it('removes a shift by shiftId and returns undo payload', async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      makeSupabaseMock({
+        coverageStatuses: [],
+        weeklyShifts: [],
+        removableShift: {
+          id: 'shift-1',
+          cycle_id: 'cycle-1',
+          user_id: 'therapist-2',
+          date: '2026-03-12',
+          shift_type: 'night',
+          role: 'staff',
+        },
+      }) as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'remove',
+          cycleId: 'cycle-1',
+          shiftId: 'shift-1',
+        }),
+      })
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      message: 'Shift removed from schedule.',
+      undoAction: {
+        action: 'assign',
+        cycleId: 'cycle-1',
+        userId: 'therapist-2',
+        shiftType: 'night',
+        date: '2026-03-12',
+        overrideWeeklyRules: true,
+      },
+    })
+  })
 })
+

@@ -145,9 +145,52 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
   const error = getSearchParam(params?.error)
   const auto = getSearchParam(params?.auto)
   const draft = getSearchParam(params?.draft)
+  const success = getSearchParam(params?.success)
+
+  if (success === 'cycle_created') {
+    const copied = parseCount(getSearchParam(params?.copied))
+    const skipped = parseCount(getSearchParam(params?.skipped))
+    if (copied > 0 || skipped > 0 || getSearchParam(params?.copied) === '0') {
+      return {
+        message:
+          skipped > 0
+            ? `Schedule cycle created. Copied ${copied} shift assignments from the previous cycle and skipped ${skipped} inactive or FMLA assignments.`
+            : `Schedule cycle created. Copied ${copied} shift assignments from the previous cycle.`,
+        variant: 'success',
+      }
+    }
+    return { message: 'Schedule cycle created.', variant: 'success' }
+  }
+  if (success === 'cycle_published') {
+    return { message: 'Schedule cycle published.', variant: 'success' }
+  }
+  if (success === 'cycle_unpublished') {
+    return { message: 'Schedule cycle moved to draft.', variant: 'success' }
+  }
+  if (success === 'shift_added') {
+    return { message: 'Shift added to schedule.', variant: 'success' }
+  }
+  if (success === 'shift_deleted') {
+    return { message: 'Shift removed from schedule.', variant: 'success' }
+  }
+  if (success === 'lead_updated') {
+    return { message: 'Designated lead updated.', variant: 'success' }
+  }
 
   if (error === 'auto_generate_failed') {
     return { message: 'Could not auto-generate draft schedule. Please try again.', variant: 'error' }
+  }
+  if (error === 'create_cycle_failed') {
+    return { message: 'Could not create schedule cycle. Please check inputs and try again.', variant: 'error' }
+  }
+  if (error === 'copy_from_last_cycle_failed') {
+    return {
+      message: 'Cycle created, but we could not copy shifts from the previous cycle. Please try again.',
+      variant: 'error',
+    }
+  }
+  if (error === 'delete_shift_failed') {
+    return { message: 'Could not delete shift. Please try again.', variant: 'error' }
   }
   if (error === 'auto_generate_db_error') {
     return { message: 'Database error while saving auto-generated shifts. Please try again.', variant: 'error' }
@@ -157,6 +200,13 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
     const detail = dropped > 0 ? ` (${dropped} shift${dropped !== 1 ? 's' : ''} skipped due to conflicts)` : ''
     return {
       message: `Auto-generate completed but coverage may be incomplete${detail}. Verify shifts and retry if needed.`,
+      variant: 'error',
+    }
+  }
+  if (error === 'auto_generate_lead_assignment_failed') {
+    return {
+      message:
+        'Auto-generate could not finalize designated leads for one or more shifts. Please review leads and retry.',
       variant: 'error',
     }
   }
@@ -227,10 +277,8 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
     const missingLead = parseCount(getSearchParam(params?.lead_missing))
     const multipleLeads = parseCount(getSearchParam(params?.lead_multiple))
     const ineligibleLead = parseCount(getSearchParam(params?.lead_ineligible))
-    const affected = getSearchParam(params?.affected)
-    const affectedSummary = affected ? ` Affected: ${affected}.` : ''
     return {
-      message: `Publish blocked. Coverage under: ${underCoverage}, coverage over: ${overCoverage}, missing lead: ${missingLead}, multiple leads: ${multipleLeads}, ineligible lead: ${ineligibleLead}.${affectedSummary}`,
+      message: `Publish blocked. Coverage under: ${underCoverage}, coverage over: ${overCoverage}, missing lead: ${missingLead}, multiple leads: ${multipleLeads}, ineligible lead: ${ineligibleLead}.`,
       variant: 'error',
     }
   }
@@ -256,13 +304,24 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
   if (auto === 'generated') {
     const added = parseCount(getSearchParam(params?.added))
     const unfilled = parseCount(getSearchParam(params?.unfilled))
+    const leadMissing = parseCount(getSearchParam(params?.lead_missing))
 
-    if (added === 0 && unfilled === 0) {
-      return { message: 'Draft schedule was already filled. No changes made.', variant: 'success' }
-    }
-    if (unfilled > 0) {
+    if (added === 0 && unfilled === 0 && leadMissing === 0) {
       return {
-        message: `Draft generated with ${added} new shifts. ${unfilled} slots still need manual fill.`,
+        message:
+          'Auto-generate made no changes because this draft already has assignment coverage. Use "Clear draft and start over" to rebuild it.',
+        variant: 'success',
+      }
+    }
+    if (unfilled > 0 || leadMissing > 0) {
+      const unfilledText =
+        unfilled > 0 ? `${unfilled} slot${unfilled !== 1 ? 's' : ''} still need manual fill.` : ''
+      const leadText =
+        leadMissing > 0
+          ? `${leadMissing} shift${leadMissing !== 1 ? 's' : ''} still need a designated lead.`
+          : ''
+      return {
+        message: `Draft generated with ${added} new shifts. ${unfilledText} ${leadText}`.trim(),
         variant: 'error',
       }
     }
@@ -313,6 +372,16 @@ export function pickTherapistForDate(
     if (assignedUserIdsForDate.has(therapist.id)) continue
     const unavailableDates = unavailableDatesByUser.get(therapist.id)
     if (unavailableDates?.has(date)) continue
+
+    const preferredDays = Array.isArray(therapist.preferred_work_days)
+      ? therapist.preferred_work_days
+      : []
+    if (therapist.employment_type === 'prn') {
+      if (weekday === null) continue
+      if (preferredDays.length === 0) continue
+      if (!preferredDays.includes(weekday)) continue
+    }
+
     const weeklyDates =
       weeklyWorkedDatesByUserWeek.get(weeklyCountKey(therapist.id, bounds.weekStart)) ?? new Set<string>()
     const weeklyLimit = sanitizeWeeklyLimit(
@@ -321,9 +390,6 @@ export function pickTherapistForDate(
     )
     if (!weeklyDates.has(date) && weeklyDates.size >= weeklyLimit) continue
 
-    const preferredDays = Array.isArray(therapist.preferred_work_days)
-      ? therapist.preferred_work_days
-      : []
     const prefersDay =
       weekday === null || preferredDays.length === 0 || preferredDays.includes(weekday)
 
