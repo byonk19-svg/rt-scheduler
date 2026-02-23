@@ -8,7 +8,7 @@ import {
   type TableStatusOption,
   type TableToolbarFilters,
 } from '@/components/TableToolbar'
-import { Button } from '@/components/ui/button'
+import { FormSubmitButton } from '@/components/form-submit-button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDate } from '@/lib/schedule-helpers'
 import { filterAndSortRows, type FilterableRow } from '@/lib/table-filtering'
@@ -123,9 +123,9 @@ export function ScheduleListTable({
                     <input type="hidden" name="shift_id" value={row.id} />
                     <input type="hidden" name="cycle_id" value={cycleId} />
                     <input type="hidden" name="view" value={viewMode} />
-                    <Button type="submit" variant="outline" size="sm">
+                    <FormSubmitButton type="submit" variant="outline" size="sm" pendingText="Deleting...">
                       Delete
-                    </Button>
+                    </FormSubmitButton>
                   </form>
                 </TableCell>
               )}

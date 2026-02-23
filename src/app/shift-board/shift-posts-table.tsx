@@ -1,8 +1,11 @@
 'use client'
 
 import { Fragment, useMemo, useState } from 'react'
+import { CheckCircle2 } from 'lucide-react'
 
 import { DEFAULT_TABLE_FILTERS, TableToolbar, type TableToolbarFilters } from '@/components/TableToolbar'
+import { EmptyState } from '@/components/EmptyState'
+import { FormSubmitButton } from '@/components/form-submit-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -92,6 +95,88 @@ export function ShiftPostsTable({
     return filterAndSortRows(mappedRows, filters)
   }, [filters, role, rows, scope])
 
+  const defaultFiltersForRole: TableToolbarFilters = {
+    ...DEFAULT_TABLE_FILTERS,
+    status: role === 'manager' ? 'pending' : 'all',
+  }
+  const noPendingApprovals = role === 'manager' && filters.status === 'pending' && visibleRows.length === 0
+  function renderRowActions(row: ShiftPostTableRow) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        {row.isOwnPost && row.status === 'pending' && (
+          <form action={deleteShiftPostAction}>
+            <input type="hidden" name="post_id" value={row.id} />
+            <FormSubmitButton type="submit" variant="outline" size="sm" pendingText="Deleting...">
+              Delete
+            </FormSubmitButton>
+          </form>
+        )}
+
+        {row.canClaim && row.type === 'pickup' && (
+          <form action={claimShiftPostAction}>
+            <input type="hidden" name="post_id" value={row.id} />
+            <FormSubmitButton type="submit" variant="outline" size="sm" pendingText="Claiming...">
+              Claim shift
+            </FormSubmitButton>
+          </form>
+        )}
+
+        {row.canClaim && row.type === 'swap' && shiftOptions.length > 0 && (
+          <form action={claimShiftPostAction} className="flex items-center gap-2">
+            <input type="hidden" name="post_id" value={row.id} />
+            <select
+              name="swap_shift_id"
+              required
+              className="h-8 rounded-md border border-border bg-white px-2 text-xs"
+            >
+              <option value="">My shift...</option>
+              {shiftOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <FormSubmitButton type="submit" variant="outline" size="sm" pendingText="Submitting...">
+              Offer swap
+            </FormSubmitButton>
+          </form>
+        )}
+
+        {row.isClaimedByMe && row.status === 'pending' && (
+          <form action={unclaimShiftPostAction}>
+            <input type="hidden" name="post_id" value={row.id} />
+            <FormSubmitButton type="submit" variant="outline" size="sm" pendingText="Unclaiming...">
+              Unclaim
+            </FormSubmitButton>
+          </form>
+        )}
+
+        {role === 'manager' && (
+          <>
+            {row.status !== 'approved' && (
+              <form action={updateShiftPostStatusAction}>
+                <input type="hidden" name="post_id" value={row.id} />
+                <input type="hidden" name="status" value="approved" />
+                <FormSubmitButton type="submit" size="sm" pendingText="Approving...">
+                  Approve
+                </FormSubmitButton>
+              </form>
+            )}
+            {row.status !== 'denied' && (
+              <form action={updateShiftPostStatusAction}>
+                <input type="hidden" name="post_id" value={row.id} />
+                <input type="hidden" name="status" value="denied" />
+                <FormSubmitButton type="submit" variant="destructive" size="sm" pendingText="Denying...">
+                  Deny
+                </FormSubmitButton>
+              </form>
+            )}
+          </>
+        )}
+      </div>
+    )
+  }
+
   return (
     <Card id="open-posts">
       <CardHeader>
@@ -120,7 +205,78 @@ export function ShiftPostsTable({
           searchPlaceholder="Search by message, poster, or shift details"
         />
 
-        <Table>
+        {visibleRows.length === 0 && (
+          <EmptyState
+            title={
+              noPendingApprovals
+                ? "You're all caught up - no pending requests right now."
+                : 'No shift posts match these filters.'
+            }
+            description={
+              noPendingApprovals ? 'Nice work. Check back later or switch to all posts.' : 'Adjust filters or view all requests.'
+            }
+            illustration={
+              noPendingApprovals ? (
+                <div className="inline-flex items-center gap-2 rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-1.5 text-[var(--success-text)]">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span className="text-xs font-medium">All clear</span>
+                </div>
+              ) : undefined
+            }
+            actions={
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => setFilters((current) => ({ ...current, status: 'all' }))}>
+                  View all
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setFilters(defaultFiltersForRole)}>
+                  Clear filters
+                </Button>
+              </div>
+            }
+          />
+        )}
+
+        {visibleRows.length > 0 && (
+          <div className="space-y-3 md:hidden">
+            {visibleRows.map((row) => (
+              <div key={`mobile-${row.id}`} className="space-y-3 rounded-md border border-border bg-card p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">
+                      {row.hasShiftDetails ? formatDate(row.shiftDate) : 'Shift unavailable'}
+                    </p>
+                    <p className="text-xs capitalize text-muted-foreground">
+                      {row.shiftType} - {row.shiftStatus.replace('_', ' ')}
+                    </p>
+                  </div>
+                  <Badge
+                    variant={
+                      row.status === 'approved'
+                        ? 'default'
+                        : row.status === 'denied'
+                          ? 'destructive'
+                          : 'outline'
+                    }
+                  >
+                    {row.status}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">{row.cycleLabel}</p>
+                <p className="text-sm text-foreground">{row.message}</p>
+                {row.offeredShiftLabel && (
+                  <p className="text-xs text-muted-foreground">Offered: {row.offeredShiftLabel}</p>
+                )}
+                {row.claimerName && row.status === 'pending' && (
+                  <p className="text-xs text-muted-foreground">Claimed by {row.claimerName}</p>
+                )}
+                {renderRowActions(row)}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {visibleRows.length > 0 && (
+        <Table className="hidden md:table">
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
@@ -135,14 +291,6 @@ export function ShiftPostsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {visibleRows.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={9} className="py-6 text-center text-muted-foreground">
-                  No shift posts match the current filters.
-                </TableCell>
-              </TableRow>
-            )}
-
             {visibleRows.map((row) => {
               const isMessageExpanded = expandedPostIds.has(row.id)
 
@@ -197,78 +345,7 @@ export function ShiftPostsTable({
                       <span className="block max-w-[22rem] truncate text-sm">{row.message}</span>
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-wrap gap-2">
-                        {row.isOwnPost && row.status === 'pending' && (
-                          <form action={deleteShiftPostAction}>
-                            <input type="hidden" name="post_id" value={row.id} />
-                            <Button type="submit" variant="outline" size="sm">
-                              Delete
-                            </Button>
-                          </form>
-                        )}
-
-                        {row.canClaim && row.type === 'pickup' && (
-                          <form action={claimShiftPostAction}>
-                            <input type="hidden" name="post_id" value={row.id} />
-                            <Button type="submit" variant="outline" size="sm">
-                              Claim shift
-                            </Button>
-                          </form>
-                        )}
-
-                        {row.canClaim && row.type === 'swap' && shiftOptions.length > 0 && (
-                          <form action={claimShiftPostAction} className="flex items-center gap-2">
-                            <input type="hidden" name="post_id" value={row.id} />
-                            <select
-                              name="swap_shift_id"
-                              required
-                              className="h-8 rounded-md border border-border bg-white px-2 text-xs"
-                            >
-                              <option value="">My shift...</option>
-                              {shiftOptions.map((option) => (
-                                <option key={option.id} value={option.id}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                            <Button type="submit" variant="outline" size="sm">
-                              Offer swap
-                            </Button>
-                          </form>
-                        )}
-
-                        {row.isClaimedByMe && row.status === 'pending' && (
-                          <form action={unclaimShiftPostAction}>
-                            <input type="hidden" name="post_id" value={row.id} />
-                            <Button type="submit" variant="outline" size="sm">
-                              Unclaim
-                            </Button>
-                          </form>
-                        )}
-
-                        {role === 'manager' && (
-                          <>
-                            {row.status !== 'approved' && (
-                              <form action={updateShiftPostStatusAction}>
-                                <input type="hidden" name="post_id" value={row.id} />
-                                <input type="hidden" name="status" value="approved" />
-                                <Button type="submit" size="sm">
-                                  Approve
-                                </Button>
-                              </form>
-                            )}
-                            {row.status !== 'denied' && (
-                              <form action={updateShiftPostStatusAction}>
-                                <input type="hidden" name="post_id" value={row.id} />
-                                <input type="hidden" name="status" value="denied" />
-                                <Button type="submit" variant="destructive" size="sm">
-                                  Deny
-                                </Button>
-                              </form>
-                            )}
-                          </>
-                        )}
-                      </div>
+                      {renderRowActions(row)}
                     </TableCell>
                     <TableCell>
                       <Button
@@ -301,6 +378,7 @@ export function ShiftPostsTable({
             })}
           </TableBody>
         </Table>
+        )}
       </CardContent>
     </Card>
   )

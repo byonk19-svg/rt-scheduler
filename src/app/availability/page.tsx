@@ -2,9 +2,10 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 import { AvailabilityRequestsTable, type AvailabilityRequestTableRow } from '@/app/availability/availability-requests-table'
-import { ManagerAttentionPanel } from '@/components/ManagerAttentionPanel'
+import { AttentionBar } from '@/components/AttentionBar'
 import type { TableToolbarFilters } from '@/components/TableToolbar'
 import { FeedbackToast } from '@/components/feedback-toast'
+import { FormSubmitButton } from '@/components/form-submit-button'
 import { MoreActionsMenu } from '@/components/more-actions-menu'
 import { PrintMenuItem } from '@/components/print-menu-item'
 import { Button } from '@/components/ui/button'
@@ -81,6 +82,20 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
     }
   }
 
+  if (success === 'request_deleted') {
+    return {
+      message: 'Availability request deleted.',
+      variant: 'success',
+    }
+  }
+
+  if (error === 'delete_failed') {
+    return {
+      message: 'Could not delete availability request.',
+      variant: 'error',
+    }
+  }
+
   return null
 }
 
@@ -153,10 +168,11 @@ async function deleteAvailabilityRequest(formData: FormData) {
 
   if (error) {
     console.error('Failed to delete availability request:', error)
+    redirect('/availability?error=delete_failed')
   }
 
   revalidatePath('/availability')
-  redirect('/availability')
+  redirect('/availability?success=request_deleted')
 }
 
 export default async function AvailabilityPage({
@@ -284,9 +300,14 @@ export default async function AvailabilityPage({
           </div>
 
           <div className="xl:col-span-12">
-            <Button type="submit">Submit availability request</Button>
+            <FormSubmitButton type="submit" pendingText="Submitting...">Submit availability request</FormSubmitButton>
           </div>
         </form>
+        {feedback?.variant === 'error' && (
+          <p className="mt-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]">
+            {feedback.message}
+          </p>
+        )}
       </CardContent>
     </Card>
   )
@@ -304,7 +325,9 @@ export default async function AvailabilityPage({
         </p>
       </div>
 
-      {role === 'manager' && managerAttention && <ManagerAttentionPanel snapshot={managerAttention} />}
+      {role === 'manager' && managerAttention && (
+        <AttentionBar snapshot={managerAttention} variant="compact" context="approvals" />
+      )}
 
       <div className="flex items-center gap-2">
         <Button asChild>

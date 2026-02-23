@@ -6,6 +6,7 @@ export type ToastVariant = 'success' | 'error'
 
 export type ShiftStatus = 'scheduled' | 'on_call' | 'sick' | 'called_off'
 export type ShiftRole = 'lead' | 'staff'
+export type AssignmentStatus = 'scheduled' | 'call_in' | 'cancelled' | 'on_call' | 'left_early'
 export type EmploymentType = 'full_time' | 'part_time' | 'prn'
 
 export type Cycle = {
@@ -34,6 +35,11 @@ export type ShiftRow = {
   date: string
   shift_type: 'day' | 'night'
   status: ShiftStatus
+  assignment_status: AssignmentStatus
+  status_note: string | null
+  left_early_time: string | null
+  status_updated_at: string | null
+  status_updated_by: string | null
   role: ShiftRole
   user_id: string
   profiles:
@@ -45,9 +51,15 @@ export type ShiftRow = {
 export type ScheduleSearchParams = {
   cycle?: string
   view?: string
+  panel?: string
+  add_date?: string
+  add_shift_type?: string
+  success?: string
   auto?: string
   added?: string
   unfilled?: string
+  copied?: string
+  skipped?: string
   error?: string
   week_start?: string
   week_end?: string
@@ -63,6 +75,7 @@ export type ScheduleSearchParams = {
   set_lead_error?: string
   filter?: string
   focus?: string
+  focus_slot?: string
   show_unavailable?: string
   draft?: string
   removed?: string
@@ -93,6 +106,12 @@ export type CalendarShift = {
   date: string
   shift_type: 'day' | 'night'
   status: ShiftStatus
+  assignment_status: AssignmentStatus
+  status_note: string | null
+  left_early_time: string | null
+  status_updated_at: string | null
+  status_updated_by: string | null
+  status_updated_by_name: string | null
   role: ShiftRole
   user_id: string
   full_name: string

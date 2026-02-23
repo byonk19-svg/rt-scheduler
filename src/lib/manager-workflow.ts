@@ -32,6 +32,7 @@ type DashboardLinks = {
   coverage: string
   fixCoverage: string
   coverageMissingLead: string
+  coverageUnderCoverage: string
   coverageUnfilled: string
   coverageNeedsAttention: string
   publish: string
@@ -61,12 +62,13 @@ function getLinks(activeCycle: CycleRow | null): DashboardLinks {
   if (!activeCycle) {
     return {
       approvals: MANAGER_WORKFLOW_LINKS.approvals,
-      approvalsPending: '/shift-board?status=pending#open-posts',
+      approvalsPending: '/approvals?status=pending',
       coverage: MANAGER_WORKFLOW_LINKS.coverage,
-      fixCoverage: '/schedule?view=calendar&filter=missing_lead&focus=first',
-      coverageMissingLead: '/schedule?view=calendar&filter=missing_lead&focus=first',
-      coverageUnfilled: '/schedule?view=calendar&filter=under_coverage&focus=first',
-      coverageNeedsAttention: '/schedule?view=calendar&filter=needs_attention&focus=first',
+      fixCoverage: '/coverage?view=calendar&filter=missing_lead&focus=first',
+      coverageMissingLead: '/coverage?view=calendar&filter=missing_lead&focus=first',
+      coverageUnderCoverage: '/coverage?view=calendar&filter=under_coverage&focus=first',
+      coverageUnfilled: '/coverage?view=calendar&filter=unfilled&focus=first',
+      coverageNeedsAttention: '/coverage?view=calendar&filter=needs_attention&focus=first',
       publish: MANAGER_WORKFLOW_LINKS.publish,
     }
   }
@@ -74,12 +76,13 @@ function getLinks(activeCycle: CycleRow | null): DashboardLinks {
   const cycleParam = `cycle=${activeCycle.id}`
   return {
     approvals: MANAGER_WORKFLOW_LINKS.approvals,
-    approvalsPending: `/shift-board?status=pending#open-posts`,
-    coverage: `/schedule?${cycleParam}&view=calendar`,
-    fixCoverage: `/schedule?${cycleParam}&view=calendar&filter=missing_lead&focus=first`,
-    coverageMissingLead: `/schedule?${cycleParam}&view=calendar&filter=missing_lead&focus=first`,
-    coverageUnfilled: `/schedule?${cycleParam}&view=calendar&filter=under_coverage&focus=first`,
-    coverageNeedsAttention: `/schedule?${cycleParam}&view=calendar&filter=needs_attention&focus=first`,
+    approvalsPending: `/approvals?status=pending`,
+    coverage: `/coverage?${cycleParam}&view=calendar`,
+    fixCoverage: `/coverage?${cycleParam}&view=calendar&filter=missing_lead&focus=first`,
+    coverageMissingLead: `/coverage?${cycleParam}&view=calendar&filter=missing_lead&focus=first`,
+    coverageUnderCoverage: `/coverage?${cycleParam}&view=calendar&filter=under_coverage&focus=first`,
+    coverageUnfilled: `/coverage?${cycleParam}&view=calendar&filter=unfilled&focus=first`,
+    coverageNeedsAttention: `/coverage?${cycleParam}&view=calendar&filter=needs_attention&focus=first`,
     publish: `/schedule?${cycleParam}&view=grid`,
   }
 }
@@ -106,7 +109,9 @@ export async function getManagerAttentionSnapshot(supabase: SupabaseServerClient
     activeCycle
       ? supabase
           .from('shifts')
-          .select('date, shift_type, status, role, user_id, profiles(is_lead_eligible)')
+          .select(
+            'date, shift_type, status, role, user_id, profiles:profiles!shifts_user_id_fkey(is_lead_eligible)'
+          )
           .eq('cycle_id', activeCycle.id)
           .gte('date', activeCycle.start_date)
           .lte('date', activeCycle.end_date)

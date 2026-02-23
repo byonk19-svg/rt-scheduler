@@ -1,13 +1,36 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
+import { FeedbackToast } from '@/components/feedback-toast'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/server'
 
-export default async function StaffDashboardPage() {
+type StaffDashboardSearchParams = {
+  success?: string | string[]
+}
+
+function getSearchParam(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) return value[0]
+  return value
+}
+
+function getStaffDashboardFeedback(params?: StaffDashboardSearchParams): { message: string; variant: 'success' } | null {
+  const success = getSearchParam(params?.success)
+  if (success === 'signed_in') return { message: 'Signed in successfully.', variant: 'success' }
+  if (success === 'access_requested') return { message: 'Access request submitted and signed in.', variant: 'success' }
+  return null
+}
+
+export default async function StaffDashboardPage({
+  searchParams,
+}: {
+  searchParams?: Promise<StaffDashboardSearchParams>
+}) {
   const supabase = await createClient()
+  const params = searchParams ? await searchParams : undefined
+  const feedback = getStaffDashboardFeedback(params)
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -31,6 +54,7 @@ export default async function StaffDashboardPage() {
 
   return (
     <div className="space-y-6">
+      {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
       <div className="teamwise-surface rounded-2xl border border-border p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
         <h1 className="app-page-title">Staff Home</h1>
         <p className="mt-1 text-sm text-muted-foreground">Welcome, {fullName}. Your self-service tools are prioritized below.</p>
