@@ -1,6 +1,6 @@
 export type Role = 'manager' | 'therapist'
 
-export type ViewMode = 'grid' | 'list' | 'calendar'
+export type ViewMode = 'grid' | 'list' | 'calendar' | 'week'
 
 export type ToastVariant = 'success' | 'error'
 

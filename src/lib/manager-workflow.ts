@@ -64,11 +64,11 @@ function getLinks(activeCycle: CycleRow | null): DashboardLinks {
       approvals: MANAGER_WORKFLOW_LINKS.approvals,
       approvalsPending: '/approvals?status=pending',
       coverage: MANAGER_WORKFLOW_LINKS.coverage,
-      fixCoverage: '/coverage?view=calendar&filter=missing_lead&focus=first',
-      coverageMissingLead: '/coverage?view=calendar&filter=missing_lead&focus=first',
-      coverageUnderCoverage: '/coverage?view=calendar&filter=under_coverage&focus=first',
-      coverageUnfilled: '/coverage?view=calendar&filter=unfilled&focus=first',
-      coverageNeedsAttention: '/coverage?view=calendar&filter=needs_attention&focus=first',
+      fixCoverage: '/coverage?view=week&filter=missing_lead&focus=first',
+      coverageMissingLead: '/coverage?view=week&filter=missing_lead&focus=first',
+      coverageUnderCoverage: '/coverage?view=week&filter=under_coverage&focus=first',
+      coverageUnfilled: '/coverage?view=week&filter=unfilled&focus=first',
+      coverageNeedsAttention: '/coverage?view=week&filter=needs_attention&focus=first',
       publish: MANAGER_WORKFLOW_LINKS.publish,
     }
   }
@@ -77,13 +77,13 @@ function getLinks(activeCycle: CycleRow | null): DashboardLinks {
   return {
     approvals: MANAGER_WORKFLOW_LINKS.approvals,
     approvalsPending: `/approvals?status=pending`,
-    coverage: `/coverage?${cycleParam}&view=calendar`,
-    fixCoverage: `/coverage?${cycleParam}&view=calendar&filter=missing_lead&focus=first`,
-    coverageMissingLead: `/coverage?${cycleParam}&view=calendar&filter=missing_lead&focus=first`,
-    coverageUnderCoverage: `/coverage?${cycleParam}&view=calendar&filter=under_coverage&focus=first`,
-    coverageUnfilled: `/coverage?${cycleParam}&view=calendar&filter=unfilled&focus=first`,
-    coverageNeedsAttention: `/coverage?${cycleParam}&view=calendar&filter=needs_attention&focus=first`,
-    publish: `/schedule?${cycleParam}&view=grid`,
+    coverage: `/coverage?${cycleParam}&view=week`,
+    fixCoverage: `/coverage?${cycleParam}&view=week&filter=missing_lead&focus=first`,
+    coverageMissingLead: `/coverage?${cycleParam}&view=week&filter=missing_lead&focus=first`,
+    coverageUnderCoverage: `/coverage?${cycleParam}&view=week&filter=under_coverage&focus=first`,
+    coverageUnfilled: `/coverage?${cycleParam}&view=week&filter=unfilled&focus=first`,
+    coverageNeedsAttention: `/coverage?${cycleParam}&view=week&filter=needs_attention&focus=first`,
+    publish: `/schedule?${cycleParam}&view=week`,
   }
 }
 

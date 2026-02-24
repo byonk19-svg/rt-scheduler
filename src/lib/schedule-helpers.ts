@@ -106,9 +106,11 @@ export function buildDateRange(startDate: string, endDate: string): string[] {
 }
 
 export function normalizeViewMode(value: string | undefined): ViewMode {
-  if (value === 'list') return 'list'
+  if (value === 'list') return 'week'
+  if (value === 'grid') return 'week'
   if (value === 'calendar') return 'calendar'
-  return 'grid'
+  if (value === 'week') return 'week'
+  return 'week'
 }
 
 export function buildScheduleUrl(

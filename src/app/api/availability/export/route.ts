@@ -42,7 +42,7 @@ export async function GET() {
     .eq('id', user.id)
     .maybeSingle()
 
-  const isManager = profile?.role === 'manager' || user.user_metadata?.role === 'manager'
+  const isManager = profile?.role === 'manager'
 
   let query = supabase
     .from('availability_requests')

@@ -432,7 +432,7 @@ export default async function DirectoryPage({
     .eq('id', user.id)
     .maybeSingle()
 
-  const isManager = profile?.role === 'manager' || user.user_metadata?.role === 'manager'
+  const isManager = profile?.role === 'manager'
   if (!isManager) {
     redirect('/dashboard/staff')
   }

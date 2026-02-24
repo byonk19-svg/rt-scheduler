@@ -11,7 +11,7 @@ import type { ShiftSlotValidationIssue } from '@/lib/schedule-rule-validation'
 type AffectedShiftsDrawerProps = {
   issues: ShiftSlotValidationIssue[]
   cycleId: string
-  viewMode: 'grid' | 'list' | 'calendar'
+  viewMode: 'grid' | 'list' | 'calendar' | 'week'
   showUnavailable: boolean
 }
 
