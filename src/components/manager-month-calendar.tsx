@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import type { DragEvent, TouchEvent } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { CalendarToolbar } from '@/components/CalendarToolbar'
+import { FeedbackToast } from '@/components/feedback-toast'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -22,6 +23,7 @@ type Therapist = {
   id: string
   full_name: string
   shift_type: 'day' | 'night'
+  employment_type?: 'full_time' | 'part_time' | 'prn'
   is_lead_eligible?: boolean
 }
 
@@ -36,10 +38,23 @@ type Shift = {
   status_updated_at: string | null
   status_updated_by: string | null
   status_updated_by_name: string | null
+  availability_override: boolean
+  availability_override_reason: string | null
+  availability_override_at: string | null
+  availability_override_by: string | null
+  availability_override_by_name: string | null
   role: 'lead' | 'staff'
   user_id: string
   full_name: string
   isLeadEligible: boolean
+}
+
+type AvailabilityEntry = {
+  therapist_id: string
+  date: string
+  shift_type: 'day' | 'night' | 'both'
+  entry_type: 'unavailable' | 'available'
+  reason: string | null
 }
 
 type DragPayload =
@@ -54,6 +69,8 @@ type DragActionBody =
       shiftType: 'day' | 'night'
       date: string
       overrideWeeklyRules: boolean
+      availabilityOverride?: boolean
+      availabilityOverrideReason?: string
     }
   | {
       action: 'move'
@@ -62,6 +79,8 @@ type DragActionBody =
       targetDate: string
       targetShiftType: 'day' | 'night'
       overrideWeeklyRules: boolean
+      availabilityOverride?: boolean
+      availabilityOverrideReason?: string
     }
   | {
       action: 'remove'
@@ -83,11 +102,21 @@ type SetLeadActionBody = {
   date: string
   shiftType: 'day' | 'night'
   overrideWeeklyRules: boolean
+  availabilityOverride?: boolean
+  availabilityOverrideReason?: string
 }
 
 type DragActionResponse = {
   message?: string
   error?: string
+  code?: string
+  availability?: {
+    therapistId: string
+    therapistName: string
+    date: string
+    shiftType: 'day' | 'night'
+    reason: string | null
+  }
   undoAction?: DragActionBody
 }
 
@@ -126,6 +155,13 @@ type AssignmentStatusSnapshot = {
   leftEarlyTime: string | null
 }
 
+type StatusLogEntry = {
+  from: AssignmentStatus
+  to: AssignmentStatus
+  therapistName: string
+  time: string
+}
+
 type StatusPopoverState = {
   assignmentId: string
   userId: string
@@ -141,6 +177,7 @@ type ManagerMonthCalendarProps = {
   startDate: string
   endDate: string
   therapists: Therapist[]
+  availabilityEntries: AvailabilityEntry[]
   shifts: Shift[]
   issueFilter?:
     | 'all'
@@ -157,6 +194,7 @@ type ManagerMonthCalendarProps = {
   defaultShiftType?: 'day' | 'night'
   canManageStaffing?: boolean
   canEditAssignmentStatus?: boolean
+  canViewAvailabilityOverride?: boolean
 }
 
 function dateFromKey(value: string): Date {
@@ -264,14 +302,14 @@ function formatStatusTimestamp(value: string | null): string {
 function formatStatusPopoverHeader(date: string, shiftType: 'day' | 'night', therapistName: string): string {
   const parsed = dateFromKey(date)
   if (Number.isNaN(parsed.getTime())) {
-    return `${date} · ${shiftType === 'day' ? 'Day' : 'Night'} shift · ${therapistName}`
+    return `${date} | ${shiftType === 'day' ? 'Day' : 'Night'} shift | ${therapistName}`
   }
   const dateLabel = parsed.toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
   })
-  return `${dateLabel} · ${shiftType === 'day' ? 'Day' : 'Night'} shift · ${therapistName}`
+  return `${dateLabel} | ${shiftType === 'day' ? 'Day' : 'Night'} shift | ${therapistName}`
 }
 
 function toTimeInputValue(value: string | null): string {
@@ -279,10 +317,36 @@ function toTimeInputValue(value: string | null): string {
   return value.slice(0, 5)
 }
 
+function initials(name: string): string {
+  return name
+    .split(' ')
+    .map((part) => part[0] ?? '')
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+}
+
+function firstName(name: string): string {
+  return name.split(' ')[0] ?? name
+}
+
 function statusMatchesFilter(status: AssignmentStatus, filter: StatusFilter): boolean {
   if (filter === 'all') return true
   if (filter === 'any_non_scheduled') return status !== 'scheduled'
   return status === filter
+}
+
+function getAvatarTone(status: AssignmentStatus): string {
+  if (status === 'cancelled') return 'bg-red-500'
+  if (status === 'on_call') return 'bg-orange-600'
+  return 'bg-indigo-500'
+}
+
+function toStatusButtonLabel(status: AssignmentStatus): string {
+  if (status === 'scheduled') return 'Active'
+  if (status === 'on_call') return 'On Call'
+  if (status === 'left_early') return 'Leave Early'
+  return 'Cancelled'
 }
 
 function assignmentStatusTooltip(shift: Shift): string | null {
@@ -298,11 +362,29 @@ function assignmentStatusTooltip(shift: Shift): string | null {
   return parts.join('\n')
 }
 
+function availabilityShiftMatches(entryShiftType: 'day' | 'night' | 'both', shiftType: 'day' | 'night'): boolean {
+  return entryShiftType === 'both' || entryShiftType === shiftType
+}
+
+function formatOverrideTimestamp(value: string | null): string {
+  if (!value) return 'Unknown time'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
 export function ManagerMonthCalendar({
   cycleId,
   startDate,
   endDate,
   therapists,
+  availabilityEntries,
   shifts,
   issueFilter = 'all',
   focusSlotKey = null,
@@ -310,6 +392,7 @@ export function ManagerMonthCalendar({
   defaultShiftType = 'day',
   canManageStaffing = true,
   canEditAssignmentStatus = false,
+  canViewAvailabilityOverride = false,
 }: ManagerMonthCalendarProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -318,6 +401,7 @@ export function ManagerMonthCalendar({
   const [undoAction, setUndoAction] = useState<DragActionBody | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [overrideWeeklyRules, setOverrideWeeklyRules] = useState(false)
+  const [localShifts, setLocalShifts] = useState<Shift[]>(shifts)
   const [selectedShiftType, setSelectedShiftType] = useState<'day' | 'night'>(() => {
     const focusShiftType = focusSlotKey?.split(':')[1]
     if (focusShiftType === 'night') return 'night'
@@ -328,10 +412,24 @@ export function ManagerMonthCalendar({
     const startKey = focusedDate && /^\d{4}-\d{2}-\d{2}$/.test(focusedDate) ? focusedDate : startDate
     return keyFromDate(startOfWeek(dateFromKey(startKey)))
   })
+  const [selectedDate, setSelectedDate] = useState<string | null>(() => {
+    const focusedDate = focusSlotKey?.split(':')[0]
+    if (focusedDate && /^\d{4}-\d{2}-\d{2}$/.test(focusedDate)) return focusedDate
+    return startDate
+  })
   const [staffingPoolOpen, setStaffingPoolOpen] = useState(false)
   const [drawerSlot, setDrawerSlot] = useState<{ date: string; shiftType: 'day' | 'night' } | null>(null)
   const [drawerAddTherapistId, setDrawerAddTherapistId] = useState('')
   const [drawerLeadTherapistId, setDrawerLeadTherapistId] = useState('')
+  const [availabilityConflictDialog, setAvailabilityConflictDialog] = useState<{
+    therapistId: string
+    therapistName: string
+    date: string
+    shiftType: 'day' | 'night'
+    reason: string | null
+    action: DragActionBody | SetLeadActionBody
+  } | null>(null)
+  const [availabilityOverrideReasonDraft, setAvailabilityOverrideReasonDraft] = useState('')
   const [statusPopover, setStatusPopover] = useState<StatusPopoverState | null>(null)
   const [statusDraft, setStatusDraft] = useState<{
     status: AssignmentStatus
@@ -340,10 +438,31 @@ export function ManagerMonthCalendar({
   } | null>(null)
   const [isStatusSaving, setIsStatusSaving] = useState(false)
   const [statusUndoSnapshot, setStatusUndoSnapshot] = useState<AssignmentStatusSnapshot | null>(null)
+  const [toastState, setToastState] = useState<{
+    id: number
+    message: string
+    variant: 'success' | 'error'
+  } | null>(null)
+  const [statusLogByShift, setStatusLogByShift] = useState<Record<string, StatusLogEntry[]>>({})
   const mobileTouchStartX = useRef<number | null>(null)
   const mobileTouchStartY = useRef<number | null>(null)
   const statusPopoverRef = useRef<HTMLDivElement | null>(null)
   const isStatusSavingRef = useRef(false)
+
+  useEffect(() => {
+    setLocalShifts(shifts)
+  }, [shifts])
+
+  useEffect(() => {
+    if (!selectedDate) {
+      setSelectedDate(startDate)
+      return
+    }
+
+    if (selectedDate < startDate || selectedDate > endDate) {
+      setSelectedDate(startDate)
+    }
+  }, [endDate, selectedDate, startDate])
 
   const rangeLabel = useMemo(() => formatRangeLabel(startDate, endDate), [startDate, endDate])
   const calendarWeeks = useMemo(() => buildCalendarWeeks(startDate, endDate), [startDate, endDate])
@@ -383,7 +502,7 @@ export function ManagerMonthCalendar({
 
   const shiftsByDate = useMemo(() => {
     const map = new Map<string, Shift[]>()
-    for (const shift of shifts) {
+    for (const shift of localShifts) {
       const row = map.get(shift.date) ?? []
       row.push(shift)
       map.set(shift.date, row)
@@ -395,7 +514,95 @@ export function ManagerMonthCalendar({
       })
     }
     return map
-  }, [shifts])
+  }, [localShifts])
+
+  const availabilityEntriesByTherapist = useMemo(() => {
+    const map = new Map<string, AvailabilityEntry[]>()
+    for (const entry of availabilityEntries) {
+      const rows = map.get(entry.therapist_id) ?? []
+      rows.push(entry)
+      map.set(entry.therapist_id, rows)
+    }
+    return map
+  }, [availabilityEntries])
+  const therapistById = useMemo(
+    () => new Map(therapists.map((therapist) => [therapist.id, therapist])),
+    [therapists]
+  )
+
+  const getTherapistAvailabilityState = useCallback(
+    (
+      therapistId: string,
+      date: string,
+      shiftType: 'day' | 'night'
+    ): { unavailableConflict: boolean; unavailableReason: string | null; prnNotOffered: boolean } => {
+      const therapist = therapistById.get(therapistId)
+      const entries = availabilityEntriesByTherapist.get(therapistId) ?? []
+
+      const unavailableEntry =
+        entries.find(
+          (entry) =>
+            entry.entry_type === 'unavailable' &&
+            entry.date === date &&
+            availabilityShiftMatches(entry.shift_type, shiftType)
+        ) ?? null
+
+      const hasPrnAvailableOffer = entries.some(
+        (entry) =>
+          entry.entry_type === 'available' &&
+          entry.date === date &&
+          availabilityShiftMatches(entry.shift_type, shiftType)
+      )
+
+      return {
+        unavailableConflict: unavailableEntry !== null,
+        unavailableReason: unavailableEntry?.reason ?? null,
+        prnNotOffered: therapist?.employment_type === 'prn' && !hasPrnAvailableOffer,
+      }
+    },
+    [availabilityEntriesByTherapist, therapistById]
+  )
+
+  const selectedDayShifts = useMemo(() => {
+    if (!selectedDate) return []
+    return (shiftsByDate.get(selectedDate) ?? [])
+      .filter((shift) => shift.shift_type === selectedShiftType)
+      .slice()
+      .sort((a, b) => {
+        if (a.role !== b.role) return a.role === 'lead' ? -1 : 1
+        return a.full_name.localeCompare(b.full_name)
+      })
+  }, [selectedDate, selectedShiftType, shiftsByDate])
+
+  const selectedLeadShift = useMemo(
+    () => selectedDayShifts.find((shift) => shift.role === 'lead') ?? null,
+    [selectedDayShifts]
+  )
+
+  const selectedStaffShifts = useMemo(
+    () => selectedDayShifts.filter((shift) => shift.role !== 'lead'),
+    [selectedDayShifts]
+  )
+
+  const selectedCounts = useMemo(() => {
+    return {
+      active: selectedDayShifts.filter((shift) => shift.assignment_status !== 'cancelled').length,
+      onCall: selectedDayShifts.filter((shift) => shift.assignment_status === 'on_call').length,
+      leaveEarly: selectedDayShifts.filter((shift) => shift.assignment_status === 'left_early').length,
+      cancelled: selectedDayShifts.filter((shift) => shift.assignment_status === 'cancelled').length,
+    }
+  }, [selectedDayShifts])
+
+  const selectedDayLogs = useMemo(() => {
+    return selectedDayShifts
+      .flatMap((shift) =>
+        (statusLogByShift[shift.id] ?? []).map((entry, index) => ({
+          ...entry,
+          key: `${shift.id}-${index}`,
+        }))
+      )
+      .slice(-12)
+  }, [selectedDayShifts, statusLogByShift])
 
   const dayTherapists = useMemo(
     () => therapists.filter((therapist) => therapist.shift_type === 'day'),
@@ -406,6 +613,20 @@ export function ManagerMonthCalendar({
     [therapists]
   )
   const therapistsForPool = selectedShiftType === 'day' ? dayTherapists : nightTherapists
+  const therapistsForPoolWithAvailability = useMemo(() => {
+    if (!selectedDate) {
+      return therapistsForPool.map((therapist) => ({
+        therapist,
+        unavailableConflict: false,
+        unavailableReason: null as string | null,
+        prnNotOffered: false,
+      }))
+    }
+    return therapistsForPool.map((therapist) => ({
+      therapist,
+      ...getTherapistAvailabilityState(therapist.id, selectedDate, selectedShiftType),
+    }))
+  }, [getTherapistAvailabilityState, selectedDate, selectedShiftType, therapistsForPool])
 
   const drawerShifts = useMemo(() => {
     if (!drawerSlot) return []
@@ -445,8 +666,12 @@ export function ManagerMonthCalendar({
           !currentShiftIds.has(therapist.id) &&
           !drawerAssignedOnDate.has(therapist.id)
       )
-      .sort((a, b) => a.full_name.localeCompare(b.full_name))
-  }, [drawerSlot, drawerShifts, therapists, drawerAssignedOnDate])
+      .map((therapist) => ({
+        therapist,
+        ...getTherapistAvailabilityState(therapist.id, drawerSlot.date, drawerSlot.shiftType),
+      }))
+      .sort((a, b) => a.therapist.full_name.localeCompare(b.therapist.full_name))
+  }, [drawerAssignedOnDate, drawerShifts, drawerSlot, getTherapistAvailabilityState, therapists])
 
   const drawerLeadOptions = useMemo(() => {
     if (!drawerSlot) return []
@@ -509,13 +734,17 @@ export function ManagerMonthCalendar({
   }
 
   function onCalendarCellClick(date: string, shiftType: 'day' | 'night') {
-    openShiftDrawer(date, shiftType)
+    setSelectedDate(date)
+    if (shiftType !== selectedShiftType) {
+      setSelectedShiftType(shiftType)
+    }
   }
 
   function closeShiftDrawer() {
     setDrawerSlot(null)
     setDrawerAddTherapistId('')
     setDrawerLeadTherapistId('')
+    closeAvailabilityConflictDialog()
     closeStatusPopover()
   }
 
@@ -553,6 +782,22 @@ export function ManagerMonthCalendar({
         const result = (await response.json().catch(() => null)) as DragActionResponse | null
 
         if (!response.ok) {
+          if (result?.code === 'availability_conflict' && result.availability) {
+            setAvailabilityConflictDialog({
+              therapistId: result.availability.therapistId,
+              therapistName: result.availability.therapistName,
+              date: result.availability.date,
+              shiftType: result.availability.shiftType,
+              reason: result.availability.reason,
+              action: body,
+            })
+            setAvailabilityOverrideReasonDraft(
+              'availabilityOverrideReason' in body && typeof body.availabilityOverrideReason === 'string'
+                ? body.availabilityOverrideReason
+                : ''
+            )
+            return
+          }
           setError(result?.error ?? 'Could not update schedule. Please try again.')
           return
         }
@@ -579,6 +824,20 @@ export function ManagerMonthCalendar({
         const result = (await response.json().catch(() => null)) as DragActionResponse | null
 
         if (!response.ok) {
+          if (result?.code === 'availability_conflict' && result.availability) {
+            setAvailabilityConflictDialog({
+              therapistId: result.availability.therapistId,
+              therapistName: result.availability.therapistName,
+              date: result.availability.date,
+              shiftType: result.availability.shiftType,
+              reason: result.availability.reason,
+              action: body,
+            })
+            setAvailabilityOverrideReasonDraft(
+              typeof body.availabilityOverrideReason === 'string' ? body.availabilityOverrideReason : ''
+            )
+            return
+          }
           setError(result?.error ?? 'Could not update designated lead.')
           return
         }
@@ -587,6 +846,81 @@ export function ManagerMonthCalendar({
         router.refresh()
       })()
     })
+  }
+
+  function closeAvailabilityConflictDialog() {
+    setAvailabilityConflictDialog(null)
+    setAvailabilityOverrideReasonDraft('')
+  }
+
+  function confirmAvailabilityOverride() {
+    if (!availabilityConflictDialog) return
+    const normalizedReason = availabilityOverrideReasonDraft.trim()
+    const actionWithOverride = {
+      ...availabilityConflictDialog.action,
+      availabilityOverride: true,
+      availabilityOverrideReason: normalizedReason || undefined,
+    }
+
+    closeAvailabilityConflictDialog()
+    if (actionWithOverride.action === 'set_lead') {
+      runSetLeadAction(actionWithOverride as SetLeadActionBody)
+      return
+    }
+
+    runDragAction(actionWithOverride as DragActionBody)
+  }
+
+  function runActionWithAvailabilityCheck(action: DragActionBody | SetLeadActionBody) {
+    if (action.action === 'remove') {
+      runDragAction(action)
+      return
+    }
+
+    let therapistId = ''
+    let date = ''
+    let shiftType: 'day' | 'night' = 'day'
+
+    if (action.action === 'assign') {
+      therapistId = action.userId
+      date = action.date
+      shiftType = action.shiftType
+    } else if (action.action === 'set_lead') {
+      therapistId = action.therapistId
+      date = action.date
+      shiftType = action.shiftType
+    } else if (action.action === 'move') {
+      const shift = localShifts.find((row) => row.id === action.shiftId)
+      if (!shift) {
+        runDragAction(action)
+        return
+      }
+      therapistId = shift.user_id
+      date = action.targetDate
+      shiftType = action.targetShiftType
+    }
+
+    const therapist = therapistById.get(therapistId)
+    const availabilityState = getTherapistAvailabilityState(therapistId, date, shiftType)
+    if (availabilityState.unavailableConflict) {
+      setAvailabilityConflictDialog({
+        therapistId,
+        therapistName: therapist?.full_name ?? 'Therapist',
+        date,
+        shiftType,
+        reason: availabilityState.unavailableReason,
+        action,
+      })
+      setAvailabilityOverrideReasonDraft('')
+      return
+    }
+
+    if (action.action === 'set_lead') {
+      runSetLeadAction(action)
+      return
+    }
+
+    runDragAction(action)
   }
 
   function openStatusPopoverForShift(shift: Shift, anchor: HTMLElement) {
@@ -633,6 +967,28 @@ export function ManagerMonthCalendar({
     setError('')
     setSuccess('')
     setUndoAction(null)
+
+    const previousShift = localShifts.find((shift) => shift.id === assignmentId) ?? null
+    const optimisticStatusNote = payload.note.trim() || null
+    const optimisticLeftEarlyTime =
+      payload.status === 'left_early' ? payload.leftEarlyTime || null : null
+
+    if (previousShift) {
+      setLocalShifts((current) =>
+        current.map((shift) =>
+          shift.id === assignmentId
+            ? {
+                ...shift,
+                assignment_status: payload.status,
+                status_note: optimisticStatusNote,
+                left_early_time: optimisticLeftEarlyTime,
+                status_updated_at: new Date().toISOString(),
+              }
+            : shift
+        )
+      )
+    }
+
     isStatusSavingRef.current = true
     setIsStatusSaving(true)
     startTransition(() => {
@@ -651,7 +1007,17 @@ export function ManagerMonthCalendar({
               }),
             })
           } catch {
+            if (previousShift) {
+              setLocalShifts((current) =>
+                current.map((shift) => (shift.id === assignmentId ? previousShift : shift))
+              )
+            }
             setError('Network error while updating assignment status. Please try again.')
+            setToastState({
+              id: Date.now(),
+              message: 'Could not save status change. Rolled back local update.',
+              variant: 'error',
+            })
             return
           }
 
@@ -665,18 +1031,65 @@ export function ManagerMonthCalendar({
               response.status === 401
                 ? 'Your session expired. Sign in again and retry.'
                 : 'Could not update assignment status.'
+            if (previousShift) {
+              setLocalShifts((current) =>
+                current.map((shift) => (shift.id === assignmentId ? previousShift : shift))
+              )
+            }
             setError(result?.error ?? fallbackError)
+            setToastState({
+              id: Date.now(),
+              message: 'Could not save status change. Rolled back local update.',
+              variant: 'error',
+            })
             return
           }
 
           if (!result?.assignment) {
+            if (previousShift) {
+              setLocalShifts((current) =>
+                current.map((shift) => (shift.id === assignmentId ? previousShift : shift))
+              )
+            }
             setError(
               'Status update did not return data. Run the latest migrations and refresh this page.'
             )
+            setToastState({
+              id: Date.now(),
+              message: 'Could not save status change. Rolled back local update.',
+              variant: 'error',
+            })
             return
           }
 
           const updated = result.assignment
+          setLocalShifts((current) =>
+            current.map((shift) =>
+              shift.id === assignmentId
+                ? {
+                    ...shift,
+                    assignment_status: updated.assignment_status,
+                    status_note: updated.status_note,
+                    left_early_time: updated.left_early_time,
+                    status_updated_at: updated.status_updated_at,
+                    status_updated_by: updated.status_updated_by,
+                    status_updated_by_name: updated.status_updated_by_name,
+                  }
+                : shift
+            )
+          )
+          if (previousShift && previousShift.assignment_status !== updated.assignment_status) {
+            const logEntry: StatusLogEntry = {
+              from: previousShift.assignment_status,
+              to: updated.assignment_status,
+              therapistName: previousShift.full_name,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            }
+            setStatusLogByShift((current) => ({
+              ...current,
+              [assignmentId]: [...(current[assignmentId] ?? []), logEntry],
+            }))
+          }
           const label = assignmentStatusDescription(updated.assignment_status)
           setSuccess(
             options?.isUndo
@@ -820,6 +1233,31 @@ export function ManagerMonthCalendar({
     )
   }
 
+  function handlePanelStatusChange(shift: Shift, nextStatus: AssignmentStatus) {
+    if (isStatusSavingRef.current) return
+    if (shift.assignment_status === nextStatus) return
+
+    const snapshot: AssignmentStatusSnapshot = {
+      assignmentId: shift.id,
+      status: shift.assignment_status,
+      note: shift.status_note,
+      leftEarlyTime: toTimeInputValue(shift.left_early_time),
+    }
+
+    runAssignmentStatusUpdate(
+      shift.id,
+      {
+        status: nextStatus,
+        note: shift.status_note ?? '',
+        leftEarlyTime: nextStatus === 'left_early' ? toTimeInputValue(shift.left_early_time) : '',
+      },
+      {
+        previous: snapshot,
+        closePopover: false,
+      }
+    )
+  }
+
   function allowDrop(event: DragEvent<HTMLElement>) {
     if (!canManageStaffing) return
     event.preventDefault()
@@ -834,7 +1272,7 @@ export function ManagerMonthCalendar({
     if (!payload) return
 
     if (payload.type === 'therapist') {
-      runDragAction({
+      runActionWithAvailabilityCheck({
         action: 'assign',
         cycleId,
         userId: payload.userId,
@@ -845,7 +1283,7 @@ export function ManagerMonthCalendar({
       return
     }
 
-    runDragAction({
+    runActionWithAvailabilityCheck({
       action: 'move',
       cycleId,
       shiftId: payload.shiftId,
@@ -866,7 +1304,7 @@ export function ManagerMonthCalendar({
       return
     }
 
-    runDragAction({
+    runActionWithAvailabilityCheck({
       action: 'remove',
       cycleId,
       shiftId: payload.shiftId,
@@ -917,12 +1355,17 @@ export function ManagerMonthCalendar({
     const dayShifts = inCycle
       ? (shiftsByDate.get(date) ?? []).filter((shift) => shift.shift_type === shiftType)
       : []
+    const orderedShifts = dayShifts
+      .slice()
+      .sort((a, b) => {
+        if (a.role !== b.role) return a.role === 'lead' ? -1 : 1
+        return a.full_name.localeCompare(b.full_name)
+      })
     const slotKey = `${date}:${shiftType}`
-    const cellSummary = summarizeCalendarCell(dayShifts)
+    const cellSummary = summarizeCalendarCell(orderedShifts)
     const coverageCount = cellSummary.coverageCount
-    const leadShift = dayShifts.find((shift) => shift.role === 'lead') ?? null
-    const leadAssignments = dayShifts.filter((shift) => shift.role === 'lead')
-    const hasEligibleCoverage = dayShifts.some(
+    const leadAssignments = orderedShifts.filter((shift) => shift.role === 'lead')
+    const hasEligibleCoverage = orderedShifts.some(
       (shift) => (shift.status === 'scheduled' || shift.status === 'on_call') && shift.isLeadEligible
     )
     const missingLead = leadAssignments.length === 0 || !hasEligibleCoverage
@@ -940,25 +1383,40 @@ export function ManagerMonthCalendar({
     if (ineligibleLead) derivedReasons.push('ineligible_lead')
     const slotReasons = issueReasonsBySlot[slotKey] ?? derivedReasons
     const filterMatch = !inCycle || issueFilter === 'all' || slotReasons.includes(issueFilter)
-    const coverageTone = underCoverage ? 'text-amber-700' : overCoverage ? 'text-red-700' : 'text-emerald-700'
-    const filteredStatusStaffShifts = dayShifts
-      .filter(
-        (shift) =>
-          shift.role !== 'lead' && statusMatchesFilter(shift.assignment_status, statusFilter)
-      )
-      .sort((a, b) => a.full_name.localeCompare(b.full_name))
-    const leadVisible = Boolean(
-      leadShift && statusMatchesFilter(leadShift.assignment_status, statusFilter)
-    )
-    const hasStatusMatchInSlot = dayShifts.some((shift) =>
+    const coverageTone = missingLead
+      ? 'text-red-700'
+      : underCoverage
+        ? 'text-amber-700'
+        : overCoverage
+          ? 'text-red-700'
+          : 'text-emerald-700'
+    const statusCounts = {
+      call_in: orderedShifts.filter((shift) => shift.assignment_status === 'call_in').length,
+      on_call: orderedShifts.filter((shift) => shift.assignment_status === 'on_call').length,
+      cancelled: orderedShifts.filter((shift) => shift.assignment_status === 'cancelled').length,
+      left_early: orderedShifts.filter((shift) => shift.assignment_status === 'left_early').length,
+    }
+    const activeCount = orderedShifts.filter((shift) => shift.assignment_status !== 'cancelled').length
+    const totalCount = orderedShifts.length
+    const filteredVisibleShifts = orderedShifts.filter((shift) =>
       statusMatchesFilter(shift.assignment_status, statusFilter)
     )
-    const maxVisibleStaff = leadVisible ? 2 : 3
-    const visibleShifts = filteredStatusStaffShifts.slice(0, maxVisibleStaff)
-    const hiddenCount = Math.max(filteredStatusStaffShifts.length - maxVisibleStaff, 0)
+    const isSelected = selectedDate === date && selectedShiftType === shiftType
     const visibleIssueTags = slotReasons
       .filter((reason) => reason === 'ineligible_lead' || reason === 'multiple_leads')
       .slice(0, 2)
+    const shiftPalette =
+      shiftType === 'day'
+        ? {
+            border: 'border-sky-200',
+            bg: 'bg-sky-50',
+            text: 'text-sky-900',
+          }
+        : {
+            border: 'border-indigo-200',
+            bg: 'bg-indigo-50',
+            text: 'text-indigo-900',
+          }
     const previousDay = addDays(day, -1)
     const nextDay = addDays(day, 1)
     const isBoundaryDay =
@@ -967,23 +1425,6 @@ export function ManagerMonthCalendar({
     const dateHeaderLabel = isBoundaryDay
       ? day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
       : String(day.getDate())
-    const palette =
-      shiftType === 'day'
-        ? {
-            border: 'border-sky-200',
-            bg: 'bg-sky-50',
-            text: 'text-sky-800',
-          }
-        : {
-            border: 'border-indigo-200',
-            bg: 'bg-indigo-50',
-            text: 'text-indigo-800',
-          }
-    const leadPalette = {
-      border: 'border-amber-300',
-      bg: 'bg-amber-50',
-      text: 'text-amber-900',
-    }
 
     return (
       <div
@@ -995,12 +1436,15 @@ export function ManagerMonthCalendar({
         onClick={inCycle ? () => onCalendarCellClick(date, shiftType) : undefined}
         id={`slot-card-${date}-${shiftType}`}
         className={cn(
-          'min-h-36 rounded-xl border border-border bg-white p-2 transition-colors',
-          inCycle ? 'cursor-pointer hover:bg-secondary/20' : 'cursor-default bg-muted/40',
+          'min-h-[11.5rem] overflow-hidden rounded-lg border bg-white transition-all',
+          isSelected ? 'border-indigo-500 shadow-[0_0_0_3px_rgba(99,102,241,0.12)]' : 'border-border/80',
+          inCycle ? 'cursor-pointer hover:border-slate-300 hover:bg-secondary/10' : 'cursor-default bg-muted/30',
           issueFilter !== 'all' && !filterMatch ? 'opacity-45' : ''
         )}
         aria-label={inCycle ? `Open ${shiftType} shift details for ${formatCellDate(date)}` : `${formatCellDate(date)} outside cycle`}
       >
+        <div className={cn('h-1', missingLead ? 'bg-red-500' : 'bg-indigo-500')} />
+        <div className="p-2.5">
         {options?.showWeekday && (
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {day.toLocaleDateString('en-US', { weekday: 'short' })}
@@ -1011,18 +1455,37 @@ export function ManagerMonthCalendar({
             {dateHeaderLabel}
           </span>
           {inCycle ? (
-            <span className={cn('text-[10px] font-semibold uppercase', coverageTone)}>
-              {coverageCount}/{MAX_SHIFT_COVERAGE_PER_DAY}
-            </span>
+            <div className="flex flex-wrap items-center justify-end gap-1">
+              {statusCounts.call_in > 0 && (
+                <span className="rounded-full border border-red-200 bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-700">
+                  CI {statusCounts.call_in}
+                </span>
+              )}
+              {statusCounts.on_call > 0 && (
+                <span className="rounded-full border border-orange-200 bg-orange-50 px-1.5 py-0.5 text-[9px] font-bold text-orange-700">
+                  OC {statusCounts.on_call}
+                </span>
+              )}
+              {statusCounts.left_early > 0 && (
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">
+                  LE {statusCounts.left_early}
+                </span>
+              )}
+              {statusCounts.cancelled > 0 && (
+                <span className="rounded-full border border-red-200 bg-red-50 px-1.5 py-0.5 text-[9px] font-semibold text-red-700">
+                  -{statusCounts.cancelled}
+                </span>
+              )}
+              <span className={cn('rounded-full px-1.5 py-0.5 text-[9px] font-bold', coverageTone, missingLead ? 'bg-red-100' : 'bg-emerald-50')}>
+                {activeCount}/{totalCount}
+              </span>
+            </div>
           ) : (
             <span className="text-[10px] font-semibold uppercase text-muted-foreground">-</span>
           )}
         </div>
         {inCycle ? (
           <>
-            {missingLead && (
-              <div className="mb-2 text-[11px] font-medium text-[var(--warning-text)]">Lead missing</div>
-            )}
             {visibleIssueTags.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-1">
                 {visibleIssueTags.map((reason) => (
@@ -1036,161 +1499,93 @@ export function ManagerMonthCalendar({
               </div>
             )}
             <div className="space-y-1">
-              {leadVisible && leadShift && (
-                <div
-                  key={`lead-${leadShift.id}`}
-                  onClick={(event) => event.stopPropagation()}
-                  draggable={canManageStaffing}
-                  onDragStart={
-                    canManageStaffing
-                      ? (event) =>
-                          setDragData(event, {
-                            type: 'shift',
-                            shiftId: leadShift.id,
-                            shiftType: leadShift.shift_type,
-                          })
-                      : undefined
-                  }
-                  className={cn(
-                    'rounded-md border px-2 py-1 text-xs',
-                    canManageStaffing ? 'cursor-grab active:cursor-grabbing' : '',
-                    leadPalette.border,
-                    leadPalette.bg,
-                    leadPalette.text
-                  )}
-                >
-                  <div className="flex items-center gap-1.5">
-                    {canEditAssignmentStatus ? (
-                      <button
-                        type="button"
-                        className="font-medium hover:underline"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          openStatusPopoverForShift(leadShift, event.currentTarget)
-                        }}
-                      >
-                        {leadShift.full_name}
-                      </button>
-                    ) : (
-                      <span className="font-medium">{leadShift.full_name}</span>
-                    )}
-                    {leadShift.assignment_status !== 'scheduled' && (
-                      <span className="group relative inline-flex items-center">
-                        <span
-                          className={cn(
-                            'inline-flex items-center rounded border px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide',
-                            assignmentStatusTone(leadShift.assignment_status)
-                          )}
-                        >
-                          {assignmentStatusLabel(leadShift.assignment_status)}
-                        </span>
-                        <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-56 rounded-md border border-border bg-white p-2 text-[10px] text-foreground shadow-md group-hover:block group-focus-within:block">
-                          <span className="block font-semibold">
-                            {assignmentStatusDescription(leadShift.assignment_status)}
-                          </span>
-                          <span className="block text-muted-foreground">
-                            Updated by {leadShift.status_updated_by_name ?? 'Team member'} - {formatStatusTimestamp(leadShift.status_updated_at)}
-                          </span>
-                          {leadShift.status_note && (
-                            <span className="block truncate text-muted-foreground">{leadShift.status_note}</span>
-                          )}
-                          {leadShift.assignment_status === 'left_early' && leadShift.left_early_time && (
-                            <span className="block text-muted-foreground">Left at {toTimeInputValue(leadShift.left_early_time)}</span>
-                          )}
-                        </span>
-                      </span>
-                    )}
-                  </div>
+              {missingLead && (
+                <div className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700">
+                  No lead assigned
                 </div>
               )}
-              {visibleShifts.map((shift) => (
-                <div
-                  key={shift.id}
-                  onClick={(event) => event.stopPropagation()}
-                  draggable={canManageStaffing}
-                  onDragStart={
-                    canManageStaffing
-                      ? (event) =>
-                          setDragData(event, {
-                            type: 'shift',
-                            shiftId: shift.id,
-                            shiftType: shift.shift_type,
-                          })
-                      : undefined
-                  }
-                  className={cn(
-                    'rounded-md border px-2 py-1 text-xs',
-                    canManageStaffing ? 'cursor-grab active:cursor-grabbing' : '',
-                    palette.border,
-                    palette.bg,
-                    palette.text
-                  )}
-                >
-                  <div className="flex items-center gap-1.5">
-                    {canEditAssignmentStatus ? (
-                      <button
-                        type="button"
-                        className="font-medium hover:underline"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          openStatusPopoverForShift(shift, event.currentTarget)
-                        }}
-                      >
-                        {shift.full_name}
-                      </button>
-                    ) : (
-                      <span className="font-medium">{shift.full_name}</span>
+              {filteredVisibleShifts.length === 0 ? (
+                <span className="text-[11px] text-muted-foreground">No matching statuses</span>
+              ) : (
+                filteredVisibleShifts.map((shift) => (
+                  <div
+                    key={shift.id}
+                    onClick={(event) => event.stopPropagation()}
+                    draggable={canManageStaffing}
+                    onDragStart={
+                      canManageStaffing
+                        ? (event) =>
+                            setDragData(event, {
+                              type: 'shift',
+                              shiftId: shift.id,
+                              shiftType: shift.shift_type,
+                            })
+                        : undefined
+                    }
+                    className={cn(
+                      'rounded-md border px-2 py-1',
+                      shift.role === 'lead'
+                        ? 'border-amber-300 bg-amber-50 text-amber-900'
+                        : `${shiftPalette.border} ${shiftPalette.bg} ${shiftPalette.text}`
                     )}
-                    {shift.assignment_status !== 'scheduled' && (
-                      <span className="group relative inline-flex items-center">
+                  >
+                    <div className="flex items-center gap-1.5">
+                      {canEditAssignmentStatus ? (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            openStatusPopoverForShift(shift, event.currentTarget)
+                          }}
+                          className={cn(
+                            'font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                            shift.assignment_status === 'cancelled' ? 'text-red-700 line-through' : ''
+                          )}
+                        >
+                          {shift.full_name}
+                        </button>
+                      ) : (
+                        <span className={cn('font-medium', shift.assignment_status === 'cancelled' ? 'text-red-700 line-through' : '')}>
+                          {shift.full_name}
+                        </span>
+                      )}
+                      {shift.role === 'lead' && (
+                        <span className="text-[9px] font-semibold uppercase tracking-wide">Lead</span>
+                      )}
+                      {shift.assignment_status !== 'scheduled' && (
                         <span
                           className={cn(
                             'inline-flex items-center rounded border px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide',
                             assignmentStatusTone(shift.assignment_status)
                           )}
+                          title={assignmentStatusTooltip(shift) ?? undefined}
                         >
                           {assignmentStatusLabel(shift.assignment_status)}
                         </span>
-                        <span className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-56 rounded-md border border-border bg-white p-2 text-[10px] text-foreground shadow-md group-hover:block group-focus-within:block">
-                          <span className="block font-semibold">
-                            {assignmentStatusDescription(shift.assignment_status)}
-                          </span>
-                          <span className="block text-muted-foreground">
-                            Updated by {shift.status_updated_by_name ?? 'Team member'} - {formatStatusTimestamp(shift.status_updated_at)}
-                          </span>
-                          {shift.status_note && (
-                            <span className="block truncate text-muted-foreground">{shift.status_note}</span>
-                          )}
-                          {shift.assignment_status === 'left_early' && shift.left_early_time && (
-                            <span className="block text-muted-foreground">Left at {toTimeInputValue(shift.left_early_time)}</span>
-                          )}
+                      )}
+                      {canViewAvailabilityOverride && shift.availability_override && (
+                        <span
+                          className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-800"
+                          title={
+                            `Override by ${shift.availability_override_by_name ?? 'Manager'} - ${formatOverrideTimestamp(shift.availability_override_at)}${
+                              shift.availability_override_reason ? `\n${shift.availability_override_reason}` : ''
+                            }`
+                          }
+                        >
+                          Override
                         </span>
-                      </span>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-              {hiddenCount > 0 && (
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    openShiftDrawer(date, shiftType)
-                  }}
-                  className="text-xs font-medium text-muted-foreground underline-offset-2 hover:underline"
-                >
-                  +{hiddenCount} more
-                </button>
-              )}
-              {dayShifts.length === 0 && <div className="text-xs text-muted-foreground">No therapists assigned</div>}
-              {dayShifts.length > 0 && !hasStatusMatchInSlot && (
-                <div className="text-xs text-muted-foreground">No matching statuses</div>
+                ))
               )}
             </div>
+            {orderedShifts.length === 0 && <div className="text-[11px] text-muted-foreground">No therapists assigned</div>}
           </>
         ) : (
           <div className="text-xs text-muted-foreground">Outside cycle</div>
         )}
+        </div>
       </div>
     )
   }
@@ -1213,7 +1608,14 @@ export function ManagerMonthCalendar({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {toastState && (
+        <FeedbackToast
+          key={toastState.id}
+          message={toastState.message}
+          variant={toastState.variant}
+        />
+      )}
       {error && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       {success && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
@@ -1248,24 +1650,29 @@ export function ManagerMonthCalendar({
         </div>
       )}
 
-      <div className={cn('grid grid-cols-1 gap-4', staffingPoolOpen ? 'xl:grid-cols-[250px_1fr]' : 'xl:grid-cols-1')}>
+      <div
+        className={cn(
+          'grid grid-cols-1 gap-5',
+          staffingPoolOpen ? 'xl:grid-cols-[250px_minmax(0,1fr)_340px]' : 'xl:grid-cols-[minmax(0,1fr)_340px]'
+        )}
+      >
         {canManageStaffing && staffingPoolOpen && (
-          <div className="rounded-2xl border-2 border-border bg-card p-3">
+          <div className="rounded-2xl border border-border bg-card p-3 shadow-sm">
             <h3 className="text-sm font-semibold text-foreground">Staffing pool ({selectedShiftType})</h3>
             <p className="mt-1 text-xs text-muted-foreground">
               Drag therapists onto the {selectedShiftType} calendar cells.
             </p>
 
             <div className="mt-3 space-y-2">
-              {therapistsForPool.map((therapist) => (
+              {therapistsForPoolWithAvailability.map((row) => (
                 <div
-                  key={therapist.id}
+                  key={row.therapist.id}
                   draggable
                   onDragStart={(event) =>
                     setDragData(event, {
                       type: 'therapist',
-                      userId: therapist.id,
-                      shiftType: therapist.shift_type,
+                      userId: row.therapist.id,
+                      shiftType: row.therapist.shift_type,
                     })
                   }
                   className={cn(
@@ -1279,7 +1686,7 @@ export function ManagerMonthCalendar({
                       selectedShiftType === 'day' ? 'text-sky-900' : 'text-indigo-900'
                     )}
                   >
-                    {therapist.full_name}
+                    {row.therapist.full_name}
                   </div>
                   <div
                     className={cn(
@@ -1287,11 +1694,28 @@ export function ManagerMonthCalendar({
                       selectedShiftType === 'day' ? 'text-sky-700' : 'text-indigo-700'
                     )}
                   >
-                    {therapist.shift_type} shift
+                    {row.therapist.shift_type} shift
                   </div>
+                  {(row.unavailableConflict || row.prnNotOffered) && selectedDate && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {row.unavailableConflict && (
+                        <span className="rounded border border-red-300 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+                          Unavailable
+                        </span>
+                      )}
+                      {row.prnNotOffered && (
+                        <span className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                          Not offered (PRN)
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {row.unavailableConflict && row.unavailableReason && selectedDate && (
+                    <p className="mt-1 text-[10px] text-red-700">{row.unavailableReason}</p>
+                  )}
                 </div>
               ))}
-              {therapistsForPool.length === 0 && (
+              {therapistsForPoolWithAvailability.length === 0 && (
                 <p className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                   No {selectedShiftType} therapists available.
                 </p>
@@ -1311,7 +1735,7 @@ export function ManagerMonthCalendar({
           </div>
         )}
 
-        <div className="space-y-4 rounded-2xl border-2 border-border bg-card p-2">
+        <div className="space-y-4 rounded-2xl border border-border bg-card p-3 shadow-sm">
           <CalendarToolbar
             rangeLabel={rangeLabel}
             minCoverage={MIN_SHIFT_COVERAGE_PER_DAY}
@@ -1362,6 +1786,163 @@ export function ManagerMonthCalendar({
               {renderCalendarForShift(selectedShiftType)}
             </div>
           </div>
+        </div>
+
+        <div className="rounded-xl border border-border bg-white shadow-sm xl:sticky xl:top-5 xl:h-fit">
+          {selectedDate ? (
+            <>
+              <div className="border-b border-border bg-slate-50 px-4 py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">{formatCellDate(selectedDate)}</p>
+                    <p className="mt-1 text-xs text-muted-foreground capitalize">{selectedShiftType} shift</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDate(null)}
+                    className="text-lg leading-none text-slate-400 hover:text-slate-600"
+                    aria-label="Clear selected day"
+                  >
+                    x
+                  </button>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
+                  <span className="text-emerald-700">OK {selectedCounts.active} active</span>
+                  <span className="text-orange-700">OC {selectedCounts.onCall}</span>
+                  <span className="text-slate-600">LE {selectedCounts.leaveEarly}</span>
+                  <span className="text-red-700">X {selectedCounts.cancelled}</span>
+                </div>
+              </div>
+
+              <div className="max-h-[72vh] space-y-2 overflow-y-auto p-3">
+                {selectedLeadShift ? (
+                  <div className="rounded-lg border border-border bg-white px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className={cn('inline-flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-extrabold text-white', getAvatarTone(selectedLeadShift.assignment_status))}>
+                        {initials(selectedLeadShift.full_name)}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className={cn('truncate text-sm font-semibold', selectedLeadShift.assignment_status === 'cancelled' ? 'text-red-700 line-through' : 'text-slate-900')}>
+                          {selectedLeadShift.full_name}
+                        </p>
+                        <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">Lead</p>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {(['scheduled', 'on_call', 'left_early', 'cancelled'] as AssignmentStatus[]).map((status) => {
+                        const active = selectedLeadShift.assignment_status === status
+                        return (
+                          <button
+                            key={`${selectedLeadShift.id}-${status}`}
+                            type="button"
+                            onClick={() => canEditAssignmentStatus && handlePanelStatusChange(selectedLeadShift, status)}
+                            disabled={active || isStatusSaving || !canEditAssignmentStatus}
+                            className={cn(
+                              'rounded-md border px-2 py-1 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-60',
+                              active
+                                ? status === 'cancelled'
+                                  ? 'border-red-200 bg-red-50 text-red-700'
+                                  : status === 'on_call'
+                                    ? 'border-orange-200 bg-orange-50 text-orange-700'
+                                    : 'border-slate-300 bg-slate-100 text-slate-700'
+                                : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
+                            )}
+                          >
+                            {toStatusButtonLabel(status)}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="rounded-lg border border-dashed border-border bg-slate-50 px-3 py-2 text-xs text-muted-foreground">
+                    No lead assigned.
+                  </p>
+                )}
+
+                {selectedStaffShifts.map((shift) => (
+                  <div key={shift.id} className="rounded-lg border border-border bg-white px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className={cn('inline-flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-extrabold text-white', getAvatarTone(shift.assignment_status))}>
+                        {initials(shift.full_name)}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className={cn('truncate text-sm font-semibold', shift.assignment_status === 'cancelled' ? 'text-red-700 line-through' : 'text-slate-900')}>
+                          {shift.full_name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{assignmentStatusDescription(shift.assignment_status)}</p>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {(['scheduled', 'on_call', 'left_early', 'cancelled'] as AssignmentStatus[]).map((status) => {
+                        const active = shift.assignment_status === status
+                        return (
+                          <button
+                            key={`${shift.id}-${status}`}
+                            type="button"
+                            onClick={() => canEditAssignmentStatus && handlePanelStatusChange(shift, status)}
+                            disabled={active || isStatusSaving || !canEditAssignmentStatus}
+                            className={cn(
+                              'rounded-md border px-2 py-1 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-60',
+                              active
+                                ? status === 'cancelled'
+                                  ? 'border-red-200 bg-red-50 text-red-700'
+                                  : status === 'on_call'
+                                    ? 'border-orange-200 bg-orange-50 text-orange-700'
+                                    : 'border-slate-300 bg-slate-100 text-slate-700'
+                                : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'
+                            )}
+                          >
+                            {toStatusButtonLabel(status)}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+
+                {selectedDayLogs.length > 0 && (
+                  <div className="mt-3 rounded-lg border border-border bg-slate-50 px-3 py-2">
+                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-700">Change log</p>
+                    <div className="space-y-1">
+                      {selectedDayLogs.map((entry) => (
+                        <div key={entry.key} className="flex items-center gap-2 text-[11px] text-slate-600">
+                          <span className={cn('inline-flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-extrabold text-white', getAvatarTone(entry.to))}>
+                            {initials(entry.therapistName)}
+                          </span>
+                          <span className="font-semibold text-slate-700">{firstName(entry.therapistName)}</span>
+                          <span>{assignmentStatusDescription(entry.from)} -&gt;</span>
+                          <span className="font-semibold text-slate-700">{assignmentStatusDescription(entry.to)}</span>
+                          <span className="ml-auto text-slate-400">{entry.time}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {canManageStaffing && (
+                <div className="border-t border-border p-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openShiftDrawer(selectedDate, selectedShiftType)}
+                  >
+                    Manage shift staffing
+                  </Button>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="p-6 text-center">
+              <p className="text-sm font-medium text-muted-foreground">Select a day</p>
+              <p className="mt-2 text-sm font-semibold text-slate-700">Click any day to edit</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Set therapists to Active, On Call, Leave Early, or Cancelled.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1482,6 +2063,51 @@ export function ManagerMonthCalendar({
         </div>
       )}
 
+      <Dialog
+        open={Boolean(availabilityConflictDialog)}
+        onOpenChange={(open) => {
+          if (!open) closeAvailabilityConflictDialog()
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Conflicts with availability</DialogTitle>
+            <DialogDescription>
+              {availabilityConflictDialog
+                ? `${availabilityConflictDialog.therapistName} marked unavailable on ${formatCellDate(
+                    availabilityConflictDialog.date
+                  )}${
+                    availabilityConflictDialog.reason
+                      ? ` (${availabilityConflictDialog.reason})`
+                      : ''
+                  }. Assign anyway?`
+                : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label htmlFor="availability-override-reason" className="text-xs font-medium text-muted-foreground">
+              Override reason (optional)
+            </label>
+            <textarea
+              id="availability-override-reason"
+              rows={3}
+              value={availabilityOverrideReasonDraft}
+              onChange={(event) => setAvailabilityOverrideReasonDraft(event.target.value)}
+              className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm"
+              placeholder="Optional context for this override"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closeAvailabilityConflictDialog}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={confirmAvailabilityOverride}>
+              Assign anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={Boolean(drawerSlot)} onOpenChange={(open) => !open && closeShiftDrawer()}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
@@ -1555,7 +2181,7 @@ export function ManagerMonthCalendar({
                       variant="outline"
                       disabled={!drawerLeadTherapistId || isPending}
                       onClick={() =>
-                        runSetLeadAction({
+                        runActionWithAvailabilityCheck({
                           action: 'set_lead',
                           cycleId,
                           therapistId: drawerLeadTherapistId,
@@ -1578,62 +2204,80 @@ export function ManagerMonthCalendar({
                     <p className="text-sm text-muted-foreground">No therapists assigned yet.</p>
                   )}
                   {drawerShifts.map((shift) => (
-                    <div
-                      key={shift.id}
-                      className="flex items-center justify-between rounded-md border border-border px-3 py-2"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-foreground">{shift.full_name}</span>
-                        {shift.role === 'lead' && (
-                          <span className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
-                            Lead
-                          </span>
-                        )}
-                        {canEditAssignmentStatus ? (
-                          <button
+                    <Fragment key={shift.id}>
+                      <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-foreground">{shift.full_name}</span>
+                          {shift.role === 'lead' && (
+                            <span className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                              Lead
+                            </span>
+                          )}
+                          {canEditAssignmentStatus ? (
+                            <button
+                              type="button"
+                              className={cn(
+                                'rounded border px-1.5 py-0.5 text-[10px] font-medium',
+                                assignmentStatusTone(shift.assignment_status)
+                              )}
+                              title={assignmentStatusTooltip(shift) ?? undefined}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                openStatusPopoverForShift(shift, event.currentTarget)
+                              }}
+                            >
+                              {assignmentStatusLabel(shift.assignment_status)}
+                            </button>
+                          ) : (
+                            <span
+                              className={cn(
+                                'rounded border px-1.5 py-0.5 text-[10px] font-medium',
+                                assignmentStatusTone(shift.assignment_status)
+                              )}
+                              title={assignmentStatusTooltip(shift) ?? undefined}
+                            >
+                              {assignmentStatusLabel(shift.assignment_status)}
+                            </span>
+                          )}
+                          {canViewAvailabilityOverride && shift.availability_override && (
+                            <span
+                              className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800"
+                              title={
+                                `Override by ${shift.availability_override_by_name ?? 'Manager'} - ${formatOverrideTimestamp(shift.availability_override_at)}${
+                                  shift.availability_override_reason ? `\n${shift.availability_override_reason}` : ''
+                                }`
+                              }
+                            >
+                              Override
+                            </span>
+                          )}
+                        </div>
+                        {canManageStaffing && (
+                          <Button
                             type="button"
-                            className={cn(
-                              'rounded border px-1.5 py-0.5 text-[10px] font-medium',
-                              assignmentStatusTone(shift.assignment_status)
-                            )}
-                            title={assignmentStatusTooltip(shift) ?? undefined}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              openStatusPopoverForShift(shift, event.currentTarget)
-                            }}
+                            size="sm"
+                            variant="ghost"
+                            className="text-[var(--warning-text)]"
+                            onClick={() =>
+                              runActionWithAvailabilityCheck({
+                                action: 'remove',
+                                cycleId,
+                                shiftId: shift.id,
+                              })
+                            }
                           >
-                            {assignmentStatusLabel(shift.assignment_status)}
-                          </button>
-                        ) : (
-                          <span
-                            className={cn(
-                              'rounded border px-1.5 py-0.5 text-[10px] font-medium',
-                              assignmentStatusTone(shift.assignment_status)
-                            )}
-                            title={assignmentStatusTooltip(shift) ?? undefined}
-                          >
-                            {assignmentStatusLabel(shift.assignment_status)}
-                          </span>
+                            Remove
+                          </Button>
                         )}
                       </div>
-                      {canManageStaffing && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="text-[var(--warning-text)]"
-                          onClick={() =>
-                            runDragAction({
-                              action: 'remove',
-                              cycleId,
-                              shiftId: shift.id,
-                            })
-                          }
-                        >
-                          Remove
-                        </Button>
+                      {canViewAvailabilityOverride && shift.availability_override && (
+                        <div className="px-3 pb-2 text-[11px] text-amber-800">
+                          Override by {shift.availability_override_by_name ?? 'Manager'} on{' '}
+                          {formatOverrideTimestamp(shift.availability_override_at)}
+                          {shift.availability_override_reason ? ` - ${shift.availability_override_reason}` : ''}
+                        </div>
                       )}
-                    </div>
+                    </Fragment>
                   ))}
                 </div>
 
@@ -1645,9 +2289,10 @@ export function ManagerMonthCalendar({
                       className="h-9 min-w-64 rounded-md border border-border bg-white px-3 text-sm"
                     >
                       <option value="">Add therapist</option>
-                      {drawerStaffAddOptions.map((therapist) => (
-                        <option key={therapist.id} value={therapist.id}>
-                          {therapist.full_name}
+                      {drawerStaffAddOptions.map((option) => (
+                        <option key={option.therapist.id} value={option.therapist.id}>
+                          {option.therapist.full_name}
+                          {option.unavailableConflict ? ' - Unavailable' : option.prnNotOffered ? ' - Not offered (PRN)' : ''}
                         </option>
                       ))}
                     </select>
@@ -1656,7 +2301,7 @@ export function ManagerMonthCalendar({
                       variant="outline"
                       disabled={!drawerAddTherapistId || isPending}
                       onClick={() => {
-                        runDragAction({
+                        runActionWithAvailabilityCheck({
                           action: 'assign',
                           cycleId,
                           userId: drawerAddTherapistId,
@@ -1669,6 +2314,30 @@ export function ManagerMonthCalendar({
                     >
                       Add staff
                     </Button>
+                  </div>
+                )}
+                {canManageStaffing && drawerStaffAddOptions.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {drawerStaffAddOptions
+                      .filter((option) => option.unavailableConflict || option.prnNotOffered)
+                      .map((option) => (
+                        <div key={`availability-flag-${option.therapist.id}`} className="flex flex-wrap items-center gap-1 text-[11px]">
+                          <span className="font-medium text-foreground">{option.therapist.full_name}</span>
+                          {option.unavailableConflict && (
+                            <span className="rounded border border-red-300 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+                              Unavailable
+                            </span>
+                          )}
+                          {option.prnNotOffered && (
+                            <span className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                              Not offered (PRN)
+                            </span>
+                          )}
+                          {option.unavailableConflict && option.unavailableReason && (
+                            <span className="text-red-700">{option.unavailableReason}</span>
+                          )}
+                        </div>
+                      ))}
                   </div>
                 )}
               </div>

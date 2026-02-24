@@ -4,10 +4,10 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { FormSubmitButton } from '@/components/form-submit-button'
-import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
 import { buildScheduleUrl } from '@/lib/schedule-helpers'
 import type { Cycle, ViewMode } from '@/app/schedule/types'
 
@@ -37,22 +37,12 @@ export function ScheduleDrawerControls({
   const baseParams = showUnavailable ? { show_unavailable: 'true' } : undefined
   const baseUrl = buildScheduleUrl(activeCycleId, viewMode, baseParams)
 
-  function openPanel() {
-    router.push(buildScheduleUrl(activeCycleId, viewMode, { ...baseParams, panel: 'setup' }))
-  }
-
   function closePanel() {
     router.push(baseUrl)
   }
 
   return (
     <>
-      <div className="no-print flex flex-wrap items-center gap-2">
-        <Button type="button" variant="secondary" onClick={openPanel}>
-          Setup
-        </Button>
-      </div>
-
       <Dialog open={activePanel === 'setup'} onOpenChange={(open) => !open && closePanel()}>
         <DialogContent
           showCloseButton

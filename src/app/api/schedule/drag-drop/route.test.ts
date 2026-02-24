@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { POST } from '@/app/api/schedule/drag-drop/route'
 import { createClient } from '@/lib/supabase/server'
 import { setDesignatedLeadMutation } from '@/lib/set-designated-lead'
+import { notifyUsers } from '@/lib/notifications'
+import { writeAuditLog } from '@/lib/audit-log'
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
@@ -10,6 +12,14 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/set-designated-lead', () => ({
   setDesignatedLeadMutation: vi.fn(),
+}))
+
+vi.mock('@/lib/notifications', () => ({
+  notifyUsers: vi.fn(async () => undefined),
+}))
+
+vi.mock('@/lib/audit-log', () => ({
+  writeAuditLog: vi.fn(async () => undefined),
 }))
 
 type Scenario = {
@@ -26,6 +36,25 @@ type Scenario = {
     shift_type: 'day' | 'night'
     role: 'lead' | 'staff'
   } | null
+  availabilityRows?: Array<{
+    therapist_id: string
+    cycle_id: string
+    date: string
+    entry_type: 'unavailable' | 'available'
+    shift_type: 'day' | 'night' | 'both'
+    reason: string | null
+  }>
+  therapistProfiles?: Record<
+    string,
+    {
+      role?: string
+      is_lead_eligible?: boolean
+      full_name?: string
+      employment_type?: 'full_time' | 'part_time' | 'prn'
+      max_work_days_per_week?: number
+    }
+  >
+  insertError?: { code?: string; message?: string } | null
 }
 
 function makeSupabaseMock(scenario: Scenario) {
@@ -35,8 +64,48 @@ function makeSupabaseMock(scenario: Scenario) {
     end_date: '2026-03-31',
   }
 
+  const insertedShiftPayloads: Array<Record<string, unknown>> = []
+
   const auth = {
     getUser: async () => ({ data: { user: { id: 'manager-1' } } }),
+  }
+
+  const profileById = (id: string) => {
+    if (id === 'manager-1') {
+      return {
+        role: 'manager',
+        is_lead_eligible: false,
+        full_name: 'Manager',
+        employment_type: 'full_time',
+        max_work_days_per_week: 3,
+      }
+    }
+    if (id === 'therapist-lead') {
+      return {
+        role: scenario.leadTherapistRole ?? 'therapist',
+        is_lead_eligible: scenario.leadTherapistEligible ?? true,
+        full_name: 'Lead Therapist',
+        employment_type: 'full_time',
+        max_work_days_per_week: 3,
+      }
+    }
+    const custom = scenario.therapistProfiles?.[id]
+    if (custom) {
+      return {
+        role: custom.role ?? 'therapist',
+        is_lead_eligible: custom.is_lead_eligible ?? false,
+        full_name: custom.full_name ?? id,
+        employment_type: custom.employment_type ?? 'full_time',
+        max_work_days_per_week: custom.max_work_days_per_week ?? 3,
+      }
+    }
+    return {
+      role: 'therapist',
+      is_lead_eligible: false,
+      full_name: id,
+      employment_type: 'full_time',
+      max_work_days_per_week: 3,
+    }
   }
 
   const from = (table: string) => {
@@ -44,30 +113,29 @@ function makeSupabaseMock(scenario: Scenario) {
       table: string
       op: 'select' | 'insert' | 'update' | 'delete'
       filters: Record<string, unknown>
+      insertPayload?: Record<string, unknown>
     } = { table, op: 'select', filters: {} }
 
     const resolveSelect = (single: boolean) => {
       if (table === 'profiles') {
-        if (state.filters.id === 'manager-1') {
-          return { data: { role: 'manager' }, error: null }
+        if (typeof state.filters.id === 'string') {
+          return { data: profileById(state.filters.id), error: null }
         }
-        if (state.filters.id === 'therapist-lead') {
-          return {
-            data: {
-              id: 'therapist-lead',
-              role: scenario.leadTherapistRole ?? 'therapist',
-              is_lead_eligible: scenario.leadTherapistEligible ?? true,
-              max_work_days_per_week: 3,
-              employment_type: 'full_time',
-            },
-            error: null,
-          }
-        }
-        return { data: { max_work_days_per_week: 3, employment_type: 'full_time' }, error: null }
+        return { data: single ? null : [], error: null }
       }
 
       if (table === 'schedule_cycles') {
         return { data: cycle, error: null }
+      }
+
+      if (table === 'availability_entries') {
+        const rows = (scenario.availabilityRows ?? []).filter((row) => {
+          if (state.filters.therapist_id && row.therapist_id !== state.filters.therapist_id) return false
+          if (state.filters.cycle_id && row.cycle_id !== state.filters.cycle_id) return false
+          if (state.filters.date && row.date !== state.filters.date) return false
+          return true
+        })
+        return { data: rows, error: null }
       }
 
       if (table === 'shifts') {
@@ -111,6 +179,13 @@ function makeSupabaseMock(scenario: Scenario) {
           return { data: scenario.weeklyShifts, error: null }
         }
 
+        if (state.op === 'insert' && single) {
+          if (scenario.insertError) {
+            return { data: null, error: scenario.insertError }
+          }
+          return { data: { id: 'shift-new-1' }, error: null }
+        }
+
         return { data: single ? null : [], error: null }
       }
 
@@ -120,24 +195,24 @@ function makeSupabaseMock(scenario: Scenario) {
     const resolveMutation = () => ({ error: null })
 
     const builder: {
-      select: (columns: string) => typeof builder
+      select: (columns?: string) => typeof builder
       eq: (column: string, value: unknown) => typeof builder
       neq: (column: string, value: unknown) => typeof builder
       gte: (column: string, value: unknown) => typeof builder
       lte: (column: string, value: unknown) => typeof builder
-      maybeSingle: () => Promise<{ data: unknown; error: { message: string } | null }>
-      insert: (payload: unknown) => Promise<{ error: { code?: string; message?: string } | null }>
+      maybeSingle: () => Promise<{ data: unknown; error: { code?: string; message?: string } | null }>
+      single: () => Promise<{ data: unknown; error: { code?: string; message?: string } | null }>
+      insert: (payload: Record<string, unknown>) => typeof builder
       update: (payload: unknown) => typeof builder
       delete: () => typeof builder
-      then: <TResult1 = { data: unknown; error: { message: string } | null }, TResult2 = never>(
+      then: <TResult1 = { data: unknown; error: { code?: string; message?: string } | null }, TResult2 = never>(
         onfulfilled?:
-          | ((value: { data: unknown; error: { message: string } | null }) => TResult1 | PromiseLike<TResult1>)
+          | ((value: { data: unknown; error: { code?: string; message?: string } | null }) => TResult1 | PromiseLike<TResult1>)
           | null,
         onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
       ) => Promise<TResult1 | TResult2>
     } = {
       select: () => {
-        state.op = 'select'
         return builder
       },
       eq: (column, value) => {
@@ -157,9 +232,12 @@ function makeSupabaseMock(scenario: Scenario) {
         return builder
       },
       maybeSingle: async () => resolveSelect(true),
-      insert: async () => {
+      single: async () => resolveSelect(true),
+      insert: (payload) => {
         state.op = 'insert'
-        return resolveMutation()
+        state.insertPayload = payload
+        insertedShiftPayloads.push(payload)
+        return builder
       },
       update: () => {
         state.op = 'update'
@@ -170,10 +248,7 @@ function makeSupabaseMock(scenario: Scenario) {
         return builder
       },
       then: (onfulfilled, onrejected) => {
-        const result =
-          state.op === 'select'
-            ? Promise.resolve(resolveSelect(false))
-            : Promise.resolve(resolveMutation())
+        const result = state.op === 'select' ? Promise.resolve(resolveSelect(false)) : Promise.resolve(resolveMutation())
         return result.then(onfulfilled, onrejected)
       },
     }
@@ -181,7 +256,7 @@ function makeSupabaseMock(scenario: Scenario) {
     return builder
   }
 
-  return { auth, from }
+  return { auth, from, insertedShiftPayloads }
 }
 
 describe('drag-drop API behavior', () => {
@@ -249,6 +324,141 @@ describe('drag-drop API behavior', () => {
     expect(response.status).toBe(409)
     await expect(response.json()).resolves.toMatchObject({
       error: 'Therapists are limited to 3 day(s) per week unless override is enabled.',
+    })
+  })
+
+  it('returns 409 availability conflict when therapist marked unavailable and no override provided', async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      makeSupabaseMock({
+        coverageStatuses: ['scheduled', 'scheduled'],
+        weeklyShifts: [],
+        therapistProfiles: {
+          'therapist-1': {
+            full_name: 'Alex Jones',
+            employment_type: 'full_time',
+          },
+        },
+        availabilityRows: [
+          {
+            therapist_id: 'therapist-1',
+            cycle_id: 'cycle-1',
+            date: '2026-03-10',
+            entry_type: 'unavailable',
+            shift_type: 'both',
+            reason: 'Vacation',
+          },
+        ],
+      }) as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'assign',
+          cycleId: 'cycle-1',
+          userId: 'therapist-1',
+          shiftType: 'day',
+          date: '2026-03-10',
+          overrideWeeklyRules: false,
+        }),
+      })
+    )
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'availability_conflict',
+      availability: {
+        therapistName: 'Alex Jones',
+        reason: 'Vacation',
+      },
+    })
+  })
+
+  it('assigns unavailable therapist when override confirmed and records override metadata', async () => {
+    const supabase = makeSupabaseMock({
+      coverageStatuses: ['scheduled', 'scheduled'],
+      weeklyShifts: [],
+      therapistProfiles: {
+        'therapist-1': {
+          full_name: 'Alex Jones',
+          employment_type: 'full_time',
+        },
+      },
+      availabilityRows: [
+        {
+          therapist_id: 'therapist-1',
+          cycle_id: 'cycle-1',
+          date: '2026-03-10',
+          entry_type: 'unavailable',
+          shift_type: 'both',
+          reason: 'Doctor appointment',
+        },
+      ],
+    })
+    vi.mocked(createClient).mockResolvedValue(supabase as Awaited<ReturnType<typeof createClient>>)
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'assign',
+          cycleId: 'cycle-1',
+          userId: 'therapist-1',
+          shiftType: 'day',
+          date: '2026-03-10',
+          overrideWeeklyRules: false,
+          availabilityOverride: true,
+          availabilityOverrideReason: 'Coverage emergency',
+        }),
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(supabase.insertedShiftPayloads[0]).toMatchObject({
+      availability_override: true,
+      availability_override_reason: 'Coverage emergency',
+      availability_override_by: 'manager-1',
+    })
+    expect(writeAuditLog).toHaveBeenCalled()
+    expect(notifyUsers).toHaveBeenCalled()
+  })
+
+  it('does not block PRN assignment when no AVAILABLE entry exists (soft warning path)', async () => {
+    const supabase = makeSupabaseMock({
+      coverageStatuses: ['scheduled'],
+      weeklyShifts: [],
+      therapistProfiles: {
+        'therapist-1': {
+          full_name: 'PRN Alex',
+          employment_type: 'prn',
+        },
+      },
+      availabilityRows: [],
+    })
+    vi.mocked(createClient).mockResolvedValue(supabase as Awaited<ReturnType<typeof createClient>>)
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'assign',
+          cycleId: 'cycle-1',
+          userId: 'therapist-1',
+          shiftType: 'day',
+          date: '2026-03-10',
+          overrideWeeklyRules: false,
+        }),
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(supabase.insertedShiftPayloads[0]).toMatchObject({
+      availability_override: false,
+      availability_override_reason: null,
     })
   })
 
@@ -397,4 +607,3 @@ describe('drag-drop API behavior', () => {
     })
   })
 })
-

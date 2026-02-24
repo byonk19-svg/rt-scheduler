@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
-import { ScheduleListTable, type ScheduleListRow } from '@/app/schedule/schedule-list-table'
 import { ScheduleDrawerControls } from '@/app/schedule/schedule-drawer-controls'
 import { AffectedShiftsDrawer } from '@/app/schedule/affected-shifts-drawer'
 import { AttentionBar } from '@/components/AttentionBar'
@@ -12,8 +11,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { ManagerMonthCalendar } from '@/components/manager-month-calendar'
+import { ManagerWeekCalendar } from '@/components/manager-week-calendar'
 import { PrintSchedule } from '@/components/print-schedule'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { getManagerAttentionSnapshot } from '@/lib/manager-workflow'
 import { summarizeShiftSlotViolations } from '@/lib/schedule-rule-validation'
 import { MIN_SHIFT_COVERAGE_PER_DAY, MAX_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
@@ -21,13 +20,12 @@ import { createClient } from '@/lib/supabase/server'
 import { getSchedulingEligibleEmployees } from '@/lib/employee-directory'
 import {
   createCycleAction,
-  deleteShiftAction,
   generateDraftScheduleAction,
   resetDraftScheduleAction,
   toggleCyclePublishedAction,
 } from './actions'
 import type { CalendarShift, Cycle, Role, ScheduleSearchParams, ShiftRow, Therapist, ViewMode } from './types'
-import { buildDateRange, buildScheduleUrl, formatDate, getOne, getScheduleFeedback, getSearchParam, normalizeViewMode } from '@/lib/schedule-helpers'
+import { buildDateRange, buildScheduleUrl, getOne, getScheduleFeedback, getSearchParam, normalizeViewMode } from '@/lib/schedule-helpers'
 import type { AssignmentStatus, ShiftStatus } from './types'
 
 type IssueFilter =
@@ -48,6 +46,14 @@ type AuditLogRow = {
   profiles: { full_name: string } | { full_name: string }[] | null
 }
 
+type AvailabilityEntryRow = {
+  therapist_id: string
+  date: string
+  shift_type: 'day' | 'night' | 'both'
+  entry_type: 'unavailable' | 'available'
+  reason: string | null
+}
+
 function formatAuditAction(value: string): string {
   if (value === 'shift_added') return 'added a shift'
   if (value === 'shift_removed') return 'removed a shift'
@@ -58,7 +64,16 @@ function formatAuditAction(value: string): string {
 
 type RawShiftRow = Omit<
   ShiftRow,
-  'assignment_status' | 'status_note' | 'left_early_time' | 'status_updated_at' | 'status_updated_by' | 'profiles'
+  | 'assignment_status'
+  | 'status_note'
+  | 'left_early_time'
+  | 'status_updated_at'
+  | 'status_updated_by'
+  | 'availability_override'
+  | 'availability_override_reason'
+  | 'availability_override_at'
+  | 'availability_override_by'
+  | 'profiles'
 > & {
   profiles?:
     | { full_name: string; is_lead_eligible: boolean }
@@ -69,6 +84,10 @@ type RawShiftRow = Omit<
   left_early_time?: string | null
   status_updated_at?: string | null
   status_updated_by?: string | null
+  availability_override?: boolean | null
+  availability_override_reason?: string | null
+  availability_override_at?: string | null
+  availability_override_by?: string | null
 }
 
 function toAssignmentStatus(status: ShiftStatus, assignmentStatus?: AssignmentStatus | null): AssignmentStatus {
@@ -86,6 +105,10 @@ function normalizeShiftRows(rows: RawShiftRow[]): ShiftRow[] {
     left_early_time: row.left_early_time ?? null,
     status_updated_at: row.status_updated_at ?? null,
     status_updated_by: row.status_updated_by ?? null,
+    availability_override: row.availability_override ?? false,
+    availability_override_reason: row.availability_override_reason ?? null,
+    availability_override_at: row.availability_override_at ?? null,
+    availability_override_by: row.availability_override_by ?? null,
   }))
 }
 
@@ -131,11 +154,12 @@ export default async function SchedulePage({
       profile?.is_lead_eligible === true)
   const canManageStaffing = role === 'manager'
   // Staff can view month status indicators read-only; only lead/manager can edit.
-  const canAccessMonthCalendar = canManageStaffing || role === 'therapist'
+  const canAccessCoverageCalendar = canManageStaffing || role === 'therapist'
   const defaultCalendarView = profile?.default_calendar_view === 'night' ? 'night' : 'day'
-  if (!canAccessMonthCalendar && viewMode === 'calendar') {
-    viewMode = 'grid'
+  if (!canAccessCoverageCalendar && (viewMode === 'calendar' || viewMode === 'week')) {
+    viewMode = 'week'
   }
+  const isManagerCoverageView = role === 'manager' && (viewMode === 'calendar' || viewMode === 'week')
   const managerAttention = role === 'manager' ? await getManagerAttentionSnapshot(supabase) : null
 
   let cyclesQuery = supabase
@@ -161,13 +185,13 @@ export default async function SchedulePage({
     let shiftsQuery = supabase
       .from('shifts')
       .select(
-        'id, date, shift_type, status, assignment_status, status_note, left_early_time, status_updated_at, status_updated_by, role, user_id, profiles:profiles!shifts_user_id_fkey(full_name, is_lead_eligible)'
+        'id, date, shift_type, status, assignment_status, status_note, left_early_time, status_updated_at, status_updated_by, availability_override, availability_override_reason, availability_override_at, availability_override_by, role, user_id, profiles:profiles!shifts_user_id_fkey(full_name, is_lead_eligible)'
       )
       .eq('cycle_id', activeCycle.id)
       .order('date', { ascending: true })
       .order('shift_type', { ascending: true })
 
-    if (role !== 'manager' && viewMode !== 'calendar') {
+    if (role !== 'manager' && viewMode !== 'calendar' && viewMode !== 'week') {
       shiftsQuery = shiftsQuery.eq('user_id', user.id)
     }
 
@@ -182,7 +206,11 @@ export default async function SchedulePage({
         shiftErrorMessage.includes('status_note') ||
         shiftErrorMessage.includes('left_early_time') ||
         shiftErrorMessage.includes('status_updated_at') ||
-        shiftErrorMessage.includes('status_updated_by')
+        shiftErrorMessage.includes('status_updated_by') ||
+        shiftErrorMessage.includes('availability_override') ||
+        shiftErrorMessage.includes('availability_override_reason') ||
+        shiftErrorMessage.includes('availability_override_at') ||
+        shiftErrorMessage.includes('availability_override_by')
 
       if (!missingAssignmentStatusFields) {
         console.warn(
@@ -202,7 +230,7 @@ export default async function SchedulePage({
         .order('date', { ascending: true })
         .order('shift_type', { ascending: true })
 
-      if (role !== 'manager' && viewMode !== 'calendar') {
+      if (role !== 'manager' && viewMode !== 'calendar' && viewMode !== 'week') {
         legacyShiftsQuery = legacyShiftsQuery.eq('user_id', user.id)
       }
 
@@ -223,60 +251,92 @@ export default async function SchedulePage({
           role: 'lead' | 'staff'
           user_id: string
         }>
-
-        const legacyUserIds = Array.from(new Set(legacyRows.map((row) => row.user_id)))
-        const profileMap = new Map<string, { full_name: string; is_lead_eligible: boolean }>()
-        if (legacyUserIds.length > 0) {
-          const { data: fallbackProfilesData, error: fallbackProfilesError } = await supabase
-            .from('profiles')
-            .select('id, full_name, is_lead_eligible')
-            .in('id', legacyUserIds)
-
-          if (fallbackProfilesError) {
-            console.warn(
-              'Could not hydrate profile names for fallback shifts query.',
-              fallbackProfilesError.message || fallbackProfilesError
-            )
-          } else {
-            for (const row of fallbackProfilesData ?? []) {
-              const id = String(row.id ?? '')
-              if (!id) continue
-              profileMap.set(id, {
-                full_name: String(row.full_name ?? 'Unknown'),
-                is_lead_eligible: Boolean(row.is_lead_eligible),
-              })
-            }
-          }
-        }
-
         shifts = normalizeShiftRows(
           legacyRows.map((row) => ({
             ...row,
-            profiles: profileMap.get(row.user_id) ?? null,
+            profiles: null,
           }))
         )
       }
     }
   }
 
-  const statusUpdatedByIds = Array.from(
-    new Set(
-      shifts
-        .map((shift) => shift.status_updated_by)
-        .filter((value): value is string => typeof value === 'string' && value.length > 0)
-    )
-  )
-  const statusUpdatedByNameMap = new Map<string, string>()
-  if (statusUpdatedByIds.length > 0) {
-    const { data: updaterProfiles } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .in('id', statusUpdatedByIds)
+  const profileByUserId = new Map<string, { full_name: string; is_lead_eligible: boolean }>()
+  for (const shift of shifts) {
+    const shiftProfile = getOne(shift.profiles)
+    if (!shiftProfile) continue
+    profileByUserId.set(shift.user_id, {
+      full_name: String(shiftProfile.full_name ?? 'Unknown'),
+      is_lead_eligible: Boolean(shiftProfile.is_lead_eligible),
+    })
+  }
 
-    for (const row of updaterProfiles ?? []) {
-      const updaterId = String(row.id ?? '')
-      if (!updaterId) continue
-      statusUpdatedByNameMap.set(updaterId, String(row.full_name ?? 'Team member'))
+  const unresolvedProfileIds = new Set<string>()
+  for (const shift of shifts) {
+    if (!profileByUserId.has(shift.user_id)) {
+      unresolvedProfileIds.add(shift.user_id)
+    }
+    if (shift.status_updated_by && !profileByUserId.has(shift.status_updated_by)) {
+      unresolvedProfileIds.add(shift.status_updated_by)
+    }
+    if (shift.availability_override_by && !profileByUserId.has(shift.availability_override_by)) {
+      unresolvedProfileIds.add(shift.availability_override_by)
+    }
+  }
+
+  if (unresolvedProfileIds.size > 0) {
+    const unresolvedIds = Array.from(unresolvedProfileIds)
+    const { data: unresolvedProfiles, error: unresolvedProfilesError } = await supabase
+      .from('profiles')
+      .select('id, full_name, is_lead_eligible')
+      .in('id', unresolvedIds)
+
+    if (unresolvedProfilesError) {
+      console.warn(
+        'Could not resolve one or more profile names for schedule coverage view.',
+        unresolvedProfilesError.message || unresolvedProfilesError
+      )
+    } else {
+      for (const row of unresolvedProfiles ?? []) {
+        const id = String(row.id ?? '')
+        if (!id) continue
+        profileByUserId.set(id, {
+          full_name: String(row.full_name ?? 'Unknown'),
+          is_lead_eligible: Boolean(row.is_lead_eligible),
+        })
+      }
+    }
+  }
+
+  shifts = shifts.map((shift) => {
+    if (getOne(shift.profiles)) return shift
+    const fallbackProfile = profileByUserId.get(shift.user_id)
+    if (!fallbackProfile) return shift
+    return {
+      ...shift,
+      profiles: {
+        full_name: fallbackProfile.full_name,
+        is_lead_eligible: fallbackProfile.is_lead_eligible,
+      },
+    }
+  })
+
+  const statusUpdatedByNameMap = new Map<string, string>()
+  const availabilityOverrideByNameMap = new Map<string, string>()
+  for (const shift of shifts) {
+    const updaterId = shift.status_updated_by
+    if (!updaterId) continue
+    const updaterProfile = profileByUserId.get(updaterId)
+    if (updaterProfile) {
+      statusUpdatedByNameMap.set(updaterId, updaterProfile.full_name)
+    }
+  }
+  for (const shift of shifts) {
+    const overrideById = shift.availability_override_by
+    if (!overrideById) continue
+    const profileForOverride = profileByUserId.get(overrideById)
+    if (profileForOverride) {
+      availabilityOverrideByNameMap.set(overrideById, profileForOverride.full_name)
     }
   }
 
@@ -307,21 +367,26 @@ export default async function SchedulePage({
       ? normalizedTherapists
       : getSchedulingEligibleEmployees(normalizedTherapists)
   }
-  const cycleDates = activeCycle ? buildDateRange(activeCycle.start_date, activeCycle.end_date) : []
-  const shiftsByDate = new Map<string, { day: ShiftRow[]; night: ShiftRow[] }>()
-  for (const date of cycleDates) {
-    shiftsByDate.set(date, { day: [], night: [] })
-  }
 
-  for (const shift of shifts) {
-    const row = shiftsByDate.get(shift.date) ?? { day: [], night: [] }
-    if (shift.shift_type === 'night') {
-      row.night.push(shift)
+  let availabilityEntries: AvailabilityEntryRow[] = []
+  if (role === 'manager' && activeCycle) {
+    const { data: availabilityData, error: availabilityError } = await supabase
+      .from('availability_entries')
+      .select('therapist_id, date, shift_type, entry_type, reason')
+      .eq('cycle_id', activeCycle.id)
+      .gte('date', activeCycle.start_date)
+      .lte('date', activeCycle.end_date)
+
+    if (availabilityError) {
+      console.warn(
+        'Could not load availability entries for schedule guardrails.',
+        availabilityError.message || availabilityError
+      )
     } else {
-      row.day.push(shift)
+      availabilityEntries = (availabilityData ?? []) as AvailabilityEntryRow[]
     }
-    shiftsByDate.set(shift.date, row)
   }
+  const cycleDates = activeCycle ? buildDateRange(activeCycle.start_date, activeCycle.end_date) : []
 
   const shiftByUserDate = new Map<string, ShiftRow>()
   for (const shift of shifts) {
@@ -340,6 +405,13 @@ export default async function SchedulePage({
     status_updated_by: shift.status_updated_by,
     status_updated_by_name: shift.status_updated_by
       ? statusUpdatedByNameMap.get(shift.status_updated_by) ?? 'Team member'
+      : null,
+    availability_override: Boolean(shift.availability_override),
+    availability_override_reason: shift.availability_override_reason,
+    availability_override_at: shift.availability_override_at,
+    availability_override_by: shift.availability_override_by,
+    availability_override_by_name: shift.availability_override_by
+      ? availabilityOverrideByNameMap.get(shift.availability_override_by) ?? 'Manager'
       : null,
     role: shift.role,
     user_id: shift.user_id,
@@ -412,16 +484,6 @@ export default async function SchedulePage({
     }
   }
 
-  const leadNameBySlot = new Map<string, string | null>()
-  for (const shift of shifts) {
-    const slotKey = `${shift.date}:${shift.shift_type}`
-    if (shift.role === 'lead') {
-      leadNameBySlot.set(slotKey, getOne(shift.profiles)?.full_name ?? 'Unknown')
-    } else if (!leadNameBySlot.has(slotKey)) {
-      leadNameBySlot.set(slotKey, null)
-    }
-  }
-
   const slotValidation =
     role === 'manager'
       ? summarizeShiftSlotViolations({
@@ -463,13 +525,13 @@ export default async function SchedulePage({
   const focusSlotKey =
     normalizedFocusSlot ?? (focusMode === 'first' ? filteredSlotIssues[0]?.slotKey ?? null : null)
 
-  const slotIssuesByKey = new Map((slotValidation?.issues ?? []).map((issue) => [issue.slotKey, issue]))
   const issueReasonsBySlot = Object.fromEntries(
     (slotValidation?.issues ?? []).map((issue) => [issue.slotKey, issue.reasons])
   )
   const scheduledShifts = shifts.filter(
     (shift) => shift.status === 'scheduled' || shift.status === 'on_call'
   )
+  const availabilityOverrideCount = shifts.filter((shift) => shift.availability_override).length
   const dayShiftCount = scheduledShifts.filter((shift) => shift.shift_type === 'day').length
   const nightShiftCount = scheduledShifts.filter((shift) => shift.shift_type === 'night').length
   const publishSummary =
@@ -488,7 +550,7 @@ export default async function SchedulePage({
       : null
 
   let recentActivity: AuditLogRow[] = []
-  if (role === 'manager' && viewMode === 'calendar') {
+  if (isManagerCoverageView) {
     const { data: auditRows } = await supabase
       .from('audit_log')
       .select('id, action, target_type, target_id, created_at, user_id, profiles(full_name)')
@@ -496,17 +558,6 @@ export default async function SchedulePage({
       .limit(10)
     recentActivity = (auditRows ?? []) as AuditLogRow[]
   }
-
-  const scheduleListRows: ScheduleListRow[] = shifts.map((shift) => ({
-    id: shift.id,
-    date: shift.date,
-    therapistName: getOne(shift.profiles)?.full_name ?? 'Unknown',
-    shiftType: shift.shift_type,
-    status: shift.status,
-    role: shift.role,
-    slotLeadName: leadNameBySlot.get(`${shift.date}:${shift.shift_type}`) ?? null,
-    slotMissingLead: Boolean(slotIssuesByKey.get(`${shift.date}:${shift.shift_type}`)?.reasons.includes('missing_lead')),
-  }))
 
   const showUnavailableParam = showUnavailable ? 'true' : undefined
   const buildIssueFilterUrl = (
@@ -538,7 +589,7 @@ export default async function SchedulePage({
           </CardHeader>
           <CardContent>
             <Button asChild size="sm">
-              <Link href={buildScheduleUrl(activeCycleId, 'grid')}>View published schedule</Link>
+              <Link href={buildScheduleUrl(activeCycleId, 'week')}>View published schedule</Link>
             </Button>
           </CardContent>
         </Card>
@@ -549,24 +600,30 @@ export default async function SchedulePage({
         viewMode={viewMode}
         activeCycleId={activeCycleId}
         activeCyclePublished={Boolean(activeCycle?.published)}
+        setupHref={
+          role === 'manager'
+            ? buildScheduleUrl(activeCycleId, viewMode, {
+                show_unavailable: showUnavailableParam,
+                panel: 'setup',
+              })
+            : undefined
+        }
         title={
           viewMode === 'calendar'
             ? 'Month Calendar'
-            : viewMode === 'grid'
-              ? 'Schedule Grid'
-              : 'Schedule List'
+            : 'Week Roster'
         }
         description={
           role === 'manager'
-            ? 'Use tabs to switch views, then publish when this cycle is ready.'
-            : 'View published cycles using Grid, List, or Month.'
+            ? 'Use Week for full roster details and Month for full-cycle coverage.'
+            : 'View published cycles in Week or Month.'
         }
         toggleCyclePublishedAction={toggleCyclePublishedAction}
         generateDraftScheduleAction={generateDraftScheduleAction}
         resetDraftScheduleAction={resetDraftScheduleAction}
         publishSummary={publishSummary}
         showUnavailable={showUnavailable}
-        canViewMonth={canAccessMonthCalendar}
+        canViewMonth={canAccessCoverageCalendar}
       />
 
       {role === 'manager' && (
@@ -581,69 +638,7 @@ export default async function SchedulePage({
         />
       )}
 
-      {role === 'manager' && viewMode === 'calendar' && managerAttention && (
-        <AttentionBar snapshot={managerAttention} variant="compact" context="coverage" />
-      )}
-      {role === 'manager' && viewMode === 'calendar' && activeCycle && slotValidation && (
-        <Card className="no-print">
-          <CardContent className="space-y-3 py-4">
-            <div className="flex flex-wrap gap-2 text-sm">
-              <Badge asChild variant={activeIssueFilter === 'missing_lead' ? 'destructive' : slotValidation.missingLead > 0 ? 'destructive' : 'outline'}>
-                <Link href={buildIssueFilterUrl('missing_lead', { focusFirst: true })}>Missing lead: {slotValidation.missingLead}</Link>
-              </Badge>
-              <Badge asChild variant={activeIssueFilter === 'under_coverage' ? 'destructive' : slotValidation.underCoverage > 0 ? 'destructive' : 'outline'}>
-                <Link href={buildIssueFilterUrl('under_coverage', { focusFirst: true })}>Under coverage: {slotValidation.underCoverage}</Link>
-              </Badge>
-              <Badge asChild variant={activeIssueFilter === 'over_coverage' ? 'destructive' : slotValidation.overCoverage > 0 ? 'destructive' : 'outline'}>
-                <Link href={buildIssueFilterUrl('over_coverage', { focusFirst: true })}>Over coverage: {slotValidation.overCoverage}</Link>
-              </Badge>
-              <Badge asChild variant={activeIssueFilter === 'ineligible_lead' ? 'destructive' : slotValidation.ineligibleLead > 0 ? 'destructive' : 'outline'}>
-                <Link href={buildIssueFilterUrl('ineligible_lead', { focusFirst: true })}>Ineligible lead: {slotValidation.ineligibleLead}</Link>
-              </Badge>
-              <Badge asChild variant={activeIssueFilter === 'multiple_leads' ? 'destructive' : slotValidation.multipleLeads > 0 ? 'destructive' : 'outline'}>
-                <Link href={buildIssueFilterUrl('multiple_leads', { focusFirst: true })}>Multiple leads: {slotValidation.multipleLeads}</Link>
-              </Badge>
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-muted-foreground">
-                Coverage target: {MIN_SHIFT_COVERAGE_PER_DAY}-{MAX_SHIFT_COVERAGE_PER_DAY} with exactly one designated lead per shift.
-              </p>
-              <AffectedShiftsDrawer
-                issues={slotValidation.issues}
-                cycleId={activeCycle.id}
-                viewMode={viewMode}
-                showUnavailable={showUnavailable}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      )}
-      {role === 'manager' && viewMode === 'calendar' && (
-        <details className="no-print rounded-md border border-border bg-card p-3">
-          <summary className="cursor-pointer text-sm font-medium text-foreground">
-            Recent activity
-          </summary>
-          <div className="mt-3 space-y-2">
-            {recentActivity.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No recent activity yet.</p>
-            ) : (
-              recentActivity.map((event) => (
-                <div key={event.id} className="rounded-md border border-border px-3 py-2 text-xs">
-                  <p className="text-foreground">
-                    <span className="font-semibold">{getOne(event.profiles)?.full_name ?? 'A manager'}</span>{' '}
-                    {formatAuditAction(event.action)}
-                  </p>
-                  <p className="text-muted-foreground">
-                    {new Date(event.created_at).toLocaleString('en-US')}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-        </details>
-      )}
-
-      {!(role === 'manager' && viewMode === 'calendar') && (
+      {!isManagerCoverageView && (
       <Card className="no-print">
           <CardHeader>
             <CardTitle>Cycle Selection</CardTitle>
@@ -689,18 +684,16 @@ export default async function SchedulePage({
       )}
 
         <Card className="no-print">
-          {!(viewMode === 'calendar' && role === 'manager') && (
+          {!isManagerCoverageView && (
             <CardHeader>
               <CardTitle>
-                {viewMode === 'calendar' && role === 'manager'
-                  ? 'Month Calendar'
-                  : viewMode === 'grid'
+                {viewMode === 'week'
                   ? role === 'manager'
-                    ? 'Cycle Grid'
-                    : 'My Shift Calendar'
+                    ? 'Week Roster'
+                    : 'My Week Schedule'
                   : role === 'manager'
-                    ? 'Shift List'
-                    : 'My Shift List'}
+                    ? 'Month Calendar'
+                    : 'My Month Schedule'}
               </CardTitle>
               <CardDescription>
                 {activeCycle
@@ -709,7 +702,7 @@ export default async function SchedulePage({
               </CardDescription>
             </CardHeader>
           )}
-          <CardContent className={viewMode === 'calendar' && role === 'manager' ? 'pt-6' : undefined}>
+          <CardContent className={isManagerCoverageView ? 'pt-6' : undefined}>
             {!activeCycle && (
               <p className="text-sm text-muted-foreground">
                 {role === 'manager'
@@ -726,13 +719,14 @@ export default async function SchedulePage({
               />
             )}
 
-            {activeCycle && viewMode === 'calendar' && canAccessMonthCalendar && (
+            {activeCycle && viewMode === 'calendar' && canAccessCoverageCalendar && (
               <ManagerMonthCalendar
                 key={`${activeCycle.id}:${focusSlotKey ?? 'none'}:${defaultCalendarView}`}
                 cycleId={activeCycle.id}
                 startDate={activeCycle.start_date}
                 endDate={activeCycle.end_date}
                 therapists={assignableTherapists}
+                availabilityEntries={availabilityEntries}
                 shifts={calendarShifts}
                 issueFilter={activeIssueFilter}
                 focusSlotKey={focusSlotKey}
@@ -740,193 +734,152 @@ export default async function SchedulePage({
                 defaultShiftType={defaultCalendarView}
                 canManageStaffing={canManageStaffing}
                 canEditAssignmentStatus={canEditAssignmentStatus}
+                canViewAvailabilityOverride={canManageStaffing || canEditAssignmentStatus}
               />
             )}
-
-            {activeCycle && viewMode === 'grid' && (
-              <>
-                {role === 'therapist' && (
-                  <div className="space-y-2 md:hidden">
-                    {cycleDates.map((date) => {
-                      const row = shiftsByDate.get(date) ?? { day: [], night: [] }
-                      const myShifts = [...row.day, ...row.night]
-                      const firstShift = myShifts[0]
-                      return (
-                        <div key={`staff-mobile-${date}`} className="rounded-md border border-border bg-card p-3">
-                          <p className="text-sm font-semibold text-foreground">{formatDate(date)}</p>
-                          {firstShift ? (
-                            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
-                              <span className="capitalize">{firstShift.shift_type}</span>
-                              <Badge variant="outline" className="capitalize">
-                                {firstShift.status.replace('_', ' ')}
-                              </Badge>
-                            </div>
-                          ) : (
-                            <p className="mt-1 text-sm text-muted-foreground">No shift assigned</p>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-
-                <div className={role === 'therapist' ? 'hidden md:block' : undefined}>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        {role === 'manager' ? (
-                          <>
-                            <TableHead>Day Coverage</TableHead>
-                            <TableHead>Night Coverage</TableHead>
-                          </>
-                        ) : (
-                          <>
-                            <TableHead>My Shift</TableHead>
-                            <TableHead>Status</TableHead>
-                          </>
-                        )}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {cycleDates.map((date) => {
-                        const row = shiftsByDate.get(date) ?? { day: [], night: [] }
-
-                        if (role === 'manager') {
-                          const daySlotKey = `${date}:day`
-                          const nightSlotKey = `${date}:night`
-                          const dayLeadName = leadNameBySlot.get(daySlotKey)
-                          const nightLeadName = leadNameBySlot.get(nightSlotKey)
-                          const dayIssue = slotIssuesByKey.get(daySlotKey)
-                          const nightIssue = slotIssuesByKey.get(nightSlotKey)
-
-                          return (
-                            <TableRow key={date}>
-                              <TableCell>{formatDate(date)}</TableCell>
-                              <TableCell>
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-medium text-muted-foreground">Lead:</span>
-                                    {dayLeadName ? (
-                                      <span className="text-xs font-semibold text-foreground">{dayLeadName}</span>
-                                    ) : (
-                                      <span className="text-xs font-semibold text-[var(--warning-text)]">Missing lead</span>
-                                    )}
-                                    {dayIssue?.reasons.includes('missing_lead') && (
-                                      <span className="text-xs text-[var(--warning-text)]">!</span>
-                                    )}
-                                  </div>
-                                  {row.day.length === 0 ? (
-                                    <span className="text-muted-foreground">-</span>
-                                  ) : (
-                                    <div className="space-y-1">
-                                      {row.day.map((shift) => (
-                                        <div key={shift.id} className="flex items-center gap-2 text-sm">
-                                          <span>{getOne(shift.profiles)?.full_name ?? 'Unknown'} ({shift.status})</span>
-                                          {shift.role === 'lead' && (
-                                            <Badge variant="outline" className="h-5 px-1.5 text-[10px] uppercase tracking-wide">
-                                              Lead
-                                            </Badge>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-medium text-muted-foreground">Lead:</span>
-                                    {nightLeadName ? (
-                                      <span className="text-xs font-semibold text-foreground">{nightLeadName}</span>
-                                    ) : (
-                                      <span className="text-xs font-semibold text-[var(--warning-text)]">Missing lead</span>
-                                    )}
-                                    {nightIssue?.reasons.includes('missing_lead') && (
-                                      <span className="text-xs text-[var(--warning-text)]">!</span>
-                                    )}
-                                  </div>
-                                  {row.night.length === 0 ? (
-                                    <span className="text-muted-foreground">-</span>
-                                  ) : (
-                                    <div className="space-y-1">
-                                      {row.night.map((shift) => (
-                                        <div key={shift.id} className="flex items-center gap-2 text-sm">
-                                          <span>{getOne(shift.profiles)?.full_name ?? 'Unknown'} ({shift.status})</span>
-                                          {shift.role === 'lead' && (
-                                            <Badge variant="outline" className="h-5 px-1.5 text-[10px] uppercase tracking-wide">
-                                              Lead
-                                            </Badge>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          )
-                        }
-
-                        const myShifts = [...row.day, ...row.night]
-                        const firstShift = myShifts[0]
-
-                        return (
-                          <TableRow key={date}>
-                            <TableCell>{formatDate(date)}</TableCell>
-                            <TableCell>{firstShift ? firstShift.shift_type : '-'}</TableCell>
-                            <TableCell>{firstShift ? firstShift.status : '-'}</TableCell>
-                          </TableRow>
-                        )
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              </>
-            )}
-
-            {activeCycle && viewMode === 'list' && role === 'manager' && (
-              <ScheduleListTable
-                role={role}
-                rows={scheduleListRows}
-                emptyMessage="No shifts scheduled yet - start by adding shifts or importing from a previous cycle."
+            {activeCycle && viewMode === 'week' && canAccessCoverageCalendar && (
+              <ManagerWeekCalendar
+                key={`${activeCycle.id}:week:${focusSlotKey ?? 'none'}:${defaultCalendarView}`}
                 cycleId={activeCycle.id}
-                viewMode={viewMode}
-                deleteShiftAction={deleteShiftAction}
-              />
-            )}
-
-            {activeCycle && viewMode === 'list' && role !== 'manager' && (
-              <ScheduleListTable
-                role={role}
-                rows={scheduleListRows}
-                emptyMessage="No assigned shifts in this cycle yet."
-                cycleId={activeCycle.id}
-                viewMode={viewMode}
+                startDate={activeCycle.start_date}
+                endDate={activeCycle.end_date}
+                shifts={calendarShifts}
+                issueFilter={activeIssueFilter}
+                focusSlotKey={focusSlotKey}
+                issueReasonsBySlot={issueReasonsBySlot}
+                defaultShiftType={defaultCalendarView}
+                canEditAssignmentStatus={canEditAssignmentStatus}
+                canViewAvailabilityOverride={canManageStaffing || canEditAssignmentStatus}
               />
             )}
           </CardContent>
         </Card>
 
-        {role === 'manager' && activeCycle && viewMode === 'grid' && (
-          <Card className="no-print">
-            <CardHeader>
-              <CardTitle>Shift Entries</CardTitle>
-              <CardDescription>Detailed entries for {activeCycle.label}.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ScheduleListTable
-                role={role}
-                rows={scheduleListRows}
-                emptyMessage="No shifts scheduled yet - start by adding shifts or importing from a previous cycle."
+      {isManagerCoverageView && managerAttention && (
+        <AttentionBar snapshot={managerAttention} variant="compact" context="coverage" />
+      )}
+      {isManagerCoverageView && activeCycle && slotValidation && (
+        <Card className="no-print">
+          <CardContent className="space-y-3 py-4">
+            <div className="flex flex-wrap gap-2 text-sm">
+              <Badge
+                asChild
+                variant={
+                  activeIssueFilter === 'missing_lead'
+                    ? 'destructive'
+                    : slotValidation.missingLead > 0
+                      ? 'destructive'
+                      : 'outline'
+                }
+              >
+                <Link href={buildIssueFilterUrl('missing_lead', { focusFirst: true })}>
+                  Missing lead: {slotValidation.missingLead}
+                </Link>
+              </Badge>
+              <Badge
+                asChild
+                variant={
+                  activeIssueFilter === 'under_coverage'
+                    ? 'destructive'
+                    : slotValidation.underCoverage > 0
+                      ? 'destructive'
+                      : 'outline'
+                }
+              >
+                <Link href={buildIssueFilterUrl('under_coverage', { focusFirst: true })}>
+                  Under coverage: {slotValidation.underCoverage}
+                </Link>
+              </Badge>
+              <Badge
+                asChild
+                variant={
+                  activeIssueFilter === 'over_coverage'
+                    ? 'destructive'
+                    : slotValidation.overCoverage > 0
+                      ? 'destructive'
+                      : 'outline'
+                }
+              >
+                <Link href={buildIssueFilterUrl('over_coverage', { focusFirst: true })}>
+                  Over coverage: {slotValidation.overCoverage}
+                </Link>
+              </Badge>
+              <Badge
+                asChild
+                variant={
+                  activeIssueFilter === 'ineligible_lead'
+                    ? 'destructive'
+                    : slotValidation.ineligibleLead > 0
+                      ? 'destructive'
+                      : 'outline'
+                }
+              >
+                <Link href={buildIssueFilterUrl('ineligible_lead', { focusFirst: true })}>
+                  Ineligible lead: {slotValidation.ineligibleLead}
+                </Link>
+              </Badge>
+              <Badge
+                asChild
+                variant={
+                  activeIssueFilter === 'multiple_leads'
+                    ? 'destructive'
+                    : slotValidation.multipleLeads > 0
+                      ? 'destructive'
+                      : 'outline'
+                }
+              >
+                <Link href={buildIssueFilterUrl('multiple_leads', { focusFirst: true })}>
+                  Multiple leads: {slotValidation.multipleLeads}
+                </Link>
+              </Badge>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">
+                Coverage target: {MIN_SHIFT_COVERAGE_PER_DAY}-{MAX_SHIFT_COVERAGE_PER_DAY} with exactly one designated lead per shift.
+              </p>
+              <AffectedShiftsDrawer
+                issues={slotValidation.issues}
                 cycleId={activeCycle.id}
                 viewMode={viewMode}
-                deleteShiftAction={deleteShiftAction}
+                showUnavailable={showUnavailable}
               />
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {isManagerCoverageView && availabilityOverrideCount > 0 && (
+        <Card className="no-print border-amber-200 bg-amber-50/60">
+          <CardContent className="py-3">
+            <p className="text-xs text-amber-900">
+              Overrides: {availabilityOverrideCount} assignment{availabilityOverrideCount === 1 ? '' : 's'} conflict with availability.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+      {isManagerCoverageView && (
+        <details className="no-print rounded-md border border-border bg-card p-3">
+          <summary className="cursor-pointer text-sm font-medium text-foreground">
+            Recent activity
+          </summary>
+          <div className="mt-3 space-y-2">
+            {recentActivity.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No recent activity yet.</p>
+            ) : (
+              recentActivity.map((event) => (
+                <div key={event.id} className="rounded-md border border-border px-3 py-2 text-xs">
+                  <p className="text-foreground">
+                    <span className="font-semibold">{getOne(event.profiles)?.full_name ?? 'A manager'}</span>{' '}
+                    {formatAuditAction(event.action)}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {new Date(event.created_at).toLocaleString('en-US')}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        </details>
+      )}
 
       <PrintSchedule
         activeCycle={activeCycle ? { label: activeCycle.label, start_date: activeCycle.start_date, end_date: activeCycle.end_date } : null}

@@ -4,6 +4,7 @@ import {
   getDefaultWeeklyLimitForEmploymentType,
   sanitizeWeeklyLimit,
 } from '@/lib/scheduling-constants'
+import { hasPrnAvailableOffer, hasUnavailableConflict, type AvailabilityEntry } from '@/lib/availability-conflicts'
 import type {
   ScheduleSearchParams,
   Therapist,
@@ -106,9 +107,11 @@ export function buildDateRange(startDate: string, endDate: string): string[] {
 }
 
 export function normalizeViewMode(value: string | undefined): ViewMode {
-  if (value === 'list') return 'list'
+  if (value === 'list') return 'week'
+  if (value === 'grid') return 'week'
   if (value === 'calendar') return 'calendar'
-  return 'grid'
+  if (value === 'week') return 'week'
+  return 'week'
 }
 
 export function buildScheduleUrl(
@@ -343,7 +346,8 @@ export function pickTherapistForDate(
   therapists: Therapist[],
   cursor: number,
   date: string,
-  unavailableDatesByUser: Map<string, Set<string>>,
+  shiftType: 'day' | 'night',
+  availabilityEntriesByTherapist: Map<string, AvailabilityEntry[]>,
   assignedUserIdsForDate: Set<string>,
   weeklyWorkedDatesByUserWeek: Map<string, Set<string>>,
   weeklyLimitByTherapist: Map<string, number>
@@ -370,17 +374,16 @@ export function pickTherapistForDate(
     const index = (cursor + i) % therapists.length
     const therapist = therapists[index]
     if (assignedUserIdsForDate.has(therapist.id)) continue
-    const unavailableDates = unavailableDatesByUser.get(therapist.id)
-    if (unavailableDates?.has(date)) continue
+    const availabilityEntries = availabilityEntriesByTherapist.get(therapist.id) ?? []
+    if (hasUnavailableConflict(availabilityEntries, date, shiftType)) continue
+
+    if (therapist.employment_type === 'prn' && !hasPrnAvailableOffer(availabilityEntries, date, shiftType)) {
+      continue
+    }
 
     const preferredDays = Array.isArray(therapist.preferred_work_days)
       ? therapist.preferred_work_days
       : []
-    if (therapist.employment_type === 'prn') {
-      if (weekday === null) continue
-      if (preferredDays.length === 0) continue
-      if (!preferredDays.includes(weekday)) continue
-    }
 
     const weeklyDates =
       weeklyWorkedDatesByUserWeek.get(weeklyCountKey(therapist.id, bounds.weekStart)) ?? new Set<string>()

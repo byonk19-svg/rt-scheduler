@@ -33,7 +33,7 @@ export default async function DashboardPage({
     .eq('id', user.id)
     .maybeSingle()
 
-  const isManager = profile?.role === 'manager' || user.user_metadata?.role === 'manager'
+  const isManager = profile?.role === 'manager'
   const preferredLanding = profile?.default_landing_page === 'coverage' ? 'coverage' : 'dashboard'
   const success = getSearchParam(params?.success)
   const error = getSearchParam(params?.error)
@@ -44,9 +44,9 @@ export default async function DashboardPage({
 
   if (preferredLanding === 'coverage') {
     if (isManager) {
-      redirect(`/coverage?view=calendar${suffix ? `&${query.toString()}` : ''}`)
+      redirect(`/coverage?view=week${suffix ? `&${query.toString()}` : ''}`)
     }
-    redirect(`/schedule?view=grid${suffix ? `&${query.toString()}` : ''}`)
+    redirect(`/schedule?view=week${suffix ? `&${query.toString()}` : ''}`)
   }
 
   redirect(`${isManager ? '/dashboard/manager' : '/dashboard/staff'}${suffix}`)

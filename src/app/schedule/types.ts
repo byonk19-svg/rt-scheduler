@@ -1,6 +1,6 @@
 export type Role = 'manager' | 'therapist'
 
-export type ViewMode = 'grid' | 'list' | 'calendar'
+export type ViewMode = 'grid' | 'list' | 'calendar' | 'week'
 
 export type ToastVariant = 'success' | 'error'
 
@@ -40,6 +40,10 @@ export type ShiftRow = {
   left_early_time: string | null
   status_updated_at: string | null
   status_updated_by: string | null
+  availability_override: boolean
+  availability_override_reason: string | null
+  availability_override_at: string | null
+  availability_override_by: string | null
   role: ShiftRole
   user_id: string
   profiles:
@@ -96,9 +100,11 @@ export type ShiftLimitRow = {
   status: ShiftStatus
 }
 
-export type AvailabilityDateRow = {
-  user_id: string
+export type AvailabilityEntryRow = {
+  therapist_id: string
   date: string
+  shift_type: 'day' | 'night' | 'both'
+  entry_type: 'unavailable' | 'available'
 }
 
 export type CalendarShift = {
@@ -112,6 +118,11 @@ export type CalendarShift = {
   status_updated_at: string | null
   status_updated_by: string | null
   status_updated_by_name: string | null
+  availability_override: boolean
+  availability_override_reason: string | null
+  availability_override_at: string | null
+  availability_override_by: string | null
+  availability_override_by_name: string | null
   role: ShiftRole
   user_id: string
   full_name: string

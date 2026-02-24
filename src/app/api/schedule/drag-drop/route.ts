@@ -5,6 +5,7 @@ import { setDesignatedLeadMutation } from '@/lib/set-designated-lead'
 import { exceedsCoverageLimit, exceedsWeeklyLimit } from '@/lib/schedule-rule-validation'
 import { notifyUsers } from '@/lib/notifications'
 import { writeAuditLog } from '@/lib/audit-log'
+import { shiftTypesConflict } from '@/lib/availability-conflicts'
 import {
   MAX_WORK_DAYS_PER_WEEK,
   MAX_SHIFT_COVERAGE_PER_DAY,
@@ -21,6 +22,20 @@ type RemovableShift = {
   shift_type: 'day' | 'night'
   role: ShiftRole
 }
+
+type TherapistAvailabilityRow = {
+  entry_type: 'unavailable' | 'available'
+  shift_type: 'day' | 'night' | 'both'
+  reason: string | null
+}
+
+type TherapistAvailabilityState = {
+  therapistName: string
+  unavailableConflict: boolean
+  unavailableReason: string | null
+  prnNotAvailable: boolean
+  error?: string
+}
 type DragAction =
   | {
       action: 'assign'
@@ -29,6 +44,8 @@ type DragAction =
       shiftType: 'day' | 'night'
       date: string
       overrideWeeklyRules: boolean
+      availabilityOverride?: boolean
+      availabilityOverrideReason?: string
     }
   | {
       action: 'move'
@@ -37,6 +54,8 @@ type DragAction =
       targetDate: string
       targetShiftType: 'day' | 'night'
       overrideWeeklyRules: boolean
+      availabilityOverride?: boolean
+      availabilityOverrideReason?: string
     }
   | {
       action: 'remove'
@@ -57,6 +76,8 @@ type DragAction =
       date: string
       shiftType: 'day' | 'night'
       overrideWeeklyRules: boolean
+      availabilityOverride?: boolean
+      availabilityOverrideReason?: string
     }
 
 async function getCoverageCountForSlot(
@@ -132,6 +153,54 @@ async function getTherapistWeeklyLimit(
   return sanitizeWeeklyLimit(profile?.max_work_days_per_week, fallback)
 }
 
+async function getTherapistAvailabilityState(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  therapistId: string,
+  cycleId: string,
+  date: string,
+  shiftType: 'day' | 'night'
+): Promise<TherapistAvailabilityState> {
+  const [profileResult, availabilityResult] = await Promise.all([
+    supabase.from('profiles').select('full_name, employment_type').eq('id', therapistId).maybeSingle(),
+    supabase
+      .from('availability_entries')
+      .select('entry_type, shift_type, reason')
+      .eq('therapist_id', therapistId)
+      .eq('cycle_id', cycleId)
+      .eq('date', date),
+  ])
+
+  if (profileResult.error || availabilityResult.error) {
+    return {
+      therapistName: 'Therapist',
+      unavailableConflict: false,
+      unavailableReason: null,
+      prnNotAvailable: false,
+      error: 'Failed to validate availability constraints.',
+    }
+  }
+
+  const therapistName = String(profileResult.data?.full_name ?? 'Therapist')
+  const employmentType = String(profileResult.data?.employment_type ?? '')
+  const entries = (availabilityResult.data ?? []) as TherapistAvailabilityRow[]
+
+  const unavailableEntry =
+    entries.find(
+      (entry) => entry.entry_type === 'unavailable' && shiftTypesConflict(entry.shift_type, shiftType)
+    ) ?? null
+
+  const hasPrnAvailableOffer = entries.some(
+    (entry) => entry.entry_type === 'available' && shiftTypesConflict(entry.shift_type, shiftType)
+  )
+
+  return {
+    therapistName,
+    unavailableConflict: unavailableEntry !== null,
+    unavailableReason: unavailableEntry?.reason ?? null,
+    prnNotAvailable: employmentType === 'prn' && !hasPrnAvailableOffer,
+  }
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient()
   const {
@@ -164,6 +233,8 @@ export async function POST(request: Request) {
         targetDate?: string
         targetShiftType?: 'day' | 'night'
         overrideWeeklyRules?: boolean
+        availabilityOverride?: boolean
+        availabilityOverrideReason?: string
       }
     | null
 
@@ -187,6 +258,33 @@ export async function POST(request: Request) {
     }
     if (!isDateWithinRange(payload.date, cycle.start_date, cycle.end_date)) {
       return NextResponse.json({ error: 'Date is outside this cycle' }, { status: 400 })
+    }
+
+    const availabilityState = await getTherapistAvailabilityState(
+      supabase,
+      payload.userId,
+      payload.cycleId,
+      payload.date,
+      payload.shiftType
+    )
+    if (availabilityState.error) {
+      return NextResponse.json({ error: availabilityState.error }, { status: 500 })
+    }
+    if (availabilityState.unavailableConflict && payload.availabilityOverride !== true) {
+      return NextResponse.json(
+        {
+          error: 'Conflicts with availability.',
+          code: 'availability_conflict',
+          availability: {
+            therapistId: payload.userId,
+            therapistName: availabilityState.therapistName,
+            date: payload.date,
+            shiftType: payload.shiftType,
+            reason: availabilityState.unavailableReason,
+          },
+        },
+        { status: 409 }
+      )
     }
 
     if (!payload.overrideWeeklyRules) {
@@ -219,6 +317,13 @@ export async function POST(request: Request) {
       }
     }
 
+    const shouldSetAvailabilityOverride =
+      availabilityState.unavailableConflict && payload.availabilityOverride === true
+    const normalizedAvailabilityOverrideReason =
+      typeof payload.availabilityOverrideReason === 'string'
+        ? payload.availabilityOverrideReason.trim() || null
+        : null
+
     const { data: insertedShift, error } = await supabase
       .from('shifts')
       .insert({
@@ -228,6 +333,12 @@ export async function POST(request: Request) {
         shift_type: payload.shiftType,
         status: 'scheduled',
         role: 'staff',
+        availability_override: shouldSetAvailabilityOverride,
+        availability_override_reason: shouldSetAvailabilityOverride
+          ? normalizedAvailabilityOverrideReason
+          : null,
+        availability_override_by: shouldSetAvailabilityOverride ? user.id : null,
+        availability_override_at: shouldSetAvailabilityOverride ? new Date().toISOString() : null,
       })
       .select('id')
       .single()
@@ -290,6 +401,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Shift already on that date.' })
     }
 
+    const availabilityState = await getTherapistAvailabilityState(
+      supabase,
+      shift.user_id,
+      payload.cycleId,
+      payload.targetDate,
+      payload.targetShiftType
+    )
+    if (availabilityState.error) {
+      return NextResponse.json({ error: availabilityState.error }, { status: 500 })
+    }
+    if (availabilityState.unavailableConflict && payload.availabilityOverride !== true) {
+      return NextResponse.json(
+        {
+          error: 'Conflicts with availability.',
+          code: 'availability_conflict',
+          availability: {
+            therapistId: shift.user_id,
+            therapistName: availabilityState.therapistName,
+            date: payload.targetDate,
+            shiftType: payload.targetShiftType,
+            reason: availabilityState.unavailableReason,
+          },
+        },
+        { status: 409 }
+      )
+    }
+
     if (!payload.overrideWeeklyRules && countsTowardWeeklyLimit(shift.status as ShiftStatus)) {
       const coverage = await getCoverageCountForSlot(
         supabase,
@@ -321,9 +459,25 @@ export async function POST(request: Request) {
       }
     }
 
+    const shouldSetAvailabilityOverride =
+      availabilityState.unavailableConflict && payload.availabilityOverride === true
+    const normalizedAvailabilityOverrideReason =
+      typeof payload.availabilityOverrideReason === 'string'
+        ? payload.availabilityOverrideReason.trim() || null
+        : null
+
     const { error } = await supabase
       .from('shifts')
-      .update({ date: payload.targetDate, shift_type: payload.targetShiftType })
+      .update({
+        date: payload.targetDate,
+        shift_type: payload.targetShiftType,
+        availability_override: shouldSetAvailabilityOverride,
+        availability_override_reason: shouldSetAvailabilityOverride
+          ? normalizedAvailabilityOverrideReason
+          : null,
+        availability_override_by: shouldSetAvailabilityOverride ? user.id : null,
+        availability_override_at: shouldSetAvailabilityOverride ? new Date().toISOString() : null,
+      })
       .eq('id', payload.shiftId)
 
     if (error) {
@@ -430,6 +584,33 @@ export async function POST(request: Request) {
       )
     }
 
+    const availabilityState = await getTherapistAvailabilityState(
+      supabase,
+      payload.therapistId,
+      payload.cycleId,
+      payload.date,
+      payload.shiftType
+    )
+    if (availabilityState.error) {
+      return NextResponse.json({ error: availabilityState.error }, { status: 500 })
+    }
+    if (availabilityState.unavailableConflict && payload.availabilityOverride !== true) {
+      return NextResponse.json(
+        {
+          error: 'Conflicts with availability.',
+          code: 'availability_conflict',
+          availability: {
+            therapistId: payload.therapistId,
+            therapistName: availabilityState.therapistName,
+            date: payload.date,
+            shiftType: payload.shiftType,
+            reason: availabilityState.unavailableReason,
+          },
+        },
+        { status: 409 }
+      )
+    }
+
     const { data: existingShift, error: existingShiftError } = await supabase
       .from('shifts')
       .select('id, status')
@@ -517,6 +698,31 @@ export async function POST(request: Request) {
       targetType: 'shift_slot',
       targetId: `${payload.cycleId}:${payload.date}:${payload.shiftType}`,
     })
+
+    const shouldSetAvailabilityOverride =
+      availabilityState.unavailableConflict && payload.availabilityOverride === true
+    const normalizedAvailabilityOverrideReason =
+      typeof payload.availabilityOverrideReason === 'string'
+        ? payload.availabilityOverrideReason.trim() || null
+        : null
+    const { error: overrideUpdateError } = await supabase
+      .from('shifts')
+      .update({
+        availability_override: shouldSetAvailabilityOverride,
+        availability_override_reason: shouldSetAvailabilityOverride
+          ? normalizedAvailabilityOverrideReason
+          : null,
+        availability_override_by: shouldSetAvailabilityOverride ? user.id : null,
+        availability_override_at: shouldSetAvailabilityOverride ? new Date().toISOString() : null,
+      })
+      .eq('cycle_id', payload.cycleId)
+      .eq('user_id', payload.therapistId)
+      .eq('date', payload.date)
+      .eq('shift_type', payload.shiftType)
+
+    if (overrideUpdateError) {
+      return NextResponse.json({ error: 'Could not record availability override metadata.' }, { status: 500 })
+    }
 
     return NextResponse.json({ message: 'Designated lead updated.' })
   }

@@ -18,29 +18,29 @@ import { filterAndSortRows, type FilterableRow } from '@/lib/table-filtering'
 
 type Role = 'manager' | 'therapist'
 
-export type AvailabilityRequestTableRow = {
+export type AvailabilityEntryTableRow = {
   id: string
   date: string
   reason: string | null
   createdAt: string
   requestedBy: string
   cycleLabel: string
-  status: 'pending' | 'approved' | 'denied'
+  entryType: 'unavailable' | 'available'
+  shiftType: 'day' | 'night' | 'both'
   canDelete: boolean
 }
 
-type AvailabilityRequestsTableProps = {
+type AvailabilityEntriesTableProps = {
   role: Role
-  rows: AvailabilityRequestTableRow[]
-  deleteAvailabilityRequestAction: (formData: FormData) => void | Promise<void>
+  rows: AvailabilityEntryTableRow[]
+  deleteAvailabilityEntryAction: (formData: FormData) => void | Promise<void>
   initialFilters?: Partial<TableToolbarFilters>
 }
 
 const STATUS_OPTIONS: TableStatusOption[] = [
   { value: 'all', label: 'All' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'approved', label: 'Approved' },
-  { value: 'denied', label: 'Denied' },
+  { value: 'unavailable', label: 'Unavailable' },
+  { value: 'available', label: 'Available' },
 ]
 
 function formatDateTime(value: string): string {
@@ -49,20 +49,24 @@ function formatDateTime(value: string): string {
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function formatStatusLabel(status: AvailabilityRequestTableRow['status']): string {
-  if (status === 'approved') return 'Approved'
-  if (status === 'denied') return 'Denied'
-  return 'Pending'
+function formatEntryLabel(entryType: AvailabilityEntryTableRow['entryType']): string {
+  return entryType === 'available' ? 'Available' : 'Unavailable'
 }
 
-export function AvailabilityRequestsTable({
+function formatShiftTypeLabel(shiftType: AvailabilityEntryTableRow['shiftType']): string {
+  if (shiftType === 'both') return 'Both shifts'
+  if (shiftType === 'night') return 'Night shift'
+  return 'Day shift'
+}
+
+export function AvailabilityEntriesTable({
   role,
   rows,
-  deleteAvailabilityRequestAction,
+  deleteAvailabilityEntryAction,
   initialFilters,
-}: AvailabilityRequestsTableProps) {
-  const [scope, setScope] = useState<'all-staff' | 'my-requests'>(role === 'manager' ? 'all-staff' : 'my-requests')
-  const [expandedRequestIds, setExpandedRequestIds] = useState<Set<string>>(new Set())
+}: AvailabilityEntriesTableProps) {
+  const [scope, setScope] = useState<'all-staff' | 'my-entries'>(role === 'manager' ? 'all-staff' : 'my-entries')
+  const [expandedEntryIds, setExpandedEntryIds] = useState<Set<string>>(new Set())
 
   const defaultStatus = 'all'
   const allowedStatuses = new Set(STATUS_OPTIONS.map((option) => option.value))
@@ -82,13 +86,13 @@ export function AvailabilityRequestsTable({
     sort: initialSort,
   })
 
-  function toggleDetails(requestId: string) {
-    setExpandedRequestIds((current) => {
+  function toggleDetails(entryId: string) {
+    setExpandedEntryIds((current) => {
       const next = new Set(current)
-      if (next.has(requestId)) {
-        next.delete(requestId)
+      if (next.has(entryId)) {
+        next.delete(entryId)
       } else {
-        next.add(requestId)
+        next.add(entryId)
       }
       return next
     })
@@ -96,19 +100,20 @@ export function AvailabilityRequestsTable({
 
   const filteredRows = useMemo(() => {
     const scopedRows =
-      role === 'manager' && scope === 'my-requests' ? rows.filter((row) => row.canDelete) : rows
+      role === 'manager' && scope === 'my-entries' ? rows.filter((row) => row.canDelete) : rows
 
-    const mappedRows: Array<AvailabilityRequestTableRow & FilterableRow> = scopedRows.map((row) => ({
+    const mappedRows: Array<AvailabilityEntryTableRow & FilterableRow> = scopedRows.map((row) => ({
       ...row,
-      searchText: `${row.requestedBy} ${row.reason ?? ''} ${row.cycleLabel} ${formatDate(row.date)}`,
+      searchText: `${row.requestedBy} ${row.reason ?? ''} ${row.cycleLabel} ${formatDate(row.date)} ${row.entryType} ${row.shiftType}`,
       date: row.date,
       sortDate: row.createdAt,
+      status: row.entryType,
     }))
 
     return filterAndSortRows(mappedRows, filters)
   }, [rows, filters, role, scope])
 
-  const emptyColSpan = role === 'manager' ? 4 : 3
+  const emptyColSpan = role === 'manager' ? 5 : 4
 
   return (
     <Card>
@@ -116,14 +121,14 @@ export function AvailabilityRequestsTable({
         <CardTitle>
           {role === 'manager'
             ? scope === 'all-staff'
-              ? 'All Staff Requests'
-              : 'My Requests'
-            : 'My Requests'}
+              ? 'All Staff Availability'
+              : 'My Availability'
+            : 'My Availability'}
         </CardTitle>
         <CardDescription>
           {role === 'manager'
-            ? 'Therapist blackout dates by cycle and date.'
-            : 'Your submitted blackout dates.'}
+            ? 'Availability constraints for schedule planning. No approval workflow.'
+            : 'Your submitted availability entries for upcoming cycles.'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -140,10 +145,10 @@ export function AvailabilityRequestsTable({
             <Button
               type="button"
               size="sm"
-              variant={scope === 'my-requests' ? 'default' : 'outline'}
-              onClick={() => setScope('my-requests')}
+              variant={scope === 'my-entries' ? 'default' : 'outline'}
+              onClick={() => setScope('my-entries')}
             >
-              My requests
+              My entries
             </Button>
           </div>
         )}
@@ -151,7 +156,7 @@ export function AvailabilityRequestsTable({
         <TableToolbar
           filters={filters}
           onFiltersChange={setFilters}
-          searchPlaceholder="Search by requester, reason, or cycle"
+          searchPlaceholder="Search by requester, reason, cycle, or type"
           statusOptions={STATUS_OPTIONS}
         />
 
@@ -159,8 +164,9 @@ export function AvailabilityRequestsTable({
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
-              {role === 'manager' && <TableHead className="hidden md:table-cell">Requested By</TableHead>}
-              <TableHead>Status</TableHead>
+              {role === 'manager' && <TableHead className="hidden md:table-cell">Therapist</TableHead>}
+              <TableHead>Type</TableHead>
+              <TableHead className="hidden md:table-cell">Shift scope</TableHead>
               <TableHead>Summary</TableHead>
             </TableRow>
           </TableHeader>
@@ -168,13 +174,13 @@ export function AvailabilityRequestsTable({
             {filteredRows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={emptyColSpan} className="py-6 text-center text-muted-foreground">
-                  No availability requests match the current filters.
+                  No availability entries match the current filters.
                 </TableCell>
               </TableRow>
             )}
 
             {filteredRows.map((row) => {
-              const isExpanded = expandedRequestIds.has(row.id)
+              const isExpanded = expandedEntryIds.has(row.id)
               const reasonPreview = row.reason?.trim() || 'No reason provided'
 
               return (
@@ -194,17 +200,12 @@ export function AvailabilityRequestsTable({
                     <TableCell>{formatDate(row.date)}</TableCell>
                     {role === 'manager' && <TableCell className="hidden md:table-cell">{row.requestedBy}</TableCell>}
                     <TableCell>
-                      <Badge
-                        variant={
-                          row.status === 'approved'
-                            ? 'default'
-                            : row.status === 'denied'
-                              ? 'destructive'
-                              : 'outline'
-                        }
-                      >
-                        {formatStatusLabel(row.status)}
+                      <Badge variant={row.entryType === 'unavailable' ? 'destructive' : 'outline'}>
+                        {formatEntryLabel(row.entryType)}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <span className="text-sm text-muted-foreground">{formatShiftTypeLabel(row.shiftType)}</span>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-between gap-3">
@@ -230,10 +231,16 @@ export function AvailabilityRequestsTable({
                             </p>
                             <p className="text-sm text-foreground">{formatDateTime(row.createdAt)}</p>
                           </div>
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              Shift scope
+                            </p>
+                            <p className="text-sm text-foreground">{formatShiftTypeLabel(row.shiftType)}</p>
+                          </div>
                           {role === 'manager' && (
                             <div>
                               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                Requested By
+                                Therapist
                               </p>
                               <p className="text-sm text-foreground">{row.requestedBy}</p>
                             </div>
@@ -247,12 +254,12 @@ export function AvailabilityRequestsTable({
                           <div className="flex items-end md:justify-end">
                             {row.canDelete ? (
                               <form
-                                action={deleteAvailabilityRequestAction}
+                                action={deleteAvailabilityEntryAction}
                                 onClick={(event) => event.stopPropagation()}
                               >
-                                <input type="hidden" name="request_id" value={row.id} />
+                                <input type="hidden" name="entry_id" value={row.id} />
                                 <FormSubmitButton type="submit" variant="outline" size="sm" pendingText="Deleting...">
-                                  Delete request
+                                  Delete entry
                                 </FormSubmitButton>
                               </form>
                             ) : (

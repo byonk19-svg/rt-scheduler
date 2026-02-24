@@ -5,11 +5,9 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { Menu, ChevronDown, Loader2 } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 
-import { TeamwiseLogo } from '@/components/teamwise-logo'
 import { NotificationBell } from '@/components/NotificationBell'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { MANAGER_ROLE_BADGE_CLASS } from '@/lib/employee-tag-badges'
 import { cn } from '@/lib/utils'
 import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 
@@ -39,7 +37,7 @@ type NavItem = {
 
 const STAFF_NAV_ITEMS: readonly NavItem[] = [
   { href: '/dashboard/staff', label: 'Dashboard' },
-  { href: '/schedule?view=grid', label: 'My Schedule' },
+  { href: '/schedule?view=week', label: 'My Schedule' },
   { href: '/availability', label: 'Requests' },
   { href: '/shift-board', label: 'Shift Board' },
 ]
@@ -47,19 +45,72 @@ const STAFF_NAV_ITEMS: readonly NavItem[] = [
 const MANAGER_NAV_ITEMS: readonly NavItem[] = [
   { href: MANAGER_WORKFLOW_LINKS.dashboard, label: 'Dashboard' },
   {
-    href: MANAGER_WORKFLOW_LINKS.approvals,
-    label: 'Approvals',
-    isActive: (pathname) => pathname === '/shift-board' || pathname === '/availability',
-  },
-  {
     href: MANAGER_WORKFLOW_LINKS.coverage,
     label: 'Coverage',
-    isActive: (pathname, searchParams) => pathname === '/schedule' && searchParams.get('view') === 'calendar',
+    isActive: (pathname, searchParams) =>
+      pathname === '/coverage' ||
+      (pathname === '/schedule' && ['calendar', 'week'].includes(searchParams.get('view') ?? '')),
   },
   { href: MANAGER_WORKFLOW_LINKS.team, label: 'Team' },
+  {
+    href: MANAGER_WORKFLOW_LINKS.approvals,
+    label: 'Requests',
+    isActive: (pathname) => pathname === '/shift-board' || pathname === '/availability',
+  },
 ]
 
-const SHELL_ROUTES = ['/dashboard', '/schedule', '/availability', '/shift-board', '/profile', '/directory'] as const
+const SHELL_ROUTES = [
+  '/dashboard',
+  '/schedule',
+  '/coverage',
+  '/availability',
+  '/shift-board',
+  '/profile',
+  '/directory',
+] as const
+const NAV_AMBER = '#d97706'
+const NAV_MANAGER_BADGE_CLASS = 'border-[#fde68a] bg-[#fffbeb] text-[#b45309]'
+
+function Icon({ size = 30 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 28 28" fill="none" aria-hidden="true">
+      <rect width="28" height="28" rx="6" fill="#1c1917" />
+      <circle cx="9" cy="10" r="3" fill="#fbbf24" />
+      <path d="M4 23 Q4 17 9 17 Q14 17 14 23" fill="#fbbf24" />
+      <circle cx="20" cy="10" r="3" fill="#f59e0b" />
+      <path d="M15 23 Q15 17 20 17 Q25 17 25 23" fill="#f59e0b" />
+    </svg>
+  )
+}
+
+function Logo({ size = 30, fontSize = 17, dark = false }: { size?: number; fontSize?: number; dark?: boolean }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(size * 0.3) }}>
+      <Icon size={size} />
+      <span
+        style={{
+          fontSize,
+          fontWeight: 800,
+          fontFamily: 'var(--font-plus-jakarta), sans-serif',
+          letterSpacing: '-0.03em',
+          lineHeight: 1,
+          color: dark ? '#fafaf9' : '#1c1917',
+        }}
+      >
+        Team<span style={{ color: NAV_AMBER }}>wise</span>
+      </span>
+    </div>
+  )
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return 'TM'
+  return parts
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('')
+}
 
 function routeFromHref(href: string): string {
   return href.split('#')[0]?.split('?')[0] ?? href
@@ -83,7 +134,7 @@ function isNavItemActive(pathname: string, searchParams: SearchParamsState, navI
 
 function navLinkClass(isActive: boolean): string {
   if (isActive) {
-    return 'rounded-md bg-primary text-primary-foreground'
+    return 'rounded-md bg-[#d97706] text-white'
   }
   return 'rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground'
 }
@@ -105,10 +156,10 @@ export function AppShell({ user, publishCta, children }: AppShellProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="no-print sticky top-0 z-40 border-b border-border bg-white/95 backdrop-blur">
+      <header className="no-print sticky top-0 z-30 border-b border-border bg-white/95 backdrop-blur">
         <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3 md:px-8">
           <Link href={dashboardHref} className="shrink-0">
-            <TeamwiseLogo size="small" />
+            <Logo size={30} fontSize={17} />
           </Link>
 
           <nav className="mx-auto hidden items-center gap-2 md:flex">
@@ -143,12 +194,19 @@ export function AppShell({ user, publishCta, children }: AppShellProps) {
                 aria-expanded={userMenuOpen}
                 aria-label="Open user menu"
               >
+                <span
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold text-white"
+                  style={{ backgroundColor: NAV_AMBER }}
+                  aria-hidden="true"
+                >
+                  {initials(user?.fullName ?? 'Team member')}
+                </span>
                 <span className="max-w-[9rem] truncate font-medium">{user?.fullName}</span>
                 <Badge
                   variant={user?.role === 'manager' ? 'default' : 'outline'}
                   className={cn(
                     'hidden capitalize sm:inline-flex',
-                    user?.role === 'manager' ? MANAGER_ROLE_BADGE_CLASS : undefined
+                    user?.role === 'manager' ? NAV_MANAGER_BADGE_CLASS : undefined
                   )}
                 >
                   {user?.role}

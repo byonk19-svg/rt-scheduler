@@ -1,8 +1,21 @@
 import type { Metadata } from "next";
+import { DM_Sans, Plus_Jakarta_Sans } from "next/font/google";
 import { AppShell, type AppShellPublishCta, type AppShellUser } from "@/components/AppShell";
 import { getManagerAttentionSnapshot } from "@/lib/manager-workflow";
 import { createClient } from "@/lib/supabase/server";
 import "./globals.css";
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["800"],
+  variable: "--font-plus-jakarta",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Teamwise",
@@ -50,8 +63,8 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="en">
-      <body className="antialiased">
+    <html lang="en" className={plusJakarta.variable}>
+      <body className={`${dmSans.className} antialiased`}>
         <AppShell user={appShellUser} publishCta={appShellPublishCta}>
           {children}
         </AppShell>

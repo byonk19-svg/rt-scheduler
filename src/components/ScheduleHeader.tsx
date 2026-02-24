@@ -9,10 +9,11 @@ import { PrintMenuItem } from '@/components/print-menu-item'
 import { FormMenuSubmitButton, FormSubmitButton } from '@/components/form-submit-button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { buildScheduleUrl } from '@/lib/schedule-helpers'
 
 type Role = 'manager' | 'therapist'
-type ViewMode = 'grid' | 'list' | 'calendar'
+type ViewMode = 'grid' | 'list' | 'calendar' | 'week'
 
 type PublishSummary = {
   cycleLabel: string
@@ -32,6 +33,7 @@ type ScheduleHeaderProps = {
   activeCycleId?: string
   activeCyclePublished: boolean
   showUnavailable?: boolean
+  setupHref?: string
   title: string
   description: string
   toggleCyclePublishedAction: (formData: FormData) => void | Promise<void>
@@ -57,6 +59,7 @@ export function ScheduleHeader({
   activeCycleId,
   activeCyclePublished,
   showUnavailable = false,
+  setupHref,
   title,
   description,
   toggleCyclePublishedAction,
@@ -140,6 +143,12 @@ export function ScheduleHeader({
                   </form>
                 </div>
               </details>
+
+              {setupHref && (
+                <Button asChild type="button" variant="secondary">
+                  <Link href={setupHref}>Setup</Link>
+                </Button>
+              )}
             </>
           )}
 
@@ -169,11 +178,8 @@ export function ScheduleHeader({
       </div>
 
       <nav className="flex flex-wrap items-center gap-1 rounded-md border border-border bg-white p-1">
-        <Link href={buildScheduleUrl(activeCycleId, 'grid')} className={tabClass(viewMode === 'grid')}>
-          Grid
-        </Link>
-        <Link href={buildScheduleUrl(activeCycleId, 'list')} className={tabClass(viewMode === 'list')}>
-          List
+        <Link href={buildScheduleUrl(activeCycleId, 'week')} className={tabClass(viewMode === 'week')}>
+          Week
         </Link>
         {canViewMonth ? (
           <Link href={buildScheduleUrl(activeCycleId, 'calendar')} className={tabClass(viewMode === 'calendar')}>
