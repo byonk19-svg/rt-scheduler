@@ -1,6 +1,24 @@
 # Teamwise Scheduler - Codex Handoff Context
 
-Updated: 2026-02-24 (schedule-first UX + coverage status sync)
+Updated: 2026-02-24 (availability override guardrails + manager dashboard redesign)
+
+## Latest Completed Work (2026-02-24)
+- Availability policy is now approval-free for next cycle input:
+  - full-time/part-time submit `unavailable`
+  - PRN submit `available`
+- Added `availability_entries` table with RLS and scheduling indexes.
+- Added availability override metadata on `shifts`:
+  - `availability_override`
+  - `availability_override_reason`
+  - `availability_override_by`
+  - `availability_override_at`
+- Scheduler behavior now warns (does not hard block) when assigning against unavailable entries:
+  - manager confirmation modal with optional override reason
+  - confirmed overrides are persisted in shift metadata
+  - PRN without offered availability shows soft warning only
+- Approvals flow now excludes availability input and is scoped to post-publish shift posts.
+- Manager dashboard (`/dashboard/manager`) replaced with new design and live client-side metrics from Supabase.
+- Added Playwright e2e for availability conflict override and PRN soft-warning assignment paths.
 
 ## What This App Is
 Teamwise is a respiratory therapy scheduling app replacing paper workflows.
@@ -115,7 +133,8 @@ Core tables:
 - `profiles`
 - `schedule_cycles`
 - `shifts`
-- `availability_requests`
+- `availability_requests` (legacy)
+- `availability_entries` (active constraints model)
 - `shift_posts`
 - `notifications`
 - `audit_log`
@@ -132,6 +151,11 @@ Common shift fields used:
 - `cycle_id`, `user_id`, `date`, `shift_type`
 - `status` (`scheduled|on_call|sick|called_off`)
 - `role` (`lead|staff`)
+- availability override fields:
+  - `availability_override`
+  - `availability_override_reason`
+  - `availability_override_by`
+  - `availability_override_at`
 - assignment-status fields listed above
 - `site_id`
 
@@ -141,10 +165,13 @@ Common shift fields used:
 - `20260223121500_add_assignment_status_rpc.sql`
 - `20260223191000_harden_role_and_lead_permissions.sql`
 - `20260224103000_add_shift_status_changes_audit.sql`
+- `20260224121500_add_availability_entries_and_override_metadata.sql`
 
 ## Quality Status
 Latest local checks:
 - `npm run lint` pass
+- `npm run test:unit` pass
+- `npm run test:e2e -- e2e/availability-override.spec.ts --project=chromium` pass
 - `npm run build` pass
 
 ## Resume Checklist

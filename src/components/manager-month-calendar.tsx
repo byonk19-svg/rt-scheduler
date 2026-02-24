@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import type { DragEvent, TouchEvent } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -23,6 +23,7 @@ type Therapist = {
   id: string
   full_name: string
   shift_type: 'day' | 'night'
+  employment_type?: 'full_time' | 'part_time' | 'prn'
   is_lead_eligible?: boolean
 }
 
@@ -37,10 +38,23 @@ type Shift = {
   status_updated_at: string | null
   status_updated_by: string | null
   status_updated_by_name: string | null
+  availability_override: boolean
+  availability_override_reason: string | null
+  availability_override_at: string | null
+  availability_override_by: string | null
+  availability_override_by_name: string | null
   role: 'lead' | 'staff'
   user_id: string
   full_name: string
   isLeadEligible: boolean
+}
+
+type AvailabilityEntry = {
+  therapist_id: string
+  date: string
+  shift_type: 'day' | 'night' | 'both'
+  entry_type: 'unavailable' | 'available'
+  reason: string | null
 }
 
 type DragPayload =
@@ -55,6 +69,8 @@ type DragActionBody =
       shiftType: 'day' | 'night'
       date: string
       overrideWeeklyRules: boolean
+      availabilityOverride?: boolean
+      availabilityOverrideReason?: string
     }
   | {
       action: 'move'
@@ -63,6 +79,8 @@ type DragActionBody =
       targetDate: string
       targetShiftType: 'day' | 'night'
       overrideWeeklyRules: boolean
+      availabilityOverride?: boolean
+      availabilityOverrideReason?: string
     }
   | {
       action: 'remove'
@@ -84,11 +102,21 @@ type SetLeadActionBody = {
   date: string
   shiftType: 'day' | 'night'
   overrideWeeklyRules: boolean
+  availabilityOverride?: boolean
+  availabilityOverrideReason?: string
 }
 
 type DragActionResponse = {
   message?: string
   error?: string
+  code?: string
+  availability?: {
+    therapistId: string
+    therapistName: string
+    date: string
+    shiftType: 'day' | 'night'
+    reason: string | null
+  }
   undoAction?: DragActionBody
 }
 
@@ -149,6 +177,7 @@ type ManagerMonthCalendarProps = {
   startDate: string
   endDate: string
   therapists: Therapist[]
+  availabilityEntries: AvailabilityEntry[]
   shifts: Shift[]
   issueFilter?:
     | 'all'
@@ -165,6 +194,7 @@ type ManagerMonthCalendarProps = {
   defaultShiftType?: 'day' | 'night'
   canManageStaffing?: boolean
   canEditAssignmentStatus?: boolean
+  canViewAvailabilityOverride?: boolean
 }
 
 function dateFromKey(value: string): Date {
@@ -332,11 +362,29 @@ function assignmentStatusTooltip(shift: Shift): string | null {
   return parts.join('\n')
 }
 
+function availabilityShiftMatches(entryShiftType: 'day' | 'night' | 'both', shiftType: 'day' | 'night'): boolean {
+  return entryShiftType === 'both' || entryShiftType === shiftType
+}
+
+function formatOverrideTimestamp(value: string | null): string {
+  if (!value) return 'Unknown time'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
 export function ManagerMonthCalendar({
   cycleId,
   startDate,
   endDate,
   therapists,
+  availabilityEntries,
   shifts,
   issueFilter = 'all',
   focusSlotKey = null,
@@ -344,6 +392,7 @@ export function ManagerMonthCalendar({
   defaultShiftType = 'day',
   canManageStaffing = true,
   canEditAssignmentStatus = false,
+  canViewAvailabilityOverride = false,
 }: ManagerMonthCalendarProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -372,6 +421,15 @@ export function ManagerMonthCalendar({
   const [drawerSlot, setDrawerSlot] = useState<{ date: string; shiftType: 'day' | 'night' } | null>(null)
   const [drawerAddTherapistId, setDrawerAddTherapistId] = useState('')
   const [drawerLeadTherapistId, setDrawerLeadTherapistId] = useState('')
+  const [availabilityConflictDialog, setAvailabilityConflictDialog] = useState<{
+    therapistId: string
+    therapistName: string
+    date: string
+    shiftType: 'day' | 'night'
+    reason: string | null
+    action: DragActionBody | SetLeadActionBody
+  } | null>(null)
+  const [availabilityOverrideReasonDraft, setAvailabilityOverrideReasonDraft] = useState('')
   const [statusPopover, setStatusPopover] = useState<StatusPopoverState | null>(null)
   const [statusDraft, setStatusDraft] = useState<{
     status: AssignmentStatus
@@ -458,6 +516,53 @@ export function ManagerMonthCalendar({
     return map
   }, [localShifts])
 
+  const availabilityEntriesByTherapist = useMemo(() => {
+    const map = new Map<string, AvailabilityEntry[]>()
+    for (const entry of availabilityEntries) {
+      const rows = map.get(entry.therapist_id) ?? []
+      rows.push(entry)
+      map.set(entry.therapist_id, rows)
+    }
+    return map
+  }, [availabilityEntries])
+  const therapistById = useMemo(
+    () => new Map(therapists.map((therapist) => [therapist.id, therapist])),
+    [therapists]
+  )
+
+  const getTherapistAvailabilityState = useCallback(
+    (
+      therapistId: string,
+      date: string,
+      shiftType: 'day' | 'night'
+    ): { unavailableConflict: boolean; unavailableReason: string | null; prnNotOffered: boolean } => {
+      const therapist = therapistById.get(therapistId)
+      const entries = availabilityEntriesByTherapist.get(therapistId) ?? []
+
+      const unavailableEntry =
+        entries.find(
+          (entry) =>
+            entry.entry_type === 'unavailable' &&
+            entry.date === date &&
+            availabilityShiftMatches(entry.shift_type, shiftType)
+        ) ?? null
+
+      const hasPrnAvailableOffer = entries.some(
+        (entry) =>
+          entry.entry_type === 'available' &&
+          entry.date === date &&
+          availabilityShiftMatches(entry.shift_type, shiftType)
+      )
+
+      return {
+        unavailableConflict: unavailableEntry !== null,
+        unavailableReason: unavailableEntry?.reason ?? null,
+        prnNotOffered: therapist?.employment_type === 'prn' && !hasPrnAvailableOffer,
+      }
+    },
+    [availabilityEntriesByTherapist, therapistById]
+  )
+
   const selectedDayShifts = useMemo(() => {
     if (!selectedDate) return []
     return (shiftsByDate.get(selectedDate) ?? [])
@@ -508,6 +613,20 @@ export function ManagerMonthCalendar({
     [therapists]
   )
   const therapistsForPool = selectedShiftType === 'day' ? dayTherapists : nightTherapists
+  const therapistsForPoolWithAvailability = useMemo(() => {
+    if (!selectedDate) {
+      return therapistsForPool.map((therapist) => ({
+        therapist,
+        unavailableConflict: false,
+        unavailableReason: null as string | null,
+        prnNotOffered: false,
+      }))
+    }
+    return therapistsForPool.map((therapist) => ({
+      therapist,
+      ...getTherapistAvailabilityState(therapist.id, selectedDate, selectedShiftType),
+    }))
+  }, [getTherapistAvailabilityState, selectedDate, selectedShiftType, therapistsForPool])
 
   const drawerShifts = useMemo(() => {
     if (!drawerSlot) return []
@@ -547,8 +666,12 @@ export function ManagerMonthCalendar({
           !currentShiftIds.has(therapist.id) &&
           !drawerAssignedOnDate.has(therapist.id)
       )
-      .sort((a, b) => a.full_name.localeCompare(b.full_name))
-  }, [drawerSlot, drawerShifts, therapists, drawerAssignedOnDate])
+      .map((therapist) => ({
+        therapist,
+        ...getTherapistAvailabilityState(therapist.id, drawerSlot.date, drawerSlot.shiftType),
+      }))
+      .sort((a, b) => a.therapist.full_name.localeCompare(b.therapist.full_name))
+  }, [drawerAssignedOnDate, drawerShifts, drawerSlot, getTherapistAvailabilityState, therapists])
 
   const drawerLeadOptions = useMemo(() => {
     if (!drawerSlot) return []
@@ -621,6 +744,7 @@ export function ManagerMonthCalendar({
     setDrawerSlot(null)
     setDrawerAddTherapistId('')
     setDrawerLeadTherapistId('')
+    closeAvailabilityConflictDialog()
     closeStatusPopover()
   }
 
@@ -658,6 +782,22 @@ export function ManagerMonthCalendar({
         const result = (await response.json().catch(() => null)) as DragActionResponse | null
 
         if (!response.ok) {
+          if (result?.code === 'availability_conflict' && result.availability) {
+            setAvailabilityConflictDialog({
+              therapistId: result.availability.therapistId,
+              therapistName: result.availability.therapistName,
+              date: result.availability.date,
+              shiftType: result.availability.shiftType,
+              reason: result.availability.reason,
+              action: body,
+            })
+            setAvailabilityOverrideReasonDraft(
+              'availabilityOverrideReason' in body && typeof body.availabilityOverrideReason === 'string'
+                ? body.availabilityOverrideReason
+                : ''
+            )
+            return
+          }
           setError(result?.error ?? 'Could not update schedule. Please try again.')
           return
         }
@@ -684,6 +824,20 @@ export function ManagerMonthCalendar({
         const result = (await response.json().catch(() => null)) as DragActionResponse | null
 
         if (!response.ok) {
+          if (result?.code === 'availability_conflict' && result.availability) {
+            setAvailabilityConflictDialog({
+              therapistId: result.availability.therapistId,
+              therapistName: result.availability.therapistName,
+              date: result.availability.date,
+              shiftType: result.availability.shiftType,
+              reason: result.availability.reason,
+              action: body,
+            })
+            setAvailabilityOverrideReasonDraft(
+              typeof body.availabilityOverrideReason === 'string' ? body.availabilityOverrideReason : ''
+            )
+            return
+          }
           setError(result?.error ?? 'Could not update designated lead.')
           return
         }
@@ -692,6 +846,81 @@ export function ManagerMonthCalendar({
         router.refresh()
       })()
     })
+  }
+
+  function closeAvailabilityConflictDialog() {
+    setAvailabilityConflictDialog(null)
+    setAvailabilityOverrideReasonDraft('')
+  }
+
+  function confirmAvailabilityOverride() {
+    if (!availabilityConflictDialog) return
+    const normalizedReason = availabilityOverrideReasonDraft.trim()
+    const actionWithOverride = {
+      ...availabilityConflictDialog.action,
+      availabilityOverride: true,
+      availabilityOverrideReason: normalizedReason || undefined,
+    }
+
+    closeAvailabilityConflictDialog()
+    if (actionWithOverride.action === 'set_lead') {
+      runSetLeadAction(actionWithOverride as SetLeadActionBody)
+      return
+    }
+
+    runDragAction(actionWithOverride as DragActionBody)
+  }
+
+  function runActionWithAvailabilityCheck(action: DragActionBody | SetLeadActionBody) {
+    if (action.action === 'remove') {
+      runDragAction(action)
+      return
+    }
+
+    let therapistId = ''
+    let date = ''
+    let shiftType: 'day' | 'night' = 'day'
+
+    if (action.action === 'assign') {
+      therapistId = action.userId
+      date = action.date
+      shiftType = action.shiftType
+    } else if (action.action === 'set_lead') {
+      therapistId = action.therapistId
+      date = action.date
+      shiftType = action.shiftType
+    } else if (action.action === 'move') {
+      const shift = localShifts.find((row) => row.id === action.shiftId)
+      if (!shift) {
+        runDragAction(action)
+        return
+      }
+      therapistId = shift.user_id
+      date = action.targetDate
+      shiftType = action.targetShiftType
+    }
+
+    const therapist = therapistById.get(therapistId)
+    const availabilityState = getTherapistAvailabilityState(therapistId, date, shiftType)
+    if (availabilityState.unavailableConflict) {
+      setAvailabilityConflictDialog({
+        therapistId,
+        therapistName: therapist?.full_name ?? 'Therapist',
+        date,
+        shiftType,
+        reason: availabilityState.unavailableReason,
+        action,
+      })
+      setAvailabilityOverrideReasonDraft('')
+      return
+    }
+
+    if (action.action === 'set_lead') {
+      runSetLeadAction(action)
+      return
+    }
+
+    runDragAction(action)
   }
 
   function openStatusPopoverForShift(shift: Shift, anchor: HTMLElement) {
@@ -1043,7 +1272,7 @@ export function ManagerMonthCalendar({
     if (!payload) return
 
     if (payload.type === 'therapist') {
-      runDragAction({
+      runActionWithAvailabilityCheck({
         action: 'assign',
         cycleId,
         userId: payload.userId,
@@ -1054,7 +1283,7 @@ export function ManagerMonthCalendar({
       return
     }
 
-    runDragAction({
+    runActionWithAvailabilityCheck({
       action: 'move',
       cycleId,
       shiftId: payload.shiftId,
@@ -1075,7 +1304,7 @@ export function ManagerMonthCalendar({
       return
     }
 
-    runDragAction({
+    runActionWithAvailabilityCheck({
       action: 'remove',
       cycleId,
       shiftId: payload.shiftId,
@@ -1334,6 +1563,18 @@ export function ManagerMonthCalendar({
                           {assignmentStatusLabel(shift.assignment_status)}
                         </span>
                       )}
+                      {canViewAvailabilityOverride && shift.availability_override && (
+                        <span
+                          className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-800"
+                          title={
+                            `Override by ${shift.availability_override_by_name ?? 'Manager'} - ${formatOverrideTimestamp(shift.availability_override_at)}${
+                              shift.availability_override_reason ? `\n${shift.availability_override_reason}` : ''
+                            }`
+                          }
+                        >
+                          Override
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))
@@ -1423,15 +1664,15 @@ export function ManagerMonthCalendar({
             </p>
 
             <div className="mt-3 space-y-2">
-              {therapistsForPool.map((therapist) => (
+              {therapistsForPoolWithAvailability.map((row) => (
                 <div
-                  key={therapist.id}
+                  key={row.therapist.id}
                   draggable
                   onDragStart={(event) =>
                     setDragData(event, {
                       type: 'therapist',
-                      userId: therapist.id,
-                      shiftType: therapist.shift_type,
+                      userId: row.therapist.id,
+                      shiftType: row.therapist.shift_type,
                     })
                   }
                   className={cn(
@@ -1445,7 +1686,7 @@ export function ManagerMonthCalendar({
                       selectedShiftType === 'day' ? 'text-sky-900' : 'text-indigo-900'
                     )}
                   >
-                    {therapist.full_name}
+                    {row.therapist.full_name}
                   </div>
                   <div
                     className={cn(
@@ -1453,11 +1694,28 @@ export function ManagerMonthCalendar({
                       selectedShiftType === 'day' ? 'text-sky-700' : 'text-indigo-700'
                     )}
                   >
-                    {therapist.shift_type} shift
+                    {row.therapist.shift_type} shift
                   </div>
+                  {(row.unavailableConflict || row.prnNotOffered) && selectedDate && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {row.unavailableConflict && (
+                        <span className="rounded border border-red-300 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+                          Unavailable
+                        </span>
+                      )}
+                      {row.prnNotOffered && (
+                        <span className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                          Not offered (PRN)
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {row.unavailableConflict && row.unavailableReason && selectedDate && (
+                    <p className="mt-1 text-[10px] text-red-700">{row.unavailableReason}</p>
+                  )}
                 </div>
               ))}
-              {therapistsForPool.length === 0 && (
+              {therapistsForPoolWithAvailability.length === 0 && (
                 <p className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                   No {selectedShiftType} therapists available.
                 </p>
@@ -1805,6 +2063,51 @@ export function ManagerMonthCalendar({
         </div>
       )}
 
+      <Dialog
+        open={Boolean(availabilityConflictDialog)}
+        onOpenChange={(open) => {
+          if (!open) closeAvailabilityConflictDialog()
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Conflicts with availability</DialogTitle>
+            <DialogDescription>
+              {availabilityConflictDialog
+                ? `${availabilityConflictDialog.therapistName} marked unavailable on ${formatCellDate(
+                    availabilityConflictDialog.date
+                  )}${
+                    availabilityConflictDialog.reason
+                      ? ` (${availabilityConflictDialog.reason})`
+                      : ''
+                  }. Assign anyway?`
+                : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label htmlFor="availability-override-reason" className="text-xs font-medium text-muted-foreground">
+              Override reason (optional)
+            </label>
+            <textarea
+              id="availability-override-reason"
+              rows={3}
+              value={availabilityOverrideReasonDraft}
+              onChange={(event) => setAvailabilityOverrideReasonDraft(event.target.value)}
+              className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm"
+              placeholder="Optional context for this override"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closeAvailabilityConflictDialog}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={confirmAvailabilityOverride}>
+              Assign anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={Boolean(drawerSlot)} onOpenChange={(open) => !open && closeShiftDrawer()}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
@@ -1878,7 +2181,7 @@ export function ManagerMonthCalendar({
                       variant="outline"
                       disabled={!drawerLeadTherapistId || isPending}
                       onClick={() =>
-                        runSetLeadAction({
+                        runActionWithAvailabilityCheck({
                           action: 'set_lead',
                           cycleId,
                           therapistId: drawerLeadTherapistId,
@@ -1901,62 +2204,80 @@ export function ManagerMonthCalendar({
                     <p className="text-sm text-muted-foreground">No therapists assigned yet.</p>
                   )}
                   {drawerShifts.map((shift) => (
-                    <div
-                      key={shift.id}
-                      className="flex items-center justify-between rounded-md border border-border px-3 py-2"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-foreground">{shift.full_name}</span>
-                        {shift.role === 'lead' && (
-                          <span className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
-                            Lead
-                          </span>
-                        )}
-                        {canEditAssignmentStatus ? (
-                          <button
+                    <Fragment key={shift.id}>
+                      <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-foreground">{shift.full_name}</span>
+                          {shift.role === 'lead' && (
+                            <span className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                              Lead
+                            </span>
+                          )}
+                          {canEditAssignmentStatus ? (
+                            <button
+                              type="button"
+                              className={cn(
+                                'rounded border px-1.5 py-0.5 text-[10px] font-medium',
+                                assignmentStatusTone(shift.assignment_status)
+                              )}
+                              title={assignmentStatusTooltip(shift) ?? undefined}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                openStatusPopoverForShift(shift, event.currentTarget)
+                              }}
+                            >
+                              {assignmentStatusLabel(shift.assignment_status)}
+                            </button>
+                          ) : (
+                            <span
+                              className={cn(
+                                'rounded border px-1.5 py-0.5 text-[10px] font-medium',
+                                assignmentStatusTone(shift.assignment_status)
+                              )}
+                              title={assignmentStatusTooltip(shift) ?? undefined}
+                            >
+                              {assignmentStatusLabel(shift.assignment_status)}
+                            </span>
+                          )}
+                          {canViewAvailabilityOverride && shift.availability_override && (
+                            <span
+                              className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800"
+                              title={
+                                `Override by ${shift.availability_override_by_name ?? 'Manager'} - ${formatOverrideTimestamp(shift.availability_override_at)}${
+                                  shift.availability_override_reason ? `\n${shift.availability_override_reason}` : ''
+                                }`
+                              }
+                            >
+                              Override
+                            </span>
+                          )}
+                        </div>
+                        {canManageStaffing && (
+                          <Button
                             type="button"
-                            className={cn(
-                              'rounded border px-1.5 py-0.5 text-[10px] font-medium',
-                              assignmentStatusTone(shift.assignment_status)
-                            )}
-                            title={assignmentStatusTooltip(shift) ?? undefined}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              openStatusPopoverForShift(shift, event.currentTarget)
-                            }}
+                            size="sm"
+                            variant="ghost"
+                            className="text-[var(--warning-text)]"
+                            onClick={() =>
+                              runActionWithAvailabilityCheck({
+                                action: 'remove',
+                                cycleId,
+                                shiftId: shift.id,
+                              })
+                            }
                           >
-                            {assignmentStatusLabel(shift.assignment_status)}
-                          </button>
-                        ) : (
-                          <span
-                            className={cn(
-                              'rounded border px-1.5 py-0.5 text-[10px] font-medium',
-                              assignmentStatusTone(shift.assignment_status)
-                            )}
-                            title={assignmentStatusTooltip(shift) ?? undefined}
-                          >
-                            {assignmentStatusLabel(shift.assignment_status)}
-                          </span>
+                            Remove
+                          </Button>
                         )}
                       </div>
-                      {canManageStaffing && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="text-[var(--warning-text)]"
-                          onClick={() =>
-                            runDragAction({
-                              action: 'remove',
-                              cycleId,
-                              shiftId: shift.id,
-                            })
-                          }
-                        >
-                          Remove
-                        </Button>
+                      {canViewAvailabilityOverride && shift.availability_override && (
+                        <div className="px-3 pb-2 text-[11px] text-amber-800">
+                          Override by {shift.availability_override_by_name ?? 'Manager'} on{' '}
+                          {formatOverrideTimestamp(shift.availability_override_at)}
+                          {shift.availability_override_reason ? ` - ${shift.availability_override_reason}` : ''}
+                        </div>
                       )}
-                    </div>
+                    </Fragment>
                   ))}
                 </div>
 
@@ -1968,9 +2289,10 @@ export function ManagerMonthCalendar({
                       className="h-9 min-w-64 rounded-md border border-border bg-white px-3 text-sm"
                     >
                       <option value="">Add therapist</option>
-                      {drawerStaffAddOptions.map((therapist) => (
-                        <option key={therapist.id} value={therapist.id}>
-                          {therapist.full_name}
+                      {drawerStaffAddOptions.map((option) => (
+                        <option key={option.therapist.id} value={option.therapist.id}>
+                          {option.therapist.full_name}
+                          {option.unavailableConflict ? ' - Unavailable' : option.prnNotOffered ? ' - Not offered (PRN)' : ''}
                         </option>
                       ))}
                     </select>
@@ -1979,7 +2301,7 @@ export function ManagerMonthCalendar({
                       variant="outline"
                       disabled={!drawerAddTherapistId || isPending}
                       onClick={() => {
-                        runDragAction({
+                        runActionWithAvailabilityCheck({
                           action: 'assign',
                           cycleId,
                           userId: drawerAddTherapistId,
@@ -1992,6 +2314,30 @@ export function ManagerMonthCalendar({
                     >
                       Add staff
                     </Button>
+                  </div>
+                )}
+                {canManageStaffing && drawerStaffAddOptions.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {drawerStaffAddOptions
+                      .filter((option) => option.unavailableConflict || option.prnNotOffered)
+                      .map((option) => (
+                        <div key={`availability-flag-${option.therapist.id}`} className="flex flex-wrap items-center gap-1 text-[11px]">
+                          <span className="font-medium text-foreground">{option.therapist.full_name}</span>
+                          {option.unavailableConflict && (
+                            <span className="rounded border border-red-300 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+                              Unavailable
+                            </span>
+                          )}
+                          {option.prnNotOffered && (
+                            <span className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                              Not offered (PRN)
+                            </span>
+                          )}
+                          {option.unavailableConflict && option.unavailableReason && (
+                            <span className="text-red-700">{option.unavailableReason}</span>
+                          )}
+                        </div>
+                      ))}
                   </div>
                 )}
               </div>

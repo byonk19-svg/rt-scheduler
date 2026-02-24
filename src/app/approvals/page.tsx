@@ -23,6 +23,7 @@ export default async function ApprovalsPage({
   if (!urlParams.get('status')) {
     urlParams.set('status', 'pending')
   }
+  urlParams.set('published_only', 'true')
 
   redirect(`/shift-board?${urlParams.toString()}#open-posts`)
 }

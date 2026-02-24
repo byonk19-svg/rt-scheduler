@@ -46,6 +46,7 @@ type ManagerWeekCalendarProps = {
   >
   defaultShiftType?: 'day' | 'night'
   canEditAssignmentStatus?: boolean
+  canViewAvailabilityOverride?: boolean
 }
 
 function dateFromKey(value: string): Date {
@@ -155,6 +156,19 @@ function toTimeInputValue(value: string | null): string {
   return value.slice(0, 5)
 }
 
+function formatOverrideTimestamp(value: string | null): string {
+  if (!value) return 'Unknown time'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
 function countsTowardCoverage(status: CalendarShift['status']): boolean {
   return status === 'scheduled' || status === 'on_call'
 }
@@ -193,6 +207,7 @@ export function ManagerWeekCalendar({
   issueReasonsBySlot = {},
   defaultShiftType = 'day',
   canEditAssignmentStatus = false,
+  canViewAvailabilityOverride = false,
 }: ManagerWeekCalendarProps) {
   const [selectedShiftType, setSelectedShiftType] = useState<'day' | 'night'>(() => {
     const focusShiftType = focusSlotKey?.split(':')[1]
@@ -712,6 +727,18 @@ export function ManagerWeekCalendar({
                                     title={assignmentStatusTooltip(shift) ?? undefined}
                                   >
                                     {assignmentStatusLabel(shift.assignment_status)}
+                                  </span>
+                                )}
+                                {canViewAvailabilityOverride && shift.availability_override && (
+                                  <span
+                                    className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-800"
+                                    title={
+                                      `Override by ${shift.availability_override_by_name ?? 'Manager'} - ${formatOverrideTimestamp(shift.availability_override_at)}${
+                                        shift.availability_override_reason ? `\n${shift.availability_override_reason}` : ''
+                                      }`
+                                    }
+                                  >
+                                    Override
                                   </span>
                                 )}
                               </div>

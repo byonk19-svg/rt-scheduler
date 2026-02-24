@@ -31,7 +31,7 @@ import {
 } from '@/lib/schedule-helpers'
 import type {
   AutoScheduleShiftRow,
-  AvailabilityDateRow,
+  AvailabilityEntryRow,
   Role,
   ShiftRole,
   ShiftLimitRow,
@@ -748,58 +748,58 @@ export async function generateDraftScheduleAction(formData: FormData) {
 
   const therapistIds = therapists.map((therapist) => therapist.id)
 
-  const [existingShiftsResult, cycleAvailabilityResult, globalAvailabilityResult, weeklyShiftsResult] =
-    await Promise.all([
-      supabase
-        .from('shifts')
-        .select('user_id, date, shift_type, status, role')
-        .eq('cycle_id', cycleId),
-      supabase
-        .from('availability_requests')
-        .select('user_id, date')
-        .eq('cycle_id', cycleId)
-        .gte('date', cycle.start_date)
-        .lte('date', cycle.end_date),
-      supabase
-        .from('availability_requests')
-        .select('user_id, date')
-        .is('cycle_id', null)
-        .gte('date', cycle.start_date)
-        .lte('date', cycle.end_date),
-      supabase
-        .from('shifts')
-        .select('user_id, date, status')
-        .in('user_id', therapistIds)
-        .gte('date', firstWeekBounds.weekStart)
-        .lte('date', lastWeekBounds.weekEnd),
-    ])
+  const [existingShiftsResult, cycleAvailabilityResult, weeklyShiftsResult] = await Promise.all([
+    supabase
+      .from('shifts')
+      .select('user_id, date, shift_type, status, role')
+      .eq('cycle_id', cycleId),
+    supabase
+      .from('availability_entries')
+      .select('therapist_id, date, shift_type, entry_type')
+      .eq('cycle_id', cycleId)
+      .gte('date', cycle.start_date)
+      .lte('date', cycle.end_date),
+    supabase
+      .from('shifts')
+      .select('user_id, date, status')
+      .in('user_id', therapistIds)
+      .gte('date', firstWeekBounds.weekStart)
+      .lte('date', lastWeekBounds.weekEnd),
+  ])
 
   if (
     existingShiftsResult.error ||
     cycleAvailabilityResult.error ||
-    globalAvailabilityResult.error ||
     weeklyShiftsResult.error
   ) {
     console.error('Failed to load scheduling data for auto-generation:', {
       existingShiftsError: existingShiftsResult.error,
       cycleAvailabilityError: cycleAvailabilityResult.error,
-      globalAvailabilityError: globalAvailabilityResult.error,
       weeklyShiftsError: weeklyShiftsResult.error,
     })
     redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'auto_generate_failed' }))
   }
 
   const existingShifts = (existingShiftsResult.data ?? []) as AutoScheduleShiftRow[]
-  const blockedRows = [
-    ...((cycleAvailabilityResult.data ?? []) as AvailabilityDateRow[]),
-    ...((globalAvailabilityResult.data ?? []) as AvailabilityDateRow[]),
-  ]
-
-  const unavailableDatesByUser = new Map<string, Set<string>>()
-  for (const row of blockedRows) {
-    const unavailableDates = unavailableDatesByUser.get(row.user_id) ?? new Set<string>()
-    unavailableDates.add(row.date)
-    unavailableDatesByUser.set(row.user_id, unavailableDates)
+  const availabilityEntriesByTherapist = new Map<
+    string,
+    Array<{
+      therapistId: string
+      date: string
+      shiftType: 'day' | 'night' | 'both'
+      entryType: 'unavailable' | 'available'
+    }>
+  >()
+  for (const row of (cycleAvailabilityResult.data ?? []) as AvailabilityEntryRow[]) {
+    const therapistId = row.therapist_id
+    const rows = availabilityEntriesByTherapist.get(therapistId) ?? []
+    rows.push({
+      therapistId,
+      date: row.date,
+      shiftType: row.shift_type,
+      entryType: row.entry_type,
+    })
+    availabilityEntriesByTherapist.set(therapistId, rows)
   }
 
   const weeklyWorkedDatesByUserWeek = new Map<string, Set<string>>()
@@ -889,7 +889,8 @@ export async function generateDraftScheduleAction(formData: FormData) {
         dayLeadTherapists,
         dayLeadCursor,
         date,
-        unavailableDatesByUser,
+        'day',
+        availabilityEntriesByTherapist,
         assignedForDate,
         weeklyWorkedDatesByUserWeek,
         weeklyLimitByTherapist
@@ -925,7 +926,8 @@ export async function generateDraftScheduleAction(formData: FormData) {
         dayTherapists,
         dayCursor,
         date,
-        unavailableDatesByUser,
+        'day',
+        availabilityEntriesByTherapist,
         assignedForDate,
         weeklyWorkedDatesByUserWeek,
         weeklyLimitByTherapist
@@ -994,7 +996,8 @@ export async function generateDraftScheduleAction(formData: FormData) {
         nightLeadTherapists,
         nightLeadCursor,
         date,
-        unavailableDatesByUser,
+        'night',
+        availabilityEntriesByTherapist,
         assignedForDate,
         weeklyWorkedDatesByUserWeek,
         weeklyLimitByTherapist
@@ -1030,7 +1033,8 @@ export async function generateDraftScheduleAction(formData: FormData) {
         nightTherapists,
         nightCursor,
         date,
-        unavailableDatesByUser,
+        'night',
+        availabilityEntriesByTherapist,
         assignedForDate,
         weeklyWorkedDatesByUserWeek,
         weeklyLimitByTherapist

@@ -60,6 +60,7 @@ type ShiftDetails = {
 type ShiftBoardSearchParams = {
   success?: string | string[]
   error?: string | string[]
+  published_only?: string | string[]
 }
 
 function getSearchParam(value: string | string[] | undefined): string | undefined {
@@ -382,6 +383,7 @@ export default async function ShiftBoardPage({
   const { supabase, user, role } = await getAuthContext()
   const params = searchParams ? await searchParams : undefined
   const feedback = getShiftBoardFeedback(params)
+  const publishedOnly = getSearchParam(params?.published_only) === 'true'
   const managerAttention = role === 'manager' ? await getManagerAttentionSnapshot(supabase) : null
   const today = new Date()
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -410,14 +412,6 @@ export default async function ShiftBoardPage({
 
   const shiftIds = [...new Set(posts.map((post) => post.shift_id))]
 
-  // Collect all profile IDs we need names for: posters + claimers
-  const profileIds = [
-    ...new Set([
-      ...posts.map((post) => post.posted_by),
-      ...posts.filter((p) => p.claimed_by).map((p) => p.claimed_by as string),
-    ]),
-  ]
-
   // Collect swap shift IDs for display
   const swapShiftIds = [...new Set(posts.filter((p) => p.swap_shift_id).map((p) => p.swap_shift_id as string))]
 
@@ -434,9 +428,23 @@ export default async function ShiftBoardPage({
     }
   }
 
+  const visiblePosts = publishedOnly
+    ? posts.filter((post) => {
+        const shift = shiftDetailsById.get(post.shift_id)
+        const cycle = shift ? getOne(shift.schedule_cycles) : null
+        return Boolean(cycle?.published)
+      })
+    : posts
+
   const profileNamesById = new Map<string, string>()
-  if (profileIds.length > 0) {
-    const { data: profilesData } = await supabase.from('profiles').select('id, full_name').in('id', profileIds)
+  const visibleProfileIds = [
+    ...new Set([
+      ...visiblePosts.map((post) => post.posted_by),
+      ...visiblePosts.filter((p) => p.claimed_by).map((p) => p.claimed_by as string),
+    ]),
+  ]
+  if (visibleProfileIds.length > 0) {
+    const { data: profilesData } = await supabase.from('profiles').select('id, full_name').in('id', visibleProfileIds)
     for (const profile of profilesData ?? []) {
       profileNamesById.set(profile.id, profile.full_name)
     }
@@ -455,7 +463,7 @@ export default async function ShiftBoardPage({
       cycleLabel: cycle ? cycle.label : 'No cycle',
     } as const
   })
-  const postRows: ShiftPostTableRow[] = posts.map((post) => {
+  const postRows: ShiftPostTableRow[] = visiblePosts.map((post) => {
     const shift = shiftDetailsById.get(post.shift_id)
     const cycle = shift ? getOne(shift.schedule_cycles) : null
     const offeredShift = post.swap_shift_id ? shiftDetailsById.get(post.swap_shift_id) : null

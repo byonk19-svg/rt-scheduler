@@ -26,6 +26,18 @@ type ShiftCoverageRow = {
     | null
 }
 
+type PendingApprovalPostRow = {
+  shift_id: string
+}
+
+type ShiftPublishLookupRow = {
+  id: string
+  schedule_cycles:
+    | { published: boolean }
+    | { published: boolean }[]
+    | null
+}
+
 type DashboardLinks = {
   approvals: string
   approvalsPending: string
@@ -105,7 +117,7 @@ export async function getManagerAttentionSnapshot(supabase: SupabaseServerClient
   const links = getLinks(activeCycle)
 
   const [pendingApprovalsResult, cycleShiftsResult] = await Promise.all([
-    supabase.from('shift_posts').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    supabase.from('shift_posts').select('shift_id').eq('status', 'pending'),
     activeCycle
       ? supabase
           .from('shifts')
@@ -118,7 +130,30 @@ export async function getManagerAttentionSnapshot(supabase: SupabaseServerClient
       : Promise.resolve({ data: [], error: null }),
   ])
 
-  const pendingApprovals = pendingApprovalsResult.count ?? 0
+  let pendingApprovals = 0
+  const pendingApprovalPosts = (pendingApprovalsResult.data ?? []) as PendingApprovalPostRow[]
+  if (pendingApprovalPosts.length > 0) {
+    const shiftIds = Array.from(new Set(pendingApprovalPosts.map((post) => post.shift_id)))
+    const { data: shiftCycleRows, error: shiftCycleError } = await supabase
+      .from('shifts')
+      .select('id, schedule_cycles!inner(published)')
+      .in('id', shiftIds)
+
+    if (shiftCycleError) {
+      console.warn(
+        'Could not scope pending approvals to published cycles. Falling back to all pending posts.',
+        shiftCycleError.message || shiftCycleError
+      )
+      pendingApprovals = pendingApprovalPosts.length
+    } else {
+      const publishedShiftIds = new Set(
+        ((shiftCycleRows ?? []) as ShiftPublishLookupRow[])
+          .filter((row) => Boolean(getOne(row.schedule_cycles)?.published))
+          .map((row) => row.id)
+      )
+      pendingApprovals = pendingApprovalPosts.filter((post) => publishedShiftIds.has(post.shift_id)).length
+    }
+  }
 
   let underCoverageSlots = 0
   let overCoverageSlots = 0

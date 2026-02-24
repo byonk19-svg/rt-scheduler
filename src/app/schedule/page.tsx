@@ -46,6 +46,14 @@ type AuditLogRow = {
   profiles: { full_name: string } | { full_name: string }[] | null
 }
 
+type AvailabilityEntryRow = {
+  therapist_id: string
+  date: string
+  shift_type: 'day' | 'night' | 'both'
+  entry_type: 'unavailable' | 'available'
+  reason: string | null
+}
+
 function formatAuditAction(value: string): string {
   if (value === 'shift_added') return 'added a shift'
   if (value === 'shift_removed') return 'removed a shift'
@@ -56,7 +64,16 @@ function formatAuditAction(value: string): string {
 
 type RawShiftRow = Omit<
   ShiftRow,
-  'assignment_status' | 'status_note' | 'left_early_time' | 'status_updated_at' | 'status_updated_by' | 'profiles'
+  | 'assignment_status'
+  | 'status_note'
+  | 'left_early_time'
+  | 'status_updated_at'
+  | 'status_updated_by'
+  | 'availability_override'
+  | 'availability_override_reason'
+  | 'availability_override_at'
+  | 'availability_override_by'
+  | 'profiles'
 > & {
   profiles?:
     | { full_name: string; is_lead_eligible: boolean }
@@ -67,6 +84,10 @@ type RawShiftRow = Omit<
   left_early_time?: string | null
   status_updated_at?: string | null
   status_updated_by?: string | null
+  availability_override?: boolean | null
+  availability_override_reason?: string | null
+  availability_override_at?: string | null
+  availability_override_by?: string | null
 }
 
 function toAssignmentStatus(status: ShiftStatus, assignmentStatus?: AssignmentStatus | null): AssignmentStatus {
@@ -84,6 +105,10 @@ function normalizeShiftRows(rows: RawShiftRow[]): ShiftRow[] {
     left_early_time: row.left_early_time ?? null,
     status_updated_at: row.status_updated_at ?? null,
     status_updated_by: row.status_updated_by ?? null,
+    availability_override: row.availability_override ?? false,
+    availability_override_reason: row.availability_override_reason ?? null,
+    availability_override_at: row.availability_override_at ?? null,
+    availability_override_by: row.availability_override_by ?? null,
   }))
 }
 
@@ -160,7 +185,7 @@ export default async function SchedulePage({
     let shiftsQuery = supabase
       .from('shifts')
       .select(
-        'id, date, shift_type, status, assignment_status, status_note, left_early_time, status_updated_at, status_updated_by, role, user_id, profiles:profiles!shifts_user_id_fkey(full_name, is_lead_eligible)'
+        'id, date, shift_type, status, assignment_status, status_note, left_early_time, status_updated_at, status_updated_by, availability_override, availability_override_reason, availability_override_at, availability_override_by, role, user_id, profiles:profiles!shifts_user_id_fkey(full_name, is_lead_eligible)'
       )
       .eq('cycle_id', activeCycle.id)
       .order('date', { ascending: true })
@@ -181,7 +206,11 @@ export default async function SchedulePage({
         shiftErrorMessage.includes('status_note') ||
         shiftErrorMessage.includes('left_early_time') ||
         shiftErrorMessage.includes('status_updated_at') ||
-        shiftErrorMessage.includes('status_updated_by')
+        shiftErrorMessage.includes('status_updated_by') ||
+        shiftErrorMessage.includes('availability_override') ||
+        shiftErrorMessage.includes('availability_override_reason') ||
+        shiftErrorMessage.includes('availability_override_at') ||
+        shiftErrorMessage.includes('availability_override_by')
 
       if (!missingAssignmentStatusFields) {
         console.warn(
@@ -250,6 +279,9 @@ export default async function SchedulePage({
     if (shift.status_updated_by && !profileByUserId.has(shift.status_updated_by)) {
       unresolvedProfileIds.add(shift.status_updated_by)
     }
+    if (shift.availability_override_by && !profileByUserId.has(shift.availability_override_by)) {
+      unresolvedProfileIds.add(shift.availability_override_by)
+    }
   }
 
   if (unresolvedProfileIds.size > 0) {
@@ -290,12 +322,21 @@ export default async function SchedulePage({
   })
 
   const statusUpdatedByNameMap = new Map<string, string>()
+  const availabilityOverrideByNameMap = new Map<string, string>()
   for (const shift of shifts) {
     const updaterId = shift.status_updated_by
     if (!updaterId) continue
     const updaterProfile = profileByUserId.get(updaterId)
     if (updaterProfile) {
       statusUpdatedByNameMap.set(updaterId, updaterProfile.full_name)
+    }
+  }
+  for (const shift of shifts) {
+    const overrideById = shift.availability_override_by
+    if (!overrideById) continue
+    const profileForOverride = profileByUserId.get(overrideById)
+    if (profileForOverride) {
+      availabilityOverrideByNameMap.set(overrideById, profileForOverride.full_name)
     }
   }
 
@@ -326,6 +367,25 @@ export default async function SchedulePage({
       ? normalizedTherapists
       : getSchedulingEligibleEmployees(normalizedTherapists)
   }
+
+  let availabilityEntries: AvailabilityEntryRow[] = []
+  if (role === 'manager' && activeCycle) {
+    const { data: availabilityData, error: availabilityError } = await supabase
+      .from('availability_entries')
+      .select('therapist_id, date, shift_type, entry_type, reason')
+      .eq('cycle_id', activeCycle.id)
+      .gte('date', activeCycle.start_date)
+      .lte('date', activeCycle.end_date)
+
+    if (availabilityError) {
+      console.warn(
+        'Could not load availability entries for schedule guardrails.',
+        availabilityError.message || availabilityError
+      )
+    } else {
+      availabilityEntries = (availabilityData ?? []) as AvailabilityEntryRow[]
+    }
+  }
   const cycleDates = activeCycle ? buildDateRange(activeCycle.start_date, activeCycle.end_date) : []
 
   const shiftByUserDate = new Map<string, ShiftRow>()
@@ -345,6 +405,13 @@ export default async function SchedulePage({
     status_updated_by: shift.status_updated_by,
     status_updated_by_name: shift.status_updated_by
       ? statusUpdatedByNameMap.get(shift.status_updated_by) ?? 'Team member'
+      : null,
+    availability_override: Boolean(shift.availability_override),
+    availability_override_reason: shift.availability_override_reason,
+    availability_override_at: shift.availability_override_at,
+    availability_override_by: shift.availability_override_by,
+    availability_override_by_name: shift.availability_override_by
+      ? availabilityOverrideByNameMap.get(shift.availability_override_by) ?? 'Manager'
       : null,
     role: shift.role,
     user_id: shift.user_id,
@@ -464,6 +531,7 @@ export default async function SchedulePage({
   const scheduledShifts = shifts.filter(
     (shift) => shift.status === 'scheduled' || shift.status === 'on_call'
   )
+  const availabilityOverrideCount = shifts.filter((shift) => shift.availability_override).length
   const dayShiftCount = scheduledShifts.filter((shift) => shift.shift_type === 'day').length
   const nightShiftCount = scheduledShifts.filter((shift) => shift.shift_type === 'night').length
   const publishSummary =
@@ -658,6 +726,7 @@ export default async function SchedulePage({
                 startDate={activeCycle.start_date}
                 endDate={activeCycle.end_date}
                 therapists={assignableTherapists}
+                availabilityEntries={availabilityEntries}
                 shifts={calendarShifts}
                 issueFilter={activeIssueFilter}
                 focusSlotKey={focusSlotKey}
@@ -665,6 +734,7 @@ export default async function SchedulePage({
                 defaultShiftType={defaultCalendarView}
                 canManageStaffing={canManageStaffing}
                 canEditAssignmentStatus={canEditAssignmentStatus}
+                canViewAvailabilityOverride={canManageStaffing || canEditAssignmentStatus}
               />
             )}
             {activeCycle && viewMode === 'week' && canAccessCoverageCalendar && (
@@ -679,6 +749,7 @@ export default async function SchedulePage({
                 issueReasonsBySlot={issueReasonsBySlot}
                 defaultShiftType={defaultCalendarView}
                 canEditAssignmentStatus={canEditAssignmentStatus}
+                canViewAvailabilityOverride={canManageStaffing || canEditAssignmentStatus}
               />
             )}
           </CardContent>
@@ -773,6 +844,15 @@ export default async function SchedulePage({
                 showUnavailable={showUnavailable}
               />
             </div>
+          </CardContent>
+        </Card>
+      )}
+      {isManagerCoverageView && availabilityOverrideCount > 0 && (
+        <Card className="no-print border-amber-200 bg-amber-50/60">
+          <CardContent className="py-3">
+            <p className="text-xs text-amber-900">
+              Overrides: {availabilityOverrideCount} assignment{availabilityOverrideCount === 1 ? '' : 's'} conflict with availability.
+            </p>
           </CardContent>
         </Card>
       )}

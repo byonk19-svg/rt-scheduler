@@ -4,9 +4,11 @@ import { createClient } from '@/lib/supabase/server'
 
 type AvailabilityExportRow = {
   date: string
+  entry_type: 'unavailable' | 'available'
+  shift_type: 'day' | 'night' | 'both'
   reason: string | null
   created_at: string
-  user_id: string
+  therapist_id: string
   profiles: { full_name: string } | { full_name: string }[] | null
   schedule_cycles:
     | { label: string; start_date: string; end_date: string }
@@ -45,22 +47,22 @@ export async function GET() {
   const isManager = profile?.role === 'manager'
 
   let query = supabase
-    .from('availability_requests')
+    .from('availability_entries')
     .select(
-      'date, reason, created_at, user_id, profiles(full_name), schedule_cycles(label, start_date, end_date)'
+      'date, entry_type, shift_type, reason, created_at, therapist_id, profiles(full_name), schedule_cycles(label, start_date, end_date)'
     )
     .order('date', { ascending: true })
     .order('created_at', { ascending: true })
 
   if (!isManager) {
-    query = query.eq('user_id', user.id)
+    query = query.eq('therapist_id', user.id)
   }
 
   const { data, error } = await query
 
   if (error) {
-    console.error('Failed to export availability requests:', error)
-    return NextResponse.json({ error: 'Could not export requests' }, { status: 500 })
+    console.error('Failed to export availability entries:', error)
+    return NextResponse.json({ error: 'Could not export availability entries' }, { status: 500 })
   }
 
   const rows = (data ?? []) as AvailabilityExportRow[]
@@ -69,8 +71,10 @@ export async function GET() {
     'cycle_label',
     'cycle_start',
     'cycle_end',
+    'entry_type',
+    'shift_scope',
     'reason',
-    'requested_by',
+    'therapist',
     'submitted_at',
   ]
 
@@ -84,6 +88,8 @@ export async function GET() {
       cycle?.label ?? '',
       cycle?.start_date ?? '',
       cycle?.end_date ?? '',
+      row.entry_type,
+      row.shift_type,
       row.reason ?? '',
       requester?.full_name ?? '',
       submittedAt,
@@ -93,7 +99,7 @@ export async function GET() {
   })
 
   const csv = [header.join(','), ...lines].join('\n')
-  const filename = isManager ? 'availability-requests-all.csv' : 'availability-requests-mine.csv'
+  const filename = isManager ? 'availability-entries-all.csv' : 'availability-entries-mine.csv'
 
   return new NextResponse(csv, {
     status: 200,

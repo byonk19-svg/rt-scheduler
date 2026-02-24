@@ -1,8 +1,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
-import { AvailabilityRequestsTable, type AvailabilityRequestTableRow } from '@/app/availability/availability-requests-table'
-import { AttentionBar } from '@/components/AttentionBar'
+import { AvailabilityEntriesTable, type AvailabilityEntryTableRow } from '@/app/availability/availability-requests-table'
 import type { TableToolbarFilters } from '@/components/TableToolbar'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { FormSubmitButton } from '@/components/form-submit-button'
@@ -12,11 +11,16 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { getManagerAttentionSnapshot } from '@/lib/manager-workflow'
+import {
+  getAvailabilityEntryTypeForEmploymentType,
+  normalizeEmploymentType,
+} from '@/lib/availability-policy'
 import { createClient } from '@/lib/supabase/server'
 
 type Role = 'manager' | 'therapist'
 type ToastVariant = 'success' | 'error'
+type AvailabilityEntryType = 'unavailable' | 'available'
+type AvailabilityShiftType = 'day' | 'night' | 'both'
 
 type Cycle = {
   id: string
@@ -29,9 +33,11 @@ type Cycle = {
 type AvailabilityRow = {
   id: string
   date: string
+  shift_type: AvailabilityShiftType
+  entry_type: AvailabilityEntryType
   reason: string | null
   created_at: string
-  user_id: string
+  therapist_id: string
   profiles: { full_name: string } | { full_name: string }[] | null
   schedule_cycles:
     | { label: string; start_date: string; end_date: string }
@@ -61,37 +67,37 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
   const error = getSearchParam(params?.error)
   const success = getSearchParam(params?.success)
 
-  if (error === 'duplicate_request') {
+  if (error === 'duplicate_entry') {
     return {
-      message: 'You already submitted that availability request.',
+      message: 'You already submitted availability for that date and shift scope in this cycle.',
       variant: 'error',
     }
   }
 
   if (error === 'submit_failed') {
     return {
-      message: 'Could not submit availability request. Please try again.',
+      message: 'Could not submit availability. Please try again.',
       variant: 'error',
     }
   }
 
-  if (success === 'request_submitted') {
+  if (success === 'entry_submitted') {
     return {
-      message: 'Availability request submitted.',
+      message: 'Availability saved.',
       variant: 'success',
     }
   }
 
-  if (success === 'request_deleted') {
+  if (success === 'entry_deleted') {
     return {
-      message: 'Availability request deleted.',
+      message: 'Availability entry deleted.',
       variant: 'success',
     }
   }
 
   if (error === 'delete_failed') {
     return {
-      message: 'Could not delete availability request.',
+      message: 'Could not delete availability entry.',
       variant: 'error',
     }
   }
@@ -104,7 +110,7 @@ function getOne<T>(value: T | T[] | null | undefined): T | null {
   return value ?? null
 }
 
-async function submitAvailabilityRequest(formData: FormData) {
+async function submitAvailabilityEntry(formData: FormData) {
   'use server'
 
   const supabase = await createClient()
@@ -118,32 +124,46 @@ async function submitAvailabilityRequest(formData: FormData) {
 
   const date = String(formData.get('date') ?? '').trim()
   const cycleId = String(formData.get('cycle_id') ?? '').trim()
+  const shiftType = String(formData.get('shift_type') ?? 'both').trim() as AvailabilityShiftType
   const reason = String(formData.get('reason') ?? '').trim()
 
-  if (!date) {
+  if (!date || !cycleId || (shiftType !== 'day' && shiftType !== 'night' && shiftType !== 'both')) {
     redirect('/availability?error=submit_failed')
   }
 
-  const { error } = await supabase.from('availability_requests').insert({
-    user_id: user.id,
-    cycle_id: cycleId || null,
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('employment_type')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const entryType = getAvailabilityEntryTypeForEmploymentType(
+    normalizeEmploymentType(profile?.employment_type)
+  )
+
+  const { error } = await supabase.from('availability_entries').insert({
+    therapist_id: user.id,
+    cycle_id: cycleId,
     date,
+    shift_type: shiftType,
+    entry_type: entryType,
     reason: reason || null,
+    created_by: user.id,
   })
 
   if (error) {
-    console.error('Failed to create availability request:', error)
+    console.error('Failed to create availability entry:', error)
     if (error.code === '23505') {
-      redirect('/availability?error=duplicate_request')
+      redirect('/availability?error=duplicate_entry')
     }
     redirect('/availability?error=submit_failed')
   }
 
   revalidatePath('/availability')
-  redirect('/availability?success=request_submitted')
+  redirect('/availability?success=entry_submitted')
 }
 
-async function deleteAvailabilityRequest(formData: FormData) {
+async function deleteAvailabilityEntry(formData: FormData) {
   'use server'
 
   const supabase = await createClient()
@@ -155,24 +175,24 @@ async function deleteAvailabilityRequest(formData: FormData) {
     redirect('/login')
   }
 
-  const requestId = String(formData.get('request_id') ?? '').trim()
-  if (!requestId) {
+  const entryId = String(formData.get('entry_id') ?? '').trim()
+  if (!entryId) {
     redirect('/availability')
   }
 
   const { error } = await supabase
-    .from('availability_requests')
+    .from('availability_entries')
     .delete()
-    .eq('id', requestId)
-    .eq('user_id', user.id)
+    .eq('id', entryId)
+    .eq('therapist_id', user.id)
 
   if (error) {
-    console.error('Failed to delete availability request:', error)
+    console.error('Failed to delete availability entry:', error)
     redirect('/availability?error=delete_failed')
   }
 
   revalidatePath('/availability')
-  redirect('/availability?success=request_deleted')
+  redirect('/availability?success=entry_deleted')
 }
 
 export default async function AvailabilityPage({
@@ -203,79 +223,96 @@ export default async function AvailabilityPage({
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, full_name')
+    .select('role, full_name, employment_type')
     .eq('id', user.id)
     .maybeSingle()
 
   const role: Role = profile?.role === 'manager' ? 'manager' : 'therapist'
-  const managerAttention = role === 'manager' ? await getManagerAttentionSnapshot(supabase) : null
+  const employmentType = normalizeEmploymentType(profile?.employment_type)
+  const userEntryType = getAvailabilityEntryTypeForEmploymentType(employmentType)
 
-  const { data: cyclesData } = await supabase
+  const today = new Date()
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
+  const cyclesQuery = supabase
     .from('schedule_cycles')
     .select('id, label, start_date, end_date, published')
-    .order('start_date', { ascending: false })
+    .gte('end_date', todayKey)
+    .order('start_date', { ascending: true })
 
+  const { data: cyclesData } = await cyclesQuery
   const cycles = (cyclesData ?? []) as Cycle[]
 
-  let requestsQuery = supabase
-    .from('availability_requests')
+  let entriesQuery = supabase
+    .from('availability_entries')
     .select(
-      'id, date, reason, created_at, user_id, profiles(full_name), schedule_cycles(label, start_date, end_date)'
+      'id, date, shift_type, entry_type, reason, created_at, therapist_id, profiles(full_name), schedule_cycles(label, start_date, end_date)'
     )
     .order('date', { ascending: true })
     .order('created_at', { ascending: false })
 
   if (role !== 'manager') {
-    requestsQuery = requestsQuery.eq('user_id', user.id)
+    entriesQuery = entriesQuery.eq('therapist_id', user.id)
   }
 
-  const { data: requestsData } = await requestsQuery
-  const requests = (requestsData ?? []) as AvailabilityRow[]
+  const { data: entriesData } = await entriesQuery
+  const entries = (entriesData ?? []) as AvailabilityRow[]
   const hasCycles = cycles.length > 0
-  const availabilityRows: AvailabilityRequestTableRow[] = requests.map((request) => {
-    const cycle = getOne(request.schedule_cycles)
-    const requester = getOne(request.profiles)
+  const availabilityRows: AvailabilityEntryTableRow[] = entries.map((entry) => {
+    const cycle = getOne(entry.schedule_cycles)
+    const requester = getOne(entry.profiles)
     return {
-      id: request.id,
-      date: request.date,
-      reason: request.reason,
-      createdAt: request.created_at,
+      id: entry.id,
+      date: entry.date,
+      reason: entry.reason,
+      createdAt: entry.created_at,
       requestedBy: requester?.full_name ?? 'Unknown user',
-      cycleLabel: cycle ? `${cycle.label} (${cycle.start_date} to ${cycle.end_date})` : 'Unassigned',
-      status: 'pending',
-      canDelete: request.user_id === user.id,
+      cycleLabel: cycle ? `${cycle.label} (${cycle.start_date} to ${cycle.end_date})` : 'Unknown cycle',
+      entryType: entry.entry_type,
+      shiftType: entry.shift_type,
+      canDelete: entry.therapist_id === user.id,
     }
   })
-  const requestsCard = (
-    <AvailabilityRequestsTable
+  const entriesCard = (
+    <AvailabilityEntriesTable
       role={role}
       rows={availabilityRows}
-      deleteAvailabilityRequestAction={deleteAvailabilityRequest}
+      deleteAvailabilityEntryAction={deleteAvailabilityEntry}
       initialFilters={initialFilters}
     />
   )
-  const submitRequestCard = (
-    <Card id="submit-request">
+
+  const inputTitle = userEntryType === 'available' ? 'Days I can work' : 'Days I cannot work'
+  const inputDescription =
+    userEntryType === 'available'
+      ? 'PRN workflow: submit days you can work for the next cycle. No approval required.'
+      : 'Submit unavailable days for the next cycle. No approval required.'
+
+  const submitEntryCard = (
+    <Card id="submit-entry">
       <CardHeader>
-        <CardTitle>Submit Request</CardTitle>
-        <CardDescription>Select a date and optional cycle.</CardDescription>
+        <CardTitle>{inputTitle}</CardTitle>
+        <CardDescription>{inputDescription}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form action={submitAvailabilityRequest} className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <form action={submitAvailabilityEntry} className="grid grid-cols-1 gap-4 xl:grid-cols-12">
           <div className="space-y-2 xl:col-span-3">
             <Label htmlFor="date">Date</Label>
             <Input id="date" name="date" type="date" required />
           </div>
 
-          <div className="space-y-2 xl:col-span-4">
+          <div className="space-y-2 xl:col-span-5">
             <Label htmlFor="cycle_id">Schedule Cycle</Label>
             <select
               id="cycle_id"
               name="cycle_id"
               className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
               defaultValue=""
+              required
             >
-              <option value="">No specific cycle</option>
+              <option value="" disabled>
+                Select cycle
+              </option>
               {cycles.map((cycle) => (
                 <option key={cycle.id} value={cycle.id}>
                   {cycle.label} ({cycle.start_date} to {cycle.end_date})
@@ -285,22 +322,36 @@ export default async function AvailabilityPage({
             </select>
             {!hasCycles && (
               <p className="text-xs text-muted-foreground">
-                No schedule cycles found yet. You can still submit requests.
+                No upcoming schedule cycles found.
               </p>
             )}
           </div>
 
-          <div className="space-y-2 xl:col-span-5">
+          <div className="space-y-2 xl:col-span-2">
+            <Label htmlFor="shift_type">Shift scope</Label>
+            <select
+              id="shift_type"
+              name="shift_type"
+              className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+              defaultValue="both"
+            >
+              <option value="both">Both</option>
+              <option value="day">Day</option>
+              <option value="night">Night</option>
+            </select>
+          </div>
+
+          <div className="space-y-2 xl:col-span-2">
             <Label htmlFor="reason">Reason (optional)</Label>
             <Input
               id="reason"
               name="reason"
-              placeholder="Family event, appointment, vacation, etc."
+              placeholder="Optional note"
             />
           </div>
 
           <div className="xl:col-span-12">
-            <FormSubmitButton type="submit" pendingText="Submitting...">Submit availability request</FormSubmitButton>
+            <FormSubmitButton type="submit" pendingText="Submitting...">Save availability</FormSubmitButton>
           </div>
         </form>
         {feedback?.variant === 'error' && (
@@ -317,21 +368,19 @@ export default async function AvailabilityPage({
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
       <div>
-        <h1 className="app-page-title">Availability Requests</h1>
+        <h1 className="app-page-title">Availability</h1>
         <p className="text-muted-foreground">
           {role === 'manager'
-            ? 'Review all submitted blackout dates.'
-            : 'Submit days you cannot work for upcoming schedules.'}
+            ? 'Review submitted availability constraints for schedule planning.'
+            : userEntryType === 'available'
+              ? 'PRN: submit the days you can work in the next cycle.'
+              : 'Submit the days you cannot work in the next cycle.'}
         </p>
       </div>
 
-      {role === 'manager' && managerAttention && (
-        <AttentionBar snapshot={managerAttention} variant="compact" context="approvals" />
-      )}
-
       <div className="flex items-center gap-2">
         <Button asChild>
-          <a href="#submit-request">Submit Request</a>
+          <a href="#submit-entry">Submit availability</a>
         </Button>
         <MoreActionsMenu>
           <a href="/api/availability/export" className="block rounded-sm px-3 py-2 text-sm hover:bg-secondary">
@@ -343,13 +392,13 @@ export default async function AvailabilityPage({
 
       {role === 'manager' ? (
         <>
-          {requestsCard}
-          {submitRequestCard}
+          {entriesCard}
+          {submitEntryCard}
         </>
       ) : (
         <>
-          {submitRequestCard}
-          {requestsCard}
+          {submitEntryCard}
+          {entriesCard}
         </>
       )}
     </div>
