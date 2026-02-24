@@ -316,12 +316,30 @@ export default function CoveragePage() {
                   {day.leadShift ? `Lead: ${day.leadShift.name.split(' ')[0]}` : 'No lead'}
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  {day.staffShifts.map((shift) => (
-                    <span key={shift.id} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">
-                      <Avatar name={shift.name} status={shift.status} size={14} />
-                      {shift.name.split(' ')[0]}
-                    </span>
-                  ))}
+                  {day.staffShifts.map((shift) => {
+                    const tone =
+                      shift.status === 'cancelled'
+                        ? 'border-red-200 bg-red-50 text-red-700'
+                        : shift.status === 'oncall'
+                          ? 'border-orange-200 bg-orange-50 text-orange-700'
+                          : shift.status === 'leave_early'
+                            ? 'border-blue-200 bg-blue-50 text-blue-700'
+                            : 'border-slate-200 bg-slate-50 text-slate-700'
+                    return (
+                      <span
+                        key={shift.id}
+                        className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${tone}`}
+                      >
+                        <Avatar name={shift.name} status={shift.status} size={14} />
+                        <span className={shift.status === 'cancelled' ? 'line-through' : ''}>
+                          {shift.name.split(' ')[0]}
+                        </span>
+                        {shift.status === 'oncall' && <span className="font-extrabold">OC</span>}
+                        {shift.status === 'leave_early' && <span className="font-extrabold">LE</span>}
+                        {shift.status === 'cancelled' && <span className="font-extrabold">X</span>}
+                      </span>
+                    )
+                  })}
                 </div>
               </button>
             )

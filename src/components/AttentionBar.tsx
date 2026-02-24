@@ -98,15 +98,10 @@ function metricsForContext(context: AttentionContext, snapshot: ManagerAttention
 
   return [
     {
-      href: snapshot.links.approvalsPending,
-      label: `Pending approvals: ${snapshot.pendingApprovals}`,
-      ariaLabel: `View ${snapshot.pendingApprovals} pending approvals`,
-      emphasized: true,
-    },
-    {
       href: snapshot.links.coverageUnfilled,
       label: `Unfilled shifts: ${snapshot.unfilledShiftSlots}`,
       ariaLabel: `View ${snapshot.unfilledShiftSlots} unfilled shifts`,
+      emphasized: true,
     },
     {
       href: snapshot.links.coverageMissingLead,
@@ -117,6 +112,11 @@ function metricsForContext(context: AttentionContext, snapshot: ManagerAttention
       href: snapshot.links.coverageUnderCoverage,
       label: `Under coverage: ${snapshot.underCoverageSlots}`,
       ariaLabel: `View ${snapshot.underCoverageSlots} under coverage shifts`,
+    },
+    {
+      href: snapshot.links.approvalsPending,
+      label: `Pending approvals: ${snapshot.pendingApprovals}`,
+      ariaLabel: `View ${snapshot.pendingApprovals} pending approvals`,
     },
   ]
 }

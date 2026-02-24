@@ -1,6 +1,6 @@
 # Teamwise Scheduler - Codex Handoff Context
 
-Updated: 2026-02-24 (coverage + nav alignment)
+Updated: 2026-02-24 (schedule-first UX + coverage status sync)
 
 ## What This App Is
 Teamwise is a respiratory therapy scheduling app replacing paper workflows.
@@ -55,6 +55,8 @@ Assignment status remains informational only:
 - Click same day again toggles panel closed
 - Accordion therapist rows in panel (single expanded row)
 - Optimistic status updates with rollback on save failure
+- Calendar chips now visibly reflect assignment status updates immediately:
+  - `OC` (on call), `LE` (leave early), `X` (cancelled), with distinct chip colors
 
 Notes:
 - Current `/coverage` implementation is day-shift focused in UI/data query.
@@ -67,6 +69,10 @@ Notes:
 Grid/List tabs were removed from header navigation.
 Legacy URLs with `view=grid` and `view=list` normalize to `view=week`.
 
+Manager information hierarchy is now schedule-first:
+- Coverage and publish are primary
+- Approvals are intentionally secondary
+
 ## Navbar / Branding (Current)
 - Navbar logo replaced with inline amber icon + Teamwise wordmark component in `AppShell`
 - Plus Jakarta Sans (800) added at root layout via `next/font/google`
@@ -75,6 +81,9 @@ Legacy URLs with `view=grid` and `view=list` normalize to `view=week`.
   - user avatar circle: `#d97706`
   - manager badge: bg `#fffbeb`, text `#b45309`, border `#fde68a`
 - App shell header z-index lowered to `z-30` so coverage overlay correctly layers above it
+- App shell includes `/coverage` route so top nav is present on coverage page
+- Manager nav order is schedule-first:
+  - `Dashboard`, `Coverage`, `Team`, `Requests` (approvals moved later and renamed in nav)
 
 ## Assignment Status Feature
 Backend status values:

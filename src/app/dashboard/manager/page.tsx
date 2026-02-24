@@ -97,7 +97,7 @@ export default async function ManagerDashboardPage({
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
       <div className="teamwise-surface rounded-2xl border border-border p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
         <h1 className="app-page-title">Manager Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Welcome, {fullName}. Fix blockers, then publish confidently.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Welcome, {fullName}. Build coverage first, then publish confidently.</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Badge variant="outline">{cycleBadgeLabel}</Badge>
         </div>
@@ -108,22 +108,6 @@ export default async function ManagerDashboardPage({
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle>Approvals</CardTitle>
-            <CardDescription>
-              {summary.pendingApprovals === 0
-                ? 'No approvals waiting.'
-                : `${summary.pendingApprovals} requests awaiting review.`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild variant="outline" size="sm">
-              <Link href={summary.links.approvalsPending}>Open approvals</Link>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
             <CardTitle>Coverage</CardTitle>
             <CardDescription>Resolve lead and staffing gaps before publishing.</CardDescription>
           </CardHeader>
@@ -131,8 +115,8 @@ export default async function ManagerDashboardPage({
             <p className="text-sm text-muted-foreground">Missing lead: {summary.missingLeadShifts}</p>
             <p className="text-sm text-muted-foreground">Under coverage: {summary.underCoverageSlots}</p>
             <p className="text-sm text-muted-foreground">Over coverage: {summary.overCoverageSlots}</p>
-            <Button asChild variant="outline" size="sm">
-              <Link href={summary.links.coverageNeedsAttention}>Go to coverage</Link>
+            <Button asChild size="sm">
+              <Link href={summary.links.coverageNeedsAttention}>Open coverage</Link>
             </Button>
           </CardContent>
         </Card>
@@ -162,15 +146,28 @@ export default async function ManagerDashboardPage({
             )}
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Approvals</CardTitle>
+            <CardDescription>
+              {summary.pendingApprovals === 0
+                ? 'No approvals waiting.'
+                : `${summary.pendingApprovals} requests awaiting review.`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="ghost" size="sm">
+              <Link href={summary.links.approvalsPending}>Open approvals</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
         <CardContent className="space-y-3 pt-4">
           <h3 className="app-section-title">Quick actions</h3>
           <div className="flex flex-wrap items-center gap-2">
-            <Button asChild variant="outline">
-              <Link href={summary.links.approvalsPending}>Review approvals</Link>
-            </Button>
             <Button asChild variant="outline">
               <Link href={summary.links.fixCoverage}>Assign coverage</Link>
             </Button>
@@ -185,6 +182,9 @@ export default async function ManagerDashboardPage({
                 <Link href={summary.links.publish}>Publish cycle</Link>
               </Button>
             )}
+            <Button asChild variant="ghost">
+              <Link href={summary.links.approvalsPending}>Review approvals</Link>
+            </Button>
           </div>
         </CardContent>
       </Card>

@@ -45,11 +45,6 @@ const STAFF_NAV_ITEMS: readonly NavItem[] = [
 const MANAGER_NAV_ITEMS: readonly NavItem[] = [
   { href: MANAGER_WORKFLOW_LINKS.dashboard, label: 'Dashboard' },
   {
-    href: MANAGER_WORKFLOW_LINKS.approvals,
-    label: 'Approvals',
-    isActive: (pathname) => pathname === '/shift-board' || pathname === '/availability',
-  },
-  {
     href: MANAGER_WORKFLOW_LINKS.coverage,
     label: 'Coverage',
     isActive: (pathname, searchParams) =>
@@ -57,6 +52,11 @@ const MANAGER_NAV_ITEMS: readonly NavItem[] = [
       (pathname === '/schedule' && ['calendar', 'week'].includes(searchParams.get('view') ?? '')),
   },
   { href: MANAGER_WORKFLOW_LINKS.team, label: 'Team' },
+  {
+    href: MANAGER_WORKFLOW_LINKS.approvals,
+    label: 'Requests',
+    isActive: (pathname) => pathname === '/shift-board' || pathname === '/availability',
+  },
 ]
 
 const SHELL_ROUTES = [
