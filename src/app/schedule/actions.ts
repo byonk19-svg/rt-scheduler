@@ -105,6 +105,23 @@ function getWeeklyLimitFromProfile(profile: TherapistWeeklyLimitProfile | null |
   return sanitizeWeeklyLimit(profile?.max_work_days_per_week, employmentDefault)
 }
 
+function buildCoverageUrl(
+  cycleId?: string,
+  params?: Record<string, string | undefined>
+): string {
+  const search = new URLSearchParams()
+  if (cycleId) {
+    search.set('cycle', cycleId)
+  }
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (value) search.set(key, value)
+    }
+  }
+  const query = search.toString()
+  return query.length > 0 ? `/coverage?${query}` : '/coverage'
+}
+
 async function getTherapistWeeklyLimit(
   supabase: Awaited<ReturnType<typeof createClient>>,
   therapistId: string
@@ -316,13 +333,21 @@ export async function toggleCyclePublishedAction(formData: FormData) {
   const cycleId = String(formData.get('cycle_id') ?? '').trim()
   const currentlyPublished = String(formData.get('currently_published') ?? '').trim() === 'true'
   const view = String(formData.get('view') ?? '').trim()
+  const returnTo = String(formData.get('return_to') ?? '').trim()
   const showUnavailable = String(formData.get('show_unavailable') ?? '').trim() === 'true'
   const overrideWeeklyRules = String(formData.get('override_weekly_rules') ?? '').trim() === 'true'
   const viewParams = showUnavailable ? { show_unavailable: 'true' } : undefined
+  const buildReturnUrl = (
+    cycleIdOverride: string | undefined,
+    params?: Record<string, string | undefined>
+  ) =>
+    returnTo === 'coverage'
+      ? buildCoverageUrl(cycleIdOverride, params)
+      : buildScheduleUrl(cycleIdOverride, view, params)
   let publishCycleDetails: { label: string; startDate: string; endDate: string } | null = null
 
   if (!cycleId) {
-    redirect(buildScheduleUrl(undefined, view, viewParams))
+    redirect(buildReturnUrl(undefined, viewParams))
   }
 
   if (!currentlyPublished) {
@@ -334,7 +359,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
 
     if (cycleError || !cycle) {
       console.error('Failed to load cycle for publish validation:', cycleError)
-      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'publish_validation_failed' }))
+      redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'publish_validation_failed' }))
     }
     publishCycleDetails = {
       label: cycle.label,
@@ -364,7 +389,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
 
       if (therapistsError) {
         console.error('Failed to load therapists for publish validation:', therapistsError)
-        redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'publish_validation_failed' }))
+        redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'publish_validation_failed' }))
       }
 
       const therapists = (therapistsData ?? []) as Array<{
@@ -396,7 +421,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
 
         if (shiftsError) {
           console.error('Failed to load shifts for publish validation:', shiftsError)
-          redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'publish_validation_failed' }))
+          redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'publish_validation_failed' }))
         }
 
         const weeklyWorkedDatesByUserWeek = new Map<string, Set<string>>()
@@ -418,7 +443,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
         })
         if (violations > 0) {
           redirect(
-            buildScheduleUrl(cycleId, view, {
+            buildReturnUrl(cycleId, {
               ...viewParams,
               error: 'publish_weekly_rule_violation',
               violations: String(violations),
@@ -441,7 +466,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
 
     if (shiftCoverageError) {
       console.error('Failed to load shifts for coverage validation:', shiftCoverageError)
-      redirect(buildScheduleUrl(cycleId, view, { ...viewParams, error: 'publish_validation_failed' }))
+      redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'publish_validation_failed' }))
     }
 
     const slotValidation = summarizeShiftSlotViolations({
@@ -461,7 +486,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
 
     if (slotValidation.violations > 0) {
       redirect(
-        buildScheduleUrl(cycleId, view, {
+        buildReturnUrl(cycleId, {
           ...viewParams,
           error: 'publish_shift_rule_violation',
           under_coverage: String(slotValidation.underCoverage),
@@ -630,8 +655,9 @@ export async function toggleCyclePublishedAction(formData: FormData) {
     }
 
     revalidatePath('/schedule')
+    revalidatePath('/coverage')
     redirect(
-      buildScheduleUrl(cycleId, view, {
+      buildReturnUrl(cycleId, {
         ...viewParams,
         success: 'cycle_published',
         publish_event_id: publishEventId ?? undefined,
@@ -647,8 +673,9 @@ export async function toggleCyclePublishedAction(formData: FormData) {
   }
 
   revalidatePath('/schedule')
+  revalidatePath('/coverage')
   redirect(
-    buildScheduleUrl(cycleId, view, {
+    buildReturnUrl(cycleId, {
       ...viewParams,
       success: currentlyPublished ? 'cycle_unpublished' : 'cycle_published',
     })
@@ -676,10 +703,18 @@ export async function addShiftAction(formData: FormData) {
   const shiftType = String(formData.get('shift_type') ?? '').trim()
   const status = String(formData.get('status') ?? '').trim()
   const view = String(formData.get('view') ?? '').trim()
+  const returnTo = String(formData.get('return_to') ?? '').trim()
   const showUnavailable = String(formData.get('show_unavailable') ?? '').trim() === 'true'
   const panel = getPanelParam(formData)
   const overrideWeeklyRules = String(formData.get('override_weekly_rules') ?? '').trim() === 'on'
   const viewParams = showUnavailable ? { show_unavailable: 'true' } : undefined
+  const buildReturnUrl = (
+    cycleIdOverride: string | undefined,
+    params?: Record<string, string | undefined>
+  ) =>
+    returnTo === 'coverage'
+      ? buildCoverageUrl(cycleIdOverride, params)
+      : buildScheduleUrl(cycleIdOverride, view, params)
   const panelParams =
     panel === 'add-shift'
       ? {
@@ -693,7 +728,7 @@ export async function addShiftAction(formData: FormData) {
   const errorViewParams = panelParams ? { ...viewParams, ...panelParams } : viewParams
 
   if (!cycleId || !userId || !date || !shiftType || !status) {
-    redirect(buildScheduleUrl(undefined, view, errorViewParams))
+    redirect(buildReturnUrl(undefined, errorViewParams))
   }
 
   const therapistWeeklyLimit =
@@ -711,19 +746,19 @@ export async function addShiftAction(formData: FormData) {
 
     if (sameSlotError) {
       console.error('Failed to load slot coverage for limit check:', sameSlotError)
-      redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'add_shift_failed' }))
+      redirect(buildReturnUrl(cycleId, { ...errorViewParams, error: 'add_shift_failed' }))
     }
 
     const activeCoverage = (sameSlotShifts ?? []).filter((row) => countsTowardWeeklyLimit(row.status)).length
     if (exceedsCoverageLimit(activeCoverage, MAX_SHIFT_COVERAGE_PER_DAY)) {
-      redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'coverage_max_exceeded' }))
+      redirect(buildReturnUrl(cycleId, { ...errorViewParams, error: 'coverage_max_exceeded' }))
     }
   }
 
   if (countsTowardWeeklyLimit(status) && !overrideWeeklyRules) {
     const bounds = getWeekBoundsForDate(date)
     if (!bounds) {
-      redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'add_shift_failed' }))
+      redirect(buildReturnUrl(cycleId, { ...errorViewParams, error: 'add_shift_failed' }))
     }
 
     const { data: weeklyShiftsData, error: weeklyShiftsError } = await supabase
@@ -735,7 +770,7 @@ export async function addShiftAction(formData: FormData) {
 
     if (weeklyShiftsError) {
       console.error('Failed to load weekly shifts for limit check:', weeklyShiftsError)
-      redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'add_shift_failed' }))
+      redirect(buildReturnUrl(cycleId, { ...errorViewParams, error: 'add_shift_failed' }))
     }
 
     const workedDates = new Set<string>()
@@ -746,7 +781,7 @@ export async function addShiftAction(formData: FormData) {
 
     if (exceedsWeeklyLimit(workedDates, date, therapistWeeklyLimit)) {
       redirect(
-        buildScheduleUrl(cycleId, view, {
+        buildReturnUrl(cycleId, {
           ...errorViewParams,
           error: 'weekly_limit_exceeded',
           week_start: bounds.weekStart,
@@ -772,9 +807,9 @@ export async function addShiftAction(formData: FormData) {
   if (error) {
     console.error('Failed to insert shift:', error)
     if (error.code === '23505') {
-      redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'duplicate_shift' }))
+      redirect(buildReturnUrl(cycleId, { ...errorViewParams, error: 'duplicate_shift' }))
     }
-    redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'add_shift_failed' }))
+    redirect(buildReturnUrl(cycleId, { ...errorViewParams, error: 'add_shift_failed' }))
   }
 
   if (insertedShift?.id) {
@@ -796,7 +831,8 @@ export async function addShiftAction(formData: FormData) {
   })
 
   revalidatePath('/schedule')
-  redirect(buildScheduleUrl(cycleId, view, { ...viewParams, success: 'shift_added' }))
+  revalidatePath('/coverage')
+  redirect(buildReturnUrl(cycleId, { ...viewParams, success: 'shift_added' }))
 }
 
 export async function generateDraftScheduleAction(formData: FormData) {

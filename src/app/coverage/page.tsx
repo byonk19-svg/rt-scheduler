@@ -1,17 +1,19 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 
+import { toggleCyclePublishedAction } from '@/app/schedule/actions'
+import { getScheduleFeedback } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/client'
-import type { AssignmentStatus, ShiftRole, ShiftStatus } from '@/app/schedule/types'
+import type { AssignmentStatus, ScheduleSearchParams, ShiftRole, ShiftStatus } from '@/app/schedule/types'
 
 type UiStatus = 'active' | 'oncall' | 'leave_early' | 'cancelled'
 type DayStatus = 'published' | 'draft' | 'override' | 'missing_lead'
 type ShiftTab = 'Day' | 'Night'
 
 type ShiftLog = { from: string; to: UiStatus; toLabel: string; time: string }
-type ShiftItem = { id: string; name: string; status: UiStatus; log: ShiftLog[] }
+type ShiftItem = { id: string; userId: string; name: string; status: UiStatus; log: ShiftLog[] }
 type DayItem = {
   id: string
   isoDate: string
@@ -22,9 +24,11 @@ type DayItem = {
   staffShifts: ShiftItem[]
 }
 
-type CycleRow = { id: string; start_date: string; end_date: string }
+type CycleRow = { id: string; start_date: string; end_date: string; published: boolean }
+type TherapistOption = { id: string; full_name: string; shift_type: 'day' | 'night' }
 type ShiftRow = {
   id: string
+  user_id: string
   date: string
   shift_type: 'day' | 'night'
   status: ShiftStatus
@@ -149,19 +153,48 @@ function Avatar({ name, status, size = 18 }: { name: string; status: UiStatus; s
 }
 
 export default function CoveragePage() {
-  const router = useRouter()
   const search = useSearchParams()
   const cycleFromUrl = search.get('cycle')
+  const successParam = search.get('success')
+  const errorParam = search.get('error')
   const supabase = useMemo(() => createClient(), [])
   const [shiftTab, setShiftTab] = useState<ShiftTab>('Day')
   const [dayDays, setDayDays] = useState<DayItem[]>([])
   const [nightDays, setNightDays] = useState<DayItem[]>([])
+  const [activeCycleId, setActiveCycleId] = useState<string | null>(cycleFromUrl)
+  const [activeCyclePublished, setActiveCyclePublished] = useState(false)
+  const [availableTherapists, setAvailableTherapists] = useState<TherapistOption[]>([])
+  const [assignUserId, setAssignUserId] = useState('')
+  const [assigning, setAssigning] = useState(false)
+  const [assigned, setAssigned] = useState(false)
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [expandedShiftId, setExpandedShiftId] = useState<string | null>(null)
   const [error, setError] = useState<string>('')
   const days = shiftTab === 'Day' ? dayDays : nightDays
   const setDays = shiftTab === 'Day' ? setDayDays : setNightDays
+  const publishFeedbackParams = useMemo<ScheduleSearchParams>(
+    () => ({
+      error: errorParam ?? undefined,
+      week_start: search.get('week_start') ?? undefined,
+      week_end: search.get('week_end') ?? undefined,
+      violations: search.get('violations') ?? undefined,
+      under: search.get('under') ?? undefined,
+      over: search.get('over') ?? undefined,
+      under_coverage: search.get('under_coverage') ?? undefined,
+      over_coverage: search.get('over_coverage') ?? undefined,
+      lead_missing: search.get('lead_missing') ?? undefined,
+      lead_multiple: search.get('lead_multiple') ?? undefined,
+      lead_ineligible: search.get('lead_ineligible') ?? undefined,
+    }),
+    [errorParam, search]
+  )
+  const publishErrorMessage = useMemo(() => {
+    if (!errorParam) return null
+    const feedback = getScheduleFeedback(publishFeedbackParams)
+    if (feedback?.variant === 'error') return feedback.message
+    return `Publish blocked: ${errorParam.replaceAll('_', ' ')}.`
+  }, [errorParam, publishFeedbackParams])
 
   useEffect(() => {
     let active = true
@@ -179,7 +212,7 @@ export default function CoveragePage() {
 
         const { data: cyclesData, error: cyclesError } = await supabase
           .from('schedule_cycles')
-          .select('id, start_date, end_date')
+          .select('id, start_date, end_date, published')
           .order('start_date', { ascending: false })
 
         if (!active) return
@@ -199,10 +232,14 @@ export default function CoveragePage() {
             cycleEndDate = cycle.end_date
           }
         }
+        if (active) {
+          setActiveCycleId(cycleId)
+          setActiveCyclePublished(Boolean(cyclesData && cycleId && (cyclesData as CycleRow[]).find((c) => c.id === cycleId)?.published))
+        }
 
         let shiftsQuery = supabase
           .from('shifts')
-          .select('id,date,shift_type,status,assignment_status,role,profiles:profiles!shifts_user_id_fkey(full_name)')
+          .select('id,user_id,date,shift_type,status,assignment_status,role,profiles:profiles!shifts_user_id_fkey(full_name)')
           .gte('date', cycleStartDate)
           .lte('date', cycleEndDate)
           .order('date', { ascending: true })
@@ -242,6 +279,7 @@ export default function CoveragePage() {
                 ? null
                 : {
                     id: lead.id,
+                    userId: lead.user_id,
                     name: getOne(lead.profiles)?.full_name ?? 'Unknown',
                     status: toUiStatus(lead.assignment_status, lead.status),
                     log: [],
@@ -250,6 +288,7 @@ export default function CoveragePage() {
               .filter((row) => row.id !== lead?.id)
               .map((row) => ({
                 id: row.id,
+                userId: row.user_id,
                 name: getOne(row.profiles)?.full_name ?? 'Unknown',
                 status: toUiStatus(row.assignment_status, row.status),
                 log: [],
@@ -289,8 +328,59 @@ export default function CoveragePage() {
     }
   }, [cycleFromUrl, supabase])
 
-  const selectedDayBase = days.find((row) => row.id === selectedId) ?? null
-  const selectedDay = selectedDayBase ? { ...selectedDayBase, shiftType: shiftTab } : null
+  useEffect(() => {
+    const selectedDay = days.find((row) => row.id === selectedId) ?? null
+    if (!selectedDay) {
+      setAvailableTherapists([])
+      setAssignUserId('')
+      return
+    }
+
+    let active = true
+    const shiftType = shiftTab === 'Day' ? 'day' : 'night'
+    const assignedUserIds = new Set(flatten(selectedDay).map((shift) => shift.userId))
+
+    void (async () => {
+      const { data, error: loadError } = await supabase
+        .from('profiles')
+        .select('id, full_name, shift_type')
+        .eq('shift_type', shiftType)
+        .eq('is_active', true)
+        .eq('on_fmla', false)
+        .in('role', ['therapist', 'staff'])
+        .order('full_name', { ascending: true })
+
+      if (!active) return
+      if (loadError) {
+        console.error('Could not load available therapists for assignment:', loadError)
+        setAvailableTherapists([])
+        setAssignUserId('')
+        return
+      }
+
+      const options = ((data ?? []) as TherapistOption[]).filter(
+        (therapist) => !assignedUserIds.has(therapist.id)
+      )
+      setAvailableTherapists(options)
+      setAssignUserId((current) => {
+        if (current && options.some((therapist) => therapist.id === current)) return current
+        return options[0]?.id ?? ''
+      })
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [days, selectedId, shiftTab, supabase])
+
+  const selectedDayBase = useMemo(
+    () => days.find((row) => row.id === selectedId) ?? null,
+    [days, selectedId]
+  )
+  const selectedDay = useMemo(
+    () => (selectedDayBase ? { ...selectedDayBase, shiftType: shiftTab } : null),
+    [selectedDayBase, shiftTab]
+  )
 
   const handleTabSwitch = (tab: ShiftTab) => {
     setShiftTab(tab)
@@ -305,8 +395,80 @@ export default function CoveragePage() {
   const handleClose = () => {
     setExpandedShiftId(null)
     setSelectedId(null)
+    setAvailableTherapists([])
+    setAssignUserId('')
+    setAssigned(false)
+    setAssigning(false)
   }
-  const publishRoute = cycleFromUrl ? `/coverage?view=week&cycle=${cycleFromUrl}` : '/coverage?view=week'
+
+  const handleAssign = useCallback(async () => {
+    if (!selectedDay || !assignUserId || !activeCycleId) return
+
+    setAssigning(true)
+    setError('')
+    setAssigned(false)
+
+    const selectedTherapist =
+      availableTherapists.find((therapist) => therapist.id === assignUserId) ?? null
+    const shiftType = selectedDay.shiftType === 'Day' ? 'day' : 'night'
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('shifts')
+      .insert({
+        cycle_id: activeCycleId,
+        user_id: assignUserId,
+        date: selectedDay.isoDate,
+        shift_type: shiftType,
+        role: 'staff',
+        status: 'scheduled',
+      })
+      .select('id, user_id, date, shift_type, status, assignment_status')
+      .single()
+
+    if (insertError || !inserted) {
+      console.error('Assign failed:', insertError)
+      if (insertError?.code === '23505') {
+        window.alert(`${selectedTherapist?.full_name ?? 'This therapist'} is already assigned on this day.`)
+      } else {
+        window.alert('Could not assign therapist. Please try again.')
+      }
+      setAssigning(false)
+      return
+    }
+
+    const insertedRow = inserted as {
+      id: string
+      user_id: string
+      status: ShiftStatus
+      assignment_status: AssignmentStatus | null
+    }
+    const name = selectedTherapist?.full_name ?? 'Unknown'
+    const nextShift: ShiftItem = {
+      id: insertedRow.id,
+      userId: insertedRow.user_id,
+      name,
+      status: toUiStatus(insertedRow.assignment_status, insertedRow.status),
+      log: [],
+    }
+
+    setDays((current) =>
+      current.map((day) => {
+        if (day.id !== selectedDay.id) return day
+        return {
+          ...day,
+          staffShifts: [...day.staffShifts, nextShift].sort((a, b) => a.name.localeCompare(b.name)),
+        }
+      })
+    )
+
+    setAvailableTherapists((current) =>
+      current.filter((therapist) => therapist.id !== insertedRow.user_id)
+    )
+    setAssignUserId('')
+    setAssigned(true)
+    setTimeout(() => setAssigned(false), 2000)
+    setAssigning(false)
+  }, [activeCycleId, assignUserId, availableTherapists, selectedDay, setDays, supabase])
 
   const handleChangeStatus = useCallback(
     async (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => {
@@ -388,15 +550,43 @@ export default function CoveragePage() {
           </div>
           <div className="flex gap-2">
             <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">Auto-draft</button>
-            <button
-              type="button"
-              onClick={() => router.push(publishRoute)}
-              className="rounded-md bg-amber-600 px-4 py-1.5 text-xs font-bold text-white"
-            >
-              Publish
-            </button>
+            <form action={toggleCyclePublishedAction}>
+              <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+              <input type="hidden" name="view" value="week" />
+              <input type="hidden" name="show_unavailable" value="false" />
+              <input type="hidden" name="currently_published" value={activeCyclePublished ? 'true' : 'false'} />
+              <input type="hidden" name="override_weekly_rules" value="false" />
+              <input type="hidden" name="return_to" value="coverage" />
+              <button
+                type="submit"
+                disabled={!activeCycleId || activeCyclePublished}
+                className="rounded-md bg-amber-600 px-4 py-1.5 text-xs font-bold text-white disabled:opacity-60"
+              >
+                {activeCyclePublished ? 'Published' : 'Publish'}
+              </button>
+            </form>
           </div>
         </div>
+        {successParam === 'cycle_published' && (
+          <p className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+            Published - visible to employees.
+          </p>
+        )}
+        {successParam === 'cycle_unpublished' && (
+          <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+            Cycle unpublished.
+          </p>
+        )}
+        {successParam === 'shift_added' && (
+          <p className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+            Shift assigned.
+          </p>
+        )}
+        {publishErrorMessage && (
+          <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800">
+            {publishErrorMessage}
+          </p>
+        )}
         {error && <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
         <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
           {(['Day', 'Night'] as const).map((tab) => (
@@ -518,6 +708,47 @@ export default function CoveragePage() {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
+              <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Assign Therapist</p>
+                {availableTherapists.length === 0 ? (
+                  <p className="mt-2 text-xs text-slate-500">
+                    No active {shiftTab.toLowerCase()}-shift therapists available.
+                  </p>
+                ) : (
+                  <form
+                    className="mt-2 flex items-center gap-2"
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      void handleAssign()
+                    }}
+                  >
+                    <select
+                      value={assignUserId}
+                      onChange={(event) => setAssignUserId(event.target.value)}
+                      className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700"
+                      required
+                    >
+                      {availableTherapists.map((therapist) => (
+                        <option key={therapist.id} value={therapist.id}>
+                          {therapist.full_name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="submit"
+                      disabled={!activeCycleId || !assignUserId || assigning}
+                      className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60"
+                    >
+                      {assigning ? 'Assigning...' : assigned ? '✓ Added' : 'Assign'}
+                    </button>
+                  </form>
+                )}
+              </div>
+              {flatten(selectedDay).length === 0 && (
+                <p className="mb-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">
+                  No therapists assigned yet.
+                </p>
+              )}
               {flatten(selectedDay).map((shift) => {
                 const expanded = expandedShiftId === shift.id
                 return (
