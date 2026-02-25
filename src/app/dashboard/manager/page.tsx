@@ -64,6 +64,7 @@ type ShiftCoverageRow = {
   shift_type: 'day' | 'night'
   status: ShiftStatus
   role: ShiftRole
+  user_id: string | null
 }
 
 type ShiftPostRow = {
@@ -108,6 +109,12 @@ function formatCycleDate(value: string): string {
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
 function countsTowardCoverage(status: ShiftStatus): boolean {
   return status === 'scheduled' || status === 'on_call'
 }
@@ -139,20 +146,60 @@ export default function ManagerDashboardPage() {
 
         const today = new Date()
         const todayKey = dateKeyFromDate(today)
+        const fallbackEndKey = dateKeyFromDate(addDays(today, 42))
         const todayStart = new Date(today)
         todayStart.setHours(0, 0, 0, 0)
 
-        const [profileResult, cyclesResult, teamProfilesResult, pendingPostsResult, reviewedPostsResult] = await Promise.all([
+        const [profileResult, activeCycleResult] = await Promise.all([
           supabase.from('profiles').select('full_name, role').eq('id', user.id).maybeSingle(),
           supabase
             .from('schedule_cycles')
             .select('id, label, start_date, end_date, published')
+            .lte('start_date', todayKey)
+            .gte('end_date', todayKey)
             .order('start_date', { ascending: false })
-            .limit(24),
+            .limit(1)
+            .maybeSingle(),
+        ])
+
+        if (profileResult.error) {
+          console.error('Failed to load manager profile for dashboard:', profileResult.error)
+        }
+
+        if (activeCycleResult.error) {
+          console.error(
+            'Failed to load current schedule cycle for dashboard. Falling back to a 6-week window:',
+            activeCycleResult.error
+          )
+        }
+
+        const profile = (profileResult.data ?? null) as ManagerProfileRow | null
+
+        if (profile?.role && profile.role !== 'manager') {
+          router.replace('/dashboard/staff')
+          return
+        }
+
+        const managerName = profile.full_name ?? user.user_metadata?.full_name ?? 'Manager'
+        const activeCycle = ((activeCycleResult.data ?? null) as Cycle | null) ?? null
+        const cycleStartDate = activeCycle?.start_date ?? todayKey
+        const cycleEndDate = activeCycle?.end_date ?? fallbackEndKey
+
+        let shiftsQuery = supabase
+          .from('shifts')
+          .select('date, shift_type, status, role, user_id')
+          .gte('date', cycleStartDate)
+          .lte('date', cycleEndDate)
+
+        if (activeCycle?.id) {
+          shiftsQuery = shiftsQuery.eq('cycle_id', activeCycle.id)
+        }
+
+        const [teamProfilesResult, pendingPostsResult, reviewedPostsResult, shiftsResult] = await Promise.all([
           supabase
             .from('profiles')
             .select('id, shift_type, is_active, on_fmla')
-            .eq('role', 'therapist'),
+            .in('role', ['therapist', 'staff']),
           supabase
             .from('shift_posts')
             .select('shift_id')
@@ -162,68 +209,58 @@ export default function ManagerDashboardPage() {
             .select('shift_id, status')
             .in('status', ['approved', 'denied'])
             .gte('created_at', todayStart.toISOString()),
+          shiftsQuery,
         ])
 
-        const profile = (profileResult.data ?? null) as ManagerProfileRow | null
-
-        if (profile?.role !== 'manager') {
-          router.replace('/dashboard/staff')
-          return
+        if (teamProfilesResult.error) {
+          console.error('Failed to load team profile metrics for dashboard:', teamProfilesResult.error)
         }
 
-        const managerName = profile.full_name ?? user.user_metadata?.full_name ?? 'Manager'
-        const cycles = (cyclesResult.data ?? []) as Cycle[]
-        const activeCycle =
-          cycles.find((cycle) => cycle.start_date <= todayKey && cycle.end_date >= todayKey) ??
-          cycles[0] ??
-          null
+        if (pendingPostsResult.error) {
+          console.error('Failed to load pending approval posts for dashboard:', pendingPostsResult.error)
+        }
+
+        if (reviewedPostsResult.error) {
+          console.error('Failed to load reviewed posts for dashboard:', reviewedPostsResult.error)
+        }
+
+        if (shiftsResult.error) {
+          console.error('Failed to load shifts for dashboard metrics:', shiftsResult.error)
+        }
 
         let unfilledShifts = 0
         let missingLead = 0
         let underCoverage = 0
         let overCoverage = 0
 
-        if (activeCycle) {
-          const { data: shiftsData, error: shiftsError } = await supabase
-            .from('shifts')
-            .select('date, shift_type, status, role')
-            .eq('cycle_id', activeCycle.id)
-            .gte('date', activeCycle.start_date)
-            .lte('date', activeCycle.end_date)
+        const shifts = shiftsResult.error ? [] : ((shiftsResult.data ?? []) as ShiftCoverageRow[])
+        const shiftsBySlot = new Map<string, ShiftCoverageRow[]>()
 
-          if (shiftsError) {
-            console.error('Failed to load cycle shifts for dashboard metrics:', shiftsError)
-          } else {
-            const shifts = (shiftsData ?? []) as ShiftCoverageRow[]
-            const shiftsBySlot = new Map<string, ShiftCoverageRow[]>()
+        for (const shift of shifts) {
+          const slotKey = `${shift.date}:${shift.shift_type}`
+          const rows = shiftsBySlot.get(slotKey) ?? []
+          rows.push(shift)
+          shiftsBySlot.set(slotKey, rows)
+        }
 
-            for (const shift of shifts) {
-              const slotKey = `${shift.date}:${shift.shift_type}`
-              const rows = shiftsBySlot.get(slotKey) ?? []
-              rows.push(shift)
-              shiftsBySlot.set(slotKey, rows)
-            }
+        for (const date of buildDateRange(cycleStartDate, cycleEndDate)) {
+          for (const shiftType of ['day', 'night'] as const) {
+            const slotKey = `${date}:${shiftType}`
+            const slotRows = shiftsBySlot.get(slotKey) ?? []
+            const activeRows = slotRows.filter((row) => countsTowardCoverage(row.status))
+            const assignedRows = activeRows.filter((row) => Boolean(row.user_id))
+            const coverageCount = assignedRows.length
+            const leadCount = assignedRows.filter((row) => row.role === 'lead').length
 
-            for (const date of buildDateRange(activeCycle.start_date, activeCycle.end_date)) {
-              for (const shiftType of ['day', 'night'] as const) {
-                const slotKey = `${date}:${shiftType}`
-                const slotRows = shiftsBySlot.get(slotKey) ?? []
-                const activeRows = slotRows.filter((row) => countsTowardCoverage(row.status))
-                const coverageCount = activeRows.length
-                const staffCount = activeRows.filter((row) => row.role === 'staff').length
-                const leadCount = activeRows.filter((row) => row.role === 'lead').length
-
-                if (staffCount === 0) unfilledShifts += 1
-                if (leadCount === 0) missingLead += 1
-                if (coverageCount < MIN_SHIFT_COVERAGE_PER_DAY) underCoverage += 1
-                if (coverageCount > MAX_SHIFT_COVERAGE_PER_DAY) overCoverage += 1
-              }
-            }
+            if (coverageCount === 0) unfilledShifts += 1
+            if (leadCount === 0) missingLead += 1
+            if (coverageCount < MIN_SHIFT_COVERAGE_PER_DAY) underCoverage += 1
+            if (coverageCount > MAX_SHIFT_COVERAGE_PER_DAY) overCoverage += 1
           }
         }
 
-        const pendingPosts = (pendingPostsResult.data ?? []) as ShiftPostRow[]
-        const reviewedPosts = (reviewedPostsResult.data ?? []) as ShiftPostRow[]
+        const pendingPosts = pendingPostsResult.error ? [] : ((pendingPostsResult.data ?? []) as ShiftPostRow[])
+        const reviewedPosts = reviewedPostsResult.error ? [] : ((reviewedPostsResult.data ?? []) as ShiftPostRow[])
 
         const shiftIds = Array.from(
           new Set(
@@ -270,7 +307,7 @@ export default function ManagerDashboardPage() {
             (publishedShiftIds === null || (row.shift_id !== null && publishedShiftIds.has(row.shift_id)))
         ).length
 
-        const teamProfiles = (teamProfilesResult.data ?? []) as TeamProfileRow[]
+        const teamProfiles = teamProfilesResult.error ? [] : ((teamProfilesResult.data ?? []) as TeamProfileRow[])
         const activeTeamProfiles = teamProfiles.filter((row) => row.is_active !== false)
 
         const activeEmployees = activeTeamProfiles.length
@@ -292,8 +329,8 @@ export default function ManagerDashboardPage() {
           dayShift,
           nightShift,
           onFmla,
-          cycleStart: activeCycle ? formatCycleDate(activeCycle.start_date) : '—',
-          cycleEnd: activeCycle ? formatCycleDate(activeCycle.end_date) : '—',
+          cycleStart: formatCycleDate(cycleStartDate),
+          cycleEnd: formatCycleDate(cycleEndDate),
           managerName,
           activeCycleId: activeCycle?.id ?? null,
         })
@@ -333,7 +370,7 @@ export default function ManagerDashboardPage() {
     : data
 
   const coverageRoute = buildCycleRoute('/coverage', data.activeCycleId)
-  const publishRoute = buildCycleRoute('/schedule', data.activeCycleId)
+  const publishRoute = buildCycleRoute('/coverage', data.activeCycleId)
   const approvalsRoute = MANAGER_WORKFLOW_LINKS.approvals
   const teamRoute = MANAGER_WORKFLOW_LINKS.team
 

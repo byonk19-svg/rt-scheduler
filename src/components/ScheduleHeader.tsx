@@ -149,6 +149,9 @@ export function ScheduleHeader({
                   <Link href={setupHref}>Setup</Link>
                 </Button>
               )}
+              <Button asChild type="button" variant="outline">
+                <Link href="/publish">Publish history</Link>
+              </Button>
             </>
           )}
 

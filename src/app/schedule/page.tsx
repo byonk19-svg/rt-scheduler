@@ -24,8 +24,17 @@ import {
   resetDraftScheduleAction,
   toggleCyclePublishedAction,
 } from './actions'
+import { PublishEmailKickoff } from './publish-email-kickoff'
 import type { CalendarShift, Cycle, Role, ScheduleSearchParams, ShiftRow, Therapist, ViewMode } from './types'
-import { buildDateRange, buildScheduleUrl, getOne, getScheduleFeedback, getSearchParam, normalizeViewMode } from '@/lib/schedule-helpers'
+import {
+  buildDateRange,
+  buildScheduleUrl,
+  getOne,
+  getScheduleFeedback,
+  getSearchParam,
+  normalizeViewMode,
+  parseCount,
+} from '@/lib/schedule-helpers'
 import type { AssignmentStatus, ShiftStatus } from './types'
 
 type IssueFilter =
@@ -136,6 +145,13 @@ export default async function SchedulePage({
   const showUnavailable = params?.show_unavailable === 'true'
   const activePanel = panelParam === 'setup' ? 'setup' : null
   const successParam = getSearchParam(params?.success)
+  const publishEventId = getSearchParam(params?.publish_event_id)
+  const publishRecipientCount = parseCount(getSearchParam(params?.recipient_count))
+  const publishQueuedCount = parseCount(getSearchParam(params?.queued_count))
+  const publishSentCount = parseCount(getSearchParam(params?.sent_count))
+  const publishFailedCount = parseCount(getSearchParam(params?.failed_count))
+  const publishEmailConfigured = getSearchParam(params?.email_configured) !== 'false'
+  const publishQueueError = getSearchParam(params?.email_queue_error)
   const feedback = getScheduleFeedback(params)
 
   const { data: profile } = await supabase
@@ -584,15 +600,42 @@ export default async function SchedulePage({
           <CardHeader>
             <CardTitle className="text-[var(--success-text)]">Cycle published successfully</CardTitle>
             <CardDescription className="text-[var(--success-text)]">
-              The schedule is now live for your team.
+              Published - visible to employees.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Button asChild size="sm">
-              <Link href={buildScheduleUrl(activeCycleId, 'week')}>View published schedule</Link>
-            </Button>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-[var(--success-text)]">
+              Emails queued/sent/failed: {publishQueuedCount}/{publishSentCount}/{publishFailedCount}
+              {publishRecipientCount > 0 ? ` (recipients: ${publishRecipientCount})` : ''}
+            </p>
+            {!publishEmailConfigured && (
+              <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                Email not configured; schedule is still published in-app.
+              </p>
+            )}
+            {publishQueueError && (
+              <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                Email queue warning: {publishQueueError.replaceAll('_', ' ')}.
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm">
+                <Link href={buildScheduleUrl(activeCycleId, 'week')}>View published schedule</Link>
+              </Button>
+              {publishEventId && (
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/publish/${publishEventId}`}>View publish details</Link>
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
+      )}
+      {successParam === 'cycle_published' && publishEventId && (
+        <PublishEmailKickoff
+          publishEventId={publishEventId}
+          enabled={publishEmailConfigured && publishQueuedCount > 0}
+        />
       )}
 
       <ScheduleHeader

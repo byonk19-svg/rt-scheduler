@@ -84,6 +84,14 @@ export type ScheduleSearchParams = {
   draft?: string
   removed?: string
   dropped?: string
+  publish_event_id?: string
+  recipient_count?: string
+  queued_count?: string
+  sent_count?: string
+  failed_count?: string
+  published_at?: string
+  email_configured?: string
+  email_queue_error?: string
 }
 
 export type AutoScheduleShiftRow = {

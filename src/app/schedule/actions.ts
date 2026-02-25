@@ -20,6 +20,7 @@ import { createClient } from '@/lib/supabase/server'
 import { setDesignatedLeadMutation } from '@/lib/set-designated-lead'
 import { notifyUsers } from '@/lib/notifications'
 import { writeAuditLog } from '@/lib/audit-log'
+import { getPublishEmailConfig } from '@/lib/publish-events'
 import {
   buildDateRange,
   buildScheduleUrl,
@@ -68,6 +69,12 @@ type ImportedShiftRow = {
   shift_type: 'day' | 'night'
   status: ShiftStatus
   role: ShiftRole
+}
+
+type PublishRecipientRow = {
+  id: string
+  email: string | null
+  full_name: string | null
 }
 
 function getOne<T>(value: T | T[] | null | undefined): T | null {
@@ -477,6 +484,15 @@ export async function toggleCyclePublishedAction(formData: FormData) {
   }
 
   if (!currentlyPublished && !error) {
+    const emailConfig = getPublishEmailConfig()
+    let publishEventId: string | null = null
+    let publishedAt: string | null = null
+    let recipientCount = 0
+    let queuedCount = 0
+    const sentCount = 0
+    let failedCount = 0
+    let emailQueueError: string | null = null
+
     await writeAuditLog(supabase, {
       userId: user.id,
       action: 'cycle_published',
@@ -484,18 +500,120 @@ export async function toggleCyclePublishedAction(formData: FormData) {
       targetId: cycleId,
     })
 
-    const { data: therapistProfiles } = await supabase
+    const { data: therapistProfiles, error: therapistProfilesError } = await supabase
       .from('profiles')
-      .select('id')
-      .eq('role', 'therapist')
+      .select('id, email, full_name')
+      .in('role', ['therapist', 'staff', 'lead'])
       .eq('is_active', true)
 
-    const therapistIds = (therapistProfiles ?? []).map((profile) => profile.id as string)
+    if (therapistProfilesError) {
+      console.error('Failed to load recipients for publish notifications:', therapistProfilesError)
+      emailQueueError = 'recipient_lookup_failed'
+    }
+
+    const dedupedRecipients = Array.from(
+      new Map(
+        ((therapistProfiles ?? []) as PublishRecipientRow[])
+          .filter((row) => Boolean(row.email))
+          .map((row) => [
+            String(row.email ?? '').trim().toLowerCase(),
+            {
+              id: row.id,
+              email: String(row.email ?? '').trim().toLowerCase(),
+              fullName: row.full_name?.trim() || null,
+            },
+          ])
+      ).values()
+    )
+
+    recipientCount = dedupedRecipients.length
+    const therapistIds = dedupedRecipients.map((recipient) => recipient.id)
     const cycleLabel = publishCycleDetails?.label ?? 'Schedule cycle'
     const cycleRange =
       publishCycleDetails
         ? `${publishCycleDetails.startDate} to ${publishCycleDetails.endDate}`
         : 'the current date range'
+
+    const { data: publishEventRow, error: publishEventError } = await supabase
+      .from('publish_events')
+      .insert({
+        cycle_id: cycleId,
+        published_by: user.id,
+        status: 'success',
+        channel: 'email',
+        recipient_count: recipientCount,
+        queued_count: recipientCount,
+        sent_count: 0,
+        failed_count: 0,
+        error_message: !emailConfig.configured ? 'Email not configured; schedule is still published in-app.' : null,
+      })
+      .select('id, published_at')
+      .single()
+
+    if (publishEventError) {
+      console.error('Failed to create publish event:', publishEventError)
+      emailQueueError = 'publish_event_insert_failed'
+    } else {
+      publishEventId = publishEventRow.id
+      publishedAt = publishEventRow.published_at
+
+      if (dedupedRecipients.length > 0) {
+        const { data: outboxRows, error: outboxError } = await supabase
+          .from('notification_outbox')
+          .insert(
+            dedupedRecipients.map((recipient) => ({
+              publish_event_id: publishEventId,
+              user_id: recipient.id,
+              email: recipient.email,
+              name: recipient.fullName,
+              channel: 'email',
+              status: 'queued',
+            }))
+          )
+          .select('id')
+
+        if (outboxError) {
+          console.error('Failed to queue publish emails:', outboxError)
+          emailQueueError = 'notification_outbox_insert_failed'
+          queuedCount = 0
+          failedCount = recipientCount
+          await supabase
+            .from('publish_events')
+            .update({
+              status: 'failed',
+              queued_count: 0,
+              sent_count: 0,
+              failed_count: failedCount,
+              error_message: 'Could not queue email notifications.',
+            })
+            .eq('id', publishEventId)
+        } else {
+          queuedCount = outboxRows?.length ?? recipientCount
+          await supabase
+            .from('publish_events')
+            .update({
+              recipient_count: recipientCount,
+              queued_count: queuedCount,
+              sent_count: 0,
+              failed_count: 0,
+              status: 'success',
+            })
+            .eq('id', publishEventId)
+        }
+      } else {
+        queuedCount = 0
+        await supabase
+          .from('publish_events')
+          .update({
+            recipient_count: 0,
+            queued_count: 0,
+            sent_count: 0,
+            failed_count: 0,
+            status: 'success',
+          })
+          .eq('id', publishEventId)
+      }
+    }
 
     await notifyUsers(supabase, {
       userIds: therapistIds,
@@ -505,6 +623,27 @@ export async function toggleCyclePublishedAction(formData: FormData) {
       targetType: 'schedule_cycle',
       targetId: cycleId,
     })
+
+    revalidatePath('/publish')
+    if (publishEventId) {
+      revalidatePath(`/publish/${publishEventId}`)
+    }
+
+    revalidatePath('/schedule')
+    redirect(
+      buildScheduleUrl(cycleId, view, {
+        ...viewParams,
+        success: 'cycle_published',
+        publish_event_id: publishEventId ?? undefined,
+        recipient_count: String(recipientCount),
+        queued_count: String(queuedCount),
+        sent_count: String(sentCount),
+        failed_count: String(failedCount),
+        published_at: publishedAt ?? undefined,
+        email_configured: emailConfig.configured ? 'true' : 'false',
+        email_queue_error: emailQueueError ?? undefined,
+      })
+    )
   }
 
   revalidatePath('/schedule')

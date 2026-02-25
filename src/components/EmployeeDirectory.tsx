@@ -265,7 +265,7 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
             <span className="text-sm font-medium text-muted-foreground">Filters:</span>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={leadOnly} onChange={(event) => setLeadOnly(event.target.checked)} />
-              Lead eligible
+              Lead
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={fmlaOnly} onChange={(event) => setFmlaOnly(event.target.checked)} />
@@ -358,7 +358,7 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
                         <div className="space-y-1">
                           <div className="flex flex-wrap gap-1.5">
                             {employee.is_lead_eligible && (
-                              <Badge className={LEAD_ELIGIBLE_BADGE_CLASS}>Lead eligible</Badge>
+                              <Badge className={LEAD_ELIGIBLE_BADGE_CLASS}>Lead</Badge>
                             )}
                             {employee.on_fmla && (
                               <Badge
@@ -425,7 +425,7 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
                   <Badge variant="outline" className={EMPLOYEE_META_BADGE_CLASS}>
                     {employmentLabel(employee.employment_type)}
                   </Badge>
-                  {employee.is_lead_eligible && <Badge className={LEAD_ELIGIBLE_BADGE_CLASS}>Lead eligible</Badge>}
+                  {employee.is_lead_eligible && <Badge className={LEAD_ELIGIBLE_BADGE_CLASS}>Lead</Badge>}
                   {includeInactive && !employee.is_active && <Badge variant="outline">Inactive</Badge>}
                   {employee.on_fmla && <Badge variant="outline">FMLA</Badge>}
                 </div>
@@ -517,7 +517,7 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
               <div className="grid grid-cols-1 gap-2">
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" name="is_lead_eligible" defaultChecked={editEmployee.is_lead_eligible} />
-                  Lead eligible
+                  Lead
                 </label>
                 <label className="flex items-center gap-2 text-sm">
                   <input

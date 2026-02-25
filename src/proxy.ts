@@ -1,6 +1,42 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+const PUBLIC_ROUTES = ['/', '/login', '/signup', '/auth/callback', '/auth/signout'] as const
+
+const MANAGER_ROUTES = [
+  '/dashboard/manager',
+  '/coverage',
+  '/directory',
+  '/team',
+  '/approvals',
+  '/requests',
+  '/shift-board',
+  '/publish',
+] as const
+
+const STAFF_ROUTES = ['/staff', '/dashboard/staff', '/requests/new'] as const
+
+type AppRole = 'manager' | 'staff'
+type ProfileRoleRow = { role: string | null }
+
+function matchesRoute(pathname: string, route: string): boolean {
+  return pathname === route || pathname.startsWith(`${route}/`)
+}
+
+function isPublicRoute(pathname: string): boolean {
+  return PUBLIC_ROUTES.some((route) => {
+    if (route === '/') return pathname === '/'
+    return matchesRoute(pathname, route)
+  })
+}
+
+function normalizeRole(value: unknown): AppRole | null {
+  if (typeof value !== 'string') return null
+  if (value === 'manager') return 'manager'
+  if (value === 'staff' || value === 'therapist' || value === 'lead') return 'staff'
+  return null
+}
+
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -34,16 +70,60 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const pathname = request.nextUrl.pathname
-  const isPublicRoute =
-    pathname === '/' ||
-    pathname.startsWith('/login') ||
-    pathname.startsWith('/signup')
+  const pathWithQuery = `${pathname}${request.nextUrl.search}`
+
+  if (isPublicRoute(pathname)) {
+    return supabaseResponse
+  }
 
   // If not logged in and trying to access a protected page, redirect to login
-  if (!user && !isPublicRoute) {
+  if (!user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    url.searchParams.set('redirectTo', pathWithQuery)
     return NextResponse.redirect(url)
+  }
+
+  const claimRole =
+    user.app_metadata?.user_role ??
+    user.user_metadata?.user_role
+  let role = normalizeRole(claimRole)
+
+  if (!role) {
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (profileError) {
+      console.warn('Role fallback lookup failed in proxy middleware:', profileError.message || profileError)
+    } else {
+      role = normalizeRole((profile as ProfileRoleRow | null)?.role)
+    }
+  }
+
+  if (!role) {
+    if (!matchesRoute(pathname, '/pending-setup')) {
+      return NextResponse.redirect(new URL('/pending-setup', request.url))
+    }
+    return supabaseResponse
+  }
+
+  if (matchesRoute(pathname, '/pending-setup')) {
+    return NextResponse.redirect(new URL(role === 'manager' ? '/dashboard' : '/staff/dashboard', request.url))
+  }
+
+  if (role === 'staff' && pathname === '/dashboard') {
+    return NextResponse.redirect(new URL('/staff/dashboard', request.url))
+  }
+
+  if (role === 'staff' && MANAGER_ROUTES.some((route) => matchesRoute(pathname, route))) {
+    return NextResponse.redirect(new URL('/staff/dashboard', request.url))
+  }
+
+  if (role === 'manager' && STAFF_ROUTES.some((route) => matchesRoute(pathname, route))) {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
   return supabaseResponse

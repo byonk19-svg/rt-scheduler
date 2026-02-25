@@ -270,3 +270,11 @@
 .fade-up {
   animation: fadeUp 0.35s ease both;
 }
+
+tr:hover td {
+  background: #fffbeb;
+}
+
+tr {
+  transition: background 0.1s;
+}

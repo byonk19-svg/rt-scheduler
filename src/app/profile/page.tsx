@@ -219,7 +219,7 @@ export default async function ProfilePage({
             </Badge>
             {role === 'therapist' && (
               <Badge variant={profile?.is_lead_eligible ? 'default' : 'outline'} className={profile?.is_lead_eligible ? LEAD_ELIGIBLE_BADGE_CLASS : undefined}>
-                {profile?.is_lead_eligible ? 'Lead eligible' : 'Staff only'}
+                {profile?.is_lead_eligible ? 'Lead' : 'Staff only'}
               </Badge>
             )}
             {role === 'therapist' && <Badge variant="outline">Max {weeklyLimit}/week</Badge>}

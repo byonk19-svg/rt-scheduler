@@ -1,13 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 import { createClient } from '@/lib/supabase/client'
 import type { AssignmentStatus, ShiftRole, ShiftStatus } from '@/app/schedule/types'
 
 type UiStatus = 'active' | 'oncall' | 'leave_early' | 'cancelled'
 type DayStatus = 'published' | 'draft' | 'override' | 'missing_lead'
+type ShiftTab = 'Day' | 'Night'
 
 type ShiftLog = { from: string; to: UiStatus; toLabel: string; time: string }
 type ShiftItem = { id: string; name: string; status: UiStatus; log: ShiftLog[] }
@@ -60,6 +61,25 @@ function toAssignment(value: UiStatus): AssignmentStatus {
   if (value === 'leave_early') return 'left_early'
   if (value === 'cancelled') return 'cancelled'
   return 'scheduled'
+}
+
+function toShiftStatus(value: UiStatus): ShiftStatus {
+  if (value === 'oncall') return 'on_call'
+  if (value === 'cancelled') return 'called_off'
+  return 'scheduled'
+}
+
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+function toIsoDate(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 function dateRange(startDate: string, endDate: string): string[] {
@@ -129,95 +149,139 @@ function Avatar({ name, status, size = 18 }: { name: string; status: UiStatus; s
 }
 
 export default function CoveragePage() {
+  const router = useRouter()
   const search = useSearchParams()
   const cycleFromUrl = search.get('cycle')
   const supabase = useMemo(() => createClient(), [])
-  const [days, setDays] = useState<DayItem[]>([])
+  const [shiftTab, setShiftTab] = useState<ShiftTab>('Day')
+  const [dayDays, setDayDays] = useState<DayItem[]>([])
+  const [nightDays, setNightDays] = useState<DayItem[]>([])
+  const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [expandedShiftId, setExpandedShiftId] = useState<string | null>(null)
   const [error, setError] = useState<string>('')
+  const days = shiftTab === 'Day' ? dayDays : nightDays
+  const setDays = shiftTab === 'Day' ? setDayDays : setNightDays
 
   useEffect(() => {
     let active = true
     async function load() {
-      const { data: cyclesData, error: cyclesError } = await supabase
-        .from('schedule_cycles')
-        .select('id, start_date, end_date')
-        .order('start_date', { ascending: false })
+      setLoading(true)
+      setError('')
 
-      if (!active) return
-      if (cyclesError) {
-        setError(cyclesError.message || 'Could not load cycles.')
-        return
-      }
+      try {
+        const today = new Date()
+        const fallbackStartDate = toIsoDate(today)
+        const fallbackEndDate = toIsoDate(addDays(today, 42))
+        let cycleStartDate = fallbackStartDate
+        let cycleEndDate = fallbackEndDate
+        let cycleId: string | null = null
 
-      const cycles = (cyclesData ?? []) as CycleRow[]
-      const cycle = cycles.find((row) => row.id === cycleFromUrl) ?? cycles[0] ?? null
-      if (!cycle) {
-        setDays([])
-        return
-      }
+        const { data: cyclesData, error: cyclesError } = await supabase
+          .from('schedule_cycles')
+          .select('id, start_date, end_date')
+          .order('start_date', { ascending: false })
 
-      const { data: shiftsData, error: shiftsError } = await supabase
-        .from('shifts')
-        .select('id,date,shift_type,status,assignment_status,role,profiles:profiles!shifts_user_id_fkey(full_name)')
-        .eq('cycle_id', cycle.id)
-        .eq('shift_type', 'day')
-        .order('date', { ascending: true })
+        if (!active) return
+        if (cyclesError) {
+          console.error('Could not load cycles for coverage; falling back to a 6-week window:', cyclesError)
+        } else {
+          const cycles = (cyclesData ?? []) as CycleRow[]
+          const todayKey = toIsoDate(today)
+          const cycle =
+            cycles.find((row) => row.id === cycleFromUrl) ??
+            cycles.find((row) => row.start_date <= todayKey && row.end_date >= todayKey) ??
+            cycles[0] ??
+            null
+          if (cycle) {
+            cycleId = cycle.id
+            cycleStartDate = cycle.start_date
+            cycleEndDate = cycle.end_date
+          }
+        }
 
-      if (!active) return
-      if (shiftsError) {
-        setError(shiftsError.message || 'Could not load shifts.')
-        return
-      }
+        let shiftsQuery = supabase
+          .from('shifts')
+          .select('id,date,shift_type,status,assignment_status,role,profiles:profiles!shifts_user_id_fkey(full_name)')
+          .gte('date', cycleStartDate)
+          .lte('date', cycleEndDate)
+          .order('date', { ascending: true })
 
-      const rows = (shiftsData ?? []) as ShiftRow[]
-      const byDate = new Map<string, ShiftRow[]>()
-      for (const row of rows) {
-        const bucket = byDate.get(row.date) ?? []
-        bucket.push(row)
-        byDate.set(row.date, bucket)
-      }
+        if (cycleId) {
+          shiftsQuery = shiftsQuery.eq('cycle_id', cycleId)
+        }
 
-      const mapped = dateRange(cycle.start_date, cycle.end_date).map((isoDate) => {
-        const slot = (byDate.get(isoDate) ?? []).slice().sort((a, b) => {
-          if (a.role !== b.role) return a.role === 'lead' ? -1 : 1
-          return (getOne(a.profiles)?.full_name ?? '').localeCompare(getOne(b.profiles)?.full_name ?? '')
-        })
-        const lead = slot.find((row) => row.role === 'lead') ?? null
-        const leadShift =
-          lead === null
-            ? null
-            : {
-                id: lead.id,
-                name: getOne(lead.profiles)?.full_name ?? 'Unknown',
-                status: toUiStatus(lead.assignment_status, lead.status),
+        const { data: shiftsData, error: shiftsError } = await shiftsQuery
+
+        if (!active) return
+        if (shiftsError) {
+          setError(shiftsError.message || 'Could not load shifts.')
+          setDayDays([])
+          setNightDays([])
+          return
+        }
+
+        const rows = (shiftsData ?? []) as ShiftRow[]
+        const mapByShiftType = (shiftType: ShiftRow['shift_type']): DayItem[] => {
+          const byDate = new Map<string, ShiftRow[]>()
+          for (const row of rows) {
+            if (row.shift_type !== shiftType) continue
+            const bucket = byDate.get(row.date) ?? []
+            bucket.push(row)
+            byDate.set(row.date, bucket)
+          }
+
+          return dateRange(cycleStartDate, cycleEndDate).map((isoDate) => {
+            const slot = (byDate.get(isoDate) ?? []).slice().sort((a, b) => {
+              if (a.role !== b.role) return a.role === 'lead' ? -1 : 1
+              return (getOne(a.profiles)?.full_name ?? '').localeCompare(getOne(b.profiles)?.full_name ?? '')
+            })
+            const lead = slot.find((row) => row.role === 'lead') ?? null
+            const leadShift =
+              lead === null
+                ? null
+                : {
+                    id: lead.id,
+                    name: getOne(lead.profiles)?.full_name ?? 'Unknown',
+                    status: toUiStatus(lead.assignment_status, lead.status),
+                    log: [],
+                  }
+            const staffShifts = slot
+              .filter((row) => row.id !== lead?.id)
+              .map((row) => ({
+                id: row.id,
+                name: getOne(row.profiles)?.full_name ?? 'Unknown',
+                status: toUiStatus(row.assignment_status, row.status),
                 log: [],
-              }
-        const staffShifts = slot
-          .filter((row) => row.id !== lead?.id)
-          .map((row) => ({
-            id: row.id,
-            name: getOne(row.profiles)?.full_name ?? 'Unknown',
-            status: toUiStatus(row.assignment_status, row.status),
-            log: [],
-          }))
-        const hasOverride = slot.some((row) => row.status === 'called_off')
-        const hasDraft = slot.some((row) => row.status === 'sick')
-        const dayStatus: DayStatus = !leadShift ? 'missing_lead' : hasOverride ? 'override' : hasDraft ? 'draft' : 'published'
-        const date = new Date(`${isoDate}T00:00:00`)
-        return {
-          id: isoDate,
-          isoDate,
-          date: date.getDate(),
-          label: date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-          dayStatus,
-          leadShift,
-          staffShifts,
-        } satisfies DayItem
-      })
+              }))
+            const hasOverride = slot.some((row) => row.status === 'called_off')
+            const hasDraft = slot.some((row) => row.status === 'sick')
+            const dayStatus: DayStatus = !leadShift ? 'missing_lead' : hasOverride ? 'override' : hasDraft ? 'draft' : 'published'
+            const date = new Date(`${isoDate}T00:00:00`)
+            return {
+              id: isoDate,
+              isoDate,
+              date: date.getDate(),
+              label: date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+              dayStatus,
+              leadShift,
+              staffShifts,
+            } satisfies DayItem
+          })
+        }
 
-      setDays(mapped)
+        setDayDays(mapByShiftType('day'))
+        setNightDays(mapByShiftType('night'))
+      } catch (loadError) {
+        console.error('Could not load coverage calendar data:', loadError)
+        setError('Could not load coverage schedule.')
+        setDayDays([])
+        setNightDays([])
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
     }
     void load()
     return () => {
@@ -225,7 +289,14 @@ export default function CoveragePage() {
     }
   }, [cycleFromUrl, supabase])
 
-  const selectedDay = days.find((row) => row.id === selectedId) ?? null
+  const selectedDayBase = days.find((row) => row.id === selectedId) ?? null
+  const selectedDay = selectedDayBase ? { ...selectedDayBase, shiftType: shiftTab } : null
+
+  const handleTabSwitch = (tab: ShiftTab) => {
+    setShiftTab(tab)
+    setExpandedShiftId(null)
+    setSelectedId(null)
+  }
 
   const handleSelect = (id: string) => {
     setExpandedShiftId(null)
@@ -235,44 +306,77 @@ export default function CoveragePage() {
     setExpandedShiftId(null)
     setSelectedId(null)
   }
+  const publishRoute = cycleFromUrl ? `/coverage?view=week&cycle=${cycleFromUrl}` : '/coverage?view=week'
 
-  const handleChangeStatus = useCallback((dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => {
-    let previous: DayItem[] = []
-    setDays((current) => {
-      previous = current
-      return current.map((day) => {
-        if (day.id !== dayId) return day
-        const update = (shift: ShiftItem | null): ShiftItem | null => {
-          if (!shift || shift.id !== shiftId || shift.status === nextStatus) return shift
-          return {
-            ...shift,
-            status: nextStatus,
-            log: [
-              ...shift.log,
-              { from: SHIFT_STATUSES[shift.status].label, to: nextStatus, toLabel: SHIFT_STATUSES[nextStatus].label, time: timestamp() },
-            ],
-          }
-        }
-        return {
-          ...day,
-          leadShift: isLead ? update(day.leadShift) : day.leadShift,
-          staffShifts: isLead ? day.staffShifts : day.staffShifts.map((shift) => update(shift) as ShiftItem),
-        }
-      })
-    })
+  const handleChangeStatus = useCallback(
+    async (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => {
+      // Keep callback aligned with the active shift tab setter.
+      void shiftTab
+      const targetDay = days.find((day) => day.id === dayId)
+      const targetShift = isLead
+        ? targetDay?.leadShift
+        : targetDay?.staffShifts.find((shift) => shift.id === shiftId)
 
-    void (async () => {
-      const response = await fetch('/api/schedule/assignment-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignmentId: shiftId, status: toAssignment(nextStatus), note: null, leftEarlyTime: null }),
-      })
-      if (!response.ok) {
-        setDays(previous)
-        setError('Could not save status update. Changes were rolled back.')
+      if (!targetShift?.id) {
+        console.error('Could not find shift row id for status update.', { dayId, shiftId, isLead })
+        return
       }
-    })()
-  }, [])
+
+      if (targetShift.status === nextStatus) {
+        return
+      }
+
+      const previousDays = days
+      const previousStatus = targetShift.status
+      const changeTime = timestamp()
+      setError('')
+
+      setDays((current) =>
+        current.map((day) => {
+          if (day.id !== dayId) return day
+          const updateShift = (shift: ShiftItem | null): ShiftItem | null => {
+            if (!shift || shift.id !== shiftId || shift.status === nextStatus) return shift
+            return {
+              ...shift,
+              status: nextStatus,
+              log: [
+                ...shift.log,
+                {
+                  from: SHIFT_STATUSES[previousStatus].label,
+                  to: nextStatus,
+                  toLabel: SHIFT_STATUSES[nextStatus].label,
+                  time: changeTime,
+                },
+              ],
+            }
+          }
+          return {
+            ...day,
+            leadShift: isLead ? updateShift(day.leadShift) : day.leadShift,
+            staffShifts: isLead ? day.staffShifts : day.staffShifts.map((shift) => updateShift(shift) as ShiftItem),
+          }
+        })
+      )
+
+      const { error: updateError } = await supabase
+        .from('shifts')
+        .update({
+          assignment_status: toAssignment(nextStatus),
+          status: toShiftStatus(nextStatus),
+        })
+        .eq('id', targetShift.id)
+
+      if (!updateError) return
+
+      console.error('Failed to persist coverage status change:', updateError)
+      setDays(previousDays)
+      setError('Could not save status update. Changes were rolled back.')
+      if (typeof window !== 'undefined') {
+        window.alert('Could not save status change. Please try again.')
+      }
+    },
+    [days, setDays, shiftTab, supabase]
+  )
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -284,17 +388,61 @@ export default function CoveragePage() {
           </div>
           <div className="flex gap-2">
             <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">Auto-draft</button>
-            <button className="rounded-md bg-amber-600 px-4 py-1.5 text-xs font-bold text-white">Publish</button>
+            <button
+              type="button"
+              onClick={() => router.push(publishRoute)}
+              className="rounded-md bg-amber-600 px-4 py-1.5 text-xs font-bold text-white"
+            >
+              Publish
+            </button>
           </div>
         </div>
         {error && <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+          {(['Day', 'Night'] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => handleTabSwitch(tab)}
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                padding: '6px 20px',
+                borderRadius: 7,
+                border: `1px solid ${shiftTab === tab ? '#d97706' : '#e5e7eb'}`,
+                background: shiftTab === tab ? '#d97706' : '#fff',
+                color: shiftTab === tab ? '#fff' : '#64748b',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+            >
+              {tab} Shift
+            </button>
+          ))}
+          <span
+            style={{
+              fontSize: 12,
+              color: '#9ca3af',
+              alignSelf: 'center',
+              marginLeft: 8,
+              fontWeight: 500,
+            }}
+          >
+            {shiftTab === 'Day' ? 'Day shift staff' : 'Night shift staff'}
+          </span>
+        </div>
         <div className="mb-1 grid grid-cols-7 gap-1.5">
           {DOW.map((day) => (
             <div key={day} className="text-center text-[10px] font-extrabold tracking-[0.07em] text-slate-400">{day}</div>
           ))}
         </div>
-        <div className="grid grid-cols-7 gap-1.5">
-          {days.map((day) => {
+        {loading ? (
+          <div className="rounded-lg border border-slate-200 bg-white px-3 py-6 text-center text-sm text-slate-500">
+            Loading schedule...
+          </div>
+        ) : (
+          <div className="grid grid-cols-7 gap-1.5">
+            {days.map((day) => {
             const activeCount = countActive(day)
             const totalCount = flatten(day).length
             const missingLead = !day.leadShift
@@ -343,8 +491,9 @@ export default function CoveragePage() {
                 </div>
               </button>
             )
-          })}
-        </div>
+            })}
+          </div>
+        )}
       </div>
 
       <div className="fixed inset-0 z-40 bg-black/10 transition-opacity" style={{ opacity: selectedDay ? 1 : 0, pointerEvents: selectedDay ? 'auto' : 'none' }} onClick={handleClose} />
@@ -355,7 +504,7 @@ export default function CoveragePage() {
               <div className="mb-2 flex items-start justify-between">
                 <div>
                   <p className="text-lg font-extrabold text-stone-900">{selectedDay.label}</p>
-                  <p className="text-xs font-medium text-amber-800">Day Shift</p>
+                  <p className="text-xs font-medium text-amber-800">{selectedDay.shiftType || 'Day'} Shift</p>
                 </div>
                 <button type="button" onClick={handleClose} aria-label="Close details panel" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-lg text-slate-500 shadow-sm">
                   &times;
