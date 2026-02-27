@@ -183,6 +183,29 @@ Latest local checks:
 6. `npm run build`
 7. `npm run dev`
 
+## Paused Work
+### Publish flow with async email + publish history
+Status: Implemented in code, pending final validation and rollout.
+
+Resume checklist:
+- Run migration: `supabase/migrations/20260225190000_add_publish_events_and_notification_outbox.sql`
+- Set env vars:
+  - `SUPABASE_SERVICE_ROLE_KEY`
+  - `RESEND_API_KEY`
+  - `PUBLISH_EMAIL_FROM`
+  - `NEXT_PUBLIC_APP_URL`
+  - optional `PUBLISH_WORKER_KEY`
+- Validate manager publish UX:
+  - Publish shows "Published - visible to employees"
+  - Publish shows queued/sent/failed counts
+- Validate async queue processing:
+  - `POST /api/publish/process` processes queued rows
+  - counts update on `/publish` and `/publish/[id]`
+- Validate retry path:
+  - Use "Re-send failed" on `/publish/[id]`
+  - Reprocess queue and confirm failures can move to sent
+- Optional: add scheduled worker/cron to call `/api/publish/process`
+
 ## Next High-Value Priorities
 1. Align `/coverage` and `/schedule` into one consistent data/view model (reduce duplicated calendar logic)
 2. Add integration tests for overlay panel interactions (open/close/toggle/accordion)

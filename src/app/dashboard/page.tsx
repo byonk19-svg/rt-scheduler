@@ -46,8 +46,8 @@ export default async function DashboardPage({
     if (isManager) {
       redirect(`/coverage?view=week${suffix ? `&${query.toString()}` : ''}`)
     }
-    redirect(`/schedule?view=week${suffix ? `&${query.toString()}` : ''}`)
+    redirect(`/staff/schedule${suffix}`)
   }
 
-  redirect(`${isManager ? '/dashboard/manager' : '/dashboard/staff'}${suffix}`)
+  redirect(`${isManager ? '/dashboard/manager' : '/staff/dashboard'}${suffix}`)
 }

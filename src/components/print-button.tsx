@@ -1,11 +1,17 @@
 'use client'
 
+import type { ComponentProps } from 'react'
+
 import { Button } from '@/components/ui/button'
 
-export function PrintButton() {
+type PrintButtonProps = Omit<ComponentProps<typeof Button>, 'type' | 'onClick' | 'children'> & {
+  label?: string
+}
+
+export function PrintButton({ label = 'Print schedule', ...props }: PrintButtonProps) {
   return (
-    <Button type="button" variant="outline" size="sm" onClick={() => window.print()}>
-      Print Final
+    <Button type="button" onClick={() => window.print()} {...props}>
+      {label}
     </Button>
   )
 }

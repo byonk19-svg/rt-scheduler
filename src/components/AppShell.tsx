@@ -65,6 +65,7 @@ const SHELL_ROUTES = [
   '/coverage',
   '/availability',
   '/shift-board',
+  '/publish',
   '/profile',
   '/directory',
 ] as const

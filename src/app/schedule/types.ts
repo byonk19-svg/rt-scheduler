@@ -47,8 +47,8 @@ export type ShiftRow = {
   role: ShiftRole
   user_id: string
   profiles:
-    | { full_name: string; is_lead_eligible: boolean }
-    | { full_name: string; is_lead_eligible: boolean }[]
+    | { full_name: string; is_lead_eligible: boolean; employment_type?: EmploymentType | null }
+    | { full_name: string; is_lead_eligible: boolean; employment_type?: EmploymentType | null }[]
     | null
 }
 
@@ -84,6 +84,14 @@ export type ScheduleSearchParams = {
   draft?: string
   removed?: string
   dropped?: string
+  publish_event_id?: string
+  recipient_count?: string
+  queued_count?: string
+  sent_count?: string
+  failed_count?: string
+  published_at?: string
+  email_configured?: string
+  email_queue_error?: string
 }
 
 export type AutoScheduleShiftRow = {

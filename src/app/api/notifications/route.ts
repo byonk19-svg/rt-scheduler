@@ -4,8 +4,11 @@ import { createClient } from '@/lib/supabase/server'
 
 type NotificationRow = {
   id: string
+  event_type: string
   title: string
   message: string
+  target_type: 'schedule_cycle' | 'shift' | 'shift_post' | 'system' | null
+  target_id: string | null
   created_at: string
   read_at: string | null
 }
@@ -23,7 +26,7 @@ export async function GET() {
   const [notificationsResult, unreadCountResult] = await Promise.all([
     supabase
       .from('notifications')
-      .select('id, title, message, created_at, read_at')
+      .select('id, event_type, title, message, target_type, target_id, created_at, read_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(12),

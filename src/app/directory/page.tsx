@@ -1,495 +1,452 @@
-import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
+'use client'
 
-import { EmployeeDirectory } from '@/components/EmployeeDirectory'
-import { FeedbackToast } from '@/components/feedback-toast'
-import {
-  normalizeEmploymentType,
-  normalizeFmlaReturnDate,
-  normalizeShiftType,
-  normalizeActiveValue,
-  type EmployeeDirectoryRecord,
-} from '@/lib/employee-directory'
-import { getDefaultWeeklyLimitForEmploymentType, sanitizeWeeklyLimit } from '@/lib/scheduling-constants'
-import { createClient } from '@/lib/supabase/server'
+import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
-type DirectorySearchParams = {
-  success?: string | string[]
-  error?: string | string[]
-  realigned?: string | string[]
-  removed?: string | string[]
-  demoted?: string | string[]
+import type { EmployeeEmploymentType, EmployeeShiftType } from '@/lib/employee-directory'
+import { createClient } from '@/lib/supabase/client'
+
+type DirectoryEmployee = {
+  id: string
+  name: string
+  email: string
+  shift: 'Day' | 'Night'
+  type: 'Full-time' | 'Part-time' | 'PRN'
+  isLead: boolean
+  fmla: boolean
+  inactive: boolean
 }
-
-type ProfileRoleRow = { role: 'manager' | 'therapist' }
 
 type DirectoryProfileRow = {
   id: string
-  full_name: string
-  email: string
-  phone_number: string | null
-  shift_type: string
+  full_name: string | null
+  email: string | null
+  role: 'manager' | 'therapist' | null
+  shift_type: EmployeeShiftType | null
+  employment_type: EmployeeEmploymentType | null
   is_lead_eligible: boolean | null
-  employment_type: string | null
-  max_work_days_per_week: number | null
   on_fmla: boolean | null
-  fmla_return_date: string | null
   is_active: boolean | null
 }
 
-type FutureDraftShiftRow = {
-  id: string
-  shift_type: 'day' | 'night'
-  role: 'lead' | 'staff'
-  schedule_cycles: { published: boolean } | { published: boolean }[] | null
+type ShiftTab = 'All' | 'Day' | 'Night'
+type SortCol = 'name' | 'shift' | 'type'
+type SortDir = 'asc' | 'desc'
+
+function initials(name: string) {
+  return name
+    .split(' ')
+    .map((word) => word[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
 }
 
-function getSearchParam(value: string | string[] | undefined): string | undefined {
-  if (Array.isArray(value)) return value[0]
-  return value
+function mapShiftLabel(value: EmployeeShiftType | null): 'Day' | 'Night' {
+  return value === 'night' ? 'Night' : 'Day'
 }
 
-function getFeedback(params?: DirectorySearchParams): { message: string; variant: 'success' | 'error' } | null {
-  const success = getSearchParam(params?.success)
-  const error = getSearchParam(params?.error)
-  const realignedRaw = getSearchParam(params?.realigned)
-  const removedRaw = getSearchParam(params?.removed)
-  const demotedRaw = getSearchParam(params?.demoted)
-  const realignedCount = Number.parseInt(realignedRaw ?? '', 10)
-  const removedCount = Number.parseInt(removedRaw ?? '', 10)
-  const demotedCount = Number.parseInt(demotedRaw ?? '', 10)
+function mapEmploymentLabel(value: EmployeeEmploymentType | null): 'Full-time' | 'Part-time' | 'PRN' {
+  if (value === 'prn') return 'PRN'
+  if (value === 'part_time') return 'Part-time'
+  return 'Full-time'
+}
 
-  if (success === 'employee_updated') {
-    return { message: 'Employee directory updated.', variant: 'success' }
-  }
-  if (success === 'employee_updated_schedule_synced') {
-    const safeRealigned = Number.isFinite(realignedCount) && realignedCount > 0 ? realignedCount : 0
-    const safeRemoved = Number.isFinite(removedCount) && removedCount > 0 ? removedCount : 0
-    const safeDemoted = Number.isFinite(demotedCount) && demotedCount > 0 ? demotedCount : 0
-    const parts = [
-      safeRemoved > 0 ? `${safeRemoved} future draft shift(s) removed` : null,
-      safeRealigned > 0 ? `${safeRealigned} future draft shift(s) moved to updated team` : null,
-      safeDemoted > 0 ? `${safeDemoted} lead assignment(s) demoted to staff` : null,
-    ].filter(Boolean)
-    if (parts.length === 0) {
-      return { message: 'Employee directory updated and schedule synchronized.', variant: 'success' }
-    }
-    return { message: `Employee updated. ${parts.join(', ')}.`, variant: 'success' }
-  }
-  if (success === 'employee_updated_and_realigned') {
-    const safeCount = Number.isFinite(realignedCount) && realignedCount > 0 ? realignedCount : 0
-    return {
-      message:
-        safeCount > 0
-          ? `Employee updated. ${safeCount} future draft shift(s) realigned to the selected team.`
-          : 'Employee updated and draft shifts realigned.',
-      variant: 'success',
-    }
-  }
-  if (success === 'employee_deactivated') {
-    const safeRemoved = Number.isFinite(removedCount) && removedCount > 0 ? removedCount : 0
-    if (safeRemoved > 0) {
-      return {
-        message: `Employee deactivated. Removed ${safeRemoved} future draft shift assignment(s).`,
-        variant: 'success',
+export default function TeamPage() {
+  const router = useRouter()
+  const supabase = useMemo(() => createClient(), [])
+
+  const [employees, setEmployees] = useState<DirectoryEmployee[]>([])
+  const [shiftTab, setShiftTab] = useState<ShiftTab>('All')
+  const [search, setSearch] = useState('')
+  const [filterLead, setFilterLead] = useState(false)
+  const [filterFmla, setFilterFmla] = useState(false)
+  const [filterInactive, setFilterInactive] = useState(false)
+  const [sortCol, setSortCol] = useState<SortCol>('name')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+
+    async function loadEmployees() {
+      setLoading(true)
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!active) return
+
+      if (!user) {
+        router.replace('/login')
+        return
       }
-    }
-    return { message: 'Employee deactivated.', variant: 'success' }
-  }
-  if (success === 'employee_reactivated') {
-    return { message: 'Employee reactivated.', variant: 'success' }
-  }
 
-  if (error === 'employee_update_failed') {
-    return { message: 'Could not update employee profile.', variant: 'error' }
-  }
-  if (error === 'employee_status_update_failed') {
-    return { message: 'Could not update employee status.', variant: 'error' }
-  }
-  if (error === 'employee_contact_validation') {
-    return { message: 'Name and email are required.', variant: 'error' }
-  }
-  if (error === 'employee_contact_unauthorized') {
-    return { message: 'Manager access is required to edit employee profiles.', variant: 'error' }
-  }
-  if (error === 'employee_contact_phone_invalid') {
-    return { message: 'Phone number must be 10 digits (US format).', variant: 'error' }
-  }
-  if (error === 'employee_contact_shift_invalid') {
-    return { message: 'Shift type must be day or night.', variant: 'error' }
-  }
-  if (error === 'employee_contact_employment_invalid') {
-    return { message: 'Employment type must be full-time, part-time, or PRN.', variant: 'error' }
-  }
-  if (error === 'employee_contact_weekly_limit_invalid') {
-    return { message: 'Weekly shift limit must be between 1 and 7.', variant: 'error' }
-  }
-  if (error === 'employee_fmla_return_date_invalid') {
-    return { message: 'Potential return date must be a valid date.', variant: 'error' }
-  }
-  if (error === 'employee_realign_failed') {
-    return { message: 'Employee saved, but future draft shifts could not be realigned.', variant: 'error' }
-  }
+      const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle()
 
-  return null
-}
+      if (!active) return
 
-function normalizePhoneNumber(raw: string): string | null {
-  const digitsOnly = raw.replace(/\D/g, '')
-  if (!digitsOnly) return null
+      if ((currentProfile as { role?: string } | null)?.role !== 'manager') {
+        router.replace('/dashboard/staff')
+        return
+      }
 
-  const normalizedDigits =
-    digitsOnly.length === 11 && digitsOnly.startsWith('1') ? digitsOnly.slice(1) : digitsOnly
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, shift_type, employment_type, is_lead_eligible, on_fmla, is_active')
+        .eq('role', 'therapist')
+        .order('shift_type', { ascending: true })
+        .order('full_name', { ascending: true })
 
-  if (normalizedDigits.length !== 10) {
-    return 'INVALID'
-  }
+      if (!active) return
 
-  return `(${normalizedDigits.slice(0, 3)}) ${normalizedDigits.slice(3, 6)}-${normalizedDigits.slice(6)}`
-}
+      if (error) {
+        console.error('Failed to load directory employees:', error)
+        setEmployees([])
+        setLoading(false)
+        return
+      }
 
-async function assertManagerSession() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+      const mapped = ((data ?? []) as DirectoryProfileRow[]).map((row) => {
+        const name = row.full_name?.trim() || row.email?.trim() || 'Unknown employee'
+        const email = row.email?.trim() || 'No email'
 
-  if (!user) {
-    redirect('/login')
-  }
+        return {
+          id: row.id,
+          name,
+          email,
+          shift: mapShiftLabel(row.shift_type),
+          type: mapEmploymentLabel(row.employment_type),
+          isLead: row.is_lead_eligible === true,
+          fmla: row.on_fmla === true,
+          inactive: row.is_active === false,
+        } satisfies DirectoryEmployee
+      })
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  if ((profile as ProfileRoleRow | null)?.role !== 'manager') {
-    redirect('/dashboard/staff')
-  }
-
-  return { supabase }
-}
-
-function getTodayDateKey(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-}
-
-function isPublishedCycle(
-  relation: FutureDraftShiftRow['schedule_cycles']
-): boolean {
-  const cycle = Array.isArray(relation) ? relation[0] : relation
-  return Boolean(cycle?.published)
-}
-
-async function reconcileFutureDraftShiftsForEmployee({
-  supabase,
-  profileId,
-  shiftType,
-  isLeadEligible,
-  onFmla,
-  isActive,
-}: {
-  supabase: Awaited<ReturnType<typeof createClient>>
-  profileId: string
-  shiftType: 'day' | 'night'
-  isLeadEligible: boolean
-  onFmla: boolean
-  isActive: boolean
-}): Promise<{ removed: number; realigned: number; demoted: number }> {
-  const todayKey = getTodayDateKey()
-  const { data: futureShifts, error: futureShiftsError } = await supabase
-    .from('shifts')
-    .select('id, shift_type, role, schedule_cycles(published)')
-    .eq('user_id', profileId)
-    .gte('date', todayKey)
-
-  if (futureShiftsError) {
-    throw futureShiftsError
-  }
-
-  const draftFutureShifts = ((futureShifts ?? []) as FutureDraftShiftRow[]).filter(
-    (row) => !isPublishedCycle(row.schedule_cycles)
-  )
-  if (draftFutureShifts.length === 0) {
-    return { removed: 0, realigned: 0, demoted: 0 }
-  }
-
-  if (!isActive || onFmla) {
-    const ids = draftFutureShifts.map((row) => row.id)
-    if (ids.length === 0) {
-      return { removed: 0, realigned: 0, demoted: 0 }
+      setEmployees(mapped)
+      setLoading(false)
     }
 
-    const { error: removeError } = await supabase.from('shifts').delete().in('id', ids)
-    if (removeError) throw removeError
-    return { removed: ids.length, realigned: 0, demoted: 0 }
-  }
+    void loadEmployees()
 
-  const shiftsToRealign = draftFutureShifts.filter((row) => row.shift_type !== shiftType).map((row) => row.id)
-  const leadShiftsToDemote = !isLeadEligible
-    ? draftFutureShifts.filter((row) => row.role === 'lead').map((row) => row.id)
-    : []
+    return () => {
+      active = false
+    }
+  }, [router, supabase])
 
-  if (shiftsToRealign.length > 0) {
-    const { error: realignError } = await supabase
-      .from('shifts')
-      .update({ shift_type: shiftType })
-      .in('id', shiftsToRealign)
-    if (realignError) throw realignError
-  }
-
-  if (leadShiftsToDemote.length > 0) {
-    const { error: demoteError } = await supabase
-      .from('shifts')
-      .update({ role: 'staff' })
-      .in('id', leadShiftsToDemote)
-    if (demoteError) throw demoteError
-  }
-
-  return {
-    removed: 0,
-    realigned: shiftsToRealign.length,
-    demoted: leadShiftsToDemote.length,
-  }
-}
-
-async function saveEmployeeDirectoryAction(formData: FormData) {
-  'use server'
-
-  const { supabase } = await assertManagerSession()
-
-  const profileId = String(formData.get('profile_id') ?? '').trim()
-  const fullName = String(formData.get('full_name') ?? '').trim()
-  const email = String(formData.get('email') ?? '')
-    .trim()
-    .toLowerCase()
-  const phoneNumber = String(formData.get('phone_number') ?? '').trim()
-  const shiftTypeRaw = String(formData.get('shift_type') ?? '').trim()
-  const employmentTypeRaw = String(formData.get('employment_type') ?? '').trim()
-  const maxWorkDaysRaw = Number.parseInt(String(formData.get('max_work_days_per_week') ?? '').trim(), 10)
-  const isLeadEligible = String(formData.get('is_lead_eligible') ?? '').trim() === 'on'
-  const onFmla = String(formData.get('on_fmla') ?? '').trim() === 'on'
-  const isActive = String(formData.get('is_active') ?? '').trim() === 'on'
-  const fmlaReturnDateRaw = String(formData.get('fmla_return_date') ?? '').trim()
-
-  if (!profileId || !fullName || !email) {
-    redirect('/directory?error=employee_contact_validation#employee-directory')
-  }
-  if (shiftTypeRaw !== 'day' && shiftTypeRaw !== 'night') {
-    redirect('/directory?error=employee_contact_shift_invalid#employee-directory')
-  }
-  if (!['full_time', 'part_time', 'prn'].includes(employmentTypeRaw)) {
-    redirect('/directory?error=employee_contact_employment_invalid#employee-directory')
-  }
-
-  const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber)
-  if (normalizedPhoneNumber === 'INVALID') {
-    redirect('/directory?error=employee_contact_phone_invalid#employee-directory')
-  }
-
-  if (onFmla && fmlaReturnDateRaw && !/^\d{4}-\d{2}-\d{2}$/.test(fmlaReturnDateRaw)) {
-    redirect('/directory?error=employee_fmla_return_date_invalid#employee-directory')
-  }
-
-  const employmentType = normalizeEmploymentType(employmentTypeRaw)
-  const normalizedShiftType = normalizeShiftType(shiftTypeRaw)
-  const weeklyLimit = sanitizeWeeklyLimit(maxWorkDaysRaw, getDefaultWeeklyLimitForEmploymentType(employmentType))
-  if (!Number.isFinite(maxWorkDaysRaw) || maxWorkDaysRaw < 1 || maxWorkDaysRaw > 7) {
-    redirect('/directory?error=employee_contact_weekly_limit_invalid#employee-directory')
-  }
-
-  const { error } = await supabase
-    .from('profiles')
-    .update({
-      full_name: fullName,
-      email,
-      phone_number: normalizedPhoneNumber,
-      shift_type: normalizedShiftType,
-      employment_type: employmentType,
-      max_work_days_per_week: weeklyLimit,
-      is_lead_eligible: isLeadEligible,
-      on_fmla: onFmla,
-      fmla_return_date: normalizeFmlaReturnDate(fmlaReturnDateRaw, onFmla),
-      is_active: isActive,
-    })
-    .eq('id', profileId)
-    .eq('role', 'therapist')
-
-  if (error) {
-    console.error('Failed to update employee profile:', error)
-    redirect('/directory?error=employee_update_failed#employee-directory')
-  }
-
-  let syncCounts = { removed: 0, realigned: 0, demoted: 0 }
-  try {
-    syncCounts = await reconcileFutureDraftShiftsForEmployee({
-      supabase,
-      profileId,
-      shiftType: normalizedShiftType,
-      isLeadEligible,
-      onFmla,
-      isActive,
-    })
-  } catch (syncError) {
-    console.error('Failed to synchronize future draft shifts after employee update:', syncError)
-    redirect('/directory?error=employee_realign_failed#employee-directory')
-  }
-
-  revalidatePath('/directory')
-  revalidatePath('/dashboard/manager')
-  revalidatePath('/schedule')
-  revalidatePath('/coverage')
-
-  if (syncCounts.removed > 0 || syncCounts.realigned > 0 || syncCounts.demoted > 0) {
-    redirect(
-      `/directory?success=employee_updated_schedule_synced&removed=${syncCounts.removed}&realigned=${syncCounts.realigned}&demoted=${syncCounts.demoted}#employee-directory`
+  const filtered = employees
+    .filter((employee) => shiftTab === 'All' || employee.shift === shiftTab)
+    .filter((employee) => !filterLead || employee.isLead)
+    .filter((employee) => !filterFmla || employee.fmla)
+    .filter((employee) => filterInactive || !employee.inactive)
+    .filter(
+      (employee) =>
+        search === '' ||
+        employee.name.toLowerCase().includes(search.toLowerCase()) ||
+        employee.email.toLowerCase().includes(search.toLowerCase())
     )
-  }
-
-  redirect('/directory?success=employee_updated#employee-directory')
-}
-
-async function setEmployeeActiveAction(formData: FormData) {
-  'use server'
-
-  const { supabase } = await assertManagerSession()
-
-  const profileId = String(formData.get('profile_id') ?? '').trim()
-  const setActiveRaw = String(formData.get('set_active') ?? '').trim()
-
-  if (!profileId || (setActiveRaw !== 'true' && setActiveRaw !== 'false')) {
-    redirect('/directory?error=employee_status_update_failed#employee-directory')
-  }
-
-  const targetActive = normalizeActiveValue(setActiveRaw)
-
-  const { error } = await supabase
-    .from('profiles')
-    .update({ is_active: targetActive })
-    .eq('id', profileId)
-    .eq('role', 'therapist')
-
-  if (error) {
-    console.error('Failed to update employee active status:', error)
-    redirect('/directory?error=employee_status_update_failed#employee-directory')
-  }
-
-  const { data: updatedProfile, error: updatedProfileError } = await supabase
-    .from('profiles')
-    .select('shift_type, is_lead_eligible, on_fmla, is_active')
-    .eq('id', profileId)
-    .eq('role', 'therapist')
-    .maybeSingle()
-
-  if (updatedProfileError || !updatedProfile) {
-    console.error('Failed to load updated employee profile after active toggle:', updatedProfileError)
-    redirect('/directory?error=employee_status_update_failed#employee-directory')
-  }
-
-  let syncCounts = { removed: 0, realigned: 0, demoted: 0 }
-  try {
-    syncCounts = await reconcileFutureDraftShiftsForEmployee({
-      supabase,
-      profileId,
-      shiftType: normalizeShiftType(updatedProfile.shift_type),
-      isLeadEligible: Boolean(updatedProfile.is_lead_eligible),
-      onFmla: Boolean(updatedProfile.on_fmla),
-      isActive: updatedProfile.is_active !== false,
+    .sort((a, b) => {
+      const av = a[sortCol].toLowerCase()
+      const bv = b[sortCol].toLowerCase()
+      return sortDir === 'asc' ? (av > bv ? 1 : -1) : av < bv ? 1 : -1
     })
-  } catch (syncError) {
-    console.error('Failed to synchronize future draft shifts after active toggle:', syncError)
-    redirect('/directory?error=employee_status_update_failed#employee-directory')
+
+  const toggleSort = (col: SortCol) => {
+    if (sortCol === col) setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'))
+    else {
+      setSortCol(col)
+      setSortDir('asc')
+    }
   }
 
-  revalidatePath('/directory')
-  revalidatePath('/dashboard/manager')
-  revalidatePath('/schedule')
-  revalidatePath('/coverage')
-  redirect(
-    `/directory?success=${targetActive ? 'employee_reactivated' : 'employee_deactivated'}&removed=${syncCounts.removed}&realigned=${syncCounts.realigned}&demoted=${syncCounts.demoted}#employee-directory`
+  const SortIcon = ({ col }: { col: SortCol }) => (
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ marginLeft: 4, opacity: sortCol === col ? 1 : 0.3 }}>
+      <path d="M5 1l2.5 3h-5L5 1zM5 9L2.5 6h5L5 9z" fill={sortCol === col ? '#d97706' : '#9ca3af'} />
+    </svg>
   )
-}
-
-export default async function DirectoryPage({
-  searchParams,
-}: {
-  searchParams?: Promise<DirectorySearchParams>
-}) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name, role')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  const isManager = profile?.role === 'manager'
-  if (!isManager) {
-    redirect('/dashboard/staff')
-  }
-
-  const params = searchParams ? await searchParams : undefined
-  const feedback = getFeedback(params)
-
-  const { data: therapistsData } = await supabase
-    .from('profiles')
-    .select(
-      'id, full_name, email, phone_number, shift_type, is_lead_eligible, employment_type, max_work_days_per_week, on_fmla, fmla_return_date, is_active'
-    )
-    .eq('role', 'therapist')
-    .order('shift_type', { ascending: true })
-    .order('full_name', { ascending: true })
-
-  const therapists = ((therapistsData ?? []) as DirectoryProfileRow[]).map((row) => {
-    const employmentType = normalizeEmploymentType(String(row.employment_type ?? ''))
-    return {
-      id: row.id,
-      full_name: row.full_name,
-      email: row.email,
-      phone_number: row.phone_number,
-      shift_type: normalizeShiftType(row.shift_type),
-      employment_type: employmentType,
-      max_work_days_per_week: sanitizeWeeklyLimit(
-        row.max_work_days_per_week,
-        getDefaultWeeklyLimitForEmploymentType(employmentType)
-      ),
-      is_lead_eligible: Boolean(row.is_lead_eligible),
-      on_fmla: Boolean(row.on_fmla),
-      fmla_return_date: row.fmla_return_date,
-      is_active: row.is_active !== false,
-    } satisfies EmployeeDirectoryRecord
-  })
-
-  const fullName = profile?.full_name ?? user.user_metadata?.full_name ?? 'Manager'
 
   return (
-    <div className="space-y-6">
-      {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
-
-      <div className="teamwise-surface rounded-2xl border border-border p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-        <h1 className="app-page-title">Team Directory</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Manage staffing details for {fullName}&apos;s team.</p>
-        {feedback?.variant === 'error' && (
-          <p className="mt-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]">
-            {feedback.message}
-          </p>
-        )}
+    <div style={{ maxWidth: 1050, margin: '0 auto', padding: '32px 28px' }}>
+      <div className="fade-up" style={{ marginBottom: 6 }}>
+        <h1
+          style={{
+            fontSize: 26,
+            fontWeight: 800,
+            color: '#0f172a',
+            letterSpacing: '-0.02em',
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+          }}
+        >
+          Team Directory
+        </h1>
+        <p style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>Manage staffing details for your team.</p>
       </div>
 
-      <EmployeeDirectory
-        employees={therapists}
-        saveEmployeeAction={saveEmployeeDirectoryAction}
-        setEmployeeActiveAction={setEmployeeActiveAction}
-      />
+      <div className="fade-up" style={{ animationDelay: '0.04s', marginTop: 24, marginBottom: 16 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>Employee Directory</h2>
+        <p style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+          Search, filter, and maintain active staffing profiles in one place.
+        </p>
+      </div>
+
+      <div className="fade-up" style={{ animationDelay: '0.06s', display: 'flex', gap: 4, marginBottom: 16 }}>
+        {(['All', 'Day', 'Night'] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setShiftTab(tab)}
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              padding: '5px 16px',
+              borderRadius: 7,
+              border: `1px solid ${shiftTab === tab ? '#d97706' : '#e5e7eb'}`,
+              background: shiftTab === tab ? '#d97706' : '#fff',
+              color: shiftTab === tab ? '#fff' : '#64748b',
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      <div className="fade-up" style={{ animationDelay: '0.08s', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            fill="none"
+            style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+          >
+            <circle cx="6" cy="6" r="4" stroke="#9ca3af" strokeWidth="1.5" />
+            <path d="M9.5 9.5l2.5 2.5" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search name or email"
+            style={{
+              width: '100%',
+              padding: '7px 10px 7px 30px',
+              border: '1px solid #e5e7eb',
+              borderRadius: 7,
+              fontSize: 12,
+              color: '#374151',
+              outline: 'none',
+              background: '#fff',
+            }}
+          />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>Filters:</span>
+          {[
+            { label: 'Lead', val: filterLead, set: setFilterLead },
+            { label: 'FMLA', val: filterFmla, set: setFilterFmla },
+            { label: 'Include inactive', val: filterInactive, set: setFilterInactive },
+          ].map(({ label, val, set }) => (
+            <label
+              key={label}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                cursor: 'pointer',
+                fontSize: 12,
+                color: '#374151',
+                fontWeight: val ? 700 : 400,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={val}
+                onChange={(event) => set(event.target.checked)}
+                style={{ accentColor: '#d97706', width: 13, height: 13, cursor: 'pointer' }}
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+        <button
+          type="button"
+          style={{
+            fontSize: 12,
+            fontWeight: 700,
+            padding: '7px 16px',
+            borderRadius: 7,
+            border: 'none',
+            background: '#d97706',
+            color: '#fff',
+            marginLeft: 'auto',
+            cursor: 'pointer',
+          }}
+        >
+          + Add employee
+        </button>
+      </div>
+
+      <p className="fade-up" style={{ animationDelay: '0.09s', fontSize: 12, color: '#9ca3af', marginBottom: 10 }}>
+        {loading ? 'Loading...' : `${filtered.length} employee${filtered.length !== 1 ? 's' : ''}`}
+      </p>
+
+      <div className="fade-up" style={{ animationDelay: '0.1s', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+              {[
+                { label: 'Employee', col: 'name' as const, width: '35%' },
+                { label: 'Shift', col: 'shift' as const, width: '15%' },
+                { label: 'Type', col: 'type' as const, width: '15%' },
+                { label: 'Tags', col: null, width: '25%' },
+                { label: 'Actions', col: null, width: '10%' },
+              ].map(({ label, col, width }) => (
+                <th
+                  key={label}
+                  onClick={col ? () => toggleSort(col) : undefined}
+                  style={{
+                    padding: '10px 16px',
+                    textAlign: 'left',
+                    fontSize: 11,
+                    fontWeight: 800,
+                    color: sortCol === col ? '#d97706' : '#6b7280',
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                    cursor: col ? 'pointer' : 'default',
+                    width,
+                    userSelect: 'none',
+                  }}
+                >
+                  <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    {label}
+                    {col && <SortIcon col={col} />}
+                  </span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((employee, index) => (
+              <tr key={employee.id} style={{ borderBottom: index < filtered.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                <td style={{ padding: '12px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: '50%',
+                        background: '#1c1917',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <span style={{ fontSize: 10, fontWeight: 800, color: '#fbbf24' }}>{initials(employee.name)}</span>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', lineHeight: 1 }}>{employee.name}</p>
+                      <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{employee.email}</p>
+                    </div>
+                  </div>
+                </td>
+                <td style={{ padding: '12px 16px' }}>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: '#374151',
+                      background: '#f1f5f9',
+                      border: '1px solid #e5e7eb',
+                      padding: '2px 10px',
+                      borderRadius: 20,
+                    }}
+                  >
+                    {employee.shift}
+                  </span>
+                </td>
+                <td style={{ padding: '12px 16px' }}>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: employee.type === 'PRN' ? '#6d28d9' : '#374151',
+                      background: employee.type === 'PRN' ? '#f5f3ff' : '#f8fafc',
+                      border: `1px solid ${employee.type === 'PRN' ? '#ddd6fe' : '#e5e7eb'}`,
+                      padding: '2px 10px',
+                      borderRadius: 20,
+                    }}
+                  >
+                    {employee.type}
+                  </span>
+                </td>
+                <td style={{ padding: '12px 16px' }}>
+                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                    {employee.isLead && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 800,
+                          color: '#b45309',
+                          background: '#fffbeb',
+                          border: '1px solid #fde68a',
+                          padding: '2px 9px',
+                          borderRadius: 20,
+                        }}
+                      >
+                        Lead
+                      </span>
+                    )}
+                    {employee.fmla && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 800,
+                          color: '#dc2626',
+                          background: '#fef2f2',
+                          border: '1px solid #fecaca',
+                          padding: '2px 9px',
+                          borderRadius: 20,
+                        }}
+                      >
+                        FMLA
+                      </span>
+                    )}
+                    {!employee.isLead && !employee.fmla && <span style={{ fontSize: 11, color: '#d1d5db' }}>-</span>}
+                  </div>
+                </td>
+                <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                  <button
+                    type="button"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      fontSize: 16,
+                      color: '#9ca3af',
+                      cursor: 'pointer',
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                    }}
+                  >
+                    ...
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {filtered.length === 0 && !loading && (
+          <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
+            No employees match your filters.
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { FeedbackToast } from '@/components/feedback-toast'
 import { ManagerMonthCalendar } from '@/components/manager-month-calendar'
 import { ManagerWeekCalendar } from '@/components/manager-week-calendar'
+import { PrintButton } from '@/components/print-button'
 import { PrintSchedule } from '@/components/print-schedule'
 import { getManagerAttentionSnapshot } from '@/lib/manager-workflow'
 import { summarizeShiftSlotViolations } from '@/lib/schedule-rule-validation'
@@ -24,8 +25,17 @@ import {
   resetDraftScheduleAction,
   toggleCyclePublishedAction,
 } from './actions'
+import { PublishEmailKickoff } from './publish-email-kickoff'
 import type { CalendarShift, Cycle, Role, ScheduleSearchParams, ShiftRow, Therapist, ViewMode } from './types'
-import { buildDateRange, buildScheduleUrl, getOne, getScheduleFeedback, getSearchParam, normalizeViewMode } from '@/lib/schedule-helpers'
+import {
+  buildDateRange,
+  buildScheduleUrl,
+  getOne,
+  getScheduleFeedback,
+  getSearchParam,
+  normalizeViewMode,
+  parseCount,
+} from '@/lib/schedule-helpers'
 import type { AssignmentStatus, ShiftStatus } from './types'
 
 type IssueFilter =
@@ -44,6 +54,16 @@ type AuditLogRow = {
   created_at: string
   user_id: string
   profiles: { full_name: string } | { full_name: string }[] | null
+}
+
+type LatestPublishEventRow = {
+  id: string
+  published_at: string
+  recipient_count: number
+  queued_count: number
+  sent_count: number
+  failed_count: number
+  profiles: { full_name: string | null } | { full_name: string | null }[] | null
 }
 
 type AvailabilityEntryRow = {
@@ -136,6 +156,13 @@ export default async function SchedulePage({
   const showUnavailable = params?.show_unavailable === 'true'
   const activePanel = panelParam === 'setup' ? 'setup' : null
   const successParam = getSearchParam(params?.success)
+  const publishEventId = getSearchParam(params?.publish_event_id)
+  const publishRecipientCount = parseCount(getSearchParam(params?.recipient_count))
+  const publishQueuedCount = parseCount(getSearchParam(params?.queued_count))
+  const publishSentCount = parseCount(getSearchParam(params?.sent_count))
+  const publishFailedCount = parseCount(getSearchParam(params?.failed_count))
+  const publishEmailConfigured = getSearchParam(params?.email_configured) !== 'false'
+  const publishQueueError = getSearchParam(params?.email_queue_error)
   const feedback = getScheduleFeedback(params)
 
   const { data: profile } = await supabase
@@ -178,6 +205,28 @@ export default async function SchedulePage({
     cycles[0] ??
     null
   const activeCycleId = activeCycle?.id
+  let latestPublishEvent: LatestPublishEventRow | null = null
+
+  if (activeCycle?.published && role === 'manager') {
+    const { data: latestPublishData, error: latestPublishError } = await supabase
+      .from('publish_events')
+      .select(
+        'id, published_at, recipient_count, queued_count, sent_count, failed_count, profiles!publish_events_published_by_fkey(full_name)'
+      )
+      .eq('cycle_id', activeCycle.id)
+      .order('published_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (latestPublishError) {
+      console.warn(
+        'Could not load latest publish event for cycle status.',
+        latestPublishError.message || latestPublishError
+      )
+    } else if (latestPublishData) {
+      latestPublishEvent = latestPublishData as LatestPublishEventRow
+    }
+  }
 
   let shifts: ShiftRow[] = []
 
@@ -474,16 +523,6 @@ export default async function SchedulePage({
   const dayTeam = printUsers.filter((member) => member.shift_type === 'day')
   const nightTeam = printUsers.filter((member) => member.shift_type === 'night')
 
-  const coverageTotalsByDate = new Map<string, number>()
-  if (role === 'manager') {
-    for (const date of cycleDates) {
-      const total = shifts.filter(
-        (shift) => shift.date === date && (shift.status === 'scheduled' || shift.status === 'on_call')
-      ).length
-      coverageTotalsByDate.set(date, total)
-    }
-  }
-
   const slotValidation =
     role === 'manager'
       ? summarizeShiftSlotViolations({
@@ -548,6 +587,11 @@ export default async function SchedulePage({
           overCoverage: slotValidation?.overCoverage ?? 0,
         }
       : null
+  const latestPublishDetailsId = publishEventId ?? latestPublishEvent?.id ?? null
+  const latestPublishBy = getOne(latestPublishEvent?.profiles)?.full_name ?? null
+  const latestPublishAtLabel = latestPublishEvent?.published_at
+    ? new Date(latestPublishEvent.published_at).toLocaleString('en-US')
+    : null
 
   let recentActivity: AuditLogRow[] = []
   if (isManagerCoverageView) {
@@ -584,13 +628,87 @@ export default async function SchedulePage({
           <CardHeader>
             <CardTitle className="text-[var(--success-text)]">Cycle published successfully</CardTitle>
             <CardDescription className="text-[var(--success-text)]">
-              The schedule is now live for your team.
+              Published - visible to employees.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Button asChild size="sm">
-              <Link href={buildScheduleUrl(activeCycleId, 'week')}>View published schedule</Link>
-            </Button>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-[var(--success-text)]">
+              Emails queued/sent/failed: {publishQueuedCount}/{publishSentCount}/{publishFailedCount}
+              {publishRecipientCount > 0 ? ` (recipients: ${publishRecipientCount})` : ''}
+            </p>
+            {!publishEmailConfigured && (
+              <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                Email not configured; schedule is still published in-app.
+              </p>
+            )}
+            {publishQueueError && (
+              <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                Email queue warning: {publishQueueError.replaceAll('_', ' ')}.
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm">
+                <Link href={buildScheduleUrl(activeCycleId, 'week')}>View published schedule</Link>
+              </Button>
+              <PrintButton variant="outline" size="sm" />
+              {publishEventId && (
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/publish/${publishEventId}`}>View publish details</Link>
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {successParam === 'cycle_published' && publishEventId && (
+        <PublishEmailKickoff
+          publishEventId={publishEventId}
+          enabled={publishEmailConfigured && publishQueuedCount > 0}
+        />
+      )}
+      {activeCycle?.published && (
+        <Card className="no-print border-[var(--success-border)] bg-[var(--success-subtle)]/60">
+          <CardHeader>
+            <CardTitle className="text-[var(--success-text)]">Published schedule</CardTitle>
+            <CardDescription className="text-[var(--success-text)]">
+              {activeCycle.label} is live and visible to employees.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-[var(--success-text)]">
+              Cycle range: {activeCycle.start_date} to {activeCycle.end_date}
+            </p>
+            {latestPublishAtLabel && (
+              <p className="text-sm text-[var(--success-text)]">
+                Last published: {latestPublishAtLabel}
+                {latestPublishBy ? ` by ${latestPublishBy}` : ''}
+              </p>
+            )}
+            {role === 'manager' && latestPublishEvent && (
+              <p className="text-sm text-[var(--success-text)]">
+                Email queued/sent/failed: {latestPublishEvent.queued_count}/{latestPublishEvent.sent_count}/
+                {latestPublishEvent.failed_count}
+                {latestPublishEvent.recipient_count > 0
+                  ? ` (recipients: ${latestPublishEvent.recipient_count})`
+                  : ''}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm">
+                <Link href={buildScheduleUrl(activeCycle.id, 'week')}>View week</Link>
+              </Button>
+              {canAccessCoverageCalendar && (
+                <Button asChild variant="outline" size="sm">
+                  <Link href={buildScheduleUrl(activeCycle.id, 'calendar')}>View month</Link>
+                </Button>
+              )}
+              <PrintButton variant="outline" size="sm" />
+              {role === 'manager' && latestPublishDetailsId && (
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/publish/${latestPublishDetailsId}`}>View publish details</Link>
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -890,7 +1008,6 @@ export default async function SchedulePage({
         shiftByUserDate={Object.fromEntries(
           Array.from(shiftByUserDate.entries()).map(([key, shift]) => [key, shift.status])
         )}
-        coverageTotalsByDate={Object.fromEntries(coverageTotalsByDate.entries())}
         isManager={role === 'manager'}
       />
     </div>
