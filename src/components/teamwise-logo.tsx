@@ -23,7 +23,13 @@ export function TeamwiseMark({ size = 'default', className = '' }: TeamwiseLogoP
       <rect x="4" y="6" width="24" height="22" rx="4" fill="#1D608E" />
       <rect x="4" y="6" width="24" height="6" rx="4" fill="#1D608E" />
       <rect x="6" y="8" width="20" height="2" rx="1" fill="#E27F3F" />
-      <path d="M10 18L14 22L22 14" stroke="#E27F3F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M10 18L14 22L22 14"
+        stroke="#E27F3F"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }

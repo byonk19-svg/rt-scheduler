@@ -10,7 +10,13 @@ type EmptyStateProps = {
   className?: string
 }
 
-export function EmptyState({ title, description, illustration, actions, className }: EmptyStateProps) {
+export function EmptyState({
+  title,
+  description,
+  illustration,
+  actions,
+  className,
+}: EmptyStateProps) {
   return (
     <Card className={className}>
       <CardHeader>

@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation'
 
+import { can } from '@/lib/auth/can'
+import { parseRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 
 type DashboardSearchParams = {
@@ -33,7 +35,7 @@ export default async function DashboardPage({
     .eq('id', user.id)
     .maybeSingle()
 
-  const isManager = profile?.role === 'manager'
+  const isManager = can(parseRole(profile?.role), 'access_manager_ui')
   const preferredLanding = profile?.default_landing_page === 'coverage' ? 'coverage' : 'dashboard'
   const success = getSearchParam(params?.success)
   const error = getSearchParam(params?.error)

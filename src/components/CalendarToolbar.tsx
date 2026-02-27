@@ -59,7 +59,9 @@ export function CalendarToolbar({
     <div className="rounded-xl border border-border bg-white/95 p-3 backdrop-blur">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-foreground">Target: {minCoverage}-{maxCoverage} per shift</p>
+          <p className="text-sm font-semibold text-foreground">
+            Target: {minCoverage}-{maxCoverage} per shift
+          </p>
           <p className="text-xs text-muted-foreground">{rangeLabel}</p>
         </div>
 
@@ -90,7 +92,7 @@ export function CalendarToolbar({
                     ? 'Ineligible lead'
                     : issueFilter === 'multiple_leads'
                       ? 'Multiple leads'
-                  : 'All'}
+                      : 'All'}
           </span>
           <span className="text-xs font-medium text-muted-foreground">View:</span>
           <div className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 p-1">
@@ -184,14 +186,31 @@ export function CalendarToolbar({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Legend</span>
-          <span className={cn('rounded-md border px-2 py-0.5 text-xs font-medium', legendChipClass('draft'))}>
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Legend
+          </span>
+          <span
+            className={cn(
+              'rounded-md border px-2 py-0.5 text-xs font-medium',
+              legendChipClass('draft')
+            )}
+          >
             Draft
           </span>
-          <span className={cn('rounded-md border px-2 py-0.5 text-xs font-medium', legendChipClass('published'))}>
+          <span
+            className={cn(
+              'rounded-md border px-2 py-0.5 text-xs font-medium',
+              legendChipClass('published')
+            )}
+          >
             Published
           </span>
-          <span className={cn('rounded-md border px-2 py-0.5 text-xs font-medium', legendChipClass('override'))}>
+          <span
+            className={cn(
+              'rounded-md border px-2 py-0.5 text-xs font-medium',
+              legendChipClass('override')
+            )}
+          >
             Override
           </span>
         </div>

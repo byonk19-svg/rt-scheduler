@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { can } from '@/lib/auth/can'
+import { toUiRole, type UiRole } from '@/lib/auth/roles'
 import { dateKeyFromDate, buildDateRange } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/client'
 
-type Role = 'manager' | 'therapist'
+type Role = UiRole
 type RequestType = 'swap' | 'pickup'
 type RequestStatus = 'pending' | 'approved' | 'denied' | 'expired'
 type PersistedRequestStatus = 'pending' | 'approved' | 'denied' | 'expired'
@@ -69,25 +71,26 @@ type MetricState = {
   missingLead: number
 }
 
-const STATUS_META: Record<RequestStatus, { label: string; color: string; bg: string; border: string }> = {
+const STATUS_META: Record<
+  RequestStatus,
+  { label: string; color: string; bg: string; border: string }
+> = {
   pending: { label: 'Pending', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
   approved: { label: 'Approved', color: '#065f46', bg: '#ecfdf5', border: '#a7f3d0' },
   denied: { label: 'Denied', color: '#991b1b', bg: '#fef2f2', border: '#fecaca' },
   expired: { label: 'Expired', color: '#6b7280', bg: '#f9fafb', border: '#e5e7eb' },
 }
 
-const TYPE_META: Record<RequestType, { label: string; color: string; bg: string; border: string }> = {
-  swap: { label: 'Swap', color: '#6d28d9', bg: '#f5f3ff', border: '#ddd6fe' },
-  pickup: { label: 'Pickup', color: '#0369a1', bg: '#f0f9ff', border: '#bae6fd' },
-}
+const TYPE_META: Record<RequestType, { label: string; color: string; bg: string; border: string }> =
+  {
+    swap: { label: 'Swap', color: '#6d28d9', bg: '#f5f3ff', border: '#ddd6fe' },
+    pickup: { label: 'Pickup', color: '#0369a1', bg: '#f0f9ff', border: '#bae6fd' },
+  }
 
 const HISTORY_STATUSES: RequestStatus[] = ['approved', 'denied', 'expired']
 
 function initials(name: string): string {
-  const parts = name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
+  const parts = name.trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return 'TM'
   return parts
     .slice(0, 2)
@@ -126,7 +129,11 @@ function countsTowardCoverage(status: ShiftStatus): boolean {
   return status === 'scheduled' || status === 'on_call'
 }
 
-function toUiStatus(status: PersistedRequestStatus, shiftDate: string | null, todayKey: string): RequestStatus {
+function toUiStatus(
+  status: PersistedRequestStatus,
+  shiftDate: string | null,
+  todayKey: string
+): RequestStatus {
   if (status === 'pending' && shiftDate !== null && shiftDate < todayKey) {
     return 'expired'
   }
@@ -144,7 +151,9 @@ export default function ShiftBoardPage() {
   const [metrics, setMetrics] = useState<MetricState>({ unfilled: 0, missingLead: 0 })
   const [pendingCount, setPendingCount] = useState(0)
 
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'denied'>('pending')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'denied'>(
+    'pending'
+  )
   const [typeFilter, setTypeFilter] = useState<'all' | RequestType>('all')
   const [search, setSearch] = useState('')
   const [activeTab, setActiveTab] = useState<'open' | 'history'>('open')
@@ -184,18 +193,23 @@ export default function ShiftBoardPage() {
             .select('id, start_date, end_date')
             .order('start_date', { ascending: false })
             .limit(24),
-          supabase.from('shift_posts').select('id', { head: true, count: 'exact' }).eq('status', 'pending'),
+          supabase
+            .from('shift_posts')
+            .select('id', { head: true, count: 'exact' })
+            .eq('status', 'pending'),
           postsQuery,
         ])
 
         const profile = (profileResult.data ?? null) as ProfileLookupRow | null
-        const nextRole: Role = profile?.role === 'manager' ? 'manager' : 'therapist'
+        const nextRole: Role = toUiRole(profile?.role)
         setRole(nextRole)
         setPendingCount(pendingPostsResult.count ?? 0)
 
         const cycles = (cyclesResult.data ?? []) as CycleRow[]
         const activeCycle =
-          cycles.find((cycle) => cycle.start_date <= todayKey && cycle.end_date >= todayKey) ?? cycles[0] ?? null
+          cycles.find((cycle) => cycle.start_date <= todayKey && cycle.end_date >= todayKey) ??
+          cycles[0] ??
+          null
 
         let unfilled = 0
         let missingLead = 0
@@ -209,7 +223,10 @@ export default function ShiftBoardPage() {
             .lte('date', activeCycle.end_date)
 
           if (coverageError) {
-            console.error('Failed to load shift coverage metrics for requests board:', coverageError)
+            console.error(
+              'Failed to load shift coverage metrics for requests board:',
+              coverageError
+            )
           } else {
             const bySlot = new Map<string, ShiftCoverageRow[]>()
             for (const row of (coverageData ?? []) as ShiftCoverageRow[]) {
@@ -234,7 +251,11 @@ export default function ShiftBoardPage() {
         }
 
         const postRows = (postsResult.data ?? []) as ShiftPostRow[]
-        const shiftIds = Array.from(new Set(postRows.map((row) => row.shift_id).filter((value): value is string => Boolean(value))))
+        const shiftIds = Array.from(
+          new Set(
+            postRows.map((row) => row.shift_id).filter((value): value is string => Boolean(value))
+          )
+        )
 
         let shiftsById = new Map<string, ShiftLookupRow>()
         if (shiftIds.length > 0) {
@@ -243,9 +264,7 @@ export default function ShiftBoardPage() {
             .select('id, date, shift_type')
             .in('id', shiftIds)
 
-          shiftsById = new Map(
-            ((shiftsData ?? []) as ShiftLookupRow[]).map((row) => [row.id, row])
-          )
+          shiftsById = new Map(((shiftsData ?? []) as ShiftLookupRow[]).map((row) => [row.id, row]))
         }
 
         const profileIds = Array.from(
@@ -264,14 +283,21 @@ export default function ShiftBoardPage() {
             .in('id', profileIds)
 
           namesById = new Map(
-            ((profileRows ?? []) as ProfileLookupRow[]).map((row) => [row.id, row.full_name ?? 'Unknown'])
+            ((profileRows ?? []) as ProfileLookupRow[]).map((row) => [
+              row.id,
+              row.full_name ?? 'Unknown',
+            ])
           )
         }
 
         const mappedRequests = postRows.map((row) => {
           const shift = row.shift_id ? shiftsById.get(row.shift_id) : null
-          const posterName = row.posted_by ? namesById.get(row.posted_by) ?? 'Unknown therapist' : 'Unknown therapist'
-          const shiftLabel = shift ? formatShiftLabel(shift.date, shift.shift_type) : 'Shift unavailable'
+          const posterName = row.posted_by
+            ? (namesById.get(row.posted_by) ?? 'Unknown therapist')
+            : 'Unknown therapist'
+          const shiftLabel = shift
+            ? formatShiftLabel(shift.date, shift.shift_type)
+            : 'Shift unavailable'
 
           return {
             id: row.id,
@@ -284,7 +310,7 @@ export default function ShiftBoardPage() {
             status: toUiStatus(row.status, shift?.date ?? null, todayKey),
             posted: formatRelativeTime(row.created_at),
             postedAt: row.created_at,
-            swapWithName: row.claimed_by ? namesById.get(row.claimed_by) ?? null : null,
+            swapWithName: row.claimed_by ? (namesById.get(row.claimed_by) ?? null) : null,
           } satisfies ShiftBoardRequest
         })
 
@@ -339,7 +365,7 @@ export default function ShiftBoardPage() {
 
   const handleAction = useCallback(
     async (id: string, action: 'approve' | 'deny') => {
-      if (role !== 'manager') return
+      if (!can(role, 'review_shift_posts')) return
 
       const nextStatus: PersistedRequestStatus = action === 'approve' ? 'approved' : 'denied'
       const previousRequests = requests
@@ -357,7 +383,10 @@ export default function ShiftBoardPage() {
       setSavingState((current) => ({ ...current, [id]: true }))
       setError(null)
 
-      const { error: updateError } = await supabase.from('shift_posts').update({ status: nextStatus }).eq('id', id)
+      const { error: updateError } = await supabase
+        .from('shift_posts')
+        .update({ status: nextStatus })
+        .eq('id', id)
 
       if (updateError) {
         console.error('Failed to save action:', updateError.message)
@@ -448,11 +477,23 @@ export default function ShiftBoardPage() {
         }}
       >
         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-          <SummaryItem label="Pending approvals" value={loading ? '...' : pending} color={!loading && pending > 0 ? '#d97706' : '#059669'} />
+          <SummaryItem
+            label="Pending approvals"
+            value={loading ? '...' : pending}
+            color={!loading && pending > 0 ? '#d97706' : '#059669'}
+          />
           <div style={{ width: 1, background: '#f1f5f9', alignSelf: 'stretch' }} />
-          <SummaryItem label="Unfilled shifts" value={loading ? '...' : metrics.unfilled} color={!loading && metrics.unfilled > 0 ? '#dc2626' : '#059669'} />
+          <SummaryItem
+            label="Unfilled shifts"
+            value={loading ? '...' : metrics.unfilled}
+            color={!loading && metrics.unfilled > 0 ? '#dc2626' : '#059669'}
+          />
           <div style={{ width: 1, background: '#f1f5f9', alignSelf: 'stretch' }} />
-          <SummaryItem label="Missing lead" value={loading ? '...' : metrics.missingLead} color={!loading && metrics.missingLead > 0 ? '#dc2626' : '#059669'} />
+          <SummaryItem
+            label="Missing lead"
+            value={loading ? '...' : metrics.missingLead}
+            color={!loading && metrics.missingLead > 0 ? '#dc2626' : '#059669'}
+          />
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
@@ -490,7 +531,10 @@ export default function ShiftBoardPage() {
         </div>
       </div>
 
-      <div className="fade-up" style={{ animationDelay: '0.08s', display: 'flex', gap: 4, marginBottom: 20 }}>
+      <div
+        className="fade-up"
+        style={{ animationDelay: '0.08s', display: 'flex', gap: 4, marginBottom: 20 }}
+      >
         {[
           { id: 'open' as const, label: 'Open Posts' },
           { id: 'history' as const, label: 'History' },
@@ -537,7 +581,13 @@ export default function ShiftBoardPage() {
             height="14"
             viewBox="0 0 14 14"
             fill="none"
-            style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+            style={{
+              position: 'absolute',
+              left: 10,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              pointerEvents: 'none',
+            }}
           >
             <circle cx="6" cy="6" r="4" stroke="#9ca3af" strokeWidth="1.5" />
             <path d="M9.5 9.5l2.5 2.5" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" />
@@ -636,7 +686,10 @@ export default function ShiftBoardPage() {
         </div>
       </div>
 
-      <div className="fade-up" style={{ animationDelay: '0.15s', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div
+        className="fade-up"
+        style={{ animationDelay: '0.15s', display: 'flex', flexDirection: 'column', gap: 8 }}
+      >
         {!loading && filtered.length === 0 ? (
           <EmptyState
             statusFilter={statusFilter}
@@ -651,7 +704,7 @@ export default function ShiftBoardPage() {
             <RequestCard
               key={request.id}
               req={request}
-              canReview={role === 'manager'}
+              canReview={can(role, 'review_shift_posts')}
               saving={Boolean(savingState[request.id])}
               onAction={(action) => void handleAction(request.id, action)}
               onViewShift={() => handleViewShift(request.shiftDate)}
@@ -664,13 +717,31 @@ export default function ShiftBoardPage() {
   )
 }
 
-function SummaryItem({ label, value, color }: { label: string; value: number | string; color: string }) {
+function SummaryItem({
+  label,
+  value,
+  color,
+}: {
+  label: string
+  value: number | string
+  color: string
+}) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <span style={{ fontSize: 22, fontWeight: 800, color, lineHeight: 1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      <span
+        style={{
+          fontSize: 22,
+          fontWeight: 800,
+          color,
+          lineHeight: 1,
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+        }}
+      >
         {value}
       </span>
-      <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500, whiteSpace: 'nowrap' }}>{label}</span>
+      <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500, whiteSpace: 'nowrap' }}>
+        {label}
+      </span>
     </div>
   )
 }
@@ -723,7 +794,15 @@ function RequestCard({
           <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{req.avatar}</span>
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 4,
+              flexWrap: 'wrap',
+            }}
+          >
             <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{req.poster}</span>
             <span
               style={{
@@ -771,18 +850,43 @@ function RequestCard({
             }}
           >
             <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-              <rect x="0.5" y="1.5" width="10" height="9" rx="1.5" stroke="#d97706" strokeWidth="1.2" />
-              <path d="M3.5 0.5v2M7.5 0.5v2M0.5 4.5h10" stroke="#d97706" strokeWidth="1.2" strokeLinecap="round" />
+              <rect
+                x="0.5"
+                y="1.5"
+                width="10"
+                height="9"
+                rx="1.5"
+                stroke="#d97706"
+                strokeWidth="1.2"
+              />
+              <path
+                d="M3.5 0.5v2M7.5 0.5v2M0.5 4.5h10"
+                stroke="#d97706"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+              />
             </svg>
             <span style={{ fontSize: 11, fontWeight: 600, color: '#374151' }}>{req.shift}</span>
           </div>
           <p style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>{req.message}</p>
-          {req.swapWithName && <p style={{ marginTop: 6, fontSize: 11, color: '#64748b' }}>Swap with: {req.swapWithName}</p>}
+          {req.swapWithName && (
+            <p style={{ marginTop: 6, fontSize: 11, color: '#64748b' }}>
+              Swap with: {req.swapWithName}
+            </p>
+          )}
         </div>
       </div>
 
       {isPending && canReview && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+            marginTop: 12,
+            paddingTop: 12,
+            borderTop: '1px solid #f1f5f9',
+          }}
+        >
           <button
             type="button"
             disabled={saving}
@@ -841,7 +945,9 @@ function RequestCard({
       )}
 
       {(!isPending || !canReview) && (
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #f1f5f9', display: 'flex' }}>
+        <div
+          style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #f1f5f9', display: 'flex' }}
+        >
           <button
             type="button"
             onClick={onViewShift}
@@ -868,7 +974,15 @@ function RequestCard({
 function EmptyState({ statusFilter, onClear }: { statusFilter: string; onClear: () => void }) {
   const allClear = statusFilter === 'pending'
   return (
-    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: '40px 24px', textAlign: 'center' }}>
+    <div
+      style={{
+        background: '#fff',
+        border: '1px solid #e5e7eb',
+        borderRadius: 10,
+        padding: '40px 24px',
+        textAlign: 'center',
+      }}
+    >
       <div
         style={{
           width: 44,
@@ -891,7 +1005,9 @@ function EmptyState({ statusFilter, onClear }: { statusFilter: string; onClear: 
         {allClear ? "You're all caught up" : 'No results found'}
       </p>
       <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>
-        {allClear ? 'No pending requests right now. Check back later.' : 'Try adjusting your search or filters.'}
+        {allClear
+          ? 'No pending requests right now. Check back later.'
+          : 'Try adjusting your search or filters.'}
       </p>
       <button
         type="button"

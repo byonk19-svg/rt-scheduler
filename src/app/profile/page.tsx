@@ -5,6 +5,8 @@ import { FeedbackToast } from '@/components/feedback-toast'
 import { FormSubmitButton } from '@/components/form-submit-button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { can } from '@/lib/auth/can'
+import { toUiRole } from '@/lib/auth/roles'
 import {
   EMPLOYEE_META_BADGE_CLASS,
   LEAD_ELIGIBLE_BADGE_CLASS,
@@ -45,7 +47,9 @@ function normalizePreferredWorkDays(rawValues: FormDataEntryValue[]): number[] {
   return Array.from(new Set(days)).sort((a, b) => a - b)
 }
 
-function getFeedback(searchParams?: ProfileSearchParams): { message: string; variant: 'success' | 'error' } | null {
+function getFeedback(
+  searchParams?: ProfileSearchParams
+): { message: string; variant: 'success' | 'error' } | null {
   const success = getSearchParam(searchParams?.success)
   const error = getSearchParam(searchParams?.error)
 
@@ -166,21 +170,24 @@ export default async function ProfilePage({
 
   const fullName = profile?.full_name ?? user.user_metadata?.full_name ?? 'Team member'
   const email = profile?.email ?? user.email ?? 'No email on file'
-  const role = profile?.role === 'manager' ? 'manager' : 'therapist'
+  const role = toUiRole(profile?.role)
+  const canAccessManagerUi = can(role, 'access_manager_ui')
+  const isTherapist = !canAccessManagerUi
   const shiftType = profile?.shift_type === 'night' ? 'night' : 'day'
   const employmentType =
     profile?.employment_type === 'part_time' || profile?.employment_type === 'prn'
       ? profile.employment_type
       : 'full_time'
-  const weeklyLimit = typeof profile?.max_work_days_per_week === 'number' ? profile.max_work_days_per_week : 3
+  const weeklyLimit =
+    typeof profile?.max_work_days_per_week === 'number' ? profile.max_work_days_per_week : 3
   const preferredWorkDays = Array.isArray(profile?.preferred_work_days)
     ? profile.preferred_work_days
         .map((value) => Number(value))
         .filter((value) => Number.isInteger(value) && value >= 0 && value <= 6)
     : []
-  const preferredDayLabels = WEEKDAY_OPTIONS.filter((option) => preferredWorkDays.includes(option.value)).map(
-    (option) => option.label
-  )
+  const preferredDayLabels = WEEKDAY_OPTIONS.filter((option) =>
+    preferredWorkDays.includes(option.value)
+  ).map((option) => option.label)
   const defaultCalendarView = profile?.default_calendar_view === 'night' ? 'night' : 'day'
   const defaultLandingPage = profile?.default_landing_page === 'coverage' ? 'coverage' : 'dashboard'
 
@@ -208,7 +215,11 @@ export default async function ProfilePage({
             <p className="font-medium text-foreground">{email}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Badge className={role === 'manager' ? cn('capitalize', MANAGER_ROLE_BADGE_CLASS) : 'capitalize'}>
+            <Badge
+              className={
+                canAccessManagerUi ? cn('capitalize', MANAGER_ROLE_BADGE_CLASS) : 'capitalize'
+              }
+            >
               {role}
             </Badge>
             <Badge variant="outline" className={cn('capitalize', EMPLOYEE_META_BADGE_CLASS)}>
@@ -217,12 +228,15 @@ export default async function ProfilePage({
             <Badge variant="outline" className={cn('capitalize', EMPLOYEE_META_BADGE_CLASS)}>
               {employmentType.replace('_', ' ')}
             </Badge>
-            {role === 'therapist' && (
-              <Badge variant={profile?.is_lead_eligible ? 'default' : 'outline'} className={profile?.is_lead_eligible ? LEAD_ELIGIBLE_BADGE_CLASS : undefined}>
+            {isTherapist && (
+              <Badge
+                variant={profile?.is_lead_eligible ? 'default' : 'outline'}
+                className={profile?.is_lead_eligible ? LEAD_ELIGIBLE_BADGE_CLASS : undefined}
+              >
                 {profile?.is_lead_eligible ? 'Lead' : 'Staff only'}
               </Badge>
             )}
-            {role === 'therapist' && <Badge variant="outline">Max {weeklyLimit}/week</Badge>}
+            {isTherapist && <Badge variant="outline">Max {weeklyLimit}/week</Badge>}
           </div>
         </CardContent>
       </Card>
@@ -230,13 +244,18 @@ export default async function ProfilePage({
       <Card>
         <CardHeader>
           <CardTitle>Preferences</CardTitle>
-          <CardDescription>Set your default calendar view and where you land after sign-in.</CardDescription>
+          <CardDescription>
+            Set your default calendar view and where you land after sign-in.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form action={savePreferencesAction} className="space-y-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1">
-                <label htmlFor="default_calendar_view" className="text-sm font-medium text-foreground">
+                <label
+                  htmlFor="default_calendar_view"
+                  className="text-sm font-medium text-foreground"
+                >
                   Default calendar view
                 </label>
                 <select
@@ -250,7 +269,10 @@ export default async function ProfilePage({
                 </select>
               </div>
               <div className="space-y-1">
-                <label htmlFor="default_landing_page" className="text-sm font-medium text-foreground">
+                <label
+                  htmlFor="default_landing_page"
+                  className="text-sm font-medium text-foreground"
+                >
                   Default landing page
                 </label>
                 <select
@@ -264,18 +286,20 @@ export default async function ProfilePage({
                 </select>
               </div>
             </div>
-            <FormSubmitButton type="submit" pendingText="Saving...">Save preferences</FormSubmitButton>
+            <FormSubmitButton type="submit" pendingText="Saving...">
+              Save preferences
+            </FormSubmitButton>
           </form>
         </CardContent>
       </Card>
 
-      {role === 'therapist' && (
+      {isTherapist && (
         <Card>
           <CardHeader>
             <CardTitle>Preferred Work Days</CardTitle>
             <CardDescription>
-              Auto-generate will prioritize these weekdays when possible. Leave all unchecked if you have no
-              day-of-week preference.
+              Auto-generate will prioritize these weekdays when possible. Leave all unchecked if you
+              have no day-of-week preference.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -297,9 +321,12 @@ export default async function ProfilePage({
                 ))}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <FormSubmitButton type="submit" pendingText="Saving...">Save preferred days</FormSubmitButton>
+                <FormSubmitButton type="submit" pendingText="Saving...">
+                  Save preferred days
+                </FormSubmitButton>
                 <p className="text-xs text-muted-foreground">
-                  Current: {preferredDayLabels.length > 0 ? preferredDayLabels.join(', ') : 'No preference'}
+                  Current:{' '}
+                  {preferredDayLabels.length > 0 ? preferredDayLabels.join(', ') : 'No preference'}
                 </p>
               </div>
             </form>

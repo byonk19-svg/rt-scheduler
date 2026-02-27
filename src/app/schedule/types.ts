@@ -1,4 +1,6 @@
-export type Role = 'manager' | 'therapist'
+import type { UiRole } from '@/lib/auth/roles'
+
+export type Role = UiRole
 
 export type ViewMode = 'grid' | 'list' | 'calendar' | 'week'
 

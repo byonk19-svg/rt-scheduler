@@ -3,17 +3,30 @@
 import { Fragment, useMemo, useState } from 'react'
 import { CheckCircle2 } from 'lucide-react'
 
-import { DEFAULT_TABLE_FILTERS, TableToolbar, type TableToolbarFilters } from '@/components/TableToolbar'
+import {
+  DEFAULT_TABLE_FILTERS,
+  TableToolbar,
+  type TableToolbarFilters,
+} from '@/components/TableToolbar'
 import { EmptyState } from '@/components/EmptyState'
 import { FormSubmitButton } from '@/components/form-submit-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { can } from '@/lib/auth/can'
+import type { UiRole } from '@/lib/auth/roles'
 import { formatDate } from '@/lib/schedule-helpers'
 import { filterAndSortRows, type FilterableRow } from '@/lib/table-filtering'
 
-type Role = 'manager' | 'therapist'
+type Role = UiRole
 type PostType = 'swap' | 'pickup'
 type PostStatus = 'pending' | 'approved' | 'denied'
 
@@ -60,11 +73,12 @@ export function ShiftPostsTable({
   unclaimShiftPostAction,
   updateShiftPostStatusAction,
 }: ShiftPostsTableProps) {
+  const canReviewShiftPosts = can(role, 'review_shift_posts')
   const [scope, setScope] = useState<'mine' | 'all'>(role === 'therapist' ? 'mine' : 'all')
   const [expandedPostIds, setExpandedPostIds] = useState<Set<string>>(new Set())
   const [filters, setFilters] = useState<TableToolbarFilters>({
     ...DEFAULT_TABLE_FILTERS,
-    status: role === 'manager' ? 'pending' : 'all',
+    status: canReviewShiftPosts ? 'pending' : 'all',
   })
 
   function toggleMessage(postId: string) {
@@ -97,9 +111,10 @@ export function ShiftPostsTable({
 
   const defaultFiltersForRole: TableToolbarFilters = {
     ...DEFAULT_TABLE_FILTERS,
-    status: role === 'manager' ? 'pending' : 'all',
+    status: canReviewShiftPosts ? 'pending' : 'all',
   }
-  const noPendingApprovals = role === 'manager' && filters.status === 'pending' && visibleRows.length === 0
+  const noPendingApprovals =
+    canReviewShiftPosts && filters.status === 'pending' && visibleRows.length === 0
   function renderRowActions(row: ShiftPostTableRow) {
     return (
       <div className="flex flex-wrap gap-2">
@@ -151,7 +166,7 @@ export function ShiftPostsTable({
           </form>
         )}
 
-        {role === 'manager' && (
+        {canReviewShiftPosts && (
           <>
             {row.status !== 'approved' && (
               <form action={updateShiftPostStatusAction}>
@@ -166,7 +181,12 @@ export function ShiftPostsTable({
               <form action={updateShiftPostStatusAction}>
                 <input type="hidden" name="post_id" value={row.id} />
                 <input type="hidden" name="status" value="denied" />
-                <FormSubmitButton type="submit" variant="destructive" size="sm" pendingText="Denying...">
+                <FormSubmitButton
+                  type="submit"
+                  variant="destructive"
+                  size="sm"
+                  pendingText="Denying..."
+                >
                   Deny
                 </FormSubmitButton>
               </form>
@@ -182,7 +202,7 @@ export function ShiftPostsTable({
       <CardHeader>
         <CardTitle>Open Posts</CardTitle>
         <CardDescription>
-          {role === 'manager'
+          {canReviewShiftPosts
             ? 'Approve or deny requests from the team.'
             : 'Track active requests and your own submissions.'}
         </CardDescription>
@@ -190,10 +210,20 @@ export function ShiftPostsTable({
       <CardContent className="space-y-4">
         {role === 'therapist' && (
           <div className="flex items-center gap-2">
-            <Button type="button" size="sm" variant={scope === 'mine' ? 'default' : 'outline'} onClick={() => setScope('mine')}>
+            <Button
+              type="button"
+              size="sm"
+              variant={scope === 'mine' ? 'default' : 'outline'}
+              onClick={() => setScope('mine')}
+            >
               My Requests
             </Button>
-            <Button type="button" size="sm" variant={scope === 'all' ? 'default' : 'outline'} onClick={() => setScope('all')}>
+            <Button
+              type="button"
+              size="sm"
+              variant={scope === 'all' ? 'default' : 'outline'}
+              onClick={() => setScope('all')}
+            >
               All Posts
             </Button>
           </div>
@@ -213,7 +243,9 @@ export function ShiftPostsTable({
                 : 'No shift posts match these filters.'
             }
             description={
-              noPendingApprovals ? 'Nice work. Check back later or switch to all posts.' : 'Adjust filters or view all requests.'
+              noPendingApprovals
+                ? 'Nice work. Check back later or switch to all posts.'
+                : 'Adjust filters or view all requests.'
             }
             illustration={
               noPendingApprovals ? (
@@ -225,10 +257,20 @@ export function ShiftPostsTable({
             }
             actions={
               <div className="flex flex-wrap items-center gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => setFilters((current) => ({ ...current, status: 'all' }))}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFilters((current) => ({ ...current, status: 'all' }))}
+                >
                   View all
                 </Button>
-                <Button type="button" variant="outline" size="sm" onClick={() => setFilters(defaultFiltersForRole)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFilters(defaultFiltersForRole)}
+                >
                   Clear filters
                 </Button>
               </div>
@@ -239,7 +281,10 @@ export function ShiftPostsTable({
         {visibleRows.length > 0 && (
           <div className="space-y-3 md:hidden">
             {visibleRows.map((row) => (
-              <div key={`mobile-${row.id}`} className="space-y-3 rounded-md border border-border bg-card p-3">
+              <div
+                key={`mobile-${row.id}`}
+                className="space-y-3 rounded-md border border-border bg-card p-3"
+              >
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-sm font-semibold text-foreground">
@@ -276,108 +321,114 @@ export function ShiftPostsTable({
         )}
 
         {visibleRows.length > 0 && (
-        <Table className="hidden md:table">
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Shift</TableHead>
-              <TableHead className="hidden md:table-cell">Type</TableHead>
-              <TableHead className="hidden lg:table-cell">Posted By</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="hidden lg:table-cell">Submitted</TableHead>
-              <TableHead className="hidden xl:table-cell">Message</TableHead>
-              <TableHead>Action</TableHead>
-              <TableHead>Details</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visibleRows.map((row) => {
-              const isMessageExpanded = expandedPostIds.has(row.id)
+          <Table className="hidden md:table">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Shift</TableHead>
+                <TableHead className="hidden md:table-cell">Type</TableHead>
+                <TableHead className="hidden lg:table-cell">Posted By</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="hidden lg:table-cell">Submitted</TableHead>
+                <TableHead className="hidden xl:table-cell">Message</TableHead>
+                <TableHead>Action</TableHead>
+                <TableHead>Details</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {visibleRows.map((row) => {
+                const isMessageExpanded = expandedPostIds.has(row.id)
 
-              return (
-                <Fragment key={row.id}>
-                  <TableRow>
-                    <TableCell>{row.hasShiftDetails ? formatDate(row.shiftDate) : 'Unavailable'}</TableCell>
-                    <TableCell>
-                      {row.hasShiftDetails ? (
-                        <>
-                          <div className="capitalize">{row.shiftType}</div>
-                          <div className="mt-1">
-                            <Badge variant="outline" className="capitalize">
-                              {row.shiftStatus.replace('_', ' ')}
-                            </Badge>
+                return (
+                  <Fragment key={row.id}>
+                    <TableRow>
+                      <TableCell>
+                        {row.hasShiftDetails ? formatDate(row.shiftDate) : 'Unavailable'}
+                      </TableCell>
+                      <TableCell>
+                        {row.hasShiftDetails ? (
+                          <>
+                            <div className="capitalize">{row.shiftType}</div>
+                            <div className="mt-1">
+                              <Badge variant="outline" className="capitalize">
+                                {row.shiftStatus.replace('_', ' ')}
+                              </Badge>
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {row.cycleLabel}
+                            </div>
+                            {row.offeredShiftLabel && (
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                Offered: {row.offeredShiftLabel}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">Shift details unavailable</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <Badge variant="outline" className="capitalize">
+                          {row.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">{row.postedBy}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            row.status === 'approved'
+                              ? 'default'
+                              : row.status === 'denied'
+                                ? 'destructive'
+                                : 'outline'
+                          }
+                        >
+                          {row.status}
+                        </Badge>
+                        {row.claimerName && row.status === 'pending' && (
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            Claimed by {row.claimerName}
                           </div>
-                          <div className="mt-1 text-xs text-muted-foreground">{row.cycleLabel}</div>
-                          {row.offeredShiftLabel && (
-                            <div className="mt-1 text-xs text-muted-foreground">Offered: {row.offeredShiftLabel}</div>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground">Shift details unavailable</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <Badge variant="outline" className="capitalize">
-                        {row.type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">{row.postedBy}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          row.status === 'approved'
-                            ? 'default'
-                            : row.status === 'denied'
-                              ? 'destructive'
-                              : 'outline'
-                        }
-                      >
-                        {row.status}
-                      </Badge>
-                      {row.claimerName && row.status === 'pending' && (
-                        <div className="mt-1 text-xs text-muted-foreground">Claimed by {row.claimerName}</div>
-                      )}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      {new Date(row.createdAt).toLocaleDateString('en-US')}
-                    </TableCell>
-                    <TableCell className="hidden xl:table-cell">
-                      <span className="block max-w-[22rem] truncate text-sm">{row.message}</span>
-                    </TableCell>
-                    <TableCell>
-                      {renderRowActions(row)}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => toggleMessage(row.id)}
-                        aria-expanded={isMessageExpanded}
-                        aria-controls={`post-message-${row.id}`}
-                      >
-                        {isMessageExpanded ? 'Hide' : 'Message'}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-
-                  {isMessageExpanded && (
-                    <TableRow id={`post-message-${row.id}`}>
-                      <TableCell colSpan={9} className="bg-muted/40">
-                        <div className="space-y-1 py-1">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            Message
-                          </p>
-                          <p className="text-sm text-foreground">{row.message}</p>
-                        </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        {new Date(row.createdAt).toLocaleDateString('en-US')}
+                      </TableCell>
+                      <TableCell className="hidden xl:table-cell">
+                        <span className="block max-w-[22rem] truncate text-sm">{row.message}</span>
+                      </TableCell>
+                      <TableCell>{renderRowActions(row)}</TableCell>
+                      <TableCell>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleMessage(row.id)}
+                          aria-expanded={isMessageExpanded}
+                          aria-controls={`post-message-${row.id}`}
+                        >
+                          {isMessageExpanded ? 'Hide' : 'Message'}
+                        </Button>
                       </TableCell>
                     </TableRow>
-                  )}
-                </Fragment>
-              )
-            })}
-          </TableBody>
-        </Table>
+
+                    {isMessageExpanded && (
+                      <TableRow id={`post-message-${row.id}`}>
+                        <TableCell colSpan={9} className="bg-muted/40">
+                          <div className="space-y-1 py-1">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              Message
+                            </p>
+                            <p className="text-sm text-foreground">{row.message}</p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                )
+              })}
+            </TableBody>
+          </Table>
         )}
       </CardContent>
     </Card>

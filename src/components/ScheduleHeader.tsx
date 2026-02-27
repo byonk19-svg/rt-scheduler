@@ -7,12 +7,20 @@ import { ChevronDown } from 'lucide-react'
 import { MoreActionsMenu } from '@/components/more-actions-menu'
 import { PrintButton } from '@/components/print-button'
 import { FormMenuSubmitButton, FormSubmitButton } from '@/components/form-submit-button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { can } from '@/lib/auth/can'
+import type { UiRole } from '@/lib/auth/roles'
 import { buildScheduleUrl } from '@/lib/schedule-helpers'
 
-type Role = 'manager' | 'therapist'
+type Role = UiRole
 type ViewMode = 'grid' | 'list' | 'calendar' | 'week'
 
 type PublishSummary = {
@@ -43,7 +51,8 @@ type ScheduleHeaderProps = {
   canViewMonth?: boolean
 }
 
-const menuActionClass = 'block w-full rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary disabled:opacity-50'
+const menuActionClass =
+  'block w-full rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary disabled:opacity-50'
 
 function tabClass(isActive: boolean): string {
   if (isActive) {
@@ -66,16 +75,16 @@ export function ScheduleHeader({
   generateDraftScheduleAction,
   resetDraftScheduleAction,
   publishSummary = null,
-  canViewMonth = role === 'manager',
+  canViewMonth = can(role, 'manage_schedule'),
 }: ScheduleHeaderProps) {
+  const canManageSchedule = can(role, 'manage_schedule')
   const hasActiveCycle = Boolean(activeCycleId)
   const canPublish = hasActiveCycle && !activeCyclePublished
-  const autoGenerateHelperMessage =
-    !hasActiveCycle
-      ? 'Select a cycle to auto-generate a draft.'
-      : activeCyclePublished
-        ? 'Draft actions are disabled for published cycles.'
-        : null
+  const autoGenerateHelperMessage = !hasActiveCycle
+    ? 'Select a cycle to auto-generate a draft.'
+    : activeCyclePublished
+      ? 'Draft actions are disabled for published cycles.'
+      : null
   const [publishDialogOpen, setPublishDialogOpen] = useState(false)
   const [publishConfirmationText, setPublishConfirmationText] = useState('')
   const publishConfirmEnabled = publishConfirmationText.trim().toUpperCase() === 'PUBLISH'
@@ -89,12 +98,16 @@ export function ScheduleHeader({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {role === 'manager' && (
+          {canManageSchedule && (
             <>
               <form action={generateDraftScheduleAction}>
                 <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
                 <input type="hidden" name="view" value={viewMode} />
-                <input type="hidden" name="show_unavailable" value={showUnavailable ? 'true' : 'false'} />
+                <input
+                  type="hidden"
+                  name="show_unavailable"
+                  value={showUnavailable ? 'true' : 'false'}
+                />
                 <FormSubmitButton
                   type="submit"
                   variant="outline"
@@ -124,20 +137,38 @@ export function ScheduleHeader({
                   <form action={toggleCyclePublishedAction}>
                     <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
                     <input type="hidden" name="view" value={viewMode} />
-                    <input type="hidden" name="show_unavailable" value={showUnavailable ? 'true' : 'false'} />
+                    <input
+                      type="hidden"
+                      name="show_unavailable"
+                      value={showUnavailable ? 'true' : 'false'}
+                    />
                     <input type="hidden" name="currently_published" value="false" />
                     <input type="hidden" name="override_weekly_rules" value="true" />
-                    <FormMenuSubmitButton type="submit" className={menuActionClass} disabled={!canPublish} pendingText="Publishing...">
+                    <FormMenuSubmitButton
+                      type="submit"
+                      className={menuActionClass}
+                      disabled={!canPublish}
+                      pendingText="Publishing..."
+                    >
                       Publish with overrides
                     </FormMenuSubmitButton>
                   </form>
                   <form action={toggleCyclePublishedAction}>
                     <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
                     <input type="hidden" name="view" value={viewMode} />
-                    <input type="hidden" name="show_unavailable" value={showUnavailable ? 'true' : 'false'} />
+                    <input
+                      type="hidden"
+                      name="show_unavailable"
+                      value={showUnavailable ? 'true' : 'false'}
+                    />
                     <input type="hidden" name="currently_published" value="false" />
                     <input type="hidden" name="override_weekly_rules" value="false" />
-                    <FormMenuSubmitButton type="submit" className={menuActionClass} disabled={!canPublish} pendingText="Publishing...">
+                    <FormMenuSubmitButton
+                      type="submit"
+                      className={menuActionClass}
+                      disabled={!canPublish}
+                      pendingText="Publishing..."
+                    >
                       Publish draft
                     </FormMenuSubmitButton>
                   </form>
@@ -155,12 +186,16 @@ export function ScheduleHeader({
             </>
           )}
 
-          {role === 'manager' && (
+          {canManageSchedule && (
             <MoreActionsMenu>
               <form action={resetDraftScheduleAction}>
                 <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
                 <input type="hidden" name="view" value={viewMode} />
-                <input type="hidden" name="show_unavailable" value={showUnavailable ? 'true' : 'false'} />
+                <input
+                  type="hidden"
+                  name="show_unavailable"
+                  value={showUnavailable ? 'true' : 'false'}
+                />
                 <FormMenuSubmitButton
                   type="submit"
                   className={`${menuActionClass} text-[var(--warning-text)]`}
@@ -175,22 +210,30 @@ export function ScheduleHeader({
 
           <PrintButton variant="outline" label="Print schedule" />
 
-          {role === 'manager' && autoGenerateHelperMessage && (
+          {canManageSchedule && autoGenerateHelperMessage && (
             <p className="w-full text-xs text-muted-foreground">{autoGenerateHelperMessage}</p>
           )}
         </div>
       </div>
 
       <nav className="flex flex-wrap items-center gap-1 rounded-md border border-border bg-white p-1">
-        <Link href={buildScheduleUrl(activeCycleId, 'week')} className={tabClass(viewMode === 'week')}>
+        <Link
+          href={buildScheduleUrl(activeCycleId, 'week')}
+          className={tabClass(viewMode === 'week')}
+        >
           Week
         </Link>
         {canViewMonth ? (
-          <Link href={buildScheduleUrl(activeCycleId, 'calendar')} className={tabClass(viewMode === 'calendar')}>
+          <Link
+            href={buildScheduleUrl(activeCycleId, 'calendar')}
+            className={tabClass(viewMode === 'calendar')}
+          >
             Month
           </Link>
         ) : (
-          <span className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground/70">Month</span>
+          <span className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground/70">
+            Month
+          </span>
         )}
       </nav>
 
@@ -217,16 +260,40 @@ export function ScheduleHeader({
               </div>
 
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <p className="text-muted-foreground">Total scheduled shifts: <span className="font-medium text-foreground">{publishSummary.totalScheduledShifts}</span></p>
-                <p className="text-muted-foreground">Day shifts: <span className="font-medium text-foreground">{publishSummary.dayShifts}</span></p>
-                <p className="text-muted-foreground">Night shifts: <span className="font-medium text-foreground">{publishSummary.nightShifts}</span></p>
+                <p className="text-muted-foreground">
+                  Total scheduled shifts:{' '}
+                  <span className="font-medium text-foreground">
+                    {publishSummary.totalScheduledShifts}
+                  </span>
+                </p>
+                <p className="text-muted-foreground">
+                  Day shifts:{' '}
+                  <span className="font-medium text-foreground">{publishSummary.dayShifts}</span>
+                </p>
+                <p className="text-muted-foreground">
+                  Night shifts:{' '}
+                  <span className="font-medium text-foreground">{publishSummary.nightShifts}</span>
+                </p>
               </div>
 
               <div className="rounded-md border border-border p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Remaining warnings</p>
-                <p className="mt-1 text-muted-foreground">Missing leads: <span className="font-medium text-foreground">{publishSummary.missingLead}</span></p>
-                <p className="text-muted-foreground">Under coverage: <span className="font-medium text-foreground">{publishSummary.underCoverage}</span></p>
-                <p className="text-muted-foreground">Over coverage: <span className="font-medium text-foreground">{publishSummary.overCoverage}</span></p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Remaining warnings
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  Missing leads:{' '}
+                  <span className="font-medium text-foreground">{publishSummary.missingLead}</span>
+                </p>
+                <p className="text-muted-foreground">
+                  Under coverage:{' '}
+                  <span className="font-medium text-foreground">
+                    {publishSummary.underCoverage}
+                  </span>
+                </p>
+                <p className="text-muted-foreground">
+                  Over coverage:{' '}
+                  <span className="font-medium text-foreground">{publishSummary.overCoverage}</span>
+                </p>
               </div>
             </div>
           ) : (
@@ -236,12 +303,19 @@ export function ScheduleHeader({
           <form action={toggleCyclePublishedAction} className="space-y-3">
             <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
             <input type="hidden" name="view" value={viewMode} />
-            <input type="hidden" name="show_unavailable" value={showUnavailable ? 'true' : 'false'} />
+            <input
+              type="hidden"
+              name="show_unavailable"
+              value={showUnavailable ? 'true' : 'false'}
+            />
             <input type="hidden" name="currently_published" value="false" />
             <input type="hidden" name="override_weekly_rules" value="false" />
 
             <div className="space-y-1">
-              <label htmlFor="publish-confirmation" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <label
+                htmlFor="publish-confirmation"
+                className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+              >
                 Type PUBLISH to confirm
               </label>
               <Input

@@ -9,31 +9,23 @@ import {
   resetDraftScheduleAction,
   toggleCyclePublishedAction,
 } from '@/app/schedule/actions'
+import { CalendarGrid } from '@/components/coverage/CalendarGrid'
+import { ShiftDrawer } from '@/components/coverage/ShiftDrawer'
 import { PrintSchedule } from '@/components/print-schedule'
 import {
-  type CoverageUiStatus,
   updateCoverageAssignmentStatus,
 } from '@/lib/coverage/updateAssignmentStatus'
+import {
+  assignCoverageShift,
+  persistCoverageShiftStatus,
+  unassignCoverageShift,
+} from '@/lib/coverage/mutations'
+import { flatten, type DayItem, type ShiftItem, type ShiftTab, type UiStatus } from '@/lib/coverage/selectors'
 import { getScheduleFeedback } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/client'
 import type { AssignmentStatus, ScheduleSearchParams, ShiftRole, ShiftStatus } from '@/app/schedule/types'
 
-type UiStatus = CoverageUiStatus
-type DayStatus = 'published' | 'draft' | 'override' | 'missing_lead'
-type ShiftTab = 'Day' | 'Night'
-
-type ShiftLog = { from: string; to: UiStatus; toLabel: string; time: string }
-type ShiftItem = { id: string; userId: string; name: string; status: UiStatus; log: ShiftLog[] }
-type DayItem = {
-  id: string
-  isoDate: string
-  date: number
-  label: string
-  dayStatus: DayStatus
-  constraintBlocked: boolean
-  leadShift: ShiftItem | null
-  staffShifts: ShiftItem[]
-}
+type DayStatus = DayItem['dayStatus']
 
 type CycleRow = { id: string; label: string; start_date: string; end_date: string; published: boolean }
 type TherapistOption = { id: string; full_name: string; shift_type: 'day' | 'night' }
@@ -59,12 +51,11 @@ type ShiftRow = {
 }
 type AssignedShiftRow = Omit<ShiftRow, 'user_id'> & { user_id: string }
 
-const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
-const SHIFT_STATUSES: Record<UiStatus, { label: string; color: string; bg: string; border: string }> = {
-  active: { label: 'Active', color: '#374151', bg: '#f9fafb', border: '#e5e7eb' },
-  oncall: { label: 'On Call', color: '#c2410c', bg: '#fff7ed', border: '#fed7aa' },
-  leave_early: { label: 'Leave Early', color: '#2563eb', bg: '#f9fafb', border: '#e5e7eb' },
-  cancelled: { label: 'Cancelled', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
+const SHIFT_STATUS_LABELS: Record<UiStatus, string> = {
+  active: 'Active',
+  oncall: 'On Call',
+  leave_early: 'Leave Early',
+  cancelled: 'Cancelled',
 }
 const NO_ELIGIBLE_CONSTRAINT_REASON = 'no_eligible_candidates_due_to_constraints'
 
@@ -112,15 +103,6 @@ function dateRange(startDate: string, endDate: string): string[] {
   return out
 }
 
-function initials(name: string): string {
-  return name
-    .split(' ')
-    .map((word) => word[0] ?? '')
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
-}
-
 function timestamp(): string {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
@@ -135,49 +117,6 @@ function formatMonthLabel(value: string): string {
   const parsed = new Date(`${value}T00:00:00`)
   if (Number.isNaN(parsed.getTime())) return value
   return parsed.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-}
-
-function formatMonthShort(value: string): string {
-  const parsed = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return value
-  return parsed.toLocaleDateString('en-US', { month: 'short' })
-}
-
-function flatten(day: DayItem): Array<ShiftItem & { isLead: boolean }> {
-  const lead = day.leadShift ? [{ ...day.leadShift, isLead: true }] : []
-  return [...lead, ...day.staffShifts.map((row) => ({ ...row, isLead: false }))]
-}
-
-function countBy(day: DayItem, status: UiStatus): number {
-  return flatten(day).filter((row) => row.status === status).length
-}
-
-function countActive(day: DayItem): number {
-  return flatten(day).filter((row) => row.status !== 'cancelled').length
-}
-
-function Avatar({ name, status, size = 18 }: { name: string; status: UiStatus; size?: number }) {
-  const bg = status === 'cancelled' ? '#ef4444' : status === 'oncall' ? '#ea580c' : '#d97706'
-  return (
-    <span
-      title={name}
-      style={{
-        width: size,
-        height: size,
-        borderRadius: 999,
-        background: bg,
-        color: '#fff',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontWeight: 800,
-        fontSize: size * 0.38,
-        flexShrink: 0,
-      }}
-    >
-      {initials(name)}
-    </span>
-  )
 }
 
 export default function CoveragePage() {
@@ -572,18 +511,12 @@ export default function CoveragePage() {
       availableTherapists.find((therapist) => therapist.id === assignUserId) ?? null
     const shiftType = selectedDay.shiftType === 'Day' ? 'day' : 'night'
 
-    const { data: inserted, error: insertError } = await supabase
-      .from('shifts')
-      .insert({
-        cycle_id: activeCycleId,
-        user_id: assignUserId,
-        date: selectedDay.isoDate,
-        shift_type: shiftType,
-        role: 'staff',
-        status: 'scheduled',
-      })
-      .select('id, user_id, date, shift_type, status, assignment_status')
-      .single()
+    const { data: inserted, error: insertError } = await assignCoverageShift(supabase, {
+      cycleId: activeCycleId,
+      userId: assignUserId,
+      isoDate: selectedDay.isoDate,
+      shiftType,
+    })
 
     if (insertError || !inserted) {
       console.error('Assign failed:', insertError)
@@ -648,54 +581,77 @@ export default function CoveragePage() {
         return
       }
 
-      const previousDays = days
       const previousStatus = targetShift.status
       const changeTime = timestamp()
+      const optimisticFromLabel = SHIFT_STATUS_LABELS[previousStatus]
+      const optimisticToLabel = SHIFT_STATUS_LABELS[nextStatus]
+
+      const applyShiftStatus = (
+        shift: ShiftItem | null,
+        mode: 'optimistic' | 'rollback'
+      ): ShiftItem | null => {
+        if (!shift || shift.id !== shiftId) return shift
+
+        if (mode === 'optimistic') {
+          if (shift.status === nextStatus) return shift
+          return {
+            ...shift,
+            status: nextStatus,
+            log: [
+              ...shift.log,
+              {
+                from: optimisticFromLabel,
+                to: nextStatus,
+                toLabel: optimisticToLabel,
+                time: changeTime,
+              },
+            ],
+          }
+        }
+
+        const lastLog = shift.log[shift.log.length - 1]
+        const isMatchingOptimisticLog =
+          Boolean(lastLog) &&
+          lastLog.from === optimisticFromLabel &&
+          lastLog.to === nextStatus &&
+          lastLog.toLabel === optimisticToLabel &&
+          lastLog.time === changeTime
+
+        if (!isMatchingOptimisticLog || shift.status !== nextStatus) {
+          return shift
+        }
+
+        return {
+          ...shift,
+          status: previousStatus,
+          log: shift.log.slice(0, -1),
+        }
+      }
+
+      const buildStatusUpdater =
+        (mode: 'optimistic' | 'rollback') =>
+        (current: DayItem[]): DayItem[] =>
+          current.map((day) => {
+            if (day.id !== dayId) return day
+            return {
+              ...day,
+              leadShift: isLead ? applyShiftStatus(day.leadShift, mode) : day.leadShift,
+              staffShifts: isLead
+                ? day.staffShifts
+                : day.staffShifts.map((shift) => applyShiftStatus(shift, mode) as ShiftItem),
+            }
+          })
 
       await updateCoverageAssignmentStatus({
         shiftId: targetShift.id,
         nextStatus,
+        setState: setDays,
         clearError: () => setError(''),
         showError: (message) => setError(message),
-        applyOptimisticUpdate: () => {
-          setDays((current) =>
-            current.map((day) => {
-              if (day.id !== dayId) return day
-              const updateShift = (shift: ShiftItem | null): ShiftItem | null => {
-                if (!shift || shift.id !== shiftId || shift.status === nextStatus) return shift
-                return {
-                  ...shift,
-                  status: nextStatus,
-                  log: [
-                    ...shift.log,
-                    {
-                      from: SHIFT_STATUSES[previousStatus].label,
-                      to: nextStatus,
-                      toLabel: SHIFT_STATUSES[nextStatus].label,
-                      time: changeTime,
-                    },
-                  ],
-                }
-              }
-              return {
-                ...day,
-                leadShift: isLead ? updateShift(day.leadShift) : day.leadShift,
-                staffShifts: isLead
-                  ? day.staffShifts
-                  : day.staffShifts.map((shift) => updateShift(shift) as ShiftItem),
-              }
-            })
-          )
-        },
-        rollbackOptimisticUpdate: () => setDays(previousDays),
+        applyOptimisticUpdate: buildStatusUpdater('optimistic'),
+        rollbackOptimisticUpdate: buildStatusUpdater('rollback'),
         persistAssignmentStatus: async (id, payload) =>
-          await supabase
-            .from('shifts')
-            .update({
-              assignment_status: payload.assignment_status,
-              status: payload.status,
-            })
-            .eq('id', id),
+          await persistCoverageShiftStatus(supabase, id, payload),
         logError: (message, error) => {
           console.error(message, error)
         },
@@ -726,7 +682,7 @@ export default function CoveragePage() {
         })
       )
 
-      const { error: deleteError } = await supabase.from('shifts').delete().eq('id', shiftId)
+      const { error: deleteError } = await unassignCoverageShift(supabase, shiftId)
 
       if (!deleteError) {
         setUnassigningShiftId(null)
@@ -863,247 +819,36 @@ export default function CoveragePage() {
           <p className="text-xs font-medium text-slate-600">{cycleRangeLabel}</p>
           <p className="mt-1 text-xs text-slate-500">Months in view: {visibleMonths.join(' • ') || 'N/A'}</p>
         </div>
-        <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
-          {(['Day', 'Night'] as const).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => handleTabSwitch(tab)}
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                padding: '6px 20px',
-                borderRadius: 7,
-                border: `1px solid ${shiftTab === tab ? '#d97706' : '#e5e7eb'}`,
-                background: shiftTab === tab ? '#d97706' : '#fff',
-                color: shiftTab === tab ? '#fff' : '#64748b',
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-              }}
-            >
-              {tab} Shift
-            </button>
-          ))}
-          <span
-            style={{
-              fontSize: 12,
-              color: '#9ca3af',
-              alignSelf: 'center',
-              marginLeft: 8,
-              fontWeight: 500,
-            }}
-          >
-            {shiftTab === 'Day' ? 'Day shift staff' : 'Night shift staff'}
-          </span>
-        </div>
-        <div className="mb-1 grid grid-cols-7 gap-1.5">
-          {DOW.map((day) => (
-            <div key={day} className="text-center text-[10px] font-extrabold tracking-[0.07em] text-slate-400">{day}</div>
-          ))}
-        </div>
-        {loading ? (
-          <div className="rounded-lg border border-slate-200 bg-white px-3 py-6 text-center text-sm text-slate-500">
-            Loading schedule...
-          </div>
-        ) : (
-          <div className="grid grid-cols-7 gap-1.5">
-            {days.map((day, index) => {
-            const activeCount = countActive(day)
-            const totalCount = flatten(day).length
-            const missingLead = !day.leadShift
-            const parsed = new Date(`${day.isoDate}T00:00:00`)
-            const showMonthTag = index === 0 || (!Number.isNaN(parsed.getTime()) && parsed.getDate() === 1)
-            return (
-              <button
-                key={day.id}
-                type="button"
-                onClick={() => handleSelect(day.id)}
-                className="rounded-lg border border-slate-200 bg-white p-2 text-left hover:border-amber-600"
-                style={selectedId === day.id ? { borderColor: '#d97706', boxShadow: '0 0 0 3px rgba(217,119,6,0.15)' } : undefined}
-              >
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="text-sm font-extrabold text-slate-900">{day.date}</span>
-                    {showMonthTag && (
-                      <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
-                        {formatMonthShort(day.isoDate)}
-                      </span>
-                    )}
-                  </span>
-                  <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ color: missingLead ? '#dc2626' : '#047857', background: missingLead ? '#fee2e2' : '#ecfdf5' }}>
-                    {activeCount}/{totalCount}
-                  </span>
-                </div>
-                <div className="mb-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800">
-                  {day.leadShift ? `Lead: ${day.leadShift.name.split(' ')[0]}` : 'No lead'}
-                </div>
-                {day.constraintBlocked && (
-                  <div className="mb-1.5 rounded border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-medium text-red-700">
-                    No eligible therapists (constraints)
-                  </div>
-                )}
-                <div className="flex flex-wrap gap-1">
-                  {day.staffShifts.map((shift) => {
-                    const tone =
-                      shift.status === 'cancelled'
-                        ? 'border-red-200 bg-red-50 text-red-700'
-                        : shift.status === 'oncall'
-                          ? 'border-orange-200 bg-orange-50 text-orange-700'
-                          : shift.status === 'leave_early'
-                            ? 'border-blue-200 bg-blue-50 text-blue-700'
-                            : 'border-slate-200 bg-slate-50 text-slate-700'
-                    return (
-                      <span
-                        key={shift.id}
-                        className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${tone}`}
-                      >
-                        <Avatar name={shift.name} status={shift.status} size={14} />
-                        <span className={shift.status === 'cancelled' ? 'line-through' : ''}>
-                          {shift.name.split(' ')[0]}
-                        </span>
-                        {shift.status === 'oncall' && <span className="font-extrabold">OC</span>}
-                        {shift.status === 'leave_early' && <span className="font-extrabold">LE</span>}
-                        {shift.status === 'cancelled' && <span className="font-extrabold">X</span>}
-                      </span>
-                    )
-                  })}
-                </div>
-              </button>
-            )
-            })}
-          </div>
-        )}
+        <CalendarGrid
+          days={days}
+          loading={loading}
+          selectedId={selectedId}
+          shiftTab={shiftTab}
+          onTabSwitch={handleTabSwitch}
+          onSelect={handleSelect}
+        />
       </div>
 
-      <div className="no-print fixed inset-0 z-40 bg-black/10 transition-opacity" style={{ opacity: selectedDay ? 1 : 0, pointerEvents: selectedDay ? 'auto' : 'none' }} onClick={handleClose} />
-      <aside className="no-print fixed bottom-0 right-0 top-0 z-50 w-[360px] bg-white shadow-2xl transition-transform" style={{ transform: selectedDay ? 'translateX(0)' : 'translateX(100%)' }}>
-        {selectedDay && (
-          <div className="flex h-full flex-col">
-            <div className="border-b border-amber-200 bg-amber-50 px-5 py-4">
-              <div className="mb-2 flex items-start justify-between">
-                <div>
-                  <p className="text-lg font-extrabold text-stone-900">{selectedDay.label}</p>
-                  <p className="text-xs font-medium text-amber-800">{selectedDay.shiftType || 'Day'} Shift</p>
-                </div>
-                <button type="button" onClick={handleClose} aria-label="Close details panel" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-lg text-slate-500 shadow-sm">
-                  &times;
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-3 text-xs font-bold">
-                <span className="text-emerald-700">OK {countActive(selectedDay)} active</span>
-                <span className="text-orange-700">OC {countBy(selectedDay, 'oncall')}</span>
-                <span className="text-blue-700">LE {countBy(selectedDay, 'leave_early')}</span>
-                <span className="text-red-700">X {countBy(selectedDay, 'cancelled')}</span>
-              </div>
-              {selectedDay.constraintBlocked && (
-                <p className="mt-2 rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700">
-                  No eligible therapists (constraints)
-                </p>
-              )}
-            </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
-                <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Assign Therapist</p>
-                {availableTherapists.length === 0 ? (
-                  <p className="mt-2 text-xs text-slate-500">
-                    No active {shiftTab.toLowerCase()}-shift therapists available.
-                  </p>
-                ) : (
-                  <form
-                    className="mt-2 flex items-center gap-2"
-                    onSubmit={(event) => {
-                      event.preventDefault()
-                      void handleAssign()
-                    }}
-                  >
-                    <select
-                      value={assignUserId}
-                      onChange={(event) => setAssignUserId(event.target.value)}
-                      className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700"
-                      required
-                    >
-                      {availableTherapists.map((therapist) => (
-                        <option key={therapist.id} value={therapist.id}>
-                          {therapist.full_name}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="submit"
-                      disabled={!activeCycleId || !assignUserId || assigning}
-                      className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60"
-                    >
-                      {assigning ? 'Assigning...' : assigned ? '✓ Added' : 'Assign'}
-                    </button>
-                  </form>
-                )}
-              </div>
-              {flatten(selectedDay).length === 0 && (
-                <p className="mb-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">
-                  No therapists assigned yet.
-                </p>
-              )}
-              {flatten(selectedDay).map((shift) => {
-                const expanded = expandedShiftId === shift.id
-                return (
-                  <div key={shift.id} className="mb-2 overflow-hidden rounded-lg border border-slate-200">
-                    <button type="button" onClick={() => setExpandedShiftId((prev) => (prev === shift.id ? null : shift.id))} className="flex w-full items-center gap-2 px-3 py-2 text-left">
-                      <Avatar name={shift.name} status={shift.status} size={expanded ? 34 : 28} />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold text-slate-900">{shift.name}</p>
-                        <p className="text-xs font-semibold" style={{ color: SHIFT_STATUSES[shift.status].color }}>{SHIFT_STATUSES[shift.status].label}</p>
-                      </div>
-                      {shift.isLead && <span className="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">Lead</span>}
-                    </button>
-                    {expanded && (
-                      <div className="border-t border-slate-100 px-3 py-3">
-                        <div className="mb-2 flex flex-wrap gap-1">
-                          {(Object.keys(SHIFT_STATUSES) as UiStatus[]).map((statusKey) => {
-                            const activeStatus = shift.status === statusKey
-                            return (
-                              <button
-                                key={`${shift.id}-${statusKey}`}
-                                type="button"
-                                disabled={activeStatus}
-                                onClick={() => handleChangeStatus(selectedDay.id, shift.id, shift.isLead, statusKey)}
-                                className="flex-1 rounded-md border px-2 py-1 text-xs font-bold disabled:cursor-default"
-                                style={{ borderColor: activeStatus ? SHIFT_STATUSES[statusKey].border : '#e5e7eb', background: activeStatus ? SHIFT_STATUSES[statusKey].bg : '#fff', color: activeStatus ? SHIFT_STATUSES[statusKey].color : '#9ca3af' }}
-                              >
-                                {SHIFT_STATUSES[statusKey].label}
-                              </button>
-                            )
-                          })}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => void handleUnassign(selectedDay.id, shift.id, shift.isLead)}
-                          disabled={unassigningShiftId === shift.id}
-                          className="mb-2 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 disabled:opacity-60"
-                        >
-                          {unassigningShiftId === shift.id ? 'Unassigning...' : shift.isLead ? 'Remove lead assignment' : 'Unassign therapist'}
-                        </button>
-                        {shift.log.length > 0 && (
-                          <div className="space-y-1 border-t border-slate-100 pt-2">
-                            <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Changes</p>
-                            {shift.log.map((entry, index) => (
-                              <div key={`${shift.id}-log-${index}`} className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                                <span className="font-semibold text-slate-700">{entry.from}</span>
-                                <span>-&gt;</span>
-                                <span className="font-bold" style={{ color: SHIFT_STATUSES[entry.to].color }}>{entry.toLabel}</span>
-                                <span className="ml-auto">{entry.time}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-      </aside>
+      <ShiftDrawer
+        open={Boolean(selectedDay)}
+        selectedDay={selectedDay}
+        activeCycleId={activeCycleId}
+        shiftTab={shiftTab}
+        availableTherapists={availableTherapists}
+        assignUserId={assignUserId}
+        assigning={assigning}
+        assigned={assigned}
+        expandedShiftId={expandedShiftId}
+        unassigningShiftId={unassigningShiftId}
+        onClose={handleClose}
+        onAssignSubmit={handleAssign}
+        onAssignUserIdChange={setAssignUserId}
+        onToggleExpanded={(shiftId) =>
+          setExpandedShiftId((previous) => (previous === shiftId ? null : shiftId))
+        }
+        onChangeStatus={handleChangeStatus}
+        onUnassign={handleUnassign}
+      />
       <PrintSchedule
         activeCycle={printCycle}
         cycleDates={printCycleDates}

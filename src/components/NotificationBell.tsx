@@ -124,7 +124,9 @@ export function NotificationBell({ variant = 'default' }: NotificationBellProps)
     if (!response.ok) return
     setUnreadCount(0)
     const now = new Date().toISOString()
-    setNotifications((current) => current.map((item) => ({ ...item, read_at: item.read_at ?? now })))
+    setNotifications((current) =>
+      current.map((item) => ({ ...item, read_at: item.read_at ?? now }))
+    )
   }
 
   async function handleNotificationClick(item: NotificationItem) {
@@ -159,21 +161,22 @@ export function NotificationBell({ variant = 'default' }: NotificationBellProps)
         aria-expanded={open}
       >
         <Bell className="h-4 w-4" />
-        {unreadCount > 0 && (
-          isStaffVariant ? (
+        {unreadCount > 0 &&
+          (isStaffVariant ? (
             <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border border-white bg-[#d97706]" />
           ) : (
             <span className="absolute -top-1 -right-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
               {unreadBadgeLabel}
             </span>
-          )
-        )}
+          ))}
       </button>
 
       {open && (
         <div className="absolute right-0 z-40 mt-2 w-80 max-w-[calc(100vw-1rem)] rounded-md border border-border bg-white p-2 shadow-lg">
           <div className="mb-2 flex items-center justify-between px-2">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Notifications</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Notifications
+            </div>
             {unreadCount > 0 && (
               <button
                 type="button"
@@ -202,11 +205,15 @@ export function NotificationBell({ variant = 'default' }: NotificationBellProps)
                     item.read_at ? 'bg-card' : 'bg-[#fffbeb]'
                   } ${getNotificationHref(item) ? 'cursor-pointer' : ''}`}
                 >
-                  <p className={`text-sm text-foreground ${item.read_at ? 'font-medium' : 'font-semibold'}`}>
+                  <p
+                    className={`text-sm text-foreground ${item.read_at ? 'font-medium' : 'font-semibold'}`}
+                  >
                     {item.title}
                   </p>
                   <p className="text-xs text-muted-foreground">{item.message}</p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">{timeAgo(item.created_at)}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {timeAgo(item.created_at)}
+                  </p>
                 </div>
               ))
             )}

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 
+import { can } from '@/lib/auth/can'
+import { parseRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 
 type AvailabilityExportRow = {
@@ -45,7 +47,7 @@ export async function GET() {
     .eq('id', user.id)
     .maybeSingle()
 
-  const isManager = profile?.role === 'manager'
+  const isManager = can(parseRole(profile?.role), 'export_all_availability')
 
   let query = supabase
     .from('availability_overrides')

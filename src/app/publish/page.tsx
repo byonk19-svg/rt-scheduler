@@ -1,11 +1,9 @@
-﻿import Link from 'next/link'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
+import { can } from '@/lib/auth/can'
+import { parseRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
-
-type ProfileRoleRow = {
-  role: string | null
-}
 
 type PublishEventRow = {
   id: string
@@ -57,7 +55,7 @@ export default async function PublishHistoryPage() {
     .eq('id', user.id)
     .maybeSingle()
 
-  if ((profile as ProfileRoleRow | null)?.role !== 'manager') {
+  if (!can(parseRole(profile?.role), 'manage_publish')) {
     redirect('/dashboard')
   }
 
@@ -147,4 +145,3 @@ export default async function PublishHistoryPage() {
     </div>
   )
 }
-

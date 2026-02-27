@@ -28,7 +28,14 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 type EmployeeDirectoryProps = {
   employees: EmployeeDirectoryRecord[]
@@ -207,7 +214,9 @@ function EmployeeActionsMenu({
           </form>
         )}
         <div className="my-1 h-px bg-border" />
-        <span className="block px-2 py-1 text-xs text-muted-foreground">Delete is replaced by deactivate.</span>
+        <span className="block px-2 py-1 text-xs text-muted-foreground">
+          Delete is replaced by deactivate.
+        </span>
       </div>
     </details>
   )
@@ -274,9 +283,13 @@ export function EmployeeDirectory({
       if (sortKey === 'employee') {
         result = a.full_name.localeCompare(b.full_name) || a.email.localeCompare(b.email)
       } else if (sortKey === 'shift') {
-        result = shiftRank(a.shift_type) - shiftRank(b.shift_type) || a.full_name.localeCompare(b.full_name)
+        result =
+          shiftRank(a.shift_type) - shiftRank(b.shift_type) ||
+          a.full_name.localeCompare(b.full_name)
       } else if (sortKey === 'type') {
-        result = typeRank(a.employment_type) - typeRank(b.employment_type) || a.full_name.localeCompare(b.full_name)
+        result =
+          typeRank(a.employment_type) - typeRank(b.employment_type) ||
+          a.full_name.localeCompare(b.full_name)
       } else {
         result = tagsRank(a) - tagsRank(b) || a.full_name.localeCompare(b.full_name)
       }
@@ -360,7 +373,9 @@ export function EmployeeDirectory({
     <Card id="employee-directory">
       <CardHeader>
         <CardTitle>Employee Directory</CardTitle>
-        <CardDescription>Search, filter, and maintain active staffing profiles in one place.</CardDescription>
+        <CardDescription>
+          Search, filter, and maintain active staffing profiles in one place.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-2">
@@ -387,11 +402,19 @@ export function EmployeeDirectory({
           <div className="flex flex-wrap items-center gap-3 rounded-md border border-border px-3 py-2">
             <span className="text-sm font-medium text-muted-foreground">Filters:</span>
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={leadOnly} onChange={(event) => setLeadOnly(event.target.checked)} />
+              <input
+                type="checkbox"
+                checked={leadOnly}
+                onChange={(event) => setLeadOnly(event.target.checked)}
+              />
               Lead
             </label>
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={fmlaOnly} onChange={(event) => setFmlaOnly(event.target.checked)} />
+              <input
+                type="checkbox"
+                checked={fmlaOnly}
+                onChange={(event) => setFmlaOnly(event.target.checked)}
+              />
               FMLA
             </label>
             <label className="flex items-center gap-2 text-sm">
@@ -606,10 +629,14 @@ export function EmployeeDirectory({
                                 Works days: {employee.works_dow_mode === 'hard' ? 'Hard' : 'Soft'}
                               </Badge>
                             )}
-                            {includeInactive && !employee.is_active && <Badge variant="outline">Inactive</Badge>}
+                            {includeInactive && !employee.is_active && (
+                              <Badge variant="outline">Inactive</Badge>
+                            )}
                           </div>
                           {employee.on_fmla && employee.fmla_return_date && (
-                            <p className="text-xs text-muted-foreground">Return: {formatEmployeeDate(employee.fmla_return_date)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Return: {formatEmployeeDate(employee.fmla_return_date)}
+                            </p>
                           )}
                         </div>
                       ) : (
@@ -633,7 +660,9 @@ export function EmployeeDirectory({
 
         <div className="space-y-3 md:hidden">
           {sortedEmployees.length === 0 ? (
-            <p className="rounded-md border border-border p-3 text-sm text-muted-foreground">No employees match the current filters.</p>
+            <p className="rounded-md border border-border p-3 text-sm text-muted-foreground">
+              No employees match the current filters.
+            </p>
           ) : (
             sortedEmployees.map((employee) => (
               <div
@@ -659,8 +688,12 @@ export function EmployeeDirectory({
                   <Badge variant="outline" className={EMPLOYEE_META_BADGE_CLASS}>
                     {employmentLabel(employee.employment_type)}
                   </Badge>
-                  {employee.is_lead_eligible && <Badge className={LEAD_ELIGIBLE_BADGE_CLASS}>Lead</Badge>}
-                  {includeInactive && !employee.is_active && <Badge variant="outline">Inactive</Badge>}
+                  {employee.is_lead_eligible && (
+                    <Badge className={LEAD_ELIGIBLE_BADGE_CLASS}>Lead</Badge>
+                  )}
+                  {includeInactive && !employee.is_active && (
+                    <Badge variant="outline">Inactive</Badge>
+                  )}
                   {employee.on_fmla && <Badge variant="outline">FMLA</Badge>}
                   {employee.works_dow.length > 0 && (
                     <Badge variant="outline">Works: {weekdayLabel(employee.works_dow)}</Badge>
@@ -672,11 +705,15 @@ export function EmployeeDirectory({
                     <Badge variant="outline">Alt weekend</Badge>
                   )}
                   {employee.works_dow.length > 0 && (
-                    <Badge variant="outline">Works days: {employee.works_dow_mode === 'hard' ? 'Hard' : 'Soft'}</Badge>
+                    <Badge variant="outline">
+                      Works days: {employee.works_dow_mode === 'hard' ? 'Hard' : 'Soft'}
+                    </Badge>
                   )}
                 </div>
                 {employee.on_fmla && employee.fmla_return_date && (
-                  <p className="mt-1 text-xs text-muted-foreground">Return: {formatEmployeeDate(employee.fmla_return_date)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Return: {formatEmployeeDate(employee.fmla_return_date)}
+                  </p>
                 )}
               </div>
             ))
@@ -696,7 +733,9 @@ export function EmployeeDirectory({
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Edit employee</DialogTitle>
-            <DialogDescription>Update profile details and scheduling eligibility settings.</DialogDescription>
+            <DialogDescription>
+              Update profile details and scheduling eligibility settings.
+            </DialogDescription>
           </DialogHeader>
           {editEmployee && (
             <div className="space-y-4">
@@ -705,11 +744,22 @@ export function EmployeeDirectory({
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1">
                     <Label htmlFor="edit_name">Name</Label>
-                    <Input id="edit_name" name="full_name" defaultValue={editEmployee.full_name} required />
+                    <Input
+                      id="edit_name"
+                      name="full_name"
+                      defaultValue={editEmployee.full_name}
+                      required
+                    />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="edit_email">Email</Label>
-                    <Input id="edit_email" name="email" type="email" defaultValue={editEmployee.email} required />
+                    <Input
+                      id="edit_email"
+                      name="email"
+                      type="email"
+                      defaultValue={editEmployee.email}
+                      required
+                    />
                   </div>
                 </div>
 
@@ -772,11 +822,15 @@ export function EmployeeDirectory({
                 <div className="space-y-2 rounded-md border border-border bg-secondary/20 p-3">
                   <Label className="text-sm font-semibold">Works weekdays</Label>
                   <p className="text-xs text-muted-foreground">
-                    Auto-generate uses these as preferred or required depending on the Hard/Soft rule.
+                    Auto-generate uses these as preferred or required depending on the Hard/Soft
+                    rule.
                   </p>
                   <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
                     {WEEKDAY_OPTIONS.map((day) => (
-                      <label key={`preferred-day-${day.value}`} className="flex items-center gap-1.5 text-xs">
+                      <label
+                        key={`preferred-day-${day.value}`}
+                        className="flex items-center gap-1.5 text-xs"
+                      >
                         <input
                           type="checkbox"
                           name="works_dow"
@@ -790,13 +844,18 @@ export function EmployeeDirectory({
                 </div>
 
                 <div className="space-y-2 rounded-md border border-border bg-secondary/20 p-3">
-                  <Label className="text-sm font-semibold">Absolutely cannot work these weekdays</Label>
+                  <Label className="text-sm font-semibold">
+                    Absolutely cannot work these weekdays
+                  </Label>
                   <p className="text-xs text-muted-foreground">
                     Auto-generate will never assign this therapist on checked weekdays.
                   </p>
                   <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
                     {WEEKDAY_OPTIONS.map((day) => (
-                      <label key={`blocked-day-${day.value}`} className="flex items-center gap-1.5 text-xs">
+                      <label
+                        key={`blocked-day-${day.value}`}
+                        className="flex items-center gap-1.5 text-xs"
+                      >
                         <input
                           type="checkbox"
                           name="offs_dow"
@@ -812,7 +871,8 @@ export function EmployeeDirectory({
                 <div className="space-y-2 rounded-md border border-border bg-secondary/20 p-3">
                   <Label className="text-sm font-semibold">Works days rule</Label>
                   <p className="text-xs text-muted-foreground">
-                    Hard: only works days are allowed. Soft: works days are preferred but other days are allowed.
+                    Hard: only works days are allowed. Soft: works days are preferred but other days
+                    are allowed.
                   </p>
                   <div className="inline-flex rounded-md border border-border bg-background p-1">
                     <label className="cursor-pointer">
@@ -836,7 +896,9 @@ export function EmployeeDirectory({
                       <span
                         className={cn(
                           'rounded px-3 py-1.5 text-sm',
-                          worksDowModeDraft === 'hard' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'
+                          worksDowModeDraft === 'hard'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'text-muted-foreground'
                         )}
                       >
                         Hard
@@ -863,7 +925,9 @@ export function EmployeeDirectory({
                       <span
                         className={cn(
                           'rounded px-3 py-1.5 text-sm',
-                          worksDowModeDraft === 'soft' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'
+                          worksDowModeDraft === 'soft'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'text-muted-foreground'
                         )}
                       >
                         Soft
@@ -874,7 +938,11 @@ export function EmployeeDirectory({
 
                 <div className="grid grid-cols-1 gap-2">
                   <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" name="is_lead_eligible" defaultChecked={editEmployee.is_lead_eligible} />
+                    <input
+                      type="checkbox"
+                      name="is_lead_eligible"
+                      defaultChecked={editEmployee.is_lead_eligible}
+                    />
                     Lead
                   </label>
                   <fieldset className="space-y-1">
@@ -937,7 +1005,11 @@ export function EmployeeDirectory({
                     On FMLA
                   </label>
                   <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" name="is_active" defaultChecked={editEmployee.is_active} />
+                    <input
+                      type="checkbox"
+                      name="is_active"
+                      defaultChecked={editEmployee.is_active}
+                    />
                     Active
                   </label>
                 </div>
@@ -953,7 +1025,8 @@ export function EmployeeDirectory({
                       required
                     />
                     <p className="text-xs text-muted-foreground">
-                      Auto-generate assigns this therapist on alternating weekends from this anchor Saturday.
+                      Auto-generate assigns this therapist on alternating weekends from this anchor
+                      Saturday.
                     </p>
                   </div>
                 )}
@@ -965,14 +1038,24 @@ export function EmployeeDirectory({
                       id="edit_fmla_return"
                       name="fmla_return_date"
                       type="date"
-                      defaultValue={normalizeFmlaReturnDate(editEmployee.fmla_return_date ?? '', true) ?? ''}
+                      defaultValue={
+                        normalizeFmlaReturnDate(editEmployee.fmla_return_date ?? '', true) ?? ''
+                      }
                     />
                   </div>
                 )}
 
                 <DialogFooter>
-                  <FormSubmitButton type="submit" pendingText="Saving...">Save</FormSubmitButton>
-                  <FormSubmitButton type="submit" variant="outline" name="realign_future_shifts" value="true" pendingText="Saving...">
+                  <FormSubmitButton type="submit" pendingText="Saving...">
+                    Save
+                  </FormSubmitButton>
+                  <FormSubmitButton
+                    type="submit"
+                    variant="outline"
+                    name="realign_future_shifts"
+                    value="true"
+                    pendingText="Saving..."
+                  >
                     Save + realign shifts
                   </FormSubmitButton>
                 </DialogFooter>
@@ -988,11 +1071,15 @@ export function EmployeeDirectory({
                 <div>
                   <p className="text-sm font-semibold">Date Overrides (Manager)</p>
                   <p className="text-xs text-muted-foreground">
-                    Add or update cycle-specific dates for this therapist. Same cycle/date/shift updates existing entry.
+                    Add or update cycle-specific dates for this therapist. Same cycle/date/shift
+                    updates existing entry.
                   </p>
                 </div>
 
-                <form action={saveEmployeeDateOverrideAction} className="grid grid-cols-1 gap-2 md:grid-cols-12">
+                <form
+                  action={saveEmployeeDateOverrideAction}
+                  className="grid grid-cols-1 gap-2 md:grid-cols-12"
+                >
                   <input type="hidden" name="profile_id" value={editEmployee.id} />
                   <div className="space-y-1 md:col-span-3">
                     <Label htmlFor="override_date">Date</Label>
@@ -1028,7 +1115,7 @@ export function EmployeeDirectory({
                       required
                     >
                       <option value="force_off">Need off</option>
-                      <option value="force_on">Available</option>
+                      <option value="force_on">Available to work</option>
                     </select>
                   </div>
                   <div className="space-y-1 md:col-span-2">
@@ -1057,9 +1144,13 @@ export function EmployeeDirectory({
                 </form>
 
                 <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Current overrides</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Current overrides
+                  </p>
                   {editEmployeeDateOverrides.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No date overrides for this therapist yet.</p>
+                    <p className="text-sm text-muted-foreground">
+                      No date overrides for this therapist yet.
+                    </p>
                   ) : (
                     <div className="space-y-2">
                       {editEmployeeDateOverrides.map((row) => (
@@ -1069,7 +1160,9 @@ export function EmployeeDirectory({
                         >
                           <div className="space-y-0.5">
                             <p className="text-sm font-medium">
-                              {formatEmployeeDate(row.date)} - {row.override_type === 'force_on' ? 'Available to work' : 'Need off'} ({row.shift_type})
+                              {formatEmployeeDate(row.date)} -{' '}
+                              {row.override_type === 'force_on' ? 'Available to work' : 'Need off'}{' '}
+                              ({row.shift_type})
                             </p>
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="text-xs text-muted-foreground">
@@ -1077,14 +1170,21 @@ export function EmployeeDirectory({
                                 {row.note ? ` | ${row.note}` : ''}
                               </p>
                               <Badge variant="outline" className="text-[10px]">
-                                {row.source === 'manager' ? 'Entered by manager' : 'Entered by therapist'}
+                                {row.source === 'manager'
+                                  ? 'Entered by manager'
+                                  : 'Entered by therapist'}
                               </Badge>
                             </div>
                           </div>
                           <form action={deleteEmployeeDateOverrideAction}>
                             <input type="hidden" name="override_id" value={row.id} />
                             <input type="hidden" name="profile_id" value={editEmployee.id} />
-                            <FormSubmitButton type="submit" variant="ghost" size="sm" pendingText="Deleting...">
+                            <FormSubmitButton
+                              type="submit"
+                              variant="ghost"
+                              size="sm"
+                              pendingText="Deleting..."
+                            >
                               Delete
                             </FormSubmitButton>
                           </form>
@@ -1099,7 +1199,10 @@ export function EmployeeDirectory({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(deactivateEmployee)} onOpenChange={(open) => !open && setDeactivateEmployeeId(null)}>
+      <Dialog
+        open={Boolean(deactivateEmployee)}
+        onOpenChange={(open) => !open && setDeactivateEmployeeId(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Deactivate employee</DialogTitle>
@@ -1114,7 +1217,11 @@ export function EmployeeDirectory({
               <input type="hidden" name="profile_id" value={deactivateEmployee.id} />
               <input type="hidden" name="set_active" value="false" />
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setDeactivateEmployeeId(null)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDeactivateEmployeeId(null)}
+                >
                   Cancel
                 </Button>
                 <FormSubmitButton type="submit" variant="destructive" pendingText="Deactivating...">

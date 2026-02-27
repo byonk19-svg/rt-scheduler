@@ -1,9 +1,11 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import type { AssignmentStatus, ShiftRole, ShiftStatus } from '@/app/schedule/types'
+import { can } from '@/lib/auth/can'
+import { parseRole } from '@/lib/auth/roles'
 import { dateKeyFromDate } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/client'
 
@@ -101,14 +103,20 @@ type MeState = {
   cycle: string
 }
 
-const SHIFT_STATUS: Record<UiShiftStatus, { label: string; color: string; bg: string; border: string }> = {
+const SHIFT_STATUS: Record<
+  UiShiftStatus,
+  { label: string; color: string; bg: string; border: string }
+> = {
   scheduled: { label: 'Scheduled', color: '#059669', bg: '#ecfdf5', border: '#a7f3d0' },
   oncall: { label: 'On Call', color: '#c2410c', bg: '#fff7ed', border: '#fed7aa' },
   leave_early: { label: 'Leave Early', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
   cancelled: { label: 'Cancelled', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
 }
 
-const REQUEST_STATUS: Record<RequestStatus, { label: string; color: string; bg: string; border: string }> = {
+const REQUEST_STATUS: Record<
+  RequestStatus,
+  { label: string; color: string; bg: string; border: string }
+> = {
   pending: { label: 'Pending', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
   approved: { label: 'Approved', color: '#065f46', bg: '#ecfdf5', border: '#a7f3d0' },
   denied: { label: 'Denied', color: '#991b1b', bg: '#fef2f2', border: '#fecaca' },
@@ -169,7 +177,11 @@ function toUiShiftStatus(status: ShiftStatus, assignment: AssignmentStatus | nul
   return 'scheduled'
 }
 
-function toRequestStatus(status: PersistedRequestStatus, shiftDate: string | null, todayKey: string): RequestStatus {
+function toRequestStatus(
+  status: PersistedRequestStatus,
+  shiftDate: string | null,
+  todayKey: string
+): RequestStatus {
   if (status === 'pending' && shiftDate !== null && shiftDate < todayKey) {
     return 'expired'
   }
@@ -238,28 +250,36 @@ export default function StaffDashboardPage() {
         if (!active) return
 
         const profile = (profileResult.data ?? null) as ProfileRow | null
-        if (profile?.role === 'manager') {
+        if (can(parseRole(profile?.role), 'access_manager_ui')) {
           router.replace('/dashboard/manager')
           return
         }
 
         const cycles = (cyclesResult.data ?? []) as CycleRow[]
         const activeCycle =
-          cycles.find((cycle) => cycle.start_date <= todayKey && cycle.end_date >= todayKey) ?? cycles[0] ?? null
+          cycles.find((cycle) => cycle.start_date <= todayKey && cycle.end_date >= todayKey) ??
+          cycles[0] ??
+          null
 
         const ownShifts = (ownShiftsResult.data ?? []) as OwnShiftRow[]
         const ownShiftIds = ownShifts.map((shift) => shift.id)
         const ownDates = Array.from(new Set(ownShifts.map((shift) => shift.date)))
         const ownShiftTypes = Array.from(new Set(ownShifts.map((shift) => shift.shift_type)))
         const ownCycleIds = Array.from(
-          new Set(ownShifts.map((shift) => shift.cycle_id).filter((cycleId): cycleId is string => Boolean(cycleId)))
+          new Set(
+            ownShifts
+              .map((shift) => shift.cycle_id)
+              .filter((cycleId): cycleId is string => Boolean(cycleId))
+          )
         )
 
         let slotShifts: SlotShiftRow[] = []
         if (ownDates.length > 0 && ownShiftTypes.length > 0) {
           let slotQuery = supabase
             .from('shifts')
-            .select('id, date, shift_type, role, user_id, cycle_id, profiles:profiles!shifts_user_id_fkey(full_name)')
+            .select(
+              'id, date, shift_type, role, user_id, cycle_id, profiles:profiles!shifts_user_id_fkey(full_name)'
+            )
             .in('date', ownDates)
             .in('shift_type', ownShiftTypes)
 
@@ -310,7 +330,11 @@ export default function StaffDashboardPage() {
             dateIso: shift.date,
             date: Number.isNaN(parsedDate.getTime())
               ? shift.date
-              : parsedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+              : parsedDate.toLocaleDateString('en-US', {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                }),
             dow: Number.isNaN(parsedDate.getTime())
               ? shift.date.slice(0, 3).toUpperCase()
               : parsedDate.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
@@ -325,11 +349,19 @@ export default function StaffDashboardPage() {
 
         const requestRows = (requestResult.data ?? []) as RawRequestRow[]
         const requestShiftIds = Array.from(
-          new Set(requestRows.map((row) => row.shift_id).filter((shiftId): shiftId is string => Boolean(shiftId)))
+          new Set(
+            requestRows
+              .map((row) => row.shift_id)
+              .filter((shiftId): shiftId is string => Boolean(shiftId))
+          )
         )
 
         const requestSwapWithIds = Array.from(
-          new Set(requestRows.map((row) => row.claimed_by).filter((profileId): profileId is string => Boolean(profileId)))
+          new Set(
+            requestRows
+              .map((row) => row.claimed_by)
+              .filter((profileId): profileId is string => Boolean(profileId))
+          )
         )
 
         let requestShiftsById = new Map<string, ShiftLookupRow>()
@@ -352,23 +384,29 @@ export default function StaffDashboardPage() {
             .in('id', requestSwapWithIds)
 
           requestSwapById = new Map(
-            ((requestSwapRows ?? []) as NameLookupRow[]).map((row) => [row.id, row.full_name ?? 'Unknown'])
+            ((requestSwapRows ?? []) as NameLookupRow[]).map((row) => [
+              row.id,
+              row.full_name ?? 'Unknown',
+            ])
           )
         }
 
         const mappedRequests = requestRows.map((request) => {
-          const shift = request.shift_id ? requestShiftsById.get(request.shift_id) ?? null : null
+          const shift = request.shift_id ? (requestShiftsById.get(request.shift_id) ?? null) : null
           return {
             id: request.id,
             type: request.type,
-            shift: shift ? formatRequestShiftLabel(shift.date, shift.shift_type) : 'Shift unavailable',
+            shift: shift
+              ? formatRequestShiftLabel(shift.date, shift.shift_type)
+              : 'Shift unavailable',
             status: toRequestStatus(request.status, shift?.date ?? null, todayKey),
-            swapWith: request.claimed_by ? requestSwapById.get(request.claimed_by) ?? null : null,
+            swapWith: request.claimed_by ? (requestSwapById.get(request.claimed_by) ?? null) : null,
             posted: formatRelativeTime(request.created_at),
           } satisfies StaffRequest
         })
 
-        const name = profile?.full_name ?? user.user_metadata?.full_name ?? user.email ?? 'Staff member'
+        const name =
+          profile?.full_name ?? user.user_metadata?.full_name ?? user.email ?? 'Staff member'
 
         setMe({
           name,
@@ -462,10 +500,30 @@ export default function StaffDashboardPage() {
         }}
       >
         <div>
-          <p style={{ fontSize: 11, fontWeight: 800, color: '#b45309', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Next shift</p>
-          <p style={{ marginTop: 3, fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{loading ? '—' : nextShift?.date ?? 'No upcoming shifts'}</p>
+          <p
+            style={{
+              fontSize: 11,
+              fontWeight: 800,
+              color: '#b45309',
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+            }}
+          >
+            Next shift
+          </p>
+          <p style={{ marginTop: 3, fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
+            {loading ? '—' : (nextShift?.date ?? 'No upcoming shifts')}
+          </p>
           {!loading && nextShift && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                marginTop: 6,
+                flexWrap: 'wrap',
+              }}
+            >
               <span
                 style={{
                   fontSize: 10,
@@ -481,13 +539,17 @@ export default function StaffDashboardPage() {
               >
                 {SHIFT_STATUS[nextShift.status].label}
               </span>
-              <span style={{ fontSize: 12, color: '#64748b' }}>{nextShift.isLead ? 'You are lead' : `Lead: ${nextShift.lead}`}</span>
+              <span style={{ fontSize: 12, color: '#64748b' }}>
+                {nextShift.isLead ? 'You are lead' : `Lead: ${nextShift.lead}`}
+              </span>
             </div>
           )}
         </div>
         <button
           type="button"
-          onClick={() => router.push(nextShift ? `/requests/new?shiftId=${nextShift.id}` : '/requests/new')}
+          onClick={() =>
+            router.push(nextShift ? `/requests/new?shiftId=${nextShift.id}` : '/requests/new')
+          }
           style={{
             fontSize: 12,
             fontWeight: 700,
@@ -503,20 +565,66 @@ export default function StaffDashboardPage() {
         </button>
       </div>
 
-      <div className="fade-up" style={{ animationDelay: '0.06s', display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, marginBottom: 18 }}>
-        <StatTile label="Upcoming shifts" value={loading ? '—' : String(upcomingCount)} color="#0f172a" />
+      <div
+        className="fade-up"
+        style={{
+          animationDelay: '0.06s',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+          gap: 10,
+          marginBottom: 18,
+        }}
+      >
+        <StatTile
+          label="Upcoming shifts"
+          value={loading ? '—' : String(upcomingCount)}
+          color="#0f172a"
+        />
         <StatTile label="Lead shifts" value={loading ? '—' : String(leadCount)} color="#b45309" />
-        <StatTile label="Open requests" value={loading ? '—' : String(openRequestCount)} color="#d97706" />
+        <StatTile
+          label="Open requests"
+          value={loading ? '—' : String(openRequestCount)}
+          color="#d97706"
+        />
       </div>
 
-      <div className="fade-up" style={{ animationDelay: '0.09s', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: '14px 16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+      <div
+        className="fade-up"
+        style={{
+          animationDelay: '0.09s',
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 14,
+        }}
+      >
+        <div
+          style={{
+            background: '#fff',
+            border: '1px solid #e5e7eb',
+            borderRadius: 10,
+            padding: '14px 16px',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 10,
+            }}
+          >
             <p style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>Upcoming shifts</p>
             <button
               type="button"
               onClick={() => router.push('/staff/schedule')}
-              style={{ fontSize: 11, fontWeight: 700, color: '#b45309', background: 'none', border: 'none', cursor: 'pointer' }}
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: '#b45309',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+              }}
             >
               View all
             </button>
@@ -528,8 +636,20 @@ export default function StaffDashboardPage() {
           ) : (
             <div style={{ display: 'grid', gap: 8 }}>
               {previewShifts.map((shift) => (
-                <div key={shift.id} style={{ border: '1px solid #f1f5f9', borderRadius: 8, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{shift.date}</span>
+                <div
+                  key={shift.id}
+                  style={{
+                    border: '1px solid #f1f5f9',
+                    borderRadius: 8,
+                    padding: '8px 10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>
+                    {shift.date}
+                  </span>
                   <span
                     style={{
                       marginLeft: 'auto',
@@ -552,13 +672,34 @@ export default function StaffDashboardPage() {
           )}
         </div>
 
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: '14px 16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <div
+          style={{
+            background: '#fff',
+            border: '1px solid #e5e7eb',
+            borderRadius: 10,
+            padding: '14px 16px',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 10,
+            }}
+          >
             <p style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>My requests</p>
             <button
               type="button"
               onClick={() => router.push('/staff/requests')}
-              style={{ fontSize: 11, fontWeight: 700, color: '#b45309', background: 'none', border: 'none', cursor: 'pointer' }}
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: '#b45309',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+              }}
             >
               View all
             </button>
@@ -570,9 +711,21 @@ export default function StaffDashboardPage() {
           ) : (
             <div style={{ display: 'grid', gap: 8 }}>
               {previewRequests.map((request) => (
-                <div key={request.id} style={{ border: '1px solid #f1f5f9', borderRadius: 8, padding: '8px 10px' }}>
+                <div
+                  key={request.id}
+                  style={{ border: '1px solid #f1f5f9', borderRadius: 8, padding: '8px 10px' }}
+                >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#0f172a', textTransform: 'capitalize' }}>{request.type}</span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: '#0f172a',
+                        textTransform: 'capitalize',
+                      }}
+                    >
+                      {request.type}
+                    </span>
                     <span
                       style={{
                         marginLeft: 'auto',
@@ -604,7 +757,14 @@ export default function StaffDashboardPage() {
 
 function StatTile({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: '12px 14px' }}>
+    <div
+      style={{
+        background: '#fff',
+        border: '1px solid #e5e7eb',
+        borderRadius: 10,
+        padding: '12px 14px',
+      }}
+    >
       <p style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>{label}</p>
       <p
         style={{
@@ -621,4 +781,3 @@ function StatTile({ label, value, color }: { label: string; value: string; color
     </div>
   )
 }
-

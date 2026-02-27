@@ -12,12 +12,15 @@ export type PersistCoverageAssignmentStatus = (
   payload: CoverageAssignmentPayload
 ) => Promise<{ error: unknown | null }>
 
-type UpdateCoverageAssignmentStatusOptions = {
+export type CoverageStateUpdater<TState> = (current: TState) => TState
+
+type UpdateCoverageAssignmentStatusOptions<TState> = {
   shiftId: string
   nextStatus: CoverageUiStatus
+  setState: (updater: CoverageStateUpdater<TState>) => void
   persistAssignmentStatus: PersistCoverageAssignmentStatus
-  applyOptimisticUpdate: () => void
-  rollbackOptimisticUpdate: () => void
+  applyOptimisticUpdate: CoverageStateUpdater<TState>
+  rollbackOptimisticUpdate: CoverageStateUpdater<TState>
   clearError: () => void
   showError: (message: string) => void
   logError?: (message: string, error: unknown) => void
@@ -37,9 +40,10 @@ export function toShiftStatus(value: CoverageUiStatus): ShiftStatus {
   return 'scheduled'
 }
 
-export async function updateCoverageAssignmentStatus({
+export async function updateCoverageAssignmentStatus<TState>({
   shiftId,
   nextStatus,
+  setState,
   persistAssignmentStatus,
   applyOptimisticUpdate,
   rollbackOptimisticUpdate,
@@ -47,9 +51,9 @@ export async function updateCoverageAssignmentStatus({
   showError,
   logError,
   failureMessage = 'Could not save status update. Changes were rolled back.',
-}: UpdateCoverageAssignmentStatusOptions): Promise<boolean> {
+}: UpdateCoverageAssignmentStatusOptions<TState>): Promise<boolean> {
   clearError()
-  applyOptimisticUpdate()
+  setState(applyOptimisticUpdate)
 
   const { error } = await persistAssignmentStatus(shiftId, {
     assignment_status: toAssignmentStatus(nextStatus),
@@ -60,7 +64,7 @@ export async function updateCoverageAssignmentStatus({
     return true
   }
 
-  rollbackOptimisticUpdate()
+  setState(rollbackOptimisticUpdate)
   showError(failureMessage)
 
   if (logError) {

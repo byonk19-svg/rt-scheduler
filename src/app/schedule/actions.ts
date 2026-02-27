@@ -30,10 +30,11 @@ import {
   pickTherapistForDate,
   weeklyCountKey,
 } from '@/lib/schedule-helpers'
+import { can } from '@/lib/auth/can'
+import { parseRole } from '@/lib/auth/roles'
 import type {
   AutoScheduleShiftRow,
   AvailabilityOverrideRow,
-  Role,
   ShiftRole,
   ShiftLimitRow,
   ShiftStatus,
@@ -91,10 +92,14 @@ function getPanelParam(formData: FormData): 'setup' | 'new-cycle' | 'add-shift' 
   return undefined
 }
 
-async function getRoleForUser(userId: string): Promise<Role> {
+async function getRoleForUser(userId: string) {
   const supabase = await createClient()
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).maybeSingle()
-  return profile?.role === 'manager' ? 'manager' : 'therapist'
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .maybeSingle()
+  return parseRole(profile?.role)
 }
 
 type TherapistWeeklyLimitProfile = {
@@ -102,15 +107,14 @@ type TherapistWeeklyLimitProfile = {
   employment_type: string | null
 }
 
-function getWeeklyLimitFromProfile(profile: TherapistWeeklyLimitProfile | null | undefined): number {
+function getWeeklyLimitFromProfile(
+  profile: TherapistWeeklyLimitProfile | null | undefined
+): number {
   const employmentDefault = getDefaultWeeklyLimitForEmploymentType(profile?.employment_type)
   return sanitizeWeeklyLimit(profile?.max_work_days_per_week, employmentDefault)
 }
 
-function buildCoverageUrl(
-  cycleId?: string,
-  params?: Record<string, string | undefined>
-): string {
+function buildCoverageUrl(cycleId?: string, params?: Record<string, string | undefined>): string {
   const search = new URLSearchParams()
   if (cycleId) {
     search.set('cycle', cycleId)
@@ -150,7 +154,7 @@ export async function createCycleAction(formData: FormData) {
   }
 
   const role = await getRoleForUser(user.id)
-  if (role !== 'manager') {
+  if (!can(role, 'manage_schedule')) {
     redirect('/schedule')
   }
 
@@ -165,7 +169,9 @@ export async function createCycleAction(formData: FormData) {
   const errorViewParams = panel ? { panel } : undefined
 
   if (!label || !startDate || !endDate) {
-    redirect(buildScheduleUrl(undefined, view, { ...errorViewParams, error: 'create_cycle_failed' }))
+    redirect(
+      buildScheduleUrl(undefined, view, { ...errorViewParams, error: 'create_cycle_failed' })
+    )
   }
 
   const { data, error } = await supabase
@@ -181,7 +187,9 @@ export async function createCycleAction(formData: FormData) {
 
   if (error) {
     console.error('Failed to create schedule cycle:', error)
-    redirect(buildScheduleUrl(undefined, view, { ...errorViewParams, error: 'create_cycle_failed' }))
+    redirect(
+      buildScheduleUrl(undefined, view, { ...errorViewParams, error: 'create_cycle_failed' })
+    )
   }
 
   if (copyFromLastCycle) {
@@ -195,11 +203,7 @@ export async function createCycleAction(formData: FormData) {
         .order('start_date', { ascending: false })
         .limit(1)
         .maybeSingle(),
-      supabase
-        .from('schedule_cycles')
-        .select('id')
-        .eq('id', data.id)
-        .single(),
+      supabase.from('schedule_cycles').select('id').eq('id', data.id).single(),
     ])
 
     if (sourceCycleResult.error || importedShiftsResult.error) {
@@ -208,7 +212,12 @@ export async function createCycleAction(formData: FormData) {
         importedCycleError: importedShiftsResult.error,
       })
       revalidatePath('/schedule')
-      redirect(buildScheduleUrl(data.id, view, { ...errorViewParams, error: 'copy_from_last_cycle_failed' }))
+      redirect(
+        buildScheduleUrl(data.id, view, {
+          ...errorViewParams,
+          error: 'copy_from_last_cycle_failed',
+        })
+      )
     }
 
     const sourceCycle = sourceCycleResult.data as CycleImportSourceRow | null
@@ -223,7 +232,12 @@ export async function createCycleAction(formData: FormData) {
       if (sourceShiftsError) {
         console.error('Failed to load source shifts for cycle import:', sourceShiftsError)
         revalidatePath('/schedule')
-        redirect(buildScheduleUrl(data.id, view, { ...errorViewParams, error: 'copy_from_last_cycle_failed' }))
+        redirect(
+          buildScheduleUrl(data.id, view, {
+            ...errorViewParams,
+            error: 'copy_from_last_cycle_failed',
+          })
+        )
       }
 
       const sourceShifts = (sourceShiftsData ?? []) as ImportedShiftRow[]
@@ -242,12 +256,22 @@ export async function createCycleAction(formData: FormData) {
           .eq('on_fmla', false)
 
         if (eligibleProfilesError) {
-          console.error('Failed to load eligible therapists for cycle import:', eligibleProfilesError)
+          console.error(
+            'Failed to load eligible therapists for cycle import:',
+            eligibleProfilesError
+          )
           revalidatePath('/schedule')
-          redirect(buildScheduleUrl(data.id, view, { ...errorViewParams, error: 'copy_from_last_cycle_failed' }))
+          redirect(
+            buildScheduleUrl(data.id, view, {
+              ...errorViewParams,
+              error: 'copy_from_last_cycle_failed',
+            })
+          )
         }
 
-        const eligibleTherapistIds = new Set((eligibleProfilesData ?? []).map((row) => row.id as string))
+        const eligibleTherapistIds = new Set(
+          (eligibleProfilesData ?? []).map((row) => row.id as string)
+        )
         let skippedAssignments = 0
         const shiftsToInsert = sourceShifts
           .map((shift) => {
@@ -289,7 +313,12 @@ export async function createCycleAction(formData: FormData) {
           if (insertedShiftsError) {
             console.error('Failed to insert imported shifts:', insertedShiftsError)
             revalidatePath('/schedule')
-            redirect(buildScheduleUrl(data.id, view, { ...errorViewParams, error: 'copy_from_last_cycle_failed' }))
+            redirect(
+              buildScheduleUrl(data.id, view, {
+                ...errorViewParams,
+                error: 'copy_from_last_cycle_failed',
+              })
+            )
           }
 
           copiedAssignments = insertedShifts?.length ?? 0
@@ -330,7 +359,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
   }
 
   const role = await getRoleForUser(user.id)
-  if (role !== 'manager') {
+  if (!can(role, 'manage_schedule')) {
     redirect('/schedule')
   }
 
@@ -545,10 +574,14 @@ export async function toggleCyclePublishedAction(formData: FormData) {
         ((therapistProfiles ?? []) as PublishRecipientRow[])
           .filter((row) => Boolean(row.email))
           .map((row) => [
-            String(row.email ?? '').trim().toLowerCase(),
+            String(row.email ?? '')
+              .trim()
+              .toLowerCase(),
             {
               id: row.id,
-              email: String(row.email ?? '').trim().toLowerCase(),
+              email: String(row.email ?? '')
+                .trim()
+                .toLowerCase(),
               fullName: row.full_name?.trim() || null,
             },
           ])
@@ -558,10 +591,9 @@ export async function toggleCyclePublishedAction(formData: FormData) {
     recipientCount = dedupedRecipients.length
     const therapistIds = dedupedRecipients.map((recipient) => recipient.id)
     const cycleLabel = publishCycleDetails?.label ?? 'Schedule cycle'
-    const cycleRange =
-      publishCycleDetails
-        ? `${publishCycleDetails.startDate} to ${publishCycleDetails.endDate}`
-        : 'the current date range'
+    const cycleRange = publishCycleDetails
+      ? `${publishCycleDetails.startDate} to ${publishCycleDetails.endDate}`
+      : 'the current date range'
 
     const { data: publishEventRow, error: publishEventError } = await supabase
       .from('publish_events')
@@ -574,7 +606,9 @@ export async function toggleCyclePublishedAction(formData: FormData) {
         queued_count: recipientCount,
         sent_count: 0,
         failed_count: 0,
-        error_message: !emailConfig.configured ? 'Email not configured; schedule is still published in-app.' : null,
+        error_message: !emailConfig.configured
+          ? 'Email not configured; schedule is still published in-app.'
+          : null,
       })
       .select('id, published_at')
       .single()
@@ -697,7 +731,7 @@ export async function addShiftAction(formData: FormData) {
   }
 
   const role = await getRoleForUser(user.id)
-  if (role !== 'manager') {
+  if (!can(role, 'manage_schedule')) {
     redirect('/schedule')
   }
 
@@ -753,7 +787,9 @@ export async function addShiftAction(formData: FormData) {
       redirect(buildReturnUrl(cycleId, { ...errorViewParams, error: 'add_shift_failed' }))
     }
 
-    const activeCoverage = (sameSlotShifts ?? []).filter((row) => countsTowardWeeklyLimit(row.status)).length
+    const activeCoverage = (sameSlotShifts ?? []).filter((row) =>
+      countsTowardWeeklyLimit(row.status)
+    ).length
     if (exceedsCoverageLimit(activeCoverage, MAX_SHIFT_COVERAGE_PER_DAY)) {
       redirect(buildReturnUrl(cycleId, { ...errorViewParams, error: 'coverage_max_exceeded' }))
     }
@@ -850,7 +886,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
   }
 
   const role = await getRoleForUser(user.id)
-  if (role !== 'manager') {
+  if (!can(role, 'manage_schedule')) {
     redirect('/schedule')
   }
 
@@ -927,15 +963,17 @@ export async function generateDraftScheduleAction(formData: FormData) {
   }
 
   const patternByTherapist = new Map(
-    ((workPatternsData ?? []) as Array<{
-      therapist_id: string
-      works_dow: number[] | null
-      offs_dow: number[] | null
-      weekend_rotation: 'none' | 'every_other' | null
-      weekend_anchor_date: string | null
-      works_dow_mode: 'hard' | 'soft' | null
-      shift_preference: 'day' | 'night' | 'either' | null
-    }>).map((row) => [
+    (
+      (workPatternsData ?? []) as Array<{
+        therapist_id: string
+        works_dow: number[] | null
+        offs_dow: number[] | null
+        weekend_rotation: 'none' | 'every_other' | null
+        weekend_anchor_date: string | null
+        works_dow_mode: 'hard' | 'soft' | null
+        shift_preference: 'day' | 'night' | 'either' | null
+      }>
+    ).map((row) => [
       row.therapist_id,
       normalizeWorkPattern({
         therapist_id: row.therapist_id,
@@ -1025,11 +1063,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
       .lte('date', lastWeekBounds.weekEnd),
   ])
 
-  if (
-    existingShiftsResult.error ||
-    cycleOverridesResult.error ||
-    weeklyShiftsResult.error
-  ) {
+  if (existingShiftsResult.error || cycleOverridesResult.error || weeklyShiftsResult.error) {
     console.error('Failed to load scheduling data for auto-generation:', {
       existingShiftsError: existingShiftsResult.error,
       cycleOverridesError: cycleOverridesResult.error,
@@ -1038,13 +1072,12 @@ export async function generateDraftScheduleAction(formData: FormData) {
     redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'auto_generate_failed' }))
   }
 
-  const existingShifts = ((existingShiftsResult.data ?? []) as Array<
-    AutoScheduleShiftRow & { unfilled_reason?: string | null; user_id: string | null }
-  >).filter((row) => Boolean(row.user_id) && !row.unfilled_reason) as AutoScheduleShiftRow[]
-  const availabilityOverridesByTherapist = new Map<
-    string,
-    AvailabilityOverrideRow[]
-  >()
+  const existingShifts = (
+    (existingShiftsResult.data ?? []) as Array<
+      AutoScheduleShiftRow & { unfilled_reason?: string | null; user_id: string | null }
+    >
+  ).filter((row) => Boolean(row.user_id) && !row.unfilled_reason) as AutoScheduleShiftRow[]
+  const availabilityOverridesByTherapist = new Map<string, AvailabilityOverrideRow[]>()
   for (const row of (cycleOverridesResult.data ?? []) as AvailabilityOverrideRow[]) {
     const therapistId = row.therapist_id
     const rows = availabilityOverridesByTherapist.get(therapistId) ?? []
@@ -1100,7 +1133,11 @@ export async function generateDraftScheduleAction(formData: FormData) {
   let unfilledSlots = 0
   let constraintsUnfilledSlots = 0
   let missingLeadSlots = 0
-  const pendingLeadUpdates: Array<{ date: string; shiftType: 'day' | 'night'; therapistId: string }> = []
+  const pendingLeadUpdates: Array<{
+    date: string
+    shiftType: 'day' | 'night'
+    therapistId: string
+  }> = []
   const unfilledConstraintSlots: Array<{
     date: string
     shiftType: 'day' | 'night'
@@ -1194,7 +1231,8 @@ export async function generateDraftScheduleAction(formData: FormData) {
     })
     dayCursor = dayFill.nextCursor
     for (const pickedTherapist of dayFill.pickedTherapists) {
-      const roleForDayShift: ShiftRole = !dayHasLead && pickedTherapist.is_lead_eligible ? 'lead' : 'staff'
+      const roleForDayShift: ShiftRole =
+        !dayHasLead && pickedTherapist.is_lead_eligible ? 'lead' : 'staff'
       draftShiftsToInsert.push({
         cycle_id: cycleId,
         user_id: pickedTherapist.id,
@@ -1347,7 +1385,9 @@ export async function generateDraftScheduleAction(formData: FormData) {
 
     const silentlyDropped = draftShiftsToInsert.length - (inserted?.length ?? 0)
     if (silentlyDropped > 0) {
-      console.warn(`Auto-generate: ${silentlyDropped} shift(s) skipped due to concurrent conflicts.`)
+      console.warn(
+        `Auto-generate: ${silentlyDropped} shift(s) skipped due to concurrent conflicts.`
+      )
       redirect(
         buildReturnUrl(cycleId, {
           ...viewParams,
@@ -1371,9 +1411,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
       status_note: `Missing ${slot.missingCount} required assignment${slot.missingCount === 1 ? '' : 's'} due to hard constraints.`,
     }))
 
-    const { error: unfilledInsertError } = await supabase
-      .from('shifts')
-      .insert(unfilledReasonRows)
+    const { error: unfilledInsertError } = await supabase.from('shifts').insert(unfilledReasonRows)
 
     if (unfilledInsertError) {
       console.error('Failed to record unfilled constraint reasons:', unfilledInsertError)
@@ -1391,7 +1429,9 @@ export async function generateDraftScheduleAction(formData: FormData) {
       })
       if (!leadResult.ok) {
         console.error('Auto-generate failed to designate lead for slot:', update, leadResult.error)
-        redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'auto_generate_lead_assignment_failed' }))
+        redirect(
+          buildReturnUrl(cycleId, { ...viewParams, error: 'auto_generate_lead_assignment_failed' })
+        )
       }
     }
   }
@@ -1421,7 +1461,7 @@ export async function resetDraftScheduleAction(formData: FormData) {
   }
 
   const role = await getRoleForUser(user.id)
-  if (role !== 'manager') {
+  if (!can(role, 'manage_schedule')) {
     redirect('/schedule')
   }
 
@@ -1492,7 +1532,7 @@ export async function deleteShiftAction(formData: FormData) {
   }
 
   const role = await getRoleForUser(user.id)
-  if (role !== 'manager') {
+  if (!can(role, 'manage_schedule')) {
     redirect('/schedule')
   }
 
@@ -1532,7 +1572,7 @@ export async function setDesignatedLeadAction(formData: FormData) {
   }
 
   const role = await getRoleForUser(user.id)
-  if (role !== 'manager') {
+  if (!can(role, 'manage_schedule')) {
     redirect('/schedule')
   }
 
@@ -1557,7 +1597,9 @@ export async function setDesignatedLeadAction(formData: FormData) {
   const errorViewParams = panelParams ? { ...viewParams, ...panelParams } : viewParams
 
   if (!cycleId || !therapistId || !date || (shiftType !== 'day' && shiftType !== 'night')) {
-    redirect(buildScheduleUrl(cycleId || undefined, view, { ...errorViewParams, error: 'set_lead_failed' }))
+    redirect(
+      buildScheduleUrl(cycleId || undefined, view, { ...errorViewParams, error: 'set_lead_failed' })
+    )
   }
 
   const { data: therapist, error: therapistError } = await supabase
@@ -1566,8 +1608,15 @@ export async function setDesignatedLeadAction(formData: FormData) {
     .eq('id', therapistId)
     .maybeSingle()
 
-  if (therapistError || !therapist || therapist.role !== 'therapist' || !therapist.is_lead_eligible) {
-    redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_not_eligible' }))
+  if (
+    therapistError ||
+    !therapist ||
+    therapist.role !== 'therapist' ||
+    !therapist.is_lead_eligible
+  ) {
+    redirect(
+      buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_not_eligible' })
+    )
   }
 
   const therapistWeeklyLimit = getWeeklyLimitFromProfile({
@@ -1602,9 +1651,13 @@ export async function setDesignatedLeadAction(formData: FormData) {
       redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_failed' }))
     }
 
-    const activeCoverage = (sameSlotShifts ?? []).filter((row) => countsTowardWeeklyLimit(row.status)).length
+    const activeCoverage = (sameSlotShifts ?? []).filter((row) =>
+      countsTowardWeeklyLimit(row.status)
+    ).length
     if (exceedsCoverageLimit(activeCoverage, MAX_SHIFT_COVERAGE_PER_DAY)) {
-      redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_coverage_max' }))
+      redirect(
+        buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_coverage_max' })
+      )
     }
 
     const bounds = getWeekBoundsForDate(date)
@@ -1631,7 +1684,9 @@ export async function setDesignatedLeadAction(formData: FormData) {
     }
 
     if (exceedsWeeklyLimit(workedDates, date, therapistWeeklyLimit)) {
-      redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_weekly_limit' }))
+      redirect(
+        buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_weekly_limit' })
+      )
     }
   }
 
@@ -1644,7 +1699,9 @@ export async function setDesignatedLeadAction(formData: FormData) {
 
   if (!mutationResult.ok) {
     if (mutationResult.reason === 'lead_not_eligible') {
-      redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_not_eligible' }))
+      redirect(
+        buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_not_eligible' })
+      )
     }
     if (mutationResult.reason === 'multiple_leads_prevented') {
       redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_multiple' }))

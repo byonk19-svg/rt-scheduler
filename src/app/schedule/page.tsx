@@ -14,6 +14,8 @@ import { ManagerMonthCalendar } from '@/components/manager-month-calendar'
 import { ManagerWeekCalendar } from '@/components/manager-week-calendar'
 import { PrintButton } from '@/components/print-button'
 import { PrintSchedule } from '@/components/print-schedule'
+import { can } from '@/lib/auth/can'
+import { parseRole, toUiRole } from '@/lib/auth/roles'
 import { getManagerAttentionSnapshot } from '@/lib/manager-workflow'
 import { summarizeShiftSlotViolations } from '@/lib/schedule-rule-validation'
 import { MIN_SHIFT_COVERAGE_PER_DAY, MAX_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
@@ -26,7 +28,15 @@ import {
   toggleCyclePublishedAction,
 } from './actions'
 import { PublishEmailKickoff } from './publish-email-kickoff'
-import type { CalendarShift, Cycle, Role, ScheduleSearchParams, ShiftRow, Therapist, ViewMode } from './types'
+import type {
+  CalendarShift,
+  Cycle,
+  Role,
+  ScheduleSearchParams,
+  ShiftRow,
+  Therapist,
+  ViewMode,
+} from './types'
 import {
   buildDateRange,
   buildScheduleUrl,
@@ -76,7 +86,12 @@ type AvailabilityOverrideRow = {
 }
 type NormalizedWorkPattern = Pick<
   Therapist,
-  'works_dow' | 'offs_dow' | 'weekend_rotation' | 'weekend_anchor_date' | 'works_dow_mode' | 'shift_preference'
+  | 'works_dow'
+  | 'offs_dow'
+  | 'weekend_rotation'
+  | 'weekend_anchor_date'
+  | 'works_dow_mode'
+  | 'shift_preference'
 >
 const NO_ELIGIBLE_CONSTRAINT_REASON = 'no_eligible_candidates_due_to_constraints'
 
@@ -97,8 +112,16 @@ type RawShiftRow = {
   user_id: string | null
   unfilled_reason?: string | null
   profiles?:
-    | { full_name: string; is_lead_eligible: boolean; employment_type?: 'full_time' | 'part_time' | 'prn' | null }
-    | { full_name: string; is_lead_eligible: boolean; employment_type?: 'full_time' | 'part_time' | 'prn' | null }[]
+    | {
+        full_name: string
+        is_lead_eligible: boolean
+        employment_type?: 'full_time' | 'part_time' | 'prn' | null
+      }
+    | {
+        full_name: string
+        is_lead_eligible: boolean
+        employment_type?: 'full_time' | 'part_time' | 'prn' | null
+      }[]
     | null
   assignment_status?: AssignmentStatus | null
   status_note?: string | null
@@ -111,7 +134,10 @@ type RawShiftRow = {
   availability_override_by?: string | null
 }
 
-function toAssignmentStatus(status: ShiftStatus, assignmentStatus?: AssignmentStatus | null): AssignmentStatus {
+function toAssignmentStatus(
+  status: ShiftStatus,
+  assignmentStatus?: AssignmentStatus | null
+): AssignmentStatus {
   if (assignmentStatus) return assignmentStatus
   if (status === 'on_call') return 'on_call'
   return 'scheduled'
@@ -127,11 +153,11 @@ function normalizeShiftRows(rows: RawShiftRow[]): ShiftRow[] {
       assignment_status: toAssignmentStatus(row.status, row.assignment_status),
       status_note: row.status_note ?? null,
       left_early_time: row.left_early_time ?? null,
-    status_updated_at: row.status_updated_at ?? null,
-    status_updated_by: row.status_updated_by ?? null,
-    availability_override: row.availability_override ?? false,
-    availability_override_reason: row.availability_override_reason ?? null,
-    availability_override_at: row.availability_override_at ?? null,
+      status_updated_at: row.status_updated_at ?? null,
+      status_updated_by: row.status_updated_by ?? null,
+      availability_override: row.availability_override ?? false,
+      availability_override_reason: row.availability_override_reason ?? null,
+      availability_override_at: row.availability_override_at ?? null,
       availability_override_by: row.availability_override_by ?? null,
     }))
 }
@@ -177,41 +203,38 @@ export default async function SchedulePage({
     .eq('id', user.id)
     .maybeSingle()
 
-  const role: Role = profile?.role === 'manager' ? 'manager' : 'therapist'
-  const canEditAssignmentStatus =
-    role === 'manager' ||
-    profile?.role === 'lead' ||
-    ((profile?.role === 'therapist' || profile?.role === 'staff') &&
-      profile?.is_lead_eligible === true)
-  const canManageStaffing = role === 'manager'
+  const role: Role = toUiRole(profile?.role)
+  const canManageSchedule = can(role, 'manage_schedule')
+  const canManageStaffing = can(role, 'manage_coverage')
+  const canEditAssignmentStatus = can(parseRole(profile?.role), 'update_assignment_status', {
+    isLeadEligible: profile?.is_lead_eligible === true,
+  })
   // Staff can view month status indicators read-only; only lead/manager can edit.
   const canAccessCoverageCalendar = canManageStaffing || role === 'therapist'
   const defaultCalendarView = profile?.default_calendar_view === 'night' ? 'night' : 'day'
   if (!canAccessCoverageCalendar && (viewMode === 'calendar' || viewMode === 'week')) {
     viewMode = 'week'
   }
-  const isManagerCoverageView = role === 'manager' && (viewMode === 'calendar' || viewMode === 'week')
-  const managerAttention = role === 'manager' ? await getManagerAttentionSnapshot(supabase) : null
+  const isManagerCoverageView =
+    canManageSchedule && (viewMode === 'calendar' || viewMode === 'week')
+  const managerAttention = canManageSchedule ? await getManagerAttentionSnapshot(supabase) : null
 
   let cyclesQuery = supabase
     .from('schedule_cycles')
     .select('id, label, start_date, end_date, published')
     .order('start_date', { ascending: false })
 
-  if (role !== 'manager') {
+  if (!canManageSchedule) {
     cyclesQuery = cyclesQuery.eq('published', true)
   }
 
   const { data: cyclesData } = await cyclesQuery
   const cycles = (cyclesData ?? []) as Cycle[]
-  const activeCycle =
-    cycles.find((cycle) => cycle.id === selectedCycleId) ??
-    cycles[0] ??
-    null
+  const activeCycle = cycles.find((cycle) => cycle.id === selectedCycleId) ?? cycles[0] ?? null
   const activeCycleId = activeCycle?.id
   let latestPublishEvent: LatestPublishEventRow | null = null
 
-  if (activeCycle?.published && role === 'manager') {
+  if (activeCycle?.published && canManageSchedule) {
     const { data: latestPublishData, error: latestPublishError } = await supabase
       .from('publish_events')
       .select(
@@ -245,7 +268,7 @@ export default async function SchedulePage({
       .order('date', { ascending: true })
       .order('shift_type', { ascending: true })
 
-    if (role !== 'manager' && viewMode !== 'calendar' && viewMode !== 'week') {
+    if (!canManageSchedule && viewMode !== 'calendar' && viewMode !== 'week') {
       shiftsQuery = shiftsQuery.eq('user_id', user.id)
     }
 
@@ -259,8 +282,7 @@ export default async function SchedulePage({
       }
       shifts = normalizeShiftRows(rawRows)
     } else {
-      const shiftErrorMessage =
-        typeof shiftsError?.message === 'string' ? shiftsError.message : ''
+      const shiftErrorMessage = typeof shiftsError?.message === 'string' ? shiftsError.message : ''
       const missingAssignmentStatusFields =
         shiftErrorMessage.includes('assignment_status') ||
         shiftErrorMessage.includes('status_note') ||
@@ -290,7 +312,7 @@ export default async function SchedulePage({
         .order('date', { ascending: true })
         .order('shift_type', { ascending: true })
 
-      if (role !== 'manager' && viewMode !== 'calendar' && viewMode !== 'week') {
+      if (!canManageSchedule && viewMode !== 'calendar' && viewMode !== 'week') {
         legacyShiftsQuery = legacyShiftsQuery.eq('user_id', user.id)
       }
 
@@ -408,7 +430,7 @@ export default async function SchedulePage({
   }
 
   let assignableTherapists: Therapist[] = []
-  if (role === 'manager') {
+  if (canManageSchedule) {
     let therapistQuery = supabase
       .from('profiles')
       .select(
@@ -448,16 +470,22 @@ export default async function SchedulePage({
       if (!therapistId) continue
       patternsByTherapist.set(therapistId, {
         works_dow: Array.isArray(row.works_dow)
-          ? row.works_dow.map((day) => Number(day)).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+          ? row.works_dow
+              .map((day) => Number(day))
+              .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
           : [],
         offs_dow: Array.isArray(row.offs_dow)
-          ? row.offs_dow.map((day) => Number(day)).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+          ? row.offs_dow
+              .map((day) => Number(day))
+              .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
           : [],
         weekend_rotation: row.weekend_rotation === 'every_other' ? 'every_other' : 'none',
         weekend_anchor_date: row.weekend_anchor_date ?? null,
         works_dow_mode: row.works_dow_mode === 'soft' ? 'soft' : 'hard',
         shift_preference:
-          row.shift_preference === 'day' || row.shift_preference === 'night' || row.shift_preference === 'either'
+          row.shift_preference === 'day' ||
+          row.shift_preference === 'night' ||
+          row.shift_preference === 'either'
             ? row.shift_preference
             : 'either',
       })
@@ -480,7 +508,7 @@ export default async function SchedulePage({
   }
 
   let availabilityOverrides: AvailabilityOverrideRow[] = []
-  if (role === 'manager' && activeCycle) {
+  if (canManageSchedule && activeCycle) {
     const { data: availabilityData, error: availabilityError } = await supabase
       .from('availability_overrides')
       .select('therapist_id, cycle_id, date, shift_type, override_type, note')
@@ -516,14 +544,14 @@ export default async function SchedulePage({
     status_updated_at: shift.status_updated_at,
     status_updated_by: shift.status_updated_by,
     status_updated_by_name: shift.status_updated_by
-      ? statusUpdatedByNameMap.get(shift.status_updated_by) ?? 'Team member'
+      ? (statusUpdatedByNameMap.get(shift.status_updated_by) ?? 'Team member')
       : null,
     availability_override: Boolean(shift.availability_override),
     availability_override_reason: shift.availability_override_reason,
     availability_override_at: shift.availability_override_at,
     availability_override_by: shift.availability_override_by,
     availability_override_by_name: shift.availability_override_by
-      ? availabilityOverrideByNameMap.get(shift.availability_override_by) ?? 'Manager'
+      ? (availabilityOverrideByNameMap.get(shift.availability_override_by) ?? 'Manager')
       : null,
     role: shift.role,
     user_id: shift.user_id,
@@ -537,80 +565,83 @@ export default async function SchedulePage({
   }
 
   const therapistById = new Map(assignableTherapists.map((therapist) => [therapist.id, therapist]))
-  const printUsers: Therapist[] =
-    role === 'manager'
-      ? Array.from(
-          new Set([
-            ...assignableTherapists.map((therapist) => therapist.id),
-            ...shifts.map((shift) => shift.user_id),
-          ])
-        )
-          .map((id) => {
-            const existing = therapistById.get(id)
-            if (existing) return existing
-            return {
-              id,
-              full_name: namesFromShiftRows.get(id) ?? 'Unknown',
-              shift_type: 'day',
-              is_lead_eligible: false,
-              employment_type: 'full_time',
-              max_work_days_per_week: 3,
-              works_dow: [],
-              offs_dow: [],
-              weekend_rotation: 'none',
-              weekend_anchor_date: null,
-              works_dow_mode: 'hard',
-              shift_preference: 'either',
-              on_fmla: false,
-              fmla_return_date: null,
-              is_active: true,
-            } satisfies Therapist
-          })
-          .sort((a, b) => {
-            if (a.shift_type === b.shift_type) return a.full_name.localeCompare(b.full_name)
-            return a.shift_type === 'day' ? -1 : 1
-          })
-      : [
-          {
-            id: user.id,
-            full_name: profile?.full_name ?? 'You',
-            shift_type: profile?.shift_type === 'night' ? 'night' : 'day',
-            is_lead_eligible: Boolean(profile?.is_lead_eligible),
-            employment_type: profile?.employment_type === 'part_time' || profile?.employment_type === 'prn' ? profile.employment_type : 'full_time',
-            max_work_days_per_week:
-              typeof profile?.max_work_days_per_week === 'number' ? profile.max_work_days_per_week : 3,
+  const printUsers: Therapist[] = canManageSchedule
+    ? Array.from(
+        new Set([
+          ...assignableTherapists.map((therapist) => therapist.id),
+          ...shifts.map((shift) => shift.user_id),
+        ])
+      )
+        .map((id) => {
+          const existing = therapistById.get(id)
+          if (existing) return existing
+          return {
+            id,
+            full_name: namesFromShiftRows.get(id) ?? 'Unknown',
+            shift_type: 'day',
+            is_lead_eligible: false,
+            employment_type: 'full_time',
+            max_work_days_per_week: 3,
             works_dow: [],
             offs_dow: [],
             weekend_rotation: 'none',
             weekend_anchor_date: null,
             works_dow_mode: 'hard',
             shift_preference: 'either',
-            on_fmla: Boolean(profile?.on_fmla),
-            fmla_return_date: profile?.fmla_return_date ?? null,
-            is_active: profile?.is_active !== false,
-          },
-        ]
+            on_fmla: false,
+            fmla_return_date: null,
+            is_active: true,
+          } satisfies Therapist
+        })
+        .sort((a, b) => {
+          if (a.shift_type === b.shift_type) return a.full_name.localeCompare(b.full_name)
+          return a.shift_type === 'day' ? -1 : 1
+        })
+    : [
+        {
+          id: user.id,
+          full_name: profile?.full_name ?? 'You',
+          shift_type: profile?.shift_type === 'night' ? 'night' : 'day',
+          is_lead_eligible: Boolean(profile?.is_lead_eligible),
+          employment_type:
+            profile?.employment_type === 'part_time' || profile?.employment_type === 'prn'
+              ? profile.employment_type
+              : 'full_time',
+          max_work_days_per_week:
+            typeof profile?.max_work_days_per_week === 'number'
+              ? profile.max_work_days_per_week
+              : 3,
+          works_dow: [],
+          offs_dow: [],
+          weekend_rotation: 'none',
+          weekend_anchor_date: null,
+          works_dow_mode: 'hard',
+          shift_preference: 'either',
+          on_fmla: Boolean(profile?.on_fmla),
+          fmla_return_date: profile?.fmla_return_date ?? null,
+          is_active: profile?.is_active !== false,
+        },
+      ]
 
   const dayTeam = printUsers.filter((member) => member.shift_type === 'day')
   const nightTeam = printUsers.filter((member) => member.shift_type === 'night')
 
-  const slotValidation =
-    role === 'manager'
-      ? summarizeShiftSlotViolations({
-          cycleDates,
-          assignments: shifts.map((shift) => ({
-            date: shift.date,
-            shiftType: shift.shift_type,
-            status: shift.status,
-            role: shift.role,
-            therapistId: shift.user_id,
-            therapistName: getOne(shift.profiles)?.full_name ?? 'Unknown',
-            isLeadEligible: Boolean(getOne(shift.profiles)?.is_lead_eligible),
-          })),
-          minCoveragePerShift: MIN_SHIFT_COVERAGE_PER_DAY,
-          maxCoveragePerShift: MAX_SHIFT_COVERAGE_PER_DAY,
-        })
-      : null
+  const slotValidation = canManageSchedule
+    ? summarizeShiftSlotViolations({
+        cycleDates,
+        assignments: shifts.map((shift) => ({
+          date: shift.date,
+          shiftType: shift.shift_type,
+          status: shift.status,
+          role: shift.role,
+          therapistId: shift.user_id,
+          therapistName: getOne(shift.profiles)?.full_name ?? 'Unknown',
+          isLeadEligible: Boolean(getOne(shift.profiles)?.is_lead_eligible),
+        })),
+        minCoveragePerShift: MIN_SHIFT_COVERAGE_PER_DAY,
+        maxCoveragePerShift: MAX_SHIFT_COVERAGE_PER_DAY,
+      })
+    : null
 
   const normalizedIssueFilter = issueFilter === 'unfilled' ? 'under_coverage' : issueFilter
   const isNeedsAttentionFilter = normalizedIssueFilter === 'needs_attention'
@@ -620,20 +651,15 @@ export default async function SchedulePage({
     normalizedIssueFilter === 'over_coverage' ||
     normalizedIssueFilter === 'ineligible_lead' ||
     normalizedIssueFilter === 'multiple_leads'
-  const activeIssueFilter: IssueFilter =
-    isSpecificIssueFilter
-      ? normalizedIssueFilter
-      : 'all'
+  const activeIssueFilter: IssueFilter = isSpecificIssueFilter ? normalizedIssueFilter : 'all'
   const filteredSlotIssues =
     isNeedsAttentionFilter || activeIssueFilter === 'all'
-      ? slotValidation?.issues ?? []
+      ? (slotValidation?.issues ?? [])
       : (slotValidation?.issues ?? []).filter((issue) => issue.reasons.includes(activeIssueFilter))
   const normalizedFocusSlot =
-    focusSlotParam && /^\d{4}-\d{2}-\d{2}:(day|night)$/.test(focusSlotParam)
-      ? focusSlotParam
-      : null
+    focusSlotParam && /^\d{4}-\d{2}-\d{2}:(day|night)$/.test(focusSlotParam) ? focusSlotParam : null
   const focusSlotKey =
-    normalizedFocusSlot ?? (focusMode === 'first' ? filteredSlotIssues[0]?.slotKey ?? null : null)
+    normalizedFocusSlot ?? (focusMode === 'first' ? (filteredSlotIssues[0]?.slotKey ?? null) : null)
 
   const issueReasonsBySlot = Object.fromEntries(
     (slotValidation?.issues ?? []).map((issue) => [issue.slotKey, issue.reasons])
@@ -647,7 +673,7 @@ export default async function SchedulePage({
   const dayShiftCount = scheduledShifts.filter((shift) => shift.shift_type === 'day').length
   const nightShiftCount = scheduledShifts.filter((shift) => shift.shift_type === 'night').length
   const publishSummary =
-    role === 'manager' && activeCycle
+    canManageSchedule && activeCycle
       ? {
           cycleLabel: activeCycle.label,
           startDate: activeCycle.start_date,
@@ -699,14 +725,17 @@ export default async function SchedulePage({
       {successParam === 'cycle_published' && (
         <Card className="no-print border-[var(--success-border)] bg-[var(--success-subtle)]">
           <CardHeader>
-            <CardTitle className="text-[var(--success-text)]">Cycle published successfully</CardTitle>
+            <CardTitle className="text-[var(--success-text)]">
+              Cycle published successfully
+            </CardTitle>
             <CardDescription className="text-[var(--success-text)]">
               Published - visible to employees.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-[var(--success-text)]">
-              Emails queued/sent/failed: {publishQueuedCount}/{publishSentCount}/{publishFailedCount}
+              Emails queued/sent/failed: {publishQueuedCount}/{publishSentCount}/
+              {publishFailedCount}
               {publishRecipientCount > 0 ? ` (recipients: ${publishRecipientCount})` : ''}
             </p>
             {!publishEmailConfigured && (
@@ -757,10 +786,10 @@ export default async function SchedulePage({
                 {latestPublishBy ? ` by ${latestPublishBy}` : ''}
               </p>
             )}
-            {role === 'manager' && latestPublishEvent && (
+            {canManageSchedule && latestPublishEvent && (
               <p className="text-sm text-[var(--success-text)]">
-                Email queued/sent/failed: {latestPublishEvent.queued_count}/{latestPublishEvent.sent_count}/
-                {latestPublishEvent.failed_count}
+                Email queued/sent/failed: {latestPublishEvent.queued_count}/
+                {latestPublishEvent.sent_count}/{latestPublishEvent.failed_count}
                 {latestPublishEvent.recipient_count > 0
                   ? ` (recipients: ${latestPublishEvent.recipient_count})`
                   : ''}
@@ -776,7 +805,7 @@ export default async function SchedulePage({
                 </Button>
               )}
               <PrintButton variant="outline" size="sm" />
-              {role === 'manager' && latestPublishDetailsId && (
+              {canManageSchedule && latestPublishDetailsId && (
                 <Button asChild variant="outline" size="sm">
                   <Link href={`/publish/${latestPublishDetailsId}`}>View publish details</Link>
                 </Button>
@@ -792,20 +821,16 @@ export default async function SchedulePage({
         activeCycleId={activeCycleId}
         activeCyclePublished={Boolean(activeCycle?.published)}
         setupHref={
-          role === 'manager'
+          canManageSchedule
             ? buildScheduleUrl(activeCycleId, viewMode, {
                 show_unavailable: showUnavailableParam,
                 panel: 'setup',
               })
             : undefined
         }
-        title={
-          viewMode === 'calendar'
-            ? 'Month Calendar'
-            : 'Week Roster'
-        }
+        title={viewMode === 'calendar' ? 'Month Calendar' : 'Week Roster'}
         description={
-          role === 'manager'
+          canManageSchedule
             ? 'Use Week for full roster details and Month for full-cycle coverage.'
             : 'View published cycles in Week or Month.'
         }
@@ -817,7 +842,7 @@ export default async function SchedulePage({
         canViewMonth={canAccessCoverageCalendar}
       />
 
-      {role === 'manager' && (
+      {canManageSchedule && (
         <ScheduleDrawerControls
           cycles={cycles}
           activeCycleId={activeCycleId}
@@ -830,7 +855,7 @@ export default async function SchedulePage({
       )}
 
       {!isManagerCoverageView && (
-      <Card className="no-print">
+        <Card className="no-print">
           <CardHeader>
             <CardTitle>Cycle Selection</CardTitle>
             <CardDescription>Pick a cycle to view the schedule.</CardDescription>
@@ -838,7 +863,7 @@ export default async function SchedulePage({
           <CardContent className="space-y-4">
             {cycles.length === 0 && (
               <p className="text-sm text-muted-foreground">
-                {role === 'manager'
+                {canManageSchedule
                   ? 'No schedule cycles yet. Create one below to start building the grid.'
                   : 'No published schedule cycles are available yet.'}
               </p>
@@ -852,7 +877,11 @@ export default async function SchedulePage({
                     key={cycle.id}
                     variant="outline"
                     size="sm"
-                    className={activeCycle?.id === cycle.id ? 'border-primary/40 bg-secondary text-foreground' : undefined}
+                    className={
+                      activeCycle?.id === cycle.id
+                        ? 'border-primary/40 bg-secondary text-foreground'
+                        : undefined
+                    }
                   >
                     <Link href={buildScheduleUrl(cycle.id, viewMode)}>
                       {cycle.label} ({cycle.start_date} to {cycle.end_date})
@@ -867,85 +896,89 @@ export default async function SchedulePage({
                 <Badge variant={activeCycle.published ? 'default' : 'outline'}>
                   {activeCycle.published ? 'Published' : 'Draft'}
                 </Badge>
-                {role === 'manager' && <span className="text-xs text-muted-foreground">Publish actions are in the header.</span>}
+                {canManageSchedule && (
+                  <span className="text-xs text-muted-foreground">
+                    Publish actions are in the header.
+                  </span>
+                )}
               </div>
             )}
           </CardContent>
         </Card>
       )}
 
-        <Card className="no-print">
-          {!isManagerCoverageView && (
-            <CardHeader>
-              <CardTitle>
-                {viewMode === 'week'
-                  ? role === 'manager'
-                    ? 'Week Roster'
-                    : 'My Week Schedule'
-                  : role === 'manager'
-                    ? 'Month Calendar'
-                    : 'My Month Schedule'}
-              </CardTitle>
-              <CardDescription>
-                {activeCycle
-                  ? `${activeCycle.label} (${activeCycle.start_date} to ${activeCycle.end_date})`
-                  : 'Select a cycle to view schedule details.'}
-              </CardDescription>
-            </CardHeader>
+      <Card className="no-print">
+        {!isManagerCoverageView && (
+          <CardHeader>
+            <CardTitle>
+              {viewMode === 'week'
+                ? canManageSchedule
+                  ? 'Week Roster'
+                  : 'My Week Schedule'
+                : canManageSchedule
+                  ? 'Month Calendar'
+                  : 'My Month Schedule'}
+            </CardTitle>
+            <CardDescription>
+              {activeCycle
+                ? `${activeCycle.label} (${activeCycle.start_date} to ${activeCycle.end_date})`
+                : 'Select a cycle to view schedule details.'}
+            </CardDescription>
+          </CardHeader>
+        )}
+        <CardContent className={isManagerCoverageView ? 'pt-6' : undefined}>
+          {!activeCycle && (
+            <p className="text-sm text-muted-foreground">
+              {canManageSchedule
+                ? 'Create a cycle or select one above to start building the schedule.'
+                : 'No published cycle selected.'}
+            </p>
           )}
-          <CardContent className={isManagerCoverageView ? 'pt-6' : undefined}>
-            {!activeCycle && (
-              <p className="text-sm text-muted-foreground">
-                {role === 'manager'
-                  ? 'Create a cycle or select one above to start building the schedule.'
-                  : 'No published cycle selected.'}
-              </p>
-            )}
 
-            {activeCycle && role === 'manager' && shifts.length === 0 && (
-              <EmptyState
-                title="No shifts scheduled yet - start by adding shifts or importing from a previous cycle."
-                description="Open a calendar day to assign therapists, or use setup options to seed this cycle."
-                className="mb-4 border-dashed"
-              />
-            )}
+          {activeCycle && canManageSchedule && shifts.length === 0 && (
+            <EmptyState
+              title="No shifts scheduled yet - start by adding shifts or importing from a previous cycle."
+              description="Open a calendar day to assign therapists, or use setup options to seed this cycle."
+              className="mb-4 border-dashed"
+            />
+          )}
 
-            {activeCycle && viewMode === 'calendar' && canAccessCoverageCalendar && (
-              <ManagerMonthCalendar
-                key={`${activeCycle.id}:${focusSlotKey ?? 'none'}:${defaultCalendarView}`}
-                cycleId={activeCycle.id}
-                startDate={activeCycle.start_date}
-                endDate={activeCycle.end_date}
-                therapists={assignableTherapists}
-                availabilityOverrides={availabilityOverrides}
-                shifts={calendarShifts}
-                issueFilter={activeIssueFilter}
-                focusSlotKey={focusSlotKey}
-                issueReasonsBySlot={issueReasonsBySlot}
-                constraintBlockedSlotKeys={Array.from(constraintUnfilledSlotKeys)}
-                defaultShiftType={defaultCalendarView}
-                canManageStaffing={canManageStaffing}
-                canEditAssignmentStatus={canEditAssignmentStatus}
-                canViewAvailabilityOverride={canManageStaffing || canEditAssignmentStatus}
-              />
-            )}
-            {activeCycle && viewMode === 'week' && canAccessCoverageCalendar && (
-              <ManagerWeekCalendar
-                key={`${activeCycle.id}:week:${focusSlotKey ?? 'none'}:${defaultCalendarView}`}
-                cycleId={activeCycle.id}
-                startDate={activeCycle.start_date}
-                endDate={activeCycle.end_date}
-                shifts={calendarShifts}
-                issueFilter={activeIssueFilter}
-                focusSlotKey={focusSlotKey}
-                issueReasonsBySlot={issueReasonsBySlot}
-                defaultShiftType={defaultCalendarView}
-                canEditAssignmentStatus={canEditAssignmentStatus}
-                canViewAvailabilityOverride={canManageStaffing || canEditAssignmentStatus}
-              />
-            )}
-          </CardContent>
-        </Card>
+          {activeCycle && viewMode === 'calendar' && canAccessCoverageCalendar && (
+            <ManagerMonthCalendar
+              key={`${activeCycle.id}:${focusSlotKey ?? 'none'}:${defaultCalendarView}`}
+              cycleId={activeCycle.id}
+              startDate={activeCycle.start_date}
+              endDate={activeCycle.end_date}
+              therapists={assignableTherapists}
+              availabilityOverrides={availabilityOverrides}
+              shifts={calendarShifts}
+              issueFilter={activeIssueFilter}
+              focusSlotKey={focusSlotKey}
+              issueReasonsBySlot={issueReasonsBySlot}
+              constraintBlockedSlotKeys={Array.from(constraintUnfilledSlotKeys)}
+              defaultShiftType={defaultCalendarView}
+              canManageStaffing={canManageStaffing}
+              canEditAssignmentStatus={canEditAssignmentStatus}
+              canViewAvailabilityOverride={canManageStaffing || canEditAssignmentStatus}
+            />
+          )}
+          {activeCycle && viewMode === 'week' && canAccessCoverageCalendar && (
+            <ManagerWeekCalendar
+              key={`${activeCycle.id}:week:${focusSlotKey ?? 'none'}:${defaultCalendarView}`}
+              cycleId={activeCycle.id}
+              startDate={activeCycle.start_date}
+              endDate={activeCycle.end_date}
+              shifts={calendarShifts}
+              issueFilter={activeIssueFilter}
+              focusSlotKey={focusSlotKey}
+              issueReasonsBySlot={issueReasonsBySlot}
+              defaultShiftType={defaultCalendarView}
+              canEditAssignmentStatus={canEditAssignmentStatus}
+              canViewAvailabilityOverride={canManageStaffing || canEditAssignmentStatus}
+            />
+          )}
+        </CardContent>
+      </Card>
 
       {isManagerCoverageView && managerAttention && (
         <AttentionBar snapshot={managerAttention} variant="compact" context="coverage" />
@@ -1042,7 +1075,8 @@ export default async function SchedulePage({
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs text-muted-foreground">
-                Coverage target: {MIN_SHIFT_COVERAGE_PER_DAY}-{MAX_SHIFT_COVERAGE_PER_DAY} with exactly one designated lead per shift.
+                Coverage target: {MIN_SHIFT_COVERAGE_PER_DAY}-{MAX_SHIFT_COVERAGE_PER_DAY} with
+                exactly one designated lead per shift.
               </p>
               <AffectedShiftsDrawer
                 issues={slotValidation.issues}
@@ -1058,7 +1092,8 @@ export default async function SchedulePage({
         <Card className="no-print border-amber-200 bg-amber-50/60">
           <CardContent className="py-3">
             <p className="text-xs text-amber-900">
-              Overrides: {availabilityOverrideCount} assignment{availabilityOverrideCount === 1 ? '' : 's'} conflict with availability.
+              Overrides: {availabilityOverrideCount} assignment
+              {availabilityOverrideCount === 1 ? '' : 's'} conflict with availability.
             </p>
           </CardContent>
         </Card>
@@ -1075,7 +1110,9 @@ export default async function SchedulePage({
               recentActivity.map((event) => (
                 <div key={event.id} className="rounded-md border border-border px-3 py-2 text-xs">
                   <p className="text-foreground">
-                    <span className="font-semibold">{getOne(event.profiles)?.full_name ?? 'A manager'}</span>{' '}
+                    <span className="font-semibold">
+                      {getOne(event.profiles)?.full_name ?? 'A manager'}
+                    </span>{' '}
                     {formatAuditAction(event.action)}
                   </p>
                   <p className="text-muted-foreground">
@@ -1089,7 +1126,15 @@ export default async function SchedulePage({
       )}
 
       <PrintSchedule
-        activeCycle={activeCycle ? { label: activeCycle.label, start_date: activeCycle.start_date, end_date: activeCycle.end_date } : null}
+        activeCycle={
+          activeCycle
+            ? {
+                label: activeCycle.label,
+                start_date: activeCycle.start_date,
+                end_date: activeCycle.end_date,
+              }
+            : null
+        }
         cycleDates={cycleDates}
         dayTeam={dayTeam}
         nightTeam={nightTeam}
@@ -1097,7 +1142,7 @@ export default async function SchedulePage({
         shiftByUserDate={Object.fromEntries(
           Array.from(shiftByUserDate.entries()).map(([key, shift]) => [key, shift.status])
         )}
-        isManager={role === 'manager'}
+        isManager={canManageSchedule}
       />
     </div>
   )
