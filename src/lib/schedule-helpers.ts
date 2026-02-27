@@ -4,8 +4,10 @@ import {
   getDefaultWeeklyLimitForEmploymentType,
   sanitizeWeeklyLimit,
 } from '@/lib/scheduling-constants'
-import { hasPrnAvailableOffer, hasUnavailableConflict, type AvailabilityEntry } from '@/lib/availability-conflicts'
+import { resolveAvailability } from '@/lib/coverage/resolve-availability'
+import { normalizeWorkPattern } from '@/lib/coverage/work-patterns'
 import type {
+  AvailabilityOverrideRow,
   ScheduleSearchParams,
   Therapist,
   ToastVariant,
@@ -308,23 +310,28 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
     const added = parseCount(getSearchParam(params?.added))
     const unfilled = parseCount(getSearchParam(params?.unfilled))
     const leadMissing = parseCount(getSearchParam(params?.lead_missing))
+    const constraintsUnfilled = parseCount(getSearchParam(params?.constraints_unfilled))
 
-    if (added === 0 && unfilled === 0 && leadMissing === 0) {
+    if (added === 0 && unfilled === 0 && leadMissing === 0 && constraintsUnfilled === 0) {
       return {
         message:
           'Auto-generate made no changes because this draft already has assignment coverage. Use "Clear draft and start over" to rebuild it.',
         variant: 'success',
       }
     }
-    if (unfilled > 0 || leadMissing > 0) {
+    if (unfilled > 0 || leadMissing > 0 || constraintsUnfilled > 0) {
       const unfilledText =
         unfilled > 0 ? `${unfilled} slot${unfilled !== 1 ? 's' : ''} still need manual fill.` : ''
       const leadText =
         leadMissing > 0
           ? `${leadMissing} shift${leadMissing !== 1 ? 's' : ''} still need a designated lead.`
           : ''
+      const constraintText =
+        constraintsUnfilled > 0
+          ? `${constraintsUnfilled} slot${constraintsUnfilled !== 1 ? 's' : ''} were left unfilled due to constraints.`
+          : ''
       return {
-        message: `Draft generated with ${added} new shifts. ${unfilledText} ${leadText}`.trim(),
+        message: `Draft generated with ${added} new shifts. ${unfilledText} ${leadText} ${constraintText}`.trim(),
         variant: 'error',
       }
     }
@@ -347,7 +354,8 @@ export function pickTherapistForDate(
   cursor: number,
   date: string,
   shiftType: 'day' | 'night',
-  availabilityEntriesByTherapist: Map<string, AvailabilityEntry[]>,
+  availabilityOverridesByTherapist: Map<string, AvailabilityOverrideRow[]>,
+  cycleId: string,
   assignedUserIdsForDate: Set<string>,
   weeklyWorkedDatesByUserWeek: Map<string, Set<string>>,
   weeklyLimitByTherapist: Map<string, number>
@@ -366,24 +374,36 @@ export function pickTherapistForDate(
     therapist: Therapist
     index: number
     weeklyCount: number
+    penalty: number
     offset: number
-    prefersDay: boolean
   } | null = null
 
   for (let i = 0; i < therapists.length; i += 1) {
     const index = (cursor + i) % therapists.length
     const therapist = therapists[index]
     if (assignedUserIdsForDate.has(therapist.id)) continue
-    const availabilityEntries = availabilityEntriesByTherapist.get(therapist.id) ?? []
-    if (hasUnavailableConflict(availabilityEntries, date, shiftType)) continue
+    if (weekday === null) continue
 
-    if (therapist.employment_type === 'prn' && !hasPrnAvailableOffer(availabilityEntries, date, shiftType)) {
-      continue
-    }
+    const patternDecision = resolveAvailability({
+      therapistId: therapist.id,
+      cycleId,
+      date,
+      shiftType,
+      isActive: therapist.is_active,
+      onFmla: therapist.on_fmla,
+      pattern: normalizeWorkPattern({
+        therapist_id: therapist.id,
+        works_dow: therapist.works_dow,
+        offs_dow: therapist.offs_dow,
+        weekend_rotation: therapist.weekend_rotation,
+        weekend_anchor_date: therapist.weekend_anchor_date,
+        works_dow_mode: therapist.works_dow_mode,
+        shift_preference: therapist.shift_preference,
+      }),
+      overrides: availabilityOverridesByTherapist.get(therapist.id) ?? [],
+    })
 
-    const preferredDays = Array.isArray(therapist.preferred_work_days)
-      ? therapist.preferred_work_days
-      : []
+    if (!patternDecision.allowed) continue
 
     const weeklyDates =
       weeklyWorkedDatesByUserWeek.get(weeklyCountKey(therapist.id, bounds.weekStart)) ?? new Set<string>()
@@ -393,19 +413,14 @@ export function pickTherapistForDate(
     )
     if (!weeklyDates.has(date) && weeklyDates.size >= weeklyLimit) continue
 
-    const prefersDay =
-      weekday === null || preferredDays.length === 0 || preferredDays.includes(weekday)
-
     const weeklyCount = weeklyDates.size
     if (
       !best ||
-      (prefersDay && !best.prefersDay) ||
-      (prefersDay === best.prefersDay && weeklyCount < best.weeklyCount) ||
-      (prefersDay === best.prefersDay &&
-        weeklyCount === best.weeklyCount &&
-        i < best.offset)
+      weeklyCount < best.weeklyCount ||
+      (weeklyCount === best.weeklyCount && patternDecision.penalty < best.penalty) ||
+      (weeklyCount === best.weeklyCount && patternDecision.penalty === best.penalty && i < best.offset)
     ) {
-      best = { therapist, index, weeklyCount, offset: i, prefersDay }
+      best = { therapist, index, weeklyCount, penalty: patternDecision.penalty, offset: i }
     }
   }
 

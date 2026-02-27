@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -101,7 +101,7 @@ async function createUser(
   return { id: userId }
 }
 
-async function login(page: Parameters<typeof test>[0]['page'], email: string, password: string) {
+async function login(page: Page, email: string, password: string) {
   await page.goto('/login')
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill(password)
@@ -184,13 +184,13 @@ test.describe.serial('availability override scheduling', () => {
 
     createdCycleIds.push(cycleInsert.data.id)
 
-    const availabilityInsert = await supabase.from('availability_entries').insert({
+    const availabilityInsert = await supabase.from('availability_overrides').insert({
       therapist_id: therapist.id,
       cycle_id: cycleInsert.data.id,
       date: targetDate,
       shift_type: 'both',
-      entry_type: 'unavailable',
-      reason: 'Vacation',
+      override_type: 'force_off',
+      note: 'Vacation',
       created_by: therapist.id,
     })
 
@@ -217,7 +217,7 @@ test.describe.serial('availability override scheduling', () => {
 
     for (const cycleId of createdCycleIds) {
       await ctx.supabase.from('shifts').delete().eq('cycle_id', cycleId)
-      await ctx.supabase.from('availability_entries').delete().eq('cycle_id', cycleId)
+      await ctx.supabase.from('availability_overrides').delete().eq('cycle_id', cycleId)
       await ctx.supabase.from('schedule_cycles').delete().eq('id', cycleId)
     }
 

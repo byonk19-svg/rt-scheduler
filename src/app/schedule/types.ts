@@ -8,6 +8,8 @@ export type ShiftStatus = 'scheduled' | 'on_call' | 'sick' | 'called_off'
 export type ShiftRole = 'lead' | 'staff'
 export type AssignmentStatus = 'scheduled' | 'call_in' | 'cancelled' | 'on_call' | 'left_early'
 export type EmploymentType = 'full_time' | 'part_time' | 'prn'
+export type WeekendRotation = 'none' | 'every_other'
+export type WorksDowMode = 'hard' | 'soft'
 
 export type Cycle = {
   id: string
@@ -24,7 +26,12 @@ export type Therapist = {
   is_lead_eligible: boolean
   employment_type: EmploymentType
   max_work_days_per_week: number
-  preferred_work_days: number[]
+  works_dow: number[]
+  offs_dow: number[]
+  weekend_rotation: WeekendRotation
+  weekend_anchor_date: string | null
+  works_dow_mode: WorksDowMode
+  shift_preference?: 'day' | 'night' | 'either' | null
   on_fmla: boolean
   fmla_return_date: string | null
   is_active: boolean
@@ -35,6 +42,7 @@ export type ShiftRow = {
   date: string
   shift_type: 'day' | 'night'
   status: ShiftStatus
+  unfilled_reason: string | null
   assignment_status: AssignmentStatus
   status_note: string | null
   left_early_time: string | null
@@ -62,6 +70,7 @@ export type ScheduleSearchParams = {
   auto?: string
   added?: string
   unfilled?: string
+  constraints_unfilled?: string
   copied?: string
   skipped?: string
   error?: string
@@ -108,7 +117,16 @@ export type ShiftLimitRow = {
   status: ShiftStatus
 }
 
-export type AvailabilityEntryRow = {
+export type AvailabilityOverrideRow = {
+  therapist_id: string
+  cycle_id: string
+  date: string
+  shift_type: 'day' | 'night' | 'both'
+  override_type: 'force_off' | 'force_on'
+  note?: string | null
+}
+
+export type LegacyAvailabilityEntryRow = {
   therapist_id: string
   date: string
   shift_type: 'day' | 'night' | 'both'
@@ -120,6 +138,7 @@ export type CalendarShift = {
   date: string
   shift_type: 'day' | 'night'
   status: ShiftStatus
+  unfilled_reason: string | null
   assignment_status: AssignmentStatus
   status_note: string | null
   left_early_time: string | null

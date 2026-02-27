@@ -1,24 +1,38 @@
 # Teamwise Scheduler - Codex Handoff Context
 
-Updated: 2026-02-24 (availability override guardrails + manager dashboard redesign)
+Updated: 2026-02-27 (print layout parity + smart picker + coverage unassign)
 
-## Latest Completed Work (2026-02-24)
-- Availability policy is now approval-free for next cycle input:
+## Latest Completed Work (2026-02-27)
+- Publish visibility UX improved:
+  - Added clear "Published schedule" status surfaces and quick links.
+  - Added print entry points in schedule and coverage manager flows.
+- Print output redesigned to match the paper-style schedule:
+  - Dense grid, weekday/date headers, heavy borders.
+  - Day and Night now print on separate pages.
+  - PRN therapists are separated by a distinct divider row in print.
+- Coverage drawer gained unassign support:
+  - Managers can unassign therapist rows directly in the day detail panel.
+  - UI updates immediately with rollback on failure.
+- Manager month shift drawer "Assign Therapist" upgraded to smart picker:
+  - Searchable list with workload context:
+    - `Week: {count}/3`
+    - `Cycle: {count}`
+  - Fairness-first sorting: lowest week count, then cycle count, then name.
+  - Weekly limit behavior in picker:
+    - At `3/week` rows are disabled unless weekly override is enabled.
+    - Override-enabled rows remain selectable and are visibly marked.
+- Added workload metrics module + tests:
+  - `src/lib/therapist-picker-metrics.ts`
+  - `src/lib/therapist-picker-metrics.test.ts`
+
+## Previous Milestone (2026-02-24)
+- Availability workflow moved to `availability_entries` with role-based input:
   - full-time/part-time submit `unavailable`
   - PRN submit `available`
-- Added `availability_entries` table with RLS and scheduling indexes.
-- Added availability override metadata on `shifts`:
-  - `availability_override`
-  - `availability_override_reason`
-  - `availability_override_by`
-  - `availability_override_at`
-- Scheduler behavior now warns (does not hard block) when assigning against unavailable entries:
-  - manager confirmation modal with optional override reason
-  - confirmed overrides are persisted in shift metadata
-  - PRN without offered availability shows soft warning only
-- Approvals flow now excludes availability input and is scoped to post-publish shift posts.
-- Manager dashboard (`/dashboard/manager`) replaced with new design and live client-side metrics from Supabase.
-- Added Playwright e2e for availability conflict override and PRN soft-warning assignment paths.
+- Availability override metadata and confirmation flow added to `shifts`.
+- Approvals flow narrowed to post-publish shift posts.
+- Manager dashboard redesign shipped with live Supabase metrics.
+- e2e coverage added for availability override + PRN soft-warning paths.
 
 ## What This App Is
 Teamwise is a respiratory therapy scheduling app replacing paper workflows.
@@ -72,12 +86,11 @@ Assignment status remains informational only:
 - Click backdrop (`z-40`) or close button to dismiss
 - Click same day again toggles panel closed
 - Accordion therapist rows in panel (single expanded row)
+- Day/Night shift tabs in coverage view
 - Optimistic status updates with rollback on save failure
+- Unassign therapist action from expanded row in the right panel
 - Calendar chips now visibly reflect assignment status updates immediately:
   - `OC` (on call), `LE` (leave early), `X` (cancelled), with distinct chip colors
-
-Notes:
-- Current `/coverage` implementation is day-shift focused in UI/data query.
 
 ## Schedule UX (Current)
 `/schedule` navigation now exposes only:
