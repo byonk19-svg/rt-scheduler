@@ -1,6 +1,8 @@
-﻿import type { SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
+import { can } from '@/lib/auth/can'
+import { parseRole } from '@/lib/auth/roles'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
   buildPublishEmailPayload,
@@ -8,8 +10,6 @@ import {
   refreshPublishEventCounts,
 } from '@/lib/publish-events'
 import { createClient } from '@/lib/supabase/server'
-
-type ProfileRoleRow = { role: string | null }
 
 type OutboxRow = {
   id: string
@@ -21,10 +21,7 @@ type OutboxRow = {
 
 type PublishEventLookupRow = {
   id: string
-  schedule_cycles:
-    | { label: string | null }
-    | { label: string | null }[]
-    | null
+  schedule_cycles: { label: string | null } | { label: string | null }[] | null
 }
 
 function getOne<T>(value: T | T[] | null | undefined): T | null {
@@ -66,7 +63,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Could not verify manager role.' }, { status: 500 })
     }
 
-    if ((profile as ProfileRoleRow | null)?.role !== 'manager') {
+    if (!can(parseRole(profile?.role), 'manage_publish')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
   }
@@ -112,9 +109,11 @@ export async function POST(request: Request) {
   const eventIds = Array.from(new Set(rows.map((row) => row.publish_event_id)))
 
   if (rows.length === 0) {
-    const counts = publishEventId ? await refreshPublishEventCounts(admin, [publishEventId]).catch(() => new Map()) : new Map()
+    const counts = publishEventId
+      ? await refreshPublishEventCounts(admin, [publishEventId]).catch(() => new Map())
+      : new Map()
     const publishEventCounts = publishEventId
-      ? counts.get(publishEventId) ?? { queuedCount: 0, sentCount: 0, failedCount: 0 }
+      ? (counts.get(publishEventId) ?? { queuedCount: 0, sentCount: 0, failedCount: 0 })
       : null
 
     return NextResponse.json({
@@ -212,7 +211,8 @@ export async function POST(request: Request) {
 
       sent += 1
     } catch (sendError) {
-      const errorMessage = sendError instanceof Error ? sendError.message : 'Unknown email delivery error'
+      const errorMessage =
+        sendError instanceof Error ? sendError.message : 'Unknown email delivery error'
 
       await admin
         .from('notification_outbox')
@@ -230,7 +230,7 @@ export async function POST(request: Request) {
 
   const counts = await refreshPublishEventCounts(admin, eventIds)
   const publishEventCounts = publishEventId
-    ? counts.get(publishEventId) ?? { queuedCount: 0, sentCount: 0, failedCount: 0 }
+    ? (counts.get(publishEventId) ?? { queuedCount: 0, sentCount: 0, failedCount: 0 })
     : null
 
   return NextResponse.json({
@@ -242,5 +242,3 @@ export async function POST(request: Request) {
     publishEventCounts,
   })
 }
-
-

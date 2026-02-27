@@ -1,15 +1,13 @@
-﻿'use server'
+'use server'
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
+import { can } from '@/lib/auth/can'
+import { parseRole } from '@/lib/auth/roles'
 import { refreshPublishEventCounts } from '@/lib/publish-events'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-
-type ProfileRoleRow = {
-  role: string | null
-}
 
 async function requireManagerUser() {
   const supabase = await createClient()
@@ -27,7 +25,7 @@ async function requireManagerUser() {
     .eq('id', user.id)
     .maybeSingle()
 
-  if ((profile as ProfileRoleRow | null)?.role !== 'manager') {
+  if (!can(parseRole(profile?.role), 'manage_publish')) {
     redirect('/dashboard')
   }
 
@@ -75,4 +73,3 @@ export async function requeueFailedPublishEmailsAction(formData: FormData) {
   const requeued = requeuedRows?.length ?? 0
   redirect(`/publish/${publishEventId}?success=failed_requeued&requeued=${requeued}`)
 }
-

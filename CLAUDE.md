@@ -1,8 +1,39 @@
 # Teamwise Scheduler - Codex Handoff Context
 
-Updated: 2026-02-27 (PRN strict eligibility + cycle-scoped work patterns + manager-entered availability)
+Updated: 2026-02-27 (PRN strict eligibility + RBAC centralization + coverage refactor + Prettier/CI formatting)
+
+## Latest Completed Work (2026-02-27, follow-up)
+
+- Centralized RBAC model and permission checks:
+  - added shared auth helpers:
+    - `src/lib/auth/roles.ts`
+    - `src/lib/auth/can.ts`
+  - replaced scattered role string checks in UI gating with `can(...)`
+  - enforced matching checks in server actions and APIs (schedule/drag-drop/publish/directory/availability export/assignment status paths)
+  - middleware/proxy route gating aligned to centralized permission helpers
+- Added security documentation:
+  - `docs/SECURITY.md` now includes a concise role-permission matrix
+- Refactored coverage page into smaller units without behavior changes:
+  - `src/components/coverage/CalendarGrid.tsx`
+  - `src/components/coverage/ShiftDrawer.tsx`
+  - `src/lib/coverage/selectors.ts`
+  - `src/lib/coverage/mutations.ts`
+  - `src/app/coverage/page.tsx` now composes these modules
+- Hardened assignment status optimistic-update flow against stale closures:
+  - extracted helper:
+    - `src/lib/coverage/updateAssignmentStatus.ts`
+  - added unit test coverage:
+    - `src/lib/coverage/updateAssignmentStatus.test.ts`
+    - success path asserts no rollback
+    - failure path asserts rollback is executed
+- Added and enforced formatting tooling:
+  - `.prettierrc`, `.prettierignore`
+  - npm scripts: `format`, `format:check`
+  - Husky + lint-staged pre-commit formatting
+  - CI updated to run `npm run format:check`
 
 ## Latest Completed Work (2026-02-27)
+
 - Enforced PRN strict eligibility end-to-end:
   - Added shared eligibility resolver used by auto-generate + picker/API paths:
     - `resolveEligibility(...)` in `src/lib/coverage/resolve-availability.ts`
@@ -63,6 +94,7 @@ Updated: 2026-02-27 (PRN strict eligibility + cycle-scoped work patterns + manag
   - includes proper rollback + user-facing error + real error logging
 
 ## Previous Milestone (2026-02-24)
+
 - Availability workflow moved to `availability_entries` with role-based input:
   - full-time/part-time submit `unavailable`
   - PRN submit `available`
@@ -72,17 +104,21 @@ Updated: 2026-02-27 (PRN strict eligibility + cycle-scoped work patterns + manag
 - e2e coverage added for availability override + PRN soft-warning paths.
 
 ## What This App Is
+
 Teamwise is a respiratory therapy scheduling app replacing paper workflows.
 Core domains: coverage planning, cycles, availability requests, shift board, approvals, publish flow, directory.
 
 ## Current Stack
+
 - Next.js 16.1.6 (App Router) + TypeScript
 - Supabase (Auth + Postgres + RLS + RPC)
 - Tailwind + shadcn/ui patterns
 - Vitest (unit) + Playwright (e2e)
 
 ## Current Product Shape
+
 Primary routes:
+
 - `/` public marketing
 - `/login`, `/signup`
 - `/dashboard` role redirect
@@ -96,13 +132,16 @@ Primary routes:
 - `/profile`
 
 ## Role Model
+
 Role source: `profiles.role`.
+
 - `manager`: full scheduling + publish + directory controls
 - `therapist`: staff experience
 
 Lead capability is represented by `profiles.is_lead_eligible`.
 
 ## Scheduling Rules (Active)
+
 - Coverage target: 3-5 per shift slot
 - Weekly therapist limits from profile/defaults
 - Exactly one designated lead (`shifts.role='lead'`) and lead must be eligible
@@ -123,6 +162,7 @@ Lead capability is represented by `profiles.is_lead_eligible`.
   - PRN without `force_on` and without an offered recurring day is not eligible.
 
 Auto-generate:
+
 - Targets 4 therapists first when feasible
 - Treats slot as unfilled only when below 3
 - Excludes inactive + FMLA by default
@@ -130,10 +170,13 @@ Auto-generate:
 - Marks constraint-caused unfilled slots for UI messaging and auditability
 
 Assignment status remains informational only:
+
 - Does not change coverage counts, attention metrics, or publish blockers
 
 ## Coverage UX (Current)
+
 `/coverage` now uses:
+
 - Full-width 7-column day calendar (no side panel shrinking layout)
 - Fixed right slide-over detail panel (`z-50`)
 - Click backdrop (`z-40`) or close button to dismiss
@@ -151,7 +194,9 @@ Assignment status remains informational only:
   - PRN enabled via cycle override is labeled `Offered`
 
 ## Schedule UX (Current)
+
 `/schedule` navigation now exposes only:
+
 - `Week`
 - `Month`
 
@@ -159,10 +204,12 @@ Grid/List tabs were removed from header navigation.
 Legacy URLs with `view=grid` and `view=list` normalize to `view=week`.
 
 Manager information hierarchy is now schedule-first:
+
 - Coverage and publish are primary
 - Approvals are intentionally secondary
 
 ## Navbar / Branding (Current)
+
 - Navbar logo replaced with inline amber icon + Teamwise wordmark component in `AppShell`
 - Plus Jakarta Sans (800) added at root layout via `next/font/google`
 - Amber accents:
@@ -175,10 +222,13 @@ Manager information hierarchy is now schedule-first:
   - `Dashboard`, `Coverage`, `Team`, `Requests` (approvals moved later and renamed in nav)
 
 ## Assignment Status Feature
+
 Backend status values:
+
 - `scheduled`, `call_in`, `cancelled`, `on_call`, `left_early`
 
 Stored fields on shifts:
+
 - `assignment_status`
 - `status_note`
 - `left_early_time`
@@ -186,21 +236,27 @@ Stored fields on shifts:
 - `status_updated_by`
 
 Write path:
+
 - `POST /api/schedule/assignment-status`
 - Optimistic local update with rollback on failure in client views
 
 ## Notifications and Audit
+
 Notifications:
+
 - Bell in top nav
 - unread badge + list + mark-read behavior
 - APIs: `/api/notifications`, `/api/notifications/mark-read`
 
 Audit:
+
 - `public.audit_log`
 - recent activity panel available in schedule coverage flows
 
 ## Data Model Snapshot
+
 Core tables:
+
 - `profiles`
 - `schedule_cycles`
 - `shifts`
@@ -213,6 +269,7 @@ Core tables:
 - `audit_log`
 
 Common profile fields used:
+
 - `full_name`, `email`, `phone_number`
 - `role`, `shift_type`, `employment_type`
 - `max_work_days_per_week`
@@ -221,6 +278,7 @@ Common profile fields used:
 - `site_id`
 
 Common shift fields used:
+
 - `cycle_id`, `user_id`, `date`, `shift_type`
 - `status` (`scheduled|on_call|sick|called_off`)
 - `role` (`lead|staff`)
@@ -234,6 +292,7 @@ Common shift fields used:
 - `site_id`
 
 ## Recent Migrations (Relevant)
+
 - `20260223091500_add_profile_view_and_landing_preferences.sql`
 - `20260223104500_add_notifications_and_audit_log.sql`
 - `20260223121500_add_assignment_status_rpc.sql`
@@ -244,7 +303,9 @@ Common shift fields used:
 - `20260227184500_add_source_to_availability_overrides.sql`
 
 ## Quality Status
+
 Latest local checks:
+
 - `npx tsc --noEmit` pass
 - `npm run lint` pass
 - `npm run test:unit` pass
@@ -254,6 +315,7 @@ Latest local checks:
   - `src/app/api/schedule/drag-drop/route.test.ts`
 
 ## Resume Checklist
+
 1. `git status -sb`
 2. `supabase db push`
 3. `npm install`
@@ -263,10 +325,13 @@ Latest local checks:
 7. `npm run dev`
 
 ## Paused Work
+
 ### Publish flow with async email + publish history
+
 Status: Implemented in code, pending final validation and rollout.
 
 Resume checklist:
+
 - Run migration: `supabase/migrations/20260225190000_add_publish_events_and_notification_outbox.sql`
 - Set env vars:
   - `SUPABASE_SERVICE_ROLE_KEY`
@@ -286,6 +351,7 @@ Resume checklist:
 - Optional: add scheduled worker/cron to call `/api/publish/process`
 
 ## Next High-Value Priorities
+
 1. Add integration/e2e coverage for manager date-override workflow in `/directory`
 2. Add server-side validation messages for cycle/date conflicts directly in drawer UI
 3. Align `/coverage` and `/schedule` into one consistent data/view model (reduce duplicated calendar logic)

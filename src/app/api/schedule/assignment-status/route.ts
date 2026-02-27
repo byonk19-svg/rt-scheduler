@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 
+import { can } from '@/lib/auth/can'
+import { parseRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 
 const ASSIGNMENT_STATUS_VALUES = [
@@ -20,7 +22,7 @@ type UpdateAssignmentStatusRequest = {
 }
 
 type ActorProfile = {
-  role: string
+  role: string | null
   is_lead_eligible: boolean | null
 }
 
@@ -36,12 +38,6 @@ type RpcAssignmentStatusRow = {
 
 function isAllowedAssignmentStatus(value: string): value is AssignmentStatus {
   return ASSIGNMENT_STATUS_VALUES.includes(value as AssignmentStatus)
-}
-
-function canUpdateAssignmentStatus(profile: ActorProfile | null): boolean {
-  if (!profile) return false
-  if (profile.role === 'manager' || profile.role === 'lead') return true
-  return (profile.role === 'therapist' || profile.role === 'staff') && profile.is_lead_eligible === true
 }
 
 export async function POST(request: Request) {
@@ -65,7 +61,10 @@ export async function POST(request: Request) {
   }
 
   if (leftEarlyTimeRaw && !/^\d{2}:\d{2}(:\d{2})?$/.test(leftEarlyTimeRaw)) {
-    return NextResponse.json({ error: 'Left early time must be HH:MM or HH:MM:SS.' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Left early time must be HH:MM or HH:MM:SS.' },
+      { status: 400 }
+    )
   }
 
   const { data: profile } = await supabase
@@ -74,7 +73,12 @@ export async function POST(request: Request) {
     .eq('id', user.id)
     .maybeSingle()
 
-  if (!canUpdateAssignmentStatus((profile ?? null) as ActorProfile | null)) {
+  const actorProfile = (profile ?? null) as ActorProfile | null
+  if (
+    !can(parseRole(actorProfile?.role), 'update_assignment_status', {
+      isLeadEligible: actorProfile?.is_lead_eligible === true,
+    })
+  ) {
     return NextResponse.json(
       { error: 'Only leads or managers can update assignment statuses.' },
       { status: 403 }

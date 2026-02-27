@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 
 import { EmployeeDirectory } from '@/components/EmployeeDirectory'
 import { FeedbackToast } from '@/components/feedback-toast'
+import { can } from '@/lib/auth/can'
+import { parseRole } from '@/lib/auth/roles'
 import {
   getDefaultWeeklyLimitForEmploymentType,
   sanitizeWeeklyLimit,
@@ -166,7 +168,10 @@ function getDirectoryFeedback(params?: DirectorySearchParams): {
   }
 
   if (error === 'weekend_anchor_required') {
-    return { message: 'Set a weekend anchor date (Sat/Sun) for every-other-weekend scheduling.', variant: 'error' }
+    return {
+      message: 'Set a weekend anchor date (Sat/Sun) for every-other-weekend scheduling.',
+      variant: 'error',
+    }
   }
 
   if (error === 'weekend_anchor_invalid') {
@@ -174,7 +179,10 @@ function getDirectoryFeedback(params?: DirectorySearchParams): {
   }
 
   if (error === 'override_missing_fields') {
-    return { message: 'Date override requires cycle, date, shift, and override type.', variant: 'error' }
+    return {
+      message: 'Date override requires cycle, date, shift, and override type.',
+      variant: 'error',
+    }
   }
 
   if (error === 'override_failed') {
@@ -186,7 +194,10 @@ function getDirectoryFeedback(params?: DirectorySearchParams): {
   }
 
   if (error === 'override_schema_missing') {
-    return { message: 'Date override schema is not available yet. Run latest migration.', variant: 'error' }
+    return {
+      message: 'Date override schema is not available yet. Run latest migration.',
+      variant: 'error',
+    }
   }
 
   if (success === 'profile_saved') {
@@ -234,7 +245,7 @@ async function requireManager() {
     .eq('id', user.id)
     .maybeSingle()
 
-  if (profile?.role !== 'manager') {
+  if (!can(parseRole(profile?.role), 'manage_directory')) {
     redirect('/dashboard/staff')
   }
 
@@ -310,7 +321,9 @@ async function saveEmployeeAction(formData: FormData) {
   const email = String(formData.get('email') ?? '').trim()
   const phoneNumberRaw = String(formData.get('phone_number') ?? '').trim()
   const shiftType = normalizeShiftType(String(formData.get('shift_type') ?? '').trim())
-  const employmentType = normalizeEmploymentType(String(formData.get('employment_type') ?? '').trim())
+  const employmentType = normalizeEmploymentType(
+    String(formData.get('employment_type') ?? '').trim()
+  )
   const weeklyLimitInput = Number.parseInt(String(formData.get('max_work_days_per_week') ?? ''), 10)
   const weeklyLimit = sanitizeWeeklyLimit(
     Number.isFinite(weeklyLimitInput) ? weeklyLimitInput : null,
@@ -350,7 +363,10 @@ async function saveEmployeeAction(formData: FormData) {
   const isLeadEligible = formData.get('is_lead_eligible') === 'on'
   const onFmla = formData.get('on_fmla') === 'on'
   const isActive = formData.get('is_active') === 'on'
-  const fmlaReturnDate = normalizeFmlaReturnDate(String(formData.get('fmla_return_date') ?? ''), onFmla)
+  const fmlaReturnDate = normalizeFmlaReturnDate(
+    String(formData.get('fmla_return_date') ?? ''),
+    onFmla
+  )
   const phoneNumber = phoneNumberRaw.length > 0 ? phoneNumberRaw : null
   const shouldRealignFutureShifts = formData.get('realign_future_shifts') === 'true'
 
@@ -376,20 +392,18 @@ async function saveEmployeeAction(formData: FormData) {
     redirect('/directory?error=update_failed')
   }
 
-  const { error: workPatternError } = await supabase
-    .from('work_patterns')
-    .upsert(
-      {
-        therapist_id: profileId,
-        works_dow: worksDow,
-        offs_dow: offsDow,
-        weekend_rotation: weekendRotation,
-        weekend_anchor_date: weekendAnchorDate,
-        works_dow_mode: worksDowMode,
-        shift_preference: 'either',
-      },
-      { onConflict: 'therapist_id' }
-    )
+  const { error: workPatternError } = await supabase.from('work_patterns').upsert(
+    {
+      therapist_id: profileId,
+      works_dow: worksDow,
+      offs_dow: offsDow,
+      weekend_rotation: weekendRotation,
+      weekend_anchor_date: weekendAnchorDate,
+      works_dow_mode: worksDowMode,
+      shift_preference: 'either',
+    },
+    { onConflict: 'therapist_id' }
+  )
 
   if (workPatternError) {
     if (isMissingWorkPatternsSchema(workPatternError)) {
@@ -463,7 +477,10 @@ async function saveEmployeeDateOverrideAction(formData: FormData) {
   const shiftTypeRaw = String(formData.get('shift_type') ?? '').trim()
   const overrideTypeRaw = String(formData.get('override_type') ?? '').trim()
   const noteRaw = String(formData.get('note') ?? '').trim()
-  const shiftType = shiftTypeRaw === 'day' || shiftTypeRaw === 'night' || shiftTypeRaw === 'both' ? shiftTypeRaw : ''
+  const shiftType =
+    shiftTypeRaw === 'day' || shiftTypeRaw === 'night' || shiftTypeRaw === 'both'
+      ? shiftTypeRaw
+      : ''
   const overrideType =
     overrideTypeRaw === 'force_off' || overrideTypeRaw === 'force_on' ? overrideTypeRaw : ''
 
@@ -482,20 +499,18 @@ async function saveEmployeeDateOverrideAction(formData: FormData) {
     redirect('/directory?error=override_failed')
   }
 
-  const { error: overrideError } = await supabase
-    .from('availability_overrides')
-    .upsert(
-      buildManagerOverrideInput({
-        cycleId,
-        therapistId: profileId,
-        date,
-        shiftType,
-        overrideType,
-        note: noteRaw,
-        managerId,
-      }),
-      { onConflict: 'cycle_id,therapist_id,date,shift_type' }
-    )
+  const { error: overrideError } = await supabase.from('availability_overrides').upsert(
+    buildManagerOverrideInput({
+      cycleId,
+      therapistId: profileId,
+      date,
+      shiftType,
+      overrideType,
+      note: noteRaw,
+      managerId,
+    }),
+    { onConflict: 'cycle_id,therapist_id,date,shift_type' }
+  )
 
   if (overrideError) {
     if (isMissingAvailabilityOverridesSchema(overrideError)) {
@@ -613,7 +628,9 @@ export default async function TeamPage({
   if (therapistIds.length > 0) {
     const { data: dateOverridesData, error: dateOverridesError } = await supabase
       .from('availability_overrides')
-      .select('id, therapist_id, cycle_id, date, shift_type, override_type, note, created_at, source')
+      .select(
+        'id, therapist_id, cycle_id, date, shift_type, override_type, note, created_at, source'
+      )
       .in('therapist_id', therapistIds)
       .order('date', { ascending: true })
 

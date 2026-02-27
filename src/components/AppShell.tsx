@@ -5,6 +5,8 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { Menu, ChevronDown, Loader2 } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 
+import { can } from '@/lib/auth/can'
+import type { UiRole } from '@/lib/auth/roles'
 import { NotificationBell } from '@/components/NotificationBell'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,7 +15,7 @@ import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 
 export type AppShellUser = {
   fullName: string
-  role: 'manager' | 'therapist'
+  role: UiRole
 }
 
 export type AppShellPublishCta = {
@@ -84,7 +86,15 @@ function Icon({ size = 30 }: { size?: number }) {
   )
 }
 
-function Logo({ size = 30, fontSize = 17, dark = false }: { size?: number; fontSize?: number; dark?: boolean }) {
+function Logo({
+  size = 30,
+  fontSize = 17,
+  dark = false,
+}: {
+  size?: number
+  fontSize?: number
+  dark?: boolean
+}) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(size * 0.3) }}>
       <Icon size={size} />
@@ -126,7 +136,11 @@ function usesAppShell(pathname: string): boolean {
   return SHELL_ROUTES.some((route) => isRouteActive(pathname, route))
 }
 
-function isNavItemActive(pathname: string, searchParams: SearchParamsState, navItem: NavItem): boolean {
+function isNavItemActive(
+  pathname: string,
+  searchParams: SearchParamsState,
+  navItem: NavItem
+): boolean {
   if (navItem.isActive) {
     return navItem.isActive(pathname, searchParams)
   }
@@ -146,10 +160,11 @@ export function AppShell({ user, publishCta, children }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
+  const canAccessManagerUi = can(user?.role, 'access_manager_ui')
 
   const shouldRenderShell = useMemo(() => Boolean(user) && usesAppShell(pathname), [pathname, user])
-  const navItems = user?.role === 'manager' ? MANAGER_NAV_ITEMS : STAFF_NAV_ITEMS
-  const dashboardHref = user?.role === 'manager' ? MANAGER_WORKFLOW_LINKS.dashboard : '/dashboard/staff'
+  const navItems = canAccessManagerUi ? MANAGER_NAV_ITEMS : STAFF_NAV_ITEMS
+  const dashboardHref = canAccessManagerUi ? MANAGER_WORKFLOW_LINKS.dashboard : '/dashboard/staff'
 
   if (!shouldRenderShell) {
     return <>{children}</>
@@ -179,7 +194,7 @@ export function AppShell({ user, publishCta, children }: AppShellProps) {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
-            {user?.role === 'manager' && publishCta && (
+            {canAccessManagerUi && publishCta && (
               <Button asChild size="sm" className="hidden md:inline-flex">
                 <Link href={publishCta.href}>{publishCta.label}</Link>
               </Button>
@@ -204,10 +219,10 @@ export function AppShell({ user, publishCta, children }: AppShellProps) {
                 </span>
                 <span className="max-w-[9rem] truncate font-medium">{user?.fullName}</span>
                 <Badge
-                  variant={user?.role === 'manager' ? 'default' : 'outline'}
+                  variant={canAccessManagerUi ? 'default' : 'outline'}
                   className={cn(
                     'hidden capitalize sm:inline-flex',
-                    user?.role === 'manager' ? NAV_MANAGER_BADGE_CLASS : undefined
+                    canAccessManagerUi ? NAV_MANAGER_BADGE_CLASS : undefined
                   )}
                 >
                   {user?.role}
@@ -217,7 +232,10 @@ export function AppShell({ user, publishCta, children }: AppShellProps) {
 
               {userMenuOpen && (
                 <div className="absolute right-0 mt-2 w-44 rounded-md border border-border bg-white p-1 shadow-lg">
-                  <Link href="/profile" className="block rounded-sm px-3 py-2 text-sm hover:bg-secondary">
+                  <Link
+                    href="/profile"
+                    className="block rounded-sm px-3 py-2 text-sm hover:bg-secondary"
+                  >
                     Profile
                   </Link>
                   <form action="/auth/signout" method="post" onSubmit={() => setSigningOut(true)}>
@@ -226,7 +244,9 @@ export function AppShell({ user, publishCta, children }: AppShellProps) {
                       disabled={signingOut}
                       className="inline-flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary disabled:opacity-60"
                     >
-                      {signingOut && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                      {signingOut && (
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                      )}
                       {signingOut ? 'Signing out...' : 'Sign out'}
                     </button>
                   </form>
@@ -252,8 +272,11 @@ export function AppShell({ user, publishCta, children }: AppShellProps) {
         {mobileMenuOpen && (
           <div id="app-shell-mobile-nav" className="border-t border-border md:hidden">
             <nav className="mx-auto flex w-full max-w-6xl flex-col gap-1 px-4 py-3">
-              {user?.role === 'manager' && publishCta && (
-                <Link href={publishCta.href} className="mb-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">
+              {canAccessManagerUi && publishCta && (
+                <Link
+                  href={publishCta.href}
+                  className="mb-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+                >
                   {publishCta.label}
                 </Link>
               )}

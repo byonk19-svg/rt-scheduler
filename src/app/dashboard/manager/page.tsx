@@ -1,9 +1,11 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import type { Cycle, ShiftRole, ShiftStatus } from '@/app/schedule/types'
+import { can } from '@/lib/auth/can'
+import { parseRole } from '@/lib/auth/roles'
 import { buildDateRange, dateKeyFromDate } from '@/lib/schedule-helpers'
 import { MAX_SHIFT_COVERAGE_PER_DAY, MIN_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
 import { createClient } from '@/lib/supabase/client'
@@ -74,10 +76,7 @@ type ShiftPostRow = {
 
 type ShiftPublishedLookupRow = {
   id: string
-  schedule_cycles:
-    | { published: boolean }
-    | { published: boolean }[]
-    | null
+  schedule_cycles: { published: boolean } | { published: boolean }[] | null
 }
 
 const INITIAL_DATA: DashboardData = {
@@ -175,7 +174,7 @@ export default function ManagerDashboardPage() {
 
         const profile = (profileResult.data ?? null) as ManagerProfileRow | null
 
-        if (profile?.role && profile.role !== 'manager') {
+        if (!can(parseRole(profile?.role), 'access_manager_ui')) {
           router.replace('/dashboard/staff')
           return
         }
@@ -195,29 +194,33 @@ export default function ManagerDashboardPage() {
           shiftsQuery = shiftsQuery.eq('cycle_id', activeCycle.id)
         }
 
-        const [teamProfilesResult, pendingPostsResult, reviewedPostsResult, shiftsResult] = await Promise.all([
-          supabase
-            .from('profiles')
-            .select('id, shift_type, is_active, on_fmla')
-            .in('role', ['therapist', 'staff']),
-          supabase
-            .from('shift_posts')
-            .select('shift_id')
-            .eq('status', 'pending'),
-          supabase
-            .from('shift_posts')
-            .select('shift_id, status')
-            .in('status', ['approved', 'denied'])
-            .gte('created_at', todayStart.toISOString()),
-          shiftsQuery,
-        ])
+        const [teamProfilesResult, pendingPostsResult, reviewedPostsResult, shiftsResult] =
+          await Promise.all([
+            supabase
+              .from('profiles')
+              .select('id, shift_type, is_active, on_fmla')
+              .in('role', ['therapist', 'staff']),
+            supabase.from('shift_posts').select('shift_id').eq('status', 'pending'),
+            supabase
+              .from('shift_posts')
+              .select('shift_id, status')
+              .in('status', ['approved', 'denied'])
+              .gte('created_at', todayStart.toISOString()),
+            shiftsQuery,
+          ])
 
         if (teamProfilesResult.error) {
-          console.error('Failed to load team profile metrics for dashboard:', teamProfilesResult.error)
+          console.error(
+            'Failed to load team profile metrics for dashboard:',
+            teamProfilesResult.error
+          )
         }
 
         if (pendingPostsResult.error) {
-          console.error('Failed to load pending approval posts for dashboard:', pendingPostsResult.error)
+          console.error(
+            'Failed to load pending approval posts for dashboard:',
+            pendingPostsResult.error
+          )
         }
 
         if (reviewedPostsResult.error) {
@@ -259,8 +262,12 @@ export default function ManagerDashboardPage() {
           }
         }
 
-        const pendingPosts = pendingPostsResult.error ? [] : ((pendingPostsResult.data ?? []) as ShiftPostRow[])
-        const reviewedPosts = reviewedPostsResult.error ? [] : ((reviewedPostsResult.data ?? []) as ShiftPostRow[])
+        const pendingPosts = pendingPostsResult.error
+          ? []
+          : ((pendingPostsResult.data ?? []) as ShiftPostRow[])
+        const reviewedPosts = reviewedPostsResult.error
+          ? []
+          : ((reviewedPostsResult.data ?? []) as ShiftPostRow[])
 
         const shiftIds = Array.from(
           new Set(
@@ -279,7 +286,10 @@ export default function ManagerDashboardPage() {
             .in('id', shiftIds)
 
           if (publishedLookupError) {
-            console.error('Failed to scope approval metrics to published cycles:', publishedLookupError)
+            console.error(
+              'Failed to scope approval metrics to published cycles:',
+              publishedLookupError
+            )
             publishedShiftIds = null
           } else {
             publishedShiftIds = new Set(
@@ -293,21 +303,26 @@ export default function ManagerDashboardPage() {
         const pendingApprovals =
           publishedShiftIds === null
             ? pendingPosts.length
-            : pendingPosts.filter((row) => row.shift_id && publishedShiftIds.has(row.shift_id)).length
+            : pendingPosts.filter((row) => row.shift_id && publishedShiftIds.has(row.shift_id))
+                .length
 
         const approvedToday = reviewedPosts.filter(
           (row) =>
             row.status === 'approved' &&
-            (publishedShiftIds === null || (row.shift_id !== null && publishedShiftIds.has(row.shift_id)))
+            (publishedShiftIds === null ||
+              (row.shift_id !== null && publishedShiftIds.has(row.shift_id)))
         ).length
 
         const deniedToday = reviewedPosts.filter(
           (row) =>
             row.status === 'denied' &&
-            (publishedShiftIds === null || (row.shift_id !== null && publishedShiftIds.has(row.shift_id)))
+            (publishedShiftIds === null ||
+              (row.shift_id !== null && publishedShiftIds.has(row.shift_id)))
         ).length
 
-        const teamProfiles = teamProfilesResult.error ? [] : ((teamProfilesResult.data ?? []) as TeamProfileRow[])
+        const teamProfiles = teamProfilesResult.error
+          ? []
+          : ((teamProfilesResult.data ?? []) as TeamProfileRow[])
         const activeTeamProfiles = teamProfiles.filter((row) => row.is_active !== false)
 
         const activeEmployees = activeTeamProfiles.length
@@ -411,7 +426,12 @@ export default function ManagerDashboardPage() {
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <rect x="1" y="2" width="12" height="11" rx="2" stroke="#d97706" strokeWidth="1.5" />
-              <path d="M5 1v2M9 1v2M1 6h12" stroke="#d97706" strokeWidth="1.5" strokeLinecap="round" />
+              <path
+                d="M5 1v2M9 1v2M1 6h12"
+                stroke="#d97706"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
             </svg>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#92400e' }}>
               Cycle: {d.cycleStart} – {d.cycleEnd}
@@ -454,7 +474,13 @@ export default function ManagerDashboardPage() {
 
       <div
         className="fade-up"
-        style={{ animationDelay: '0.1s', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 24 }}
+        style={{
+          animationDelay: '0.1s',
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr 1fr',
+          gap: 14,
+          marginBottom: 24,
+        }}
       >
         <Card>
           <CardHeader icon="📋" title="Coverage" subtitle="Resolve gaps before publishing" />
@@ -484,7 +510,9 @@ export default function ManagerDashboardPage() {
             <CheckRow
               label="Lead"
               status={leadHasIssues ? 'error' : 'ok'}
-              detail={loading ? '—' : leadHasIssues ? `${data.missingLead} shifts missing lead` : 'clear'}
+              detail={
+                loading ? '—' : leadHasIssues ? `${data.missingLead} shifts missing lead` : 'clear'
+              }
             />
           </div>
           <AmberButton full onClick={() => router.push(publishRoute)}>
@@ -520,7 +548,9 @@ export default function ManagerDashboardPage() {
           marginBottom: 24,
         }}
       >
-        <p style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>Quick actions</p>
+        <p style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>
+          Quick actions
+        </p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {[
             { label: 'Assign coverage', route: coverageRoute, active: true },
@@ -551,12 +581,27 @@ export default function ManagerDashboardPage() {
 
       <div
         className="fade-up"
-        style={{ animationDelay: '0.2s', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: '18px 20px' }}
+        style={{
+          animationDelay: '0.2s',
+          background: '#fff',
+          border: '1px solid #e5e7eb',
+          borderRadius: 10,
+          padding: '18px 20px',
+        }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: 14,
+          }}
+        >
           <div>
             <p style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>Team summary</p>
-            <p style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>Directory management on the Team page.</p>
+            <p style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+              Directory management on the Team page.
+            </p>
           </div>
           <GhostButton onClick={() => router.push(teamRoute)}>Manage team</GhostButton>
         </div>
@@ -567,7 +612,15 @@ export default function ManagerDashboardPage() {
             { label: 'Night shift', value: d.nightShift, icon: '🌙' },
             { label: 'On FMLA', value: d.onFmla, icon: '📋' },
           ].map(({ label, value, icon }) => (
-            <div key={label} style={{ background: '#f8fafc', borderRadius: 8, padding: '12px 14px', border: '1px solid #f1f5f9' }}>
+            <div
+              key={label}
+              style={{
+                background: '#f8fafc',
+                borderRadius: 8,
+                padding: '12px 14px',
+                border: '1px solid #f1f5f9',
+              }}
+            >
               <div style={{ fontSize: 18, marginBottom: 6 }}>{icon}</div>
               <div
                 style={{
@@ -580,7 +633,9 @@ export default function ManagerDashboardPage() {
               >
                 {value}
               </div>
-              <div style={{ fontSize: 11, color: '#64748b', marginTop: 3, fontWeight: 500 }}>{label}</div>
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 3, fontWeight: 500 }}>
+                {label}
+              </div>
             </div>
           ))}
         </div>
@@ -608,7 +663,15 @@ function Card({ children }: { children: React.ReactNode }) {
 
 function CardHeader({ icon, title, subtitle }: { icon: string; title: string; subtitle: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 12, borderBottom: '1px solid #f1f5f9' }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        paddingBottom: 12,
+        borderBottom: '1px solid #f1f5f9',
+      }}
+    >
       <div
         style={{
           width: 34,
@@ -647,12 +710,22 @@ function Stat({ label, value, color }: { label: string; value: string | number; 
       >
         {value}
       </span>
-      <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500, whiteSpace: 'nowrap' }}>{label}</span>
+      <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500, whiteSpace: 'nowrap' }}>
+        {label}
+      </span>
     </div>
   )
 }
 
-function IssueRow({ label, value, type }: { label: string; value: number | string; type: 'error' | 'warn' | 'ok' }) {
+function IssueRow({
+  label,
+  value,
+  type,
+}: {
+  label: string
+  value: number | string
+  type: 'error' | 'warn' | 'ok'
+}) {
   const color = type === 'error' ? '#dc2626' : type === 'warn' ? '#c2410c' : '#059669'
   const bg = type === 'error' ? '#fee2e2' : type === 'warn' ? '#ffedd5' : '#ecfdf5'
 
@@ -668,18 +741,44 @@ function IssueRow({ label, value, type }: { label: string; value: number | strin
       }}
     >
       <span style={{ fontSize: 12, color: '#374151', fontWeight: 500 }}>{label}</span>
-      <span style={{ fontSize: 12, fontWeight: 800, color, background: bg, padding: '1px 8px', borderRadius: 20 }}>
+      <span
+        style={{
+          fontSize: 12,
+          fontWeight: 800,
+          color,
+          background: bg,
+          padding: '1px 8px',
+          borderRadius: 20,
+        }}
+      >
         {value}
       </span>
     </div>
   )
 }
 
-function CheckRow({ label, status, detail }: { label: string; status: 'ok' | 'error'; detail: string }) {
+function CheckRow({
+  label,
+  status,
+  detail,
+}: {
+  label: string
+  status: 'ok' | 'error'
+  detail: string
+}) {
   const isOk = status === 'ok'
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', background: '#f8fafc', borderRadius: 7 }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '7px 10px',
+        background: '#f8fafc',
+        borderRadius: 7,
+      }}
+    >
       <span style={{ fontSize: 13, flexShrink: 0 }}>{isOk ? '✅' : '❌'}</span>
       <span style={{ fontSize: 12, fontWeight: 600, color: '#374151', minWidth: 70 }}>{label}</span>
       <span
@@ -697,7 +796,15 @@ function CheckRow({ label, status, detail }: { label: string; status: 'ok' | 'er
   )
 }
 
-function AmberButton({ children, onClick, full = false }: { children: React.ReactNode; onClick?: () => void; full?: boolean }) {
+function AmberButton({
+  children,
+  onClick,
+  full = false,
+}: {
+  children: React.ReactNode
+  onClick?: () => void
+  full?: boolean
+}) {
   return (
     <button
       onClick={onClick}
@@ -719,7 +826,15 @@ function AmberButton({ children, onClick, full = false }: { children: React.Reac
   )
 }
 
-function GhostButton({ children, onClick, full = false }: { children: React.ReactNode; onClick?: () => void; full?: boolean }) {
+function GhostButton({
+  children,
+  onClick,
+  full = false,
+}: {
+  children: React.ReactNode
+  onClick?: () => void
+  full?: boolean
+}) {
   return (
     <button
       onClick={onClick}

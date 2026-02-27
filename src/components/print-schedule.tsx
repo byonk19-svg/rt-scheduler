@@ -146,7 +146,10 @@ function ScheduleSection({
             <tr className="print-prn-divider-row">
               <td className="print-lottery-name-col print-prn-divider-label">PRN</td>
               {cycleDates.map((date, index) => (
-                <td key={`${label}-prn-divider-${date}`} className={getWeekBoundaryClass(index, cycleDates.length)} />
+                <td
+                  key={`${label}-prn-divider-${date}`}
+                  className={getWeekBoundaryClass(index, cycleDates.length)}
+                />
               ))}
             </tr>
           )}
@@ -166,7 +169,10 @@ function ScheduleSection({
           <tr className="print-lottery-total-row">
             <td className="print-lottery-name-col">Total</td>
             {cycleDates.map((date, index) => (
-              <td key={`${label}-total-${date}`} className={getWeekBoundaryClass(index, cycleDates.length)}>
+              <td
+                key={`${label}-total-${date}`}
+                className={getWeekBoundaryClass(index, cycleDates.length)}
+              >
                 {countCoveredMembers(tableMembers, date, shiftByUserDate)}
               </td>
             ))}
@@ -194,8 +200,12 @@ export function PrintSchedule({
 
   if (!mounted) return null
 
-  const printDayTeam = isManager ? dayTeam : printUsers.filter((member) => member.shift_type === 'day')
-  const printNightTeam = isManager ? nightTeam : printUsers.filter((member) => member.shift_type === 'night')
+  const printDayTeam = isManager
+    ? dayTeam
+    : printUsers.filter((member) => member.shift_type === 'day')
+  const printNightTeam = isManager
+    ? nightTeam
+    : printUsers.filter((member) => member.shift_type === 'night')
   const dateRangeLabel = activeCycle
     ? `${formatRangeDate(activeCycle.start_date)} - ${formatRangeDate(activeCycle.end_date)}`
     : ''

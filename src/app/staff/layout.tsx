@@ -1,5 +1,7 @@
-﻿import { redirect } from 'next/navigation'
+import { redirect } from 'next/navigation'
 
+import { can } from '@/lib/auth/can'
+import { parseRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 import { StaffNavbar } from '@/app/staff/staff-navbar'
 
@@ -30,11 +32,12 @@ export default async function StaffLayout({
 
   const typedProfile = (profile ?? null) as LayoutProfileRow | null
 
-  if (typedProfile?.role === 'manager') {
+  if (can(parseRole(typedProfile?.role), 'access_manager_ui')) {
     redirect('/dashboard/manager')
   }
 
-  const fullName = typedProfile?.full_name ?? user.user_metadata?.full_name ?? user.email ?? 'Staff member'
+  const fullName =
+    typedProfile?.full_name ?? user.user_metadata?.full_name ?? user.email ?? 'Staff member'
 
   return (
     <div className="min-h-screen bg-background">
@@ -43,4 +46,3 @@ export default async function StaffLayout({
     </div>
   )
 }
-

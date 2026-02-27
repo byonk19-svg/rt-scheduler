@@ -17,14 +17,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { summarizeCalendarCell } from '@/lib/calendar-cell'
-import {
-  buildTherapistWorkloadCounts,
-  getWeekBoundsForDate,
-} from '@/lib/therapist-picker-metrics'
-import {
-  formatEligibilityReason,
-  resolveEligibility,
-} from '@/lib/coverage/resolve-availability'
+import { buildTherapistWorkloadCounts, getWeekBoundsForDate } from '@/lib/therapist-picker-metrics'
+import { formatEligibilityReason, resolveEligibility } from '@/lib/coverage/resolve-availability'
 import type { AvailabilityOverrideRow } from '@/lib/coverage/types'
 import { normalizeWorkPattern } from '@/lib/coverage/work-patterns'
 import { cn } from '@/lib/utils'
@@ -148,20 +142,9 @@ type AssignmentStatusResponse = {
   error?: string
 }
 
-type AssignmentStatus =
-  | 'scheduled'
-  | 'call_in'
-  | 'cancelled'
-  | 'on_call'
-  | 'left_early'
+type AssignmentStatus = 'scheduled' | 'call_in' | 'cancelled' | 'on_call' | 'left_early'
 
-type StatusFilter =
-  | 'all'
-  | 'any_non_scheduled'
-  | 'call_in'
-  | 'on_call'
-  | 'cancelled'
-  | 'left_early'
+type StatusFilter = 'all' | 'any_non_scheduled' | 'call_in' | 'on_call' | 'cancelled' | 'left_early'
 
 type AssignmentStatusSnapshot = {
   assignmentId: string
@@ -204,7 +187,9 @@ type ManagerMonthCalendarProps = {
   focusSlotKey?: string | null
   issueReasonsBySlot?: Record<
     string,
-    Array<'under_coverage' | 'over_coverage' | 'missing_lead' | 'multiple_leads' | 'ineligible_lead'>
+    Array<
+      'under_coverage' | 'over_coverage' | 'missing_lead' | 'multiple_leads' | 'ineligible_lead'
+    >
   >
   constraintBlockedSlotKeys?: string[]
   defaultShiftType?: 'day' | 'night'
@@ -254,8 +239,16 @@ function formatRangeLabel(startDate: string, endDate: string): string {
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
     return `${startDate} to ${endDate}`
   }
-  const startLabel = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  const endLabel = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const startLabel = start.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+  const endLabel = end.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
   return `Cycle range: ${startLabel} to ${endLabel}`
 }
 
@@ -315,7 +308,11 @@ function formatStatusTimestamp(value: string | null): string {
   })
 }
 
-function formatStatusPopoverHeader(date: string, shiftType: 'day' | 'night', therapistName: string): string {
+function formatStatusPopoverHeader(
+  date: string,
+  shiftType: 'day' | 'night',
+  therapistName: string
+): string {
   const parsed = dateFromKey(date)
   if (Number.isNaN(parsed.getTime())) {
     return `${date} | ${shiftType === 'day' ? 'Day' : 'Night'} shift | ${therapistName}`
@@ -422,7 +419,8 @@ export function ManagerMonthCalendar({
   })
   const [mobileWeekStart, setMobileWeekStart] = useState(() => {
     const focusedDate = focusSlotKey?.split(':')[0]
-    const startKey = focusedDate && /^\d{4}-\d{2}-\d{2}$/.test(focusedDate) ? focusedDate : startDate
+    const startKey =
+      focusedDate && /^\d{4}-\d{2}-\d{2}$/.test(focusedDate) ? focusedDate : startDate
     return keyFromDate(startOfWeek(dateFromKey(startKey)))
   })
   const [selectedDate, setSelectedDate] = useState<string | null>(() => {
@@ -431,7 +429,9 @@ export function ManagerMonthCalendar({
     return startDate
   })
   const [staffingPoolOpen, setStaffingPoolOpen] = useState(false)
-  const [drawerSlot, setDrawerSlot] = useState<{ date: string; shiftType: 'day' | 'night' } | null>(null)
+  const [drawerSlot, setDrawerSlot] = useState<{ date: string; shiftType: 'day' | 'night' } | null>(
+    null
+  )
   const [drawerAddTherapistId, setDrawerAddTherapistId] = useState('')
   const [drawerTherapistSearch, setDrawerTherapistSearch] = useState('')
   const [drawerLeadTherapistId, setDrawerLeadTherapistId] = useState('')
@@ -451,7 +451,9 @@ export function ManagerMonthCalendar({
     leftEarlyTime: string
   } | null>(null)
   const [isStatusSaving, setIsStatusSaving] = useState(false)
-  const [statusUndoSnapshot, setStatusUndoSnapshot] = useState<AssignmentStatusSnapshot | null>(null)
+  const [statusUndoSnapshot, setStatusUndoSnapshot] = useState<AssignmentStatusSnapshot | null>(
+    null
+  )
   const [toastState, setToastState] = useState<{
     id: number
     message: string
@@ -578,7 +580,12 @@ export function ManagerMonthCalendar({
           id: therapistId,
           is_active: therapist.is_active,
           on_fmla: therapist.on_fmla,
-          employment_type: therapist.employment_type === 'prn' ? 'prn' : therapist.employment_type === 'part_time' ? 'part_time' : 'full_time',
+          employment_type:
+            therapist.employment_type === 'prn'
+              ? 'prn'
+              : therapist.employment_type === 'part_time'
+                ? 'part_time'
+                : 'full_time',
           pattern: normalizeWorkPattern({
             therapist_id: therapist.id,
             works_dow: therapist.works_dow,
@@ -634,8 +641,10 @@ export function ManagerMonthCalendar({
     return {
       active: selectedDayShifts.filter((shift) => shift.assignment_status !== 'cancelled').length,
       onCall: selectedDayShifts.filter((shift) => shift.assignment_status === 'on_call').length,
-      leaveEarly: selectedDayShifts.filter((shift) => shift.assignment_status === 'left_early').length,
-      cancelled: selectedDayShifts.filter((shift) => shift.assignment_status === 'cancelled').length,
+      leaveEarly: selectedDayShifts.filter((shift) => shift.assignment_status === 'left_early')
+        .length,
+      cancelled: selectedDayShifts.filter((shift) => shift.assignment_status === 'cancelled')
+        .length,
     }
   }, [selectedDayShifts])
 
@@ -689,7 +698,9 @@ export function ManagerMonthCalendar({
   }, [drawerSlot, shiftsByDate])
 
   const drawerCoverageCount = useMemo(
-    () => drawerShifts.filter((shift) => shift.status === 'scheduled' || shift.status === 'on_call').length,
+    () =>
+      drawerShifts.filter((shift) => shift.status === 'scheduled' || shift.status === 'on_call')
+        .length,
     [drawerShifts]
   )
   const drawerLeadCount = useMemo(
@@ -728,7 +739,8 @@ export function ManagerMonthCalendar({
   }, [drawerSlot])
 
   const workloadCountsByTherapist = useMemo(() => {
-    if (!drawerSlot || !drawerWeekBounds) return new Map<string, { weekShiftCount: number; cycleShiftCount: number }>()
+    if (!drawerSlot || !drawerWeekBounds)
+      return new Map<string, { weekShiftCount: number; cycleShiftCount: number }>()
     return buildTherapistWorkloadCounts({
       shifts: localShifts.map((shift) => ({
         userId: shift.user_id,
@@ -831,7 +843,9 @@ export function ManagerMonthCalendar({
   }, [statusPopover])
 
   function openShiftDrawer(date: string, shiftType: 'day' | 'night') {
-    const slotShifts = (shiftsByDate.get(date) ?? []).filter((shift) => shift.shift_type === shiftType)
+    const slotShifts = (shiftsByDate.get(date) ?? []).filter(
+      (shift) => shift.shift_type === shiftType
+    )
     const currentLead = slotShifts.find((shift) => shift.role === 'lead')
     setDrawerSlot({ date, shiftType })
     setDrawerLeadTherapistId(currentLead?.user_id ?? '')
@@ -899,7 +913,8 @@ export function ManagerMonthCalendar({
               action: body,
             })
             setAvailabilityOverrideReasonDraft(
-              'availabilityOverrideReason' in body && typeof body.availabilityOverrideReason === 'string'
+              'availabilityOverrideReason' in body &&
+                typeof body.availabilityOverrideReason === 'string'
                 ? body.availabilityOverrideReason
                 : ''
             )
@@ -979,7 +994,9 @@ export function ManagerMonthCalendar({
               action: body,
             })
             setAvailabilityOverrideReasonDraft(
-              typeof body.availabilityOverrideReason === 'string' ? body.availabilityOverrideReason : ''
+              typeof body.availabilityOverrideReason === 'string'
+                ? body.availabilityOverrideReason
+                : ''
             )
             return
           }
@@ -1152,7 +1169,8 @@ export function ManagerMonthCalendar({
                 assignmentId,
                 status: payload.status,
                 note: payload.note.trim() || null,
-                leftEarlyTime: payload.status === 'left_early' ? payload.leftEarlyTime || null : null,
+                leftEarlyTime:
+                  payload.status === 'left_early' ? payload.leftEarlyTime || null : null,
               }),
             })
           } catch {
@@ -1170,7 +1188,8 @@ export function ManagerMonthCalendar({
             return
           }
 
-          const isJsonResponse = response.headers.get('content-type')?.includes('application/json') === true
+          const isJsonResponse =
+            response.headers.get('content-type')?.includes('application/json') === true
           const result = isJsonResponse
             ? ((await response.json().catch(() => null)) as AssignmentStatusResponse | null)
             : null
@@ -1241,9 +1260,7 @@ export function ManagerMonthCalendar({
           }
           const label = assignmentStatusDescription(updated.assignment_status)
           setSuccess(
-            options?.isUndo
-              ? `Reverted status to ${label.toLowerCase()}.`
-              : `Marked ${label}.`
+            options?.isUndo ? `Reverted status to ${label.toLowerCase()}.` : `Marked ${label}.`
           )
 
           if (!options?.isUndo && options?.previous) {
@@ -1294,8 +1311,7 @@ export function ManagerMonthCalendar({
   ): boolean {
     const normalizedDraftNote = draft.note.trim()
     const normalizedSnapshotNote = (snapshot.note ?? '').trim()
-    const normalizedDraftLeftTime =
-      draft.status === 'left_early' ? draft.leftEarlyTime.trim() : ''
+    const normalizedDraftLeftTime = draft.status === 'left_early' ? draft.leftEarlyTime.trim() : ''
     const normalizedSnapshotLeftTime =
       snapshot.status === 'left_early' ? (snapshot.leftEarlyTime ?? '').trim() : ''
 
@@ -1314,15 +1330,11 @@ export function ManagerMonthCalendar({
       return
     }
 
-    runAssignmentStatusUpdate(
-      statusPopover.assignmentId,
-      statusDraft,
-      {
-        previous: options?.isUndo ? null : statusPopover.snapshot,
-        closePopover: options?.closePopover,
-        isUndo: options?.isUndo,
-      }
-    )
+    runAssignmentStatusUpdate(statusPopover.assignmentId, statusDraft, {
+      previous: options?.isUndo ? null : statusPopover.snapshot,
+      closePopover: options?.closePopover,
+      isUndo: options?.isUndo,
+    })
   }
 
   function handleStatusSelect(nextStatus: AssignmentStatus) {
@@ -1413,7 +1425,11 @@ export function ManagerMonthCalendar({
     event.dataTransfer.dropEffect = 'move'
   }
 
-  function onDropDate(event: DragEvent<HTMLDivElement>, date: string, targetShiftType: 'day' | 'night') {
+  function onDropDate(
+    event: DragEvent<HTMLDivElement>,
+    date: string,
+    targetShiftType: 'day' | 'night'
+  ) {
     if (!canManageStaffing) return
     event.preventDefault()
 
@@ -1504,18 +1520,17 @@ export function ManagerMonthCalendar({
     const dayShifts = inCycle
       ? (shiftsByDate.get(date) ?? []).filter((shift) => shift.shift_type === shiftType)
       : []
-    const orderedShifts = dayShifts
-      .slice()
-      .sort((a, b) => {
-        if (a.role !== b.role) return a.role === 'lead' ? -1 : 1
-        return a.full_name.localeCompare(b.full_name)
-      })
+    const orderedShifts = dayShifts.slice().sort((a, b) => {
+      if (a.role !== b.role) return a.role === 'lead' ? -1 : 1
+      return a.full_name.localeCompare(b.full_name)
+    })
     const slotKey = `${date}:${shiftType}`
     const cellSummary = summarizeCalendarCell(orderedShifts)
     const coverageCount = cellSummary.coverageCount
     const leadAssignments = orderedShifts.filter((shift) => shift.role === 'lead')
     const hasEligibleCoverage = orderedShifts.some(
-      (shift) => (shift.status === 'scheduled' || shift.status === 'on_call') && shift.isLeadEligible
+      (shift) =>
+        (shift.status === 'scheduled' || shift.status === 'on_call') && shift.isLeadEligible
     )
     const missingLead = leadAssignments.length === 0 || !hasEligibleCoverage
     const underCoverage = coverageCount < MIN_SHIFT_COVERAGE_PER_DAY
@@ -1546,7 +1561,9 @@ export function ManagerMonthCalendar({
       cancelled: orderedShifts.filter((shift) => shift.assignment_status === 'cancelled').length,
       left_early: orderedShifts.filter((shift) => shift.assignment_status === 'left_early').length,
     }
-    const activeCount = orderedShifts.filter((shift) => shift.assignment_status !== 'cancelled').length
+    const activeCount = orderedShifts.filter(
+      (shift) => shift.assignment_status !== 'cancelled'
+    ).length
     const totalCount = orderedShifts.length
     const filteredVisibleShifts = orderedShifts.filter((shift) =>
       statusMatchesFilter(shift.assignment_status, statusFilter)
@@ -1587,159 +1604,188 @@ export function ManagerMonthCalendar({
         id={`slot-card-${date}-${shiftType}`}
         className={cn(
           'min-h-[11.5rem] overflow-hidden rounded-lg border bg-white transition-all',
-          isSelected ? 'border-indigo-500 shadow-[0_0_0_3px_rgba(99,102,241,0.12)]' : 'border-border/80',
-          inCycle ? 'cursor-pointer hover:border-slate-300 hover:bg-secondary/10' : 'cursor-default bg-muted/30',
+          isSelected
+            ? 'border-indigo-500 shadow-[0_0_0_3px_rgba(99,102,241,0.12)]'
+            : 'border-border/80',
+          inCycle
+            ? 'cursor-pointer hover:border-slate-300 hover:bg-secondary/10'
+            : 'cursor-default bg-muted/30',
           issueFilter !== 'all' && !filterMatch ? 'opacity-45' : ''
         )}
-        aria-label={inCycle ? `Open ${shiftType} shift details for ${formatCellDate(date)}` : `${formatCellDate(date)} outside cycle`}
+        aria-label={
+          inCycle
+            ? `Open ${shiftType} shift details for ${formatCellDate(date)}`
+            : `${formatCellDate(date)} outside cycle`
+        }
       >
         <div className={cn('h-1', missingLead ? 'bg-red-500' : 'bg-indigo-500')} />
         <div className="p-2.5">
-        {options?.showWeekday && (
-          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {day.toLocaleDateString('en-US', { weekday: 'short' })}
-          </p>
-        )}
-        <div className="mb-2 flex items-center justify-between">
-          <span className={cn('font-semibold text-foreground', isBoundaryDay ? 'text-xs' : 'text-sm')}>
-            {dateHeaderLabel}
-          </span>
-          {inCycle ? (
-            <div className="flex flex-wrap items-center justify-end gap-1">
-              {statusCounts.call_in > 0 && (
-                <span className="rounded-full border border-red-200 bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-700">
-                  CI {statusCounts.call_in}
-                </span>
-              )}
-              {statusCounts.on_call > 0 && (
-                <span className="rounded-full border border-orange-200 bg-orange-50 px-1.5 py-0.5 text-[9px] font-bold text-orange-700">
-                  OC {statusCounts.on_call}
-                </span>
-              )}
-              {statusCounts.left_early > 0 && (
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">
-                  LE {statusCounts.left_early}
-                </span>
-              )}
-              {statusCounts.cancelled > 0 && (
-                <span className="rounded-full border border-red-200 bg-red-50 px-1.5 py-0.5 text-[9px] font-semibold text-red-700">
-                  -{statusCounts.cancelled}
-                </span>
-              )}
-              <span className={cn('rounded-full px-1.5 py-0.5 text-[9px] font-bold', coverageTone, missingLead ? 'bg-red-100' : 'bg-emerald-50')}>
-                {activeCount}/{totalCount}
-              </span>
-            </div>
-          ) : (
-            <span className="text-[10px] font-semibold uppercase text-muted-foreground">-</span>
+          {options?.showWeekday && (
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {day.toLocaleDateString('en-US', { weekday: 'short' })}
+            </p>
           )}
-        </div>
-        {inCycle ? (
-          <>
-            {visibleIssueTags.length > 0 && (
-              <div className="mb-2 flex flex-wrap gap-1">
-                {visibleIssueTags.map((reason) => (
-                  <span
-                    key={`${slotKey}-${reason}`}
-                    className="rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-[10px] font-medium text-amber-800"
-                  >
-                    {reason === 'ineligible_lead' ? 'Ineligible lead' : 'Multiple leads'}
+          <div className="mb-2 flex items-center justify-between">
+            <span
+              className={cn('font-semibold text-foreground', isBoundaryDay ? 'text-xs' : 'text-sm')}
+            >
+              {dateHeaderLabel}
+            </span>
+            {inCycle ? (
+              <div className="flex flex-wrap items-center justify-end gap-1">
+                {statusCounts.call_in > 0 && (
+                  <span className="rounded-full border border-red-200 bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-700">
+                    CI {statusCounts.call_in}
                   </span>
-                ))}
+                )}
+                {statusCounts.on_call > 0 && (
+                  <span className="rounded-full border border-orange-200 bg-orange-50 px-1.5 py-0.5 text-[9px] font-bold text-orange-700">
+                    OC {statusCounts.on_call}
+                  </span>
+                )}
+                {statusCounts.left_early > 0 && (
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">
+                    LE {statusCounts.left_early}
+                  </span>
+                )}
+                {statusCounts.cancelled > 0 && (
+                  <span className="rounded-full border border-red-200 bg-red-50 px-1.5 py-0.5 text-[9px] font-semibold text-red-700">
+                    -{statusCounts.cancelled}
+                  </span>
+                )}
+                <span
+                  className={cn(
+                    'rounded-full px-1.5 py-0.5 text-[9px] font-bold',
+                    coverageTone,
+                    missingLead ? 'bg-red-100' : 'bg-emerald-50'
+                  )}
+                >
+                  {activeCount}/{totalCount}
+                </span>
               </div>
+            ) : (
+              <span className="text-[10px] font-semibold uppercase text-muted-foreground">-</span>
             )}
-            <div className="space-y-1">
-              {blockedByConstraints && (
-                <div className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-800">
-                  No eligible therapists (constraints)
+          </div>
+          {inCycle ? (
+            <>
+              {visibleIssueTags.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1">
+                  {visibleIssueTags.map((reason) => (
+                    <span
+                      key={`${slotKey}-${reason}`}
+                      className="rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-[10px] font-medium text-amber-800"
+                    >
+                      {reason === 'ineligible_lead' ? 'Ineligible lead' : 'Multiple leads'}
+                    </span>
+                  ))}
                 </div>
               )}
-              {missingLead && (
-                <div className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700">
-                  No lead assigned
-                </div>
-              )}
-              {filteredVisibleShifts.length === 0 ? (
-                <span className="text-[11px] text-muted-foreground">No matching statuses</span>
-              ) : (
-                filteredVisibleShifts.map((shift) => (
-                  <div
-                    key={shift.id}
-                    onClick={(event) => event.stopPropagation()}
-                    draggable={canManageStaffing}
-                    onDragStart={
-                      canManageStaffing
-                        ? (event) =>
-                            setDragData(event, {
-                              type: 'shift',
-                              shiftId: shift.id,
-                              shiftType: shift.shift_type,
-                            })
-                        : undefined
-                    }
-                    className={cn(
-                      'rounded-md border px-2 py-1',
-                      shift.role === 'lead'
-                        ? 'border-amber-300 bg-amber-50 text-amber-900'
-                        : `${shiftPalette.border} ${shiftPalette.bg} ${shiftPalette.text}`
-                    )}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      {canEditAssignmentStatus ? (
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            openStatusPopoverForShift(shift, event.currentTarget)
-                          }}
-                          className={cn(
-                            'font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-                            shift.assignment_status === 'cancelled' ? 'text-red-700 line-through' : ''
-                          )}
-                        >
-                          {shift.full_name}
-                        </button>
-                      ) : (
-                        <span className={cn('font-medium', shift.assignment_status === 'cancelled' ? 'text-red-700 line-through' : '')}>
-                          {shift.full_name}
-                        </span>
-                      )}
-                      {shift.role === 'lead' && (
-                        <span className="text-[9px] font-semibold uppercase tracking-wide">Lead</span>
-                      )}
-                      {shift.assignment_status !== 'scheduled' && (
-                        <span
-                          className={cn(
-                            'inline-flex items-center rounded border px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide',
-                            assignmentStatusTone(shift.assignment_status)
-                          )}
-                          title={assignmentStatusTooltip(shift) ?? undefined}
-                        >
-                          {assignmentStatusLabel(shift.assignment_status)}
-                        </span>
-                      )}
-                      {canViewAvailabilityOverride && shift.availability_override && (
-                        <span
-                          className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-800"
-                          title={
-                            `Override by ${shift.availability_override_by_name ?? 'Manager'} - ${formatOverrideTimestamp(shift.availability_override_at)}${
-                              shift.availability_override_reason ? `\n${shift.availability_override_reason}` : ''
-                            }`
-                          }
-                        >
-                          Override
-                        </span>
-                      )}
-                    </div>
+              <div className="space-y-1">
+                {blockedByConstraints && (
+                  <div className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-800">
+                    No eligible therapists (constraints)
                   </div>
-                ))
+                )}
+                {missingLead && (
+                  <div className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700">
+                    No lead assigned
+                  </div>
+                )}
+                {filteredVisibleShifts.length === 0 ? (
+                  <span className="text-[11px] text-muted-foreground">No matching statuses</span>
+                ) : (
+                  filteredVisibleShifts.map((shift) => (
+                    <div
+                      key={shift.id}
+                      onClick={(event) => event.stopPropagation()}
+                      draggable={canManageStaffing}
+                      onDragStart={
+                        canManageStaffing
+                          ? (event) =>
+                              setDragData(event, {
+                                type: 'shift',
+                                shiftId: shift.id,
+                                shiftType: shift.shift_type,
+                              })
+                          : undefined
+                      }
+                      className={cn(
+                        'rounded-md border px-2 py-1',
+                        shift.role === 'lead'
+                          ? 'border-amber-300 bg-amber-50 text-amber-900'
+                          : `${shiftPalette.border} ${shiftPalette.bg} ${shiftPalette.text}`
+                      )}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {canEditAssignmentStatus ? (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              openStatusPopoverForShift(shift, event.currentTarget)
+                            }}
+                            className={cn(
+                              'font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                              shift.assignment_status === 'cancelled'
+                                ? 'text-red-700 line-through'
+                                : ''
+                            )}
+                          >
+                            {shift.full_name}
+                          </button>
+                        ) : (
+                          <span
+                            className={cn(
+                              'font-medium',
+                              shift.assignment_status === 'cancelled'
+                                ? 'text-red-700 line-through'
+                                : ''
+                            )}
+                          >
+                            {shift.full_name}
+                          </span>
+                        )}
+                        {shift.role === 'lead' && (
+                          <span className="text-[9px] font-semibold uppercase tracking-wide">
+                            Lead
+                          </span>
+                        )}
+                        {shift.assignment_status !== 'scheduled' && (
+                          <span
+                            className={cn(
+                              'inline-flex items-center rounded border px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide',
+                              assignmentStatusTone(shift.assignment_status)
+                            )}
+                            title={assignmentStatusTooltip(shift) ?? undefined}
+                          >
+                            {assignmentStatusLabel(shift.assignment_status)}
+                          </span>
+                        )}
+                        {canViewAvailabilityOverride && shift.availability_override && (
+                          <span
+                            className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-800"
+                            title={`Override by ${shift.availability_override_by_name ?? 'Manager'} - ${formatOverrideTimestamp(shift.availability_override_at)}${
+                              shift.availability_override_reason
+                                ? `\n${shift.availability_override_reason}`
+                                : ''
+                            }`}
+                          >
+                            Override
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              {orderedShifts.length === 0 && (
+                <div className="text-[11px] text-muted-foreground">No therapists assigned</div>
               )}
-            </div>
-            {orderedShifts.length === 0 && <div className="text-[11px] text-muted-foreground">No therapists assigned</div>}
-          </>
-        ) : (
-          <div className="text-xs text-muted-foreground">Outside cycle</div>
-        )}
+            </>
+          ) : (
+            <div className="text-xs text-muted-foreground">Outside cycle</div>
+          )}
         </div>
       </div>
     )
@@ -1750,13 +1796,14 @@ export function ManagerMonthCalendar({
       <div className="space-y-2">
         <div className="grid min-w-[760px] grid-cols-7 gap-2">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-            <div key={`continuous-${shiftType}-${day}`} className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <div
+              key={`continuous-${shiftType}-${day}`}
+              className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+            >
               {day}
             </div>
           ))}
-          {calendarWeeks.flatMap((week) =>
-            week.map((day) => renderShiftDayCell(day, shiftType))
-          )}
+          {calendarWeeks.flatMap((week) => week.map((day) => renderShiftDayCell(day, shiftType)))}
         </div>
       </div>
     )
@@ -1771,7 +1818,11 @@ export function ManagerMonthCalendar({
           variant={toastState.variant}
         />
       )}
-      {error && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {error && (
+        <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </p>
+      )}
       {success && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
           <span>{success}</span>
@@ -1799,7 +1850,12 @@ export function ManagerMonthCalendar({
 
       {canManageStaffing && (
         <div className="flex items-center justify-end">
-          <Button type="button" size="sm" variant="outline" onClick={() => setStaffingPoolOpen((open) => !open)}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setStaffingPoolOpen((open) => !open)}
+          >
             {staffingPoolOpen ? 'Hide staffing pool' : 'Show staffing pool'}
           </Button>
         </div>
@@ -1808,12 +1864,16 @@ export function ManagerMonthCalendar({
       <div
         className={cn(
           'grid grid-cols-1 gap-5',
-          staffingPoolOpen ? 'xl:grid-cols-[250px_minmax(0,1fr)_340px]' : 'xl:grid-cols-[minmax(0,1fr)_340px]'
+          staffingPoolOpen
+            ? 'xl:grid-cols-[250px_minmax(0,1fr)_340px]'
+            : 'xl:grid-cols-[minmax(0,1fr)_340px]'
         )}
       >
         {canManageStaffing && staffingPoolOpen && (
           <div className="rounded-2xl border border-border bg-card p-3 shadow-sm">
-            <h3 className="text-sm font-semibold text-foreground">Staffing pool ({selectedShiftType})</h3>
+            <h3 className="text-sm font-semibold text-foreground">
+              Staffing pool ({selectedShiftType})
+            </h3>
             <p className="mt-1 text-xs text-muted-foreground">
               Drag therapists onto the {selectedShiftType} calendar cells.
             </p>
@@ -1840,7 +1900,9 @@ export function ManagerMonthCalendar({
                     row.prnNotOffered
                       ? 'cursor-not-allowed opacity-60'
                       : 'cursor-grab active:cursor-grabbing',
-                    selectedShiftType === 'day' ? 'border-sky-200 bg-sky-50' : 'border-indigo-200 bg-indigo-50'
+                    selectedShiftType === 'day'
+                      ? 'border-sky-200 bg-sky-50'
+                      : 'border-indigo-200 bg-indigo-50'
                   )}
                 >
                   <div
@@ -1934,20 +1996,22 @@ export function ManagerMonthCalendar({
                 Next
               </Button>
             </div>
-            <p className="px-1 text-[11px] text-muted-foreground">Swipe left or right to navigate weeks.</p>
+            <p className="px-1 text-[11px] text-muted-foreground">
+              Swipe left or right to navigate weeks.
+            </p>
             <div
               className="space-y-2"
               onTouchStart={onMobileWeekTouchStart}
               onTouchEnd={onMobileWeekTouchEnd}
             >
-              {mobileWeekDays.map((day) => renderShiftDayCell(day, selectedShiftType, { showWeekday: true }))}
+              {mobileWeekDays.map((day) =>
+                renderShiftDayCell(day, selectedShiftType, { showWeekday: true })
+              )}
             </div>
           </div>
 
           <div className="hidden space-y-4 md:block">
-            <div className="overflow-x-auto">
-              {renderCalendarForShift(selectedShiftType)}
-            </div>
+            <div className="overflow-x-auto">{renderCalendarForShift(selectedShiftType)}</div>
           </div>
         </div>
 
@@ -1957,8 +2021,12 @@ export function ManagerMonthCalendar({
               <div className="border-b border-border bg-slate-50 px-4 py-3">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="text-sm font-bold text-slate-900">{formatCellDate(selectedDate)}</p>
-                    <p className="mt-1 text-xs text-muted-foreground capitalize">{selectedShiftType} shift</p>
+                    <p className="text-sm font-bold text-slate-900">
+                      {formatCellDate(selectedDate)}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground capitalize">
+                      {selectedShiftType} shift
+                    </p>
                   </div>
                   <button
                     type="button"
@@ -1981,24 +2049,43 @@ export function ManagerMonthCalendar({
                 {selectedLeadShift ? (
                   <div className="rounded-lg border border-border bg-white px-3 py-2">
                     <div className="flex items-center gap-2">
-                      <span className={cn('inline-flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-extrabold text-white', getAvatarTone(selectedLeadShift.assignment_status))}>
+                      <span
+                        className={cn(
+                          'inline-flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-extrabold text-white',
+                          getAvatarTone(selectedLeadShift.assignment_status)
+                        )}
+                      >
                         {initials(selectedLeadShift.full_name)}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className={cn('truncate text-sm font-semibold', selectedLeadShift.assignment_status === 'cancelled' ? 'text-red-700 line-through' : 'text-slate-900')}>
+                        <p
+                          className={cn(
+                            'truncate text-sm font-semibold',
+                            selectedLeadShift.assignment_status === 'cancelled'
+                              ? 'text-red-700 line-through'
+                              : 'text-slate-900'
+                          )}
+                        >
                           {selectedLeadShift.full_name}
                         </p>
-                        <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">Lead</p>
+                        <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">
+                          Lead
+                        </p>
                       </div>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1">
-                      {(['scheduled', 'on_call', 'left_early', 'cancelled'] as AssignmentStatus[]).map((status) => {
+                      {(
+                        ['scheduled', 'on_call', 'left_early', 'cancelled'] as AssignmentStatus[]
+                      ).map((status) => {
                         const active = selectedLeadShift.assignment_status === status
                         return (
                           <button
                             key={`${selectedLeadShift.id}-${status}`}
                             type="button"
-                            onClick={() => canEditAssignmentStatus && handlePanelStatusChange(selectedLeadShift, status)}
+                            onClick={() =>
+                              canEditAssignmentStatus &&
+                              handlePanelStatusChange(selectedLeadShift, status)
+                            }
                             disabled={active || isStatusSaving || !canEditAssignmentStatus}
                             className={cn(
                               'rounded-md border px-2 py-1 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-60',
@@ -2024,26 +2111,47 @@ export function ManagerMonthCalendar({
                 )}
 
                 {selectedStaffShifts.map((shift) => (
-                  <div key={shift.id} className="rounded-lg border border-border bg-white px-3 py-2">
+                  <div
+                    key={shift.id}
+                    className="rounded-lg border border-border bg-white px-3 py-2"
+                  >
                     <div className="flex items-center gap-2">
-                      <span className={cn('inline-flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-extrabold text-white', getAvatarTone(shift.assignment_status))}>
+                      <span
+                        className={cn(
+                          'inline-flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-extrabold text-white',
+                          getAvatarTone(shift.assignment_status)
+                        )}
+                      >
                         {initials(shift.full_name)}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className={cn('truncate text-sm font-semibold', shift.assignment_status === 'cancelled' ? 'text-red-700 line-through' : 'text-slate-900')}>
+                        <p
+                          className={cn(
+                            'truncate text-sm font-semibold',
+                            shift.assignment_status === 'cancelled'
+                              ? 'text-red-700 line-through'
+                              : 'text-slate-900'
+                          )}
+                        >
                           {shift.full_name}
                         </p>
-                        <p className="text-xs text-muted-foreground">{assignmentStatusDescription(shift.assignment_status)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {assignmentStatusDescription(shift.assignment_status)}
+                        </p>
                       </div>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1">
-                      {(['scheduled', 'on_call', 'left_early', 'cancelled'] as AssignmentStatus[]).map((status) => {
+                      {(
+                        ['scheduled', 'on_call', 'left_early', 'cancelled'] as AssignmentStatus[]
+                      ).map((status) => {
                         const active = shift.assignment_status === status
                         return (
                           <button
                             key={`${shift.id}-${status}`}
                             type="button"
-                            onClick={() => canEditAssignmentStatus && handlePanelStatusChange(shift, status)}
+                            onClick={() =>
+                              canEditAssignmentStatus && handlePanelStatusChange(shift, status)
+                            }
                             disabled={active || isStatusSaving || !canEditAssignmentStatus}
                             className={cn(
                               'rounded-md border px-2 py-1 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-60',
@@ -2066,16 +2174,30 @@ export function ManagerMonthCalendar({
 
                 {selectedDayLogs.length > 0 && (
                   <div className="mt-3 rounded-lg border border-border bg-slate-50 px-3 py-2">
-                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-700">Change log</p>
+                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-slate-700">
+                      Change log
+                    </p>
                     <div className="space-y-1">
                       {selectedDayLogs.map((entry) => (
-                        <div key={entry.key} className="flex items-center gap-2 text-[11px] text-slate-600">
-                          <span className={cn('inline-flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-extrabold text-white', getAvatarTone(entry.to))}>
+                        <div
+                          key={entry.key}
+                          className="flex items-center gap-2 text-[11px] text-slate-600"
+                        >
+                          <span
+                            className={cn(
+                              'inline-flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-extrabold text-white',
+                              getAvatarTone(entry.to)
+                            )}
+                          >
                             {initials(entry.therapistName)}
                           </span>
-                          <span className="font-semibold text-slate-700">{firstName(entry.therapistName)}</span>
+                          <span className="font-semibold text-slate-700">
+                            {firstName(entry.therapistName)}
+                          </span>
                           <span>{assignmentStatusDescription(entry.from)} -&gt;</span>
-                          <span className="font-semibold text-slate-700">{assignmentStatusDescription(entry.to)}</span>
+                          <span className="font-semibold text-slate-700">
+                            {assignmentStatusDescription(entry.to)}
+                          </span>
                           <span className="ml-auto text-slate-400">{entry.time}</span>
                         </div>
                       ))}
@@ -2130,7 +2252,10 @@ export function ManagerMonthCalendar({
           </p>
 
           <div className="mt-2 space-y-1">
-            <label htmlFor="assignment-status-select" className="text-[11px] font-medium text-muted-foreground">
+            <label
+              htmlFor="assignment-status-select"
+              className="text-[11px] font-medium text-muted-foreground"
+            >
               Status
             </label>
             <select
@@ -2149,7 +2274,10 @@ export function ManagerMonthCalendar({
           </div>
 
           <div className="mt-3 space-y-1">
-            <label htmlFor="assignment-status-note" className="text-[11px] font-medium text-muted-foreground">
+            <label
+              htmlFor="assignment-status-note"
+              className="text-[11px] font-medium text-muted-foreground"
+            >
               Note (optional)
             </label>
             <textarea
@@ -2157,7 +2285,9 @@ export function ManagerMonthCalendar({
               rows={2}
               value={statusDraft.note}
               onChange={(event) =>
-                setStatusDraft((current) => (current ? { ...current, note: event.target.value } : current))
+                setStatusDraft((current) =>
+                  current ? { ...current, note: event.target.value } : current
+                )
               }
               onBlur={() => saveStatusDraft({ closePopover: false })}
               disabled={isStatusSaving}
@@ -2168,7 +2298,10 @@ export function ManagerMonthCalendar({
 
           {statusDraft.status === 'left_early' && (
             <div className="mt-2 space-y-1">
-              <label htmlFor="assignment-left-early-time" className="text-[11px] font-medium text-muted-foreground">
+              <label
+                htmlFor="assignment-left-early-time"
+                className="text-[11px] font-medium text-muted-foreground"
+              >
                 Left at (optional)
               </label>
               <input
@@ -2211,7 +2344,13 @@ export function ManagerMonthCalendar({
           </div>
 
           <div className="mt-3 flex items-center justify-end gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={closeStatusPopover} disabled={isStatusSaving}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={closeStatusPopover}
+              disabled={isStatusSaving}
+            >
               Close
             </Button>
             <Button
@@ -2232,7 +2371,7 @@ export function ManagerMonthCalendar({
           if (!open) closeAvailabilityConflictDialog()
         }}
       >
-          <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Assignment warning</DialogTitle>
             <DialogDescription>
@@ -2248,7 +2387,10 @@ export function ManagerMonthCalendar({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <label htmlFor="availability-override-reason" className="text-xs font-medium text-muted-foreground">
+            <label
+              htmlFor="availability-override-reason"
+              className="text-xs font-medium text-muted-foreground"
+            >
               Override reason (optional)
             </label>
             <textarea
@@ -2278,7 +2420,9 @@ export function ManagerMonthCalendar({
               {drawerSlot ? `${drawerSlot.shiftType === 'day' ? 'Day' : 'Night'} Shift` : 'Shift'}
             </DialogTitle>
             <DialogDescription>
-              {drawerSlot ? `${formatCellDate(drawerSlot.date)} - full roster and lead controls` : ''}
+              {drawerSlot
+                ? `${formatCellDate(drawerSlot.date)} - full roster and lead controls`
+                : ''}
             </DialogDescription>
           </DialogHeader>
 
@@ -2370,7 +2514,9 @@ export function ManagerMonthCalendar({
                     <Fragment key={shift.id}>
                       <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-foreground">{shift.full_name}</span>
+                          <span className="text-sm font-medium text-foreground">
+                            {shift.full_name}
+                          </span>
                           {shift.role === 'lead' && (
                             <span className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
                               Lead
@@ -2405,11 +2551,11 @@ export function ManagerMonthCalendar({
                           {canViewAvailabilityOverride && shift.availability_override && (
                             <span
                               className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800"
-                              title={
-                                `Override by ${shift.availability_override_by_name ?? 'Manager'} - ${formatOverrideTimestamp(shift.availability_override_at)}${
-                                  shift.availability_override_reason ? `\n${shift.availability_override_reason}` : ''
-                                }`
-                              }
+                              title={`Override by ${shift.availability_override_by_name ?? 'Manager'} - ${formatOverrideTimestamp(shift.availability_override_at)}${
+                                shift.availability_override_reason
+                                  ? `\n${shift.availability_override_reason}`
+                                  : ''
+                              }`}
                             >
                               Override
                             </span>
@@ -2437,7 +2583,9 @@ export function ManagerMonthCalendar({
                         <div className="px-3 pb-2 text-[11px] text-amber-800">
                           Override by {shift.availability_override_by_name ?? 'Manager'} on{' '}
                           {formatOverrideTimestamp(shift.availability_override_at)}
-                          {shift.availability_override_reason ? ` - ${shift.availability_override_reason}` : ''}
+                          {shift.availability_override_reason
+                            ? ` - ${shift.availability_override_reason}`
+                            : ''}
                         </div>
                       )}
                     </Fragment>
@@ -2455,7 +2603,9 @@ export function ManagerMonthCalendar({
                       />
                       <div className="max-h-56 overflow-y-auto rounded-md border border-border bg-white p-1">
                         {drawerVisibleStaffOptions.length === 0 ? (
-                          <p className="px-2 py-2 text-xs text-muted-foreground">No matching therapists.</p>
+                          <p className="px-2 py-2 text-xs text-muted-foreground">
+                            No matching therapists.
+                          </p>
                         ) : (
                           drawerVisibleStaffOptions.map((option) => {
                             const selected = drawerAddTherapistId === option.therapist.id
@@ -2468,8 +2618,8 @@ export function ManagerMonthCalendar({
                                   option.disabledForEligibility
                                     ? 'PRN not offered for this date'
                                     : option.disabledForWeeklyLimit
-                                    ? `At weekly limit (${WEEKLY_LIMIT}/week)`
-                                    : undefined
+                                      ? `At weekly limit (${WEEKLY_LIMIT}/week)`
+                                      : undefined
                                 }
                                 onClick={() => setDrawerAddTherapistId(option.therapist.id)}
                                 className={cn(
@@ -2479,7 +2629,9 @@ export function ManagerMonthCalendar({
                                 )}
                               >
                                 <div className="min-w-0">
-                                  <p className="truncate font-medium text-foreground">{option.therapist.full_name}</p>
+                                  <p className="truncate font-medium text-foreground">
+                                    {option.therapist.full_name}
+                                  </p>
                                   <div className="mt-1 flex flex-wrap gap-1 text-[10px]">
                                     {option.therapist.is_lead_eligible && (
                                       <span className="rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 font-medium text-sky-700">

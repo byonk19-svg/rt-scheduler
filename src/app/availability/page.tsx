@@ -1,7 +1,10 @@
-﻿import { revalidatePath } from 'next/cache'
+import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
-import { AvailabilityEntriesTable, type AvailabilityEntryTableRow } from '@/app/availability/availability-requests-table'
+import {
+  AvailabilityEntriesTable,
+  type AvailabilityEntryTableRow,
+} from '@/app/availability/availability-requests-table'
 import type { TableToolbarFilters } from '@/components/TableToolbar'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { FormSubmitButton } from '@/components/form-submit-button'
@@ -11,9 +14,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { can } from '@/lib/auth/can'
+import { parseRole, toUiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
-
-type Role = 'manager' | 'therapist'
 type ToastVariant = 'success' | 'error'
 type AvailabilityOverrideType = 'force_off' | 'force_on'
 type AvailabilityShiftType = 'day' | 'night' | 'both'
@@ -68,7 +71,8 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
 
   if (error === 'duplicate_entry') {
     return {
-      message: 'An override already exists for that date and shift scope in this cycle. It was updated.',
+      message:
+        'An override already exists for that date and shift scope in this cycle. It was updated.',
       variant: 'success',
     }
   }
@@ -130,7 +134,9 @@ async function submitAvailabilityEntry(formData: FormData) {
   const date = String(formData.get('date') ?? '').trim()
   const cycleId = String(formData.get('cycle_id') ?? '').trim()
   const shiftType = String(formData.get('shift_type') ?? 'both').trim() as AvailabilityShiftType
-  const overrideType = String(formData.get('override_type') ?? '').trim() as AvailabilityOverrideType
+  const overrideType = String(
+    formData.get('override_type') ?? ''
+  ).trim() as AvailabilityOverrideType
   const note = String(formData.get('note') ?? '').trim()
 
   const { data: profile } = await supabase
@@ -139,7 +145,7 @@ async function submitAvailabilityEntry(formData: FormData) {
     .eq('id', user.id)
     .maybeSingle()
 
-  const isTherapist = profile?.role !== 'manager'
+  const isTherapist = !can(parseRole(profile?.role), 'access_manager_ui')
   const employmentType: EmploymentType =
     profile?.employment_type === 'prn'
       ? 'prn'
@@ -164,21 +170,19 @@ async function submitAvailabilityEntry(formData: FormData) {
     }
   }
 
-  const { error } = await supabase
-    .from('availability_overrides')
-    .upsert(
-      {
-        therapist_id: user.id,
-        cycle_id: cycleId,
-        date,
-        shift_type: shiftType,
-        override_type: overrideType,
-        note: note || null,
-        created_by: user.id,
-        source: 'therapist',
-      },
-      { onConflict: 'cycle_id,therapist_id,date,shift_type' }
-    )
+  const { error } = await supabase.from('availability_overrides').upsert(
+    {
+      therapist_id: user.id,
+      cycle_id: cycleId,
+      date,
+      shift_type: shiftType,
+      override_type: overrideType,
+      note: note || null,
+      created_by: user.id,
+      source: 'therapist',
+    },
+    { onConflict: 'cycle_id,therapist_id,date,shift_type' }
+  )
 
   if (error) {
     console.error('Failed to save availability override:', error)
@@ -254,7 +258,8 @@ export default async function AvailabilityPage({
     .eq('id', user.id)
     .maybeSingle()
 
-  const role: Role = profile?.role === 'manager' ? 'manager' : 'therapist'
+  const role = toUiRole(profile?.role)
+  const canManageAvailability = can(role, 'access_manager_ui')
   const isPrnTherapist = role === 'therapist' && profile?.employment_type === 'prn'
 
   const today = new Date()
@@ -287,7 +292,7 @@ export default async function AvailabilityPage({
     entriesQuery = entriesQuery.eq('cycle_id', selectedCycleId)
   }
 
-  if (role !== 'manager') {
+  if (!canManageAvailability) {
     entriesQuery = entriesQuery.eq('therapist_id', user.id)
   }
 
@@ -305,7 +310,9 @@ export default async function AvailabilityPage({
       reason: entry.note,
       createdAt: entry.created_at,
       requestedBy: requester?.full_name ?? 'Unknown user',
-      cycleLabel: cycle ? `${cycle.label} (${cycle.start_date} to ${cycle.end_date})` : 'Unknown cycle',
+      cycleLabel: cycle
+        ? `${cycle.label} (${cycle.start_date} to ${cycle.end_date})`
+        : 'Unknown cycle',
       entryType: entry.override_type,
       shiftType: entry.shift_type,
       canDelete: entry.therapist_id === user.id,
@@ -326,7 +333,7 @@ export default async function AvailabilityPage({
       <CardHeader>
         <CardTitle>Cycle-specific date overrides</CardTitle>
         <CardDescription>
-          {role === 'manager'
+          {canManageAvailability
             ? 'Submit overrides for one schedule cycle only. "Need off" forces off; "Available to work" forces on.'
             : isPrnTherapist
               ? 'Submit "Available to work (PRN)" for one schedule cycle only.'
@@ -360,9 +367,7 @@ export default async function AvailabilityPage({
               ))}
             </select>
             {!hasCycles && (
-              <p className="text-xs text-muted-foreground">
-                No upcoming schedule cycles found.
-              </p>
+              <p className="text-xs text-muted-foreground">No upcoming schedule cycles found.</p>
             )}
           </div>
 
@@ -374,7 +379,7 @@ export default async function AvailabilityPage({
               className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
               defaultValue={isPrnTherapist ? 'force_on' : 'force_off'}
             >
-              {role === 'manager' ? (
+              {canManageAvailability ? (
                 <>
                   <option value="force_off">Need off</option>
                   <option value="force_on">Available to work</option>
@@ -407,7 +412,9 @@ export default async function AvailabilityPage({
           </div>
 
           <div className="xl:col-span-12">
-            <FormSubmitButton type="submit" pendingText="Saving...">Save override</FormSubmitButton>
+            <FormSubmitButton type="submit" pendingText="Saving...">
+              Save override
+            </FormSubmitButton>
           </div>
         </form>
         {feedback?.variant === 'error' && (
@@ -426,7 +433,7 @@ export default async function AvailabilityPage({
       <div>
         <h1 className="app-page-title">Availability</h1>
         <p className="text-muted-foreground">
-          {role === 'manager'
+          {canManageAvailability
             ? 'Review cycle-scoped therapist date overrides for schedule planning.'
             : isPrnTherapist
               ? 'Submit cycle-scoped PRN offers: Available to work (PRN).'
@@ -439,14 +446,17 @@ export default async function AvailabilityPage({
           <a href="#submit-entry">Submit override</a>
         </Button>
         <MoreActionsMenu>
-          <a href="/api/availability/export" className="block rounded-sm px-3 py-2 text-sm hover:bg-secondary">
+          <a
+            href="/api/availability/export"
+            className="block rounded-sm px-3 py-2 text-sm hover:bg-secondary"
+          >
             Export CSV
           </a>
           <PrintMenuItem />
         </MoreActionsMenu>
       </div>
 
-      {role === 'manager' ? (
+      {canManageAvailability ? (
         <>
           {entriesCard}
           {submitEntryCard}

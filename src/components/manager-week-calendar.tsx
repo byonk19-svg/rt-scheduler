@@ -42,7 +42,9 @@ type ManagerWeekCalendarProps = {
   focusSlotKey?: string | null
   issueReasonsBySlot?: Record<
     string,
-    Array<'under_coverage' | 'over_coverage' | 'missing_lead' | 'multiple_leads' | 'ineligible_lead'>
+    Array<
+      'under_coverage' | 'over_coverage' | 'missing_lead' | 'multiple_leads' | 'ineligible_lead'
+    >
   >
   defaultShiftType?: 'day' | 'night'
   canEditAssignmentStatus?: boolean
@@ -140,9 +142,14 @@ function formatStatusTimestamp(value: string | null): string {
   })
 }
 
-function formatStatusPopoverHeader(date: string, shiftType: 'day' | 'night', therapistName: string): string {
+function formatStatusPopoverHeader(
+  date: string,
+  shiftType: 'day' | 'night',
+  therapistName: string
+): string {
   const parsed = dateFromKey(date)
-  if (Number.isNaN(parsed.getTime())) return `${date} · ${shiftType === 'day' ? 'Day' : 'Night'} shift · ${therapistName}`
+  if (Number.isNaN(parsed.getTime()))
+    return `${date} · ${shiftType === 'day' ? 'Day' : 'Night'} shift · ${therapistName}`
   const dateLabel = parsed.toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
@@ -181,7 +188,9 @@ function statusDraftChanged(
   const snapshotNote = (snapshot.note ?? '').trim()
   const draftTime = draft.status === 'left_early' ? draft.leftEarlyTime.trim() : ''
   const snapshotTime = snapshot.status === 'left_early' ? (snapshot.leftEarlyTime ?? '').trim() : ''
-  return draft.status !== snapshot.status || draftNote !== snapshotNote || draftTime !== snapshotTime
+  return (
+    draft.status !== snapshot.status || draftNote !== snapshotNote || draftTime !== snapshotTime
+  )
 }
 
 function assignmentStatusTooltip(shift: CalendarShift): string | null {
@@ -217,7 +226,9 @@ export function ManagerWeekCalendar({
   const [localShifts, setLocalShifts] = useState(shifts)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [statusUndoSnapshot, setStatusUndoSnapshot] = useState<AssignmentStatusSnapshot | null>(null)
+  const [statusUndoSnapshot, setStatusUndoSnapshot] = useState<AssignmentStatusSnapshot | null>(
+    null
+  )
   const [toastState, setToastState] = useState<{
     id: number
     message: string
@@ -240,7 +251,10 @@ export function ManagerWeekCalendar({
 
   const calendarWeeks = useMemo(() => buildCalendarWeeks(startDate, endDate), [startDate, endDate])
   const weekStartKeys = useMemo(
-    () => calendarWeeks.map((week) => keyFromDate(week[0])).filter((value, index, list) => list.indexOf(value) === index),
+    () =>
+      calendarWeeks
+        .map((week) => keyFromDate(week[0]))
+        .filter((value, index, list) => list.indexOf(value) === index),
     [calendarWeeks]
   )
 
@@ -488,12 +502,12 @@ export function ManagerWeekCalendar({
     } catch (statusError) {
       if (previousShift) {
         setLocalShifts((current) =>
-          current.map((shift) =>
-            shift.id === statusPopover.assignmentId ? previousShift : shift
-          )
+          current.map((shift) => (shift.id === statusPopover.assignmentId ? previousShift : shift))
         )
       }
-      setError(statusError instanceof Error ? statusError.message : 'Could not save assignment status.')
+      setError(
+        statusError instanceof Error ? statusError.message : 'Could not save assignment status.'
+      )
       setToastState({
         id: Date.now(),
         message: 'Could not save status change. Rolled back local update.',
@@ -575,7 +589,11 @@ export function ManagerWeekCalendar({
           variant={toastState.variant}
         />
       )}
-      {error && <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {error && (
+        <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </p>
+      )}
       {success && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
           <span>{success}</span>
@@ -615,11 +633,29 @@ export function ManagerWeekCalendar({
             </Button>
           </div>
           <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-            <Button type="button" size="sm" variant="outline" disabled={!canGoPrev} onClick={() => setSelectedWeekStart(weekStartKeys[selectedWeekIndex - 1] ?? selectedWeekStart)}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={!canGoPrev}
+              onClick={() =>
+                setSelectedWeekStart(weekStartKeys[selectedWeekIndex - 1] ?? selectedWeekStart)
+              }
+            >
               Previous week
             </Button>
-            <span>{selectedWeek.length > 0 ? formatWeekRange(selectedWeek) : 'No week selected'}</span>
-            <Button type="button" size="sm" variant="outline" disabled={!canGoNext} onClick={() => setSelectedWeekStart(weekStartKeys[selectedWeekIndex + 1] ?? selectedWeekStart)}>
+            <span>
+              {selectedWeek.length > 0 ? formatWeekRange(selectedWeek) : 'No week selected'}
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={!canGoNext}
+              onClick={() =>
+                setSelectedWeekStart(weekStartKeys[selectedWeekIndex + 1] ?? selectedWeekStart)
+              }
+            >
               Next week
             </Button>
           </div>
@@ -639,7 +675,9 @@ export function ManagerWeekCalendar({
                     })
                 : []
               const lead = dayShifts.find((shift) => shift.role === 'lead') ?? null
-              const coverageCount = dayShifts.filter((shift) => countsTowardCoverage(shift.status)).length
+              const coverageCount = dayShifts.filter((shift) =>
+                countsTowardCoverage(shift.status)
+              ).length
               const hasEligibleCoverage = dayShifts.some(
                 (shift) => countsTowardCoverage(shift.status) && shift.isLeadEligible
               )
@@ -648,7 +686,11 @@ export function ManagerWeekCalendar({
               const overCoverage = coverageCount > MAX_SHIFT_COVERAGE_PER_DAY
               const slotKey = `${date}:${selectedShiftType}`
               const derivedReasons: Array<
-                'under_coverage' | 'over_coverage' | 'missing_lead' | 'multiple_leads' | 'ineligible_lead'
+                | 'under_coverage'
+                | 'over_coverage'
+                | 'missing_lead'
+                | 'multiple_leads'
+                | 'ineligible_lead'
               > = []
               if (underCoverage) derivedReasons.push('under_coverage')
               if (overCoverage) derivedReasons.push('over_coverage')
@@ -671,20 +713,32 @@ export function ManagerWeekCalendar({
                   )}
                 >
                   <div className="mb-2 border-b border-border pb-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{weekDayLabel}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {weekDayLabel}
+                    </p>
                     <p className="text-sm font-semibold text-foreground">{dayLabel}</p>
                     {inCycle ? (
                       <div className="mt-1 flex flex-wrap items-center gap-1">
-                        <span className={cn(
-                          'rounded border px-1 py-0.5 text-[10px] font-semibold',
-                          underCoverage ? 'border-amber-300 bg-amber-50 text-amber-800' : overCoverage ? 'border-red-300 bg-red-50 text-red-800' : 'border-emerald-300 bg-emerald-50 text-emerald-800'
-                        )}>
+                        <span
+                          className={cn(
+                            'rounded border px-1 py-0.5 text-[10px] font-semibold',
+                            underCoverage
+                              ? 'border-amber-300 bg-amber-50 text-amber-800'
+                              : overCoverage
+                                ? 'border-red-300 bg-red-50 text-red-800'
+                                : 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                          )}
+                        >
                           {coverageCount}/{MAX_SHIFT_COVERAGE_PER_DAY}
                         </span>
-                        <span className={cn(
-                          'rounded border px-1 py-0.5 text-[10px] font-semibold',
-                          missingLead ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-emerald-300 bg-emerald-50 text-emerald-800'
-                        )}>
+                        <span
+                          className={cn(
+                            'rounded border px-1 py-0.5 text-[10px] font-semibold',
+                            missingLead
+                              ? 'border-amber-300 bg-amber-50 text-amber-800'
+                              : 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                          )}
+                        >
                           {missingLead ? 'Lead missing' : 'Lead set'}
                         </span>
                       </div>
@@ -705,13 +759,18 @@ export function ManagerWeekCalendar({
                               : `${shiftPalette.border} ${shiftPalette.bg} ${shiftPalette.text}`
 
                           return (
-                            <div key={shift.id} className={cn('rounded-md border px-2 py-1', chipTone)}>
+                            <div
+                              key={shift.id}
+                              className={cn('rounded-md border px-2 py-1', chipTone)}
+                            >
                               <div className="flex items-center gap-1.5">
                                 {canEditAssignmentStatus ? (
                                   <button
                                     type="button"
                                     className="font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                                    onClick={(event) => openStatusPopoverForShift(shift, event.currentTarget)}
+                                    onClick={(event) =>
+                                      openStatusPopoverForShift(shift, event.currentTarget)
+                                    }
                                   >
                                     {shift.full_name}
                                   </button>
@@ -732,11 +791,11 @@ export function ManagerWeekCalendar({
                                 {canViewAvailabilityOverride && shift.availability_override && (
                                   <span
                                     className="inline-flex items-center rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-800"
-                                    title={
-                                      `Override by ${shift.availability_override_by_name ?? 'Manager'} - ${formatOverrideTimestamp(shift.availability_override_at)}${
-                                        shift.availability_override_reason ? `\n${shift.availability_override_reason}` : ''
-                                      }`
-                                    }
+                                    title={`Override by ${shift.availability_override_by_name ?? 'Manager'} - ${formatOverrideTimestamp(shift.availability_override_at)}${
+                                      shift.availability_override_reason
+                                        ? `\n${shift.availability_override_reason}`
+                                        : ''
+                                    }`}
                                   >
                                     Override
                                   </span>
@@ -768,11 +827,18 @@ export function ManagerWeekCalendar({
           }}
         >
           <p className="text-xs font-medium text-foreground">
-            {formatStatusPopoverHeader(statusPopover.date, statusPopover.shiftType, statusPopover.therapistName)}
+            {formatStatusPopoverHeader(
+              statusPopover.date,
+              statusPopover.shiftType,
+              statusPopover.therapistName
+            )}
           </p>
 
           <div className="mt-2 space-y-1">
-            <label htmlFor={`week-assignment-status-select-${cycleId}`} className="text-[11px] font-medium text-muted-foreground">
+            <label
+              htmlFor={`week-assignment-status-select-${cycleId}`}
+              className="text-[11px] font-medium text-muted-foreground"
+            >
               Status
             </label>
             <select
@@ -791,7 +857,10 @@ export function ManagerWeekCalendar({
           </div>
 
           <div className="mt-3 space-y-1">
-            <label htmlFor={`week-assignment-status-note-${cycleId}`} className="text-[11px] font-medium text-muted-foreground">
+            <label
+              htmlFor={`week-assignment-status-note-${cycleId}`}
+              className="text-[11px] font-medium text-muted-foreground"
+            >
               Note (optional)
             </label>
             <textarea
@@ -799,7 +868,9 @@ export function ManagerWeekCalendar({
               rows={2}
               value={statusDraft.note}
               onChange={(event) =>
-                setStatusDraft((current) => (current ? { ...current, note: event.target.value } : current))
+                setStatusDraft((current) =>
+                  current ? { ...current, note: event.target.value } : current
+                )
               }
               onBlur={() => saveStatusDraft({ closePopover: false })}
               disabled={isStatusSaving}
@@ -810,7 +881,10 @@ export function ManagerWeekCalendar({
 
           {statusDraft.status === 'left_early' && (
             <div className="mt-2 space-y-1">
-              <label htmlFor={`week-assignment-left-early-time-${cycleId}`} className="text-[11px] font-medium text-muted-foreground">
+              <label
+                htmlFor={`week-assignment-left-early-time-${cycleId}`}
+                className="text-[11px] font-medium text-muted-foreground"
+              >
                 Left at (optional)
               </label>
               <input
@@ -836,7 +910,10 @@ export function ManagerWeekCalendar({
               onClick={handleResetToScheduled}
               disabled={
                 isStatusSaving ||
-                !statusDraftChanged({ status: 'scheduled', note: '', leftEarlyTime: '' }, statusPopover.snapshot)
+                !statusDraftChanged(
+                  { status: 'scheduled', note: '', leftEarlyTime: '' },
+                  statusPopover.snapshot
+                )
               }
             >
               Reset to Scheduled
@@ -850,7 +927,13 @@ export function ManagerWeekCalendar({
           </div>
 
           <div className="mt-3 flex items-center justify-end gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={closeStatusPopover} disabled={isStatusSaving}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={closeStatusPopover}
+              disabled={isStatusSaving}
+            >
               Close
             </Button>
             <Button

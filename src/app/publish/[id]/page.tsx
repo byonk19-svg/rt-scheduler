@@ -1,15 +1,13 @@
-﻿import Link from 'next/link'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
+import { can } from '@/lib/auth/can'
+import { parseRole } from '@/lib/auth/roles'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { buildScheduleUrl, parseCount } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/server'
 import { ProcessQueuedButton } from '@/app/publish/process-queued-button'
 import { requeueFailedPublishEmailsAction } from '@/app/publish/actions'
-
-type ProfileRoleRow = {
-  role: string | null
-}
 
 type PublishEventDetailRow = {
   id: string
@@ -97,7 +95,7 @@ export default async function PublishEventDetailPage({
     .eq('id', user.id)
     .maybeSingle()
 
-  if ((profile as ProfileRoleRow | null)?.role !== 'manager') {
+  if (!can(parseRole(profile?.role), 'manage_publish')) {
     redirect('/dashboard')
   }
 
@@ -166,21 +164,51 @@ export default async function PublishEventDetailPage({
 
       <div className="rounded-md border border-border bg-white p-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <p className="text-sm text-muted-foreground">Event ID: <span className="font-medium text-foreground">{event.id}</span></p>
-          <p className="text-sm text-muted-foreground">Cycle: <span className="font-medium text-foreground">{cycle?.label ?? event.cycle_id}</span></p>
-          <p className="text-sm text-muted-foreground">Published at: <span className="font-medium text-foreground">{new Date(event.published_at).toLocaleString('en-US')}</span></p>
-          <p className="text-sm text-muted-foreground">Published by: <span className="font-medium text-foreground">{getOne(event.profiles)?.full_name ?? 'Manager'}</span></p>
-          <p className="text-sm text-muted-foreground">Recipients: <span className="font-medium text-foreground">{event.recipient_count}</span></p>
-          <p className="text-sm text-muted-foreground">Channel: <span className="font-medium text-foreground">{event.channel}</span></p>
-          <p className="text-sm text-muted-foreground">Queued: <span className="font-medium text-foreground">{event.queued_count}</span></p>
-          <p className="text-sm text-muted-foreground">Sent: <span className="font-medium text-foreground">{event.sent_count}</span></p>
-          <p className="text-sm text-muted-foreground">Failed: <span className="font-medium text-foreground">{event.failed_count}</span></p>
-          <p className="text-sm text-muted-foreground">Status: <span className="font-medium text-foreground">{event.status}</span></p>
+          <p className="text-sm text-muted-foreground">
+            Event ID: <span className="font-medium text-foreground">{event.id}</span>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Cycle:{' '}
+            <span className="font-medium text-foreground">{cycle?.label ?? event.cycle_id}</span>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Published at:{' '}
+            <span className="font-medium text-foreground">
+              {new Date(event.published_at).toLocaleString('en-US')}
+            </span>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Published by:{' '}
+            <span className="font-medium text-foreground">
+              {getOne(event.profiles)?.full_name ?? 'Manager'}
+            </span>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Recipients: <span className="font-medium text-foreground">{event.recipient_count}</span>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Channel: <span className="font-medium text-foreground">{event.channel}</span>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Queued: <span className="font-medium text-foreground">{event.queued_count}</span>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Sent: <span className="font-medium text-foreground">{event.sent_count}</span>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Failed: <span className="font-medium text-foreground">{event.failed_count}</span>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Status: <span className="font-medium text-foreground">{event.status}</span>
+          </p>
         </div>
 
         {cycle && (
           <p className="mt-3 text-sm text-muted-foreground">
-            Cycle range: <span className="font-medium text-foreground">{cycle.start_date} to {cycle.end_date}</span>
+            Cycle range:{' '}
+            <span className="font-medium text-foreground">
+              {cycle.start_date} to {cycle.end_date}
+            </span>
           </p>
         )}
 
@@ -236,4 +264,3 @@ export default async function PublishEventDetailPage({
     </div>
   )
 }
-

@@ -12,11 +12,20 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { FormSubmitButton } from '@/components/form-submit-button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { can } from '@/lib/auth/can'
+import type { UiRole } from '@/lib/auth/roles'
 import { formatDate } from '@/lib/schedule-helpers'
 import { filterAndSortRows, type FilterableRow } from '@/lib/table-filtering'
 
-type Role = 'manager' | 'therapist'
+type Role = UiRole
 
 export type AvailabilityEntryTableRow = {
   id: string
@@ -66,7 +75,10 @@ export function AvailabilityEntriesTable({
   deleteAvailabilityEntryAction,
   initialFilters,
 }: AvailabilityEntriesTableProps) {
-  const [scope, setScope] = useState<'all-staff' | 'my-entries'>(role === 'manager' ? 'all-staff' : 'my-entries')
+  const canManageAvailability = can(role, 'access_manager_ui')
+  const [scope, setScope] = useState<'all-staff' | 'my-entries'>(
+    canManageAvailability ? 'all-staff' : 'my-entries'
+  )
   const [expandedEntryIds, setExpandedEntryIds] = useState<Set<string>>(new Set())
 
   const defaultStatus = 'all'
@@ -101,7 +113,7 @@ export function AvailabilityEntriesTable({
 
   const filteredRows = useMemo(() => {
     const scopedRows =
-      role === 'manager' && scope === 'my-entries' ? rows.filter((row) => row.canDelete) : rows
+      canManageAvailability && scope === 'my-entries' ? rows.filter((row) => row.canDelete) : rows
 
     const mappedRows: Array<AvailabilityEntryTableRow & FilterableRow> = scopedRows.map((row) => ({
       ...row,
@@ -112,28 +124,28 @@ export function AvailabilityEntriesTable({
     }))
 
     return filterAndSortRows(mappedRows, filters)
-  }, [rows, filters, role, scope])
+  }, [canManageAvailability, rows, filters, scope])
 
-  const emptyColSpan = role === 'manager' ? 5 : 4
+  const emptyColSpan = canManageAvailability ? 5 : 4
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>
-          {role === 'manager'
+          {canManageAvailability
             ? scope === 'all-staff'
               ? 'All Staff Availability'
               : 'My Availability'
             : 'My Availability'}
         </CardTitle>
         <CardDescription>
-          {role === 'manager'
+          {canManageAvailability
             ? 'Availability constraints for schedule planning. No approval workflow.'
             : 'Your submitted availability entries for upcoming cycles.'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {role === 'manager' && (
+        {canManageAvailability && (
           <div className="flex items-center gap-2">
             <Button
               type="button"
@@ -165,7 +177,9 @@ export function AvailabilityEntriesTable({
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
-              {role === 'manager' && <TableHead className="hidden md:table-cell">Therapist</TableHead>}
+              {canManageAvailability && (
+                <TableHead className="hidden md:table-cell">Therapist</TableHead>
+              )}
               <TableHead>Type</TableHead>
               <TableHead className="hidden md:table-cell">Shift scope</TableHead>
               <TableHead>Summary</TableHead>
@@ -174,7 +188,10 @@ export function AvailabilityEntriesTable({
           <TableBody>
             {filteredRows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={emptyColSpan} className="py-6 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={emptyColSpan}
+                  className="py-6 text-center text-muted-foreground"
+                >
                   No availability entries match the current filters.
                 </TableCell>
               </TableRow>
@@ -199,19 +216,27 @@ export function AvailabilityEntriesTable({
                     aria-expanded={isExpanded}
                   >
                     <TableCell>{formatDate(row.date)}</TableCell>
-                    {role === 'manager' && <TableCell className="hidden md:table-cell">{row.requestedBy}</TableCell>}
+                    {canManageAvailability && (
+                      <TableCell className="hidden md:table-cell">{row.requestedBy}</TableCell>
+                    )}
                     <TableCell>
                       <Badge variant={row.entryType === 'force_off' ? 'destructive' : 'outline'}>
                         {formatEntryLabel(row.entryType)}
                       </Badge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
-                      <span className="text-sm text-muted-foreground">{formatShiftTypeLabel(row.shiftType)}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {formatShiftTypeLabel(row.shiftType)}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-between gap-3">
-                        <span className="line-clamp-1 text-sm text-foreground">{reasonPreview}</span>
-                        <span className="text-xs text-muted-foreground">{isExpanded ? 'Hide' : 'Details'}</span>
+                        <span className="line-clamp-1 text-sm text-foreground">
+                          {reasonPreview}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {isExpanded ? 'Hide' : 'Details'}
+                        </span>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -230,15 +255,19 @@ export function AvailabilityEntriesTable({
                             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                               Submitted
                             </p>
-                            <p className="text-sm text-foreground">{formatDateTime(row.createdAt)}</p>
+                            <p className="text-sm text-foreground">
+                              {formatDateTime(row.createdAt)}
+                            </p>
                           </div>
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                               Shift scope
                             </p>
-                            <p className="text-sm text-foreground">{formatShiftTypeLabel(row.shiftType)}</p>
+                            <p className="text-sm text-foreground">
+                              {formatShiftTypeLabel(row.shiftType)}
+                            </p>
                           </div>
-                          {role === 'manager' && (
+                          {canManageAvailability && (
                             <div>
                               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                 Therapist
@@ -260,12 +289,19 @@ export function AvailabilityEntriesTable({
                               >
                                 <input type="hidden" name="entry_id" value={row.id} />
                                 <input type="hidden" name="cycle_id" value={row.cycleId} />
-                                <FormSubmitButton type="submit" variant="outline" size="sm" pendingText="Deleting...">
+                                <FormSubmitButton
+                                  type="submit"
+                                  variant="outline"
+                                  size="sm"
+                                  pendingText="Deleting..."
+                                >
                                   Delete entry
                                 </FormSubmitButton>
                               </form>
                             ) : (
-                              <span className="text-xs text-muted-foreground">No actions available.</span>
+                              <span className="text-xs text-muted-foreground">
+                                No actions available.
+                              </span>
                             )}
                           </div>
                         </div>
