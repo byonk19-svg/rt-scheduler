@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 
 import { MoreActionsMenu } from '@/components/more-actions-menu'
-import { PrintMenuItem } from '@/components/print-menu-item'
+import { PrintButton } from '@/components/print-button'
 import { FormMenuSubmitButton, FormSubmitButton } from '@/components/form-submit-button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -155,8 +155,8 @@ export function ScheduleHeader({
             </>
           )}
 
-          <MoreActionsMenu>
-            {role === 'manager' && (
+          {role === 'manager' && (
+            <MoreActionsMenu>
               <form action={resetDraftScheduleAction}>
                 <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
                 <input type="hidden" name="view" value={viewMode} />
@@ -170,9 +170,10 @@ export function ScheduleHeader({
                   Clear draft and start over
                 </FormMenuSubmitButton>
               </form>
-            )}
-            <PrintMenuItem />
-          </MoreActionsMenu>
+            </MoreActionsMenu>
+          )}
+
+          <PrintButton variant="outline" label="Print schedule" />
 
           {role === 'manager' && autoGenerateHelperMessage && (
             <p className="w-full text-xs text-muted-foreground">{autoGenerateHelperMessage}</p>

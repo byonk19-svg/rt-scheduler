@@ -2,7 +2,7 @@
 import { redirect } from 'next/navigation'
 
 import { FeedbackToast } from '@/components/feedback-toast'
-import { parseCount } from '@/lib/schedule-helpers'
+import { buildScheduleUrl, parseCount } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/server'
 import { ProcessQueuedButton } from '@/app/publish/process-queued-button'
 import { requeueFailedPublishEmailsAction } from '@/app/publish/actions'
@@ -131,6 +131,7 @@ export default async function PublishEventDetailPage({
 
   const failedRows = failedRowsError ? [] : ((failedRowsData ?? []) as FailedRecipientRow[])
   const cycle = getOne(event.schedule_cycles)
+  const publishedScheduleHref = buildScheduleUrl(event.cycle_id, 'week')
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-4 py-6">
@@ -147,6 +148,12 @@ export default async function PublishEventDetailPage({
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-bold text-foreground">Publish details</h1>
         <div className="flex items-center gap-2">
+          <Link
+            href={publishedScheduleHref}
+            className="rounded-md border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-secondary"
+          >
+            View published schedule
+          </Link>
           <Link
             href="/publish"
             className="rounded-md border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-secondary"

@@ -238,23 +238,42 @@ export default function MySchedulePage() {
           </h1>
           <p style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>View upcoming shifts and request swaps when needed.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => router.push('/requests/new')}
-          style={{
-            fontSize: 12,
-            fontWeight: 700,
-            padding: '7px 16px',
-            borderRadius: 7,
-            border: 'none',
-            background: '#d97706',
-            color: '#fff',
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          + Request swap
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              padding: '7px 16px',
+              borderRadius: 7,
+              border: '1px solid #e5e7eb',
+              background: '#fff',
+              color: '#334155',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Print schedule
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push('/requests/new')}
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              padding: '7px 16px',
+              borderRadius: 7,
+              border: 'none',
+              background: '#d97706',
+              color: '#fff',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            + Request swap
+          </button>
+        </div>
       </div>
 
       {error && (

@@ -47,8 +47,8 @@ export type ShiftRow = {
   role: ShiftRole
   user_id: string
   profiles:
-    | { full_name: string; is_lead_eligible: boolean }
-    | { full_name: string; is_lead_eligible: boolean }[]
+    | { full_name: string; is_lead_eligible: boolean; employment_type?: EmploymentType | null }
+    | { full_name: string; is_lead_eligible: boolean; employment_type?: EmploymentType | null }[]
     | null
 }
 

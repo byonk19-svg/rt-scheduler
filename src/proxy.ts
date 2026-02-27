@@ -38,6 +38,15 @@ function normalizeRole(value: unknown): AppRole | null {
 }
 
 export async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+  const pathWithQuery = `${pathname}${request.nextUrl.search}`
+
+  if (isPublicRoute(pathname)) {
+    return NextResponse.next({
+      request,
+    })
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -65,15 +74,21 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  const pathname = request.nextUrl.pathname
-  const pathWithQuery = `${pathname}${request.nextUrl.search}`
-
-  if (isPublicRoute(pathname)) {
-    return supabaseResponse
+  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'] = null
+  try {
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser()
+    user = authUser
+  } catch (error) {
+    console.warn(
+      'Supabase auth check failed in proxy middleware:',
+      error instanceof Error ? error.message : error
+    )
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    url.searchParams.set('redirectTo', pathWithQuery)
+    return NextResponse.redirect(url)
   }
 
   // If not logged in and trying to access a protected page, redirect to login

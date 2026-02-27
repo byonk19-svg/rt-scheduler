@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { CalendarToolbar } from '@/components/CalendarToolbar'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Dialog,
   DialogContent,
@@ -16,16 +17,23 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { summarizeCalendarCell } from '@/lib/calendar-cell'
+import {
+  buildTherapistWorkloadCounts,
+  getWeekBoundsForDate,
+} from '@/lib/therapist-picker-metrics'
 import { cn } from '@/lib/utils'
 import { MIN_SHIFT_COVERAGE_PER_DAY, MAX_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
 
 type Therapist = {
   id: string
   full_name: string
+  email?: string | null
   shift_type: 'day' | 'night'
   employment_type?: 'full_time' | 'part_time' | 'prn'
   is_lead_eligible?: boolean
 }
+
+const WEEKLY_LIMIT = 3
 
 type Shift = {
   id: string
@@ -420,6 +428,7 @@ export function ManagerMonthCalendar({
   const [staffingPoolOpen, setStaffingPoolOpen] = useState(false)
   const [drawerSlot, setDrawerSlot] = useState<{ date: string; shiftType: 'day' | 'night' } | null>(null)
   const [drawerAddTherapistId, setDrawerAddTherapistId] = useState('')
+  const [drawerTherapistSearch, setDrawerTherapistSearch] = useState('')
   const [drawerLeadTherapistId, setDrawerLeadTherapistId] = useState('')
   const [availabilityConflictDialog, setAvailabilityConflictDialog] = useState<{
     therapistId: string
@@ -673,6 +682,58 @@ export function ManagerMonthCalendar({
       .sort((a, b) => a.therapist.full_name.localeCompare(b.therapist.full_name))
   }, [drawerAssignedOnDate, drawerShifts, drawerSlot, getTherapistAvailabilityState, therapists])
 
+  const drawerWeekBounds = useMemo(() => {
+    if (!drawerSlot) return null
+    return getWeekBoundsForDate(drawerSlot.date)
+  }, [drawerSlot])
+
+  const workloadCountsByTherapist = useMemo(() => {
+    if (!drawerSlot || !drawerWeekBounds) return new Map<string, { weekShiftCount: number; cycleShiftCount: number }>()
+    return buildTherapistWorkloadCounts({
+      shifts: localShifts.map((shift) => ({
+        userId: shift.user_id,
+        date: shift.date,
+        status: shift.status,
+      })),
+      weekStart: drawerWeekBounds.weekStart,
+      weekEnd: drawerWeekBounds.weekEnd,
+      cycleStart: startDate,
+      cycleEnd: endDate,
+    })
+  }, [drawerSlot, drawerWeekBounds, endDate, localShifts, startDate])
+
+  const drawerSmartStaffOptions = useMemo(() => {
+    return drawerStaffAddOptions
+      .map((option) => {
+        const workload = workloadCountsByTherapist.get(option.therapist.id) ?? {
+          weekShiftCount: 0,
+          cycleShiftCount: 0,
+        }
+        const atWeeklyLimit = workload.weekShiftCount >= WEEKLY_LIMIT
+        return {
+          ...option,
+          ...workload,
+          atWeeklyLimit,
+          disabledForWeeklyLimit: atWeeklyLimit && !overrideWeeklyRules,
+        }
+      })
+      .sort(
+        (a, b) =>
+          a.weekShiftCount - b.weekShiftCount ||
+          a.cycleShiftCount - b.cycleShiftCount ||
+          a.therapist.full_name.localeCompare(b.therapist.full_name)
+      )
+  }, [drawerStaffAddOptions, overrideWeeklyRules, workloadCountsByTherapist])
+
+  const drawerVisibleStaffOptions = useMemo(() => {
+    const query = drawerTherapistSearch.trim().toLowerCase()
+    if (!query) return drawerSmartStaffOptions
+    return drawerSmartStaffOptions.filter((option) => {
+      const haystack = `${option.therapist.full_name} ${option.therapist.email ?? ''}`.toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [drawerSmartStaffOptions, drawerTherapistSearch])
+
   const drawerLeadOptions = useMemo(() => {
     if (!drawerSlot) return []
     const currentShiftIds = new Set(drawerShifts.map((shift) => shift.user_id))
@@ -731,6 +792,7 @@ export function ManagerMonthCalendar({
     setDrawerSlot({ date, shiftType })
     setDrawerLeadTherapistId(currentLead?.user_id ?? '')
     setDrawerAddTherapistId('')
+    setDrawerTherapistSearch('')
   }
 
   function onCalendarCellClick(date: string, shiftType: 'day' | 'night') {
@@ -743,6 +805,7 @@ export function ManagerMonthCalendar({
   function closeShiftDrawer() {
     setDrawerSlot(null)
     setDrawerAddTherapistId('')
+    setDrawerTherapistSearch('')
     setDrawerLeadTherapistId('')
     closeAvailabilityConflictDialog()
     closeStatusPopover()
@@ -800,6 +863,43 @@ export function ManagerMonthCalendar({
           }
           setError(result?.error ?? 'Could not update schedule. Please try again.')
           return
+        }
+
+        if (body.action === 'assign') {
+          const assignedTherapist = therapistById.get(body.userId)
+          setLocalShifts((current) => {
+            const exists = current.some(
+              (shift) =>
+                shift.user_id === body.userId &&
+                shift.date === body.date &&
+                shift.shift_type === body.shiftType
+            )
+            if (exists) return current
+
+            const optimisticShift: Shift = {
+              id: `optimistic-${body.userId}-${body.date}-${body.shiftType}`,
+              date: body.date,
+              shift_type: body.shiftType,
+              status: 'scheduled',
+              assignment_status: 'scheduled',
+              status_note: null,
+              left_early_time: null,
+              status_updated_at: null,
+              status_updated_by: null,
+              status_updated_by_name: null,
+              availability_override: false,
+              availability_override_reason: null,
+              availability_override_at: null,
+              availability_override_by: null,
+              availability_override_by_name: null,
+              role: 'staff',
+              user_id: body.userId,
+              full_name: assignedTherapist?.full_name ?? 'Therapist',
+              isLeadEligible: Boolean(assignedTherapist?.is_lead_eligible),
+            }
+
+            return [...current, optimisticShift]
+          })
         }
 
         setSuccess(result?.message ?? (options?.isUndo ? 'Undo complete.' : 'Schedule updated.'))
@@ -2283,19 +2383,80 @@ export function ManagerMonthCalendar({
 
                 {canManageStaffing && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <select
-                      value={drawerAddTherapistId}
-                      onChange={(event) => setDrawerAddTherapistId(event.target.value)}
-                      className="h-9 min-w-64 rounded-md border border-border bg-white px-3 text-sm"
-                    >
-                      <option value="">Add therapist</option>
-                      {drawerStaffAddOptions.map((option) => (
-                        <option key={option.therapist.id} value={option.therapist.id}>
-                          {option.therapist.full_name}
-                          {option.unavailableConflict ? ' - Unavailable' : option.prnNotOffered ? ' - Not offered (PRN)' : ''}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="min-w-64 flex-1 space-y-2">
+                      <Input
+                        value={drawerTherapistSearch}
+                        onChange={(event) => setDrawerTherapistSearch(event.target.value)}
+                        placeholder="Search therapist"
+                        className="h-9"
+                      />
+                      <div className="max-h-56 overflow-y-auto rounded-md border border-border bg-white p-1">
+                        {drawerVisibleStaffOptions.length === 0 ? (
+                          <p className="px-2 py-2 text-xs text-muted-foreground">No matching therapists.</p>
+                        ) : (
+                          drawerVisibleStaffOptions.map((option) => {
+                            const selected = drawerAddTherapistId === option.therapist.id
+                            return (
+                              <button
+                                key={option.therapist.id}
+                                type="button"
+                                disabled={option.disabledForWeeklyLimit}
+                                title={
+                                  option.disabledForWeeklyLimit
+                                    ? `At weekly limit (${WEEKLY_LIMIT}/week)`
+                                    : undefined
+                                }
+                                onClick={() => setDrawerAddTherapistId(option.therapist.id)}
+                                className={cn(
+                                  'flex w-full items-start justify-between gap-2 rounded-md px-2 py-2 text-left text-sm',
+                                  selected ? 'bg-secondary' : 'hover:bg-muted',
+                                  option.disabledForWeeklyLimit && 'cursor-not-allowed opacity-50'
+                                )}
+                              >
+                                <div className="min-w-0">
+                                  <p className="truncate font-medium text-foreground">{option.therapist.full_name}</p>
+                                  <div className="mt-1 flex flex-wrap gap-1 text-[10px]">
+                                    {option.therapist.is_lead_eligible && (
+                                      <span className="rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 font-medium text-sky-700">
+                                        Lead eligible
+                                      </span>
+                                    )}
+                                    {option.therapist.employment_type === 'prn' && (
+                                      <span className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-medium text-slate-700">
+                                        PRN
+                                      </span>
+                                    )}
+                                    {option.unavailableConflict && (
+                                      <span className="rounded border border-red-300 bg-red-50 px-1.5 py-0.5 font-medium text-red-700">
+                                        Unavailable
+                                      </span>
+                                    )}
+                                    {option.prnNotOffered && (
+                                      <span className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 font-medium text-amber-700">
+                                        Not offered
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex shrink-0 flex-wrap justify-end gap-1 text-[10px]">
+                                  <span className="rounded border border-border bg-muted px-1.5 py-0.5 text-muted-foreground">
+                                    Week: {option.weekShiftCount}/{WEEKLY_LIMIT}
+                                  </span>
+                                  <span className="rounded border border-border bg-muted px-1.5 py-0.5 text-muted-foreground">
+                                    Cycle: {option.cycleShiftCount}
+                                  </span>
+                                  {option.atWeeklyLimit && overrideWeeklyRules && (
+                                    <span className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 font-medium text-amber-800">
+                                      Override
+                                    </span>
+                                  )}
+                                </div>
+                              </button>
+                            )
+                          })
+                        )}
+                      </div>
+                    </div>
                     <Button
                       type="button"
                       variant="outline"
@@ -2310,34 +2471,11 @@ export function ManagerMonthCalendar({
                           overrideWeeklyRules,
                         })
                         setDrawerAddTherapistId('')
+                        setDrawerTherapistSearch('')
                       }}
                     >
-                      Add staff
+                      Assign
                     </Button>
-                  </div>
-                )}
-                {canManageStaffing && drawerStaffAddOptions.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {drawerStaffAddOptions
-                      .filter((option) => option.unavailableConflict || option.prnNotOffered)
-                      .map((option) => (
-                        <div key={`availability-flag-${option.therapist.id}`} className="flex flex-wrap items-center gap-1 text-[11px]">
-                          <span className="font-medium text-foreground">{option.therapist.full_name}</span>
-                          {option.unavailableConflict && (
-                            <span className="rounded border border-red-300 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
-                              Unavailable
-                            </span>
-                          )}
-                          {option.prnNotOffered && (
-                            <span className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
-                              Not offered (PRN)
-                            </span>
-                          )}
-                          {option.unavailableConflict && option.unavailableReason && (
-                            <span className="text-red-700">{option.unavailableReason}</span>
-                          )}
-                        </div>
-                      ))}
                   </div>
                 )}
               </div>

@@ -1,9 +1,11 @@
 'use client'
 
+import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 import { toggleCyclePublishedAction } from '@/app/schedule/actions'
+import { PrintSchedule } from '@/components/print-schedule'
 import { getScheduleFeedback } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/client'
 import type { AssignmentStatus, ScheduleSearchParams, ShiftRole, ShiftStatus } from '@/app/schedule/types'
@@ -24,8 +26,14 @@ type DayItem = {
   staffShifts: ShiftItem[]
 }
 
-type CycleRow = { id: string; start_date: string; end_date: string; published: boolean }
+type CycleRow = { id: string; label: string; start_date: string; end_date: string; published: boolean }
 type TherapistOption = { id: string; full_name: string; shift_type: 'day' | 'night' }
+type PrintTherapist = {
+  id: string
+  full_name: string
+  shift_type: 'day' | 'night'
+  employment_type?: 'full_time' | 'part_time' | 'prn'
+}
 type ShiftRow = {
   id: string
   user_id: string
@@ -34,7 +42,10 @@ type ShiftRow = {
   status: ShiftStatus
   assignment_status: AssignmentStatus | null
   role: ShiftRole
-  profiles: { full_name: string } | { full_name: string }[] | null
+  profiles:
+    | { full_name: string; employment_type: 'full_time' | 'part_time' | 'prn' | null }
+    | { full_name: string; employment_type: 'full_time' | 'part_time' | 'prn' | null }[]
+    | null
 }
 
 const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
@@ -163,10 +174,17 @@ export default function CoveragePage() {
   const [nightDays, setNightDays] = useState<DayItem[]>([])
   const [activeCycleId, setActiveCycleId] = useState<string | null>(cycleFromUrl)
   const [activeCyclePublished, setActiveCyclePublished] = useState(false)
+  const [printCycle, setPrintCycle] = useState<{ label: string; start_date: string; end_date: string } | null>(null)
+  const [printCycleDates, setPrintCycleDates] = useState<string[]>([])
+  const [printDayTeam, setPrintDayTeam] = useState<PrintTherapist[]>([])
+  const [printNightTeam, setPrintNightTeam] = useState<PrintTherapist[]>([])
+  const [printUsers, setPrintUsers] = useState<PrintTherapist[]>([])
+  const [printShiftByUserDate, setPrintShiftByUserDate] = useState<Record<string, ShiftStatus>>({})
   const [availableTherapists, setAvailableTherapists] = useState<TherapistOption[]>([])
   const [assignUserId, setAssignUserId] = useState('')
   const [assigning, setAssigning] = useState(false)
   const [assigned, setAssigned] = useState(false)
+  const [unassigningShiftId, setUnassigningShiftId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [expandedShiftId, setExpandedShiftId] = useState<string | null>(null)
@@ -195,6 +213,9 @@ export default function CoveragePage() {
     if (feedback?.variant === 'error') return feedback.message
     return `Publish blocked: ${errorParam.replaceAll('_', ' ')}.`
   }, [errorParam, publishFeedbackParams])
+  const publishedScheduleHref = activeCycleId
+    ? `/schedule?cycle=${activeCycleId}&view=week`
+    : '/schedule?view=week'
 
   useEffect(() => {
     let active = true
@@ -209,10 +230,11 @@ export default function CoveragePage() {
         let cycleStartDate = fallbackStartDate
         let cycleEndDate = fallbackEndDate
         let cycleId: string | null = null
+        let selectedCycle: CycleRow | null = null
 
         const { data: cyclesData, error: cyclesError } = await supabase
           .from('schedule_cycles')
-          .select('id, start_date, end_date, published')
+          .select('id, label, start_date, end_date, published')
           .order('start_date', { ascending: false })
 
         if (!active) return
@@ -227,6 +249,7 @@ export default function CoveragePage() {
             cycles[0] ??
             null
           if (cycle) {
+            selectedCycle = cycle
             cycleId = cycle.id
             cycleStartDate = cycle.start_date
             cycleEndDate = cycle.end_date
@@ -234,12 +257,28 @@ export default function CoveragePage() {
         }
         if (active) {
           setActiveCycleId(cycleId)
-          setActiveCyclePublished(Boolean(cyclesData && cycleId && (cyclesData as CycleRow[]).find((c) => c.id === cycleId)?.published))
+          setActiveCyclePublished(Boolean(selectedCycle?.published))
+          setPrintCycle(
+            selectedCycle
+              ? {
+                  label: selectedCycle.label,
+                  start_date: selectedCycle.start_date,
+                  end_date: selectedCycle.end_date,
+                }
+              : {
+                  label: 'Coverage schedule',
+                  start_date: cycleStartDate,
+                  end_date: cycleEndDate,
+                }
+          )
+          setPrintCycleDates(dateRange(cycleStartDate, cycleEndDate))
         }
 
         let shiftsQuery = supabase
           .from('shifts')
-          .select('id,user_id,date,shift_type,status,assignment_status,role,profiles:profiles!shifts_user_id_fkey(full_name)')
+          .select(
+            'id,user_id,date,shift_type,status,assignment_status,role,profiles:profiles!shifts_user_id_fkey(full_name,employment_type)'
+          )
           .gte('date', cycleStartDate)
           .lte('date', cycleEndDate)
           .order('date', { ascending: true })
@@ -255,10 +294,67 @@ export default function CoveragePage() {
           setError(shiftsError.message || 'Could not load shifts.')
           setDayDays([])
           setNightDays([])
+          setPrintUsers([])
+          setPrintDayTeam([])
+          setPrintNightTeam([])
+          setPrintShiftByUserDate({})
           return
         }
 
         const rows = (shiftsData ?? []) as ShiftRow[]
+        const therapistTallies = new Map<
+          string,
+          {
+            id: string
+            full_name: string
+            day: number
+            night: number
+            employment_type?: 'full_time' | 'part_time' | 'prn'
+          }
+        >()
+        const nextShiftByUserDate: Record<string, ShiftStatus> = {}
+
+        for (const row of rows) {
+          const profile = getOne(row.profiles)
+          const fullName = profile?.full_name ?? 'Unknown'
+          const current = therapistTallies.get(row.user_id) ?? {
+            id: row.user_id,
+            full_name: fullName,
+            day: 0,
+            night: 0,
+            employment_type:
+              profile?.employment_type === 'part_time' || profile?.employment_type === 'prn'
+                ? profile.employment_type
+                : 'full_time',
+          }
+          if (row.shift_type === 'night') current.night += 1
+          else current.day += 1
+          if (profile?.employment_type === 'part_time' || profile?.employment_type === 'prn') {
+            current.employment_type = profile.employment_type
+          }
+          therapistTallies.set(row.user_id, current)
+          nextShiftByUserDate[`${row.user_id}:${row.date}`] = row.status
+        }
+
+        const nextPrintUsers = Array.from(therapistTallies.values())
+          .map((row) => ({
+            id: row.id,
+            full_name: row.full_name,
+            shift_type: row.night > row.day ? 'night' : 'day',
+            employment_type: row.employment_type ?? 'full_time',
+          }))
+          .sort((a, b) => {
+            if (a.shift_type === b.shift_type) return a.full_name.localeCompare(b.full_name)
+            return a.shift_type === 'day' ? -1 : 1
+          })
+
+        if (active) {
+          setPrintUsers(nextPrintUsers)
+          setPrintDayTeam(nextPrintUsers.filter((user) => user.shift_type === 'day'))
+          setPrintNightTeam(nextPrintUsers.filter((user) => user.shift_type === 'night'))
+          setPrintShiftByUserDate(nextShiftByUserDate)
+        }
+
         const mapByShiftType = (shiftType: ShiftRow['shift_type']): DayItem[] => {
           const byDate = new Map<string, ShiftRow[]>()
           for (const row of rows) {
@@ -316,6 +412,10 @@ export default function CoveragePage() {
         setError('Could not load coverage schedule.')
         setDayDays([])
         setNightDays([])
+        setPrintUsers([])
+        setPrintDayTeam([])
+        setPrintNightTeam([])
+        setPrintShiftByUserDate({})
       } finally {
         if (active) {
           setLoading(false)
@@ -540,15 +640,62 @@ export default function CoveragePage() {
     [days, setDays, shiftTab, supabase]
   )
 
+  const handleUnassign = useCallback(
+    async (dayId: string, shiftId: string, isLead: boolean) => {
+      if (!shiftId || unassigningShiftId) return
+
+      const previousDays = days
+      setError('')
+      setUnassigningShiftId(shiftId)
+      setExpandedShiftId((current) => (current === shiftId ? null : current))
+
+      setDays((current) =>
+        current.map((day) => {
+          if (day.id !== dayId) return day
+          if (isLead) {
+            return { ...day, leadShift: null }
+          }
+          return {
+            ...day,
+            staffShifts: day.staffShifts.filter((shift) => shift.id !== shiftId),
+          }
+        })
+      )
+
+      const { error: deleteError } = await supabase.from('shifts').delete().eq('id', shiftId)
+
+      if (!deleteError) {
+        setUnassigningShiftId(null)
+        return
+      }
+
+      console.error('Failed to unassign therapist from shift:', deleteError)
+      setDays(previousDays)
+      setError('Could not unassign therapist. Changes were rolled back.')
+      setUnassigningShiftId(null)
+      if (typeof window !== 'undefined') {
+        window.alert('Could not unassign therapist. Please try again.')
+      }
+    },
+    [days, setDays, supabase, unassigningShiftId]
+  )
+
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="px-7 py-6">
+      <div className="no-print px-7 py-6">
         <div className="mb-5 flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-extrabold text-slate-900">Coverage</h1>
             <p className="mt-1 text-sm text-slate-500">Click a day to edit therapist statuses</p>
           </div>
           <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
+            >
+              Print schedule
+            </button>
             <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">Auto-draft</button>
             <form action={toggleCyclePublishedAction}>
               <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
@@ -567,6 +714,28 @@ export default function CoveragePage() {
             </form>
           </div>
         </div>
+        {activeCyclePublished && (
+          <div className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
+            <p className="text-xs font-semibold text-emerald-800">
+              This cycle is published and visible to employees.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Link
+                href={publishedScheduleHref}
+                className="rounded-md border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+              >
+                View published schedule
+              </Link>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="rounded-md border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+              >
+                Print published schedule
+              </button>
+            </div>
+          </div>
+        )}
         {successParam === 'cycle_published' && (
           <p className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
             Published - visible to employees.
@@ -686,8 +855,8 @@ export default function CoveragePage() {
         )}
       </div>
 
-      <div className="fixed inset-0 z-40 bg-black/10 transition-opacity" style={{ opacity: selectedDay ? 1 : 0, pointerEvents: selectedDay ? 'auto' : 'none' }} onClick={handleClose} />
-      <aside className="fixed bottom-0 right-0 top-0 z-50 w-[360px] bg-white shadow-2xl transition-transform" style={{ transform: selectedDay ? 'translateX(0)' : 'translateX(100%)' }}>
+      <div className="no-print fixed inset-0 z-40 bg-black/10 transition-opacity" style={{ opacity: selectedDay ? 1 : 0, pointerEvents: selectedDay ? 'auto' : 'none' }} onClick={handleClose} />
+      <aside className="no-print fixed bottom-0 right-0 top-0 z-50 w-[360px] bg-white shadow-2xl transition-transform" style={{ transform: selectedDay ? 'translateX(0)' : 'translateX(100%)' }}>
         {selectedDay && (
           <div className="flex h-full flex-col">
             <div className="border-b border-amber-200 bg-amber-50 px-5 py-4">
@@ -780,6 +949,14 @@ export default function CoveragePage() {
                             )
                           })}
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => void handleUnassign(selectedDay.id, shift.id, shift.isLead)}
+                          disabled={unassigningShiftId === shift.id}
+                          className="mb-2 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 disabled:opacity-60"
+                        >
+                          {unassigningShiftId === shift.id ? 'Unassigning...' : shift.isLead ? 'Remove lead assignment' : 'Unassign therapist'}
+                        </button>
                         {shift.log.length > 0 && (
                           <div className="space-y-1 border-t border-slate-100 pt-2">
                             <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">Changes</p>
@@ -802,6 +979,15 @@ export default function CoveragePage() {
           </div>
         )}
       </aside>
+      <PrintSchedule
+        activeCycle={printCycle}
+        cycleDates={printCycleDates}
+        dayTeam={printDayTeam}
+        nightTeam={printNightTeam}
+        printUsers={printUsers}
+        shiftByUserDate={printShiftByUserDate}
+        isManager
+      />
     </div>
   )
 }
