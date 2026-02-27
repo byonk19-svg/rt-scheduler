@@ -4,7 +4,7 @@ import {
   getDefaultWeeklyLimitForEmploymentType,
   sanitizeWeeklyLimit,
 } from '@/lib/scheduling-constants'
-import { resolveAvailability } from '@/lib/coverage/resolve-availability'
+import { resolveEligibility } from '@/lib/coverage/resolve-availability'
 import { normalizeWorkPattern } from '@/lib/coverage/work-patterns'
 import type {
   AvailabilityOverrideRow,
@@ -384,22 +384,25 @@ export function pickTherapistForDate(
     if (assignedUserIdsForDate.has(therapist.id)) continue
     if (weekday === null) continue
 
-    const patternDecision = resolveAvailability({
-      therapistId: therapist.id,
+    const patternDecision = resolveEligibility({
+      therapist: {
+        id: therapist.id,
+        is_active: therapist.is_active,
+        on_fmla: therapist.on_fmla,
+        employment_type: therapist.employment_type,
+        pattern: normalizeWorkPattern({
+          therapist_id: therapist.id,
+          works_dow: therapist.works_dow,
+          offs_dow: therapist.offs_dow,
+          weekend_rotation: therapist.weekend_rotation,
+          weekend_anchor_date: therapist.weekend_anchor_date,
+          works_dow_mode: therapist.works_dow_mode,
+          shift_preference: therapist.shift_preference,
+        }),
+      },
       cycleId,
       date,
       shiftType,
-      isActive: therapist.is_active,
-      onFmla: therapist.on_fmla,
-      pattern: normalizeWorkPattern({
-        therapist_id: therapist.id,
-        works_dow: therapist.works_dow,
-        offs_dow: therapist.offs_dow,
-        weekend_rotation: therapist.weekend_rotation,
-        weekend_anchor_date: therapist.weekend_anchor_date,
-        works_dow_mode: therapist.works_dow_mode,
-        shift_preference: therapist.shift_preference,
-      }),
       overrides: availabilityOverridesByTherapist.get(therapist.id) ?? [],
     })
 

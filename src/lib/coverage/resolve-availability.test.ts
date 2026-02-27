@@ -140,4 +140,77 @@ describe('resolveAvailability', () => {
     expect(onFmla.allowed).toBe(false)
     expect(onFmla.reason).toBe('on_fmla')
   })
+
+  it('blocks PRN when no force_on override and pattern does not offer weekday', () => {
+    const pattern = buildPattern({
+      works_dow: [2],
+      offs_dow: [],
+      weekend_rotation: 'none',
+      works_dow_mode: 'soft',
+    })
+
+    const resolution = resolveAvailability({
+      therapistId: 'therapist-1',
+      cycleId: 'cycle-a',
+      date: '2026-03-02',
+      shiftType: 'day',
+      isActive: true,
+      onFmla: false,
+      employmentType: 'prn',
+      pattern,
+      overrides: [],
+    })
+
+    expect(resolution.allowed).toBe(false)
+    expect(resolution.reason).toBe('prn_not_offered_for_date')
+  })
+
+  it('allows PRN with force_on override even when recurring pattern blocks', () => {
+    const pattern = buildPattern({
+      works_dow: [1],
+      offs_dow: [5],
+      weekend_rotation: 'every_other',
+      weekend_anchor_date: '2026-02-21',
+      works_dow_mode: 'hard',
+    })
+
+    const resolution = resolveAvailability({
+      therapistId: 'therapist-1',
+      cycleId: 'cycle-a',
+      date: '2026-03-06',
+      shiftType: 'day',
+      isActive: true,
+      onFmla: false,
+      employmentType: 'prn',
+      pattern,
+      overrides: [buildOverride({ override_type: 'force_on' })],
+    })
+
+    expect(resolution.allowed).toBe(true)
+    expect(resolution.reason).toBe('override_force_on')
+  })
+
+  it('allows PRN when recurring pattern offers the weekday', () => {
+    const pattern = buildPattern({
+      works_dow: [1],
+      offs_dow: [],
+      weekend_rotation: 'none',
+      works_dow_mode: 'hard',
+    })
+
+    const resolution = resolveAvailability({
+      therapistId: 'therapist-1',
+      cycleId: 'cycle-a',
+      date: '2026-03-02',
+      shiftType: 'day',
+      isActive: true,
+      onFmla: false,
+      employmentType: 'prn',
+      pattern,
+      overrides: [],
+    })
+
+    expect(resolution.allowed).toBe(true)
+    expect(resolution.reason).toBe('allowed')
+  })
 })

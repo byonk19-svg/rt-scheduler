@@ -426,7 +426,7 @@ describe('drag-drop API behavior', () => {
     expect(notifyUsers).toHaveBeenCalled()
   })
 
-  it('does not block PRN assignment when no AVAILABLE entry exists (soft warning path)', async () => {
+  it('blocks PRN assignment when no force_on override and no offered pattern day exists', async () => {
     const supabase = makeSupabaseMock({
       coverageStatuses: ['scheduled'],
       weeklyShifts: [],
@@ -455,10 +455,9 @@ describe('drag-drop API behavior', () => {
       })
     )
 
-    expect(response.status).toBe(200)
-    expect(supabase.insertedShiftPayloads[0]).toMatchObject({
-      availability_override: false,
-      availability_override_reason: null,
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'PRN not offered for this date',
     })
   })
 

@@ -1,29 +1,66 @@
 # Teamwise Scheduler - Codex Handoff Context
 
-Updated: 2026-02-27 (print layout parity + smart picker + coverage unassign)
+Updated: 2026-02-27 (PRN strict eligibility + cycle-scoped work patterns + manager-entered availability)
 
 ## Latest Completed Work (2026-02-27)
-- Publish visibility UX improved:
-  - Added clear "Published schedule" status surfaces and quick links.
-  - Added print entry points in schedule and coverage manager flows.
-- Print output redesigned to match the paper-style schedule:
-  - Dense grid, weekday/date headers, heavy borders.
-  - Day and Night now print on separate pages.
-  - PRN therapists are separated by a distinct divider row in print.
-- Coverage drawer gained unassign support:
-  - Managers can unassign therapist rows directly in the day detail panel.
-  - UI updates immediately with rollback on failure.
-- Manager month shift drawer "Assign Therapist" upgraded to smart picker:
-  - Searchable list with workload context:
-    - `Week: {count}/3`
-    - `Cycle: {count}`
-  - Fairness-first sorting: lowest week count, then cycle count, then name.
-  - Weekly limit behavior in picker:
-    - At `3/week` rows are disabled unless weekly override is enabled.
-    - Override-enabled rows remain selectable and are visibly marked.
-- Added workload metrics module + tests:
-  - `src/lib/therapist-picker-metrics.ts`
-  - `src/lib/therapist-picker-metrics.test.ts`
+- Enforced PRN strict eligibility end-to-end:
+  - Added shared eligibility resolver used by auto-generate + picker/API paths:
+    - `resolveEligibility(...)` in `src/lib/coverage/resolve-availability.ts`
+    - PRN can be scheduled only when:
+      - cycle override has `force_on`, OR
+      - recurring work pattern explicitly offers that weekday (`works_dow`) and other hard constraints pass.
+    - new blocked reason surfaced: `PRN not offered for this date`
+  - Auto-generate candidate selection now honors PRN strict policy through shared resolver:
+    - `src/lib/schedule-helpers.ts`
+  - Assignment/move/set-lead drag-drop API now hard-blocks PRN-not-offered (not override-confirmable):
+    - `src/app/api/schedule/drag-drop/route.ts`
+- Picker and availability UX aligned to strict policy:
+  - Manager month smart picker:
+    - PRN-not-offered rows are disabled with tooltip `PRN not offered for this date`
+    - override-enabled PRN rows show badge `Offered`
+    - file: `src/components/manager-month-calendar.tsx`
+  - Therapist availability page:
+    - PRN therapists can submit only `Available to work (PRN)` (`force_on`)
+    - non-PRN therapists submit `Need off` (`force_off`)
+    - server-side validation enforces employment-type override policy
+    - files:
+      - `src/app/availability/page.tsx`
+      - `src/app/availability/availability-requests-table.tsx`
+  - Manager directory wording clarified for override type labels:
+    - `src/components/EmployeeDirectory.tsx`
+- Introduced recurring work-pattern model:
+  - New `work_patterns` table (manager-managed):
+    - `works_dow`, `offs_dow`
+    - `weekend_rotation` + `weekend_anchor_date`
+    - `works_dow_mode` (`hard`/`soft`)
+  - New typed helpers and unit tests:
+    - `src/lib/coverage/work-patterns.ts`
+    - `src/lib/coverage/resolve-availability.ts`
+    - `src/lib/coverage/generator-slot.ts`
+- Replaced legacy availability entry flow with one cycle-scoped source of truth:
+  - `availability_overrides` now used for therapist + manager overrides.
+  - Supports `force_off` and `force_on` by cycle/date/shift.
+  - Added `source` metadata (`therapist`/`manager`) with source-aware RLS.
+- Auto-generate now enforces hard constraints and records constraint-based unfilled slots:
+  - Never violates `offs_dow`
+  - Never violates off-weekend parity
+  - Honors `works_dow_mode='hard'` as strict
+  - Applies penalty when `works_dow_mode='soft'`
+  - Writes `shifts.unfilled_reason='no_eligible_candidates_due_to_constraints'`
+- Coverage and schedule feedback updated:
+  - `constraints_unfilled` summary surfaced post-generation
+  - slot-level badge: `No eligible therapists (constraints)`
+- Team Directory manager workflow expanded:
+  - Employee drawer includes cycle-scoped Date Overrides editor:
+    - add/update/delete `Need off` / `Available to work`
+    - manager saves with `source='manager'`
+    - rows show badge: `Entered by manager`
+  - Added cycle-scoped `Missing availability` table with quick action:
+    - shows overrides count, last updated, submitted/not submitted
+    - `Enter availability` opens drawer focused on override section
+- Coverage assignment status update logic extracted + tested:
+  - `src/lib/coverage/updateAssignmentStatus.ts`
+  - includes proper rollback + user-facing error + real error logging
 
 ## Previous Milestone (2026-02-24)
 - Availability workflow moved to `availability_entries` with role-based input:
@@ -69,12 +106,28 @@ Lead capability is represented by `profiles.is_lead_eligible`.
 - Coverage target: 3-5 per shift slot
 - Weekly therapist limits from profile/defaults
 - Exactly one designated lead (`shifts.role='lead'`) and lead must be eligible
+- Recurring pattern constraints:
+  - `offs_dow` is hard block
+  - every-other-weekend off parity is hard block
+  - `works_dow` is hard when `works_dow_mode='hard'`
+  - `works_dow` is soft preference when `works_dow_mode='soft'`
+- Cycle-scoped date overrides precedence:
+  - inactive/FMLA blocks first
+  - `force_off` blocks date in that cycle
+  - `force_on` allows date in that cycle (except inactive/FMLA)
+  - fallback to recurring pattern if no override
+- PRN strict policy:
+  - PRN is eligible only when:
+    - cycle override matches with `force_on`, OR
+    - recurring pattern offers that date (`works_dow`) and hard constraints pass.
+  - PRN without `force_on` and without an offered recurring day is not eligible.
 
 Auto-generate:
 - Targets 4 therapists first when feasible
 - Treats slot as unfilled only when below 3
 - Excludes inactive + FMLA by default
-- PRN requires preferred weekdays to be considered
+- Leaves remaining slots unfilled when constraints eliminate candidates
+- Marks constraint-caused unfilled slots for UI messaging and auditability
 
 Assignment status remains informational only:
 - Does not change coverage counts, attention metrics, or publish blockers
@@ -91,6 +144,11 @@ Assignment status remains informational only:
 - Unassign therapist action from expanded row in the right panel
 - Calendar chips now visibly reflect assignment status updates immediately:
   - `OC` (on call), `LE` (leave early), `X` (cancelled), with distinct chip colors
+- Constraint visibility:
+  - slot badge and detail note for `No eligible therapists (constraints)`
+- Assignment picker behavior:
+  - PRN not offered for date is disabled in smart picker with tooltip
+  - PRN enabled via cycle override is labeled `Offered`
 
 ## Schedule UX (Current)
 `/schedule` navigation now exposes only:
@@ -147,7 +205,9 @@ Core tables:
 - `schedule_cycles`
 - `shifts`
 - `availability_requests` (legacy)
-- `availability_entries` (active constraints model)
+- `availability_entries` (legacy transitional model)
+- `work_patterns` (active recurring rules model)
+- `availability_overrides` (active cycle-scoped override model)
 - `shift_posts`
 - `notifications`
 - `audit_log`
@@ -155,7 +215,7 @@ Core tables:
 Common profile fields used:
 - `full_name`, `email`, `phone_number`
 - `role`, `shift_type`, `employment_type`
-- `max_work_days_per_week`, `preferred_work_days`
+- `max_work_days_per_week`
 - `is_lead_eligible`, `on_fmla`, `fmla_return_date`, `is_active`
 - `default_calendar_view`, `default_landing_page`
 - `site_id`
@@ -164,6 +224,7 @@ Common shift fields used:
 - `cycle_id`, `user_id`, `date`, `shift_type`
 - `status` (`scheduled|on_call|sick|called_off`)
 - `role` (`lead|staff`)
+- `unfilled_reason`
 - availability override fields:
   - `availability_override`
   - `availability_override_reason`
@@ -179,21 +240,26 @@ Common shift fields used:
 - `20260223191000_harden_role_and_lead_permissions.sql`
 - `20260224103000_add_shift_status_changes_audit.sql`
 - `20260224121500_add_availability_entries_and_override_metadata.sql`
+- `20260227143000_add_work_patterns_and_cycle_overrides.sql`
+- `20260227184500_add_source_to_availability_overrides.sql`
 
 ## Quality Status
 Latest local checks:
+- `npx tsc --noEmit` pass
 - `npm run lint` pass
 - `npm run test:unit` pass
-- `npm run test:e2e -- e2e/availability-override.spec.ts --project=chromium` pass
-- `npm run build` pass
+- Focused unit coverage for PRN strict policy pass:
+  - `src/lib/coverage/resolve-availability.test.ts`
+  - `src/lib/schedule-helpers.test.ts`
+  - `src/app/api/schedule/drag-drop/route.test.ts`
 
 ## Resume Checklist
 1. `git status -sb`
 2. `supabase db push`
 3. `npm install`
-4. `npm run lint`
-5. `npm run test:unit`
-6. `npm run build`
+4. `npx tsc --noEmit`
+5. `npm run lint`
+6. `npm run test:unit`
 7. `npm run dev`
 
 ## Paused Work
@@ -220,7 +286,7 @@ Resume checklist:
 - Optional: add scheduled worker/cron to call `/api/publish/process`
 
 ## Next High-Value Priorities
-1. Align `/coverage` and `/schedule` into one consistent data/view model (reduce duplicated calendar logic)
-2. Add integration tests for overlay panel interactions (open/close/toggle/accordion)
-3. Add tests for optimistic rollback path on assignment-status update failures
-4. Decide if Night shift should be shown in `/coverage` or route all manager coverage flow through `/schedule?view=week|calendar`
+1. Add integration/e2e coverage for manager date-override workflow in `/directory`
+2. Add server-side validation messages for cycle/date conflicts directly in drawer UI
+3. Align `/coverage` and `/schedule` into one consistent data/view model (reduce duplicated calendar logic)
+4. Add integration tests for calendar overlay interactions (open/close/toggle/accordion)

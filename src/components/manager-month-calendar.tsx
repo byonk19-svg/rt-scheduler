@@ -21,7 +21,10 @@ import {
   buildTherapistWorkloadCounts,
   getWeekBoundsForDate,
 } from '@/lib/therapist-picker-metrics'
-import { resolveAvailability } from '@/lib/coverage/resolve-availability'
+import {
+  formatEligibilityReason,
+  resolveEligibility,
+} from '@/lib/coverage/resolve-availability'
 import type { AvailabilityOverrideRow } from '@/lib/coverage/types'
 import { normalizeWorkPattern } from '@/lib/coverage/work-patterns'
 import { cn } from '@/lib/utils'
@@ -556,6 +559,7 @@ export function ManagerMonthCalendar({
       forceOff: boolean
       forceOn: boolean
       inactiveOrFmla: boolean
+      prnNotOffered: boolean
     } => {
       const therapist = therapistById.get(therapistId)
       if (!therapist) {
@@ -565,49 +569,41 @@ export function ManagerMonthCalendar({
           forceOff: false,
           forceOn: false,
           inactiveOrFmla: false,
+          prnNotOffered: false,
         }
       }
 
-      const resolution = resolveAvailability({
-        therapistId,
+      const resolution = resolveEligibility({
+        therapist: {
+          id: therapistId,
+          is_active: therapist.is_active,
+          on_fmla: therapist.on_fmla,
+          employment_type: therapist.employment_type === 'prn' ? 'prn' : therapist.employment_type === 'part_time' ? 'part_time' : 'full_time',
+          pattern: normalizeWorkPattern({
+            therapist_id: therapist.id,
+            works_dow: therapist.works_dow,
+            offs_dow: therapist.offs_dow,
+            weekend_rotation: therapist.weekend_rotation,
+            weekend_anchor_date: therapist.weekend_anchor_date,
+            works_dow_mode: therapist.works_dow_mode,
+            shift_preference: therapist.shift_preference,
+          }),
+        },
         cycleId,
         date,
         shiftType,
-        isActive: therapist.is_active,
-        onFmla: therapist.on_fmla,
-        pattern: normalizeWorkPattern({
-          therapist_id: therapist.id,
-          works_dow: therapist.works_dow,
-          offs_dow: therapist.offs_dow,
-          weekend_rotation: therapist.weekend_rotation,
-          weekend_anchor_date: therapist.weekend_anchor_date,
-          works_dow_mode: therapist.works_dow_mode,
-          shift_preference: therapist.shift_preference,
-        }),
         overrides: availabilityOverridesByTherapist.get(therapistId) ?? [],
       })
 
-      const reasonLabel =
-        resolution.reason === 'override_force_off'
-          ? 'Force off override'
-          : resolution.reason === 'blocked_offs_dow'
-            ? 'Never works this weekday'
-            : resolution.reason === 'blocked_every_other_weekend'
-              ? 'Off weekend by alternating rotation'
-              : resolution.reason === 'blocked_outside_works_dow_hard'
-                ? 'Outside hard works-day rule'
-                : resolution.reason === 'inactive'
-                  ? 'Inactive therapist'
-                  : resolution.reason === 'on_fmla'
-                    ? 'Therapist on FMLA'
-                    : null
+      const reasonLabel = formatEligibilityReason(resolution.reason)
 
       return {
         blockedByConstraints: !resolution.allowed,
         unavailableReason: reasonLabel,
         forceOff: resolution.reason === 'override_force_off',
-        forceOn: resolution.reason === 'override_force_on',
+        forceOn: resolution.offeredByOverride,
         inactiveOrFmla: resolution.reason === 'inactive' || resolution.reason === 'on_fmla',
+        prnNotOffered: resolution.prnNotOffered,
       }
     },
     [availabilityOverridesByTherapist, cycleId, therapistById]
@@ -672,6 +668,7 @@ export function ManagerMonthCalendar({
         forceOff: false,
         forceOn: false,
         inactiveOrFmla: false,
+        prnNotOffered: false,
       }))
     }
     return therapistsForPool.map((therapist) => ({
@@ -753,11 +750,15 @@ export function ManagerMonthCalendar({
           cycleShiftCount: 0,
         }
         const atWeeklyLimit = workload.weekShiftCount >= WEEKLY_LIMIT
+        const disabledForEligibility = option.prnNotOffered
+        const disabledForWeeklyLimit = atWeeklyLimit && !overrideWeeklyRules
         return {
           ...option,
           ...workload,
           atWeeklyLimit,
-          disabledForWeeklyLimit: atWeeklyLimit && !overrideWeeklyRules,
+          disabledForEligibility,
+          disabledForWeeklyLimit,
+          disabled: disabledForEligibility || disabledForWeeklyLimit,
         }
       })
       .sort(
@@ -1046,7 +1047,7 @@ export function ManagerMonthCalendar({
 
     const therapist = therapistById.get(therapistId)
     const availabilityState = getTherapistAvailabilityState(therapistId, date, shiftType)
-    if (availabilityState.inactiveOrFmla) {
+    if (availabilityState.inactiveOrFmla || availabilityState.prnNotOffered) {
       setError(availabilityState.unavailableReason ?? 'This therapist cannot be assigned.')
       return
     }
@@ -1821,16 +1822,24 @@ export function ManagerMonthCalendar({
               {therapistsForPoolWithAvailability.map((row) => (
                 <div
                   key={row.therapist.id}
-                  draggable
-                  onDragStart={(event) =>
+                  draggable={!row.prnNotOffered}
+                  title={row.prnNotOffered ? 'PRN not offered for this date' : undefined}
+                  onDragStart={(event) => {
+                    if (row.prnNotOffered) {
+                      event.preventDefault()
+                      return
+                    }
                     setDragData(event, {
                       type: 'therapist',
                       userId: row.therapist.id,
                       shiftType: row.therapist.shift_type,
                     })
-                  }
+                  }}
                   className={cn(
-                    'cursor-grab rounded-xl border px-3 py-2 text-sm active:cursor-grabbing',
+                    'rounded-xl border px-3 py-2 text-sm',
+                    row.prnNotOffered
+                      ? 'cursor-not-allowed opacity-60'
+                      : 'cursor-grab active:cursor-grabbing',
                     selectedShiftType === 'day' ? 'border-sky-200 bg-sky-50' : 'border-indigo-200 bg-indigo-50'
                   )}
                 >
@@ -1859,7 +1868,7 @@ export function ManagerMonthCalendar({
                       )}
                       {row.forceOn && (
                         <span className="rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
-                          Available (override)
+                          Offered
                         </span>
                       )}
                     </div>
@@ -2454,9 +2463,11 @@ export function ManagerMonthCalendar({
                               <button
                                 key={option.therapist.id}
                                 type="button"
-                                disabled={option.disabledForWeeklyLimit}
+                                disabled={option.disabled}
                                 title={
-                                  option.disabledForWeeklyLimit
+                                  option.disabledForEligibility
+                                    ? 'PRN not offered for this date'
+                                    : option.disabledForWeeklyLimit
                                     ? `At weekly limit (${WEEKLY_LIMIT}/week)`
                                     : undefined
                                 }
@@ -2464,7 +2475,7 @@ export function ManagerMonthCalendar({
                                 className={cn(
                                   'flex w-full items-start justify-between gap-2 rounded-md px-2 py-2 text-left text-sm',
                                   selected ? 'bg-secondary' : 'hover:bg-muted',
-                                  option.disabledForWeeklyLimit && 'cursor-not-allowed opacity-50'
+                                  option.disabled && 'cursor-not-allowed opacity-50'
                                 )}
                               >
                                 <div className="min-w-0">
@@ -2487,7 +2498,7 @@ export function ManagerMonthCalendar({
                                     )}
                                     {option.forceOn && (
                                       <span className="rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 font-medium text-emerald-700">
-                                        Available
+                                        Offered
                                       </span>
                                     )}
                                   </div>

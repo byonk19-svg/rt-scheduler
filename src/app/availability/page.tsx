@@ -17,6 +17,7 @@ type Role = 'manager' | 'therapist'
 type ToastVariant = 'success' | 'error'
 type AvailabilityOverrideType = 'force_off' | 'force_on'
 type AvailabilityShiftType = 'day' | 'night' | 'both'
+type EmploymentType = 'full_time' | 'part_time' | 'prn'
 
 type Cycle = {
   id: string
@@ -78,6 +79,12 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
       variant: 'error',
     }
   }
+  if (error === 'invalid_override_type') {
+    return {
+      message: 'That override type is not allowed for your employment type.',
+      variant: 'error',
+    }
+  }
 
   if (success === 'entry_submitted') {
     return {
@@ -126,6 +133,20 @@ async function submitAvailabilityEntry(formData: FormData) {
   const overrideType = String(formData.get('override_type') ?? '').trim() as AvailabilityOverrideType
   const note = String(formData.get('note') ?? '').trim()
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, employment_type')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const isTherapist = profile?.role !== 'manager'
+  const employmentType: EmploymentType =
+    profile?.employment_type === 'prn'
+      ? 'prn'
+      : profile?.employment_type === 'part_time'
+        ? 'part_time'
+        : 'full_time'
+
   if (
     !date ||
     !cycleId ||
@@ -133,6 +154,14 @@ async function submitAvailabilityEntry(formData: FormData) {
     (overrideType !== 'force_off' && overrideType !== 'force_on')
   ) {
     redirect('/availability?error=submit_failed')
+  }
+
+  if (isTherapist) {
+    const requiredOverrideType: AvailabilityOverrideType =
+      employmentType === 'prn' ? 'force_on' : 'force_off'
+    if (overrideType !== requiredOverrideType) {
+      redirect(`/availability?error=invalid_override_type&cycle=${cycleId}`)
+    }
   }
 
   const { error } = await supabase
@@ -221,11 +250,12 @@ export default async function AvailabilityPage({
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, full_name')
+    .select('role, full_name, employment_type')
     .eq('id', user.id)
     .maybeSingle()
 
   const role: Role = profile?.role === 'manager' ? 'manager' : 'therapist'
+  const isPrnTherapist = role === 'therapist' && profile?.employment_type === 'prn'
 
   const today = new Date()
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -296,7 +326,11 @@ export default async function AvailabilityPage({
       <CardHeader>
         <CardTitle>Cycle-specific date overrides</CardTitle>
         <CardDescription>
-          Submit overrides for one schedule cycle only. &quot;Need off&quot; forces off; &quot;Available to work&quot; forces on.
+          {role === 'manager'
+            ? 'Submit overrides for one schedule cycle only. "Need off" forces off; "Available to work" forces on.'
+            : isPrnTherapist
+              ? 'Submit "Available to work (PRN)" for one schedule cycle only.'
+              : 'Submit "Need off" for one schedule cycle only.'}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -338,10 +372,18 @@ export default async function AvailabilityPage({
               id="override_type"
               name="override_type"
               className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
-              defaultValue="force_off"
+              defaultValue={isPrnTherapist ? 'force_on' : 'force_off'}
             >
-              <option value="force_off">Need off</option>
-              <option value="force_on">Available to work</option>
+              {role === 'manager' ? (
+                <>
+                  <option value="force_off">Need off</option>
+                  <option value="force_on">Available to work</option>
+                </>
+              ) : isPrnTherapist ? (
+                <option value="force_on">Available to work (PRN)</option>
+              ) : (
+                <option value="force_off">Need off</option>
+              )}
             </select>
           </div>
 
@@ -386,7 +428,9 @@ export default async function AvailabilityPage({
         <p className="text-muted-foreground">
           {role === 'manager'
             ? 'Review cycle-scoped therapist date overrides for schedule planning.'
-            : 'Submit cycle-scoped date overrides: Need off or Available to work.'}
+            : isPrnTherapist
+              ? 'Submit cycle-scoped PRN offers: Available to work (PRN).'
+              : 'Submit cycle-scoped date overrides: Need off.'}
         </p>
       </div>
 

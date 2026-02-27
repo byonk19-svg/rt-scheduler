@@ -1028,7 +1028,7 @@ export function EmployeeDirectory({
                       required
                     >
                       <option value="force_off">Need off</option>
-                      <option value="force_on">Available</option>
+                      <option value="force_on">Available to work</option>
                     </select>
                   </div>
                   <div className="space-y-1 md:col-span-2">

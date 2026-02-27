@@ -139,6 +139,50 @@ describe('pickTherapistForDate', () => {
     expect(pick.therapist).toBeNull()
   })
 
+  it('blocks PRN when date is not offered by recurring pattern', () => {
+    const therapist = buildTherapist({
+      employment_type: 'prn',
+      works_dow: [2],
+      works_dow_mode: 'soft',
+    })
+
+    const pick = pickTherapistForDate(
+      [therapist],
+      0,
+      '2026-03-02',
+      'day',
+      new Map<string, AvailabilityOverrideRow[]>(),
+      'cycle-1',
+      new Set<string>(),
+      new Map(),
+      new Map([['therapist-1', 3]])
+    )
+
+    expect(pick.therapist).toBeNull()
+  })
+
+  it('allows PRN when recurring pattern offers the weekday', () => {
+    const therapist = buildTherapist({
+      employment_type: 'prn',
+      works_dow: [1],
+      works_dow_mode: 'hard',
+    })
+
+    const pick = pickTherapistForDate(
+      [therapist],
+      0,
+      '2026-03-02',
+      'day',
+      new Map<string, AvailabilityOverrideRow[]>(),
+      'cycle-1',
+      new Set<string>(),
+      new Map(),
+      new Map([['therapist-1', 3]])
+    )
+
+    expect(pick.therapist?.id).toBe('therapist-1')
+  })
+
   it('prefers works_dow matches when mode is soft', () => {
     const therapists: Therapist[] = [
       buildTherapist({
@@ -211,6 +255,7 @@ describe('pickTherapistForDate', () => {
 
   it('force_on override allows scheduling outside hard recurring pattern', () => {
     const therapist = buildTherapist({
+      employment_type: 'prn',
       works_dow: [2],
       works_dow_mode: 'hard',
     })

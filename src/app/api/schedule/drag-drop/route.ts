@@ -12,7 +12,7 @@ import {
   sanitizeWeeklyLimit,
 } from '@/lib/scheduling-constants'
 import { countsTowardWeeklyLimit, getWeekBoundsForDate, isDateWithinRange } from '@/lib/schedule-helpers'
-import { resolveAvailability } from '@/lib/coverage/resolve-availability'
+import { formatEligibilityReason, resolveEligibility } from '@/lib/coverage/resolve-availability'
 import { normalizeWorkPattern } from '@/lib/coverage/work-patterns'
 import type { AvailabilityOverrideRow as CycleAvailabilityOverrideRow } from '@/lib/coverage/types'
 import type { ShiftStatus, ShiftRole, EmploymentType } from '@/app/schedule/types'
@@ -32,6 +32,7 @@ type TherapistAvailabilityState = {
   forceOff: boolean
   forceOn: boolean
   inactiveOrFmla: boolean
+  prnNotOffered: boolean
   error?: string
 }
 type DragAction =
@@ -161,7 +162,7 @@ async function getTherapistAvailabilityState(
   const [profileResult, availabilityResult, patternResult] = await Promise.all([
     supabase
       .from('profiles')
-      .select('full_name, is_active, on_fmla')
+      .select('full_name, is_active, on_fmla, employment_type')
       .eq('id', therapistId)
       .maybeSingle(),
     supabase
@@ -185,6 +186,7 @@ async function getTherapistAvailabilityState(
       forceOff: false,
       forceOn: false,
       inactiveOrFmla: false,
+      prnNotOffered: false,
       error: 'Failed to validate availability constraints.',
     }
   }
@@ -211,38 +213,34 @@ async function getTherapistAvailabilityState(
       })
 
   const overrides = (availabilityResult.data ?? []) as CycleAvailabilityOverrideRow[]
-  const resolution = resolveAvailability({
-    therapistId,
+  const resolution = resolveEligibility({
+    therapist: {
+      id: therapistId,
+      is_active: profileResult.data.is_active !== false,
+      on_fmla: profileResult.data.on_fmla === true,
+      employment_type:
+        profileResult.data.employment_type === 'prn'
+          ? 'prn'
+          : profileResult.data.employment_type === 'part_time'
+            ? 'part_time'
+            : 'full_time',
+      pattern,
+    },
     cycleId,
     date,
     shiftType,
-    isActive: profileResult.data.is_active !== false,
-    onFmla: profileResult.data.on_fmla === true,
-    pattern,
     overrides,
   })
-  const reasonLabel =
-    resolution.reason === 'override_force_off'
-      ? 'Force off override'
-      : resolution.reason === 'blocked_offs_dow'
-        ? 'Never works this weekday'
-        : resolution.reason === 'blocked_every_other_weekend'
-          ? 'Off weekend by alternating rotation'
-          : resolution.reason === 'blocked_outside_works_dow_hard'
-            ? 'Outside hard works-day rule'
-            : resolution.reason === 'inactive'
-              ? 'Inactive therapist'
-              : resolution.reason === 'on_fmla'
-                ? 'Therapist on FMLA'
-                : null
+  const reasonLabel = formatEligibilityReason(resolution.reason)
 
   return {
     therapistName,
     blockedByConstraints: !resolution.allowed,
     unavailableReason: reasonLabel,
     forceOff: resolution.reason === 'override_force_off',
-    forceOn: resolution.reason === 'override_force_on',
+    forceOn: resolution.offeredByOverride,
     inactiveOrFmla: resolution.reason === 'inactive' || resolution.reason === 'on_fmla',
+    prnNotOffered: resolution.prnNotOffered,
   }
 }
 
@@ -315,7 +313,10 @@ export async function POST(request: Request) {
     if (availabilityState.error) {
       return NextResponse.json({ error: availabilityState.error }, { status: 500 })
     }
-    if (availabilityState.blockedByConstraints && availabilityState.inactiveOrFmla) {
+    if (
+      availabilityState.blockedByConstraints &&
+      (availabilityState.inactiveOrFmla || availabilityState.prnNotOffered)
+    ) {
       return NextResponse.json(
         {
           error: availabilityState.unavailableReason ?? 'This therapist cannot be assigned.',
@@ -466,7 +467,10 @@ export async function POST(request: Request) {
     if (availabilityState.error) {
       return NextResponse.json({ error: availabilityState.error }, { status: 500 })
     }
-    if (availabilityState.blockedByConstraints && availabilityState.inactiveOrFmla) {
+    if (
+      availabilityState.blockedByConstraints &&
+      (availabilityState.inactiveOrFmla || availabilityState.prnNotOffered)
+    ) {
       return NextResponse.json(
         {
           error: availabilityState.unavailableReason ?? 'This therapist cannot be assigned.',
@@ -659,7 +663,10 @@ export async function POST(request: Request) {
     if (availabilityState.error) {
       return NextResponse.json({ error: availabilityState.error }, { status: 500 })
     }
-    if (availabilityState.blockedByConstraints && availabilityState.inactiveOrFmla) {
+    if (
+      availabilityState.blockedByConstraints &&
+      (availabilityState.inactiveOrFmla || availabilityState.prnNotOffered)
+    ) {
       return NextResponse.json(
         {
           error: availabilityState.unavailableReason ?? 'This therapist cannot be assigned.',
