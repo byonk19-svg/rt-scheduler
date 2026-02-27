@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-react'
 
 import {
+  buildMissingAvailabilityRows,
   filterEmployeeDirectoryRecords,
   formatEmployeeDate,
   isFmlaReturnDateEnabled,
@@ -31,8 +32,28 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 type EmployeeDirectoryProps = {
   employees: EmployeeDirectoryRecord[]
+  cycles: Array<{
+    id: string
+    label: string
+    start_date: string
+    end_date: string
+    published: boolean
+  }>
+  dateOverrides: Array<{
+    id: string
+    therapist_id: string
+    cycle_id: string
+    date: string
+    shift_type: 'day' | 'night' | 'both'
+    override_type: 'force_off' | 'force_on'
+    note: string | null
+    created_at: string
+    source: 'therapist' | 'manager'
+  }>
   saveEmployeeAction: (formData: FormData) => void | Promise<void>
   setEmployeeActiveAction: (formData: FormData) => void | Promise<void>
+  saveEmployeeDateOverrideAction: (formData: FormData) => void | Promise<void>
+  deleteEmployeeDateOverrideAction: (formData: FormData) => void | Promise<void>
 }
 
 type DirectorySortKey = 'employee' | 'shift' | 'type' | 'tags'
@@ -44,11 +65,43 @@ const TABS: Array<{ value: EmployeeDirectoryTab; label: string }> = [
   { value: 'day', label: 'Day' },
   { value: 'night', label: 'Night' },
 ]
+const WEEKDAY_OPTIONS: Array<{ value: number; label: string }> = [
+  { value: 0, label: 'Sun' },
+  { value: 1, label: 'Mon' },
+  { value: 2, label: 'Tue' },
+  { value: 3, label: 'Wed' },
+  { value: 4, label: 'Thu' },
+  { value: 5, label: 'Fri' },
+  { value: 6, label: 'Sat' },
+]
 
 function employmentLabel(value: EmployeeDirectoryRecord['employment_type']): string {
   if (value === 'part_time') return 'Part-time'
   if (value === 'prn') return 'PRN'
   return 'Full-time'
+}
+
+function weekdayLabel(values: number[]): string {
+  if (values.length === 0) return 'Any day'
+  const byValue = new Map(WEEKDAY_OPTIONS.map((option) => [option.value, option.label]))
+  return values
+    .filter((value) => byValue.has(value))
+    .map((value) => byValue.get(value) ?? '')
+    .filter((value) => value.length > 0)
+    .join(', ')
+}
+
+function formatDateTime(value: string | null): string {
+  if (!value) return 'Never'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }
 
 function ShiftBadge({ shiftType }: { shiftType: EmployeeDirectoryRecord['shift_type'] }) {
@@ -160,7 +213,15 @@ function EmployeeActionsMenu({
   )
 }
 
-export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeActiveAction }: EmployeeDirectoryProps) {
+export function EmployeeDirectory({
+  employees,
+  cycles,
+  dateOverrides,
+  saveEmployeeAction,
+  setEmployeeActiveAction,
+  saveEmployeeDateOverrideAction,
+  deleteEmployeeDateOverrideAction,
+}: EmployeeDirectoryProps) {
   const [tab, setTab] = useState<EmployeeDirectoryTab>('all')
   const [searchText, setSearchText] = useState('')
   const [leadOnly, setLeadOnly] = useState(false)
@@ -168,8 +229,18 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
   const [includeInactive, setIncludeInactive] = useState(false)
   const [sortKey, setSortKey] = useState<DirectorySortKey>('employee')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
-  const [editState, setEditState] = useState<{ employeeId: string; onFmla: boolean } | null>(null)
+  const [availabilityCycleId, setAvailabilityCycleId] = useState<string>('')
+  const [overrideCycleIdDraft, setOverrideCycleIdDraft] = useState<string>(cycles[0]?.id ?? '')
+  const [focusAvailabilitySection, setFocusAvailabilitySection] = useState(false)
+  const [editState, setEditState] = useState<{
+    employeeId: string
+    onFmla: boolean
+    weekendRotation: 'none' | 'every_other'
+    worksDowMode: 'hard' | 'soft'
+  } | null>(null)
   const [deactivateEmployeeId, setDeactivateEmployeeId] = useState<string | null>(null)
+  const availabilitySectionRef = useRef<HTMLDivElement | null>(null)
+  const selectedAvailabilityCycleId = availabilityCycleId || cycles[0]?.id || ''
 
   const filteredEmployees = useMemo(
     () =>
@@ -222,16 +293,68 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
     setSortDirection('asc')
   }
 
+  function openEditForEmployee(
+    employeeId: string,
+    options?: { focusAvailability?: boolean; cycleId?: string }
+  ) {
+    const employee = employees.find((row) => row.id === employeeId)
+    if (!employee) return
+    setEditState({
+      employeeId: employee.id,
+      onFmla: employee.on_fmla,
+      weekendRotation: employee.weekend_rotation,
+      worksDowMode: employee.works_dow_mode,
+    })
+    setFocusAvailabilitySection(Boolean(options?.focusAvailability))
+    if (options?.cycleId) {
+      setOverrideCycleIdDraft(options.cycleId)
+    } else {
+      setOverrideCycleIdDraft((current) => current || selectedAvailabilityCycleId)
+    }
+  }
+
   const editEmployee = useMemo(
     () => employees.find((employee) => employee.id === editState?.employeeId) ?? null,
     [employees, editState?.employeeId]
   )
   const onFmlaDraft = editState?.onFmla ?? false
+  const weekendRotationDraft = editState?.weekendRotation ?? 'none'
+  const worksDowModeDraft = editState?.worksDowMode ?? 'hard'
 
   const deactivateEmployee = useMemo(
     () => employees.find((employee) => employee.id === deactivateEmployeeId) ?? null,
     [employees, deactivateEmployeeId]
   )
+  const cycleLabelById = useMemo(
+    () =>
+      new Map(
+        cycles.map((cycle) => [
+          cycle.id,
+          `${cycle.label} (${formatEmployeeDate(cycle.start_date)} to ${formatEmployeeDate(cycle.end_date)})`,
+        ])
+      ),
+    [cycles]
+  )
+  const editEmployeeDateOverrides = useMemo(() => {
+    if (!editEmployee) return []
+    return dateOverrides
+      .filter((row) => row.therapist_id === editEmployee.id)
+      .slice()
+      .sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date)
+        if (a.shift_type !== b.shift_type) return a.shift_type.localeCompare(b.shift_type)
+        return a.cycle_id.localeCompare(b.cycle_id)
+      })
+  }, [dateOverrides, editEmployee])
+  const missingAvailabilityRows = useMemo(
+    () => buildMissingAvailabilityRows(employees, dateOverrides, selectedAvailabilityCycleId),
+    [dateOverrides, employees, selectedAvailabilityCycleId]
+  )
+
+  useEffect(() => {
+    if (!editEmployee || !focusAvailabilitySection) return
+    availabilitySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [editEmployee, focusAvailabilitySection])
 
   return (
     <Card id="employee-directory">
@@ -283,6 +406,85 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
         </div>
 
         <p className="text-xs text-muted-foreground">{sortedEmployees.length} employee(s)</p>
+
+        <div className="space-y-2 rounded-md border border-border bg-secondary/20 p-3">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold">Missing availability</p>
+              <p className="text-xs text-muted-foreground">
+                Review who has not submitted any cycle-specific dates and quickly enter them.
+              </p>
+            </div>
+            <div className="w-full md:w-72">
+              <Label htmlFor="missing_cycle_id" className="text-xs">
+                Selected cycle
+              </Label>
+              <select
+                id="missing_cycle_id"
+                className="mt-1 h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                value={selectedAvailabilityCycleId}
+                onChange={(event) => setAvailabilityCycleId(event.target.value)}
+              >
+                {cycles.map((cycle) => (
+                  <option key={`missing-cycle-${cycle.id}`} value={cycle.id}>
+                    {cycle.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-md border border-border bg-background">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Therapist</TableHead>
+                  <TableHead>Overrides</TableHead>
+                  <TableHead>Last updated</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {missingAvailabilityRows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
+                      No therapists available for this cycle.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  missingAvailabilityRows.map((row) => (
+                    <TableRow key={`missing-${row.therapistId}`}>
+                      <TableCell className="font-medium">{row.therapistName}</TableCell>
+                      <TableCell>{row.overridesCount}</TableCell>
+                      <TableCell>{formatDateTime(row.lastUpdatedAt)}</TableCell>
+                      <TableCell>
+                        <Badge variant={row.submitted ? 'outline' : 'destructive'}>
+                          {row.submitted ? 'Submitted' : 'Not submitted'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            openEditForEmployee(row.therapistId, {
+                              focusAvailability: true,
+                              cycleId: selectedAvailabilityCycleId,
+                            })
+                          }
+                        >
+                          Enter availability
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
 
         <div className="hidden rounded-md border border-border md:block">
           <Table>
@@ -338,7 +540,7 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
                 sortedEmployees.map((employee) => (
                   <TableRow
                     key={employee.id}
-                    onClick={() => setEditState({ employeeId: employee.id, onFmla: employee.on_fmla })}
+                    onClick={() => openEditForEmployee(employee.id)}
                     className="cursor-pointer hover:bg-secondary/50"
                   >
                     <TableCell>
@@ -354,7 +556,12 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {employee.is_lead_eligible || employee.on_fmla || (includeInactive && !employee.is_active) ? (
+                      {employee.is_lead_eligible ||
+                      employee.on_fmla ||
+                      employee.works_dow.length > 0 ||
+                      employee.offs_dow.length > 0 ||
+                      employee.weekend_rotation === 'every_other' ||
+                      (includeInactive && !employee.is_active) ? (
                         <div className="space-y-1">
                           <div className="flex flex-wrap gap-1.5">
                             {employee.is_lead_eligible && (
@@ -372,6 +579,33 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
                                 FMLA
                               </Badge>
                             )}
+                            {employee.works_dow.length > 0 && (
+                              <Badge variant="outline" title={weekdayLabel(employee.works_dow)}>
+                                Works: {weekdayLabel(employee.works_dow)}
+                              </Badge>
+                            )}
+                            {employee.offs_dow.length > 0 && (
+                              <Badge variant="outline" title={weekdayLabel(employee.offs_dow)}>
+                                Never: {weekdayLabel(employee.offs_dow)}
+                              </Badge>
+                            )}
+                            {employee.weekend_rotation === 'every_other' && (
+                              <Badge
+                                variant="outline"
+                                title={
+                                  employee.weekend_anchor_date
+                                    ? `Anchor weekend: ${formatEmployeeDate(employee.weekend_anchor_date)}`
+                                    : undefined
+                                }
+                              >
+                                Alt weekend
+                              </Badge>
+                            )}
+                            {employee.works_dow.length > 0 && (
+                              <Badge variant="outline">
+                                Works days: {employee.works_dow_mode === 'hard' ? 'Hard' : 'Soft'}
+                              </Badge>
+                            )}
                             {includeInactive && !employee.is_active && <Badge variant="outline">Inactive</Badge>}
                           </div>
                           {employee.on_fmla && employee.fmla_return_date && (
@@ -385,7 +619,7 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
                     <TableCell className="text-right">
                       <EmployeeActionsMenu
                         employee={employee}
-                        onEdit={() => setEditState({ employeeId: employee.id, onFmla: employee.on_fmla })}
+                        onEdit={() => openEditForEmployee(employee.id)}
                         onDeactivate={() => setDeactivateEmployeeId(employee.id)}
                         setEmployeeActiveAction={setEmployeeActiveAction}
                       />
@@ -405,7 +639,7 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
               <div
                 key={employee.id}
                 className="rounded-md border border-border p-3"
-                onClick={() => setEditState({ employeeId: employee.id, onFmla: employee.on_fmla })}
+                onClick={() => openEditForEmployee(employee.id)}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
@@ -414,7 +648,7 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
                   </div>
                   <EmployeeActionsMenu
                     employee={employee}
-                    onEdit={() => setEditState({ employeeId: employee.id, onFmla: employee.on_fmla })}
+                    onEdit={() => openEditForEmployee(employee.id)}
                     onDeactivate={() => setDeactivateEmployeeId(employee.id)}
                     setEmployeeActiveAction={setEmployeeActiveAction}
                   />
@@ -428,6 +662,18 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
                   {employee.is_lead_eligible && <Badge className={LEAD_ELIGIBLE_BADGE_CLASS}>Lead</Badge>}
                   {includeInactive && !employee.is_active && <Badge variant="outline">Inactive</Badge>}
                   {employee.on_fmla && <Badge variant="outline">FMLA</Badge>}
+                  {employee.works_dow.length > 0 && (
+                    <Badge variant="outline">Works: {weekdayLabel(employee.works_dow)}</Badge>
+                  )}
+                  {employee.offs_dow.length > 0 && (
+                    <Badge variant="outline">Never: {weekdayLabel(employee.offs_dow)}</Badge>
+                  )}
+                  {employee.weekend_rotation === 'every_other' && (
+                    <Badge variant="outline">Alt weekend</Badge>
+                  )}
+                  {employee.works_dow.length > 0 && (
+                    <Badge variant="outline">Works days: {employee.works_dow_mode === 'hard' ? 'Hard' : 'Soft'}</Badge>
+                  )}
                 </div>
                 {employee.on_fmla && employee.fmla_return_date && (
                   <p className="mt-1 text-xs text-muted-foreground">Return: {formatEmployeeDate(employee.fmla_return_date)}</p>
@@ -438,130 +684,417 @@ export function EmployeeDirectory({ employees, saveEmployeeAction, setEmployeeAc
         </div>
       </CardContent>
 
-      <Dialog open={Boolean(editEmployee)} onOpenChange={(open) => !open && setEditState(null)}>
-        <DialogContent className="sm:max-w-xl">
+      <Dialog
+        open={Boolean(editEmployee)}
+        onOpenChange={(open) => {
+          if (open) return
+          setEditState(null)
+          setFocusAvailabilitySection(false)
+          setOverrideCycleIdDraft(selectedAvailabilityCycleId)
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Edit employee</DialogTitle>
             <DialogDescription>Update profile details and scheduling eligibility settings.</DialogDescription>
           </DialogHeader>
           {editEmployee && (
-            <form key={editEmployee.id} action={saveEmployeeAction} className="space-y-4">
-              <input type="hidden" name="profile_id" value={editEmployee.id} />
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <Label htmlFor="edit_name">Name</Label>
-                  <Input id="edit_name" name="full_name" defaultValue={editEmployee.full_name} required />
+            <div className="space-y-4">
+              <form key={editEmployee.id} action={saveEmployeeAction} className="space-y-4">
+                <input type="hidden" name="profile_id" value={editEmployee.id} />
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="edit_name">Name</Label>
+                    <Input id="edit_name" name="full_name" defaultValue={editEmployee.full_name} required />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="edit_email">Email</Label>
+                    <Input id="edit_email" name="email" type="email" defaultValue={editEmployee.email} required />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="edit_email">Email</Label>
-                  <Input id="edit_email" name="email" type="email" defaultValue={editEmployee.email} required />
-                </div>
-              </div>
 
-              <div className="space-y-1">
-                <Label htmlFor="edit_phone">Phone</Label>
-                <Input
-                  id="edit_phone"
-                  name="phone_number"
-                  type="tel"
-                  inputMode="numeric"
-                  autoComplete="tel"
-                  defaultValue={editEmployee.phone_number ?? ''}
-                  placeholder="(555) 123-4567"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="space-y-1">
-                  <Label htmlFor="edit_shift">Shift/Team</Label>
-                  <select
-                    id="edit_shift"
-                    name="shift_type"
-                    className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
-                    defaultValue={editEmployee.shift_type}
-                  >
-                    <option value="day">Day</option>
-                    <option value="night">Night</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="edit_employment">Employment</Label>
-                  <select
-                    id="edit_employment"
-                    name="employment_type"
-                    className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
-                    defaultValue={editEmployee.employment_type}
-                  >
-                    <option value="full_time">Full-time</option>
-                    <option value="part_time">Part-time</option>
-                    <option value="prn">PRN</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="edit_max_week">Max shifts/week</Label>
-                  <select
-                    id="edit_max_week"
-                    name="max_work_days_per_week"
-                    className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
-                    defaultValue={String(editEmployee.max_work_days_per_week)}
-                  >
-                    {Array.from({ length: 7 }, (_, index) => index + 1).map((value) => (
-                      <option key={`max-${value}`} value={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-2">
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" name="is_lead_eligible" defaultChecked={editEmployee.is_lead_eligible} />
-                  Lead
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    name="on_fmla"
-                    checked={onFmlaDraft}
-                    onChange={(event) =>
-                      setEditState((current) =>
-                        current
-                          ? {
-                              ...current,
-                              onFmla: event.target.checked,
-                            }
-                          : current
-                      )
-                    }
-                  />
-                  On FMLA
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" name="is_active" defaultChecked={editEmployee.is_active} />
-                  Active
-                </label>
-              </div>
-
-              {isFmlaReturnDateEnabled(onFmlaDraft) && (
-                <div className="space-y-1">
-                  <Label htmlFor="edit_fmla_return">Potential return date</Label>
+                  <Label htmlFor="edit_phone">Phone</Label>
                   <Input
-                    id="edit_fmla_return"
-                    name="fmla_return_date"
-                    type="date"
-                    defaultValue={normalizeFmlaReturnDate(editEmployee.fmla_return_date ?? '', true) ?? ''}
+                    id="edit_phone"
+                    name="phone_number"
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel"
+                    defaultValue={editEmployee.phone_number ?? ''}
+                    placeholder="(555) 123-4567"
                   />
                 </div>
-              )}
 
-              <DialogFooter>
-                <FormSubmitButton type="submit" pendingText="Saving...">Save</FormSubmitButton>
-                <FormSubmitButton type="submit" variant="outline" name="realign_future_shifts" value="true" pendingText="Saving...">
-                  Save + realign shifts
-                </FormSubmitButton>
-              </DialogFooter>
-            </form>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="edit_shift">Shift/Team</Label>
+                    <select
+                      id="edit_shift"
+                      name="shift_type"
+                      className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                      defaultValue={editEmployee.shift_type}
+                    >
+                      <option value="day">Day</option>
+                      <option value="night">Night</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="edit_employment">Employment</Label>
+                    <select
+                      id="edit_employment"
+                      name="employment_type"
+                      className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                      defaultValue={editEmployee.employment_type}
+                    >
+                      <option value="full_time">Full-time</option>
+                      <option value="part_time">Part-time</option>
+                      <option value="prn">PRN</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="edit_max_week">Max shifts/week</Label>
+                    <select
+                      id="edit_max_week"
+                      name="max_work_days_per_week"
+                      className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                      defaultValue={String(editEmployee.max_work_days_per_week)}
+                    >
+                      {Array.from({ length: 7 }, (_, index) => index + 1).map((value) => (
+                        <option key={`max-${value}`} value={value}>
+                          {value}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-2 rounded-md border border-border bg-secondary/20 p-3">
+                  <Label className="text-sm font-semibold">Works weekdays</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Auto-generate uses these as preferred or required depending on the Hard/Soft rule.
+                  </p>
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+                    {WEEKDAY_OPTIONS.map((day) => (
+                      <label key={`preferred-day-${day.value}`} className="flex items-center gap-1.5 text-xs">
+                        <input
+                          type="checkbox"
+                          name="works_dow"
+                          value={String(day.value)}
+                          defaultChecked={editEmployee.works_dow.includes(day.value)}
+                        />
+                        {day.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2 rounded-md border border-border bg-secondary/20 p-3">
+                  <Label className="text-sm font-semibold">Absolutely cannot work these weekdays</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Auto-generate will never assign this therapist on checked weekdays.
+                  </p>
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+                    {WEEKDAY_OPTIONS.map((day) => (
+                      <label key={`blocked-day-${day.value}`} className="flex items-center gap-1.5 text-xs">
+                        <input
+                          type="checkbox"
+                          name="offs_dow"
+                          value={String(day.value)}
+                          defaultChecked={editEmployee.offs_dow.includes(day.value)}
+                        />
+                        {day.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2 rounded-md border border-border bg-secondary/20 p-3">
+                  <Label className="text-sm font-semibold">Works days rule</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Hard: only works days are allowed. Soft: works days are preferred but other days are allowed.
+                  </p>
+                  <div className="inline-flex rounded-md border border-border bg-background p-1">
+                    <label className="cursor-pointer">
+                      <input
+                        className="sr-only"
+                        type="radio"
+                        name="works_dow_mode"
+                        value="hard"
+                        checked={worksDowModeDraft === 'hard'}
+                        onChange={() =>
+                          setEditState((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  worksDowMode: 'hard',
+                                }
+                              : current
+                          )
+                        }
+                      />
+                      <span
+                        className={cn(
+                          'rounded px-3 py-1.5 text-sm',
+                          worksDowModeDraft === 'hard' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'
+                        )}
+                      >
+                        Hard
+                      </span>
+                    </label>
+                    <label className="cursor-pointer">
+                      <input
+                        className="sr-only"
+                        type="radio"
+                        name="works_dow_mode"
+                        value="soft"
+                        checked={worksDowModeDraft === 'soft'}
+                        onChange={() =>
+                          setEditState((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  worksDowMode: 'soft',
+                                }
+                              : current
+                          )
+                        }
+                      />
+                      <span
+                        className={cn(
+                          'rounded px-3 py-1.5 text-sm',
+                          worksDowModeDraft === 'soft' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'
+                        )}
+                      >
+                        Soft
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="is_lead_eligible" defaultChecked={editEmployee.is_lead_eligible} />
+                    Lead
+                  </label>
+                  <fieldset className="space-y-1">
+                    <legend className="text-sm">Weekend rotation</legend>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name="weekend_rotation"
+                        value="none"
+                        checked={weekendRotationDraft === 'none'}
+                        onChange={() =>
+                          setEditState((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  weekendRotation: 'none',
+                                }
+                              : current
+                          )
+                        }
+                      />
+                      None
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name="weekend_rotation"
+                        value="every_other"
+                        checked={weekendRotationDraft === 'every_other'}
+                        onChange={() =>
+                          setEditState((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  weekendRotation: 'every_other',
+                                }
+                              : current
+                          )
+                        }
+                      />
+                      Every other weekend
+                    </label>
+                  </fieldset>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      name="on_fmla"
+                      checked={onFmlaDraft}
+                      onChange={(event) =>
+                        setEditState((current) =>
+                          current
+                            ? {
+                                ...current,
+                                onFmla: event.target.checked,
+                              }
+                            : current
+                        )
+                      }
+                    />
+                    On FMLA
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="is_active" defaultChecked={editEmployee.is_active} />
+                    Active
+                  </label>
+                </div>
+
+                {weekendRotationDraft === 'every_other' && (
+                  <div className="space-y-1">
+                    <Label htmlFor="edit_weekend_anchor">Weekend anchor date (Saturday)</Label>
+                    <Input
+                      id="edit_weekend_anchor"
+                      name="weekend_anchor_date"
+                      type="date"
+                      defaultValue={editEmployee.weekend_anchor_date ?? ''}
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Auto-generate assigns this therapist on alternating weekends from this anchor Saturday.
+                    </p>
+                  </div>
+                )}
+
+                {isFmlaReturnDateEnabled(onFmlaDraft) && (
+                  <div className="space-y-1">
+                    <Label htmlFor="edit_fmla_return">Potential return date</Label>
+                    <Input
+                      id="edit_fmla_return"
+                      name="fmla_return_date"
+                      type="date"
+                      defaultValue={normalizeFmlaReturnDate(editEmployee.fmla_return_date ?? '', true) ?? ''}
+                    />
+                  </div>
+                )}
+
+                <DialogFooter>
+                  <FormSubmitButton type="submit" pendingText="Saving...">Save</FormSubmitButton>
+                  <FormSubmitButton type="submit" variant="outline" name="realign_future_shifts" value="true" pendingText="Saving...">
+                    Save + realign shifts
+                  </FormSubmitButton>
+                </DialogFooter>
+              </form>
+
+              <div
+                ref={availabilitySectionRef}
+                className={cn(
+                  'space-y-3 rounded-md border border-border bg-secondary/20 p-3',
+                  focusAvailabilitySection ? 'ring-2 ring-primary/40' : ''
+                )}
+              >
+                <div>
+                  <p className="text-sm font-semibold">Date Overrides (Manager)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Add or update cycle-specific dates for this therapist. Same cycle/date/shift updates existing entry.
+                  </p>
+                </div>
+
+                <form action={saveEmployeeDateOverrideAction} className="grid grid-cols-1 gap-2 md:grid-cols-12">
+                  <input type="hidden" name="profile_id" value={editEmployee.id} />
+                  <div className="space-y-1 md:col-span-3">
+                    <Label htmlFor="override_date">Date</Label>
+                    <Input id="override_date" name="date" type="date" required />
+                  </div>
+                  <div className="space-y-1 md:col-span-4">
+                    <Label htmlFor="override_cycle_id">Cycle</Label>
+                    <select
+                      id="override_cycle_id"
+                      name="cycle_id"
+                      className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                      value={overrideCycleIdDraft}
+                      onChange={(event) => setOverrideCycleIdDraft(event.target.value)}
+                      required
+                    >
+                      <option value="" disabled>
+                        Select cycle
+                      </option>
+                      {cycles.map((cycle) => (
+                        <option key={`cycle-${cycle.id}`} value={cycle.id}>
+                          {cycle.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1 md:col-span-2">
+                    <Label htmlFor="override_type">Override</Label>
+                    <select
+                      id="override_type"
+                      name="override_type"
+                      className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                      defaultValue="force_off"
+                      required
+                    >
+                      <option value="force_off">Need off</option>
+                      <option value="force_on">Available</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1 md:col-span-2">
+                    <Label htmlFor="override_shift_type">Shift</Label>
+                    <select
+                      id="override_shift_type"
+                      name="shift_type"
+                      className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                      defaultValue="both"
+                      required
+                    >
+                      <option value="both">Both</option>
+                      <option value="day">Day</option>
+                      <option value="night">Night</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1 md:col-span-9">
+                    <Label htmlFor="override_note">Note (optional)</Label>
+                    <Input id="override_note" name="note" placeholder="Vacation, training, etc." />
+                  </div>
+                  <div className="flex items-end md:col-span-3">
+                    <FormSubmitButton type="submit" pendingText="Saving..." className="w-full">
+                      Save date override
+                    </FormSubmitButton>
+                  </div>
+                </form>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Current overrides</p>
+                  {editEmployeeDateOverrides.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No date overrides for this therapist yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {editEmployeeDateOverrides.map((row) => (
+                        <div
+                          key={row.id}
+                          className="flex flex-col gap-2 rounded-md border border-border bg-background p-2 md:flex-row md:items-center md:justify-between"
+                        >
+                          <div className="space-y-0.5">
+                            <p className="text-sm font-medium">
+                              {formatEmployeeDate(row.date)} - {row.override_type === 'force_on' ? 'Available to work' : 'Need off'} ({row.shift_type})
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-xs text-muted-foreground">
+                                {cycleLabelById.get(row.cycle_id) ?? row.cycle_id}
+                                {row.note ? ` | ${row.note}` : ''}
+                              </p>
+                              <Badge variant="outline" className="text-[10px]">
+                                {row.source === 'manager' ? 'Entered by manager' : 'Entered by therapist'}
+                              </Badge>
+                            </div>
+                          </div>
+                          <form action={deleteEmployeeDateOverrideAction}>
+                            <input type="hidden" name="override_id" value={row.id} />
+                            <input type="hidden" name="profile_id" value={editEmployee.id} />
+                            <FormSubmitButton type="submit" variant="ghost" size="sm" pendingText="Deleting...">
+                              Delete
+                            </FormSubmitButton>
+                          </form>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>

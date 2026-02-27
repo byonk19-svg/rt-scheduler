@@ -40,9 +40,9 @@ type Scenario = {
     therapist_id: string
     cycle_id: string
     date: string
-    entry_type: 'unavailable' | 'available'
+    override_type: 'force_off' | 'force_on'
     shift_type: 'day' | 'night' | 'both'
-    reason: string | null
+    note: string | null
   }>
   therapistProfiles?: Record<
     string,
@@ -128,7 +128,7 @@ function makeSupabaseMock(scenario: Scenario) {
         return { data: cycle, error: null }
       }
 
-      if (table === 'availability_entries') {
+      if (table === 'availability_overrides') {
         const rows = (scenario.availabilityRows ?? []).filter((row) => {
           if (state.filters.therapist_id && row.therapist_id !== state.filters.therapist_id) return false
           if (state.filters.cycle_id && row.cycle_id !== state.filters.cycle_id) return false
@@ -192,7 +192,7 @@ function makeSupabaseMock(scenario: Scenario) {
       return { data: single ? null : [], error: null }
     }
 
-    const resolveMutation = () => ({ error: null })
+    const resolveMutation = () => ({ data: null, error: null })
 
     const builder: {
       select: (columns?: string) => typeof builder
@@ -270,7 +270,7 @@ describe('drag-drop API behavior', () => {
       makeSupabaseMock({
         coverageStatuses: ['scheduled', 'scheduled', 'scheduled', 'scheduled', 'scheduled'],
         weeklyShifts: [],
-      }) as Awaited<ReturnType<typeof createClient>>
+      }) as unknown as Awaited<ReturnType<typeof createClient>>
     )
 
     const response = await POST(
@@ -303,7 +303,7 @@ describe('drag-drop API behavior', () => {
           { date: '2026-03-09', status: 'scheduled' },
           { date: '2026-03-11', status: 'on_call' },
         ],
-      }) as Awaited<ReturnType<typeof createClient>>
+      }) as unknown as Awaited<ReturnType<typeof createClient>>
     )
 
     const response = await POST(
@@ -343,12 +343,12 @@ describe('drag-drop API behavior', () => {
             therapist_id: 'therapist-1',
             cycle_id: 'cycle-1',
             date: '2026-03-10',
-            entry_type: 'unavailable',
+            override_type: 'force_off',
             shift_type: 'both',
-            reason: 'Vacation',
+            note: 'Vacation',
           },
         ],
-      }) as Awaited<ReturnType<typeof createClient>>
+      }) as unknown as Awaited<ReturnType<typeof createClient>>
     )
 
     const response = await POST(
@@ -371,7 +371,7 @@ describe('drag-drop API behavior', () => {
       code: 'availability_conflict',
       availability: {
         therapistName: 'Alex Jones',
-        reason: 'Vacation',
+        reason: 'Force off override',
       },
     })
   })
@@ -391,13 +391,13 @@ describe('drag-drop API behavior', () => {
           therapist_id: 'therapist-1',
           cycle_id: 'cycle-1',
           date: '2026-03-10',
-          entry_type: 'unavailable',
+          override_type: 'force_off',
           shift_type: 'both',
-          reason: 'Doctor appointment',
+          note: 'Doctor appointment',
         },
       ],
     })
-    vi.mocked(createClient).mockResolvedValue(supabase as Awaited<ReturnType<typeof createClient>>)
+    vi.mocked(createClient).mockResolvedValue(supabase as unknown as Awaited<ReturnType<typeof createClient>>)
 
     const response = await POST(
       new Request('http://localhost/api/schedule/drag-drop', {
@@ -438,7 +438,7 @@ describe('drag-drop API behavior', () => {
       },
       availabilityRows: [],
     })
-    vi.mocked(createClient).mockResolvedValue(supabase as Awaited<ReturnType<typeof createClient>>)
+    vi.mocked(createClient).mockResolvedValue(supabase as unknown as Awaited<ReturnType<typeof createClient>>)
 
     const response = await POST(
       new Request('http://localhost/api/schedule/drag-drop', {
@@ -469,7 +469,7 @@ describe('drag-drop API behavior', () => {
         weeklyShifts: [],
         leadTherapistEligible: true,
         existingShiftForLead: { id: 'shift-existing', status: 'scheduled' },
-      }) as Awaited<ReturnType<typeof createClient>>
+      }) as unknown as Awaited<ReturnType<typeof createClient>>
     )
 
     const response = await POST(
@@ -505,7 +505,7 @@ describe('drag-drop API behavior', () => {
         coverageStatuses: ['scheduled'],
         weeklyShifts: [],
         leadTherapistEligible: false,
-      }) as Awaited<ReturnType<typeof createClient>>
+      }) as unknown as Awaited<ReturnType<typeof createClient>>
     )
 
     const response = await POST(
@@ -541,7 +541,7 @@ describe('drag-drop API behavior', () => {
         weeklyShifts: [],
         leadTherapistEligible: true,
         existingShiftForLead: { id: 'shift-existing', status: 'scheduled' },
-      }) as Awaited<ReturnType<typeof createClient>>
+      }) as unknown as Awaited<ReturnType<typeof createClient>>
     )
 
     const response = await POST(
@@ -578,7 +578,7 @@ describe('drag-drop API behavior', () => {
           shift_type: 'night',
           role: 'staff',
         },
-      }) as Awaited<ReturnType<typeof createClient>>
+      }) as unknown as Awaited<ReturnType<typeof createClient>>
     )
 
     const response = await POST(

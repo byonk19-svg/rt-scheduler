@@ -66,13 +66,19 @@ type LatestPublishEventRow = {
   profiles: { full_name: string | null } | { full_name: string | null }[] | null
 }
 
-type AvailabilityEntryRow = {
+type AvailabilityOverrideRow = {
   therapist_id: string
+  cycle_id: string
   date: string
   shift_type: 'day' | 'night' | 'both'
-  entry_type: 'unavailable' | 'available'
-  reason: string | null
+  override_type: 'force_off' | 'force_on'
+  note: string | null
 }
+type NormalizedWorkPattern = Pick<
+  Therapist,
+  'works_dow' | 'offs_dow' | 'weekend_rotation' | 'weekend_anchor_date' | 'works_dow_mode' | 'shift_preference'
+>
+const NO_ELIGIBLE_CONSTRAINT_REASON = 'no_eligible_candidates_due_to_constraints'
 
 function formatAuditAction(value: string): string {
   if (value === 'shift_added') return 'added a shift'
@@ -82,22 +88,17 @@ function formatAuditAction(value: string): string {
   return value.replaceAll('_', ' ')
 }
 
-type RawShiftRow = Omit<
-  ShiftRow,
-  | 'assignment_status'
-  | 'status_note'
-  | 'left_early_time'
-  | 'status_updated_at'
-  | 'status_updated_by'
-  | 'availability_override'
-  | 'availability_override_reason'
-  | 'availability_override_at'
-  | 'availability_override_by'
-  | 'profiles'
-> & {
+type RawShiftRow = {
+  id: string
+  date: string
+  shift_type: 'day' | 'night'
+  status: ShiftStatus
+  role: 'lead' | 'staff'
+  user_id: string | null
+  unfilled_reason?: string | null
   profiles?:
-    | { full_name: string; is_lead_eligible: boolean }
-    | { full_name: string; is_lead_eligible: boolean }[]
+    | { full_name: string; is_lead_eligible: boolean; employment_type?: 'full_time' | 'part_time' | 'prn' | null }
+    | { full_name: string; is_lead_eligible: boolean; employment_type?: 'full_time' | 'part_time' | 'prn' | null }[]
     | null
   assignment_status?: AssignmentStatus | null
   status_note?: string | null
@@ -117,19 +118,22 @@ function toAssignmentStatus(status: ShiftStatus, assignmentStatus?: AssignmentSt
 }
 
 function normalizeShiftRows(rows: RawShiftRow[]): ShiftRow[] {
-  return rows.map((row) => ({
-    ...row,
-    profiles: row.profiles ?? null,
-    assignment_status: toAssignmentStatus(row.status, row.assignment_status),
-    status_note: row.status_note ?? null,
-    left_early_time: row.left_early_time ?? null,
+  return rows
+    .filter((row): row is RawShiftRow & { user_id: string } => typeof row.user_id === 'string')
+    .map((row) => ({
+      ...row,
+      profiles: row.profiles ?? null,
+      unfilled_reason: row.unfilled_reason ?? null,
+      assignment_status: toAssignmentStatus(row.status, row.assignment_status),
+      status_note: row.status_note ?? null,
+      left_early_time: row.left_early_time ?? null,
     status_updated_at: row.status_updated_at ?? null,
     status_updated_by: row.status_updated_by ?? null,
     availability_override: row.availability_override ?? false,
     availability_override_reason: row.availability_override_reason ?? null,
     availability_override_at: row.availability_override_at ?? null,
-    availability_override_by: row.availability_override_by ?? null,
-  }))
+      availability_override_by: row.availability_override_by ?? null,
+    }))
 }
 
 export default async function SchedulePage({
@@ -168,7 +172,7 @@ export default async function SchedulePage({
   const { data: profile } = await supabase
     .from('profiles')
     .select(
-      'role, full_name, shift_type, is_lead_eligible, employment_type, max_work_days_per_week, preferred_work_days, on_fmla, fmla_return_date, is_active, default_calendar_view'
+      'role, full_name, shift_type, is_lead_eligible, employment_type, max_work_days_per_week, on_fmla, fmla_return_date, is_active, default_calendar_view'
     )
     .eq('id', user.id)
     .maybeSingle()
@@ -229,12 +233,13 @@ export default async function SchedulePage({
   }
 
   let shifts: ShiftRow[] = []
+  const constraintUnfilledSlotKeys = new Set<string>()
 
   if (activeCycle) {
     let shiftsQuery = supabase
       .from('shifts')
       .select(
-        'id, date, shift_type, status, assignment_status, status_note, left_early_time, status_updated_at, status_updated_by, availability_override, availability_override_reason, availability_override_at, availability_override_by, role, user_id, profiles:profiles!shifts_user_id_fkey(full_name, is_lead_eligible)'
+        'id, date, shift_type, status, unfilled_reason, assignment_status, status_note, left_early_time, status_updated_at, status_updated_by, availability_override, availability_override_reason, availability_override_at, availability_override_by, role, user_id, profiles:profiles!shifts_user_id_fkey(full_name, is_lead_eligible)'
       )
       .eq('cycle_id', activeCycle.id)
       .order('date', { ascending: true })
@@ -246,7 +251,13 @@ export default async function SchedulePage({
 
     const { data: shiftsData, error: shiftsError } = await shiftsQuery
     if (!shiftsError) {
-      shifts = normalizeShiftRows((shiftsData ?? []) as RawShiftRow[])
+      const rawRows = (shiftsData ?? []) as RawShiftRow[]
+      for (const row of rawRows) {
+        if (row.user_id) continue
+        if (row.unfilled_reason !== NO_ELIGIBLE_CONSTRAINT_REASON) continue
+        constraintUnfilledSlotKeys.add(`${row.date}:${row.shift_type}`)
+      }
+      shifts = normalizeShiftRows(rawRows)
     } else {
       const shiftErrorMessage =
         typeof shiftsError?.message === 'string' ? shiftsError.message : ''
@@ -274,7 +285,7 @@ export default async function SchedulePage({
 
       let legacyShiftsQuery = supabase
         .from('shifts')
-        .select('id, date, shift_type, status, role, user_id')
+        .select('id, date, shift_type, status, unfilled_reason, role, user_id')
         .eq('cycle_id', activeCycle.id)
         .order('date', { ascending: true })
         .order('shift_type', { ascending: true })
@@ -297,12 +308,19 @@ export default async function SchedulePage({
           date: string
           shift_type: 'day' | 'night'
           status: ShiftStatus
+          unfilled_reason?: string | null
           role: 'lead' | 'staff'
-          user_id: string
+          user_id: string | null
         }>
+        for (const row of legacyRows) {
+          if (row.user_id) continue
+          if (row.unfilled_reason !== NO_ELIGIBLE_CONSTRAINT_REASON) continue
+          constraintUnfilledSlotKeys.add(`${row.date}:${row.shift_type}`)
+        }
         shifts = normalizeShiftRows(
           legacyRows.map((row) => ({
             ...row,
+            unfilled_reason: row.unfilled_reason ?? null,
             profiles: null,
           }))
         )
@@ -394,7 +412,7 @@ export default async function SchedulePage({
     let therapistQuery = supabase
       .from('profiles')
       .select(
-        'id, full_name, shift_type, is_lead_eligible, employment_type, max_work_days_per_week, preferred_work_days, on_fmla, fmla_return_date, is_active'
+        'id, full_name, shift_type, is_lead_eligible, employment_type, max_work_days_per_week, on_fmla, fmla_return_date, is_active'
       )
       .eq('role', 'therapist')
       .order('full_name', { ascending: true })
@@ -404,35 +422,79 @@ export default async function SchedulePage({
     }
 
     const { data: therapistData } = await therapistQuery
-    const normalizedTherapists = ((therapistData ?? []) as Therapist[]).map((therapist) => ({
-      ...therapist,
-      preferred_work_days: Array.isArray(therapist.preferred_work_days)
-        ? therapist.preferred_work_days
-            .map((day) => Number(day))
-            .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
-        : [],
-    }))
+    const baseTherapists = (therapistData ?? []) as Array<{
+      id: string
+      full_name: string
+      shift_type: 'day' | 'night'
+      is_lead_eligible: boolean
+      employment_type: 'full_time' | 'part_time' | 'prn'
+      max_work_days_per_week: number
+      on_fmla: boolean
+      fmla_return_date: string | null
+      is_active: boolean
+    }>
+    const therapistIds = baseTherapists.map((therapist) => therapist.id)
+    const { data: patternRows } = therapistIds.length
+      ? await supabase
+          .from('work_patterns')
+          .select(
+            'therapist_id, works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode, shift_preference'
+          )
+          .in('therapist_id', therapistIds)
+      : { data: [] }
+    const patternsByTherapist = new Map<string, NormalizedWorkPattern>()
+    for (const row of patternRows ?? []) {
+      const therapistId = String(row.therapist_id ?? '')
+      if (!therapistId) continue
+      patternsByTherapist.set(therapistId, {
+        works_dow: Array.isArray(row.works_dow)
+          ? row.works_dow.map((day) => Number(day)).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+          : [],
+        offs_dow: Array.isArray(row.offs_dow)
+          ? row.offs_dow.map((day) => Number(day)).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+          : [],
+        weekend_rotation: row.weekend_rotation === 'every_other' ? 'every_other' : 'none',
+        weekend_anchor_date: row.weekend_anchor_date ?? null,
+        works_dow_mode: row.works_dow_mode === 'soft' ? 'soft' : 'hard',
+        shift_preference:
+          row.shift_preference === 'day' || row.shift_preference === 'night' || row.shift_preference === 'either'
+            ? row.shift_preference
+            : 'either',
+      })
+    }
+    const normalizedTherapists = baseTherapists.map((therapist) => {
+      const pattern = patternsByTherapist.get(therapist.id)
+      return {
+        ...therapist,
+        works_dow: pattern?.works_dow ?? [],
+        offs_dow: pattern?.offs_dow ?? [],
+        weekend_rotation: pattern?.weekend_rotation ?? 'none',
+        weekend_anchor_date: pattern?.weekend_anchor_date ?? null,
+        works_dow_mode: pattern?.works_dow_mode ?? 'hard',
+        shift_preference: pattern?.shift_preference ?? 'either',
+      } satisfies Therapist
+    })
     assignableTherapists = showUnavailable
       ? normalizedTherapists
       : getSchedulingEligibleEmployees(normalizedTherapists)
   }
 
-  let availabilityEntries: AvailabilityEntryRow[] = []
+  let availabilityOverrides: AvailabilityOverrideRow[] = []
   if (role === 'manager' && activeCycle) {
     const { data: availabilityData, error: availabilityError } = await supabase
-      .from('availability_entries')
-      .select('therapist_id, date, shift_type, entry_type, reason')
+      .from('availability_overrides')
+      .select('therapist_id, cycle_id, date, shift_type, override_type, note')
       .eq('cycle_id', activeCycle.id)
       .gte('date', activeCycle.start_date)
       .lte('date', activeCycle.end_date)
 
     if (availabilityError) {
       console.warn(
-        'Could not load availability entries for schedule guardrails.',
+        'Could not load availability overrides for schedule guardrails.',
         availabilityError.message || availabilityError
       )
     } else {
-      availabilityEntries = (availabilityData ?? []) as AvailabilityEntryRow[]
+      availabilityOverrides = (availabilityData ?? []) as AvailabilityOverrideRow[]
     }
   }
   const cycleDates = activeCycle ? buildDateRange(activeCycle.start_date, activeCycle.end_date) : []
@@ -447,6 +509,7 @@ export default async function SchedulePage({
     date: shift.date,
     shift_type: shift.shift_type,
     status: shift.status,
+    unfilled_reason: shift.unfilled_reason,
     assignment_status: shift.assignment_status,
     status_note: shift.status_note,
     left_early_time: shift.left_early_time,
@@ -492,7 +555,12 @@ export default async function SchedulePage({
               is_lead_eligible: false,
               employment_type: 'full_time',
               max_work_days_per_week: 3,
-              preferred_work_days: [],
+              works_dow: [],
+              offs_dow: [],
+              weekend_rotation: 'none',
+              weekend_anchor_date: null,
+              works_dow_mode: 'hard',
+              shift_preference: 'either',
               on_fmla: false,
               fmla_return_date: null,
               is_active: true,
@@ -511,9 +579,12 @@ export default async function SchedulePage({
             employment_type: profile?.employment_type === 'part_time' || profile?.employment_type === 'prn' ? profile.employment_type : 'full_time',
             max_work_days_per_week:
               typeof profile?.max_work_days_per_week === 'number' ? profile.max_work_days_per_week : 3,
-            preferred_work_days: Array.isArray(profile?.preferred_work_days)
-              ? profile.preferred_work_days
-              : [],
+            works_dow: [],
+            offs_dow: [],
+            weekend_rotation: 'none',
+            weekend_anchor_date: null,
+            works_dow_mode: 'hard',
+            shift_preference: 'either',
             on_fmla: Boolean(profile?.on_fmla),
             fmla_return_date: profile?.fmla_return_date ?? null,
             is_active: profile?.is_active !== false,
@@ -567,6 +638,8 @@ export default async function SchedulePage({
   const issueReasonsBySlot = Object.fromEntries(
     (slotValidation?.issues ?? []).map((issue) => [issue.slotKey, issue.reasons])
   )
+  const constraintsUnfilled = constraintUnfilledSlotKeys.size
+  const firstConstraintSlotKey = Array.from(constraintUnfilledSlotKeys)[0] ?? null
   const scheduledShifts = shifts.filter(
     (shift) => shift.status === 'scheduled' || shift.status === 'on_call'
   )
@@ -844,11 +917,12 @@ export default async function SchedulePage({
                 startDate={activeCycle.start_date}
                 endDate={activeCycle.end_date}
                 therapists={assignableTherapists}
-                availabilityEntries={availabilityEntries}
+                availabilityOverrides={availabilityOverrides}
                 shifts={calendarShifts}
                 issueFilter={activeIssueFilter}
                 focusSlotKey={focusSlotKey}
                 issueReasonsBySlot={issueReasonsBySlot}
+                constraintBlockedSlotKeys={Array.from(constraintUnfilledSlotKeys)}
                 defaultShiftType={defaultCalendarView}
                 canManageStaffing={canManageStaffing}
                 canEditAssignmentStatus={canEditAssignmentStatus}
@@ -949,6 +1023,21 @@ export default async function SchedulePage({
                 <Link href={buildIssueFilterUrl('multiple_leads', { focusFirst: true })}>
                   Multiple leads: {slotValidation.multipleLeads}
                 </Link>
+              </Badge>
+              <Badge variant={constraintsUnfilled > 0 ? 'destructive' : 'outline'}>
+                {firstConstraintSlotKey ? (
+                  <Link
+                    href={buildScheduleUrl(activeCycle.id, viewMode, {
+                      show_unavailable: showUnavailableParam,
+                      focus: 'slot',
+                      focus_slot: firstConstraintSlotKey,
+                    })}
+                  >
+                    Unfilled (constraints): {constraintsUnfilled}
+                  </Link>
+                ) : (
+                  <>Unfilled (constraints): {constraintsUnfilled}</>
+                )}
               </Badge>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2">

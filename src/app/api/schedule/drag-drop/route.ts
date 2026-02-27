@@ -5,7 +5,6 @@ import { setDesignatedLeadMutation } from '@/lib/set-designated-lead'
 import { exceedsCoverageLimit, exceedsWeeklyLimit } from '@/lib/schedule-rule-validation'
 import { notifyUsers } from '@/lib/notifications'
 import { writeAuditLog } from '@/lib/audit-log'
-import { shiftTypesConflict } from '@/lib/availability-conflicts'
 import {
   MAX_WORK_DAYS_PER_WEEK,
   MAX_SHIFT_COVERAGE_PER_DAY,
@@ -13,6 +12,9 @@ import {
   sanitizeWeeklyLimit,
 } from '@/lib/scheduling-constants'
 import { countsTowardWeeklyLimit, getWeekBoundsForDate, isDateWithinRange } from '@/lib/schedule-helpers'
+import { resolveAvailability } from '@/lib/coverage/resolve-availability'
+import { normalizeWorkPattern } from '@/lib/coverage/work-patterns'
+import type { AvailabilityOverrideRow as CycleAvailabilityOverrideRow } from '@/lib/coverage/types'
 import type { ShiftStatus, ShiftRole, EmploymentType } from '@/app/schedule/types'
 type RemovableShift = {
   id: string
@@ -23,17 +25,13 @@ type RemovableShift = {
   role: ShiftRole
 }
 
-type TherapistAvailabilityRow = {
-  entry_type: 'unavailable' | 'available'
-  shift_type: 'day' | 'night' | 'both'
-  reason: string | null
-}
-
 type TherapistAvailabilityState = {
   therapistName: string
-  unavailableConflict: boolean
+  blockedByConstraints: boolean
   unavailableReason: string | null
-  prnNotAvailable: boolean
+  forceOff: boolean
+  forceOn: boolean
+  inactiveOrFmla: boolean
   error?: string
 }
 type DragAction =
@@ -160,44 +158,91 @@ async function getTherapistAvailabilityState(
   date: string,
   shiftType: 'day' | 'night'
 ): Promise<TherapistAvailabilityState> {
-  const [profileResult, availabilityResult] = await Promise.all([
-    supabase.from('profiles').select('full_name, employment_type').eq('id', therapistId).maybeSingle(),
+  const [profileResult, availabilityResult, patternResult] = await Promise.all([
     supabase
-      .from('availability_entries')
-      .select('entry_type, shift_type, reason')
+      .from('profiles')
+      .select('full_name, is_active, on_fmla')
+      .eq('id', therapistId)
+      .maybeSingle(),
+    supabase
+      .from('availability_overrides')
+      .select('cycle_id, therapist_id, date, shift_type, override_type, note')
       .eq('therapist_id', therapistId)
       .eq('cycle_id', cycleId)
       .eq('date', date),
+    supabase
+      .from('work_patterns')
+      .select('therapist_id, works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode, shift_preference')
+      .eq('therapist_id', therapistId)
+      .maybeSingle(),
   ])
 
-  if (profileResult.error || availabilityResult.error) {
+  if (profileResult.error || availabilityResult.error || patternResult.error || !profileResult.data) {
     return {
       therapistName: 'Therapist',
-      unavailableConflict: false,
+      blockedByConstraints: false,
       unavailableReason: null,
-      prnNotAvailable: false,
+      forceOff: false,
+      forceOn: false,
+      inactiveOrFmla: false,
       error: 'Failed to validate availability constraints.',
     }
   }
 
   const therapistName = String(profileResult.data?.full_name ?? 'Therapist')
-  const employmentType = String(profileResult.data?.employment_type ?? '')
-  const entries = (availabilityResult.data ?? []) as TherapistAvailabilityRow[]
+  const pattern = patternResult.data
+    ? normalizeWorkPattern({
+        therapist_id: therapistId,
+        works_dow: patternResult.data.works_dow,
+        offs_dow: patternResult.data.offs_dow,
+        weekend_rotation: patternResult.data.weekend_rotation,
+        weekend_anchor_date: patternResult.data.weekend_anchor_date,
+        works_dow_mode: patternResult.data.works_dow_mode,
+        shift_preference: patternResult.data.shift_preference,
+      })
+    : normalizeWorkPattern({
+        therapist_id: therapistId,
+        works_dow: [],
+        offs_dow: [],
+        weekend_rotation: 'none',
+        weekend_anchor_date: null,
+        works_dow_mode: 'hard',
+        shift_preference: 'either',
+      })
 
-  const unavailableEntry =
-    entries.find(
-      (entry) => entry.entry_type === 'unavailable' && shiftTypesConflict(entry.shift_type, shiftType)
-    ) ?? null
-
-  const hasPrnAvailableOffer = entries.some(
-    (entry) => entry.entry_type === 'available' && shiftTypesConflict(entry.shift_type, shiftType)
-  )
+  const overrides = (availabilityResult.data ?? []) as CycleAvailabilityOverrideRow[]
+  const resolution = resolveAvailability({
+    therapistId,
+    cycleId,
+    date,
+    shiftType,
+    isActive: profileResult.data.is_active !== false,
+    onFmla: profileResult.data.on_fmla === true,
+    pattern,
+    overrides,
+  })
+  const reasonLabel =
+    resolution.reason === 'override_force_off'
+      ? 'Force off override'
+      : resolution.reason === 'blocked_offs_dow'
+        ? 'Never works this weekday'
+        : resolution.reason === 'blocked_every_other_weekend'
+          ? 'Off weekend by alternating rotation'
+          : resolution.reason === 'blocked_outside_works_dow_hard'
+            ? 'Outside hard works-day rule'
+            : resolution.reason === 'inactive'
+              ? 'Inactive therapist'
+              : resolution.reason === 'on_fmla'
+                ? 'Therapist on FMLA'
+                : null
 
   return {
     therapistName,
-    unavailableConflict: unavailableEntry !== null,
-    unavailableReason: unavailableEntry?.reason ?? null,
-    prnNotAvailable: employmentType === 'prn' && !hasPrnAvailableOffer,
+    blockedByConstraints: !resolution.allowed,
+    unavailableReason: reasonLabel,
+    forceOff: resolution.reason === 'override_force_off',
+    forceOn: resolution.reason === 'override_force_on',
+    inactiveOrFmla: resolution.reason === 'inactive' || resolution.reason === 'on_fmla',
   }
 }
 
@@ -270,10 +315,18 @@ export async function POST(request: Request) {
     if (availabilityState.error) {
       return NextResponse.json({ error: availabilityState.error }, { status: 500 })
     }
-    if (availabilityState.unavailableConflict && payload.availabilityOverride !== true) {
+    if (availabilityState.blockedByConstraints && availabilityState.inactiveOrFmla) {
       return NextResponse.json(
         {
-          error: 'Conflicts with availability.',
+          error: availabilityState.unavailableReason ?? 'This therapist cannot be assigned.',
+        },
+        { status: 409 }
+      )
+    }
+    if (availabilityState.blockedByConstraints && payload.availabilityOverride !== true) {
+      return NextResponse.json(
+        {
+          error: 'Conflicts with scheduling constraints.',
           code: 'availability_conflict',
           availability: {
             therapistId: payload.userId,
@@ -318,7 +371,9 @@ export async function POST(request: Request) {
     }
 
     const shouldSetAvailabilityOverride =
-      availabilityState.unavailableConflict && payload.availabilityOverride === true
+      availabilityState.blockedByConstraints &&
+      !availabilityState.inactiveOrFmla &&
+      payload.availabilityOverride === true
     const normalizedAvailabilityOverrideReason =
       typeof payload.availabilityOverrideReason === 'string'
         ? payload.availabilityOverrideReason.trim() || null
@@ -411,10 +466,18 @@ export async function POST(request: Request) {
     if (availabilityState.error) {
       return NextResponse.json({ error: availabilityState.error }, { status: 500 })
     }
-    if (availabilityState.unavailableConflict && payload.availabilityOverride !== true) {
+    if (availabilityState.blockedByConstraints && availabilityState.inactiveOrFmla) {
       return NextResponse.json(
         {
-          error: 'Conflicts with availability.',
+          error: availabilityState.unavailableReason ?? 'This therapist cannot be assigned.',
+        },
+        { status: 409 }
+      )
+    }
+    if (availabilityState.blockedByConstraints && payload.availabilityOverride !== true) {
+      return NextResponse.json(
+        {
+          error: 'Conflicts with scheduling constraints.',
           code: 'availability_conflict',
           availability: {
             therapistId: shift.user_id,
@@ -460,7 +523,9 @@ export async function POST(request: Request) {
     }
 
     const shouldSetAvailabilityOverride =
-      availabilityState.unavailableConflict && payload.availabilityOverride === true
+      availabilityState.blockedByConstraints &&
+      !availabilityState.inactiveOrFmla &&
+      payload.availabilityOverride === true
     const normalizedAvailabilityOverrideReason =
       typeof payload.availabilityOverrideReason === 'string'
         ? payload.availabilityOverrideReason.trim() || null
@@ -594,10 +659,18 @@ export async function POST(request: Request) {
     if (availabilityState.error) {
       return NextResponse.json({ error: availabilityState.error }, { status: 500 })
     }
-    if (availabilityState.unavailableConflict && payload.availabilityOverride !== true) {
+    if (availabilityState.blockedByConstraints && availabilityState.inactiveOrFmla) {
       return NextResponse.json(
         {
-          error: 'Conflicts with availability.',
+          error: availabilityState.unavailableReason ?? 'This therapist cannot be assigned.',
+        },
+        { status: 409 }
+      )
+    }
+    if (availabilityState.blockedByConstraints && payload.availabilityOverride !== true) {
+      return NextResponse.json(
+        {
+          error: 'Conflicts with scheduling constraints.',
           code: 'availability_conflict',
           availability: {
             therapistId: payload.therapistId,
@@ -700,7 +773,9 @@ export async function POST(request: Request) {
     })
 
     const shouldSetAvailabilityOverride =
-      availabilityState.unavailableConflict && payload.availabilityOverride === true
+      availabilityState.blockedByConstraints &&
+      !availabilityState.inactiveOrFmla &&
+      payload.availabilityOverride === true
     const normalizedAvailabilityOverrideReason =
       typeof payload.availabilityOverrideReason === 'string'
         ? payload.availabilityOverrideReason.trim() || null

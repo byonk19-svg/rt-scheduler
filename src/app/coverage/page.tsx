@@ -4,13 +4,21 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
-import { toggleCyclePublishedAction } from '@/app/schedule/actions'
+import {
+  generateDraftScheduleAction,
+  resetDraftScheduleAction,
+  toggleCyclePublishedAction,
+} from '@/app/schedule/actions'
 import { PrintSchedule } from '@/components/print-schedule'
+import {
+  type CoverageUiStatus,
+  updateCoverageAssignmentStatus,
+} from '@/lib/coverage/updateAssignmentStatus'
 import { getScheduleFeedback } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/client'
 import type { AssignmentStatus, ScheduleSearchParams, ShiftRole, ShiftStatus } from '@/app/schedule/types'
 
-type UiStatus = 'active' | 'oncall' | 'leave_early' | 'cancelled'
+type UiStatus = CoverageUiStatus
 type DayStatus = 'published' | 'draft' | 'override' | 'missing_lead'
 type ShiftTab = 'Day' | 'Night'
 
@@ -22,6 +30,7 @@ type DayItem = {
   date: number
   label: string
   dayStatus: DayStatus
+  constraintBlocked: boolean
   leadShift: ShiftItem | null
   staffShifts: ShiftItem[]
 }
@@ -36,10 +45,11 @@ type PrintTherapist = {
 }
 type ShiftRow = {
   id: string
-  user_id: string
+  user_id: string | null
   date: string
   shift_type: 'day' | 'night'
   status: ShiftStatus
+  unfilled_reason: string | null
   assignment_status: AssignmentStatus | null
   role: ShiftRole
   profiles:
@@ -47,6 +57,7 @@ type ShiftRow = {
     | { full_name: string; employment_type: 'full_time' | 'part_time' | 'prn' | null }[]
     | null
 }
+type AssignedShiftRow = Omit<ShiftRow, 'user_id'> & { user_id: string }
 
 const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 const SHIFT_STATUSES: Record<UiStatus, { label: string; color: string; bg: string; border: string }> = {
@@ -55,6 +66,7 @@ const SHIFT_STATUSES: Record<UiStatus, { label: string; color: string; bg: strin
   leave_early: { label: 'Leave Early', color: '#2563eb', bg: '#f9fafb', border: '#e5e7eb' },
   cancelled: { label: 'Cancelled', color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
 }
+const NO_ELIGIBLE_CONSTRAINT_REASON = 'no_eligible_candidates_due_to_constraints'
 
 function getOne<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null
@@ -69,19 +81,6 @@ function toUiStatus(assignment: AssignmentStatus | null, status: ShiftStatus): U
   if (status === 'on_call') return 'oncall'
   if (status === 'sick' || status === 'called_off') return 'cancelled'
   return 'active'
-}
-
-function toAssignment(value: UiStatus): AssignmentStatus {
-  if (value === 'oncall') return 'on_call'
-  if (value === 'leave_early') return 'left_early'
-  if (value === 'cancelled') return 'cancelled'
-  return 'scheduled'
-}
-
-function toShiftStatus(value: UiStatus): ShiftStatus {
-  if (value === 'oncall') return 'on_call'
-  if (value === 'cancelled') return 'called_off'
-  return 'scheduled'
 }
 
 function addDays(date: Date, days: number): Date {
@@ -126,6 +125,24 @@ function timestamp(): string {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
+function formatDateLabel(value: string): string {
+  const parsed = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function formatMonthLabel(value: string): string {
+  const parsed = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+}
+
+function formatMonthShort(value: string): string {
+  const parsed = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleDateString('en-US', { month: 'short' })
+}
+
 function flatten(day: DayItem): Array<ShiftItem & { isLead: boolean }> {
   const lead = day.leadShift ? [{ ...day.leadShift, isLead: true }] : []
   return [...lead, ...day.staffShifts.map((row) => ({ ...row, isLead: false }))]
@@ -168,6 +185,8 @@ export default function CoveragePage() {
   const cycleFromUrl = search.get('cycle')
   const successParam = search.get('success')
   const errorParam = search.get('error')
+  const autoParam = search.get('auto')
+  const draftParam = search.get('draft')
   const supabase = useMemo(() => createClient(), [])
   const [shiftTab, setShiftTab] = useState<ShiftTab>('Day')
   const [dayDays, setDayDays] = useState<DayItem[]>([])
@@ -191,9 +210,17 @@ export default function CoveragePage() {
   const [error, setError] = useState<string>('')
   const days = shiftTab === 'Day' ? dayDays : nightDays
   const setDays = shiftTab === 'Day' ? setDayDays : setNightDays
-  const publishFeedbackParams = useMemo<ScheduleSearchParams>(
+  const scheduleFeedbackParams = useMemo<ScheduleSearchParams>(
     () => ({
+      success: successParam ?? undefined,
       error: errorParam ?? undefined,
+      auto: autoParam ?? undefined,
+      draft: draftParam ?? undefined,
+      added: search.get('added') ?? undefined,
+      unfilled: search.get('unfilled') ?? undefined,
+      constraints_unfilled: search.get('constraints_unfilled') ?? undefined,
+      dropped: search.get('dropped') ?? undefined,
+      removed: search.get('removed') ?? undefined,
       week_start: search.get('week_start') ?? undefined,
       week_end: search.get('week_end') ?? undefined,
       violations: search.get('violations') ?? undefined,
@@ -205,17 +232,38 @@ export default function CoveragePage() {
       lead_multiple: search.get('lead_multiple') ?? undefined,
       lead_ineligible: search.get('lead_ineligible') ?? undefined,
     }),
-    [errorParam, search]
+    [autoParam, draftParam, errorParam, search, successParam]
   )
   const publishErrorMessage = useMemo(() => {
     if (!errorParam) return null
-    const feedback = getScheduleFeedback(publishFeedbackParams)
+    const feedback = getScheduleFeedback(scheduleFeedbackParams)
     if (feedback?.variant === 'error') return feedback.message
     return `Publish blocked: ${errorParam.replaceAll('_', ' ')}.`
-  }, [errorParam, publishFeedbackParams])
+  }, [errorParam, scheduleFeedbackParams])
+  const autoDraftFeedback = useMemo(() => {
+    if (!autoParam && !draftParam) return null
+    return getScheduleFeedback(scheduleFeedbackParams)
+  }, [autoParam, draftParam, scheduleFeedbackParams])
   const publishedScheduleHref = activeCycleId
     ? `/schedule?cycle=${activeCycleId}&view=week`
     : '/schedule?view=week'
+  const cycleRangeLabel = useMemo(() => {
+    if (!printCycle) return 'Current 6-week window'
+    return `${formatDateLabel(printCycle.start_date)} to ${formatDateLabel(printCycle.end_date)}`
+  }, [printCycle])
+  const visibleMonths = useMemo(() => {
+    const labels: string[] = []
+    const seen = new Set<string>()
+    for (const day of days) {
+      const parsed = new Date(`${day.isoDate}T00:00:00`)
+      if (Number.isNaN(parsed.getTime())) continue
+      const key = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      labels.push(formatMonthLabel(day.isoDate))
+    }
+    return labels
+  }, [days])
 
   useEffect(() => {
     let active = true
@@ -277,7 +325,7 @@ export default function CoveragePage() {
         let shiftsQuery = supabase
           .from('shifts')
           .select(
-            'id,user_id,date,shift_type,status,assignment_status,role,profiles:profiles!shifts_user_id_fkey(full_name,employment_type)'
+            'id,user_id,date,shift_type,status,unfilled_reason,assignment_status,role,profiles:profiles!shifts_user_id_fkey(full_name,employment_type)'
           )
           .gte('date', cycleStartDate)
           .lte('date', cycleEndDate)
@@ -302,6 +350,17 @@ export default function CoveragePage() {
         }
 
         const rows = (shiftsData ?? []) as ShiftRow[]
+        const assignmentRows: AssignedShiftRow[] = []
+        const constraintBlockedSlotKeys = new Set<string>()
+        for (const row of rows) {
+          if (!row.user_id) {
+            if (row.unfilled_reason === NO_ELIGIBLE_CONSTRAINT_REASON) {
+              constraintBlockedSlotKeys.add(`${row.date}:${row.shift_type}`)
+            }
+            continue
+          }
+          assignmentRows.push({ ...row, user_id: row.user_id })
+        }
         const therapistTallies = new Map<
           string,
           {
@@ -314,7 +373,7 @@ export default function CoveragePage() {
         >()
         const nextShiftByUserDate: Record<string, ShiftStatus> = {}
 
-        for (const row of rows) {
+        for (const row of assignmentRows) {
           const profile = getOne(row.profiles)
           const fullName = profile?.full_name ?? 'Unknown'
           const current = therapistTallies.get(row.user_id) ?? {
@@ -336,8 +395,8 @@ export default function CoveragePage() {
           nextShiftByUserDate[`${row.user_id}:${row.date}`] = row.status
         }
 
-        const nextPrintUsers = Array.from(therapistTallies.values())
-          .map((row) => ({
+        const nextPrintUsers: PrintTherapist[] = Array.from(therapistTallies.values())
+          .map<PrintTherapist>((row) => ({
             id: row.id,
             full_name: row.full_name,
             shift_type: row.night > row.day ? 'night' : 'day',
@@ -356,8 +415,8 @@ export default function CoveragePage() {
         }
 
         const mapByShiftType = (shiftType: ShiftRow['shift_type']): DayItem[] => {
-          const byDate = new Map<string, ShiftRow[]>()
-          for (const row of rows) {
+          const byDate = new Map<string, AssignedShiftRow[]>()
+          for (const row of assignmentRows) {
             if (row.shift_type !== shiftType) continue
             const bucket = byDate.get(row.date) ?? []
             bucket.push(row)
@@ -399,6 +458,7 @@ export default function CoveragePage() {
               date: date.getDate(),
               label: date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
               dayStatus,
+              constraintBlocked: constraintBlockedSlotKeys.has(`${isoDate}:${shiftType}`),
               leadShift,
               staffShifts,
             } satisfies DayItem
@@ -591,51 +651,55 @@ export default function CoveragePage() {
       const previousDays = days
       const previousStatus = targetShift.status
       const changeTime = timestamp()
-      setError('')
 
-      setDays((current) =>
-        current.map((day) => {
-          if (day.id !== dayId) return day
-          const updateShift = (shift: ShiftItem | null): ShiftItem | null => {
-            if (!shift || shift.id !== shiftId || shift.status === nextStatus) return shift
-            return {
-              ...shift,
-              status: nextStatus,
-              log: [
-                ...shift.log,
-                {
-                  from: SHIFT_STATUSES[previousStatus].label,
-                  to: nextStatus,
-                  toLabel: SHIFT_STATUSES[nextStatus].label,
-                  time: changeTime,
-                },
-              ],
-            }
-          }
-          return {
-            ...day,
-            leadShift: isLead ? updateShift(day.leadShift) : day.leadShift,
-            staffShifts: isLead ? day.staffShifts : day.staffShifts.map((shift) => updateShift(shift) as ShiftItem),
-          }
-        })
-      )
-
-      const { error: updateError } = await supabase
-        .from('shifts')
-        .update({
-          assignment_status: toAssignment(nextStatus),
-          status: toShiftStatus(nextStatus),
-        })
-        .eq('id', targetShift.id)
-
-      if (!updateError) return
-
-      console.error('Failed to persist coverage status change:', updateError)
-      setDays(previousDays)
-      setError('Could not save status update. Changes were rolled back.')
-      if (typeof window !== 'undefined') {
-        window.alert('Could not save status change. Please try again.')
-      }
+      await updateCoverageAssignmentStatus({
+        shiftId: targetShift.id,
+        nextStatus,
+        clearError: () => setError(''),
+        showError: (message) => setError(message),
+        applyOptimisticUpdate: () => {
+          setDays((current) =>
+            current.map((day) => {
+              if (day.id !== dayId) return day
+              const updateShift = (shift: ShiftItem | null): ShiftItem | null => {
+                if (!shift || shift.id !== shiftId || shift.status === nextStatus) return shift
+                return {
+                  ...shift,
+                  status: nextStatus,
+                  log: [
+                    ...shift.log,
+                    {
+                      from: SHIFT_STATUSES[previousStatus].label,
+                      to: nextStatus,
+                      toLabel: SHIFT_STATUSES[nextStatus].label,
+                      time: changeTime,
+                    },
+                  ],
+                }
+              }
+              return {
+                ...day,
+                leadShift: isLead ? updateShift(day.leadShift) : day.leadShift,
+                staffShifts: isLead
+                  ? day.staffShifts
+                  : day.staffShifts.map((shift) => updateShift(shift) as ShiftItem),
+              }
+            })
+          )
+        },
+        rollbackOptimisticUpdate: () => setDays(previousDays),
+        persistAssignmentStatus: async (id, payload) =>
+          await supabase
+            .from('shifts')
+            .update({
+              assignment_status: payload.assignment_status,
+              status: payload.status,
+            })
+            .eq('id', id),
+        logError: (message, error) => {
+          console.error(message, error)
+        },
+      })
     },
     [days, setDays, shiftTab, supabase]
   )
@@ -696,7 +760,32 @@ export default function CoveragePage() {
             >
               Print schedule
             </button>
-            <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">Auto-draft</button>
+            <form action={generateDraftScheduleAction}>
+              <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+              <input type="hidden" name="view" value="week" />
+              <input type="hidden" name="show_unavailable" value="false" />
+              <input type="hidden" name="return_to" value="coverage" />
+              <button
+                type="submit"
+                disabled={!activeCycleId || activeCyclePublished}
+                className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-60"
+              >
+                Auto-draft
+              </button>
+            </form>
+            <form action={resetDraftScheduleAction}>
+              <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+              <input type="hidden" name="view" value="week" />
+              <input type="hidden" name="show_unavailable" value="false" />
+              <input type="hidden" name="return_to" value="coverage" />
+              <button
+                type="submit"
+                disabled={!activeCycleId || activeCyclePublished}
+                className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-60"
+              >
+                Clear draft
+              </button>
+            </form>
             <form action={toggleCyclePublishedAction}>
               <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
               <input type="hidden" name="view" value="week" />
@@ -751,12 +840,29 @@ export default function CoveragePage() {
             Shift assigned.
           </p>
         )}
+        {autoDraftFeedback && (
+          <p
+            className={`mb-3 rounded-md px-3 py-2 text-xs font-semibold ${
+              autoDraftFeedback.variant === 'error'
+                ? 'border border-red-200 bg-red-50 text-red-800'
+                : 'border border-emerald-200 bg-emerald-50 text-emerald-800'
+            }`}
+          >
+            {autoDraftFeedback.message}
+          </p>
+        )}
         {publishErrorMessage && (
           <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800">
             {publishErrorMessage}
           </p>
         )}
         {error && <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
+        <div className="mb-3 rounded-md border border-slate-200 bg-white px-3 py-2">
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-500">Cycle</p>
+          <p className="text-sm font-extrabold text-slate-900">{printCycle?.label ?? 'Current coverage window'}</p>
+          <p className="text-xs font-medium text-slate-600">{cycleRangeLabel}</p>
+          <p className="mt-1 text-xs text-slate-500">Months in view: {visibleMonths.join(' • ') || 'N/A'}</p>
+        </div>
         <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
           {(['Day', 'Night'] as const).map((tab) => (
             <button
@@ -801,10 +907,12 @@ export default function CoveragePage() {
           </div>
         ) : (
           <div className="grid grid-cols-7 gap-1.5">
-            {days.map((day) => {
+            {days.map((day, index) => {
             const activeCount = countActive(day)
             const totalCount = flatten(day).length
             const missingLead = !day.leadShift
+            const parsed = new Date(`${day.isoDate}T00:00:00`)
+            const showMonthTag = index === 0 || (!Number.isNaN(parsed.getTime()) && parsed.getDate() === 1)
             return (
               <button
                 key={day.id}
@@ -814,7 +922,14 @@ export default function CoveragePage() {
                 style={selectedId === day.id ? { borderColor: '#d97706', boxShadow: '0 0 0 3px rgba(217,119,6,0.15)' } : undefined}
               >
                 <div className="mb-1 flex items-center justify-between">
-                  <span className="text-sm font-extrabold text-slate-900">{day.date}</span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="text-sm font-extrabold text-slate-900">{day.date}</span>
+                    {showMonthTag && (
+                      <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+                        {formatMonthShort(day.isoDate)}
+                      </span>
+                    )}
+                  </span>
                   <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ color: missingLead ? '#dc2626' : '#047857', background: missingLead ? '#fee2e2' : '#ecfdf5' }}>
                     {activeCount}/{totalCount}
                   </span>
@@ -822,6 +937,11 @@ export default function CoveragePage() {
                 <div className="mb-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800">
                   {day.leadShift ? `Lead: ${day.leadShift.name.split(' ')[0]}` : 'No lead'}
                 </div>
+                {day.constraintBlocked && (
+                  <div className="mb-1.5 rounded border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-medium text-red-700">
+                    No eligible therapists (constraints)
+                  </div>
+                )}
                 <div className="flex flex-wrap gap-1">
                   {day.staffShifts.map((shift) => {
                     const tone =
@@ -875,6 +995,11 @@ export default function CoveragePage() {
                 <span className="text-blue-700">LE {countBy(selectedDay, 'leave_early')}</span>
                 <span className="text-red-700">X {countBy(selectedDay, 'cancelled')}</span>
               </div>
+              {selectedDay.constraintBlocked && (
+                <p className="mt-2 rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700">
+                  No eligible therapists (constraints)
+                </p>
+              )}
             </div>
             <div className="flex-1 overflow-y-auto p-4">
               <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">

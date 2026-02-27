@@ -20,12 +20,13 @@ type Role = 'manager' | 'therapist'
 
 export type AvailabilityEntryTableRow = {
   id: string
+  cycleId: string
   date: string
   reason: string | null
   createdAt: string
   requestedBy: string
   cycleLabel: string
-  entryType: 'unavailable' | 'available'
+  entryType: 'force_off' | 'force_on'
   shiftType: 'day' | 'night' | 'both'
   canDelete: boolean
 }
@@ -39,8 +40,8 @@ type AvailabilityEntriesTableProps = {
 
 const STATUS_OPTIONS: TableStatusOption[] = [
   { value: 'all', label: 'All' },
-  { value: 'unavailable', label: 'Unavailable' },
-  { value: 'available', label: 'Available' },
+  { value: 'force_off', label: 'Need off' },
+  { value: 'force_on', label: 'Available to work' },
 ]
 
 function formatDateTime(value: string): string {
@@ -50,7 +51,7 @@ function formatDateTime(value: string): string {
 }
 
 function formatEntryLabel(entryType: AvailabilityEntryTableRow['entryType']): string {
-  return entryType === 'available' ? 'Available' : 'Unavailable'
+  return entryType === 'force_on' ? 'Available to work' : 'Need off'
 }
 
 function formatShiftTypeLabel(shiftType: AvailabilityEntryTableRow['shiftType']): string {
@@ -200,7 +201,7 @@ export function AvailabilityEntriesTable({
                     <TableCell>{formatDate(row.date)}</TableCell>
                     {role === 'manager' && <TableCell className="hidden md:table-cell">{row.requestedBy}</TableCell>}
                     <TableCell>
-                      <Badge variant={row.entryType === 'unavailable' ? 'destructive' : 'outline'}>
+                      <Badge variant={row.entryType === 'force_off' ? 'destructive' : 'outline'}>
                         {formatEntryLabel(row.entryType)}
                       </Badge>
                     </TableCell>
@@ -258,6 +259,7 @@ export function AvailabilityEntriesTable({
                                 onClick={(event) => event.stopPropagation()}
                               >
                                 <input type="hidden" name="entry_id" value={row.id} />
+                                <input type="hidden" name="cycle_id" value={row.cycleId} />
                                 <FormSubmitButton type="submit" variant="outline" size="sm" pendingText="Deleting...">
                                   Delete entry
                                 </FormSubmitButton>

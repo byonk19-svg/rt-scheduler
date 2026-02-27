@@ -180,7 +180,7 @@ export default function ManagerDashboardPage() {
           return
         }
 
-        const managerName = profile.full_name ?? user.user_metadata?.full_name ?? 'Manager'
+        const managerName = profile?.full_name ?? user.user_metadata?.full_name ?? 'Manager'
         const activeCycle = ((activeCycleResult.data ?? null) as Cycle | null) ?? null
         const cycleStartDate = activeCycle?.start_date ?? todayKey
         const cycleEndDate = activeCycle?.end_date ?? fallbackEndKey

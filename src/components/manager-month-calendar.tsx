@@ -21,6 +21,9 @@ import {
   buildTherapistWorkloadCounts,
   getWeekBoundsForDate,
 } from '@/lib/therapist-picker-metrics'
+import { resolveAvailability } from '@/lib/coverage/resolve-availability'
+import type { AvailabilityOverrideRow } from '@/lib/coverage/types'
+import { normalizeWorkPattern } from '@/lib/coverage/work-patterns'
 import { cn } from '@/lib/utils'
 import { MIN_SHIFT_COVERAGE_PER_DAY, MAX_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
 
@@ -31,6 +34,14 @@ type Therapist = {
   shift_type: 'day' | 'night'
   employment_type?: 'full_time' | 'part_time' | 'prn'
   is_lead_eligible?: boolean
+  works_dow: number[]
+  offs_dow: number[]
+  weekend_rotation: 'none' | 'every_other'
+  weekend_anchor_date: string | null
+  works_dow_mode: 'hard' | 'soft'
+  shift_preference?: 'day' | 'night' | 'either' | null
+  on_fmla: boolean
+  is_active: boolean
 }
 
 const WEEKLY_LIMIT = 3
@@ -40,6 +51,7 @@ type Shift = {
   date: string
   shift_type: 'day' | 'night'
   status: 'scheduled' | 'on_call' | 'sick' | 'called_off'
+  unfilled_reason: string | null
   assignment_status: 'scheduled' | 'call_in' | 'cancelled' | 'on_call' | 'left_early'
   status_note: string | null
   left_early_time: string | null
@@ -55,14 +67,6 @@ type Shift = {
   user_id: string
   full_name: string
   isLeadEligible: boolean
-}
-
-type AvailabilityEntry = {
-  therapist_id: string
-  date: string
-  shift_type: 'day' | 'night' | 'both'
-  entry_type: 'unavailable' | 'available'
-  reason: string | null
 }
 
 type DragPayload =
@@ -185,7 +189,7 @@ type ManagerMonthCalendarProps = {
   startDate: string
   endDate: string
   therapists: Therapist[]
-  availabilityEntries: AvailabilityEntry[]
+  availabilityOverrides: AvailabilityOverrideRow[]
   shifts: Shift[]
   issueFilter?:
     | 'all'
@@ -199,6 +203,7 @@ type ManagerMonthCalendarProps = {
     string,
     Array<'under_coverage' | 'over_coverage' | 'missing_lead' | 'multiple_leads' | 'ineligible_lead'>
   >
+  constraintBlockedSlotKeys?: string[]
   defaultShiftType?: 'day' | 'night'
   canManageStaffing?: boolean
   canEditAssignmentStatus?: boolean
@@ -370,10 +375,6 @@ function assignmentStatusTooltip(shift: Shift): string | null {
   return parts.join('\n')
 }
 
-function availabilityShiftMatches(entryShiftType: 'day' | 'night' | 'both', shiftType: 'day' | 'night'): boolean {
-  return entryShiftType === 'both' || entryShiftType === shiftType
-}
-
 function formatOverrideTimestamp(value: string | null): string {
   if (!value) return 'Unknown time'
   const parsed = new Date(value)
@@ -392,11 +393,12 @@ export function ManagerMonthCalendar({
   startDate,
   endDate,
   therapists,
-  availabilityEntries,
+  availabilityOverrides,
   shifts,
   issueFilter = 'all',
   focusSlotKey = null,
   issueReasonsBySlot = {},
+  constraintBlockedSlotKeys = [],
   defaultShiftType = 'day',
   canManageStaffing = true,
   canEditAssignmentStatus = false,
@@ -508,6 +510,10 @@ export function ManagerMonthCalendar({
 
     return { left, top, width }
   }, [statusPopover, statusDraft?.status])
+  const constraintBlockedSlotKeySet = useMemo(
+    () => new Set(constraintBlockedSlotKeys),
+    [constraintBlockedSlotKeys]
+  )
 
   const shiftsByDate = useMemo(() => {
     const map = new Map<string, Shift[]>()
@@ -525,15 +531,15 @@ export function ManagerMonthCalendar({
     return map
   }, [localShifts])
 
-  const availabilityEntriesByTherapist = useMemo(() => {
-    const map = new Map<string, AvailabilityEntry[]>()
-    for (const entry of availabilityEntries) {
+  const availabilityOverridesByTherapist = useMemo(() => {
+    const map = new Map<string, AvailabilityOverrideRow[]>()
+    for (const entry of availabilityOverrides) {
       const rows = map.get(entry.therapist_id) ?? []
       rows.push(entry)
       map.set(entry.therapist_id, rows)
     }
     return map
-  }, [availabilityEntries])
+  }, [availabilityOverrides])
   const therapistById = useMemo(
     () => new Map(therapists.map((therapist) => [therapist.id, therapist])),
     [therapists]
@@ -544,32 +550,67 @@ export function ManagerMonthCalendar({
       therapistId: string,
       date: string,
       shiftType: 'day' | 'night'
-    ): { unavailableConflict: boolean; unavailableReason: string | null; prnNotOffered: boolean } => {
+    ): {
+      blockedByConstraints: boolean
+      unavailableReason: string | null
+      forceOff: boolean
+      forceOn: boolean
+      inactiveOrFmla: boolean
+    } => {
       const therapist = therapistById.get(therapistId)
-      const entries = availabilityEntriesByTherapist.get(therapistId) ?? []
+      if (!therapist) {
+        return {
+          blockedByConstraints: false,
+          unavailableReason: null,
+          forceOff: false,
+          forceOn: false,
+          inactiveOrFmla: false,
+        }
+      }
 
-      const unavailableEntry =
-        entries.find(
-          (entry) =>
-            entry.entry_type === 'unavailable' &&
-            entry.date === date &&
-            availabilityShiftMatches(entry.shift_type, shiftType)
-        ) ?? null
+      const resolution = resolveAvailability({
+        therapistId,
+        cycleId,
+        date,
+        shiftType,
+        isActive: therapist.is_active,
+        onFmla: therapist.on_fmla,
+        pattern: normalizeWorkPattern({
+          therapist_id: therapist.id,
+          works_dow: therapist.works_dow,
+          offs_dow: therapist.offs_dow,
+          weekend_rotation: therapist.weekend_rotation,
+          weekend_anchor_date: therapist.weekend_anchor_date,
+          works_dow_mode: therapist.works_dow_mode,
+          shift_preference: therapist.shift_preference,
+        }),
+        overrides: availabilityOverridesByTherapist.get(therapistId) ?? [],
+      })
 
-      const hasPrnAvailableOffer = entries.some(
-        (entry) =>
-          entry.entry_type === 'available' &&
-          entry.date === date &&
-          availabilityShiftMatches(entry.shift_type, shiftType)
-      )
+      const reasonLabel =
+        resolution.reason === 'override_force_off'
+          ? 'Force off override'
+          : resolution.reason === 'blocked_offs_dow'
+            ? 'Never works this weekday'
+            : resolution.reason === 'blocked_every_other_weekend'
+              ? 'Off weekend by alternating rotation'
+              : resolution.reason === 'blocked_outside_works_dow_hard'
+                ? 'Outside hard works-day rule'
+                : resolution.reason === 'inactive'
+                  ? 'Inactive therapist'
+                  : resolution.reason === 'on_fmla'
+                    ? 'Therapist on FMLA'
+                    : null
 
       return {
-        unavailableConflict: unavailableEntry !== null,
-        unavailableReason: unavailableEntry?.reason ?? null,
-        prnNotOffered: therapist?.employment_type === 'prn' && !hasPrnAvailableOffer,
+        blockedByConstraints: !resolution.allowed,
+        unavailableReason: reasonLabel,
+        forceOff: resolution.reason === 'override_force_off',
+        forceOn: resolution.reason === 'override_force_on',
+        inactiveOrFmla: resolution.reason === 'inactive' || resolution.reason === 'on_fmla',
       }
     },
-    [availabilityEntriesByTherapist, therapistById]
+    [availabilityOverridesByTherapist, cycleId, therapistById]
   )
 
   const selectedDayShifts = useMemo(() => {
@@ -626,9 +667,11 @@ export function ManagerMonthCalendar({
     if (!selectedDate) {
       return therapistsForPool.map((therapist) => ({
         therapist,
-        unavailableConflict: false,
+        blockedByConstraints: false,
         unavailableReason: null as string | null,
-        prnNotOffered: false,
+        forceOff: false,
+        forceOn: false,
+        inactiveOrFmla: false,
       }))
     }
     return therapistsForPool.map((therapist) => ({
@@ -881,6 +924,7 @@ export function ManagerMonthCalendar({
               date: body.date,
               shift_type: body.shiftType,
               status: 'scheduled',
+              unfilled_reason: null,
               assignment_status: 'scheduled',
               status_note: null,
               left_early_time: null,
@@ -1002,7 +1046,11 @@ export function ManagerMonthCalendar({
 
     const therapist = therapistById.get(therapistId)
     const availabilityState = getTherapistAvailabilityState(therapistId, date, shiftType)
-    if (availabilityState.unavailableConflict) {
+    if (availabilityState.inactiveOrFmla) {
+      setError(availabilityState.unavailableReason ?? 'This therapist cannot be assigned.')
+      return
+    }
+    if (availabilityState.blockedByConstraints) {
       setAvailabilityConflictDialog({
         therapistId,
         therapistName: therapist?.full_name ?? 'Therapist',
@@ -1482,6 +1530,7 @@ export function ManagerMonthCalendar({
     if (multipleLeads) derivedReasons.push('multiple_leads')
     if (ineligibleLead) derivedReasons.push('ineligible_lead')
     const slotReasons = issueReasonsBySlot[slotKey] ?? derivedReasons
+    const blockedByConstraints = constraintBlockedSlotKeySet.has(slotKey)
     const filterMatch = !inCycle || issueFilter === 'all' || slotReasons.includes(issueFilter)
     const coverageTone = missingLead
       ? 'text-red-700'
@@ -1599,6 +1648,11 @@ export function ManagerMonthCalendar({
               </div>
             )}
             <div className="space-y-1">
+              {blockedByConstraints && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-800">
+                  No eligible therapists (constraints)
+                </div>
+              )}
               {missingLead && (
                 <div className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700">
                   No lead assigned
@@ -1796,21 +1850,21 @@ export function ManagerMonthCalendar({
                   >
                     {row.therapist.shift_type} shift
                   </div>
-                  {(row.unavailableConflict || row.prnNotOffered) && selectedDate && (
+                  {(row.blockedByConstraints || row.forceOn) && selectedDate && (
                     <div className="mt-1 flex flex-wrap gap-1">
-                      {row.unavailableConflict && (
+                      {row.blockedByConstraints && (
                         <span className="rounded border border-red-300 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
-                          Unavailable
+                          Constraint
                         </span>
                       )}
-                      {row.prnNotOffered && (
-                        <span className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
-                          Not offered (PRN)
+                      {row.forceOn && (
+                        <span className="rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+                          Available (override)
                         </span>
                       )}
                     </div>
                   )}
-                  {row.unavailableConflict && row.unavailableReason && selectedDate && (
+                  {row.blockedByConstraints && row.unavailableReason && selectedDate && (
                     <p className="mt-1 text-[10px] text-red-700">{row.unavailableReason}</p>
                   )}
                 </div>
@@ -2169,12 +2223,12 @@ export function ManagerMonthCalendar({
           if (!open) closeAvailabilityConflictDialog()
         }}
       >
-        <DialogContent className="sm:max-w-lg">
+          <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Conflicts with availability</DialogTitle>
+            <DialogTitle>Assignment warning</DialogTitle>
             <DialogDescription>
               {availabilityConflictDialog
-                ? `${availabilityConflictDialog.therapistName} marked unavailable on ${formatCellDate(
+                ? `${availabilityConflictDialog.therapistName} has a scheduling constraint on ${formatCellDate(
                     availabilityConflictDialog.date
                   )}${
                     availabilityConflictDialog.reason
@@ -2426,14 +2480,14 @@ export function ManagerMonthCalendar({
                                         PRN
                                       </span>
                                     )}
-                                    {option.unavailableConflict && (
+                                    {option.blockedByConstraints && (
                                       <span className="rounded border border-red-300 bg-red-50 px-1.5 py-0.5 font-medium text-red-700">
-                                        Unavailable
+                                        Constraint
                                       </span>
                                     )}
-                                    {option.prnNotOffered && (
-                                      <span className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 font-medium text-amber-700">
-                                        Not offered
+                                    {option.forceOn && (
+                                      <span className="rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 font-medium text-emerald-700">
+                                        Available
                                       </span>
                                     )}
                                   </div>

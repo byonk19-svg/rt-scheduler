@@ -1,7 +1,40 @@
-import { describe, expect, it } from 'vitest'
+﻿import { describe, expect, it } from 'vitest'
 
-import type { Therapist } from '@/app/schedule/types'
+import type { AvailabilityOverrideRow, Therapist } from '@/app/schedule/types'
 import { getScheduleFeedback, pickTherapistForDate } from '@/lib/schedule-helpers'
+
+function buildTherapist(overrides?: Partial<Therapist>): Therapist {
+  return {
+    id: 'therapist-1',
+    full_name: 'Therapist One',
+    shift_type: 'day',
+    is_lead_eligible: false,
+    employment_type: 'full_time',
+    max_work_days_per_week: 3,
+    works_dow: [],
+    offs_dow: [],
+    weekend_rotation: 'none',
+    weekend_anchor_date: null,
+    works_dow_mode: 'hard',
+    shift_preference: 'either',
+    on_fmla: false,
+    fmla_return_date: null,
+    is_active: true,
+    ...overrides,
+  }
+}
+
+function buildOverride(overrides?: Partial<AvailabilityOverrideRow>): AvailabilityOverrideRow {
+  return {
+    cycle_id: 'cycle-1',
+    therapist_id: 'therapist-1',
+    date: '2026-03-06',
+    shift_type: 'both',
+    override_type: 'force_off',
+    note: null,
+    ...overrides,
+  }
+}
 
 describe('schedule feedback messaging', () => {
   it('summarizes publish blocking with lead and coverage issue counts', () => {
@@ -12,7 +45,6 @@ describe('schedule feedback messaging', () => {
       lead_missing: '3',
       lead_multiple: '1',
       lead_ineligible: '1',
-      affected: '2026-03-22 day, 2026-03-22 night',
     })
 
     expect(feedback?.variant).toBe('error')
@@ -21,60 +53,41 @@ describe('schedule feedback messaging', () => {
     expect(feedback?.message).toContain('missing lead: 3')
     expect(feedback?.message).toContain('multiple leads: 1')
     expect(feedback?.message).toContain('ineligible lead: 1')
-    expect(feedback?.message).not.toContain('Affected:')
   })
 
-  it('shows lead warning when auto-generate cannot assign a lead to every shift', () => {
+  it('includes constraint-driven unfilled counts after auto-generate', () => {
     const feedback = getScheduleFeedback({
       auto: 'generated',
-      added: '12',
+      added: '8',
       unfilled: '0',
-      lead_missing: '2',
+      lead_missing: '0',
+      constraints_unfilled: '2',
     })
 
     expect(feedback?.variant).toBe('error')
-    expect(feedback?.message).toContain('Draft generated with 12 new shifts.')
-    expect(feedback?.message).toContain('2 shifts still need a designated lead.')
+    expect(feedback?.message).toContain('2 slots were left unfilled due to constraints.')
   })
 })
 
-describe('auto-generate preferred day and availability selection', () => {
-  it('prioritizes therapists who prefer the target weekday', () => {
+describe('pickTherapistForDate', () => {
+  it('chooses lower weekly count first', () => {
     const therapists: Therapist[] = [
-      {
-        id: 'a',
-        full_name: 'Alex',
-        shift_type: 'day',
-        is_lead_eligible: false,
-        employment_type: 'full_time',
-        max_work_days_per_week: 3,
-        preferred_work_days: [2],
-        on_fmla: false,
-        fmla_return_date: null,
-        is_active: true,
-      },
-      {
-        id: 'b',
-        full_name: 'Bailey',
-        shift_type: 'day',
-        is_lead_eligible: false,
-        employment_type: 'full_time',
-        max_work_days_per_week: 3,
-        preferred_work_days: [1],
-        on_fmla: false,
-        fmla_return_date: null,
-        is_active: true,
-      },
+      buildTherapist({ id: 'a', full_name: 'Alex' }),
+      buildTherapist({ id: 'b', full_name: 'Bailey' }),
     ]
 
     const pick = pickTherapistForDate(
       therapists,
       0,
-      '2026-02-23',
+      '2026-03-02',
       'day',
-      new Map(),
-      new Set(),
-      new Map(),
+      new Map<string, AvailabilityOverrideRow[]>(),
+      'cycle-1',
+      new Set<string>(),
+      new Map<string, Set<string>>([
+        ['a:2026-03-01', new Set(['2026-03-01', '2026-03-02'])],
+        ['b:2026-03-01', new Set(['2026-03-01'])],
+      ]),
       new Map([
         ['a', 3],
         ['b', 3],
@@ -84,164 +97,159 @@ describe('auto-generate preferred day and availability selection', () => {
     expect(pick.therapist?.id).toBe('b')
   })
 
-  it('falls back to non-preferred therapists when needed', () => {
-    const therapists: Therapist[] = [
-      {
-        id: 'a',
-        full_name: 'Alex',
-        shift_type: 'day',
-        is_lead_eligible: false,
-        employment_type: 'full_time',
-        max_work_days_per_week: 3,
-        preferred_work_days: [2],
-        on_fmla: false,
-        fmla_return_date: null,
-        is_active: true,
-      },
-    ]
+  it('blocks offs_dow weekday assignments', () => {
+    const therapist = buildTherapist({
+      offs_dow: [1],
+      works_dow_mode: 'soft',
+    })
 
     const pick = pickTherapistForDate(
-      therapists,
+      [therapist],
       0,
-      '2026-02-23',
+      '2026-03-02',
       'day',
+      new Map<string, AvailabilityOverrideRow[]>(),
+      'cycle-1',
+      new Set<string>(),
       new Map(),
-      new Set(),
-      new Map(),
-      new Map([['a', 3]])
+      new Map([['therapist-1', 3]])
     )
 
-    expect(pick.therapist?.id).toBe('a')
+    expect(pick.therapist).toBeNull()
   })
 
-  it('does not auto-schedule PRN therapists without AVAILABLE entries', () => {
+  it('blocks non-works day when works_dow_mode is hard', () => {
+    const therapist = buildTherapist({
+      works_dow: [2],
+      works_dow_mode: 'hard',
+    })
+
+    const pick = pickTherapistForDate(
+      [therapist],
+      0,
+      '2026-03-02',
+      'day',
+      new Map<string, AvailabilityOverrideRow[]>(),
+      'cycle-1',
+      new Set<string>(),
+      new Map(),
+      new Map([['therapist-1', 3]])
+    )
+
+    expect(pick.therapist).toBeNull()
+  })
+
+  it('prefers works_dow matches when mode is soft', () => {
     const therapists: Therapist[] = [
-      {
-        id: 'prn-no-entries',
-        full_name: 'PRN No Entries',
-        shift_type: 'day',
-        is_lead_eligible: false,
-        employment_type: 'prn',
-        max_work_days_per_week: 1,
-        preferred_work_days: [],
-        on_fmla: false,
-        fmla_return_date: null,
-        is_active: true,
-      },
-      {
-        id: 'full-time',
-        full_name: 'Full Timer',
-        shift_type: 'day',
-        is_lead_eligible: false,
-        employment_type: 'full_time',
-        max_work_days_per_week: 3,
-        preferred_work_days: [],
-        on_fmla: false,
-        fmla_return_date: null,
-        is_active: true,
-      },
+      buildTherapist({
+        id: 'soft-non-match',
+        full_name: 'Soft Non Match',
+        works_dow: [2],
+        works_dow_mode: 'soft',
+      }),
+      buildTherapist({
+        id: 'soft-match',
+        full_name: 'Soft Match',
+        works_dow: [1],
+        works_dow_mode: 'soft',
+      }),
     ]
 
     const pick = pickTherapistForDate(
       therapists,
       0,
-      '2026-02-23',
+      '2026-03-02',
       'day',
-      new Map(),
-      new Set(),
+      new Map<string, AvailabilityOverrideRow[]>(),
+      'cycle-1',
+      new Set<string>(),
       new Map(),
       new Map([
-        ['prn-no-entries', 1],
-        ['full-time', 3],
+        ['soft-non-match', 3],
+        ['soft-match', 3],
       ])
     )
 
-    expect(pick.therapist?.id).toBe('full-time')
+    expect(pick.therapist?.id).toBe('soft-match')
   })
 
-  it('allows PRN therapists when an AVAILABLE entry exists for that date/shift', () => {
-    const therapists: Therapist[] = [
-      {
-        id: 'prn-available',
-        full_name: 'PRN Available',
-        shift_type: 'day',
-        is_lead_eligible: false,
-        employment_type: 'prn',
-        max_work_days_per_week: 1,
-        preferred_work_days: [],
-        on_fmla: false,
-        fmla_return_date: null,
-        is_active: true,
-      },
-    ]
+  it('supports every-other weekend parity', () => {
+    const therapist = buildTherapist({
+      weekend_rotation: 'every_other',
+      weekend_anchor_date: '2026-02-21',
+      works_dow_mode: 'soft',
+    })
 
-    const availabilityEntries = new Map([
-      [
-        'prn-available',
-        [
-          {
-            therapistId: 'prn-available',
-            date: '2026-02-24',
-            shiftType: 'day' as const,
-            entryType: 'available' as const,
-          },
-        ],
-      ],
-    ])
-
-    const pick = pickTherapistForDate(
-      therapists,
+    const allowedWeekend = pickTherapistForDate(
+      [therapist],
       0,
-      '2026-02-24',
+      '2026-03-07',
       'day',
-      availabilityEntries,
-      new Set(),
+      new Map<string, AvailabilityOverrideRow[]>(),
+      'cycle-1',
+      new Set<string>(),
       new Map(),
-      new Map([['prn-available', 1]])
+      new Map([['therapist-1', 3]])
     )
 
-    expect(pick.therapist?.id).toBe('prn-available')
+    expect(allowedWeekend.therapist?.id).toBe('therapist-1')
+
+    const blockedWeekend = pickTherapistForDate(
+      [therapist],
+      0,
+      '2026-02-28',
+      'day',
+      new Map<string, AvailabilityOverrideRow[]>(),
+      'cycle-1',
+      new Set<string>(),
+      new Map(),
+      new Map([['therapist-1', 3]])
+    )
+
+    expect(blockedWeekend.therapist).toBeNull()
   })
 
-  it('respects shift-scoped AVAILABLE entries for PRN therapists', () => {
-    const therapists: Therapist[] = [
-      {
-        id: 'prn-day-only',
-        full_name: 'PRN Day Only',
-        shift_type: 'night',
-        is_lead_eligible: false,
-        employment_type: 'prn',
-        max_work_days_per_week: 1,
-        preferred_work_days: [],
-        on_fmla: false,
-        fmla_return_date: null,
-        is_active: true,
-      },
-    ]
-
-    const availabilityEntries = new Map([
-      [
-        'prn-day-only',
-        [
-          {
-            therapistId: 'prn-day-only',
-            date: '2026-02-24',
-            shiftType: 'day' as const,
-            entryType: 'available' as const,
-          },
-        ],
-      ],
-    ])
+  it('force_on override allows scheduling outside hard recurring pattern', () => {
+    const therapist = buildTherapist({
+      works_dow: [2],
+      works_dow_mode: 'hard',
+    })
 
     const pick = pickTherapistForDate(
-      therapists,
+      [therapist],
       0,
-      '2026-02-24',
-      'night',
-      availabilityEntries,
-      new Set(),
+      '2026-03-06',
+      'day',
+      new Map<string, AvailabilityOverrideRow[]>([
+        ['therapist-1', [buildOverride({ override_type: 'force_on' })]],
+      ]),
+      'cycle-1',
+      new Set<string>(),
       new Map(),
-      new Map([['prn-day-only', 1]])
+      new Map([['therapist-1', 3]])
+    )
+
+    expect(pick.therapist?.id).toBe('therapist-1')
+  })
+
+  it('force_off override blocks even on normal works day', () => {
+    const therapist = buildTherapist({
+      works_dow: [5],
+      works_dow_mode: 'hard',
+    })
+
+    const pick = pickTherapistForDate(
+      [therapist],
+      0,
+      '2026-03-06',
+      'day',
+      new Map<string, AvailabilityOverrideRow[]>([
+        ['therapist-1', [buildOverride({ override_type: 'force_off' })]],
+      ]),
+      'cycle-1',
+      new Set<string>(),
+      new Map(),
+      new Map([['therapist-1', 3]])
     )
 
     expect(pick.therapist).toBeNull()

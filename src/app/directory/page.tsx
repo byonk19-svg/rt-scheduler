@@ -1,452 +1,699 @@
-'use client'
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 
-import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { EmployeeDirectory } from '@/components/EmployeeDirectory'
+import { FeedbackToast } from '@/components/feedback-toast'
+import {
+  getDefaultWeeklyLimitForEmploymentType,
+  sanitizeWeeklyLimit,
+} from '@/lib/scheduling-constants'
+import {
+  buildManagerOverrideInput,
+  normalizeEmploymentType,
+  normalizeFmlaReturnDate,
+  normalizeShiftType,
+  type EmployeeDirectoryRecord,
+} from '@/lib/employee-directory'
+import { createClient } from '@/lib/supabase/server'
 
-import type { EmployeeEmploymentType, EmployeeShiftType } from '@/lib/employee-directory'
-import { createClient } from '@/lib/supabase/client'
-
-type DirectoryEmployee = {
-  id: string
-  name: string
-  email: string
-  shift: 'Day' | 'Night'
-  type: 'Full-time' | 'Part-time' | 'PRN'
-  isLead: boolean
-  fmla: boolean
-  inactive: boolean
+type DirectorySearchParams = {
+  error?: string | string[]
+  success?: string | string[]
+  realigned?: string | string[]
 }
 
 type DirectoryProfileRow = {
   id: string
+  role: 'manager' | 'therapist' | null
   full_name: string | null
   email: string | null
-  role: 'manager' | 'therapist' | null
-  shift_type: EmployeeShiftType | null
-  employment_type: EmployeeEmploymentType | null
+  phone_number: string | null
+  shift_type: 'day' | 'night' | null
+  employment_type: 'full_time' | 'part_time' | 'prn' | null
+  max_work_days_per_week: number | null
   is_lead_eligible: boolean | null
   on_fmla: boolean | null
+  fmla_return_date: string | null
   is_active: boolean | null
 }
 
-type ShiftTab = 'All' | 'Day' | 'Night'
-type SortCol = 'name' | 'shift' | 'type'
-type SortDir = 'asc' | 'desc'
-
-function initials(name: string) {
-  return name
-    .split(' ')
-    .map((word) => word[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
+type WorkPatternRow = {
+  therapist_id: string
+  works_dow: number[] | null
+  offs_dow: number[] | null
+  weekend_rotation: 'none' | 'every_other' | null
+  weekend_anchor_date: string | null
+  works_dow_mode: 'hard' | 'soft' | null
+  shift_preference: 'day' | 'night' | 'either' | null
 }
 
-function mapShiftLabel(value: EmployeeShiftType | null): 'Day' | 'Night' {
-  return value === 'night' ? 'Night' : 'Day'
+type ScheduleCycleRow = {
+  id: string
+  label: string
+  start_date: string
+  end_date: string
+  published: boolean
 }
 
-function mapEmploymentLabel(value: EmployeeEmploymentType | null): 'Full-time' | 'Part-time' | 'PRN' {
-  if (value === 'prn') return 'PRN'
-  if (value === 'part_time') return 'Part-time'
-  return 'Full-time'
+type AvailabilityOverrideRow = {
+  id: string
+  therapist_id: string
+  cycle_id: string
+  date: string
+  shift_type: 'day' | 'night' | 'both'
+  override_type: 'force_off' | 'force_on'
+  note: string | null
+  created_at: string
+  source: 'therapist' | 'manager'
 }
 
-export default function TeamPage() {
-  const router = useRouter()
-  const supabase = useMemo(() => createClient(), [])
+type EmployeeDateOverrideRecord = {
+  id: string
+  therapist_id: string
+  cycle_id: string
+  date: string
+  shift_type: 'day' | 'night' | 'both'
+  override_type: 'force_off' | 'force_on'
+  note: string | null
+  created_at: string
+  source: 'therapist' | 'manager'
+}
 
-  const [employees, setEmployees] = useState<DirectoryEmployee[]>([])
-  const [shiftTab, setShiftTab] = useState<ShiftTab>('All')
-  const [search, setSearch] = useState('')
-  const [filterLead, setFilterLead] = useState(false)
-  const [filterFmla, setFilterFmla] = useState(false)
-  const [filterInactive, setFilterInactive] = useState(false)
-  const [sortCol, setSortCol] = useState<SortCol>('name')
-  const [sortDir, setSortDir] = useState<SortDir>('asc')
-  const [loading, setLoading] = useState(true)
+type EmployeeCycleRecord = {
+  id: string
+  label: string
+  start_date: string
+  end_date: string
+  published: boolean
+}
 
-  useEffect(() => {
-    let active = true
+type ToastVariant = 'success' | 'error'
 
-    async function loadEmployees() {
-      setLoading(true)
+function getSearchParam(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) return value[0]
+  return value
+}
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+function isMissingWorkPatternsSchema(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const maybeError = error as {
+    code?: string
+    message?: string
+    details?: string
+    hint?: string
+  }
+  const text = [maybeError.code, maybeError.message, maybeError.details, maybeError.hint]
+    .filter((value): value is string => typeof value === 'string' && value.length > 0)
+    .join(' ')
+    .toLowerCase()
 
-      if (!active) return
+  return (
+    maybeError.code === '42P01' ||
+    maybeError.code === '42703' ||
+    (text.includes('work_patterns') &&
+      (text.includes('does not exist') || text.includes('relation') || text.includes('column')))
+  )
+}
 
-      if (!user) {
-        router.replace('/login')
-        return
+function isMissingAvailabilityOverridesSchema(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const maybeError = error as {
+    code?: string
+    message?: string
+    details?: string
+    hint?: string
+  }
+  const text = [maybeError.code, maybeError.message, maybeError.details, maybeError.hint]
+    .filter((value): value is string => typeof value === 'string' && value.length > 0)
+    .join(' ')
+    .toLowerCase()
+
+  return (
+    maybeError.code === '42P01' ||
+    maybeError.code === '42703' ||
+    (text.includes('availability_overrides') &&
+      (text.includes('does not exist') || text.includes('relation') || text.includes('column')))
+  )
+}
+
+function getTodayKey(): string {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function getDirectoryFeedback(params?: DirectorySearchParams): {
+  message: string
+  variant: ToastVariant
+} | null {
+  const error = getSearchParam(params?.error)
+  const success = getSearchParam(params?.success)
+  const realigned = Number.parseInt(getSearchParam(params?.realigned) ?? '0', 10)
+  const realignedCount = Number.isFinite(realigned) && realigned >= 0 ? realigned : 0
+
+  if (error === 'missing_profile') {
+    return { message: 'Select an employee first.', variant: 'error' }
+  }
+
+  if (error === 'update_failed') {
+    return { message: 'Could not update employee profile. Please try again.', variant: 'error' }
+  }
+
+  if (error === 'active_update_failed') {
+    return { message: 'Could not update employee status. Please try again.', variant: 'error' }
+  }
+
+  if (error === 'weekend_anchor_required') {
+    return { message: 'Set a weekend anchor date (Sat/Sun) for every-other-weekend scheduling.', variant: 'error' }
+  }
+
+  if (error === 'weekend_anchor_invalid') {
+    return { message: 'Weekend anchor date must be a Saturday.', variant: 'error' }
+  }
+
+  if (error === 'override_missing_fields') {
+    return { message: 'Date override requires cycle, date, shift, and override type.', variant: 'error' }
+  }
+
+  if (error === 'override_failed') {
+    return { message: 'Could not save date override. Please try again.', variant: 'error' }
+  }
+
+  if (error === 'override_delete_failed') {
+    return { message: 'Could not delete date override. Please try again.', variant: 'error' }
+  }
+
+  if (error === 'override_schema_missing') {
+    return { message: 'Date override schema is not available yet. Run latest migration.', variant: 'error' }
+  }
+
+  if (success === 'profile_saved') {
+    if (realignedCount > 0) {
+      return {
+        message: `Employee updated. Realigned ${realignedCount} future draft shift assignment${realignedCount === 1 ? '' : 's'}.`,
+        variant: 'success',
       }
-
-      const { data: currentProfile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .maybeSingle()
-
-      if (!active) return
-
-      if ((currentProfile as { role?: string } | null)?.role !== 'manager') {
-        router.replace('/dashboard/staff')
-        return
-      }
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, shift_type, employment_type, is_lead_eligible, on_fmla, is_active')
-        .eq('role', 'therapist')
-        .order('shift_type', { ascending: true })
-        .order('full_name', { ascending: true })
-
-      if (!active) return
-
-      if (error) {
-        console.error('Failed to load directory employees:', error)
-        setEmployees([])
-        setLoading(false)
-        return
-      }
-
-      const mapped = ((data ?? []) as DirectoryProfileRow[]).map((row) => {
-        const name = row.full_name?.trim() || row.email?.trim() || 'Unknown employee'
-        const email = row.email?.trim() || 'No email'
-
-        return {
-          id: row.id,
-          name,
-          email,
-          shift: mapShiftLabel(row.shift_type),
-          type: mapEmploymentLabel(row.employment_type),
-          isLead: row.is_lead_eligible === true,
-          fmla: row.on_fmla === true,
-          inactive: row.is_active === false,
-        } satisfies DirectoryEmployee
-      })
-
-      setEmployees(mapped)
-      setLoading(false)
     }
+    return { message: 'Employee updated.', variant: 'success' }
+  }
 
-    void loadEmployees()
+  if (success === 'employee_deactivated') {
+    return { message: 'Employee deactivated.', variant: 'success' }
+  }
 
-    return () => {
-      active = false
-    }
-  }, [router, supabase])
+  if (success === 'employee_reactivated') {
+    return { message: 'Employee reactivated.', variant: 'success' }
+  }
 
-  const filtered = employees
-    .filter((employee) => shiftTab === 'All' || employee.shift === shiftTab)
-    .filter((employee) => !filterLead || employee.isLead)
-    .filter((employee) => !filterFmla || employee.fmla)
-    .filter((employee) => filterInactive || !employee.inactive)
-    .filter(
-      (employee) =>
-        search === '' ||
-        employee.name.toLowerCase().includes(search.toLowerCase()) ||
-        employee.email.toLowerCase().includes(search.toLowerCase())
+  if (success === 'override_saved') {
+    return { message: 'Date override saved.', variant: 'success' }
+  }
+
+  if (success === 'override_deleted') {
+    return { message: 'Date override deleted.', variant: 'success' }
+  }
+
+  return null
+}
+
+async function requireManager() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (profile?.role !== 'manager') {
+    redirect('/dashboard/staff')
+  }
+
+  return { supabase, managerId: user.id }
+}
+
+function isSaturdayDate(value: string): boolean {
+  const parsed = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return false
+  return parsed.getDay() === 6
+}
+
+async function realignFutureDraftShiftsForEmployee(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  employeeId: string
+): Promise<number> {
+  const { data: draftCycles, error: draftCyclesError } = await supabase
+    .from('schedule_cycles')
+    .select('id')
+    .eq('published', false)
+
+  if (draftCyclesError) {
+    console.error('Failed to load draft cycles for employee realignment:', draftCyclesError)
+    return 0
+  }
+
+  const cycleIds = (draftCycles ?? [])
+    .map((row) => String((row as { id?: string }).id ?? ''))
+    .filter((id) => id.length > 0)
+
+  if (cycleIds.length === 0) {
+    return 0
+  }
+
+  const { data: deletedRows, error: deleteError } = await supabase
+    .from('shifts')
+    .delete()
+    .eq('user_id', employeeId)
+    .gte('date', getTodayKey())
+    .in('cycle_id', cycleIds)
+    .select('id')
+
+  if (deleteError) {
+    console.error('Failed to realign future draft shifts for employee:', deleteError)
+    return 0
+  }
+
+  return deletedRows?.length ?? 0
+}
+
+async function saveEmployeeAction(formData: FormData) {
+  'use server'
+
+  const { supabase } = await requireManager()
+  const profileId = String(formData.get('profile_id') ?? '').trim()
+
+  if (!profileId) {
+    redirect('/directory?error=missing_profile')
+  }
+
+  const { data: targetProfile, error: targetProfileError } = await supabase
+    .from('profiles')
+    .select('id, role, shift_type, employment_type')
+    .eq('id', profileId)
+    .maybeSingle()
+
+  if (targetProfileError || !targetProfile || targetProfile.role !== 'therapist') {
+    console.error('Could not load therapist profile for update:', targetProfileError)
+    redirect('/directory?error=update_failed')
+  }
+
+  const fullName = String(formData.get('full_name') ?? '').trim()
+  const email = String(formData.get('email') ?? '').trim()
+  const phoneNumberRaw = String(formData.get('phone_number') ?? '').trim()
+  const shiftType = normalizeShiftType(String(formData.get('shift_type') ?? '').trim())
+  const employmentType = normalizeEmploymentType(String(formData.get('employment_type') ?? '').trim())
+  const weeklyLimitInput = Number.parseInt(String(formData.get('max_work_days_per_week') ?? ''), 10)
+  const weeklyLimit = sanitizeWeeklyLimit(
+    Number.isFinite(weeklyLimitInput) ? weeklyLimitInput : null,
+    getDefaultWeeklyLimitForEmploymentType(employmentType)
+  )
+  const worksDow = Array.from(
+    new Set(
+      formData
+        .getAll('works_dow')
+        .map((value) => Number.parseInt(String(value), 10))
+        .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
     )
-    .sort((a, b) => {
-      const av = a[sortCol].toLowerCase()
-      const bv = b[sortCol].toLowerCase()
-      return sortDir === 'asc' ? (av > bv ? 1 : -1) : av < bv ? 1 : -1
-    })
+  ).sort((a, b) => a - b)
+  const offsDow = Array.from(
+    new Set(
+      formData
+        .getAll('offs_dow')
+        .map((value) => Number.parseInt(String(value), 10))
+        .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+    )
+  ).sort((a, b) => a - b)
+  const weekendRotationRaw = String(formData.get('weekend_rotation') ?? 'none').trim()
+  const weekendRotation = weekendRotationRaw === 'every_other' ? 'every_other' : 'none'
+  const weekendAnchorRaw = String(formData.get('weekend_anchor_date') ?? '').trim()
+  const weekendAnchorDate = weekendRotation === 'every_other' ? weekendAnchorRaw || null : null
+  const worksDowModeRaw = String(formData.get('works_dow_mode') ?? 'hard').trim()
+  const worksDowMode = worksDowModeRaw === 'soft' ? 'soft' : 'hard'
 
-  const toggleSort = (col: SortCol) => {
-    if (sortCol === col) setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'))
-    else {
-      setSortCol(col)
-      setSortDir('asc')
+  if (weekendRotation === 'every_other' && !weekendAnchorDate) {
+    redirect('/directory?error=weekend_anchor_required')
+  }
+
+  if (weekendAnchorDate && !isSaturdayDate(weekendAnchorDate)) {
+    redirect('/directory?error=weekend_anchor_invalid')
+  }
+
+  const isLeadEligible = formData.get('is_lead_eligible') === 'on'
+  const onFmla = formData.get('on_fmla') === 'on'
+  const isActive = formData.get('is_active') === 'on'
+  const fmlaReturnDate = normalizeFmlaReturnDate(String(formData.get('fmla_return_date') ?? ''), onFmla)
+  const phoneNumber = phoneNumberRaw.length > 0 ? phoneNumberRaw : null
+  const shouldRealignFutureShifts = formData.get('realign_future_shifts') === 'true'
+
+  const { error: updateError } = await supabase
+    .from('profiles')
+    .update({
+      full_name: fullName,
+      email,
+      phone_number: phoneNumber,
+      shift_type: shiftType,
+      employment_type: employmentType,
+      max_work_days_per_week: weeklyLimit,
+      is_lead_eligible: isLeadEligible,
+      on_fmla: onFmla,
+      fmla_return_date: fmlaReturnDate,
+      is_active: isActive,
+    })
+    .eq('id', profileId)
+    .eq('role', 'therapist')
+
+  if (updateError) {
+    console.error('Failed to save employee directory profile:', updateError)
+    redirect('/directory?error=update_failed')
+  }
+
+  const { error: workPatternError } = await supabase
+    .from('work_patterns')
+    .upsert(
+      {
+        therapist_id: profileId,
+        works_dow: worksDow,
+        offs_dow: offsDow,
+        weekend_rotation: weekendRotation,
+        weekend_anchor_date: weekendAnchorDate,
+        works_dow_mode: worksDowMode,
+        shift_preference: 'either',
+      },
+      { onConflict: 'therapist_id' }
+    )
+
+  if (workPatternError) {
+    if (isMissingWorkPatternsSchema(workPatternError)) {
+      console.warn('Skipping work pattern save because work_patterns schema is not available yet.')
+    } else {
+      console.error('Failed to save work pattern:', workPatternError)
+      redirect('/directory?error=update_failed')
     }
   }
 
-  const SortIcon = ({ col }: { col: SortCol }) => (
-    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ marginLeft: 4, opacity: sortCol === col ? 1 : 0.3 }}>
-      <path d="M5 1l2.5 3h-5L5 1zM5 9L2.5 6h5L5 9z" fill={sortCol === col ? '#d97706' : '#9ca3af'} />
-    </svg>
-  )
+  const shouldAutoRealign = !isActive || onFmla
+  let realignedCount = 0
+
+  if (shouldRealignFutureShifts || shouldAutoRealign) {
+    realignedCount = await realignFutureDraftShiftsForEmployee(supabase, profileId)
+  }
+
+  revalidatePath('/directory')
+  revalidatePath('/schedule')
+  revalidatePath('/coverage')
+  revalidatePath('/dashboard/manager')
+
+  const search = new URLSearchParams({
+    success: 'profile_saved',
+    realigned: String(realignedCount),
+  })
+  redirect(`/directory?${search.toString()}`)
+}
+
+async function setEmployeeActiveAction(formData: FormData) {
+  'use server'
+
+  const { supabase } = await requireManager()
+  const profileId = String(formData.get('profile_id') ?? '').trim()
+  const setActive = String(formData.get('set_active') ?? '').trim() === 'true'
+
+  if (!profileId) {
+    redirect('/directory?error=missing_profile')
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ is_active: setActive })
+    .eq('id', profileId)
+    .eq('role', 'therapist')
+
+  if (error) {
+    console.error('Failed to update employee active status:', error)
+    redirect('/directory?error=active_update_failed')
+  }
+
+  if (!setActive) {
+    await realignFutureDraftShiftsForEmployee(supabase, profileId)
+  }
+
+  revalidatePath('/directory')
+  revalidatePath('/schedule')
+  revalidatePath('/coverage')
+  revalidatePath('/dashboard/manager')
+
+  redirect(`/directory?success=${setActive ? 'employee_reactivated' : 'employee_deactivated'}`)
+}
+
+async function saveEmployeeDateOverrideAction(formData: FormData) {
+  'use server'
+
+  const { supabase, managerId } = await requireManager()
+  const profileId = String(formData.get('profile_id') ?? '').trim()
+  const cycleId = String(formData.get('cycle_id') ?? '').trim()
+  const date = String(formData.get('date') ?? '').trim()
+  const shiftTypeRaw = String(formData.get('shift_type') ?? '').trim()
+  const overrideTypeRaw = String(formData.get('override_type') ?? '').trim()
+  const noteRaw = String(formData.get('note') ?? '').trim()
+  const shiftType = shiftTypeRaw === 'day' || shiftTypeRaw === 'night' || shiftTypeRaw === 'both' ? shiftTypeRaw : ''
+  const overrideType =
+    overrideTypeRaw === 'force_off' || overrideTypeRaw === 'force_on' ? overrideTypeRaw : ''
+
+  if (!profileId || !cycleId || !date || !shiftType || !overrideType) {
+    redirect('/directory?error=override_missing_fields')
+  }
+
+  const { data: targetProfile, error: targetProfileError } = await supabase
+    .from('profiles')
+    .select('id, role')
+    .eq('id', profileId)
+    .maybeSingle()
+
+  if (targetProfileError || !targetProfile || targetProfile.role !== 'therapist') {
+    console.error('Could not load therapist profile for date override update:', targetProfileError)
+    redirect('/directory?error=override_failed')
+  }
+
+  const { error: overrideError } = await supabase
+    .from('availability_overrides')
+    .upsert(
+      buildManagerOverrideInput({
+        cycleId,
+        therapistId: profileId,
+        date,
+        shiftType,
+        overrideType,
+        note: noteRaw,
+        managerId,
+      }),
+      { onConflict: 'cycle_id,therapist_id,date,shift_type' }
+    )
+
+  if (overrideError) {
+    if (isMissingAvailabilityOverridesSchema(overrideError)) {
+      redirect('/directory?error=override_schema_missing')
+    }
+    console.error('Failed to save employee date override:', overrideError)
+    redirect('/directory?error=override_failed')
+  }
+
+  revalidatePath('/directory')
+  revalidatePath('/schedule')
+  revalidatePath('/coverage')
+  revalidatePath('/availability')
+
+  redirect('/directory?success=override_saved')
+}
+
+async function deleteEmployeeDateOverrideAction(formData: FormData) {
+  'use server'
+
+  const { supabase } = await requireManager()
+  const overrideId = String(formData.get('override_id') ?? '').trim()
+  const profileId = String(formData.get('profile_id') ?? '').trim()
+
+  if (!overrideId || !profileId) {
+    redirect('/directory?error=override_missing_fields')
+  }
+
+  const { error: deleteError } = await supabase
+    .from('availability_overrides')
+    .delete()
+    .eq('id', overrideId)
+    .eq('therapist_id', profileId)
+
+  if (deleteError) {
+    if (isMissingAvailabilityOverridesSchema(deleteError)) {
+      redirect('/directory?error=override_schema_missing')
+    }
+    console.error('Failed to delete employee date override:', deleteError)
+    redirect('/directory?error=override_delete_failed')
+  }
+
+  revalidatePath('/directory')
+  revalidatePath('/schedule')
+  revalidatePath('/coverage')
+  revalidatePath('/availability')
+
+  redirect('/directory?success=override_deleted')
+}
+
+export default async function TeamPage({
+  searchParams,
+}: {
+  searchParams?: Promise<DirectorySearchParams>
+}) {
+  const { supabase } = await requireManager()
+  const params = searchParams ? await searchParams : undefined
+  const feedback = getDirectoryFeedback(params)
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select(
+      'id, role, full_name, email, phone_number, shift_type, employment_type, max_work_days_per_week, is_lead_eligible, on_fmla, fmla_return_date, is_active'
+    )
+    .eq('role', 'therapist')
+    .order('shift_type', { ascending: true })
+    .order('full_name', { ascending: true })
+
+  if (error) {
+    console.error('Failed to load employee directory data:', error)
+  }
+
+  const profileRows = ((data ?? []) as DirectoryProfileRow[]).filter((row) => row.id.length > 0)
+  const therapistIds = profileRows.map((row) => row.id)
+  const workPatternsByTherapistId = new Map<string, WorkPatternRow>()
+  let cycles: EmployeeCycleRecord[] = []
+  let dateOverrides: EmployeeDateOverrideRecord[] = []
+
+  if (therapistIds.length > 0) {
+    const { data: workPatternsData, error: workPatternsError } = await supabase
+      .from('work_patterns')
+      .select(
+        'therapist_id, works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode, shift_preference'
+      )
+      .in('therapist_id', therapistIds)
+
+    if (workPatternsError) {
+      if (!isMissingWorkPatternsSchema(workPatternsError)) {
+        console.warn('Failed to load work patterns for employee directory:', workPatternsError)
+      }
+    } else {
+      for (const row of (workPatternsData ?? []) as WorkPatternRow[]) {
+        workPatternsByTherapistId.set(row.therapist_id, row)
+      }
+    }
+  }
+
+  const { data: cyclesData, error: cyclesError } = await supabase
+    .from('schedule_cycles')
+    .select('id, label, start_date, end_date, published')
+    .order('start_date', { ascending: false })
+
+  if (cyclesError) {
+    console.warn('Failed to load schedule cycles for employee date overrides:', cyclesError)
+  } else {
+    cycles = ((cyclesData ?? []) as ScheduleCycleRow[]).map((row) => ({
+      id: row.id,
+      label: row.label,
+      start_date: row.start_date,
+      end_date: row.end_date,
+      published: row.published,
+    }))
+  }
+
+  if (therapistIds.length > 0) {
+    const { data: dateOverridesData, error: dateOverridesError } = await supabase
+      .from('availability_overrides')
+      .select('id, therapist_id, cycle_id, date, shift_type, override_type, note, created_at, source')
+      .in('therapist_id', therapistIds)
+      .order('date', { ascending: true })
+
+    if (dateOverridesError) {
+      if (!isMissingAvailabilityOverridesSchema(dateOverridesError)) {
+        console.warn('Failed to load employee date overrides for directory:', dateOverridesError)
+      }
+    } else {
+      dateOverrides = ((dateOverridesData ?? []) as AvailabilityOverrideRow[]).map((row) => ({
+        id: row.id,
+        therapist_id: row.therapist_id,
+        cycle_id: row.cycle_id,
+        date: row.date,
+        shift_type: row.shift_type,
+        override_type: row.override_type,
+        note: row.note,
+        created_at: row.created_at,
+        source: row.source === 'manager' ? 'manager' : 'therapist',
+      }))
+    }
+  }
+
+  const employees: EmployeeDirectoryRecord[] = profileRows.map((row) => {
+    const employmentType = normalizeEmploymentType(row.employment_type ?? 'full_time')
+    const weeklyLimit = sanitizeWeeklyLimit(
+      row.max_work_days_per_week,
+      getDefaultWeeklyLimitForEmploymentType(employmentType)
+    )
+    const pattern = workPatternsByTherapistId.get(row.id)
+    const worksDow = Array.isArray(pattern?.works_dow)
+      ? pattern.works_dow
+          .map((day) => Number(day))
+          .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+          .sort((a, b) => a - b)
+      : []
+    const offsDow = Array.isArray(pattern?.offs_dow)
+      ? pattern.offs_dow
+          .map((day) => Number(day))
+          .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+          .sort((a, b) => a - b)
+      : []
+
+    return {
+      id: row.id,
+      full_name: row.full_name?.trim() || row.email?.trim() || 'Unknown employee',
+      email: row.email?.trim() || 'no-email@teamwise.local',
+      phone_number: row.phone_number,
+      shift_type: normalizeShiftType(row.shift_type ?? 'day'),
+      employment_type: employmentType,
+      max_work_days_per_week: weeklyLimit,
+      works_dow: worksDow,
+      offs_dow: offsDow,
+      weekend_rotation: pattern?.weekend_rotation === 'every_other' ? 'every_other' : 'none',
+      weekend_anchor_date: pattern?.weekend_anchor_date ?? null,
+      works_dow_mode: pattern?.works_dow_mode === 'soft' ? 'soft' : 'hard',
+      is_lead_eligible: row.is_lead_eligible === true,
+      on_fmla: row.on_fmla === true,
+      fmla_return_date: row.fmla_return_date,
+      is_active: row.is_active !== false,
+    }
+  })
 
   return (
-    <div style={{ maxWidth: 1050, margin: '0 auto', padding: '32px 28px' }}>
-      <div className="fade-up" style={{ marginBottom: 6 }}>
-        <h1
-          style={{
-            fontSize: 26,
-            fontWeight: 800,
-            color: '#0f172a',
-            letterSpacing: '-0.02em',
-            fontFamily: "'Plus Jakarta Sans', sans-serif",
-          }}
-        >
-          Team Directory
-        </h1>
-        <p style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>Manage staffing details for your team.</p>
+    <div className="space-y-6">
+      {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
+
+      <div>
+        <h1 className="app-page-title">Team Directory</h1>
+        <p className="text-muted-foreground">Manage staffing details for your team.</p>
       </div>
 
-      <div className="fade-up" style={{ animationDelay: '0.04s', marginTop: 24, marginBottom: 16 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>Employee Directory</h2>
-        <p style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-          Search, filter, and maintain active staffing profiles in one place.
-        </p>
-      </div>
-
-      <div className="fade-up" style={{ animationDelay: '0.06s', display: 'flex', gap: 4, marginBottom: 16 }}>
-        {(['All', 'Day', 'Night'] as const).map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setShiftTab(tab)}
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              padding: '5px 16px',
-              borderRadius: 7,
-              border: `1px solid ${shiftTab === tab ? '#d97706' : '#e5e7eb'}`,
-              background: shiftTab === tab ? '#d97706' : '#fff',
-              color: shiftTab === tab ? '#fff' : '#64748b',
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-            }}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      <div className="fade-up" style={{ animationDelay: '0.08s', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
-          >
-            <circle cx="6" cy="6" r="4" stroke="#9ca3af" strokeWidth="1.5" />
-            <path d="M9.5 9.5l2.5 2.5" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search name or email"
-            style={{
-              width: '100%',
-              padding: '7px 10px 7px 30px',
-              border: '1px solid #e5e7eb',
-              borderRadius: 7,
-              fontSize: 12,
-              color: '#374151',
-              outline: 'none',
-              background: '#fff',
-            }}
-          />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>Filters:</span>
-          {[
-            { label: 'Lead', val: filterLead, set: setFilterLead },
-            { label: 'FMLA', val: filterFmla, set: setFilterFmla },
-            { label: 'Include inactive', val: filterInactive, set: setFilterInactive },
-          ].map(({ label, val, set }) => (
-            <label
-              key={label}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 5,
-                cursor: 'pointer',
-                fontSize: 12,
-                color: '#374151',
-                fontWeight: val ? 700 : 400,
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={val}
-                onChange={(event) => set(event.target.checked)}
-                style={{ accentColor: '#d97706', width: 13, height: 13, cursor: 'pointer' }}
-              />
-              {label}
-            </label>
-          ))}
-        </div>
-        <button
-          type="button"
-          style={{
-            fontSize: 12,
-            fontWeight: 700,
-            padding: '7px 16px',
-            borderRadius: 7,
-            border: 'none',
-            background: '#d97706',
-            color: '#fff',
-            marginLeft: 'auto',
-            cursor: 'pointer',
-          }}
-        >
-          + Add employee
-        </button>
-      </div>
-
-      <p className="fade-up" style={{ animationDelay: '0.09s', fontSize: 12, color: '#9ca3af', marginBottom: 10 }}>
-        {loading ? 'Loading...' : `${filtered.length} employee${filtered.length !== 1 ? 's' : ''}`}
-      </p>
-
-      <div className="fade-up" style={{ animationDelay: '0.1s', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
-              {[
-                { label: 'Employee', col: 'name' as const, width: '35%' },
-                { label: 'Shift', col: 'shift' as const, width: '15%' },
-                { label: 'Type', col: 'type' as const, width: '15%' },
-                { label: 'Tags', col: null, width: '25%' },
-                { label: 'Actions', col: null, width: '10%' },
-              ].map(({ label, col, width }) => (
-                <th
-                  key={label}
-                  onClick={col ? () => toggleSort(col) : undefined}
-                  style={{
-                    padding: '10px 16px',
-                    textAlign: 'left',
-                    fontSize: 11,
-                    fontWeight: 800,
-                    color: sortCol === col ? '#d97706' : '#6b7280',
-                    letterSpacing: '0.04em',
-                    textTransform: 'uppercase',
-                    cursor: col ? 'pointer' : 'default',
-                    width,
-                    userSelect: 'none',
-                  }}
-                >
-                  <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                    {label}
-                    {col && <SortIcon col={col} />}
-                  </span>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((employee, index) => (
-              <tr key={employee.id} style={{ borderBottom: index < filtered.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
-                <td style={{ padding: '12px 16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: '50%',
-                        background: '#1c1917',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <span style={{ fontSize: 10, fontWeight: 800, color: '#fbbf24' }}>{initials(employee.name)}</span>
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', lineHeight: 1 }}>{employee.name}</p>
-                      <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{employee.email}</p>
-                    </div>
-                  </div>
-                </td>
-                <td style={{ padding: '12px 16px' }}>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: '#374151',
-                      background: '#f1f5f9',
-                      border: '1px solid #e5e7eb',
-                      padding: '2px 10px',
-                      borderRadius: 20,
-                    }}
-                  >
-                    {employee.shift}
-                  </span>
-                </td>
-                <td style={{ padding: '12px 16px' }}>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: employee.type === 'PRN' ? '#6d28d9' : '#374151',
-                      background: employee.type === 'PRN' ? '#f5f3ff' : '#f8fafc',
-                      border: `1px solid ${employee.type === 'PRN' ? '#ddd6fe' : '#e5e7eb'}`,
-                      padding: '2px 10px',
-                      borderRadius: 20,
-                    }}
-                  >
-                    {employee.type}
-                  </span>
-                </td>
-                <td style={{ padding: '12px 16px' }}>
-                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                    {employee.isLead && (
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 800,
-                          color: '#b45309',
-                          background: '#fffbeb',
-                          border: '1px solid #fde68a',
-                          padding: '2px 9px',
-                          borderRadius: 20,
-                        }}
-                      >
-                        Lead
-                      </span>
-                    )}
-                    {employee.fmla && (
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 800,
-                          color: '#dc2626',
-                          background: '#fef2f2',
-                          border: '1px solid #fecaca',
-                          padding: '2px 9px',
-                          borderRadius: 20,
-                        }}
-                      >
-                        FMLA
-                      </span>
-                    )}
-                    {!employee.isLead && !employee.fmla && <span style={{ fontSize: 11, color: '#d1d5db' }}>-</span>}
-                  </div>
-                </td>
-                <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                  <button
-                    type="button"
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      fontSize: 16,
-                      color: '#9ca3af',
-                      cursor: 'pointer',
-                      padding: '2px 6px',
-                      borderRadius: 4,
-                    }}
-                  >
-                    ...
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {filtered.length === 0 && !loading && (
-          <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
-            No employees match your filters.
-          </div>
-        )}
-      </div>
+      <EmployeeDirectory
+        employees={employees}
+        cycles={cycles}
+        dateOverrides={dateOverrides}
+        saveEmployeeAction={saveEmployeeAction}
+        setEmployeeActiveAction={setEmployeeActiveAction}
+        saveEmployeeDateOverrideAction={saveEmployeeDateOverrideAction}
+        deleteEmployeeDateOverrideAction={deleteEmployeeDateOverrideAction}
+      />
     </div>
   )
 }

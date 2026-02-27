@@ -4,9 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 
 type AvailabilityExportRow = {
   date: string
-  entry_type: 'unavailable' | 'available'
+  override_type: 'force_off' | 'force_on'
   shift_type: 'day' | 'night' | 'both'
-  reason: string | null
+  note: string | null
+  source: 'therapist' | 'manager' | null
   created_at: string
   therapist_id: string
   profiles: { full_name: string } | { full_name: string }[] | null
@@ -47,9 +48,9 @@ export async function GET() {
   const isManager = profile?.role === 'manager'
 
   let query = supabase
-    .from('availability_entries')
+    .from('availability_overrides')
     .select(
-      'date, entry_type, shift_type, reason, created_at, therapist_id, profiles(full_name), schedule_cycles(label, start_date, end_date)'
+      'date, override_type, shift_type, note, source, created_at, therapist_id, profiles(full_name), schedule_cycles(label, start_date, end_date)'
     )
     .order('date', { ascending: true })
     .order('created_at', { ascending: true })
@@ -73,6 +74,7 @@ export async function GET() {
     'cycle_end',
     'entry_type',
     'shift_scope',
+    'source',
     'reason',
     'therapist',
     'submitted_at',
@@ -88,9 +90,10 @@ export async function GET() {
       cycle?.label ?? '',
       cycle?.start_date ?? '',
       cycle?.end_date ?? '',
-      row.entry_type,
+      row.override_type,
       row.shift_type,
-      row.reason ?? '',
+      row.source ?? 'therapist',
+      row.note ?? '',
       requester?.full_name ?? '',
       submittedAt,
     ]
@@ -99,7 +102,7 @@ export async function GET() {
   })
 
   const csv = [header.join(','), ...lines].join('\n')
-  const filename = isManager ? 'availability-entries-all.csv' : 'availability-entries-mine.csv'
+  const filename = isManager ? 'availability-overrides-all.csv' : 'availability-overrides-mine.csv'
 
   return new NextResponse(csv, {
     status: 200,
