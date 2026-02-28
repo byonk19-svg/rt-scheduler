@@ -200,6 +200,13 @@ function getDirectoryFeedback(params?: DirectorySearchParams): {
     }
   }
 
+  if (error === 'override_date_out_of_range') {
+    return {
+      message: "Date is outside the selected cycle's date range.",
+      variant: 'error',
+    }
+  }
+
   if (success === 'profile_saved') {
     if (realignedCount > 0) {
       return {
@@ -497,6 +504,22 @@ async function saveEmployeeDateOverrideAction(formData: FormData) {
   if (targetProfileError || !targetProfile || targetProfile.role !== 'therapist') {
     console.error('Could not load therapist profile for date override update:', targetProfileError)
     redirect('/directory?error=override_failed')
+  }
+
+  // Validate date is within the selected cycle's date range.
+  const { data: targetCycle, error: targetCycleError } = await supabase
+    .from('schedule_cycles')
+    .select('start_date, end_date')
+    .eq('id', cycleId)
+    .maybeSingle()
+
+  if (targetCycleError || !targetCycle) {
+    console.error('Could not load cycle for date override validation:', targetCycleError)
+    redirect('/directory?error=override_failed')
+  }
+
+  if (date < targetCycle.start_date || date > targetCycle.end_date) {
+    redirect('/directory?error=override_date_out_of_range')
   }
 
   const { error: overrideError } = await supabase.from('availability_overrides').upsert(
