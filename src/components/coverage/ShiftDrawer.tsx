@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils'
 import { countActive, countBy, flatten, type DayItem, type ShiftTab, type UiStatus } from '@/lib/coverage/selectors'
 
-type TherapistOption = { id: string; full_name: string; shift_type: 'day' | 'night' }
+type TherapistOption = { id: string; full_name: string; shift_type: 'day' | 'night'; isLeadEligible: boolean }
 type SelectedDay = DayItem & { shiftType: ShiftTab }
 
 type ShiftDrawerProps = {
@@ -20,6 +20,9 @@ type ShiftDrawerProps = {
   onClose: () => void
   onAssignSubmit: () => Promise<void> | void
   onAssignUserIdChange: (value: string) => void
+  assignRole: 'lead' | 'staff'
+  onAssignRoleChange: (role: 'lead' | 'staff') => void
+  weeklyTherapistCounts: Map<string, number>
   onToggleExpanded: (shiftId: string) => void
   onChangeStatus: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
   onUnassign: (dayId: string, shiftId: string, isLead: boolean) => Promise<void> | void
@@ -98,6 +101,9 @@ export function ShiftDrawer({
   onClose,
   onAssignSubmit,
   onAssignUserIdChange,
+  assignRole,
+  onAssignRoleChange,
+  weeklyTherapistCounts,
   onToggleExpanded,
   onChangeStatus,
   onUnassign,
@@ -158,33 +164,91 @@ export function ShiftDrawer({
                     No active {shiftTab.toLowerCase()}-shift therapists available.
                   </p>
                 ) : (
-                  <form
-                    className="mt-2 flex items-center gap-2"
-                    onSubmit={(event) => {
-                      event.preventDefault()
-                      void onAssignSubmit()
-                    }}
-                  >
-                    <select
-                      value={assignUserId}
-                      onChange={(event) => onAssignUserIdChange(event.target.value)}
-                      className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700"
-                      required
-                    >
-                      {availableTherapists.map((therapist) => (
-                        <option key={therapist.id} value={therapist.id}>
-                          {therapist.full_name}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="submit"
-                      disabled={!activeCycleId || !assignUserId || assigning}
-                      className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60"
-                    >
-                      {assigning ? 'Assigning...' : assigned ? '\u2713 Added' : 'Assign'}
-                    </button>
-                  </form>
+                  <>
+                    {/* Role toggle */}
+                    {(() => {
+                      const leadAlreadyFilled = !!selectedDay?.leadShift
+                      const leadOptions = availableTherapists.filter((t) => t.isLeadEligible)
+                      const noLeadEligible = leadOptions.length === 0
+                      const leadDisabled = leadAlreadyFilled || noLeadEligible
+                      const leadTitle = leadAlreadyFilled
+                        ? 'Lead slot already filled'
+                        : noLeadEligible
+                          ? 'No lead-eligible therapists available'
+                          : undefined
+                      return (
+                        <div className="mt-2 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => onAssignRoleChange('staff')}
+                            className={cn(
+                              'rounded px-3 py-1 text-xs font-bold border',
+                              assignRole === 'staff'
+                                ? 'bg-amber-600 text-white border-amber-600'
+                                : 'border-slate-300 text-slate-600 bg-white'
+                            )}
+                          >
+                            Staff
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onAssignRoleChange('lead')}
+                            disabled={leadDisabled}
+                            title={leadTitle}
+                            className={cn(
+                              'rounded px-3 py-1 text-xs font-bold border',
+                              assignRole === 'lead'
+                                ? 'bg-amber-600 text-white border-amber-600'
+                                : 'border-slate-300 text-slate-600 bg-white',
+                              leadDisabled && 'opacity-40 cursor-not-allowed'
+                            )}
+                          >
+                            Lead
+                          </button>
+                        </div>
+                      )
+                    })()}
+                    {/* Dropdown + submit */}
+                    {(() => {
+                      const displayOptions =
+                        assignRole === 'lead'
+                          ? availableTherapists.filter((t) => t.isLeadEligible)
+                          : availableTherapists
+                      return (
+                        <form
+                          className="mt-2 flex items-center gap-2"
+                          onSubmit={(event) => {
+                            event.preventDefault()
+                            void onAssignSubmit()
+                          }}
+                        >
+                          <select
+                            value={assignUserId}
+                            onChange={(event) => onAssignUserIdChange(event.target.value)}
+                            className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700"
+                            required
+                          >
+                            {displayOptions.map((therapist) => {
+                              const weekCount = weeklyTherapistCounts.get(therapist.id)
+                              return (
+                                <option key={therapist.id} value={therapist.id}>
+                                  {therapist.full_name}
+                                  {weekCount !== undefined ? ` · ${weekCount} this wk` : ''}
+                                </option>
+                              )
+                            })}
+                          </select>
+                          <button
+                            type="submit"
+                            disabled={!activeCycleId || !assignUserId || assigning}
+                            className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60"
+                          >
+                            {assigning ? 'Assigning...' : assigned ? '\u2713 Added' : 'Assign'}
+                          </button>
+                        </form>
+                      )
+                    })()}
+                  </>
                 )}
               </div>
               {selectedDayShifts.length === 0 && (

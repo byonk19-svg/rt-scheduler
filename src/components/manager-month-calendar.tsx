@@ -23,6 +23,13 @@ import type { AvailabilityOverrideRow } from '@/lib/coverage/types'
 import { normalizeWorkPattern } from '@/lib/coverage/work-patterns'
 import { cn } from '@/lib/utils'
 import { MIN_SHIFT_COVERAGE_PER_DAY, MAX_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
+import {
+  dateFromKey,
+  toIsoDate as keyFromDate,
+  addDays,
+  startOfWeek,
+  buildCalendarWeeks,
+} from '@/lib/calendar-utils'
 
 type Therapist = {
   id: string
@@ -198,36 +205,6 @@ type ManagerMonthCalendarProps = {
   canViewAvailabilityOverride?: boolean
 }
 
-function dateFromKey(value: string): Date {
-  const [year, month, day] = value.split('-').map(Number)
-  return new Date(year, month - 1, day)
-}
-
-function keyFromDate(value: Date): string {
-  const year = value.getFullYear()
-  const month = String(value.getMonth() + 1).padStart(2, '0')
-  const day = String(value.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function addDays(value: Date, amount: number): Date {
-  const next = new Date(value)
-  next.setDate(next.getDate() + amount)
-  return next
-}
-
-function startOfWeek(value: Date): Date {
-  const next = new Date(value)
-  next.setDate(next.getDate() - next.getDay())
-  return next
-}
-
-function endOfWeek(value: Date): Date {
-  const next = new Date(value)
-  next.setDate(next.getDate() + (6 - next.getDay()))
-  return next
-}
-
 function formatCellDate(value: string): string {
   const parsed = dateFromKey(value)
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -252,28 +229,6 @@ function formatRangeLabel(startDate: string, endDate: string): string {
   return `Cycle range: ${startLabel} to ${endLabel}`
 }
 
-function buildCalendarWeeks(startDate: string, endDate: string): Date[][] {
-  const start = dateFromKey(startDate)
-  const end = dateFromKey(endDate)
-  const weeks: Date[][] = []
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
-    return weeks
-  }
-
-  const gridStart = startOfWeek(start)
-  const gridEnd = endOfWeek(end)
-  const cursor = new Date(gridStart)
-
-  while (cursor <= gridEnd) {
-    const week: Date[] = []
-    for (let index = 0; index < 7; index += 1) {
-      week.push(addDays(cursor, index))
-    }
-    weeks.push(week)
-    cursor.setDate(cursor.getDate() + 7)
-  }
-  return weeks
-}
 
 function assignmentStatusLabel(status: AssignmentStatus): string {
   if (status === 'call_in') return 'CI'

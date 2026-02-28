@@ -24,6 +24,7 @@ export type AssignCoverageShiftParams = {
   userId: string
   isoDate: string
   shiftType: 'day' | 'night'
+  role?: 'lead' | 'staff'
 }
 
 export type AssignedCoverageShiftRow = {
@@ -46,7 +47,7 @@ export async function assignCoverageShift(
       user_id: params.userId,
       date: params.isoDate,
       shift_type: params.shiftType,
-      role: 'staff',
+      role: params.role ?? 'staff',
       status: 'scheduled',
     })
     .select('id, user_id, date, shift_type, status, assignment_status')

@@ -6,6 +6,7 @@ import {
 } from '@/lib/scheduling-constants'
 import { resolveEligibility } from '@/lib/coverage/resolve-availability'
 import { normalizeWorkPattern } from '@/lib/coverage/work-patterns'
+import { toIsoDate, dateRange, formatDateLabel } from '@/lib/calendar-utils'
 import type {
   AvailabilityOverrideRow,
   ScheduleSearchParams,
@@ -19,18 +20,7 @@ export function getOne<T>(value: T | T[] | null | undefined): T | null {
   return value ?? null
 }
 
-export function dateKeyFromDate(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-export function formatDate(value: string): string {
-  const parsed = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return value
-  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
+export { toIsoDate as dateKeyFromDate, dateRange as buildDateRange, formatDateLabel as formatDate }
 
 export function formatDayNumber(value: string): string {
   const parsed = new Date(`${value}T00:00:00`)
@@ -55,8 +45,8 @@ export function getWeekBoundsForDate(value: string): { weekStart: string; weekEn
   weekEndDate.setDate(weekStartDate.getDate() + 6)
 
   return {
-    weekStart: dateKeyFromDate(weekStartDate),
-    weekEnd: dateKeyFromDate(weekEndDate),
+    weekStart: toIsoDate(weekStartDate),
+    weekEnd: toIsoDate(weekEndDate),
   }
 }
 
@@ -87,25 +77,6 @@ export function getPrintShiftCode(status: string): string {
 
 export function isDateWithinRange(date: string, startDate: string, endDate: string): boolean {
   return date >= startDate && date <= endDate
-}
-
-export function buildDateRange(startDate: string, endDate: string): string[] {
-  const start = new Date(`${startDate}T00:00:00`)
-  const end = new Date(`${endDate}T00:00:00`)
-
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
-    return []
-  }
-
-  const dates: string[] = []
-  const current = new Date(start)
-
-  while (current <= end) {
-    dates.push(dateKeyFromDate(current))
-    current.setDate(current.getDate() + 1)
-  }
-
-  return dates
 }
 
 export function normalizeViewMode(value: string | undefined): ViewMode {
@@ -237,7 +208,7 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
     const weekStart = getSearchParam(params?.week_start)
     const weekEnd = getSearchParam(params?.week_end)
     const weekLabel =
-      weekStart && weekEnd ? ` (${formatDate(weekStart)} to ${formatDate(weekEnd)})` : ''
+      weekStart && weekEnd ? ` (${formatDateLabel(weekStart)} to ${formatDateLabel(weekEnd)})` : ''
     return {
       message: `This assignment exceeds that therapist's weekly limit (Sun-Sat)${weekLabel}.`,
       variant: 'error',
