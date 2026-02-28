@@ -442,7 +442,7 @@ export default async function AvailabilityPage({
       </div>
 
       <div className="flex items-center gap-2">
-        <Button asChild>
+        <Button asChild className="bg-[#d97706] text-white hover:bg-[#b45309]">
           <a href="#submit-entry">Submit override</a>
         </Button>
         <MoreActionsMenu>

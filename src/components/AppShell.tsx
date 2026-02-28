@@ -176,7 +176,11 @@ export function AppShell({ user, publishCta, children }: AppShellProps) {
 
           <div className="ml-auto flex items-center gap-2">
             {canAccessManagerUi && publishCta && (
-              <Button asChild size="sm" className="hidden md:inline-flex">
+              <Button
+                asChild
+                size="sm"
+                className="hidden bg-[#d97706] text-white hover:bg-[#b45309] md:inline-flex"
+              >
                 <Link href={publishCta.href}>{publishCta.label}</Link>
               </Button>
             )}
