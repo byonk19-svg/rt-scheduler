@@ -176,7 +176,7 @@ export function AttentionBar({
         <div className="flex flex-wrap items-center gap-2">
           {variant === 'full' ? (
             <>
-              <Button asChild size="sm">
+              <Button asChild size="sm" className="bg-[#d97706] text-white hover:bg-[#b45309]">
                 <Link href={snapshot.links.fixCoverage}>Fix coverage</Link>
               </Button>
               <Button asChild size="sm" variant="outline">
@@ -200,7 +200,7 @@ export function AttentionBar({
               )}
             </>
           ) : (
-            <Button asChild size="sm">
+            <Button asChild size="sm" className="bg-[#d97706] text-white hover:bg-[#b45309]">
               <Link href={compactPrimaryCta.href}>{compactPrimaryCta.label}</Link>
             </Button>
           )}

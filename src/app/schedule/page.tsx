@@ -749,7 +749,7 @@ export default async function SchedulePage({
               </p>
             )}
             <div className="flex flex-wrap gap-2">
-              <Button asChild size="sm">
+              <Button asChild size="sm" className="bg-[#d97706] text-white hover:bg-[#b45309]">
                 <Link href={buildScheduleUrl(activeCycleId, 'week')}>View published schedule</Link>
               </Button>
               <PrintButton variant="outline" size="sm" />
@@ -796,7 +796,7 @@ export default async function SchedulePage({
               </p>
             )}
             <div className="flex flex-wrap gap-2">
-              <Button asChild size="sm">
+              <Button asChild size="sm" className="bg-[#d97706] text-white hover:bg-[#b45309]">
                 <Link href={buildScheduleUrl(activeCycle.id, 'week')}>View week</Link>
               </Button>
               {canAccessCoverageCalendar && (

@@ -249,6 +249,7 @@ export function EmployeeDirectory({
     worksDowMode: 'hard' | 'soft'
   } | null>(null)
   const [deactivateEmployeeId, setDeactivateEmployeeId] = useState<string | null>(null)
+  const [overrideDateError, setOverrideDateError] = useState<string | null>(null)
   const availabilitySectionRef = useRef<HTMLDivElement | null>(null)
   const selectedAvailabilityCycleId = availabilityCycleId || cycles[0]?.id || ''
 
@@ -384,9 +385,14 @@ export function EmployeeDirectory({
             <Button
               key={item.value}
               type="button"
-              variant={tab === item.value ? 'default' : 'outline'}
+              variant="outline"
               size="sm"
               onClick={() => setTab(item.value)}
+              className={
+                tab === item.value
+                  ? 'border-[#fde68a] bg-[#fffbeb] text-[#b45309] hover:bg-[#fffbeb] hover:text-[#b45309]'
+                  : ''
+              }
             >
               {item.label}
             </Button>
@@ -742,6 +748,7 @@ export function EmployeeDirectory({
           setEditState(null)
           setFocusAvailabilitySection(false)
           setOverrideCycleIdDraft(selectedAvailabilityCycleId)
+          setOverrideDateError(null)
         }}
       >
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
@@ -1093,11 +1100,44 @@ export function EmployeeDirectory({
                 <form
                   action={saveEmployeeDateOverrideAction}
                   className="grid grid-cols-1 gap-2 md:grid-cols-12"
+                  onSubmit={(event) => {
+                    const dateValue =
+                      (
+                        event.currentTarget.querySelector(
+                          '[name="date"]'
+                        ) as HTMLInputElement | null
+                      )?.value ?? ''
+                    const selectedCycle = cycles.find((c) => c.id === overrideCycleIdDraft)
+                    if (selectedCycle && dateValue) {
+                      if (
+                        dateValue < selectedCycle.start_date ||
+                        dateValue > selectedCycle.end_date
+                      ) {
+                        event.preventDefault()
+                        setOverrideDateError(
+                          `Date must be within the selected cycle (${formatEmployeeDate(selectedCycle.start_date)} to ${formatEmployeeDate(selectedCycle.end_date)}).`
+                        )
+                        return
+                      }
+                    }
+                    setOverrideDateError(null)
+                  }}
                 >
                   <input type="hidden" name="profile_id" value={editEmployee.id} />
                   <div className="space-y-1 md:col-span-3">
                     <Label htmlFor="override_date">Date</Label>
-                    <Input id="override_date" name="date" type="date" required />
+                    <Input
+                      id="override_date"
+                      name="date"
+                      type="date"
+                      required
+                      onChange={() => setOverrideDateError(null)}
+                    />
+                    {overrideDateError && (
+                      <p className="rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]">
+                        {overrideDateError}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1 md:col-span-4">
                     <Label htmlFor="override_cycle_id">Cycle</Label>
@@ -1106,7 +1146,10 @@ export function EmployeeDirectory({
                       name="cycle_id"
                       className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
                       value={overrideCycleIdDraft}
-                      onChange={(event) => setOverrideCycleIdDraft(event.target.value)}
+                      onChange={(event) => {
+                        setOverrideCycleIdDraft(event.target.value)
+                        setOverrideDateError(null)
+                      }}
                       required
                     >
                       <option value="" disabled>
