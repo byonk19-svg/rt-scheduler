@@ -22,9 +22,10 @@ import {
 } from '@/lib/coverage/mutations'
 import { flatten, type DayItem, type ShiftItem, type ShiftTab, type UiStatus } from '@/lib/coverage/selectors'
 import { addDays, dateRange, formatDateLabel, formatMonthLabel, toIsoDate } from '@/lib/calendar-utils'
-import { getScheduleFeedback } from '@/lib/schedule-helpers'
+import { getOne, getScheduleFeedback } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/client'
-import type { AssignmentStatus, ScheduleSearchParams, ShiftRole, ShiftStatus } from '@/app/schedule/types'
+import type { AssignmentStatus, ShiftRole, ShiftStatus } from '@/lib/shift-types'
+import type { ScheduleSearchParams } from '@/app/schedule/types'
 
 type DayStatus = DayItem['dayStatus']
 
@@ -59,11 +60,6 @@ const SHIFT_STATUS_LABELS: Record<UiStatus, string> = {
   cancelled: 'Cancelled',
 }
 const NO_ELIGIBLE_CONSTRAINT_REASON = 'no_eligible_candidates_due_to_constraints'
-
-function getOne<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null
-  return value ?? null
-}
 
 function toUiStatus(assignment: AssignmentStatus | null, status: ShiftStatus): UiStatus {
   if (assignment === 'on_call') return 'oncall'

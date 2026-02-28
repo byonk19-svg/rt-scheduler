@@ -1,3 +1,5 @@
+import { toIsoDate } from '@/lib/calendar-utils'
+
 export type WorkloadShift = {
   userId: string
   date: string
@@ -7,13 +9,6 @@ export type WorkloadShift = {
 export type WorkloadCount = {
   weekShiftCount: number
   cycleShiftCount: number
-}
-
-function keyFromDate(value: Date): string {
-  const year = value.getFullYear()
-  const month = String(value.getMonth() + 1).padStart(2, '0')
-  const day = String(value.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
 }
 
 function countsTowardWorkload(status: WorkloadShift['status']): boolean {
@@ -31,8 +26,8 @@ export function getWeekBoundsForDate(value: string): { weekStart: string; weekEn
   weekEnd.setDate(weekStart.getDate() + 6)
 
   return {
-    weekStart: keyFromDate(weekStart),
-    weekEnd: keyFromDate(weekEnd),
+    weekStart: toIsoDate(weekStart),
+    weekEnd: toIsoDate(weekEnd),
   }
 }
 

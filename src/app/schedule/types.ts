@@ -1,17 +1,22 @@
 import type { UiRole } from '@/lib/auth/roles'
+// Core domain primitives live in @/lib/shift-types; imported here for local use and re-exported
+// for backward compatibility so that the 17 callers of this module need no changes.
+import type {
+  ShiftStatus,
+  ShiftRole,
+  AssignmentStatus,
+  EmploymentType,
+  WeekendRotation,
+  WorksDowMode,
+} from '@/lib/shift-types'
+
+export type { ShiftStatus, ShiftRole, AssignmentStatus, EmploymentType, WeekendRotation, WorksDowMode }
 
 export type Role = UiRole
 
 export type ViewMode = 'grid' | 'list' | 'calendar' | 'week'
 
 export type ToastVariant = 'success' | 'error'
-
-export type ShiftStatus = 'scheduled' | 'on_call' | 'sick' | 'called_off'
-export type ShiftRole = 'lead' | 'staff'
-export type AssignmentStatus = 'scheduled' | 'call_in' | 'cancelled' | 'on_call' | 'left_early'
-export type EmploymentType = 'full_time' | 'part_time' | 'prn'
-export type WeekendRotation = 'none' | 'every_other'
-export type WorksDowMode = 'hard' | 'soft'
 
 export type Cycle = {
   id: string

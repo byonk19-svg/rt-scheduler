@@ -5,6 +5,12 @@ import { FeedbackToast } from '@/components/feedback-toast'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { MAX_SHIFT_COVERAGE_PER_DAY, MIN_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
+import {
+  dateFromKey,
+  toIsoDate as keyFromDate,
+  startOfWeek,
+  buildCalendarWeeks,
+} from '@/lib/calendar-utils'
 import type { CalendarShift } from '@/app/schedule/types'
 
 type IssueFilter =
@@ -49,55 +55,6 @@ type ManagerWeekCalendarProps = {
   defaultShiftType?: 'day' | 'night'
   canEditAssignmentStatus?: boolean
   canViewAvailabilityOverride?: boolean
-}
-
-function dateFromKey(value: string): Date {
-  const [year, month, day] = value.split('-').map(Number)
-  return new Date(year, month - 1, day)
-}
-
-function keyFromDate(value: Date): string {
-  const year = value.getFullYear()
-  const month = String(value.getMonth() + 1).padStart(2, '0')
-  const day = String(value.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function addDays(value: Date, amount: number): Date {
-  const next = new Date(value)
-  next.setDate(next.getDate() + amount)
-  return next
-}
-
-function startOfWeek(value: Date): Date {
-  const next = new Date(value)
-  next.setDate(next.getDate() - next.getDay())
-  return next
-}
-
-function endOfWeek(value: Date): Date {
-  const next = new Date(value)
-  next.setDate(next.getDate() + (6 - next.getDay()))
-  return next
-}
-
-function buildCalendarWeeks(startDate: string, endDate: string): Date[][] {
-  const start = dateFromKey(startDate)
-  const end = dateFromKey(endDate)
-  const weeks: Date[][] = []
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return weeks
-
-  const gridStart = startOfWeek(start)
-  const gridEnd = endOfWeek(end)
-  const cursor = new Date(gridStart)
-
-  while (cursor <= gridEnd) {
-    const week: Date[] = []
-    for (let index = 0; index < 7; index += 1) week.push(addDays(cursor, index))
-    weeks.push(week)
-    cursor.setDate(cursor.getDate() + 7)
-  }
-  return weeks
 }
 
 function formatWeekRange(week: Date[]): string {
