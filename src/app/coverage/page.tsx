@@ -21,6 +21,7 @@ import {
   unassignCoverageShift,
 } from '@/lib/coverage/mutations'
 import { flatten, type DayItem, type ShiftItem, type ShiftTab, type UiStatus } from '@/lib/coverage/selectors'
+import { addDays, dateRange, formatDateLabel, formatMonthLabel, toIsoDate } from '@/lib/calendar-utils'
 import { getScheduleFeedback } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/client'
 import type { AssignmentStatus, ScheduleSearchParams, ShiftRole, ShiftStatus } from '@/app/schedule/types'
@@ -74,49 +75,8 @@ function toUiStatus(assignment: AssignmentStatus | null, status: ShiftStatus): U
   return 'active'
 }
 
-function addDays(date: Date, days: number): Date {
-  const next = new Date(date)
-  next.setDate(next.getDate() + days)
-  return next
-}
-
-function toIsoDate(date: Date): string {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
-
-function dateRange(startDate: string, endDate: string): string[] {
-  const start = new Date(`${startDate}T00:00:00`)
-  const end = new Date(`${endDate}T00:00:00`)
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return []
-  const out: string[] = []
-  const cursor = new Date(start)
-  while (cursor <= end) {
-    const y = cursor.getFullYear()
-    const m = String(cursor.getMonth() + 1).padStart(2, '0')
-    const d = String(cursor.getDate()).padStart(2, '0')
-    out.push(`${y}-${m}-${d}`)
-    cursor.setDate(cursor.getDate() + 1)
-  }
-  return out
-}
-
 function timestamp(): string {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-function formatDateLabel(value: string): string {
-  const parsed = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return value
-  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function formatMonthLabel(value: string): string {
-  const parsed = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return value
-  return parsed.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 }
 
 export default function CoveragePage() {
@@ -138,6 +98,7 @@ export default function CoveragePage() {
   const [printNightTeam, setPrintNightTeam] = useState<PrintTherapist[]>([])
   const [printUsers, setPrintUsers] = useState<PrintTherapist[]>([])
   const [printShiftByUserDate, setPrintShiftByUserDate] = useState<Record<string, ShiftStatus>>({})
+  const [allTherapists, setAllTherapists] = useState<TherapistOption[]>([])
   const [availableTherapists, setAvailableTherapists] = useState<TherapistOption[]>([])
   const [assignUserId, setAssignUserId] = useState('')
   const [assigning, setAssigning] = useState(false)
@@ -427,17 +388,10 @@ export default function CoveragePage() {
     }
   }, [cycleFromUrl, supabase])
 
+  // Fetch full therapist list once per shift type — not per day click.
   useEffect(() => {
-    const selectedDay = days.find((row) => row.id === selectedId) ?? null
-    if (!selectedDay) {
-      setAvailableTherapists([])
-      setAssignUserId('')
-      return
-    }
-
     let active = true
     const shiftType = shiftTab === 'Day' ? 'day' : 'night'
-    const assignedUserIds = new Set(flatten(selectedDay).map((shift) => shift.userId))
 
     void (async () => {
       const { data, error: loadError } = await supabase
@@ -452,25 +406,33 @@ export default function CoveragePage() {
       if (!active) return
       if (loadError) {
         console.error('Could not load available therapists for assignment:', loadError)
-        setAvailableTherapists([])
-        setAssignUserId('')
+        setAllTherapists([])
         return
       }
-
-      const options = ((data ?? []) as TherapistOption[]).filter(
-        (therapist) => !assignedUserIds.has(therapist.id)
-      )
-      setAvailableTherapists(options)
-      setAssignUserId((current) => {
-        if (current && options.some((therapist) => therapist.id === current)) return current
-        return options[0]?.id ?? ''
-      })
+      setAllTherapists((data ?? []) as TherapistOption[])
     })()
 
     return () => {
       active = false
     }
-  }, [days, selectedId, shiftTab, supabase])
+  }, [shiftTab, supabase])
+
+  // Filter cached list by already-assigned users whenever the selected day changes.
+  useEffect(() => {
+    const selectedDay = days.find((row) => row.id === selectedId) ?? null
+    if (!selectedDay) {
+      setAvailableTherapists([])
+      setAssignUserId('')
+      return
+    }
+    const assignedUserIds = new Set(flatten(selectedDay).map((shift) => shift.userId))
+    const options = allTherapists.filter((therapist) => !assignedUserIds.has(therapist.id))
+    setAvailableTherapists(options)
+    setAssignUserId((current) => {
+      if (current && options.some((therapist) => therapist.id === current)) return current
+      return options[0]?.id ?? ''
+    })
+  }, [days, selectedId, allTherapists])
 
   const selectedDayBase = useMemo(
     () => days.find((row) => row.id === selectedId) ?? null,

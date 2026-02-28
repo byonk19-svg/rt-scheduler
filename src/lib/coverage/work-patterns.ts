@@ -1,4 +1,5 @@
-﻿import type { ShiftTypeForAvailability } from '@/lib/coverage/types'
+﻿import { toIsoDate } from '@/lib/calendar-utils'
+import type { ShiftTypeForAvailability } from '@/lib/coverage/types'
 
 export type WeekendRotation = 'none' | 'every_other'
 export type WorksDowMode = 'hard' | 'soft'
@@ -28,13 +29,6 @@ export type PatternDecision = {
 
 const SOFT_NON_WORKS_DAY_PENALTY = 25
 
-function toDateKey(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 function parseDate(value: string): Date | null {
   const parsed = new Date(`${value}T00:00:00`)
   if (Number.isNaN(parsed.getTime())) return null
@@ -46,11 +40,11 @@ function getWeekendSaturday(value: string): string | null {
   if (!parsed) return null
 
   const dow = parsed.getDay()
-  if (dow === 6) return toDateKey(parsed)
+  if (dow === 6) return toIsoDate(parsed)
   if (dow === 0) {
     const saturday = new Date(parsed)
     saturday.setDate(parsed.getDate() - 1)
-    return toDateKey(saturday)
+    return toIsoDate(saturday)
   }
   return null
 }
