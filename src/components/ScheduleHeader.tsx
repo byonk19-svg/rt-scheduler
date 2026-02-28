@@ -56,7 +56,7 @@ const menuActionClass =
 
 function tabClass(isActive: boolean): string {
   if (isActive) {
-    return 'rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground'
+    return 'rounded-md border border-[#fde68a] bg-[#fffbeb] px-3 py-2 text-sm font-medium text-[#b45309]'
   }
 
   return 'rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground'
@@ -122,6 +122,7 @@ export function ScheduleHeader({
                 type="button"
                 disabled={!canPublish}
                 onClick={() => setPublishDialogOpen(true)}
+                className="bg-[#d97706] text-white hover:bg-[#b45309] disabled:opacity-50"
               >
                 Publish
               </FormSubmitButton>

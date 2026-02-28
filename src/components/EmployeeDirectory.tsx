@@ -384,9 +384,14 @@ export function EmployeeDirectory({
             <Button
               key={item.value}
               type="button"
-              variant={tab === item.value ? 'default' : 'outline'}
+              variant="outline"
               size="sm"
               onClick={() => setTab(item.value)}
+              className={
+                tab === item.value
+                  ? 'border-[#fde68a] bg-[#fffbeb] text-[#b45309] hover:bg-[#fffbeb] hover:text-[#b45309]'
+                  : ''
+              }
             >
               {item.label}
             </Button>
