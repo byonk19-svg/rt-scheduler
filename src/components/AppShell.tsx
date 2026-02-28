@@ -7,6 +7,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 
 import { can } from '@/lib/auth/can'
 import type { UiRole } from '@/lib/auth/roles'
+import { TeamwiseMark } from '@/components/teamwise-logo'
 import { NotificationBell } from '@/components/NotificationBell'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -74,33 +75,13 @@ const SHELL_ROUTES = [
 const NAV_AMBER = '#d97706'
 const NAV_MANAGER_BADGE_CLASS = 'border-[#fde68a] bg-[#fffbeb] text-[#b45309]'
 
-function Icon({ size = 30 }: { size?: number }) {
+function Logo({ dark = false }: { dark?: boolean }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 28 28" fill="none" aria-hidden="true">
-      <rect width="28" height="28" rx="6" fill="#1c1917" />
-      <circle cx="9" cy="10" r="3" fill="#fbbf24" />
-      <path d="M4 23 Q4 17 9 17 Q14 17 14 23" fill="#fbbf24" />
-      <circle cx="20" cy="10" r="3" fill="#f59e0b" />
-      <path d="M15 23 Q15 17 20 17 Q25 17 25 23" fill="#f59e0b" />
-    </svg>
-  )
-}
-
-function Logo({
-  size = 30,
-  fontSize = 17,
-  dark = false,
-}: {
-  size?: number
-  fontSize?: number
-  dark?: boolean
-}) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(size * 0.3) }}>
-      <Icon size={size} />
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <TeamwiseMark size="small" />
       <span
         style={{
-          fontSize,
+          fontSize: 17,
           fontWeight: 800,
           fontFamily: 'var(--font-plus-jakarta), sans-serif',
           letterSpacing: '-0.03em',
@@ -175,7 +156,7 @@ export function AppShell({ user, publishCta, children }: AppShellProps) {
       <header className="no-print sticky top-0 z-30 border-b border-border bg-white/95 backdrop-blur">
         <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3 md:px-8">
           <Link href={dashboardHref} className="shrink-0">
-            <Logo size={30} fontSize={17} />
+            <Logo />
           </Link>
 
           <nav className="mx-auto hidden items-center gap-2 md:flex">

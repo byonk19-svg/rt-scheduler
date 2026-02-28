@@ -7,11 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { can } from '@/lib/auth/can'
 import { toUiRole } from '@/lib/auth/roles'
-import {
-  EMPLOYEE_META_BADGE_CLASS,
-  LEAD_ELIGIBLE_BADGE_CLASS,
-  MANAGER_ROLE_BADGE_CLASS,
-} from '@/lib/employee-tag-badges'
+import { EMPLOYEE_META_BADGE_CLASS, LEAD_ELIGIBLE_BADGE_CLASS } from '@/lib/employee-tag-badges'
 import { createClient } from '@/lib/supabase/server'
 import { cn } from '@/lib/utils'
 
@@ -216,8 +212,11 @@ export default async function ProfilePage({
           </div>
           <div className="flex items-center gap-2">
             <Badge
+              variant="outline"
               className={
-                canAccessManagerUi ? cn('capitalize', MANAGER_ROLE_BADGE_CLASS) : 'capitalize'
+                canAccessManagerUi
+                  ? cn('capitalize', 'border-[#fde68a] bg-[#fffbeb] text-[#b45309]')
+                  : 'capitalize'
               }
             >
               {role}
@@ -286,7 +285,11 @@ export default async function ProfilePage({
                 </select>
               </div>
             </div>
-            <FormSubmitButton type="submit" pendingText="Saving...">
+            <FormSubmitButton
+              type="submit"
+              pendingText="Saving..."
+              className="bg-[#d97706] text-white hover:bg-[#b45309]"
+            >
               Save preferences
             </FormSubmitButton>
           </form>

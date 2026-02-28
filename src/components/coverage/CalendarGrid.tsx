@@ -84,9 +84,6 @@ export function CalendarGrid({
             {tab} Shift
           </button>
         ))}
-        <span className="ml-2 self-center text-xs font-medium text-[#9ca3af]">
-          {shiftTab === 'Day' ? 'Day shift staff' : 'Night shift staff'}
-        </span>
       </div>
 
       <div className="mb-1 grid grid-cols-7 gap-1.5">

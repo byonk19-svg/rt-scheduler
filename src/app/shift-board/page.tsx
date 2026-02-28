@@ -622,36 +622,9 @@ export default function ShiftBoardPage() {
                 borderRadius: 6,
                 border: '1px solid',
                 cursor: 'pointer',
-                borderColor:
-                  statusFilter === status
-                    ? status === 'pending'
-                      ? '#fde68a'
-                      : status === 'approved'
-                        ? '#a7f3d0'
-                        : status === 'denied'
-                          ? '#fecaca'
-                          : '#d97706'
-                    : '#e5e7eb',
-                background:
-                  statusFilter === status
-                    ? status === 'pending'
-                      ? '#fffbeb'
-                      : status === 'approved'
-                        ? '#ecfdf5'
-                        : status === 'denied'
-                          ? '#fef2f2'
-                          : '#fffbeb'
-                    : '#fff',
-                color:
-                  statusFilter === status
-                    ? status === 'pending'
-                      ? '#b45309'
-                      : status === 'approved'
-                        ? '#065f46'
-                        : status === 'denied'
-                          ? '#991b1b'
-                          : '#b45309'
-                    : '#9ca3af',
+                borderColor: statusFilter === status ? '#fde68a' : '#e5e7eb',
+                background: statusFilter === status ? '#fffbeb' : '#fff',
+                color: statusFilter === status ? '#b45309' : '#9ca3af',
                 textTransform: 'capitalize',
                 transition: 'all 0.1s',
               }}
@@ -673,9 +646,10 @@ export default function ShiftBoardPage() {
                 padding: '5px 12px',
                 borderRadius: 6,
                 cursor: 'pointer',
-                border: '1px solid #e5e7eb',
-                background: typeFilter === type ? '#1c1917' : '#fff',
-                color: typeFilter === type ? '#fff' : '#9ca3af',
+                border: '1px solid',
+                borderColor: typeFilter === type ? '#fde68a' : '#e5e7eb',
+                background: typeFilter === type ? '#fffbeb' : '#fff',
+                color: typeFilter === type ? '#b45309' : '#9ca3af',
                 textTransform: 'capitalize',
                 transition: 'all 0.1s',
               }}

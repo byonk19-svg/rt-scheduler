@@ -241,6 +241,7 @@ export function EmployeeDirectory({
   const [availabilityCycleId, setAvailabilityCycleId] = useState<string>('')
   const [overrideCycleIdDraft, setOverrideCycleIdDraft] = useState<string>(cycles[0]?.id ?? '')
   const [focusAvailabilitySection, setFocusAvailabilitySection] = useState(false)
+  const [collapsedMissing, setCollapsedMissing] = useState(false)
   const [editState, setEditState] = useState<{
     employeeId: string
     onFmla: boolean
@@ -432,81 +433,94 @@ export function EmployeeDirectory({
 
         <div className="space-y-2 rounded-md border border-border bg-secondary/20 p-3">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-sm font-semibold">Missing availability</p>
-              <p className="text-xs text-muted-foreground">
-                Review who has not submitted any cycle-specific dates and quickly enter them.
-              </p>
-            </div>
-            <div className="w-full md:w-72">
-              <Label htmlFor="missing_cycle_id" className="text-xs">
-                Selected cycle
-              </Label>
-              <select
-                id="missing_cycle_id"
-                className="mt-1 h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
-                value={selectedAvailabilityCycleId}
-                onChange={(event) => setAvailabilityCycleId(event.target.value)}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCollapsedMissing((prev) => !prev)}
+                className="text-sm font-semibold text-foreground hover:text-muted-foreground"
               >
-                {cycles.map((cycle) => (
-                  <option key={`missing-cycle-${cycle.id}`} value={cycle.id}>
-                    {cycle.label}
-                  </option>
-                ))}
-              </select>
+                {collapsedMissing ? '▸' : '▾'} Missing availability (
+                {missingAvailabilityRows.length})
+              </button>
+              {collapsedMissing && (
+                <span className="text-xs text-muted-foreground">
+                  {missingAvailabilityRows.filter((r) => !r.submitted).length} not submitted
+                </span>
+              )}
             </div>
+            {!collapsedMissing && (
+              <div className="w-full md:w-72">
+                <Label htmlFor="missing_cycle_id" className="text-xs">
+                  Selected cycle
+                </Label>
+                <select
+                  id="missing_cycle_id"
+                  className="mt-1 h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                  value={selectedAvailabilityCycleId}
+                  onChange={(event) => setAvailabilityCycleId(event.target.value)}
+                >
+                  {cycles.map((cycle) => (
+                    <option key={`missing-cycle-${cycle.id}`} value={cycle.id}>
+                      {cycle.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
-          <div className="overflow-x-auto rounded-md border border-border bg-background">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Therapist</TableHead>
-                  <TableHead>Overrides</TableHead>
-                  <TableHead>Last updated</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {missingAvailabilityRows.length === 0 ? (
+          {!collapsedMissing && (
+            <div className="overflow-x-auto rounded-md border border-border bg-background">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
-                      No therapists available for this cycle.
-                    </TableCell>
+                    <TableHead>Therapist</TableHead>
+                    <TableHead>Overrides</TableHead>
+                    <TableHead>Last updated</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
-                ) : (
-                  missingAvailabilityRows.map((row) => (
-                    <TableRow key={`missing-${row.therapistId}`}>
-                      <TableCell className="font-medium">{row.therapistName}</TableCell>
-                      <TableCell>{row.overridesCount}</TableCell>
-                      <TableCell>{formatDateTime(row.lastUpdatedAt)}</TableCell>
-                      <TableCell>
-                        <Badge variant={row.submitted ? 'outline' : 'destructive'}>
-                          {row.submitted ? 'Submitted' : 'Not submitted'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            openEditForEmployee(row.therapistId, {
-                              focusAvailability: true,
-                              cycleId: selectedAvailabilityCycleId,
-                            })
-                          }
-                        >
-                          Enter availability
-                        </Button>
+                </TableHeader>
+                <TableBody>
+                  {missingAvailabilityRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
+                        No therapists available for this cycle.
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                  ) : (
+                    missingAvailabilityRows.map((row) => (
+                      <TableRow key={`missing-${row.therapistId}`}>
+                        <TableCell className="font-medium">{row.therapistName}</TableCell>
+                        <TableCell>{row.overridesCount}</TableCell>
+                        <TableCell>{formatDateTime(row.lastUpdatedAt)}</TableCell>
+                        <TableCell>
+                          <Badge variant={row.submitted ? 'outline' : 'destructive'}>
+                            {row.submitted ? 'Submitted' : 'Not submitted'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              openEditForEmployee(row.therapistId, {
+                                focusAvailability: true,
+                                cycleId: selectedAvailabilityCycleId,
+                              })
+                            }
+                          >
+                            Enter availability
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </div>
 
         <div className="hidden rounded-md border border-border md:block">
