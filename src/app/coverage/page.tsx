@@ -22,7 +22,7 @@ import {
 } from '@/lib/coverage/mutations'
 import { flatten, type DayItem, type ShiftItem, type ShiftTab, type UiStatus } from '@/lib/coverage/selectors'
 import { addDays, dateRange, formatDateLabel, formatMonthLabel, toIsoDate } from '@/lib/calendar-utils'
-import { getOne, getScheduleFeedback } from '@/lib/schedule-helpers'
+import { getOne, getScheduleFeedback, getWeekBoundsForDate } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/client'
 import type { AssignmentStatus, ShiftRole, ShiftStatus } from '@/lib/shift-types'
 import type { ScheduleSearchParams } from '@/app/schedule/types'
@@ -30,7 +30,7 @@ import type { ScheduleSearchParams } from '@/app/schedule/types'
 type DayStatus = DayItem['dayStatus']
 
 type CycleRow = { id: string; label: string; start_date: string; end_date: string; published: boolean }
-type TherapistOption = { id: string; full_name: string; shift_type: 'day' | 'night' }
+type TherapistOption = { id: string; full_name: string; shift_type: 'day' | 'night'; isLeadEligible: boolean }
 type PrintTherapist = {
   id: string
   full_name: string
@@ -100,6 +100,7 @@ export default function CoveragePage() {
   const [assigning, setAssigning] = useState(false)
   const [assigned, setAssigned] = useState(false)
   const [unassigningShiftId, setUnassigningShiftId] = useState<string | null>(null)
+  const [assignRole, setAssignRole] = useState<'lead' | 'staff'>('staff')
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [expandedShiftId, setExpandedShiftId] = useState<string | null>(null)
@@ -392,7 +393,7 @@ export default function CoveragePage() {
     void (async () => {
       const { data, error: loadError } = await supabase
         .from('profiles')
-        .select('id, full_name, shift_type')
+        .select('id, full_name, shift_type, is_lead_eligible')
         .eq('shift_type', shiftType)
         .eq('is_active', true)
         .eq('on_fmla', false)
@@ -405,7 +406,11 @@ export default function CoveragePage() {
         setAllTherapists([])
         return
       }
-      setAllTherapists((data ?? []) as TherapistOption[])
+      setAllTherapists(
+        ((data ?? []) as Array<{ id: string; full_name: string; shift_type: 'day' | 'night'; is_lead_eligible: boolean | null }>).map(
+          (row) => ({ id: row.id, full_name: row.full_name, shift_type: row.shift_type, isLeadEligible: row.is_lead_eligible ?? false })
+        )
+      )
     })()
 
     return () => {
@@ -439,15 +444,35 @@ export default function CoveragePage() {
     [selectedDayBase, shiftTab]
   )
 
+  // Compute how many shifts each therapist is working in the week that contains the selected day.
+  // Used in the assign dropdown so managers can avoid overscheduling.
+  const weeklyTherapistCounts = useMemo((): Map<string, number> => {
+    if (!selectedId) return new Map()
+    const bounds = getWeekBoundsForDate(selectedId)
+    if (!bounds) return new Map()
+    const { weekStart, weekEnd } = bounds
+    const counts = new Map<string, number>()
+    for (const item of [...dayDays, ...nightDays]) {
+      if (item.isoDate < weekStart || item.isoDate > weekEnd) continue
+      const shifts = [...(item.leadShift ? [item.leadShift] : []), ...item.staffShifts]
+      for (const shift of shifts) {
+        counts.set(shift.userId, (counts.get(shift.userId) ?? 0) + 1)
+      }
+    }
+    return counts
+  }, [selectedId, dayDays, nightDays])
+
   const handleTabSwitch = (tab: ShiftTab) => {
     setShiftTab(tab)
     setExpandedShiftId(null)
     setSelectedId(null)
+    setAssignRole('staff')
   }
 
   const handleSelect = (id: string) => {
     setExpandedShiftId(null)
     setSelectedId((prev) => (prev === id ? null : id))
+    setAssignRole('staff')
   }
   const handleClose = () => {
     setExpandedShiftId(null)
@@ -456,6 +481,7 @@ export default function CoveragePage() {
     setAssignUserId('')
     setAssigned(false)
     setAssigning(false)
+    setAssignRole('staff')
   }
 
   const handleAssign = useCallback(async () => {
@@ -474,6 +500,7 @@ export default function CoveragePage() {
       userId: assignUserId,
       isoDate: selectedDay.isoDate,
       shiftType,
+      role: assignRole,
     })
 
     if (insertError || !inserted) {
@@ -502,15 +529,24 @@ export default function CoveragePage() {
       log: [],
     }
 
-    setDays((current) =>
-      current.map((day) => {
-        if (day.id !== selectedDay.id) return day
-        return {
-          ...day,
-          staffShifts: [...day.staffShifts, nextShift].sort((a, b) => a.name.localeCompare(b.name)),
-        }
-      })
-    )
+    if (assignRole === 'lead') {
+      setDays((current) =>
+        current.map((day) => {
+          if (day.id !== selectedDay.id) return day
+          return { ...day, leadShift: nextShift, dayStatus: 'published' as DayStatus }
+        })
+      )
+    } else {
+      setDays((current) =>
+        current.map((day) => {
+          if (day.id !== selectedDay.id) return day
+          return {
+            ...day,
+            staffShifts: [...day.staffShifts, nextShift].sort((a, b) => a.name.localeCompare(b.name)),
+          }
+        })
+      )
+    }
 
     setAvailableTherapists((current) =>
       current.filter((therapist) => therapist.id !== insertedRow.user_id)
@@ -519,7 +555,7 @@ export default function CoveragePage() {
     setAssigned(true)
     setTimeout(() => setAssigned(false), 2000)
     setAssigning(false)
-  }, [activeCycleId, assignUserId, availableTherapists, selectedDay, setDays, supabase])
+  }, [activeCycleId, assignRole, assignUserId, availableTherapists, selectedDay, setDays, supabase])
 
   const handleChangeStatus = useCallback(
     async (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => {
@@ -794,13 +830,16 @@ export default function CoveragePage() {
         shiftTab={shiftTab}
         availableTherapists={availableTherapists}
         assignUserId={assignUserId}
+        assignRole={assignRole}
         assigning={assigning}
         assigned={assigned}
         expandedShiftId={expandedShiftId}
         unassigningShiftId={unassigningShiftId}
+        weeklyTherapistCounts={weeklyTherapistCounts}
         onClose={handleClose}
         onAssignSubmit={handleAssign}
         onAssignUserIdChange={setAssignUserId}
+        onAssignRoleChange={setAssignRole}
         onToggleExpanded={(shiftId) =>
           setExpandedShiftId((previous) => (previous === shiftId ? null : shiftId))
         }
