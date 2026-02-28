@@ -121,6 +121,8 @@ Primary routes:
 
 - `/` public marketing
 - `/login`, `/signup`
+- `/auth/signout`
+- `/pending-setup` post-signup onboarding gate
 - `/dashboard` role redirect
 - `/dashboard/manager`, `/dashboard/staff`
 - `/coverage` dedicated coverage UI (client page, full-width calendar + slide-over panel)
@@ -130,6 +132,9 @@ Primary routes:
 - `/shift-board`
 - `/directory` (manager team directory)
 - `/profile`
+- `/requests`, `/requests/new` shift request workflow
+- `/publish`, `/publish/[id]` publish history + async email queue (implemented; requires env vars)
+- `/staff/` staff-scoped layout with staff-specific schedule and requests sub-routes
 
 ## Role Model
 
@@ -328,9 +333,14 @@ Latest local checks:
 
 ### Publish flow with async email + publish history
 
-Status: Implemented in code, pending final validation and rollout.
+Status: **Code fully implemented** — pending env var configuration and final validation before rollout.
 
-Resume checklist:
+Key files:
+- `src/app/publish/page.tsx`, `src/app/publish/[id]/page.tsx`
+- `src/app/publish/actions.ts`, `src/app/publish/process-queued-button.tsx`
+- `src/lib/publish-events.ts`
+
+To activate:
 
 - Run migration: `supabase/migrations/20260225190000_add_publish_events_and_notification_outbox.sql`
 - Set env vars:
