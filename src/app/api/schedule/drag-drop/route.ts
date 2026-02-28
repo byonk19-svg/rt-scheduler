@@ -262,6 +262,83 @@ async function getTherapistAvailabilityState(
   }
 }
 
+function parseActionBody(raw: unknown): DragAction | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const r = raw as Record<string, unknown>
+  if (typeof r.cycleId !== 'string') return null
+
+  switch (r.action) {
+    case 'assign':
+      if (typeof r.userId !== 'string') return null
+      if (r.shiftType !== 'day' && r.shiftType !== 'night') return null
+      if (typeof r.date !== 'string') return null
+      return {
+        action: 'assign',
+        cycleId: r.cycleId,
+        userId: r.userId,
+        shiftType: r.shiftType,
+        date: r.date,
+        overrideWeeklyRules: r.overrideWeeklyRules === true,
+        availabilityOverride:
+          typeof r.availabilityOverride === 'boolean' ? r.availabilityOverride : undefined,
+        availabilityOverrideReason:
+          typeof r.availabilityOverrideReason === 'string' ? r.availabilityOverrideReason : undefined,
+      }
+    case 'move':
+      if (typeof r.shiftId !== 'string') return null
+      if (typeof r.targetDate !== 'string') return null
+      if (r.targetShiftType !== 'day' && r.targetShiftType !== 'night') return null
+      return {
+        action: 'move',
+        cycleId: r.cycleId,
+        shiftId: r.shiftId,
+        targetDate: r.targetDate,
+        targetShiftType: r.targetShiftType,
+        overrideWeeklyRules: r.overrideWeeklyRules === true,
+        availabilityOverride:
+          typeof r.availabilityOverride === 'boolean' ? r.availabilityOverride : undefined,
+        availabilityOverrideReason:
+          typeof r.availabilityOverrideReason === 'string' ? r.availabilityOverrideReason : undefined,
+      }
+    case 'remove':
+      if (typeof r.shiftId === 'string') {
+        return { action: 'remove', cycleId: r.cycleId, shiftId: r.shiftId }
+      }
+      if (
+        typeof r.userId === 'string' &&
+        typeof r.date === 'string' &&
+        (r.shiftType === 'day' || r.shiftType === 'night')
+      ) {
+        return {
+          action: 'remove',
+          cycleId: r.cycleId,
+          userId: r.userId,
+          date: r.date,
+          shiftType: r.shiftType,
+        }
+      }
+      return null
+    case 'set_lead':
+      if (typeof r.therapistId !== 'string') return null
+      if (typeof r.date !== 'string') return null
+      if (r.shiftType !== 'day' && r.shiftType !== 'night') return null
+      return {
+        action: 'set_lead',
+        cycleId: r.cycleId,
+        therapistId: r.therapistId,
+        date: r.date,
+        shiftType: r.shiftType,
+        overrideWeeklyRules: r.overrideWeeklyRules === true,
+        availabilityOverride:
+          typeof r.availabilityOverride === 'boolean' ? r.availabilityOverride : undefined,
+        availabilityOverrideReason:
+          typeof r.availabilityOverrideReason === 'string' ? r.availabilityOverrideReason : undefined,
+      }
+    default:
+      return null
+  }
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient()
   const {
@@ -282,23 +359,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Manager access required' }, { status: 403 })
   }
 
-  const payload = (await request.json().catch(() => null)) as {
-    action?: 'assign' | 'move' | 'remove' | 'set_lead'
-    cycleId?: string
-    userId?: string
-    therapistId?: string
-    shiftType?: 'day' | 'night'
-    date?: string
-    shiftId?: string
-    targetDate?: string
-    targetShiftType?: 'day' | 'night'
-    overrideWeeklyRules?: boolean
-    availabilityOverride?: boolean
-    availabilityOverrideReason?: string
-  } | null
+  const payload = parseActionBody(await request.json().catch(() => null))
 
-  if (!payload?.action || !payload.cycleId) {
-    return NextResponse.json({ error: 'Missing action or cycleId' }, { status: 400 })
+  if (!payload) {
+    return NextResponse.json({ error: 'Invalid request body', code: 'invalid_body' }, { status: 400 })
   }
 
   const { data: cycle, error: cycleError } = await supabase
@@ -617,7 +681,7 @@ export async function POST(request: Request) {
     let shift: RemovableShift | null = null
     let shiftError: string | null = null
 
-    if (payload.shiftId) {
+    if ('shiftId' in payload) {
       const result = await supabase
         .from('shifts')
         .select('id, cycle_id, user_id, date, shift_type, role')
@@ -625,7 +689,7 @@ export async function POST(request: Request) {
         .maybeSingle()
       shift = (result.data as RemovableShift | null) ?? null
       shiftError = result.error?.message ?? null
-    } else if (payload.userId && payload.date && payload.shiftType) {
+    } else {
       const result = await supabase
         .from('shifts')
         .select('id, cycle_id, user_id, date, shift_type, role')
@@ -636,8 +700,6 @@ export async function POST(request: Request) {
         .maybeSingle()
       shift = (result.data as RemovableShift | null) ?? null
       shiftError = result.error?.message ?? null
-    } else {
-      return NextResponse.json({ error: 'Missing remove data' }, { status: 400 })
     }
 
     if (shiftError || !shift || shift.cycle_id !== payload.cycleId) {
