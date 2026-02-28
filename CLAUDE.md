@@ -1,6 +1,37 @@
 # Teamwise Scheduler - Codex Handoff Context
 
-Updated: 2026-02-27 (PRN strict eligibility + RBAC centralization + coverage refactor + Prettier/CI formatting)
+Updated: 2026-02-28 (shared calendar utils + coverage lead role toggle + weekly workload counts)
+
+## Latest Completed Work (2026-02-28)
+
+- Extracted shared calendar utilities — no behavior changes, net -87 lines:
+  - `src/lib/calendar-utils.ts` extended with 4 new exports:
+    - `dateFromKey`, `startOfWeek`, `endOfWeek`, `buildCalendarWeeks`
+  - `src/lib/schedule-helpers.ts` — replaced 3 duplicate function bodies with re-exports from `calendar-utils`:
+    - `dateKeyFromDate` → re-export of `toIsoDate`
+    - `buildDateRange` → re-export of `dateRange`
+    - `formatDate` → re-export of `formatDateLabel`
+  - `src/components/manager-week-calendar.tsx` — removed 5 private calendar fns, imported from `calendar-utils`
+  - `src/components/manager-month-calendar.tsx` — removed 6 private calendar fns, imported from `calendar-utils`
+  - `src/lib/therapist-picker-metrics.ts` — removed private `keyFromDate`, uses `toIsoDate`
+- Extracted shared domain primitive types:
+  - new `src/lib/shift-types.ts` with 6 core types:
+    `ShiftStatus`, `ShiftRole`, `AssignmentStatus`, `EmploymentType`, `WeekendRotation`, `WorksDowMode`
+  - `src/app/schedule/types.ts` re-exports all 6 for backward compat (17 importers untouched)
+  - `src/app/coverage/page.tsx` imports domain types from `@/lib/shift-types` directly
+
+- Coverage assign panel: lead role toggle + weekly workload counts:
+  - `src/lib/coverage/mutations.ts` — `assignCoverageShift` accepts optional `role?: 'lead' | 'staff'` (default `'staff'`)
+  - `src/app/coverage/page.tsx`:
+    - `TherapistOption` now includes `isLeadEligible: boolean` (fetched via `is_lead_eligible`)
+    - `assignRole` state (`'staff'` default), resets on day change / tab switch / close
+    - `weeklyTherapistCounts` useMemo — derives per-therapist shift count for the selected day's week from already-loaded `dayDays`/`nightDays` (zero extra network requests)
+    - `handleAssign` passes `role: assignRole`; optimistic update routes to `leadShift` vs `staffShifts` based on role
+  - `src/components/coverage/ShiftDrawer.tsx`:
+    - Staff / Lead pill toggle above the dropdown
+    - Lead disabled (with tooltip) when slot already has a lead or no lead-eligible therapists exist
+    - Dropdown filters to lead-eligible therapists when Lead is active
+    - Each option shows `· N this wk` for therapists with ≥1 shift scheduled that week
 
 ## Latest Completed Work (2026-02-27, follow-up)
 
@@ -197,6 +228,14 @@ Assignment status remains informational only:
 - Assignment picker behavior:
   - PRN not offered for date is disabled in smart picker with tooltip
   - PRN enabled via cycle override is labeled `Offered`
+- Lead role assign:
+  - Staff / Lead pill toggle in assign panel
+  - Lead button disabled when slot already has a lead or no lead-eligible therapists available
+  - Dropdown filtered to lead-eligible therapists when Lead mode is active
+  - Assigns `shifts.role='lead'`; optimistic update sets `leadShift` on the day
+- Workload visibility in assign dropdown:
+  - Each therapist option shows `· N this wk` when they have ≥1 shift scheduled that week
+  - Derived from already-loaded calendar state — no extra network requests
 
 ## Schedule UX (Current)
 
@@ -313,11 +352,14 @@ Latest local checks:
 
 - `npx tsc --noEmit` pass
 - `npm run lint` pass
-- `npm run test:unit` pass
+- `npm run test:unit` pass (150 tests)
 - Focused unit coverage for PRN strict policy pass:
   - `src/lib/coverage/resolve-availability.test.ts`
   - `src/lib/schedule-helpers.test.ts`
   - `src/app/api/schedule/drag-drop/route.test.ts`
+- e2e specs added:
+  - `e2e/coverage-overlay.spec.ts`
+  - `e2e/directory-date-override.spec.ts`
 
 ## Resume Checklist
 
@@ -336,6 +378,7 @@ Latest local checks:
 Status: **Code fully implemented** — pending env var configuration and final validation before rollout.
 
 Key files:
+
 - `src/app/publish/page.tsx`, `src/app/publish/[id]/page.tsx`
 - `src/app/publish/actions.ts`, `src/app/publish/process-queued-button.tsx`
 - `src/lib/publish-events.ts`
@@ -362,7 +405,6 @@ To activate:
 
 ## Next High-Value Priorities
 
-1. Add integration/e2e coverage for manager date-override workflow in `/directory`
-2. Add server-side validation messages for cycle/date conflicts directly in drawer UI
-3. Align `/coverage` and `/schedule` into one consistent data/view model (reduce duplicated calendar logic)
-4. Add integration tests for calendar overlay interactions (open/close/toggle/accordion)
+1. Add server-side validation messages for cycle/date conflicts directly in drawer UI
+2. Add integration tests for calendar overlay interactions (open/close/toggle/accordion)
+3. Publish flow validation — activate env vars and validate queued email send + retry path
