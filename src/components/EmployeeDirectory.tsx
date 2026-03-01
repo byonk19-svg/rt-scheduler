@@ -988,8 +988,8 @@ export function EmployeeDirectory({
             </DialogDescription>
           </DialogHeader>
           {editEmployee && (
-            <div className="space-y-4">
-              <form key={editEmployee.id} action={saveEmployeeAction} className="space-y-4">
+            <div className="space-y-3">
+              <form key={editEmployee.id} action={saveEmployeeAction} className="space-y-3">
                 <input type="hidden" name="profile_id" value={editEmployee.id} />
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1">
@@ -1026,7 +1026,7 @@ export function EmployeeDirectory({
                   />
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <div className="space-y-1">
                     <Label htmlFor="edit_shift">Shift/Team</Label>
                     <select
@@ -1412,7 +1412,7 @@ export function EmployeeDirectory({
                       </p>
                     )}
                   </div>
-                  <div className="space-y-1 md:col-span-4">
+                  <div className="space-y-1 md:col-span-7">
                     <Label htmlFor="override_cycle_id">Cycle</Label>
                     <select
                       id="override_cycle_id"
@@ -1446,7 +1446,7 @@ export function EmployeeDirectory({
                       ))}
                     </select>
                   </div>
-                  <div className="space-y-1 md:col-span-2">
+                  <div className="space-y-1 md:col-span-5">
                     <Label htmlFor="override_type">Override</Label>
                     <select
                       id="override_type"
@@ -1459,20 +1459,7 @@ export function EmployeeDirectory({
                       <option value="force_on">Available to work</option>
                     </select>
                   </div>
-                  <div className="space-y-1 md:col-span-2">
-                    <Label htmlFor="override_shift_type">Shift</Label>
-                    <select
-                      id="override_shift_type"
-                      name="shift_type"
-                      className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
-                      defaultValue="both"
-                      required
-                    >
-                      <option value="both">Both</option>
-                      <option value="day">Day</option>
-                      <option value="night">Night</option>
-                    </select>
-                  </div>
+                  <input type="hidden" name="shift_type" value={editEmployee.shift_type} />
                   <div className="space-y-2 md:col-span-12">
                     <div className="flex items-center justify-between gap-2">
                       <Label>Calendar multi-select</Label>
@@ -1605,9 +1592,8 @@ export function EmployeeDirectory({
                         >
                           <div className="space-y-0.5">
                             <p className="text-sm font-medium">
-                              {formatEmployeeDate(row.date)} -{' '}
-                              {row.override_type === 'force_on' ? 'Available to work' : 'Need off'}{' '}
-                              ({row.shift_type})
+                              {formatEmployeeDate(row.date)} —{' '}
+                              {row.override_type === 'force_on' ? 'Available to work' : 'Need off'}
                             </p>
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="text-xs text-muted-foreground">
@@ -1640,7 +1626,7 @@ export function EmployeeDirectory({
                   )}
                 </div>
               </div>
-              <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+              <div className="rounded-md border border-border bg-secondary/20 p-3">
                 <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
                   Copy shift pattern
                 </p>
