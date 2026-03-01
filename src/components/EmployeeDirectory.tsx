@@ -1,6 +1,14 @@
 'use client'
 
-import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  type MouseEvent,
+  useActionState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react'
 
 import {
@@ -71,7 +79,10 @@ type EmployeeDirectoryProps = {
   initialOverrideCycleId?: string | null
   saveEmployeeAction: (formData: FormData) => void | Promise<void>
   setEmployeeActiveAction: (formData: FormData) => void | Promise<void>
-  saveEmployeeDateOverrideAction: (formData: FormData) => void | Promise<void>
+  saveEmployeeDateOverrideAction: (
+    prevState: { error: string } | null,
+    formData: FormData
+  ) => Promise<{ error: string } | null>
   deleteEmployeeDateOverrideAction: (formData: FormData) => void | Promise<void>
   copyEmployeeShiftsAction: (formData: FormData) => void | Promise<void>
 }
@@ -341,6 +352,10 @@ export function EmployeeDirectory({
   })
   const [deactivateEmployeeId, setDeactivateEmployeeId] = useState<string | null>(null)
   const [overrideDateError, setOverrideDateError] = useState<string | null>(null)
+  const [overrideFormState, overrideFormAction] = useActionState(
+    saveEmployeeDateOverrideAction,
+    null
+  )
   const [drawerTab, setDrawerTab] = useState<DrawerTab>(
     initialEditEmployeeId && initialFocusAvailability ? 'overrides' : 'profile'
   )
@@ -1450,7 +1465,8 @@ export function EmployeeDirectory({
                     </div>
 
                     <form
-                      action={saveEmployeeDateOverrideAction}
+                      key={`${editEmployee.id}-${overrideCycleIdDraft}`}
+                      action={overrideFormAction}
                       className="grid grid-cols-1 gap-2 md:grid-cols-12"
                       onSubmit={(event) => {
                         const textDate = overrideDateDraft.trim()
@@ -1709,6 +1725,14 @@ export function EmployeeDirectory({
                           placeholder="Vacation, training, etc."
                         />
                       </div>
+                      {overrideFormState?.error && (
+                        <p
+                          role="alert"
+                          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 md:col-span-12"
+                        >
+                          {overrideFormState.error}
+                        </p>
+                      )}
                       <div className="flex items-end md:col-span-3">
                         <FormSubmitButton type="submit" pendingText="Saving..." className="w-full">
                           Save date override

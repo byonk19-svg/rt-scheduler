@@ -544,7 +544,10 @@ async function setEmployeeActiveAction(formData: FormData) {
   redirect(`/directory?success=${setActive ? 'employee_reactivated' : 'employee_deactivated'}`)
 }
 
-async function saveEmployeeDateOverrideAction(formData: FormData) {
+async function saveEmployeeDateOverrideAction(
+  _prevState: { error: string } | null,
+  formData: FormData
+): Promise<{ error: string } | null> {
   'use server'
 
   const { supabase, managerId } = await requireManager()
@@ -572,7 +575,9 @@ async function saveEmployeeDateOverrideAction(formData: FormData) {
   const openAvailabilityParams = getOpenAvailabilityParams({ profileId, cycleId })
 
   if (!profileId || !cycleId || targetDates.length === 0 || !shiftType || !overrideType) {
-    redirect(buildDirectoryUrl({ error: 'override_missing_fields', ...openAvailabilityParams }))
+    return {
+      error: 'All fields are required. Select a cycle, override type, and at least one date.',
+    }
   }
 
   const { data: targetProfile, error: targetProfileError } = await supabase
@@ -583,7 +588,7 @@ async function saveEmployeeDateOverrideAction(formData: FormData) {
 
   if (targetProfileError || !targetProfile || targetProfile.role !== 'therapist') {
     console.error('Could not load therapist profile for date override update:', targetProfileError)
-    redirect(buildDirectoryUrl({ error: 'override_failed', ...openAvailabilityParams }))
+    return { error: 'Therapist profile not found. Please close and reopen the drawer.' }
   }
 
   // Validate date is within the selected cycle's date range.
@@ -595,14 +600,15 @@ async function saveEmployeeDateOverrideAction(formData: FormData) {
 
   if (targetCycleError || !targetCycle) {
     console.error('Could not load cycle for date override validation:', targetCycleError)
-    redirect(buildDirectoryUrl({ error: 'override_failed', ...openAvailabilityParams }))
+    return { error: 'Could not load the selected cycle. Please try again.' }
   }
 
   for (const targetDate of targetDates) {
     if (targetDate < targetCycle.start_date || targetDate > targetCycle.end_date) {
-      redirect(
-        buildDirectoryUrl({ error: 'override_date_out_of_range', ...openAvailabilityParams })
-      )
+      return {
+        error:
+          'One or more selected dates are outside the chosen cycle. Please check your date selections.',
+      }
     }
   }
 
@@ -624,10 +630,12 @@ async function saveEmployeeDateOverrideAction(formData: FormData) {
 
   if (overrideError) {
     if (isMissingAvailabilityOverridesSchema(overrideError)) {
-      redirect(buildDirectoryUrl({ error: 'override_schema_missing', ...openAvailabilityParams }))
+      return {
+        error: 'Availability overrides feature is not yet set up. Run the pending migration.',
+      }
     }
     console.error('Failed to save employee date override:', overrideError)
-    redirect(buildDirectoryUrl({ error: 'override_failed', ...openAvailabilityParams }))
+    return { error: 'Could not save override. Check for duplicate entries or contact support.' }
   }
 
   revalidatePath('/directory')

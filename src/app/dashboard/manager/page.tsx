@@ -26,6 +26,7 @@ type DashboardData = {
   scheduledSlots: number
   totalSlots: number
   therapistsScheduled: number
+  workloadRows: WorkloadRow[]
   cycleStart: string
   cycleEnd: string
   managerName: string
@@ -49,6 +50,7 @@ type DashboardDisplayData = {
   scheduledSlots: MetricValue
   totalSlots: MetricValue
   therapistsScheduled: MetricValue
+  workloadRows: WorkloadRow[]
   cycleStart: string
   cycleEnd: string
   managerName: string
@@ -62,10 +64,13 @@ type ManagerProfileRow = {
 
 type TeamProfileRow = {
   id: string
+  full_name: string | null
   shift_type: 'day' | 'night' | null
   is_active: boolean | null
   on_fmla: boolean | null
 }
+
+type WorkloadRow = { id: string; name: string; shiftType: 'day' | 'night'; count: number }
 
 type ShiftCoverageRow = {
   date: string
@@ -100,6 +105,7 @@ const INITIAL_DATA: DashboardData = {
   scheduledSlots: 0,
   totalSlots: 0,
   therapistsScheduled: 0,
+  workloadRows: [],
   cycleStart: '—',
   cycleEnd: '—',
   managerName: 'Manager',
@@ -207,7 +213,7 @@ export default function ManagerDashboardPage() {
           await Promise.all([
             supabase
               .from('profiles')
-              .select('id, shift_type, is_active, on_fmla')
+              .select('id, full_name, shift_type, is_active, on_fmla')
               .in('role', ['therapist', 'staff']),
             supabase.from('shift_posts').select('shift_id').eq('status', 'pending'),
             supabase
@@ -282,6 +288,12 @@ export default function ManagerDashboardPage() {
 
         const therapistsScheduled = scheduledUserIds.size
 
+        const shiftCountsByUser = new Map<string, number>()
+        for (const shift of shifts) {
+          if (!shift.user_id || !countsTowardCoverage(shift.status)) continue
+          shiftCountsByUser.set(shift.user_id, (shiftCountsByUser.get(shift.user_id) ?? 0) + 1)
+        }
+
         const pendingPosts = pendingPostsResult.error
           ? []
           : ((pendingPostsResult.data ?? []) as ShiftPostRow[])
@@ -350,6 +362,16 @@ export default function ManagerDashboardPage() {
         const nightShift = activeTeamProfiles.filter((row) => row.shift_type === 'night').length
         const onFmla = activeTeamProfiles.filter((row) => row.on_fmla === true).length
 
+        const workloadRows: WorkloadRow[] = activeTeamProfiles
+          .map((p) => ({
+            id: p.id,
+            name: p.full_name ?? 'Unknown',
+            shiftType: (p.shift_type ?? 'day') as 'day' | 'night',
+            count: shiftCountsByUser.get(p.id) ?? 0,
+          }))
+          .filter((row) => row.count > 0)
+          .sort((a, b) => b.count - a.count)
+
         if (!isMounted) return
 
         setData({
@@ -367,6 +389,7 @@ export default function ManagerDashboardPage() {
           scheduledSlots,
           totalSlots,
           therapistsScheduled,
+          workloadRows,
           cycleStart: formatCycleDate(cycleStartDate),
           cycleEnd: formatCycleDate(cycleEndDate),
           managerName,
@@ -405,6 +428,7 @@ export default function ManagerDashboardPage() {
         scheduledSlots: '—',
         totalSlots: '—',
         therapistsScheduled: '—',
+        workloadRows: [],
         cycleStart: '—',
         cycleEnd: '—',
       }
@@ -602,6 +626,41 @@ export default function ManagerDashboardPage() {
           marginBottom: 24,
         }}
       >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 12,
+          }}
+        >
+          <p style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>Workload distribution</p>
+          <span style={{ fontSize: 11, color: '#64748b' }}>shifts this cycle · per therapist</span>
+        </div>
+        {loading ? (
+          <p style={{ fontSize: 12, color: '#64748b' }}>—</p>
+        ) : data.workloadRows.length === 0 ? (
+          <p style={{ fontSize: 12, color: '#64748b' }}>No scheduled shifts yet.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {data.workloadRows.map((row) => (
+              <WorkloadBar key={row.id} row={row} max={data.workloadRows[0]?.count ?? 1} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div
+        className="fade-up"
+        style={{
+          animationDelay: '0.25s',
+          background: '#fff',
+          border: '1px solid #e5e7eb',
+          borderRadius: 10,
+          padding: '18px 20px',
+          marginBottom: 24,
+        }}
+      >
         <p style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>
           Quick actions
         </p>
@@ -636,7 +695,7 @@ export default function ManagerDashboardPage() {
       <div
         className="fade-up"
         style={{
-          animationDelay: '0.25s',
+          animationDelay: '0.3s',
           background: '#fff',
           border: '1px solid #e5e7eb',
           borderRadius: 10,
@@ -943,6 +1002,60 @@ function FillRateBar({ scheduled, total }: { scheduled: number | null; total: nu
           }}
         />
       </div>
+    </div>
+  )
+}
+
+function WorkloadBar({ row, max }: { row: WorkloadRow; max: number }) {
+  const pct = max > 0 ? Math.round((row.count / max) * 100) : 0
+  const barColor = row.shiftType === 'day' ? '#d97706' : '#6366f1'
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: '#374151',
+          width: 140,
+          flexShrink: 0,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {row.name}
+      </span>
+      <div
+        style={{
+          flex: 1,
+          height: 6,
+          borderRadius: 99,
+          background: '#f1f5f9',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            height: '100%',
+            width: `${String(pct)}%`,
+            background: barColor,
+            borderRadius: 99,
+            transition: 'width 0.3s ease',
+          }}
+        />
+      </div>
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          color: '#374151',
+          width: 24,
+          textAlign: 'right' as const,
+          flexShrink: 0,
+        }}
+      >
+        {row.count}
+      </span>
     </div>
   )
 }

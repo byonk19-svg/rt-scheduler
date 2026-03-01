@@ -158,11 +158,13 @@ export default function ShiftBoardPage() {
   const [search, setSearch] = useState('')
   const [activeTab, setActiveTab] = useState<'open' | 'history'>('open')
   const [savingState, setSavingState] = useState<Record<string, boolean>>({})
+  const [requestErrors, setRequestErrors] = useState<Record<string, string>>({})
 
   const loadBoard = useCallback(
     async (tab: 'open' | 'history') => {
       setLoading(true)
       setError(null)
+      setRequestErrors({})
 
       try {
         const {
@@ -367,6 +369,12 @@ export default function ShiftBoardPage() {
     async (id: string, action: 'approve' | 'deny') => {
       if (!can(role, 'review_shift_posts')) return
 
+      setRequestErrors((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+
       const nextStatus: PersistedRequestStatus = action === 'approve' ? 'approved' : 'denied'
       const previousRequests = requests
 
@@ -392,15 +400,12 @@ export default function ShiftBoardPage() {
         console.error('Failed to save action:', updateError.message)
         setRequests(previousRequests)
         setError('Could not save request update. Changes were rolled back.')
-        if (typeof window !== 'undefined') {
-          if (updateError.message.includes('Lead coverage gap')) {
-            window.alert(`Cannot approve: ${updateError.message}`)
-          } else if (updateError.message.includes('Double booking')) {
-            window.alert(`Cannot approve: ${updateError.message}`)
-          } else {
-            window.alert('Could not save. Please try again.')
-          }
-        }
+        const msg = updateError.message.includes('Lead coverage gap')
+          ? 'Cannot approve: lead coverage gap. Ensure the swap does not remove the only lead.'
+          : updateError.message.includes('Double booking')
+            ? 'Cannot approve: double booking. This therapist is already assigned to this shift.'
+            : 'Could not save. Please try again.'
+        setRequestErrors((prev) => ({ ...prev, [id]: msg }))
         setSavingState((current) => ({ ...current, [id]: false }))
         return
       }
@@ -680,6 +685,7 @@ export default function ShiftBoardPage() {
               req={request}
               canReview={can(role, 'review_shift_posts')}
               saving={Boolean(savingState[request.id])}
+              error={requestErrors[request.id]}
               onAction={(action) => void handleAction(request.id, action)}
               onViewShift={() => handleViewShift(request.shiftDate)}
               delay={index * 0.04}
@@ -724,6 +730,7 @@ function RequestCard({
   req,
   canReview,
   saving,
+  error,
   onAction,
   onViewShift,
   delay = 0,
@@ -731,6 +738,7 @@ function RequestCard({
   req: ShiftBoardRequest
   canReview: boolean
   saving: boolean
+  error?: string
   onAction: (action: 'approve' | 'deny') => void
   onViewShift: () => void
   delay?: number
@@ -916,6 +924,24 @@ function RequestCard({
             View shift
           </button>
         </div>
+      )}
+
+      {error && (
+        <p
+          role="alert"
+          style={{
+            marginTop: 8,
+            fontSize: 11,
+            fontWeight: 500,
+            color: '#991b1b',
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: 6,
+            padding: '5px 8px',
+          }}
+        >
+          {error}
+        </p>
       )}
 
       {(!isPending || !canReview) && (
