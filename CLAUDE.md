@@ -1,6 +1,34 @@
 # Teamwise Scheduler - Codex Handoff Context
 
-Updated: 2026-03-01 (employee directory: tabbed drawer + badges + unified filter bar)
+Updated: 2026-03-01 (four QoL improvements: manager workload, staff dashboard metrics, shift board, directory errors)
+
+## Latest Completed Work (2026-03-01, session 2)
+
+- **Manager dashboard — workload distribution section** (`src/app/dashboard/manager/page.tsx`):
+  - Added `full_name` to team profiles query (zero extra network requests)
+  - Derives per-therapist shift count from already-loaded shifts data after coverage loop
+  - New `WorkloadRow` type + `WorkloadBar` component: amber bars for day-shift, indigo for night-shift, sorted highest-to-lowest
+  - Section animates in as part of the existing `fade-up` sequence (delays bumped +0.05s to accommodate)
+
+- **Staff dashboard — live metrics** (`src/app/dashboard/staff/page.tsx`):
+  - Converted from plain 3-nav-card hub to SSR page with real Supabase data
+  - Fetches: active/next cycle, user's upcoming shifts, availability override count, pending shift post count
+  - New metrics banner above nav cards: upcoming shifts count, next shift date, availability submitted status (green ✓ / amber warning)
+  - Card descriptions now show live context (e.g. "5 upcoming shifts this cycle", "Submitted for Mar cycle")
+
+- **Shift board — remove `window.alert()`** (`src/app/shift-board/page.tsx`):
+  - Added `requestErrors: Record<string, string>` state
+  - Replaced 3 `window.alert()` calls in `handleAction` with `setRequestErrors`
+  - Specific messages for Lead coverage gap and Double booking errors
+  - Error clears on retry + on board reload; renders inline below action buttons via `role="alert"` paragraph
+
+- **Directory drawer — inline server-side error banners** (`src/app/directory/page.tsx` + `src/components/EmployeeDirectory.tsx`):
+  - Changed `saveEmployeeDateOverrideAction` signature to `(prevState, formData)` for `useActionState` compatibility
+  - Replaced all `redirect(error)` calls with `return { error: '<specific message>' }` on failures; keeps `redirect` on success
+  - `EmployeeDirectory.tsx` uses `useActionState` to capture action state; inline red error banner inside Overrides tab form
+  - Form keyed to `editEmployee.id + overrideCycleIdDraft` to auto-reset state between drawer opens
+
+- Quality: 195 unit tests pass (20 files); tsc, lint, format:check all green
 
 ## Latest Completed Work (2026-03-01)
 
@@ -447,6 +475,6 @@ To activate:
 ## Next High-Value Priorities
 
 1. Publish flow validation — activate env vars and validate queued email send + retry path
-2. Add server-side validation messages for cycle/date conflicts directly in drawer UI
-3. Surface cycle-level scheduling metrics on the manager dashboard (e.g. per-therapist shift counts)
-4. Add e2e tests for employee directory drawer tabs and filter bar interactions
+2. Add e2e tests for employee directory drawer tabs and filter bar interactions
+3. Cycle progress visualization on manager dashboard (day-by-day fill rate heatmap or week breakdown)
+4. Staff-facing upcoming shift detail view (show who else is on shift, lead indicator)
