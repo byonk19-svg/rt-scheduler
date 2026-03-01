@@ -119,7 +119,7 @@ function isDateWithinCycle(
   dateValue: string,
   cycle: { start_date: string; end_date: string } | null
 ): boolean {
-  if (!cycle) return true
+  if (!cycle) return false
   return dateValue >= cycle.start_date && dateValue <= cycle.end_date
 }
 
@@ -322,6 +322,7 @@ export function EmployeeDirectory({
   const [deactivateEmployeeId, setDeactivateEmployeeId] = useState<string | null>(null)
   const [overrideDateError, setOverrideDateError] = useState<string | null>(null)
   const availabilitySectionRef = useRef<HTMLDivElement | null>(null)
+  const calendarRef = useRef<HTMLDivElement | null>(null)
   const selectedAvailabilityCycleId = availabilityCycleId || cycles[0]?.id || ''
 
   const filteredEmployees = useMemo(
@@ -464,6 +465,16 @@ export function EmployeeDirectory({
     [overrideCalendarMonthStart]
   )
   const selectedOverrideDatesSet = useMemo(() => new Set(overrideDatesDraft), [overrideDatesDraft])
+  const canGoPrevMonth = useMemo(() => {
+    if (!selectedOverrideCycle) return false
+    const prevMonthEnd = toMonthEndKey(shiftMonthKey(overrideCalendarMonthStart, -1))
+    return prevMonthEnd >= selectedOverrideCycle.start_date
+  }, [selectedOverrideCycle, overrideCalendarMonthStart])
+  const canGoNextMonth = useMemo(() => {
+    if (!selectedOverrideCycle) return false
+    const nextMonthStart = shiftMonthKey(overrideCalendarMonthStart, 1)
+    return nextMonthStart <= selectedOverrideCycle.end_date
+  }, [selectedOverrideCycle, overrideCalendarMonthStart])
   const missingAvailabilityRows = useMemo(
     () => buildMissingAvailabilityRows(employees, dateOverrides, selectedAvailabilityCycleId),
     [dateOverrides, employees, selectedAvailabilityCycleId]
@@ -484,7 +495,13 @@ export function EmployeeDirectory({
     }
 
     window.addEventListener('mouseup', stopDragging)
-    return () => window.removeEventListener('mouseup', stopDragging)
+    window.addEventListener('touchend', stopDragging)
+    window.addEventListener('touchcancel', stopDragging)
+    return () => {
+      window.removeEventListener('mouseup', stopDragging)
+      window.removeEventListener('touchend', stopDragging)
+      window.removeEventListener('touchcancel', stopDragging)
+    }
   }, [isCalendarDragging])
 
   const applyDateInBatch = useCallback(
@@ -504,12 +521,34 @@ export function EmployeeDirectory({
     [setOverrideDatesDraft]
   )
 
+  useEffect(() => {
+    const container = calendarRef.current
+    if (!container) return
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (!isCalendarDragging || !calendarDragMode) return
+      const touch = event.touches[0]
+      if (!touch) return
+      event.preventDefault()
+      const el = document.elementFromPoint(touch.clientX, touch.clientY)
+      const btn = el?.closest('[data-date]') as HTMLElement | null
+      const dateValue = btn?.dataset.date
+      if (!dateValue) return
+      if (!isDateWithinCycle(dateValue, selectedOverrideCycle)) return
+      if (calendarDragSeenRef.current.has(dateValue)) return
+      calendarDragSeenRef.current.add(dateValue)
+      applyDateInBatch(dateValue, calendarDragMode)
+    }
+
+    container.addEventListener('touchmove', handleTouchMove, { passive: false })
+    return () => container.removeEventListener('touchmove', handleTouchMove)
+  }, [isCalendarDragging, calendarDragMode, selectedOverrideCycle, applyDateInBatch])
+
   const handleCalendarDayMouseDown = useCallback(
     (event: MouseEvent<HTMLButtonElement>, dateValue: string) => {
       if (!isDateWithinCycle(dateValue, selectedOverrideCycle)) return
       event.preventDefault()
       setOverrideDateError(null)
-      setOverrideDateDraft('')
       const mode: 'add' | 'remove' = selectedOverrideDatesSet.has(dateValue) ? 'remove' : 'add'
       setIsCalendarDragging(true)
       setCalendarDragMode(mode)
@@ -528,6 +567,19 @@ export function EmployeeDirectory({
       applyDateInBatch(dateValue, calendarDragMode)
     },
     [isCalendarDragging, calendarDragMode, selectedOverrideCycle, applyDateInBatch]
+  )
+
+  const handleCalendarDayTouchStart = useCallback(
+    (dateValue: string) => {
+      if (!isDateWithinCycle(dateValue, selectedOverrideCycle)) return
+      setOverrideDateError(null)
+      const mode: 'add' | 'remove' = selectedOverrideDatesSet.has(dateValue) ? 'remove' : 'add'
+      setIsCalendarDragging(true)
+      setCalendarDragMode(mode)
+      calendarDragSeenRef.current = new Set([dateValue])
+      applyDateInBatch(dateValue, mode)
+    },
+    [selectedOverrideCycle, selectedOverrideDatesSet, applyDateInBatch]
   )
 
   function addDateToOverrideBatch() {
@@ -1302,12 +1354,10 @@ export function EmployeeDirectory({
                   action={saveEmployeeDateOverrideAction}
                   className="grid grid-cols-1 gap-2 md:grid-cols-12"
                   onSubmit={(event) => {
-                    const targetDates =
-                      overrideDatesDraft.length > 0
-                        ? overrideDatesDraft
-                        : overrideDateDraft
-                          ? [overrideDateDraft]
-                          : []
+                    const textDate = overrideDateDraft.trim()
+                    const targetDates = Array.from(
+                      new Set([...overrideDatesDraft, ...(textDate ? [textDate] : [])])
+                    ).sort()
                     if (targetDates.length === 0) {
                       event.preventDefault()
                       setOverrideDateError('Select at least one date.')
@@ -1342,7 +1392,7 @@ export function EmployeeDirectory({
                       value={dateValue}
                     />
                   ))}
-                  {overrideDatesDraft.length === 0 && overrideDateDraft && (
+                  {overrideDateDraft && (
                     <input type="hidden" name="date" value={overrideDateDraft} />
                   )}
                   <div className="space-y-1 md:col-span-3">
@@ -1469,6 +1519,7 @@ export function EmployeeDirectory({
                           type="button"
                           variant="ghost"
                           size="sm"
+                          disabled={!canGoPrevMonth}
                           onClick={() =>
                             setOverrideCalendarMonthStart((current) => shiftMonthKey(current, -1))
                           }
@@ -1481,6 +1532,7 @@ export function EmployeeDirectory({
                           type="button"
                           variant="ghost"
                           size="sm"
+                          disabled={!canGoNextMonth}
                           onClick={() =>
                             setOverrideCalendarMonthStart((current) => shiftMonthKey(current, 1))
                           }
@@ -1499,7 +1551,7 @@ export function EmployeeDirectory({
                           </p>
                         ))}
                       </div>
-                      <div className="space-y-1">
+                      <div className="touch-none space-y-1" ref={calendarRef}>
                         {overrideCalendarWeeks.map((week, weekIndex) => (
                           <div
                             key={`override-week-${weekIndex}`}
@@ -1514,9 +1566,14 @@ export function EmployeeDirectory({
                                 <button
                                   key={dayKey}
                                   type="button"
+                                  data-date={dayKey}
                                   disabled={!isInCycle}
                                   onMouseDown={(event) => handleCalendarDayMouseDown(event, dayKey)}
                                   onMouseEnter={() => handleCalendarDayMouseEnter(dayKey)}
+                                  onTouchStart={(e) => {
+                                    e.preventDefault()
+                                    handleCalendarDayTouchStart(dayKey)
+                                  }}
                                   className={cn(
                                     'h-8 rounded-md text-xs transition-colors',
                                     isSelected

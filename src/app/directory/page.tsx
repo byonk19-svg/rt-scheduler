@@ -535,7 +535,7 @@ async function saveEmployeeDateOverrideAction(formData: FormData) {
       : ''
   const overrideType =
     overrideTypeRaw === 'force_off' || overrideTypeRaw === 'force_on' ? overrideTypeRaw : ''
-  const targetDates = dates.length > 0 ? dates : date ? [date] : []
+  const targetDates = Array.from(new Set([...dates, ...(date ? [date] : [])]))
   const openAvailabilityParams = getOpenAvailabilityParams({ profileId, cycleId })
 
   if (!profileId || !cycleId || targetDates.length === 0 || !shiftType || !overrideType) {
