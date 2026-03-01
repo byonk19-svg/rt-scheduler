@@ -1,9 +1,22 @@
 'use client'
 
+import { useMemo } from 'react'
+
 import { cn } from '@/lib/utils'
 import { countActive, countBy, flatten, type DayItem, type ShiftTab, type UiStatus } from '@/lib/coverage/selectors'
+import {
+  getDefaultWeeklyLimitForEmploymentType,
+  sanitizeWeeklyLimit,
+} from '@/lib/scheduling-constants'
 
-type TherapistOption = { id: string; full_name: string; shift_type: 'day' | 'night'; isLeadEligible: boolean }
+type TherapistOption = {
+  id: string
+  full_name: string
+  shift_type: 'day' | 'night'
+  isLeadEligible: boolean
+  employment_type: string | null
+  max_work_days_per_week: number | null
+}
 type SelectedDay = DayItem & { shiftType: ShiftTab }
 
 type ShiftDrawerProps = {
@@ -113,6 +126,19 @@ export function ShiftDrawer({
   onUnassign,
 }: ShiftDrawerProps) {
   const selectedDayShifts = selectedDay ? flatten(selectedDay) : []
+
+  const weeklyLimitWarning = useMemo((): string => {
+    if (!assignUserId) return ''
+    const therapist = availableTherapists.find((t) => t.id === assignUserId)
+    if (!therapist) return ''
+    const weekCount = weeklyTherapistCounts.get(assignUserId) ?? 0
+    const limit = sanitizeWeeklyLimit(
+      therapist.max_work_days_per_week,
+      getDefaultWeeklyLimitForEmploymentType(therapist.employment_type)
+    )
+    if (weekCount < limit) return ''
+    return `${therapist.full_name} already has ${weekCount} of ${limit} shifts scheduled this week.`
+  }, [assignUserId, availableTherapists, weeklyTherapistCounts])
 
   return (
     <>
@@ -235,14 +261,22 @@ export function ShiftDrawer({
                             {displayOptions.map((therapist) => {
                               const weekCount = weeklyTherapistCounts.get(therapist.id)
                               const cycleCount = cycleTherapistCounts.get(therapist.id)
+                              const limit = sanitizeWeeklyLimit(
+                                therapist.max_work_days_per_week,
+                                getDefaultWeeklyLimitForEmploymentType(therapist.employment_type)
+                              )
+                              const isAtLimit = weekCount !== undefined && weekCount >= limit
                               const workloadLabel =
                                 weekCount !== undefined && cycleCount !== undefined
                                   ? ` · ${weekCount} this wk, ${cycleCount} this cyc`
                                   : cycleCount !== undefined
                                     ? ` · ${cycleCount} this cyc`
-                                    : ''
+                                    : weekCount !== undefined
+                                      ? ` · ${weekCount} this wk`
+                                      : ''
                               return (
                                 <option key={therapist.id} value={therapist.id}>
+                                  {isAtLimit ? '⚠ ' : ''}
                                   {therapist.full_name}
                                   {workloadLabel}
                                 </option>
@@ -260,6 +294,14 @@ export function ShiftDrawer({
                       )
                     })()}
                   </>
+                )}
+                {weeklyLimitWarning && (
+                  <p
+                    role="status"
+                    className="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs font-semibold text-amber-700"
+                  >
+                    ⚠ {weeklyLimitWarning}
+                  </p>
                 )}
                 {assignError && (
                   <p

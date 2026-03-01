@@ -39,7 +39,14 @@ import type { ScheduleSearchParams } from '@/app/schedule/types'
 type DayStatus = DayItem['dayStatus']
 
 type CycleRow = { id: string; label: string; start_date: string; end_date: string; published: boolean }
-type TherapistOption = { id: string; full_name: string; shift_type: 'day' | 'night'; isLeadEligible: boolean }
+type TherapistOption = {
+  id: string
+  full_name: string
+  shift_type: 'day' | 'night'
+  isLeadEligible: boolean
+  employment_type: string | null
+  max_work_days_per_week: number | null
+}
 type PrintTherapist = {
   id: string
   full_name: string
@@ -353,7 +360,7 @@ export default function CoveragePage() {
     void (async () => {
       const { data, error: loadError } = await supabase
         .from('profiles')
-        .select('id, full_name, shift_type, is_lead_eligible')
+        .select('id, full_name, shift_type, is_lead_eligible, employment_type, max_work_days_per_week')
         .eq('shift_type', shiftType)
         .eq('is_active', true)
         .eq('on_fmla', false)
@@ -367,9 +374,23 @@ export default function CoveragePage() {
         return
       }
       setAllTherapists(
-        ((data ?? []) as Array<{ id: string; full_name: string; shift_type: 'day' | 'night'; is_lead_eligible: boolean | null }>).map(
-          (row) => ({ id: row.id, full_name: row.full_name, shift_type: row.shift_type, isLeadEligible: row.is_lead_eligible ?? false })
-        )
+        (
+          (data ?? []) as Array<{
+            id: string
+            full_name: string
+            shift_type: 'day' | 'night'
+            is_lead_eligible: boolean | null
+            employment_type: string | null
+            max_work_days_per_week: number | null
+          }>
+        ).map((row) => ({
+          id: row.id,
+          full_name: row.full_name,
+          shift_type: row.shift_type,
+          isLeadEligible: row.is_lead_eligible ?? false,
+          employment_type: row.employment_type ?? null,
+          max_work_days_per_week: row.max_work_days_per_week ?? null,
+        }))
       )
     })()
 
