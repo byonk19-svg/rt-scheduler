@@ -6,6 +6,7 @@ import {
   canTherapistMutateOverride,
   filterEmployeeDirectoryRecords,
   getSchedulingEligibleEmployees,
+  isDateWithinCycle,
   isFmlaReturnDateEnabled,
   normalizeFmlaReturnDate,
   type EmployeeAvailabilityOverride,
@@ -202,5 +203,41 @@ describe('employee directory helpers', () => {
     expect(byId.get('1')?.submitted).toBe(true)
     expect(byId.get('2')?.submitted).toBe(false)
     expect(byId.get('2')?.overridesCount).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// isDateWithinCycle
+// ---------------------------------------------------------------------------
+
+describe('isDateWithinCycle', () => {
+  const cycle = { start_date: '2026-03-01', end_date: '2026-03-28' }
+
+  it('returns false when cycle is null (regression guard for bug fix)', () => {
+    expect(isDateWithinCycle('2026-03-15', null)).toBe(false)
+  })
+
+  it('returns true when date equals start_date (inclusive lower bound)', () => {
+    expect(isDateWithinCycle('2026-03-01', cycle)).toBe(true)
+  })
+
+  it('returns true when date equals end_date (inclusive upper bound)', () => {
+    expect(isDateWithinCycle('2026-03-28', cycle)).toBe(true)
+  })
+
+  it('returns true for a date strictly within the range', () => {
+    expect(isDateWithinCycle('2026-03-15', cycle)).toBe(true)
+  })
+
+  it('returns false for a date before start_date', () => {
+    expect(isDateWithinCycle('2026-02-28', cycle)).toBe(false)
+  })
+
+  it('returns false for a date after end_date', () => {
+    expect(isDateWithinCycle('2026-03-29', cycle)).toBe(false)
+  })
+
+  it('returns false for an empty string date', () => {
+    expect(isDateWithinCycle('', cycle)).toBe(false)
   })
 })

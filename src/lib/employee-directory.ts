@@ -173,3 +173,13 @@ export function normalizeShiftType(raw: string): EmployeeShiftType {
 export function normalizeActiveValue(raw: string): boolean {
   return raw === 'true'
 }
+
+/** Returns true when `dateValue` falls within the cycle's inclusive date range.
+ *  Returns false when `cycle` is null (no cycle selected → no dates are selectable). */
+export function isDateWithinCycle(
+  dateValue: string,
+  cycle: { start_date: string; end_date: string } | null
+): boolean {
+  if (!cycle) return false
+  return dateValue >= cycle.start_date && dateValue <= cycle.end_date
+}

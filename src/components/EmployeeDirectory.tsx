@@ -7,12 +7,20 @@ import {
   buildMissingAvailabilityRows,
   filterEmployeeDirectoryRecords,
   formatEmployeeDate,
+  isDateWithinCycle,
   isFmlaReturnDateEnabled,
   normalizeFmlaReturnDate,
   type EmployeeDirectoryRecord,
   type EmployeeDirectoryTab,
 } from '@/lib/employee-directory'
-import { buildCalendarWeeks, toIsoDate } from '@/lib/calendar-utils'
+import {
+  buildCalendarWeeks,
+  formatMonthLabel,
+  shiftMonthKey,
+  toIsoDate,
+  toMonthEndKey,
+  toMonthStartKey,
+} from '@/lib/calendar-utils'
 import { EMPLOYEE_META_BADGE_CLASS, LEAD_ELIGIBLE_BADGE_CLASS } from '@/lib/employee-tag-badges'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -112,44 +120,6 @@ function formatDateTime(value: string | null): string {
     year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
-  })
-}
-
-function isDateWithinCycle(
-  dateValue: string,
-  cycle: { start_date: string; end_date: string } | null
-): boolean {
-  if (!cycle) return false
-  return dateValue >= cycle.start_date && dateValue <= cycle.end_date
-}
-
-function toMonthStartKey(dateValue: string): string {
-  const parsed = new Date(`${dateValue}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return toIsoDate(new Date())
-  parsed.setDate(1)
-  return toIsoDate(parsed)
-}
-
-function toMonthEndKey(monthStartKey: string): string {
-  const parsed = new Date(`${monthStartKey}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return monthStartKey
-  const monthEnd = new Date(parsed.getFullYear(), parsed.getMonth() + 1, 0)
-  return toIsoDate(monthEnd)
-}
-
-function shiftMonthKey(monthStartKey: string, monthDelta: number): string {
-  const parsed = new Date(`${monthStartKey}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return monthStartKey
-  const shifted = new Date(parsed.getFullYear(), parsed.getMonth() + monthDelta, 1)
-  return toIsoDate(shifted)
-}
-
-function formatMonthTitle(monthStartKey: string): string {
-  const parsed = new Date(`${monthStartKey}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return monthStartKey
-  return parsed.toLocaleDateString('en-US', {
-    month: 'long',
-    year: 'numeric',
   })
 }
 
@@ -453,7 +423,7 @@ export function EmployeeDirectory({
     [cycles, overrideCycleIdDraft]
   )
   const overrideCalendarTitle = useMemo(
-    () => formatMonthTitle(overrideCalendarMonthStart),
+    () => formatMonthLabel(overrideCalendarMonthStart),
     [overrideCalendarMonthStart]
   )
   const overrideCalendarMonthKey = useMemo(

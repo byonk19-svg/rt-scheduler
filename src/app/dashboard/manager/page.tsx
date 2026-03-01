@@ -23,6 +23,9 @@ type DashboardData = {
   dayShift: number
   nightShift: number
   onFmla: number
+  scheduledSlots: number
+  totalSlots: number
+  therapistsScheduled: number
   cycleStart: string
   cycleEnd: string
   managerName: string
@@ -43,6 +46,9 @@ type DashboardDisplayData = {
   dayShift: MetricValue
   nightShift: MetricValue
   onFmla: MetricValue
+  scheduledSlots: MetricValue
+  totalSlots: MetricValue
+  therapistsScheduled: MetricValue
   cycleStart: string
   cycleEnd: string
   managerName: string
@@ -91,6 +97,9 @@ const INITIAL_DATA: DashboardData = {
   dayShift: 0,
   nightShift: 0,
   onFmla: 0,
+  scheduledSlots: 0,
+  totalSlots: 0,
+  therapistsScheduled: 0,
   cycleStart: '—',
   cycleEnd: '—',
   managerName: 'Manager',
@@ -235,6 +244,9 @@ export default function ManagerDashboardPage() {
         let missingLead = 0
         let underCoverage = 0
         let overCoverage = 0
+        let scheduledSlots = 0
+        let totalSlots = 0
+        const scheduledUserIds = new Set<string>()
 
         const shifts = shiftsResult.error ? [] : ((shiftsResult.data ?? []) as ShiftCoverageRow[])
         const shiftsBySlot = new Map<string, ShiftCoverageRow[]>()
@@ -255,12 +267,20 @@ export default function ManagerDashboardPage() {
             const coverageCount = assignedRows.length
             const leadCount = assignedRows.filter((row) => row.role === 'lead').length
 
+            totalSlots += 1
+            if (coverageCount > 0) scheduledSlots += 1
+            for (const row of assignedRows) {
+              if (row.user_id) scheduledUserIds.add(row.user_id)
+            }
+
             if (coverageCount === 0) unfilledShifts += 1
             if (leadCount === 0) missingLead += 1
             if (coverageCount < MIN_SHIFT_COVERAGE_PER_DAY) underCoverage += 1
             if (coverageCount > MAX_SHIFT_COVERAGE_PER_DAY) overCoverage += 1
           }
         }
+
+        const therapistsScheduled = scheduledUserIds.size
 
         const pendingPosts = pendingPostsResult.error
           ? []
@@ -344,6 +364,9 @@ export default function ManagerDashboardPage() {
           dayShift,
           nightShift,
           onFmla,
+          scheduledSlots,
+          totalSlots,
+          therapistsScheduled,
           cycleStart: formatCycleDate(cycleStartDate),
           cycleEnd: formatCycleDate(cycleEndDate),
           managerName,
@@ -379,6 +402,9 @@ export default function ManagerDashboardPage() {
         dayShift: '—',
         nightShift: '—',
         onFmla: '—',
+        scheduledSlots: '—',
+        totalSlots: '—',
+        therapistsScheduled: '—',
         cycleStart: '—',
         cycleEnd: '—',
       }
@@ -549,6 +575,34 @@ export default function ManagerDashboardPage() {
         }}
       >
         <p style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>
+          Cycle progress
+        </p>
+        <FillRateBar
+          scheduled={loading ? null : data.scheduledSlots}
+          total={loading ? null : data.totalSlots}
+        />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+          <SmallTile
+            label="Slots scheduled"
+            value={loading ? '—' : `${String(d.scheduledSlots)} / ${String(d.totalSlots)}`}
+            icon="📅"
+          />
+          <SmallTile label="Therapists on cycle" value={d.therapistsScheduled} icon="🧑‍⚕️" />
+        </div>
+      </div>
+
+      <div
+        className="fade-up"
+        style={{
+          animationDelay: '0.2s',
+          background: '#fff',
+          border: '1px solid #e5e7eb',
+          borderRadius: 10,
+          padding: '18px 20px',
+          marginBottom: 24,
+        }}
+      >
+        <p style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>
           Quick actions
         </p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -582,7 +636,7 @@ export default function ManagerDashboardPage() {
       <div
         className="fade-up"
         style={{
-          animationDelay: '0.2s',
+          animationDelay: '0.25s',
           background: '#fff',
           border: '1px solid #e5e7eb',
           borderRadius: 10,
@@ -853,5 +907,77 @@ function GhostButton({
     >
       {children}
     </button>
+  )
+}
+
+function FillRateBar({ scheduled, total }: { scheduled: number | null; total: number | null }) {
+  if (scheduled === null || total === null || total === 0) {
+    return (
+      <p style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>
+        {total === 0 ? 'No slots in cycle' : '—'}
+      </p>
+    )
+  }
+  const pct = Math.round((scheduled / total) * 100)
+  const barColor = pct >= 80 ? '#059669' : pct >= 60 ? '#d97706' : '#dc2626'
+  return (
+    <div>
+      <p style={{ fontSize: 12, color: '#374151', fontWeight: 600, marginBottom: 6 }}>
+        {scheduled} of {total} slots scheduled ({pct}%)
+      </p>
+      <div
+        style={{
+          height: 6,
+          borderRadius: 99,
+          background: '#f1f5f9',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            height: '100%',
+            width: `${String(pct)}%`,
+            borderRadius: 99,
+            background: barColor,
+            transition: 'width 0.4s ease',
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function SmallTile({
+  label,
+  value,
+  icon,
+}: {
+  label: string
+  value: string | number
+  icon: string
+}) {
+  return (
+    <div
+      style={{
+        background: '#f8fafc',
+        borderRadius: 8,
+        padding: '12px 14px',
+        border: '1px solid #f1f5f9',
+      }}
+    >
+      <div style={{ fontSize: 16, marginBottom: 4 }}>{icon}</div>
+      <div
+        style={{
+          fontSize: 18,
+          fontWeight: 800,
+          color: '#0f172a',
+          lineHeight: 1,
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+        }}
+      >
+        {value}
+      </div>
+      <div style={{ fontSize: 11, color: '#64748b', marginTop: 3, fontWeight: 500 }}>{label}</div>
+    </div>
   )
 }
