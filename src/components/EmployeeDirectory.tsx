@@ -79,11 +79,12 @@ type EmployeeDirectoryProps = {
 type DirectorySortKey = 'employee' | 'shift' | 'type' | 'tags'
 type SortDirection = 'asc' | 'desc'
 type SortColumnLabel = 'Employee' | 'Shift/Team' | 'Type' | 'Tags'
+type DrawerTab = 'profile' | 'scheduling' | 'overrides'
 
-const TABS: Array<{ value: EmployeeDirectoryTab; label: string }> = [
-  { value: 'all', label: 'All' },
-  { value: 'day', label: 'Day' },
-  { value: 'night', label: 'Night' },
+const DRAWER_TABS: Array<{ value: DrawerTab; label: string }> = [
+  { value: 'profile', label: 'Profile' },
+  { value: 'scheduling', label: 'Scheduling' },
+  { value: 'overrides', label: 'Overrides' },
 ]
 const WEEKDAY_OPTIONS: Array<{ value: number; label: string }> = [
   { value: 0, label: 'Sun' },
@@ -129,6 +130,49 @@ function ShiftBadge({ shiftType }: { shiftType: EmployeeDirectoryRecord['shift_t
     <Badge variant="outline" className={cn('capitalize', EMPLOYEE_META_BADGE_CLASS)}>
       {shiftType}
     </Badge>
+  )
+}
+
+function EmployeeRowBadges({ employee }: { employee: EmployeeDirectoryRecord }) {
+  return (
+    <div className="mt-1 flex flex-wrap gap-1">
+      <Badge
+        variant="outline"
+        className={cn(
+          'text-[10px] capitalize',
+          employee.shift_type === 'day'
+            ? 'border-amber-300 bg-amber-50 text-amber-800'
+            : 'border-slate-300 bg-slate-100 text-slate-700'
+        )}
+      >
+        {employee.shift_type === 'day' ? 'Day' : 'Night'}
+      </Badge>
+      <Badge
+        variant="outline"
+        className={cn(
+          'text-[10px]',
+          employee.employment_type === 'full_time'
+            ? 'border-blue-300 bg-blue-50 text-blue-800'
+            : employee.employment_type === 'part_time'
+              ? 'border-violet-300 bg-violet-50 text-violet-800'
+              : 'border-orange-300 bg-orange-50 text-orange-800'
+        )}
+      >
+        {employee.employment_type === 'full_time'
+          ? 'FT'
+          : employee.employment_type === 'part_time'
+            ? 'PT'
+            : 'PRN'}
+      </Badge>
+      {employee.is_lead_eligible && (
+        <Badge className={cn('text-[10px]', LEAD_ELIGIBLE_BADGE_CLASS)}>Lead</Badge>
+      )}
+      {!employee.is_active && (
+        <Badge variant="outline" className="border-red-300 bg-red-50 text-[10px] text-red-700">
+          Inactive
+        </Badge>
+      )}
+    </div>
   )
 }
 
@@ -297,21 +341,27 @@ export function EmployeeDirectory({
   })
   const [deactivateEmployeeId, setDeactivateEmployeeId] = useState<string | null>(null)
   const [overrideDateError, setOverrideDateError] = useState<string | null>(null)
+  const [drawerTab, setDrawerTab] = useState<DrawerTab>(
+    initialEditEmployeeId && initialFocusAvailability ? 'overrides' : 'profile'
+  )
+  const [employmentFilter, setEmploymentFilter] = useState<
+    'all' | 'full_time' | 'part_time' | 'prn'
+  >('all')
   const availabilitySectionRef = useRef<HTMLDivElement | null>(null)
   const calendarRef = useRef<HTMLDivElement | null>(null)
   const selectedAvailabilityCycleId = availabilityCycleId || cycles[0]?.id || ''
 
-  const filteredEmployees = useMemo(
-    () =>
-      filterEmployeeDirectoryRecords(employees, {
-        tab,
-        searchText,
-        leadOnly,
-        fmlaOnly,
-        includeInactive,
-      }),
-    [employees, tab, searchText, leadOnly, fmlaOnly, includeInactive]
-  )
+  const filteredEmployees = useMemo(() => {
+    const base = filterEmployeeDirectoryRecords(employees, {
+      tab,
+      searchText,
+      leadOnly,
+      fmlaOnly,
+      includeInactive,
+    })
+    if (employmentFilter === 'all') return base
+    return base.filter((e) => e.employment_type === employmentFilter)
+  }, [employees, tab, searchText, leadOnly, fmlaOnly, includeInactive, employmentFilter])
 
   const sortedEmployees = useMemo(() => {
     const direction = sortDirection === 'asc' ? 1 : -1
@@ -366,13 +416,15 @@ export function EmployeeDirectory({
         weekendRotation: employee.weekend_rotation,
         worksDowMode: employee.works_dow_mode,
       })
+      const shouldFocusAvailability = Boolean(options?.focusAvailability)
+      setFocusAvailabilitySection(shouldFocusAvailability)
+      setDrawerTab(shouldFocusAvailability ? 'overrides' : 'profile')
       setOverrideDateDraft('')
-      setOverrideDatesDraft([])
       setOverrideDateError(null)
       setIsCalendarDragging(false)
       setCalendarDragMode(null)
       calendarDragSeenRef.current.clear()
-      setFocusAvailabilitySection(Boolean(options?.focusAvailability))
+      const resolvedCycleId = options?.cycleId ?? selectedAvailabilityCycleId ?? cycles[0]?.id ?? ''
       if (options?.cycleId) {
         setOverrideCycleIdDraft(options.cycleId)
         const selectedCycle = cycles.find((cycle) => cycle.id === options.cycleId)
@@ -387,8 +439,14 @@ export function EmployeeDirectory({
           setOverrideCalendarMonthStart(toMonthStartKey(selectedCycle.start_date))
         }
       }
+      setOverrideDatesDraft(
+        dateOverrides
+          .filter((row) => row.therapist_id === employeeId && row.cycle_id === resolvedCycleId)
+          .map((row) => row.date)
+          .sort((a, b) => a.localeCompare(b))
+      )
     },
-    [employees, selectedAvailabilityCycleId, cycles]
+    [employees, selectedAvailabilityCycleId, cycles, dateOverrides]
   )
 
   const editEmployee = useMemo(
@@ -599,59 +657,105 @@ export function EmployeeDirectory({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          {TABS.map((item) => (
-            <Button
-              key={item.value}
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setTab(item.value)}
-              className={
-                tab === item.value
-                  ? 'border-[#fde68a] bg-[#fffbeb] text-[#b45309] hover:bg-[#fffbeb] hover:text-[#b45309]'
-                  : ''
-              }
-            >
-              {item.label}
-            </Button>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-border bg-secondary/10 px-3 py-2">
+            <div className="flex items-center gap-1">
+              <span className="text-xs font-semibold text-muted-foreground">Shift:</span>
+              {(['all', 'day', 'night'] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setTab(value)}
+                  className={cn(
+                    'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+                    tab === value
+                      ? 'border-[#fde68a] bg-[#fffbeb] text-[#b45309]'
+                      : 'border-transparent text-muted-foreground hover:bg-secondary'
+                  )}
+                >
+                  {value === 'all' ? 'All' : value === 'day' ? 'Day' : 'Night'}
+                </button>
+              ))}
+            </div>
+            <div className="h-4 w-px bg-border" />
+            <div className="flex items-center gap-1">
+              <span className="text-xs font-semibold text-muted-foreground">Status:</span>
+              <button
+                type="button"
+                onClick={() => setIncludeInactive(false)}
+                className={cn(
+                  'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+                  !includeInactive
+                    ? 'border-[#fde68a] bg-[#fffbeb] text-[#b45309]'
+                    : 'border-transparent text-muted-foreground hover:bg-secondary'
+                )}
+              >
+                Active
+              </button>
+              <button
+                type="button"
+                onClick={() => setIncludeInactive(true)}
+                className={cn(
+                  'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+                  includeInactive
+                    ? 'border-[#fde68a] bg-[#fffbeb] text-[#b45309]'
+                    : 'border-transparent text-muted-foreground hover:bg-secondary'
+                )}
+              >
+                All
+              </button>
+            </div>
+            <div className="h-4 w-px bg-border" />
+            <div className="flex items-center gap-1">
+              <span className="text-xs font-semibold text-muted-foreground">Type:</span>
+              {(['all', 'full_time', 'part_time', 'prn'] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setEmploymentFilter(value)}
+                  className={cn(
+                    'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+                    employmentFilter === value
+                      ? 'border-[#fde68a] bg-[#fffbeb] text-[#b45309]'
+                      : 'border-transparent text-muted-foreground hover:bg-secondary'
+                  )}
+                >
+                  {value === 'all'
+                    ? 'All'
+                    : value === 'full_time'
+                      ? 'FT'
+                      : value === 'part_time'
+                        ? 'PT'
+                        : 'PRN'}
+                </button>
+              ))}
+            </div>
+            <div className="h-4 w-px bg-border" />
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5 text-xs font-medium">
+                <input
+                  type="checkbox"
+                  checked={leadOnly}
+                  onChange={(event) => setLeadOnly(event.target.checked)}
+                />
+                Lead
+              </label>
+              <label className="flex items-center gap-1.5 text-xs font-medium">
+                <input
+                  type="checkbox"
+                  checked={fmlaOnly}
+                  onChange={(event) => setFmlaOnly(event.target.checked)}
+                />
+                FMLA
+              </label>
+            </div>
+          </div>
           <Input
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
             placeholder="Search name or email"
             className="w-full"
           />
-          <div className="flex flex-wrap items-center gap-3 rounded-md border border-border px-3 py-2">
-            <span className="text-sm font-medium text-muted-foreground">Filters:</span>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={leadOnly}
-                onChange={(event) => setLeadOnly(event.target.checked)}
-              />
-              Lead
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={fmlaOnly}
-                onChange={(event) => setFmlaOnly(event.target.checked)}
-              />
-              FMLA
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={includeInactive}
-                onChange={(event) => setIncludeInactive(event.target.checked)}
-              />
-              Include inactive
-            </label>
-          </div>
         </div>
 
         <p className="text-xs text-muted-foreground">{sortedEmployees.length} employee(s)</p>
@@ -808,6 +912,7 @@ export function EmployeeDirectory({
                     <TableCell>
                       <div className="font-medium text-foreground">{employee.full_name}</div>
                       <div className="text-xs text-muted-foreground">{employee.email}</div>
+                      <EmployeeRowBadges employee={employee} />
                     </TableCell>
                     <TableCell>
                       <ShiftBadge shiftType={employee.shift_type} />
@@ -913,6 +1018,7 @@ export function EmployeeDirectory({
                   <div>
                     <p className="font-medium text-foreground">{employee.full_name}</p>
                     <p className="text-xs text-muted-foreground">{employee.email}</p>
+                    <EmployeeRowBadges employee={employee} />
                   </div>
                   <EmployeeActionsMenu
                     employee={employee}
@@ -966,6 +1072,7 @@ export function EmployeeDirectory({
           if (open) return
           setEditState(null)
           setFocusAvailabilitySection(false)
+          setDrawerTab('profile')
           const resetCycleId = selectedAvailabilityCycleId
           setOverrideCycleIdDraft(resetCycleId)
           const resetCycle = cycles.find((cycle) => cycle.id === resetCycleId)
@@ -980,223 +1087,286 @@ export function EmployeeDirectory({
           calendarDragSeenRef.current.clear()
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
-          <DialogHeader>
+        <DialogContent className="max-h-[90vh] overflow-y-auto p-0 sm:max-w-xl">
+          <DialogHeader className="border-b border-border px-6 py-4">
             <DialogTitle>Edit employee</DialogTitle>
             <DialogDescription>
               Update profile details and scheduling eligibility settings.
             </DialogDescription>
           </DialogHeader>
           {editEmployee && (
-            <div className="space-y-3">
-              <form key={editEmployee.id} action={saveEmployeeAction} className="space-y-3">
+            <>
+              {/* Sticky tab bar */}
+              <div
+                className="sticky top-0 z-10 flex border-b border-border bg-white"
+                role="tablist"
+                aria-label="Employee drawer sections"
+              >
+                {DRAWER_TABS.map((t) => (
+                  <button
+                    key={t.value}
+                    type="button"
+                    role="tab"
+                    aria-selected={drawerTab === t.value}
+                    onClick={() => setDrawerTab(t.value)}
+                    className={cn(
+                      'flex-1 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors',
+                      drawerTab === t.value
+                        ? 'border-[#d97706] text-[#b45309]'
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Profile + Scheduling form — always in DOM, hidden on Overrides tab */}
+              <form
+                key={editEmployee.id}
+                action={saveEmployeeAction}
+                className={cn(drawerTab === 'overrides' && 'hidden')}
+              >
                 <input type="hidden" name="profile_id" value={editEmployee.id} />
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+
+                {/* ── Profile panel ── */}
+                <div className={cn('space-y-3 px-6 py-4', drawerTab !== 'profile' && 'hidden')}>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="edit_name">Name</Label>
+                      <Input
+                        id="edit_name"
+                        name="full_name"
+                        defaultValue={editEmployee.full_name}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="edit_email">Email</Label>
+                      <Input
+                        id="edit_email"
+                        name="email"
+                        type="email"
+                        defaultValue={editEmployee.email}
+                        required
+                      />
+                    </div>
+                  </div>
+
                   <div className="space-y-1">
-                    <Label htmlFor="edit_name">Name</Label>
+                    <Label htmlFor="edit_phone">Phone</Label>
                     <Input
-                      id="edit_name"
-                      name="full_name"
-                      defaultValue={editEmployee.full_name}
-                      required
+                      id="edit_phone"
+                      name="phone_number"
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel"
+                      defaultValue={editEmployee.phone_number ?? ''}
+                      placeholder="(555) 123-4567"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="edit_email">Email</Label>
-                    <Input
-                      id="edit_email"
-                      name="email"
-                      type="email"
-                      defaultValue={editEmployee.email}
-                      required
-                    />
+
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="edit_shift">Shift/Team</Label>
+                      <select
+                        id="edit_shift"
+                        name="shift_type"
+                        className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                        defaultValue={editEmployee.shift_type}
+                      >
+                        <option value="day">Day</option>
+                        <option value="night">Night</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="edit_employment">Employment</Label>
+                      <select
+                        id="edit_employment"
+                        name="employment_type"
+                        className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                        defaultValue={editEmployee.employment_type}
+                      >
+                        <option value="full_time">Full-time</option>
+                        <option value="part_time">Part-time</option>
+                        <option value="prn">PRN</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="edit_max_week">Max shifts/week</Label>
+                      <select
+                        id="edit_max_week"
+                        name="max_work_days_per_week"
+                        className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                        defaultValue={String(editEmployee.max_work_days_per_week)}
+                      >
+                        {Array.from({ length: 7 }, (_, index) => index + 1).map((value) => (
+                          <option key={`max-${value}`} value={value}>
+                            {value}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
+
+                  <div className="grid grid-cols-1 gap-2">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        name="is_lead_eligible"
+                        defaultChecked={editEmployee.is_lead_eligible}
+                      />
+                      Lead eligible
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        name="on_fmla"
+                        checked={onFmlaDraft}
+                        onChange={(event) =>
+                          setEditState((current) =>
+                            current ? { ...current, onFmla: event.target.checked } : current
+                          )
+                        }
+                      />
+                      On FMLA
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        name="is_active"
+                        defaultChecked={editEmployee.is_active}
+                      />
+                      Active
+                    </label>
+                  </div>
+
+                  {isFmlaReturnDateEnabled(onFmlaDraft) && (
+                    <div className="space-y-1">
+                      <Label htmlFor="edit_fmla_return">Potential return date</Label>
+                      <Input
+                        id="edit_fmla_return"
+                        name="fmla_return_date"
+                        type="date"
+                        defaultValue={
+                          normalizeFmlaReturnDate(editEmployee.fmla_return_date ?? '', true) ?? ''
+                        }
+                      />
+                    </div>
+                  )}
                 </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="edit_phone">Phone</Label>
-                  <Input
-                    id="edit_phone"
-                    name="phone_number"
-                    type="tel"
-                    inputMode="numeric"
-                    autoComplete="tel"
-                    defaultValue={editEmployee.phone_number ?? ''}
-                    placeholder="(555) 123-4567"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="edit_shift">Shift/Team</Label>
-                    <select
-                      id="edit_shift"
-                      name="shift_type"
-                      className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
-                      defaultValue={editEmployee.shift_type}
-                    >
-                      <option value="day">Day</option>
-                      <option value="night">Night</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="edit_employment">Employment</Label>
-                    <select
-                      id="edit_employment"
-                      name="employment_type"
-                      className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
-                      defaultValue={editEmployee.employment_type}
-                    >
-                      <option value="full_time">Full-time</option>
-                      <option value="part_time">Part-time</option>
-                      <option value="prn">PRN</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="edit_max_week">Max shifts/week</Label>
-                    <select
-                      id="edit_max_week"
-                      name="max_work_days_per_week"
-                      className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
-                      defaultValue={String(editEmployee.max_work_days_per_week)}
-                    >
-                      {Array.from({ length: 7 }, (_, index) => index + 1).map((value) => (
-                        <option key={`max-${value}`} value={value}>
-                          {value}
-                        </option>
+                {/* ── Scheduling panel ── */}
+                <div className={cn('space-y-3 px-6 py-4', drawerTab !== 'scheduling' && 'hidden')}>
+                  <div className="space-y-2 rounded-md border border-border bg-secondary/20 p-3">
+                    <Label className="text-sm font-semibold">Works weekdays</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Auto-generate uses these as preferred or required depending on the Hard/Soft
+                      rule.
+                    </p>
+                    <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+                      {WEEKDAY_OPTIONS.map((day) => (
+                        <label
+                          key={`preferred-day-${day.value}`}
+                          className="flex items-center gap-1.5 text-xs"
+                        >
+                          <input
+                            type="checkbox"
+                            name="works_dow"
+                            value={String(day.value)}
+                            defaultChecked={editEmployee.works_dow.includes(day.value)}
+                          />
+                          {day.label}
+                        </label>
                       ))}
-                    </select>
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-2 rounded-md border border-border bg-secondary/20 p-3">
-                  <Label className="text-sm font-semibold">Works weekdays</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Auto-generate uses these as preferred or required depending on the Hard/Soft
-                    rule.
-                  </p>
-                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
-                    {WEEKDAY_OPTIONS.map((day) => (
-                      <label
-                        key={`preferred-day-${day.value}`}
-                        className="flex items-center gap-1.5 text-xs"
-                      >
+                  <div className="space-y-2 rounded-md border border-border bg-secondary/20 p-3">
+                    <Label className="text-sm font-semibold">
+                      Absolutely cannot work these weekdays
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Auto-generate will never assign this therapist on checked weekdays.
+                    </p>
+                    <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+                      {WEEKDAY_OPTIONS.map((day) => (
+                        <label
+                          key={`blocked-day-${day.value}`}
+                          className="flex items-center gap-1.5 text-xs"
+                        >
+                          <input
+                            type="checkbox"
+                            name="offs_dow"
+                            value={String(day.value)}
+                            defaultChecked={editEmployee.offs_dow.includes(day.value)}
+                          />
+                          {day.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 rounded-md border border-border bg-secondary/20 p-3">
+                    <Label className="text-sm font-semibold">Works days rule</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Hard: only works days are allowed. Soft: works days are preferred but other
+                      days are allowed.
+                    </p>
+                    <div className="inline-flex rounded-md border border-border bg-background p-1">
+                      <label className="cursor-pointer">
                         <input
-                          type="checkbox"
-                          name="works_dow"
-                          value={String(day.value)}
-                          defaultChecked={editEmployee.works_dow.includes(day.value)}
+                          className="sr-only"
+                          type="radio"
+                          name="works_dow_mode"
+                          value="hard"
+                          checked={worksDowModeDraft === 'hard'}
+                          onChange={() =>
+                            setEditState((current) =>
+                              current ? { ...current, worksDowMode: 'hard' } : current
+                            )
+                          }
                         />
-                        {day.label}
+                        <span
+                          className={cn(
+                            'rounded px-3 py-1.5 text-sm',
+                            worksDowModeDraft === 'hard'
+                              ? 'bg-primary text-primary-foreground'
+                              : 'text-muted-foreground'
+                          )}
+                        >
+                          Hard
+                        </span>
                       </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-2 rounded-md border border-border bg-secondary/20 p-3">
-                  <Label className="text-sm font-semibold">
-                    Absolutely cannot work these weekdays
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Auto-generate will never assign this therapist on checked weekdays.
-                  </p>
-                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
-                    {WEEKDAY_OPTIONS.map((day) => (
-                      <label
-                        key={`blocked-day-${day.value}`}
-                        className="flex items-center gap-1.5 text-xs"
-                      >
+                      <label className="cursor-pointer">
                         <input
-                          type="checkbox"
-                          name="offs_dow"
-                          value={String(day.value)}
-                          defaultChecked={editEmployee.offs_dow.includes(day.value)}
+                          className="sr-only"
+                          type="radio"
+                          name="works_dow_mode"
+                          value="soft"
+                          checked={worksDowModeDraft === 'soft'}
+                          onChange={() =>
+                            setEditState((current) =>
+                              current ? { ...current, worksDowMode: 'soft' } : current
+                            )
+                          }
                         />
-                        {day.label}
+                        <span
+                          className={cn(
+                            'rounded px-3 py-1.5 text-sm',
+                            worksDowModeDraft === 'soft'
+                              ? 'bg-primary text-primary-foreground'
+                              : 'text-muted-foreground'
+                          )}
+                        >
+                          Soft
+                        </span>
                       </label>
-                    ))}
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-2 rounded-md border border-border bg-secondary/20 p-3">
-                  <Label className="text-sm font-semibold">Works days rule</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Hard: only works days are allowed. Soft: works days are preferred but other days
-                    are allowed.
-                  </p>
-                  <div className="inline-flex rounded-md border border-border bg-background p-1">
-                    <label className="cursor-pointer">
-                      <input
-                        className="sr-only"
-                        type="radio"
-                        name="works_dow_mode"
-                        value="hard"
-                        checked={worksDowModeDraft === 'hard'}
-                        onChange={() =>
-                          setEditState((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  worksDowMode: 'hard',
-                                }
-                              : current
-                          )
-                        }
-                      />
-                      <span
-                        className={cn(
-                          'rounded px-3 py-1.5 text-sm',
-                          worksDowModeDraft === 'hard'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'text-muted-foreground'
-                        )}
-                      >
-                        Hard
-                      </span>
-                    </label>
-                    <label className="cursor-pointer">
-                      <input
-                        className="sr-only"
-                        type="radio"
-                        name="works_dow_mode"
-                        value="soft"
-                        checked={worksDowModeDraft === 'soft'}
-                        onChange={() =>
-                          setEditState((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  worksDowMode: 'soft',
-                                }
-                              : current
-                          )
-                        }
-                      />
-                      <span
-                        className={cn(
-                          'rounded px-3 py-1.5 text-sm',
-                          worksDowModeDraft === 'soft'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'text-muted-foreground'
-                        )}
-                      >
-                        Soft
-                      </span>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-2">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      name="is_lead_eligible"
-                      defaultChecked={editEmployee.is_lead_eligible}
-                    />
-                    Lead
-                  </label>
                   <fieldset className="space-y-1">
-                    <legend className="text-sm">Weekend rotation</legend>
+                    <legend className="text-sm font-medium">Weekend rotation</legend>
                     <label className="flex items-center gap-2 text-sm">
                       <input
                         type="radio"
@@ -1205,12 +1375,7 @@ export function EmployeeDirectory({
                         checked={weekendRotationDraft === 'none'}
                         onChange={() =>
                           setEditState((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  weekendRotation: 'none',
-                                }
-                              : current
+                            current ? { ...current, weekendRotation: 'none' } : current
                           )
                         }
                       />
@@ -1224,78 +1389,34 @@ export function EmployeeDirectory({
                         checked={weekendRotationDraft === 'every_other'}
                         onChange={() =>
                           setEditState((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  weekendRotation: 'every_other',
-                                }
-                              : current
+                            current ? { ...current, weekendRotation: 'every_other' } : current
                           )
                         }
                       />
                       Every other weekend
                     </label>
                   </fieldset>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      name="on_fmla"
-                      checked={onFmlaDraft}
-                      onChange={(event) =>
-                        setEditState((current) =>
-                          current
-                            ? {
-                                ...current,
-                                onFmla: event.target.checked,
-                              }
-                            : current
-                        )
-                      }
-                    />
-                    On FMLA
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      name="is_active"
-                      defaultChecked={editEmployee.is_active}
-                    />
-                    Active
-                  </label>
+
+                  {weekendRotationDraft === 'every_other' && (
+                    <div className="space-y-1">
+                      <Label htmlFor="edit_weekend_anchor">Weekend anchor date (Saturday)</Label>
+                      <Input
+                        id="edit_weekend_anchor"
+                        name="weekend_anchor_date"
+                        type="date"
+                        defaultValue={editEmployee.weekend_anchor_date ?? ''}
+                        required
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Auto-generate assigns this therapist on alternating weekends from this
+                        anchor Saturday.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
-                {weekendRotationDraft === 'every_other' && (
-                  <div className="space-y-1">
-                    <Label htmlFor="edit_weekend_anchor">Weekend anchor date (Saturday)</Label>
-                    <Input
-                      id="edit_weekend_anchor"
-                      name="weekend_anchor_date"
-                      type="date"
-                      defaultValue={editEmployee.weekend_anchor_date ?? ''}
-                      required
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Auto-generate assigns this therapist on alternating weekends from this anchor
-                      Saturday.
-                    </p>
-                  </div>
-                )}
-
-                {isFmlaReturnDateEnabled(onFmlaDraft) && (
-                  <div className="space-y-1">
-                    <Label htmlFor="edit_fmla_return">Potential return date</Label>
-                    <Input
-                      id="edit_fmla_return"
-                      name="fmla_return_date"
-                      type="date"
-                      defaultValue={
-                        normalizeFmlaReturnDate(editEmployee.fmla_return_date ?? '', true) ?? ''
-                      }
-                    />
-                  </div>
-                )}
-
-                <DialogFooter>
+                {/* Sticky save footer — visible on Profile + Scheduling tabs */}
+                <div className="sticky bottom-0 z-10 flex justify-end gap-2 border-t border-border bg-white px-6 py-3">
                   <FormSubmitButton type="submit" pendingText="Saving...">
                     Save
                   </FormSubmitButton>
@@ -1308,381 +1429,405 @@ export function EmployeeDirectory({
                   >
                     Save + realign shifts
                   </FormSubmitButton>
-                </DialogFooter>
+                </div>
               </form>
 
-              <div
-                ref={availabilitySectionRef}
-                className={cn(
-                  'space-y-3 rounded-md border border-border bg-secondary/20 p-3',
-                  focusAvailabilitySection ? 'ring-2 ring-primary/40' : ''
-                )}
-              >
-                <div>
-                  <p className="text-sm font-semibold">Date Overrides (Manager)</p>
-                  <p className="text-xs text-muted-foreground">
-                    Add or update cycle-specific dates for this therapist. Same cycle/date/shift
-                    updates existing entry.
-                  </p>
-                </div>
-
-                <form
-                  action={saveEmployeeDateOverrideAction}
-                  className="grid grid-cols-1 gap-2 md:grid-cols-12"
-                  onSubmit={(event) => {
-                    const textDate = overrideDateDraft.trim()
-                    const targetDates = Array.from(
-                      new Set([...overrideDatesDraft, ...(textDate ? [textDate] : [])])
-                    ).sort()
-                    if (targetDates.length === 0) {
-                      event.preventDefault()
-                      setOverrideDateError('Select at least one date.')
-                      return
-                    }
-
-                    const outOfRangeDate = targetDates.find(
-                      (candidate) => !isDateWithinCycle(candidate, selectedOverrideCycle)
-                    )
-                    if (outOfRangeDate) {
-                      event.preventDefault()
-                      const label = selectedOverrideCycle
-                        ? `${formatEmployeeDate(selectedOverrideCycle.start_date)} to ${formatEmployeeDate(selectedOverrideCycle.end_date)}`
-                        : ''
-                      setOverrideDateError(
-                        selectedOverrideCycle
-                          ? `Date must be within the selected cycle (${label}).`
-                          : 'Date is outside the selected cycle.'
-                      )
-                      return
-                    }
-
-                    setOverrideDateError(null)
-                  }}
-                >
-                  <input type="hidden" name="profile_id" value={editEmployee.id} />
-                  {overrideDatesDraft.map((dateValue) => (
-                    <input
-                      key={`override-date-${dateValue}`}
-                      type="hidden"
-                      name="dates"
-                      value={dateValue}
-                    />
-                  ))}
-                  {overrideDateDraft && (
-                    <input type="hidden" name="date" value={overrideDateDraft} />
-                  )}
-                  <div className="space-y-1 md:col-span-3">
-                    <Label htmlFor="override_date">Date</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="override_date"
-                        type="date"
-                        value={overrideDateDraft}
-                        onChange={(event) => {
-                          setOverrideDateDraft(event.target.value)
-                          setOverrideDateError(null)
-                        }}
-                      />
-                      <Button type="button" variant="outline" onClick={addDateToOverrideBatch}>
-                        Add
-                      </Button>
-                    </div>
-                    {overrideDatesDraft.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {overrideDatesDraft.map((dateValue) => (
-                          <button
-                            key={`override-chip-${dateValue}`}
-                            type="button"
-                            className="rounded-full border border-border bg-background px-2 py-0.5 text-xs hover:bg-secondary"
-                            onClick={() =>
-                              setOverrideDatesDraft((current) =>
-                                current.filter((value) => value !== dateValue)
-                              )
-                            }
-                            title="Remove date"
-                          >
-                            {formatEmployeeDate(dateValue)} x
-                          </button>
-                        ))}
-                      </div>
+              {/* ── Overrides tab panel ── */}
+              {drawerTab === 'overrides' && (
+                <div ref={availabilitySectionRef} className="space-y-3 px-6 py-4">
+                  <div
+                    className={cn(
+                      'space-y-3 rounded-md border border-border bg-secondary/20 p-3',
+                      focusAvailabilitySection ? 'ring-2 ring-primary/40' : ''
                     )}
-                    {overrideDateError && (
-                      <p className="rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]">
-                        {overrideDateError}
+                  >
+                    <div>
+                      <p className="text-sm font-semibold">Date Overrides (Manager)</p>
+                      <p className="text-xs text-muted-foreground">
+                        Add or update cycle-specific dates for this therapist. Same cycle/date/shift
+                        updates existing entry.
                       </p>
-                    )}
-                  </div>
-                  <div className="space-y-1 md:col-span-7">
-                    <Label htmlFor="override_cycle_id">Cycle</Label>
-                    <select
-                      id="override_cycle_id"
-                      name="cycle_id"
-                      className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
-                      value={overrideCycleIdDraft}
-                      onChange={(event) => {
-                        const nextCycleId = event.target.value
-                        setOverrideCycleIdDraft(nextCycleId)
-                        const nextCycle = cycles.find((cycle) => cycle.id === nextCycleId) ?? null
-                        if (nextCycle) {
-                          setOverrideCalendarMonthStart(toMonthStartKey(nextCycle.start_date))
+                    </div>
+
+                    <form
+                      action={saveEmployeeDateOverrideAction}
+                      className="grid grid-cols-1 gap-2 md:grid-cols-12"
+                      onSubmit={(event) => {
+                        const textDate = overrideDateDraft.trim()
+                        const targetDates = Array.from(
+                          new Set([...overrideDatesDraft, ...(textDate ? [textDate] : [])])
+                        ).sort()
+                        if (targetDates.length === 0) {
+                          event.preventDefault()
+                          setOverrideDateError('Select at least one date.')
+                          return
                         }
-                        setOverrideDatesDraft((current) => {
-                          if (!nextCycle) return current
-                          return current.filter((dateValue) =>
-                            isDateWithinCycle(dateValue, nextCycle)
+
+                        const outOfRangeDate = targetDates.find(
+                          (candidate) => !isDateWithinCycle(candidate, selectedOverrideCycle)
+                        )
+                        if (outOfRangeDate) {
+                          event.preventDefault()
+                          const label = selectedOverrideCycle
+                            ? `${formatEmployeeDate(selectedOverrideCycle.start_date)} to ${formatEmployeeDate(selectedOverrideCycle.end_date)}`
+                            : ''
+                          setOverrideDateError(
+                            selectedOverrideCycle
+                              ? `Date must be within the selected cycle (${label}).`
+                              : 'Date is outside the selected cycle.'
                           )
-                        })
+                          return
+                        }
+
                         setOverrideDateError(null)
                       }}
-                      required
                     >
-                      <option value="" disabled>
-                        Select cycle
-                      </option>
-                      {cycles.map((cycle) => (
-                        <option key={`cycle-${cycle.id}`} value={cycle.id}>
-                          {cycle.label}
-                        </option>
+                      <input type="hidden" name="profile_id" value={editEmployee.id} />
+                      {overrideDatesDraft.map((dateValue) => (
+                        <input
+                          key={`override-date-${dateValue}`}
+                          type="hidden"
+                          name="dates"
+                          value={dateValue}
+                        />
                       ))}
-                    </select>
-                  </div>
-                  <div className="space-y-1 md:col-span-5">
-                    <Label htmlFor="override_type">Override</Label>
-                    <select
-                      id="override_type"
-                      name="override_type"
-                      className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
-                      defaultValue="force_off"
-                      required
-                    >
-                      <option value="force_off">Need off</option>
-                      <option value="force_on">Available to work</option>
-                    </select>
-                  </div>
-                  <input type="hidden" name="shift_type" value={editEmployee.shift_type} />
-                  <div className="space-y-2 md:col-span-12">
-                    <div className="flex items-center justify-between gap-2">
-                      <Label>Calendar multi-select</Label>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setOverrideDatesDraft([])
-                          setOverrideDateError(null)
-                        }}
-                        disabled={overrideDatesDraft.length === 0}
-                      >
-                        Clear selected
-                      </Button>
-                    </div>
-                    <div className="rounded-md border border-border bg-background p-2">
-                      <div className="mb-2 flex items-center justify-between">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          disabled={!canGoPrevMonth}
-                          onClick={() =>
-                            setOverrideCalendarMonthStart((current) => shiftMonthKey(current, -1))
-                          }
-                          aria-label="Previous month"
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <p className="text-sm font-medium">{overrideCalendarTitle}</p>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          disabled={!canGoNextMonth}
-                          onClick={() =>
-                            setOverrideCalendarMonthStart((current) => shiftMonthKey(current, 1))
-                          }
-                          aria-label="Next month"
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="mb-1 grid grid-cols-7 gap-1">
-                        {WEEKDAY_OPTIONS.map((day) => (
-                          <p
-                            key={`override-weekday-${day.value}`}
-                            className="text-center text-[11px] font-medium text-muted-foreground"
-                          >
-                            {day.label}
+                      {overrideDateDraft && (
+                        <input type="hidden" name="date" value={overrideDateDraft} />
+                      )}
+                      <div className="space-y-1 md:col-span-3">
+                        <Label htmlFor="override_date">Date</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="override_date"
+                            type="date"
+                            value={overrideDateDraft}
+                            onChange={(event) => {
+                              setOverrideDateDraft(event.target.value)
+                              setOverrideDateError(null)
+                            }}
+                          />
+                          <Button type="button" variant="outline" onClick={addDateToOverrideBatch}>
+                            Add
+                          </Button>
+                        </div>
+                        {overrideDatesDraft.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {overrideDatesDraft.map((dateValue) => (
+                              <button
+                                key={`override-chip-${dateValue}`}
+                                type="button"
+                                className="rounded-full border border-border bg-background px-2 py-0.5 text-xs hover:bg-secondary"
+                                onClick={() =>
+                                  setOverrideDatesDraft((current) =>
+                                    current.filter((value) => value !== dateValue)
+                                  )
+                                }
+                                title="Remove date"
+                              >
+                                {formatEmployeeDate(dateValue)} x
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {overrideDateError && (
+                          <p className="rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]">
+                            {overrideDateError}
                           </p>
-                        ))}
+                        )}
                       </div>
-                      <div className="touch-none space-y-1" ref={calendarRef}>
-                        {overrideCalendarWeeks.map((week, weekIndex) => (
-                          <div
-                            key={`override-week-${weekIndex}`}
-                            className="grid grid-cols-7 gap-1"
-                          >
-                            {week.map((day) => {
-                              const dayKey = toIsoDate(day)
-                              const isCurrentMonth = dayKey.slice(0, 7) === overrideCalendarMonthKey
-                              const isInCycle = isDateWithinCycle(dayKey, selectedOverrideCycle)
-                              const isSelected = selectedOverrideDatesSet.has(dayKey)
-                              return (
-                                <button
-                                  key={dayKey}
-                                  type="button"
-                                  data-date={dayKey}
-                                  disabled={!isInCycle}
-                                  onMouseDown={(event) => handleCalendarDayMouseDown(event, dayKey)}
-                                  onMouseEnter={() => handleCalendarDayMouseEnter(dayKey)}
-                                  onTouchStart={(e) => {
-                                    e.preventDefault()
-                                    handleCalendarDayTouchStart(dayKey)
-                                  }}
-                                  className={cn(
-                                    'h-8 rounded-md text-xs transition-colors',
-                                    isSelected
-                                      ? 'bg-[#d97706] font-semibold text-white hover:bg-[#b45309]'
-                                      : 'bg-background',
-                                    !isSelected && isInCycle && 'hover:bg-secondary',
-                                    !isCurrentMonth && !isSelected && 'text-muted-foreground',
-                                    !isInCycle && 'cursor-not-allowed opacity-35'
-                                  )}
-                                  title={
-                                    isInCycle
-                                      ? formatEmployeeDate(dayKey)
-                                      : 'Outside selected cycle'
-                                  }
-                                >
-                                  {day.getDate()}
-                                </button>
-                              )
-                            })}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Click days to toggle selection. Click and drag across days to select quickly.
-                    </p>
-                  </div>
-                  <div className="space-y-1 md:col-span-9">
-                    <Label htmlFor="override_note">Note (optional)</Label>
-                    <Input id="override_note" name="note" placeholder="Vacation, training, etc." />
-                  </div>
-                  <div className="flex items-end md:col-span-3">
-                    <FormSubmitButton type="submit" pendingText="Saving..." className="w-full">
-                      Save date override
-                    </FormSubmitButton>
-                  </div>
-                </form>
-
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Current overrides
-                  </p>
-                  {editEmployeeDateOverrides.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No date overrides for this therapist yet.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {editEmployeeDateOverrides.map((row) => (
-                        <div
-                          key={row.id}
-                          className="flex flex-col gap-2 rounded-md border border-border bg-background p-2 md:flex-row md:items-center md:justify-between"
+                      <div className="space-y-1 md:col-span-7">
+                        <Label htmlFor="override_cycle_id">Cycle</Label>
+                        <select
+                          id="override_cycle_id"
+                          name="cycle_id"
+                          className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                          value={overrideCycleIdDraft}
+                          onChange={(event) => {
+                            const nextCycleId = event.target.value
+                            setOverrideCycleIdDraft(nextCycleId)
+                            const nextCycle =
+                              cycles.find((cycle) => cycle.id === nextCycleId) ?? null
+                            if (nextCycle) {
+                              setOverrideCalendarMonthStart(toMonthStartKey(nextCycle.start_date))
+                            }
+                            // Pre-populate calendar with existing overrides for this cycle
+                            setOverrideDatesDraft(
+                              dateOverrides
+                                .filter(
+                                  (row) =>
+                                    row.therapist_id === editEmployee.id &&
+                                    row.cycle_id === nextCycleId
+                                )
+                                .map((row) => row.date)
+                                .sort((a, b) => a.localeCompare(b))
+                            )
+                            setOverrideDateError(null)
+                          }}
+                          required
                         >
-                          <div className="space-y-0.5">
-                            <p className="text-sm font-medium">
-                              {formatEmployeeDate(row.date)} —{' '}
-                              {row.override_type === 'force_on' ? 'Available to work' : 'Need off'}
-                            </p>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-xs text-muted-foreground">
-                                {cycleLabelById.get(row.cycle_id) ?? row.cycle_id}
-                                {row.note ? ` | ${row.note}` : ''}
-                              </p>
-                              <Badge variant="outline" className="text-[10px]">
-                                {row.source === 'manager'
-                                  ? 'Entered by manager'
-                                  : 'Entered by therapist'}
-                              </Badge>
-                            </div>
-                          </div>
-                          <form action={deleteEmployeeDateOverrideAction}>
-                            <input type="hidden" name="override_id" value={row.id} />
-                            <input type="hidden" name="profile_id" value={editEmployee.id} />
-                            <input type="hidden" name="cycle_id" value={row.cycle_id} />
-                            <FormSubmitButton
-                              type="submit"
+                          <option value="" disabled>
+                            Select cycle
+                          </option>
+                          {cycles.map((cycle) => (
+                            <option key={`cycle-${cycle.id}`} value={cycle.id}>
+                              {cycle.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1 md:col-span-5">
+                        <Label htmlFor="override_type">Override</Label>
+                        <select
+                          id="override_type"
+                          name="override_type"
+                          className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                          defaultValue="force_off"
+                          required
+                        >
+                          <option value="force_off">Need off</option>
+                          <option value="force_on">Available to work</option>
+                        </select>
+                      </div>
+                      <input type="hidden" name="shift_type" value={editEmployee.shift_type} />
+                      <div className="space-y-2 md:col-span-12">
+                        <div className="flex items-center justify-between gap-2">
+                          <Label>Calendar multi-select</Label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setOverrideDatesDraft([])
+                              setOverrideDateError(null)
+                            }}
+                            disabled={overrideDatesDraft.length === 0}
+                          >
+                            Clear selected
+                          </Button>
+                        </div>
+                        <div className="rounded-md border border-border bg-background p-2">
+                          <div className="mb-2 flex items-center justify-between">
+                            <Button
+                              type="button"
                               variant="ghost"
                               size="sm"
-                              pendingText="Deleting..."
+                              disabled={!canGoPrevMonth}
+                              onClick={() =>
+                                setOverrideCalendarMonthStart((current) =>
+                                  shiftMonthKey(current, -1)
+                                )
+                              }
+                              aria-label="Previous month"
                             >
-                              Delete
-                            </FormSubmitButton>
-                          </form>
+                              <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            <p className="text-sm font-medium">{overrideCalendarTitle}</p>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              disabled={!canGoNextMonth}
+                              onClick={() =>
+                                setOverrideCalendarMonthStart((current) =>
+                                  shiftMonthKey(current, 1)
+                                )
+                              }
+                              aria-label="Next month"
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="mb-1 grid grid-cols-7 gap-1">
+                            {WEEKDAY_OPTIONS.map((day) => (
+                              <p
+                                key={`override-weekday-${day.value}`}
+                                className="text-center text-[11px] font-medium text-muted-foreground"
+                              >
+                                {day.label}
+                              </p>
+                            ))}
+                          </div>
+                          <div className="touch-none space-y-1" ref={calendarRef}>
+                            {overrideCalendarWeeks.map((week, weekIndex) => (
+                              <div
+                                key={`override-week-${weekIndex}`}
+                                className="grid grid-cols-7 gap-1"
+                              >
+                                {week.map((day) => {
+                                  const dayKey = toIsoDate(day)
+                                  const isCurrentMonth =
+                                    dayKey.slice(0, 7) === overrideCalendarMonthKey
+                                  const isInCycle = isDateWithinCycle(dayKey, selectedOverrideCycle)
+                                  const isSelected = selectedOverrideDatesSet.has(dayKey)
+                                  return (
+                                    <button
+                                      key={dayKey}
+                                      type="button"
+                                      data-date={dayKey}
+                                      disabled={!isInCycle}
+                                      onMouseDown={(event) =>
+                                        handleCalendarDayMouseDown(event, dayKey)
+                                      }
+                                      onMouseEnter={() => handleCalendarDayMouseEnter(dayKey)}
+                                      onTouchStart={(e) => {
+                                        e.preventDefault()
+                                        handleCalendarDayTouchStart(dayKey)
+                                      }}
+                                      className={cn(
+                                        'h-8 rounded-md text-xs transition-colors',
+                                        isSelected
+                                          ? 'bg-[#d97706] font-semibold text-white hover:bg-[#b45309]'
+                                          : 'bg-background',
+                                        !isSelected && isInCycle && 'hover:bg-secondary',
+                                        !isCurrentMonth && !isSelected && 'text-muted-foreground',
+                                        !isInCycle && 'cursor-not-allowed opacity-35'
+                                      )}
+                                      title={
+                                        isInCycle
+                                          ? formatEmployeeDate(dayKey)
+                                          : 'Outside selected cycle'
+                                      }
+                                    >
+                                      {day.getDate()}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      ))}
+                        <p className="text-xs text-muted-foreground">
+                          Click days to toggle selection. Click and drag across days to select
+                          quickly.
+                        </p>
+                      </div>
+                      <div className="space-y-1 md:col-span-9">
+                        <Label htmlFor="override_note">Note (optional)</Label>
+                        <Input
+                          id="override_note"
+                          name="note"
+                          placeholder="Vacation, training, etc."
+                        />
+                      </div>
+                      <div className="flex items-end md:col-span-3">
+                        <FormSubmitButton type="submit" pendingText="Saving..." className="w-full">
+                          Save date override
+                        </FormSubmitButton>
+                      </div>
+                    </form>
+
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Current overrides
+                      </p>
+                      {editEmployeeDateOverrides.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          No date overrides for this therapist yet.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {editEmployeeDateOverrides.map((row) => (
+                            <div
+                              key={row.id}
+                              className="flex flex-col gap-2 rounded-md border border-border bg-background p-2 md:flex-row md:items-center md:justify-between"
+                            >
+                              <div className="space-y-0.5">
+                                <p className="text-sm font-medium">
+                                  {formatEmployeeDate(row.date)} —{' '}
+                                  {row.override_type === 'force_on'
+                                    ? 'Available to work'
+                                    : 'Need off'}
+                                </p>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="text-xs text-muted-foreground">
+                                    {cycleLabelById.get(row.cycle_id) ?? row.cycle_id}
+                                    {row.note ? ` | ${row.note}` : ''}
+                                  </p>
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {row.source === 'manager'
+                                      ? 'Entered by manager'
+                                      : 'Entered by therapist'}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <form action={deleteEmployeeDateOverrideAction}>
+                                <input type="hidden" name="override_id" value={row.id} />
+                                <input type="hidden" name="profile_id" value={editEmployee.id} />
+                                <input type="hidden" name="cycle_id" value={row.cycle_id} />
+                                <FormSubmitButton
+                                  type="submit"
+                                  variant="ghost"
+                                  size="sm"
+                                  pendingText="Deleting..."
+                                >
+                                  Delete
+                                </FormSubmitButton>
+                              </form>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
-              <div className="rounded-md border border-border bg-secondary/20 p-3">
-                <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
-                  Copy shift pattern
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Copy this employee&apos;s scheduled shifts from one cycle to another. Shifts
-                  already in the target cycle are kept.
-                </p>
-                <form action={copyEmployeeShiftsAction} className="mt-3 space-y-2">
-                  <input type="hidden" name="employee_id" value={editEmployee.id} />
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-semibold text-slate-600">
-                      From cycle
-                      <select
-                        name="source_cycle_id"
-                        value={copySourceCycleId}
-                        onChange={(e) => setCopySourceCycleId(e.target.value)}
-                        className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700"
-                      >
-                        {cycles.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="text-xs font-semibold text-slate-600">
-                      To cycle
-                      <select
-                        name="target_cycle_id"
-                        value={copyTargetCycleId}
-                        onChange={(e) => setCopyTargetCycleId(e.target.value)}
-                        className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700"
-                      >
-                        {cycles.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
                   </div>
-                  <FormSubmitButton
-                    type="submit"
-                    size="sm"
-                    disabled={
-                      !copySourceCycleId ||
-                      !copyTargetCycleId ||
-                      copySourceCycleId === copyTargetCycleId
-                    }
-                    pendingText="Copying..."
-                  >
-                    Copy shifts
-                  </FormSubmitButton>
-                </form>
-              </div>
-            </div>
+                  <div className="rounded-md border border-border bg-secondary/20 p-3">
+                    <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                      Copy shift pattern
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Copy this employee&apos;s scheduled shifts from one cycle to another. Shifts
+                      already in the target cycle are kept.
+                    </p>
+                    <form action={copyEmployeeShiftsAction} className="mt-3 space-y-2">
+                      <input type="hidden" name="employee_id" value={editEmployee.id} />
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs font-semibold text-slate-600">
+                          From cycle
+                          <select
+                            name="source_cycle_id"
+                            value={copySourceCycleId}
+                            onChange={(e) => setCopySourceCycleId(e.target.value)}
+                            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700"
+                          >
+                            {cycles.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="text-xs font-semibold text-slate-600">
+                          To cycle
+                          <select
+                            name="target_cycle_id"
+                            value={copyTargetCycleId}
+                            onChange={(e) => setCopyTargetCycleId(e.target.value)}
+                            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700"
+                          >
+                            {cycles.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </div>
+                      <FormSubmitButton
+                        type="submit"
+                        size="sm"
+                        disabled={
+                          !copySourceCycleId ||
+                          !copyTargetCycleId ||
+                          copySourceCycleId === copyTargetCycleId
+                        }
+                        pendingText="Copying..."
+                      >
+                        Copy shifts
+                      </FormSubmitButton>
+                    </form>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </DialogContent>
       </Dialog>
