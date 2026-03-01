@@ -20,10 +20,7 @@ type ShiftCoverageRow = {
   status: 'scheduled' | 'on_call' | 'sick' | 'called_off'
   role: 'lead' | 'staff'
   user_id: string
-  profiles:
-    | { is_lead_eligible: boolean }
-    | { is_lead_eligible: boolean }[]
-    | null
+  profiles: { is_lead_eligible: boolean } | { is_lead_eligible: boolean }[] | null
 }
 
 type PendingApprovalPostRow = {
@@ -32,10 +29,7 @@ type PendingApprovalPostRow = {
 
 type ShiftPublishLookupRow = {
   id: string
-  schedule_cycles:
-    | { published: boolean }
-    | { published: boolean }[]
-    | null
+  schedule_cycles: { published: boolean } | { published: boolean }[] | null
 }
 
 type DashboardLinks = {
@@ -99,7 +93,9 @@ function getLinks(activeCycle: CycleRow | null): DashboardLinks {
   }
 }
 
-export async function getManagerAttentionSnapshot(supabase: SupabaseServerClient): Promise<ManagerAttentionSnapshot> {
+export async function getManagerAttentionSnapshot(
+  supabase: SupabaseServerClient
+): Promise<ManagerAttentionSnapshot> {
   const todayKey = dateKeyFromDate(new Date())
 
   const { data: cyclesData } = await supabase
@@ -151,7 +147,9 @@ export async function getManagerAttentionSnapshot(supabase: SupabaseServerClient
           .filter((row) => Boolean(getOne(row.schedule_cycles)?.published))
           .map((row) => row.id)
       )
-      pendingApprovals = pendingApprovalPosts.filter((post) => publishedShiftIds.has(post.shift_id)).length
+      pendingApprovals = pendingApprovalPosts.filter((post) =>
+        publishedShiftIds.has(post.shift_id)
+      ).length
     }
   }
 
@@ -184,7 +182,8 @@ export async function getManagerAttentionSnapshot(supabase: SupabaseServerClient
   const coverageIssues = missingLeadShifts + underCoverageSlots + overCoverageSlots
   const unfilledShiftSlots = underCoverageSlots
   const attentionItems = pendingApprovals + coverageIssues
-  const publishReady = Boolean(activeCycle) && !activeCycle.published && pendingApprovals === 0 && coverageIssues === 0
+  const publishReady =
+    Boolean(activeCycle) && !activeCycle.published && pendingApprovals === 0 && coverageIssues === 0
 
   const resolveBlockersLink =
     coverageIssues > 0

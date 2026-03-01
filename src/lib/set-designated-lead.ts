@@ -18,11 +18,7 @@ export type SetDesignatedLeadResult =
   | { ok: true }
   | {
       ok: false
-      reason:
-        | 'multiple_leads_prevented'
-        | 'lead_not_eligible'
-        | 'invalid_input'
-        | 'failed'
+      reason: 'multiple_leads_prevented' | 'lead_not_eligible' | 'invalid_input' | 'failed'
       error?: RpcError
     }
 

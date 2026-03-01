@@ -28,8 +28,13 @@ function formatDate(value: string): string {
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-export function StaffShiftPostComposer({ shifts, createShiftPostAction }: StaffShiftPostComposerProps) {
-  const [selected, setSelected] = useState<{ shiftId: string; type: StaffShiftPostType } | null>(null)
+export function StaffShiftPostComposer({
+  shifts,
+  createShiftPostAction,
+}: StaffShiftPostComposerProps) {
+  const [selected, setSelected] = useState<{ shiftId: string; type: StaffShiftPostType } | null>(
+    null
+  )
 
   const selectedShift = useMemo(
     () => shifts.find((shift) => shift.id === selected?.shiftId) ?? null,
@@ -77,7 +82,11 @@ export function StaffShiftPostComposer({ shifts, createShiftPostAction }: StaffS
                 <Button
                   type="button"
                   size="sm"
-                  variant={selected?.shiftId === shift.id && selected.type === 'swap' ? 'default' : 'outline'}
+                  variant={
+                    selected?.shiftId === shift.id && selected.type === 'swap'
+                      ? 'default'
+                      : 'outline'
+                  }
                   onClick={() => setSelected({ shiftId: shift.id, type: 'swap' })}
                 >
                   Post for swap
@@ -85,7 +94,11 @@ export function StaffShiftPostComposer({ shifts, createShiftPostAction }: StaffS
                 <Button
                   type="button"
                   size="sm"
-                  variant={selected?.shiftId === shift.id && selected.type === 'pickup' ? 'default' : 'outline'}
+                  variant={
+                    selected?.shiftId === shift.id && selected.type === 'pickup'
+                      ? 'default'
+                      : 'outline'
+                  }
                   onClick={() => setSelected({ shiftId: shift.id, type: 'pickup' })}
                 >
                   Post for pickup
@@ -96,14 +109,21 @@ export function StaffShiftPostComposer({ shifts, createShiftPostAction }: StaffS
         </div>
 
         {selected && selectedShift && (
-          <form action={createShiftPostAction} className="space-y-3 rounded-md border border-border bg-secondary/20 p-3">
+          <form
+            action={createShiftPostAction}
+            className="space-y-3 rounded-md border border-border bg-secondary/20 p-3"
+          >
             <input type="hidden" name="shift_id" value={selected.shiftId} />
             <input type="hidden" name="type" value={selected.type} />
             <p className="text-sm font-medium text-foreground">
-              {selected.type === 'swap' ? 'Swap request' : 'Pickup request'} for {formatDate(selectedShift.date)} ({selectedShift.shiftType})
+              {selected.type === 'swap' ? 'Swap request' : 'Pickup request'} for{' '}
+              {formatDate(selectedShift.date)} ({selectedShift.shiftType})
             </p>
             <div className="space-y-1">
-              <label htmlFor="staff-post-message" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <label
+                htmlFor="staff-post-message"
+                className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+              >
                 Optional message
               </label>
               <textarea
@@ -115,12 +135,7 @@ export function StaffShiftPostComposer({ shifts, createShiftPostAction }: StaffS
               />
             </div>
             <div className="flex items-center justify-end gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => setSelected(null)}
-              >
+              <Button type="button" size="sm" variant="outline" onClick={() => setSelected(null)}>
                 Cancel
               </Button>
               <FormSubmitButton type="submit" size="sm" pendingText="Posting...">

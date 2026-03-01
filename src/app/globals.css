@@ -1,6 +1,6 @@
-@import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -48,103 +48,104 @@
 }
 
 :root {
-  --font-inter: "Segoe UI", "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-  --font-geist-mono: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-inter: 'Segoe UI', 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+  --font-geist-mono:
+    'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   --radius: 0.5rem;
-  --tw-primary-blue: #0667A9;
-  --tw-deep-blue: #1D608E;
-  --tw-light-blue: #6AA5C8;
-  --tw-accent-orange: #E27F3F;
-  --tw-soft-tint: #CEDFE3;
-  --tw-background: #F8FAFC;
-  --tw-surface: #FFFFFF;
-  --tw-text: #0F172A;
+  --tw-primary-blue: #0667a9;
+  --tw-deep-blue: #1d608e;
+  --tw-light-blue: #6aa5c8;
+  --tw-accent-orange: #e27f3f;
+  --tw-soft-tint: #cedfe3;
+  --tw-background: #f8fafc;
+  --tw-surface: #ffffff;
+  --tw-text: #0f172a;
   --tw-muted-text: #475569;
-  --tw-border: #E8EEF6;
-  --background: #F8FAFB;
-  --foreground: #0F172A;
-  --card: #FFFFFF;
-  --card-foreground: #0F172A;
-  --popover: #FFFFFF;
-  --popover-foreground: #0F172A;
-  --primary: #0667A9;
-  --primary-foreground: #FFFFFF;
-  --secondary: #CEDFE3;
-  --secondary-foreground: #0F172A;
-  --muted: #F8FAFC;
+  --tw-border: #e8eef6;
+  --background: #f8fafb;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #0667a9;
+  --primary-foreground: #ffffff;
+  --secondary: #cedfe3;
+  --secondary-foreground: #0f172a;
+  --muted: #f8fafc;
   --muted-foreground: #475569;
-  --accent: #E27F3F;
-  --accent-foreground: #FFFFFF;
-  --destructive: #EF4444;
-  --border: #E8EEF6;
+  --accent: #e27f3f;
+  --accent-foreground: #ffffff;
+  --destructive: #ef4444;
+  --border: #e8eef6;
   --input: transparent;
-  --input-background: #FFFFFF;
-  --ring: #0667A9;
-  --chart-1: #0667A9;
-  --chart-2: #6AA5C8;
-  --chart-3: #E27F3F;
-  --chart-4: #1D608E;
-  --chart-5: #CEDFE3;
-  --sidebar: #FFFFFF;
-  --sidebar-foreground: #0F172A;
-  --sidebar-primary: #0667A9;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #F8FAFC;
-  --sidebar-accent-foreground: #0F172A;
-  --sidebar-border: #E8EEF6;
-  --sidebar-ring: #0667A9;
-  --highlight: #0667A9;
-  --success: #22C55E;
-  --success-subtle: #DCFCE7;
-  --success-border: #BBF7D0;
-  --success-text: #15803D;
-  --warning: #F59E0B;
-  --warning-subtle: #FEF3C7;
-  --warning-border: #FDE68A;
-  --warning-text: #B45309;
-  --error: #EF4444;
-  --error-subtle: #FEE2E2;
-  --error-border: #FECACA;
-  --error-text: #B91C1C;
-  --info: #0EA5E9;
-  --info-subtle: #E0F2FE;
-  --info-border: #BAE6FD;
-  --info-text: #0369A1;
+  --input-background: #ffffff;
+  --ring: #0667a9;
+  --chart-1: #0667a9;
+  --chart-2: #6aa5c8;
+  --chart-3: #e27f3f;
+  --chart-4: #1d608e;
+  --chart-5: #cedfe3;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: #0667a9;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f8fafc;
+  --sidebar-accent-foreground: #0f172a;
+  --sidebar-border: #e8eef6;
+  --sidebar-ring: #0667a9;
+  --highlight: #0667a9;
+  --success: #22c55e;
+  --success-subtle: #dcfce7;
+  --success-border: #bbf7d0;
+  --success-text: #15803d;
+  --warning: #f59e0b;
+  --warning-subtle: #fef3c7;
+  --warning-border: #fde68a;
+  --warning-text: #b45309;
+  --error: #ef4444;
+  --error-subtle: #fee2e2;
+  --error-border: #fecaca;
+  --error-text: #b91c1c;
+  --info: #0ea5e9;
+  --info-subtle: #e0f2fe;
+  --info-border: #bae6fd;
+  --info-text: #0369a1;
 }
 
 .dark {
-  --background: #F8FAFB;
-  --foreground: #0F172A;
-  --card: #FFFFFF;
-  --card-foreground: #0F172A;
-  --popover: #FFFFFF;
-  --popover-foreground: #0F172A;
-  --primary: #0667A9;
-  --primary-foreground: #FFFFFF;
-  --secondary: #CEDFE3;
-  --secondary-foreground: #0F172A;
-  --muted: #F8FAFC;
+  --background: #f8fafb;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #0667a9;
+  --primary-foreground: #ffffff;
+  --secondary: #cedfe3;
+  --secondary-foreground: #0f172a;
+  --muted: #f8fafc;
   --muted-foreground: #475569;
-  --accent: #E27F3F;
-  --accent-foreground: #FFFFFF;
-  --destructive: #EF4444;
-  --border: #E8EEF6;
+  --accent: #e27f3f;
+  --accent-foreground: #ffffff;
+  --destructive: #ef4444;
+  --border: #e8eef6;
   --input: transparent;
-  --input-background: #FFFFFF;
-  --ring: #0667A9;
-  --chart-1: #0667A9;
-  --chart-2: #6AA5C8;
-  --chart-3: #E27F3F;
-  --chart-4: #1D608E;
-  --chart-5: #CEDFE3;
-  --sidebar: #FFFFFF;
-  --sidebar-foreground: #0F172A;
-  --sidebar-primary: #0667A9;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #F8FAFC;
-  --sidebar-accent-foreground: #0F172A;
-  --sidebar-border: #E8EEF6;
-  --sidebar-ring: #0667A9;
+  --input-background: #ffffff;
+  --ring: #0667a9;
+  --chart-1: #0667a9;
+  --chart-2: #6aa5c8;
+  --chart-3: #e27f3f;
+  --chart-4: #1d608e;
+  --chart-5: #cedfe3;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: #0667a9;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f8fafc;
+  --sidebar-accent-foreground: #0f172a;
+  --sidebar-border: #e8eef6;
+  --sidebar-ring: #0667a9;
 }
 
 @layer base {
@@ -158,7 +159,11 @@
       radial-gradient(circle at 88% 4%, rgba(206, 223, 227, 0.26), transparent 42%),
       linear-gradient(rgba(15, 23, 42, 0.02) 1px, transparent 1px),
       linear-gradient(90deg, rgba(15, 23, 42, 0.02) 1px, transparent 1px);
-    background-size: auto, auto, 36px 36px, 36px 36px;
+    background-size:
+      auto,
+      auto,
+      36px 36px,
+      36px 36px;
     min-height: 100vh;
   }
 
@@ -239,7 +244,7 @@
 
   .print-lottery-page {
     color: #111827;
-    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   }
 
   .print-lottery-header {
@@ -341,8 +346,14 @@
 }
 
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .fade-up {

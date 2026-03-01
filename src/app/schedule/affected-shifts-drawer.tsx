@@ -4,7 +4,13 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { buildScheduleUrl } from '@/lib/schedule-helpers'
 import type { ShiftSlotValidationIssue } from '@/lib/schedule-rule-validation'
 
@@ -31,7 +37,9 @@ function issueLabel(value: ShiftSlotValidationIssue['reasons'][number]): string 
   return 'Multiple leads'
 }
 
-function primaryReason(issue: ShiftSlotValidationIssue): ShiftSlotValidationIssue['reasons'][number] {
+function primaryReason(
+  issue: ShiftSlotValidationIssue
+): ShiftSlotValidationIssue['reasons'][number] {
   for (const reason of ISSUE_PRIORITY) {
     if (issue.reasons.includes(reason)) return reason
   }
@@ -50,7 +58,13 @@ export function AffectedShiftsDrawer({
 
   return (
     <>
-      <Button type="button" variant="link" className="h-auto px-0 text-xs" disabled={!hasIssues} onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        variant="link"
+        className="h-auto px-0 text-xs"
+        disabled={!hasIssues}
+        onClick={() => setOpen(true)}
+      >
         View affected shifts
       </Button>
 
@@ -62,9 +76,7 @@ export function AffectedShiftsDrawer({
           <div className="h-full overflow-y-auto p-6">
             <DialogHeader>
               <DialogTitle>Affected shifts</DialogTitle>
-              <DialogDescription>
-                Select an issue to jump to that calendar slot.
-              </DialogDescription>
+              <DialogDescription>Select an issue to jump to that calendar slot.</DialogDescription>
             </DialogHeader>
 
             <div className="mt-4 space-y-2">

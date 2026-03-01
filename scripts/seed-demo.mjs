@@ -15,7 +15,9 @@ let urlRef = ''
 let keyRef = ''
 try {
   urlRef = new URL(SUPABASE_URL).hostname.split('.')[0]
-  const payload = JSON.parse(Buffer.from(SUPABASE_SERVICE_ROLE_KEY.split('.')[1], 'base64url').toString('utf8'))
+  const payload = JSON.parse(
+    Buffer.from(SUPABASE_SERVICE_ROLE_KEY.split('.')[1], 'base64url').toString('utf8')
+  )
   keyRef = payload.ref ?? ''
 } catch {
   // Ignore parsing issues here; Supabase client will still report invalid API key.

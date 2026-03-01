@@ -1,8 +1,32 @@
 # Teamwise Scheduler - Codex Handoff Context
 
-Updated: 2026-02-28 (shared calendar utils + coverage lead role toggle + weekly workload counts)
+Updated: 2026-02-28 (CI/tooling hardening + cycle workload counts + selectors extraction)
 
-## Latest Completed Work (2026-02-28)
+## Latest Completed Work (2026-02-28, session 2)
+
+- CI/tooling hardening:
+  - `package.json` — `format` and `format:check` scripts now run `prettier . / prettier --check .` (whole repo, not a hardcoded path subset)
+  - `.github/workflows/ci.yml` — added `npx tsc --noEmit` step between lint and build; TypeScript is now a CI gate
+  - `eslint.config.mjs` — added `.claude/**` to global ESLint ignores so worktree build artifacts are never scanned
+
+- Cycle workload counts in assign dropdown:
+  - `src/app/coverage/page.tsx` — added `cycleTherapistCounts` useMemo (total shifts per therapist across full cycle, derived from already-loaded `dayDays`/`nightDays`, zero extra network requests)
+  - `src/components/coverage/ShiftDrawer.tsx` — dropdown now shows `· N this wk, M this cyc` when both counts are available, `· M this cyc` when only cycle data exists; gives managers a complete scheduling load picture at a glance
+
+- Extracted `buildDayItems` + `toUiStatus` from `page.tsx` into `selectors.ts`:
+  - `src/lib/coverage/selectors.ts` — new exports: `buildDayItems`, `toUiStatus`, `BuildDayRowInput`
+  - `mapByShiftType` closure in `page.tsx` replaced by `buildDayItems` call; callers pre-resolve names from DB profile join
+  - `src/lib/coverage/selectors.test.ts` — 21 new tests covering `toUiStatus` (9 cases) and `buildDayItems` (12 cases): lead/staff sorting, constraint blocking, dayStatus derivation, assignment_status mapping; total unit tests: 171
+
+- Removed final `window.alert` call:
+  - `src/app/coverage/page.tsx` `handleUnassign` — removed redundant `window.alert` (error was already shown inline via `setError`; now consistent with assign/status error patterns)
+
+- Inline assign error + 4 new e2e tests (session 1 recap):
+  - `src/components/coverage/ShiftDrawer.tsx` — `assignError: string` prop renders inline `<p role="alert">` error banner
+  - `src/app/coverage/page.tsx` — `window.alert` in `handleAssign` replaced with `setAssignError`; clears on role/user/tab/day/close
+  - `e2e/coverage-overlay.spec.ts` — 4 new tests: assign therapist, duplicate-assign inline error (via `page.route` mock), lead-toggle filtering, status change label update; total: 10 tests
+
+## Latest Completed Work (2026-02-28, session 1)
 
 - Extracted shared calendar utilities — no behavior changes, net -87 lines:
   - `src/lib/calendar-utils.ts` extended with 4 new exports:
@@ -352,13 +376,11 @@ Latest local checks:
 
 - `npx tsc --noEmit` pass
 - `npm run lint` pass
-- `npm run test:unit` pass (150 tests)
-- Focused unit coverage for PRN strict policy pass:
-  - `src/lib/coverage/resolve-availability.test.ts`
-  - `src/lib/schedule-helpers.test.ts`
-  - `src/app/api/schedule/drag-drop/route.test.ts`
-- e2e specs added:
-  - `e2e/coverage-overlay.spec.ts`
+- `npm run format:check` pass (whole-repo Prettier; `.claude/**` excluded from ESLint)
+- `npm run test:unit` pass (171 tests across 19 files)
+- CI now gates on: format check → lint → **tsc --noEmit** → build
+- e2e specs:
+  - `e2e/coverage-overlay.spec.ts` (10 tests)
   - `e2e/directory-date-override.spec.ts`
 
 ## Resume Checklist
@@ -405,6 +427,6 @@ To activate:
 
 ## Next High-Value Priorities
 
-1. Add server-side validation messages for cycle/date conflicts directly in drawer UI
-2. Add integration tests for calendar overlay interactions (open/close/toggle/accordion)
-3. Publish flow validation — activate env vars and validate queued email send + retry path
+1. Publish flow validation — activate env vars and validate queued email send + retry path
+2. Add server-side validation messages for cycle/date conflicts directly in drawer UI
+3. Surface cycle-level scheduling metrics on the manager dashboard (e.g. per-therapist shift counts)

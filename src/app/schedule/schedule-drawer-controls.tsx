@@ -4,7 +4,13 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { FormSubmitButton } from '@/components/form-submit-button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -67,7 +73,9 @@ export function ScheduleDrawerControls({
             <section className="space-y-3">
               <h3 className="app-section-title">Cycle Selection</h3>
               {cycles.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No schedule cycles yet. Create your first cycle below.</p>
+                <p className="text-sm text-muted-foreground">
+                  No schedule cycles yet. Create your first cycle below.
+                </p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {cycles.map((cycle) => {
@@ -78,7 +86,9 @@ export function ScheduleDrawerControls({
                         key={cycle.id}
                         variant="outline"
                         size="sm"
-                        className={isActive ? 'border-primary/40 bg-secondary text-foreground' : undefined}
+                        className={
+                          isActive ? 'border-primary/40 bg-secondary text-foreground' : undefined
+                        }
                       >
                         <Link href={buildScheduleUrl(cycle.id, viewMode, baseParams)}>
                           {cycle.label} ({cycle.start_date} to {cycle.end_date})
@@ -97,7 +107,12 @@ export function ScheduleDrawerControls({
                 <input type="hidden" name="panel" value="setup" />
                 <div className="space-y-2">
                   <Label htmlFor="drawer-cycle-label">Label</Label>
-                  <Input id="drawer-cycle-label" name="label" placeholder="Mar 1 - Apr 12" required />
+                  <Input
+                    id="drawer-cycle-label"
+                    name="label"
+                    placeholder="Mar 1 - Apr 12"
+                    required
+                  />
                 </div>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">

@@ -31,7 +31,8 @@ export default function Home() {
               <span className="block text-primary">not harder.</span>
             </h1>
             <p className="text-base text-muted-foreground md:text-lg">
-              Centralize approvals and coverage in one dashboard. Give your team the self-service convenience they deserve.
+              Centralize approvals and coverage in one dashboard. Give your team the self-service
+              convenience they deserve.
             </p>
             <div className="flex flex-wrap gap-3 pt-1">
               <Button asChild size="lg" className="gap-2">
@@ -137,18 +138,28 @@ export default function Home() {
           <div className="grid gap-5 md:grid-cols-3">
             <div className="space-y-2">
               <Users className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold text-foreground">1. Team submits availability</h3>
-              <p className="text-sm text-muted-foreground">Therapists add blackout dates and requests before each cycle closes.</p>
+              <h3 className="text-lg font-semibold text-foreground">
+                1. Team submits availability
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Therapists add blackout dates and requests before each cycle closes.
+              </p>
             </div>
             <div className="space-y-2">
               <Sparkles className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold text-foreground">2. Manager auto-generates draft</h3>
-              <p className="text-sm text-muted-foreground">Teamwise creates balanced day/night schedules based on rules and requests.</p>
+              <h3 className="text-lg font-semibold text-foreground">
+                2. Manager auto-generates draft
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Teamwise creates balanced day/night schedules based on rules and requests.
+              </p>
             </div>
             <div className="space-y-2">
               <CalendarDays className="h-5 w-5 text-primary" />
               <h3 className="text-lg font-semibold text-foreground">3. Fill holes and publish</h3>
-              <p className="text-sm text-muted-foreground">Drag and drop final adjustments, review violations, and publish final schedules.</p>
+              <p className="text-sm text-muted-foreground">
+                Drag and drop final adjustments, review violations, and publish final schedules.
+              </p>
             </div>
           </div>
         </section>

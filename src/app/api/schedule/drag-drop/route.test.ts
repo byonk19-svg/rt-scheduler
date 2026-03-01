@@ -27,7 +27,10 @@ type Scenario = {
   weeklyShifts: Array<{ date: string; status: 'scheduled' | 'on_call' | 'sick' | 'called_off' }>
   leadTherapistEligible?: boolean
   leadTherapistRole?: 'therapist' | 'manager'
-  existingShiftForLead?: { id: string; status: 'scheduled' | 'on_call' | 'sick' | 'called_off' } | null
+  existingShiftForLead?: {
+    id: string
+    status: 'scheduled' | 'on_call' | 'sick' | 'called_off'
+  } | null
   removableShift?: {
     id: string
     cycle_id: string
@@ -130,7 +133,8 @@ function makeSupabaseMock(scenario: Scenario) {
 
       if (table === 'availability_overrides') {
         const rows = (scenario.availabilityRows ?? []).filter((row) => {
-          if (state.filters.therapist_id && row.therapist_id !== state.filters.therapist_id) return false
+          if (state.filters.therapist_id && row.therapist_id !== state.filters.therapist_id)
+            return false
           if (state.filters.cycle_id && row.cycle_id !== state.filters.cycle_id) return false
           if (state.filters.date && row.date !== state.filters.date) return false
           return true
@@ -151,15 +155,14 @@ function makeSupabaseMock(scenario: Scenario) {
 
         if (single && state.filters.id === 'shift-1') {
           return {
-            data:
-              scenario.removableShift ?? {
-                id: 'shift-1',
-                cycle_id: 'cycle-1',
-                user_id: 'therapist-1',
-                date: '2026-03-10',
-                shift_type: 'day',
-                role: 'staff',
-              },
+            data: scenario.removableShift ?? {
+              id: 'shift-1',
+              cycle_id: 'cycle-1',
+              user_id: 'therapist-1',
+              date: '2026-03-10',
+              shift_type: 'day',
+              role: 'staff',
+            },
             error: null,
           }
         }
@@ -170,7 +173,10 @@ function makeSupabaseMock(scenario: Scenario) {
 
         if (hasCoverageFilters && !hasUserIdFilter) {
           return {
-            data: scenario.coverageStatuses.map((status, idx) => ({ id: `coverage-${idx}`, status })),
+            data: scenario.coverageStatuses.map((status, idx) => ({
+              id: `coverage-${idx}`,
+              status,
+            })),
             error: null,
           }
         }
@@ -200,14 +206,23 @@ function makeSupabaseMock(scenario: Scenario) {
       neq: (column: string, value: unknown) => typeof builder
       gte: (column: string, value: unknown) => typeof builder
       lte: (column: string, value: unknown) => typeof builder
-      maybeSingle: () => Promise<{ data: unknown; error: { code?: string; message?: string } | null }>
+      maybeSingle: () => Promise<{
+        data: unknown
+        error: { code?: string; message?: string } | null
+      }>
       single: () => Promise<{ data: unknown; error: { code?: string; message?: string } | null }>
       insert: (payload: Record<string, unknown>) => typeof builder
       update: (payload: unknown) => typeof builder
       delete: () => typeof builder
-      then: <TResult1 = { data: unknown; error: { code?: string; message?: string } | null }, TResult2 = never>(
+      then: <
+        TResult1 = { data: unknown; error: { code?: string; message?: string } | null },
+        TResult2 = never,
+      >(
         onfulfilled?:
-          | ((value: { data: unknown; error: { code?: string; message?: string } | null }) => TResult1 | PromiseLike<TResult1>)
+          | ((value: {
+              data: unknown
+              error: { code?: string; message?: string } | null
+            }) => TResult1 | PromiseLike<TResult1>)
           | null,
         onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
       ) => Promise<TResult1 | TResult2>
@@ -248,7 +263,10 @@ function makeSupabaseMock(scenario: Scenario) {
         return builder
       },
       then: (onfulfilled, onrejected) => {
-        const result = state.op === 'select' ? Promise.resolve(resolveSelect(false)) : Promise.resolve(resolveMutation())
+        const result =
+          state.op === 'select'
+            ? Promise.resolve(resolveSelect(false))
+            : Promise.resolve(resolveMutation())
         return result.then(onfulfilled, onrejected)
       },
     }
@@ -397,7 +415,9 @@ describe('drag-drop API behavior', () => {
         },
       ],
     })
-    vi.mocked(createClient).mockResolvedValue(supabase as unknown as Awaited<ReturnType<typeof createClient>>)
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
 
     const response = await POST(
       new Request('http://localhost/api/schedule/drag-drop', {
@@ -438,7 +458,9 @@ describe('drag-drop API behavior', () => {
       },
       availabilityRows: [],
     })
-    vi.mocked(createClient).mockResolvedValue(supabase as unknown as Awaited<ReturnType<typeof createClient>>)
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
 
     const response = await POST(
       new Request('http://localhost/api/schedule/drag-drop', {

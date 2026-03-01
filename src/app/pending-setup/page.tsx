@@ -39,8 +39,8 @@ export default function PendingSetupPage() {
           Account pending setup
         </h1>
         <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.6 }}>
-          Your account has been created but hasn&apos;t been assigned a role yet. Please contact your manager to get
-          access.
+          Your account has been created but hasn&apos;t been assigned a role yet. Please contact
+          your manager to get access.
         </p>
         <form action="/auth/signout" method="post" style={{ marginTop: 20 }}>
           <button

@@ -9,7 +9,10 @@ export type AvailabilityEntry = {
   reason?: string | null
 }
 
-export function shiftTypesConflict(entryShiftType: AvailabilityShiftType, shiftType: 'day' | 'night'): boolean {
+export function shiftTypesConflict(
+  entryShiftType: AvailabilityShiftType,
+  shiftType: 'day' | 'night'
+): boolean {
   return entryShiftType === 'both' || entryShiftType === shiftType
 }
 
@@ -42,6 +45,8 @@ export function hasPrnAvailableOffer(
 ): boolean {
   return entries.some(
     (entry) =>
-      entry.entryType === 'available' && entry.date === date && shiftTypesConflict(entry.shiftType, shiftType)
+      entry.entryType === 'available' &&
+      entry.date === date &&
+      shiftTypesConflict(entry.shiftType, shiftType)
   )
 }

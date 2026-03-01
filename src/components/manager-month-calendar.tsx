@@ -229,7 +229,6 @@ function formatRangeLabel(startDate: string, endDate: string): string {
   return `Cycle range: ${startLabel} to ${endLabel}`
 }
 
-
 function assignmentStatusLabel(status: AssignmentStatus): string {
   if (status === 'call_in') return 'CI'
   if (status === 'cancelled') return 'CX'

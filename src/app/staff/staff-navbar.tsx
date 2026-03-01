@@ -36,7 +36,10 @@ export function StaffNavbar({ fullName }: StaffNavbarProps) {
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-white/95 backdrop-blur">
       <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3 md:px-8">
-        <Link href="/staff/dashboard" className="shrink-0 text-sm font-extrabold tracking-tight text-stone-900">
+        <Link
+          href="/staff/dashboard"
+          className="shrink-0 text-sm font-extrabold tracking-tight text-stone-900"
+        >
           Team<span style={{ color: '#d97706' }}>wise</span>
         </Link>
 
@@ -48,7 +51,9 @@ export function StaffNavbar({ fullName }: StaffNavbarProps) {
                 key={item.href}
                 href={item.href}
                 className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                  active ? 'bg-[#d97706] text-white' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                  active
+                    ? 'bg-[#d97706] text-white'
+                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                 }`}
               >
                 {item.label}
@@ -96,7 +101,9 @@ export function StaffNavbar({ fullName }: StaffNavbarProps) {
                 key={item.href}
                 href={item.href}
                 className={`rounded-md px-3 py-2 text-xs font-medium transition-colors ${
-                  active ? 'bg-[#d97706] text-white' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                  active
+                    ? 'bg-[#d97706] text-white'
+                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                 }`}
               >
                 {item.label}
@@ -108,4 +115,3 @@ export function StaffNavbar({ fullName }: StaffNavbarProps) {
     </header>
   )
 }
-

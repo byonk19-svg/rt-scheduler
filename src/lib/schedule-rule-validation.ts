@@ -49,7 +49,9 @@ export type ShiftSlotValidationIssue = {
   slotKey: string
   date: string
   shiftType: 'day' | 'night'
-  reasons: Array<'under_coverage' | 'over_coverage' | 'missing_lead' | 'multiple_leads' | 'ineligible_lead'>
+  reasons: Array<
+    'under_coverage' | 'over_coverage' | 'missing_lead' | 'multiple_leads' | 'ineligible_lead'
+  >
   leadName: string | null
 }
 
@@ -87,14 +89,20 @@ export function summarizePublishWeeklyViolations({
   for (const therapistId of therapistIds) {
     const maxFromMap = maxWorkDaysByTherapist.get(therapistId)
     if (maxFromMap === undefined && process.env.NODE_ENV !== 'production') {
-      console.warn(`summarizePublishWeeklyViolations: no max_work_days entry for therapist ${therapistId}, using default`)
+      console.warn(
+        `summarizePublishWeeklyViolations: no max_work_days entry for therapist ${therapistId}, using default`
+      )
     }
     const therapistMaxWorkDays = maxFromMap ?? MAX_WORK_DAYS_PER_WEEK
     for (const [weekStart, weekDatesInCycle] of cycleWeekDates) {
       const requiredDays = Math.min(therapistMaxWorkDays, weekDatesInCycle.size)
-      const workedDatesFromMap = weeklyWorkedDatesByUserWeek.get(weeklyCountKey(therapistId, weekStart))
+      const workedDatesFromMap = weeklyWorkedDatesByUserWeek.get(
+        weeklyCountKey(therapistId, weekStart)
+      )
       if (workedDatesFromMap === undefined && process.env.NODE_ENV !== 'production') {
-        console.warn(`summarizePublishWeeklyViolations: no worked-dates entry for therapist ${therapistId} week ${weekStart}, assuming 0`)
+        console.warn(
+          `summarizePublishWeeklyViolations: no worked-dates entry for therapist ${therapistId} week ${weekStart}, assuming 0`
+        )
       }
       const workedDates = workedDatesFromMap ?? new Set<string>()
       const workedCount = workedDates.size
@@ -152,7 +160,9 @@ export function summarizeShiftSlotViolations({
     for (const shiftType of ['day', 'night'] as const) {
       const slotKey = coverageSlotKey(date, shiftType)
       const slotAssignments = assignmentsBySlot.get(slotKey) ?? []
-      const activeAssignments = slotAssignments.filter((assignment) => assignment.status === 'scheduled' || assignment.status === 'on_call')
+      const activeAssignments = slotAssignments.filter(
+        (assignment) => assignment.status === 'scheduled' || assignment.status === 'on_call'
+      )
       const activeCoverage = activeAssignments.length
       const leadAssignments = slotAssignments.filter((assignment) => assignment.role === 'lead')
       const hasEligibleCoverage = activeAssignments.some((assignment) => assignment.isLeadEligible)
@@ -175,7 +185,10 @@ export function summarizeShiftSlotViolations({
         multipleLeads += 1
         reasons.push('multiple_leads')
       }
-      if (leadAssignments.length > 0 && leadAssignments.some((assignment) => !assignment.isLeadEligible)) {
+      if (
+        leadAssignments.length > 0 &&
+        leadAssignments.some((assignment) => !assignment.isLeadEligible)
+      ) {
         ineligibleLead += 1
         reasons.push('ineligible_lead')
       }

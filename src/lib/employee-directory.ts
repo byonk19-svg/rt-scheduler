@@ -89,7 +89,10 @@ export function buildManagerOverrideInput(params: {
   }
 }
 
-export function canTherapistMutateOverride(override: EmployeeAvailabilityOverride, therapistId: string): boolean {
+export function canTherapistMutateOverride(
+  override: EmployeeAvailabilityOverride,
+  therapistId: string
+): boolean {
   return override.therapist_id === therapistId && override.source === 'therapist'
 }
 
@@ -114,9 +117,7 @@ export function buildMissingAvailabilityRows(
       const lastUpdatedAt =
         rows.length === 0
           ? null
-          : rows
-              .map((row) => row.created_at)
-              .sort((a, b) => b.localeCompare(a))[0] ?? null
+          : (rows.map((row) => row.created_at).sort((a, b) => b.localeCompare(a))[0] ?? null)
       return {
         therapistId: therapist.id,
         therapistName: therapist.full_name,
@@ -131,7 +132,9 @@ export function buildMissingAvailabilityRows(
     })
 }
 
-export function getSchedulingEligibleEmployees<T extends { is_active: boolean; on_fmla: boolean }>(rows: T[]): T[] {
+export function getSchedulingEligibleEmployees<T extends { is_active: boolean; on_fmla: boolean }>(
+  rows: T[]
+): T[] {
   return rows.filter((row) => row.is_active && !row.on_fmla)
 }
 

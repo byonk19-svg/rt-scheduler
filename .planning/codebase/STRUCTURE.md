@@ -30,6 +30,7 @@ rt-scheduler/
 ## Directory Purposes
 
 **`src/app/`:**
+
 - Purpose: route-level UI and request handlers.
 - Key files:
   - `src/app/schedule/page.tsx`
@@ -38,6 +39,7 @@ rt-scheduler/
   - `src/app/coverage/page.tsx`.
 
 **`src/components/`:**
+
 - Purpose: shareable UI primitives and manager calendars.
 - Key files:
   - `src/components/manager-month-calendar.tsx`
@@ -45,6 +47,7 @@ rt-scheduler/
   - `src/components/ScheduleHeader.tsx`.
 
 **`src/lib/`:**
+
 - Purpose: reusable business logic and adapters.
 - Key files:
   - `schedule-helpers.ts`
@@ -53,60 +56,71 @@ rt-scheduler/
   - `supabase/{client,server,admin}.ts`.
 
 **`supabase/migrations/`:**
+
 - Purpose: schema and policy evolution.
 - Contains timestamped SQL migrations.
 
 ## Key File Locations
 
 **Entry points:**
+
 - `src/app/layout.tsx` - global shell.
 - `src/proxy.ts` - auth + route protection.
 
 **Scheduling core:**
+
 - `src/app/schedule/page.tsx` - manager schedule container.
 - `src/app/schedule/actions.ts` - cycle/shift mutations.
 - `src/app/api/schedule/drag-drop/route.ts` - drag/drop assignment API.
 
 **Coverage/requests:**
+
 - `src/app/coverage/page.tsx`
 - `src/app/shift-board/page.tsx`
 - `src/app/requests/new/page.tsx`.
 
 **Tests:**
+
 - unit: `src/**/*.test.ts`
 - e2e: `e2e/*.spec.ts`.
 
 ## Naming Conventions
 
 **Files:**
+
 - kebab-case for modules (`manager-week-calendar.tsx`).
 - route files follow Next conventions (`page.tsx`, `route.ts`, `layout.tsx`).
 - tests end with `.test.ts`.
 
 **Imports:**
+
 - alias `@/` for `src/` modules.
 
 ## Where to Add New Code
 
 **New scheduling feature:**
+
 - UI: `src/components/` or `src/app/<feature>/page.tsx`.
 - mutation path: `src/app/<feature>/actions.ts` and/or `src/app/api/<feature>/route.ts`.
 - shared rules: `src/lib/`.
 - SQL changes: `supabase/migrations/`.
 
 **New tests:**
+
 - unit tests next to feature module in `src/`.
 - browser flow tests in `e2e/`.
 
 ## Special Directories
 
 **`.next/`:**
+
 - Build output (generated, not source of truth).
 
 **`test-results/`:**
+
 - Playwright output artifacts.
 
 ---
 
-*Structure analysis: 2026-02-25*
-*Update when route layout or domain boundaries change*
+_Structure analysis: 2026-02-25_
+_Update when route layout or domain boundaries change_
