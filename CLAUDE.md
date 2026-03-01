@@ -1,6 +1,25 @@
 # Teamwise Scheduler - Codex Handoff Context
 
-Updated: 2026-02-28 (CI/tooling hardening + cycle workload counts + selectors extraction)
+Updated: 2026-03-01 (employee directory: tabbed drawer + badges + unified filter bar)
+
+## Latest Completed Work (2026-03-01)
+
+- Employee directory UX overhaul — `src/components/EmployeeDirectory.tsx` only, no behavior changes to data layer:
+  - **Tabbed drawer** — Profile / Scheduling / Overrides tabs with sticky amber-underline tab bar
+    - Profile + Scheduling panels use CSS `hidden` (not unmounted) so all FormData fields are always present on submit regardless of active tab
+    - Overrides panel rendered outside the `saveEmployeeAction` form with its own `saveEmployeeDateOverrideAction` / `copyEmployeeShiftsAction` nested forms
+    - Drawer tab resets to `'profile'` on close; "Enter availability" quick-action opens directly to `'overrides'` tab
+  - **Sticky Save footer** — `sticky bottom-0` footer with Save + "Save + realign shifts" buttons always visible while scrolling long panels
+  - **`EmployeeRowBadges` component** — Day/Night (amber/slate), FT/PT/PRN (blue/violet/orange), Lead, and Inactive chips rendered below each employee name in both desktop table rows and mobile cards
+  - **Unified filter bar** — single compact row replacing the old dual TABS + checkbox row layout:
+    - Shift toggle (All / Day / Night)
+    - Status toggle (Active / All)
+    - Employment type toggle (All / FT / PT / PRN) — added `employmentFilter` state + post-filter step in `filteredEmployees` useMemo
+    - Lead and FMLA checkboxes inline in the same bar
+  - **Override calendar pre-population** — calendar dates pre-loaded from existing `dateOverrides` whenever the drawer opens or cycle selector changes; no stale empty calendar
+  - **`openEditForEmployee` updated** — added `dateOverrides` to deps; computes and sets `overrideDatesDraft` from existing overrides for the resolved cycle on open
+
+- Quality: 195 unit tests pass (20 files); tsc, lint, format:check all green
 
 ## Latest Completed Work (2026-02-28, session 2)
 
@@ -377,7 +396,7 @@ Latest local checks:
 - `npx tsc --noEmit` pass
 - `npm run lint` pass
 - `npm run format:check` pass (whole-repo Prettier; `.claude/**` excluded from ESLint)
-- `npm run test:unit` pass (171 tests across 19 files)
+- `npm run test:unit` pass (**195 tests** across 20 files)
 - CI now gates on: format check → lint → **tsc --noEmit** → build
 - e2e specs:
   - `e2e/coverage-overlay.spec.ts` (10 tests)
@@ -430,3 +449,4 @@ To activate:
 1. Publish flow validation — activate env vars and validate queued email send + retry path
 2. Add server-side validation messages for cycle/date conflicts directly in drawer UI
 3. Surface cycle-level scheduling metrics on the manager dashboard (e.g. per-therapist shift counts)
+4. Add e2e tests for employee directory drawer tabs and filter bar interactions
