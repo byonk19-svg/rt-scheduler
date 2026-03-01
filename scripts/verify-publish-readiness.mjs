@@ -13,6 +13,7 @@ const optionalEnvKeys = ['PUBLISH_WORKER_KEY']
 const errors = []
 const warnings = []
 const infos = []
+let hasCoreFailure = false
 
 function isPlaceholder(value) {
   if (!value) return true
@@ -66,6 +67,7 @@ async function main() {
     const value = readEnv(key)
     if (!value || isPlaceholder(value)) {
       errors.push(`Missing or placeholder env var: ${key}`)
+      hasCoreFailure = true
     }
   }
 
@@ -79,12 +81,16 @@ async function main() {
   const supabaseUrlParsed = supabaseUrl
     ? validateUrl('NEXT_PUBLIC_SUPABASE_URL', supabaseUrl)
     : null
+  if (supabaseUrl && !supabaseUrlParsed) {
+    hasCoreFailure = true
+  }
   if (appUrl) validateUrl('NEXT_PUBLIC_APP_URL', appUrl)
 
   if (supabaseUrlParsed && serviceRoleKey) {
     const urlRef = supabaseUrlParsed.hostname.split('.')[0] ?? ''
     const keyRef = decodeServiceRoleProjectRef(serviceRoleKey)
     if (urlRef && keyRef && urlRef !== keyRef) {
+      hasCoreFailure = true
       errors.push(
         `SUPABASE_SERVICE_ROLE_KEY project ref (${keyRef}) does not match NEXT_PUBLIC_SUPABASE_URL ref (${urlRef}).`
       )
@@ -117,7 +123,7 @@ async function main() {
     warnings.push('PUBLISH_WORKER_KEY appears to be a placeholder value.')
   }
 
-  if (errors.length === 0 && supabaseUrl && serviceRoleKey) {
+  if (!hasCoreFailure && supabaseUrl && serviceRoleKey) {
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     })
@@ -130,7 +136,7 @@ async function main() {
     await checkTableAccessible(
       supabase,
       'notification_outbox',
-      'id, publish_event_id, user_id, email, name, channel, status, attempt_count, sent_at, last_error, created_at, updated_at'
+      'id, publish_event_id, user_id, email, name, channel, status, attempt_count, sent_at, last_error, created_at'
     )
   }
 

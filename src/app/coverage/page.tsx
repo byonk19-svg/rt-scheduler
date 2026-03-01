@@ -20,7 +20,16 @@ import {
   persistCoverageShiftStatus,
   unassignCoverageShift,
 } from '@/lib/coverage/mutations'
-import { flatten, type DayItem, type ShiftItem, type ShiftTab, type UiStatus } from '@/lib/coverage/selectors'
+import {
+  buildDayItems,
+  flatten,
+  toUiStatus,
+  type BuildDayRowInput,
+  type DayItem,
+  type ShiftItem,
+  type ShiftTab,
+  type UiStatus,
+} from '@/lib/coverage/selectors'
 import { addDays, dateRange, formatDateLabel, formatMonthLabel, toIsoDate } from '@/lib/calendar-utils'
 import { getOne, getScheduleFeedback, getWeekBoundsForDate } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/client'
@@ -60,16 +69,6 @@ const SHIFT_STATUS_LABELS: Record<UiStatus, string> = {
   cancelled: 'Cancelled',
 }
 const NO_ELIGIBLE_CONSTRAINT_REASON = 'no_eligible_candidates_due_to_constraints'
-
-function toUiStatus(assignment: AssignmentStatus | null, status: ShiftStatus): UiStatus {
-  if (assignment === 'on_call') return 'oncall'
-  if (assignment === 'left_early') return 'leave_early'
-  if (assignment === 'call_in' || assignment === 'cancelled') return 'cancelled'
-  if (assignment === 'scheduled') return 'active'
-  if (status === 'on_call') return 'oncall'
-  if (status === 'sick' || status === 'called_off') return 'cancelled'
-  return 'active'
-}
 
 function timestamp(): string {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -312,59 +311,19 @@ export default function CoveragePage() {
           setPrintShiftByUserDate(nextShiftByUserDate)
         }
 
-        const mapByShiftType = (shiftType: ShiftRow['shift_type']): DayItem[] => {
-          const byDate = new Map<string, AssignedShiftRow[]>()
-          for (const row of assignmentRows) {
-            if (row.shift_type !== shiftType) continue
-            const bucket = byDate.get(row.date) ?? []
-            bucket.push(row)
-            byDate.set(row.date, bucket)
-          }
+        const resolvedRows: BuildDayRowInput[] = assignmentRows.map((row) => ({
+          id: row.id,
+          user_id: row.user_id,
+          date: row.date,
+          shift_type: row.shift_type,
+          role: row.role,
+          status: row.status,
+          assignment_status: row.assignment_status,
+          name: getOne(row.profiles)?.full_name ?? 'Unknown',
+        }))
 
-          return dateRange(cycleStartDate, cycleEndDate).map((isoDate) => {
-            const slot = (byDate.get(isoDate) ?? []).slice().sort((a, b) => {
-              if (a.role !== b.role) return a.role === 'lead' ? -1 : 1
-              return (getOne(a.profiles)?.full_name ?? '').localeCompare(getOne(b.profiles)?.full_name ?? '')
-            })
-            const lead = slot.find((row) => row.role === 'lead') ?? null
-            const leadShift =
-              lead === null
-                ? null
-                : {
-                    id: lead.id,
-                    userId: lead.user_id,
-                    name: getOne(lead.profiles)?.full_name ?? 'Unknown',
-                    status: toUiStatus(lead.assignment_status, lead.status),
-                    log: [],
-                  }
-            const staffShifts = slot
-              .filter((row) => row.id !== lead?.id)
-              .map((row) => ({
-                id: row.id,
-                userId: row.user_id,
-                name: getOne(row.profiles)?.full_name ?? 'Unknown',
-                status: toUiStatus(row.assignment_status, row.status),
-                log: [],
-              }))
-            const hasOverride = slot.some((row) => row.status === 'called_off')
-            const hasDraft = slot.some((row) => row.status === 'sick')
-            const dayStatus: DayStatus = !leadShift ? 'missing_lead' : hasOverride ? 'override' : hasDraft ? 'draft' : 'published'
-            const date = new Date(`${isoDate}T00:00:00`)
-            return {
-              id: isoDate,
-              isoDate,
-              date: date.getDate(),
-              label: date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-              dayStatus,
-              constraintBlocked: constraintBlockedSlotKeys.has(`${isoDate}:${shiftType}`),
-              leadShift,
-              staffShifts,
-            } satisfies DayItem
-          })
-        }
-
-        setDayDays(mapByShiftType('day'))
-        setNightDays(mapByShiftType('night'))
+        setDayDays(buildDayItems('day', resolvedRows, cycleStartDate, cycleEndDate, constraintBlockedSlotKeys))
+        setNightDays(buildDayItems('night', resolvedRows, cycleStartDate, cycleEndDate, constraintBlockedSlotKeys))
       } catch (loadError) {
         console.error('Could not load coverage calendar data:', loadError)
         setError('Could not load coverage schedule.')
@@ -446,7 +405,7 @@ export default function CoveragePage() {
   )
 
   // Compute how many shifts each therapist is working in the week that contains the selected day.
-  // Used in the assign dropdown so managers can avoid overscheduling.
+  // Used in the assign dropdown so managers can avoid overscheduling within a single week.
   const weeklyTherapistCounts = useMemo((): Map<string, number> => {
     if (!selectedId) return new Map()
     const bounds = getWeekBoundsForDate(selectedId)
@@ -462,6 +421,19 @@ export default function CoveragePage() {
     }
     return counts
   }, [selectedId, dayDays, nightDays])
+
+  // Compute total shifts per therapist across the entire loaded cycle.
+  // Combined with weeklyTherapistCounts this gives managers a full load picture.
+  const cycleTherapistCounts = useMemo((): Map<string, number> => {
+    const counts = new Map<string, number>()
+    for (const item of [...dayDays, ...nightDays]) {
+      const shifts = [...(item.leadShift ? [item.leadShift] : []), ...item.staffShifts]
+      for (const shift of shifts) {
+        counts.set(shift.userId, (counts.get(shift.userId) ?? 0) + 1)
+      }
+    }
+    return counts
+  }, [dayDays, nightDays])
 
   const handleTabSwitch = (tab: ShiftTab) => {
     setShiftTab(tab)
@@ -692,9 +664,6 @@ export default function CoveragePage() {
       setDays(previousDays)
       setError('Could not unassign therapist. Changes were rolled back.')
       setUnassigningShiftId(null)
-      if (typeof window !== 'undefined') {
-        window.alert('Could not unassign therapist. Please try again.')
-      }
     },
     [days, setDays, supabase, unassigningShiftId]
   )
@@ -841,6 +810,7 @@ export default function CoveragePage() {
         expandedShiftId={expandedShiftId}
         unassigningShiftId={unassigningShiftId}
         weeklyTherapistCounts={weeklyTherapistCounts}
+        cycleTherapistCounts={cycleTherapistCounts}
         onClose={handleClose}
         onAssignSubmit={handleAssign}
         assignError={assignError}

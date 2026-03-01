@@ -23,6 +23,7 @@ type ShiftDrawerProps = {
   assignRole: 'lead' | 'staff'
   onAssignRoleChange: (role: 'lead' | 'staff') => void
   weeklyTherapistCounts: Map<string, number>
+  cycleTherapistCounts: Map<string, number>
   assignError: string
   onToggleExpanded: (shiftId: string) => void
   onChangeStatus: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
@@ -105,6 +106,7 @@ export function ShiftDrawer({
   assignRole,
   onAssignRoleChange,
   weeklyTherapistCounts,
+  cycleTherapistCounts,
   assignError,
   onToggleExpanded,
   onChangeStatus,
@@ -232,10 +234,17 @@ export function ShiftDrawer({
                           >
                             {displayOptions.map((therapist) => {
                               const weekCount = weeklyTherapistCounts.get(therapist.id)
+                              const cycleCount = cycleTherapistCounts.get(therapist.id)
+                              const workloadLabel =
+                                weekCount !== undefined && cycleCount !== undefined
+                                  ? ` · ${weekCount} this wk, ${cycleCount} this cyc`
+                                  : cycleCount !== undefined
+                                    ? ` · ${cycleCount} this cyc`
+                                    : ''
                               return (
                                 <option key={therapist.id} value={therapist.id}>
                                   {therapist.full_name}
-                                  {weekCount !== undefined ? ` · ${weekCount} this wk` : ''}
+                                  {workloadLabel}
                                 </option>
                               )
                             })}
