@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-react'
+import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react'
 
 import {
   buildMissingAvailabilityRows,
@@ -12,6 +12,7 @@ import {
   type EmployeeDirectoryRecord,
   type EmployeeDirectoryTab,
 } from '@/lib/employee-directory'
+import { buildCalendarWeeks, toIsoDate } from '@/lib/calendar-utils'
 import { EMPLOYEE_META_BADGE_CLASS, LEAD_ELIGIBLE_BADGE_CLASS } from '@/lib/employee-tag-badges'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -57,6 +58,9 @@ type EmployeeDirectoryProps = {
     created_at: string
     source: 'therapist' | 'manager'
   }>
+  initialEditEmployeeId?: string | null
+  initialFocusAvailability?: boolean
+  initialOverrideCycleId?: string | null
   saveEmployeeAction: (formData: FormData) => void | Promise<void>
   setEmployeeActiveAction: (formData: FormData) => void | Promise<void>
   saveEmployeeDateOverrideAction: (formData: FormData) => void | Promise<void>
@@ -108,6 +112,44 @@ function formatDateTime(value: string | null): string {
     year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+  })
+}
+
+function isDateWithinCycle(
+  dateValue: string,
+  cycle: { start_date: string; end_date: string } | null
+): boolean {
+  if (!cycle) return true
+  return dateValue >= cycle.start_date && dateValue <= cycle.end_date
+}
+
+function toMonthStartKey(dateValue: string): string {
+  const parsed = new Date(`${dateValue}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return toIsoDate(new Date())
+  parsed.setDate(1)
+  return toIsoDate(parsed)
+}
+
+function toMonthEndKey(monthStartKey: string): string {
+  const parsed = new Date(`${monthStartKey}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return monthStartKey
+  const monthEnd = new Date(parsed.getFullYear(), parsed.getMonth() + 1, 0)
+  return toIsoDate(monthEnd)
+}
+
+function shiftMonthKey(monthStartKey: string, monthDelta: number): string {
+  const parsed = new Date(`${monthStartKey}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return monthStartKey
+  const shifted = new Date(parsed.getFullYear(), parsed.getMonth() + monthDelta, 1)
+  return toIsoDate(shifted)
+}
+
+function formatMonthTitle(monthStartKey: string): string {
+  const parsed = new Date(`${monthStartKey}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return monthStartKey
+  return parsed.toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric',
   })
 }
 
@@ -226,11 +268,18 @@ export function EmployeeDirectory({
   employees,
   cycles,
   dateOverrides,
+  initialEditEmployeeId = null,
+  initialFocusAvailability = false,
+  initialOverrideCycleId = null,
   saveEmployeeAction,
   setEmployeeActiveAction,
   saveEmployeeDateOverrideAction,
   deleteEmployeeDateOverrideAction,
 }: EmployeeDirectoryProps) {
+  const initialCycleId =
+    initialOverrideCycleId && cycles.some((cycle) => cycle.id === initialOverrideCycleId)
+      ? initialOverrideCycleId
+      : (cycles[0]?.id ?? '')
   const [tab, setTab] = useState<EmployeeDirectoryTab>('all')
   const [searchText, setSearchText] = useState('')
   const [leadOnly, setLeadOnly] = useState(false)
@@ -239,15 +288,37 @@ export function EmployeeDirectory({
   const [sortKey, setSortKey] = useState<DirectorySortKey>('employee')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [availabilityCycleId, setAvailabilityCycleId] = useState<string>('')
-  const [overrideCycleIdDraft, setOverrideCycleIdDraft] = useState<string>(cycles[0]?.id ?? '')
-  const [focusAvailabilitySection, setFocusAvailabilitySection] = useState(false)
+  const [overrideCycleIdDraft, setOverrideCycleIdDraft] = useState<string>(initialCycleId)
+  const [overrideCalendarMonthStart, setOverrideCalendarMonthStart] = useState<string>(() => {
+    const initialCycle = cycles.find((cycle) => cycle.id === initialCycleId)
+    const baseDate = initialCycle?.start_date ?? toIsoDate(new Date())
+    return toMonthStartKey(baseDate)
+  })
+  const [overrideDateDraft, setOverrideDateDraft] = useState<string>('')
+  const [overrideDatesDraft, setOverrideDatesDraft] = useState<string[]>([])
+  const [isCalendarDragging, setIsCalendarDragging] = useState(false)
+  const [calendarDragMode, setCalendarDragMode] = useState<'add' | 'remove' | null>(null)
+  const calendarDragSeenRef = useRef<Set<string>>(new Set())
+  const [focusAvailabilitySection, setFocusAvailabilitySection] = useState(
+    Boolean(initialEditEmployeeId && initialFocusAvailability)
+  )
   const [collapsedMissing, setCollapsedMissing] = useState(false)
   const [editState, setEditState] = useState<{
     employeeId: string
     onFmla: boolean
     weekendRotation: 'none' | 'every_other'
     worksDowMode: 'hard' | 'soft'
-  } | null>(null)
+  } | null>(() => {
+    if (!initialEditEmployeeId) return null
+    const employee = employees.find((row) => row.id === initialEditEmployeeId)
+    if (!employee) return null
+    return {
+      employeeId: employee.id,
+      onFmla: employee.on_fmla,
+      weekendRotation: employee.weekend_rotation,
+      worksDowMode: employee.works_dow_mode,
+    }
+  })
   const [deactivateEmployeeId, setDeactivateEmployeeId] = useState<string | null>(null)
   const [overrideDateError, setOverrideDateError] = useState<string | null>(null)
   const availabilitySectionRef = useRef<HTMLDivElement | null>(null)
@@ -308,25 +379,40 @@ export function EmployeeDirectory({
     setSortDirection('asc')
   }
 
-  function openEditForEmployee(
-    employeeId: string,
-    options?: { focusAvailability?: boolean; cycleId?: string }
-  ) {
-    const employee = employees.find((row) => row.id === employeeId)
-    if (!employee) return
-    setEditState({
-      employeeId: employee.id,
-      onFmla: employee.on_fmla,
-      weekendRotation: employee.weekend_rotation,
-      worksDowMode: employee.works_dow_mode,
-    })
-    setFocusAvailabilitySection(Boolean(options?.focusAvailability))
-    if (options?.cycleId) {
-      setOverrideCycleIdDraft(options.cycleId)
-    } else {
-      setOverrideCycleIdDraft((current) => current || selectedAvailabilityCycleId)
-    }
-  }
+  const openEditForEmployee = useCallback(
+    (employeeId: string, options?: { focusAvailability?: boolean; cycleId?: string }) => {
+      const employee = employees.find((row) => row.id === employeeId)
+      if (!employee) return
+      setEditState({
+        employeeId: employee.id,
+        onFmla: employee.on_fmla,
+        weekendRotation: employee.weekend_rotation,
+        worksDowMode: employee.works_dow_mode,
+      })
+      setOverrideDateDraft('')
+      setOverrideDatesDraft([])
+      setOverrideDateError(null)
+      setIsCalendarDragging(false)
+      setCalendarDragMode(null)
+      calendarDragSeenRef.current.clear()
+      setFocusAvailabilitySection(Boolean(options?.focusAvailability))
+      if (options?.cycleId) {
+        setOverrideCycleIdDraft(options.cycleId)
+        const selectedCycle = cycles.find((cycle) => cycle.id === options.cycleId)
+        if (selectedCycle) {
+          setOverrideCalendarMonthStart(toMonthStartKey(selectedCycle.start_date))
+        }
+      } else {
+        const nextCycleId = selectedAvailabilityCycleId || cycles[0]?.id || ''
+        setOverrideCycleIdDraft((current) => current || nextCycleId)
+        const selectedCycle = cycles.find((cycle) => cycle.id === nextCycleId)
+        if (selectedCycle) {
+          setOverrideCalendarMonthStart(toMonthStartKey(selectedCycle.start_date))
+        }
+      }
+    },
+    [employees, selectedAvailabilityCycleId, cycles]
+  )
 
   const editEmployee = useMemo(
     () => employees.find((employee) => employee.id === editState?.employeeId) ?? null,
@@ -361,6 +447,23 @@ export function EmployeeDirectory({
         return a.cycle_id.localeCompare(b.cycle_id)
       })
   }, [dateOverrides, editEmployee])
+  const selectedOverrideCycle = useMemo(
+    () => cycles.find((cycle) => cycle.id === overrideCycleIdDraft) ?? null,
+    [cycles, overrideCycleIdDraft]
+  )
+  const overrideCalendarTitle = useMemo(
+    () => formatMonthTitle(overrideCalendarMonthStart),
+    [overrideCalendarMonthStart]
+  )
+  const overrideCalendarMonthKey = useMemo(
+    () => overrideCalendarMonthStart.slice(0, 7),
+    [overrideCalendarMonthStart]
+  )
+  const overrideCalendarWeeks = useMemo(
+    () => buildCalendarWeeks(overrideCalendarMonthStart, toMonthEndKey(overrideCalendarMonthStart)),
+    [overrideCalendarMonthStart]
+  )
+  const selectedOverrideDatesSet = useMemo(() => new Set(overrideDatesDraft), [overrideDatesDraft])
   const missingAvailabilityRows = useMemo(
     () => buildMissingAvailabilityRows(employees, dateOverrides, selectedAvailabilityCycleId),
     [dateOverrides, employees, selectedAvailabilityCycleId]
@@ -370,6 +473,94 @@ export function EmployeeDirectory({
     if (!editEmployee || !focusAvailabilitySection) return
     availabilitySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [editEmployee, focusAvailabilitySection])
+
+  useEffect(() => {
+    if (!isCalendarDragging) return
+
+    const stopDragging = () => {
+      setIsCalendarDragging(false)
+      setCalendarDragMode(null)
+      calendarDragSeenRef.current.clear()
+    }
+
+    window.addEventListener('mouseup', stopDragging)
+    return () => window.removeEventListener('mouseup', stopDragging)
+  }, [isCalendarDragging])
+
+  const applyDateInBatch = useCallback(
+    (dateValue: string, mode: 'add' | 'remove') => {
+      setOverrideDatesDraft((current) => {
+        const alreadyIncluded = current.includes(dateValue)
+        if (mode === 'add') {
+          if (alreadyIncluded) return current
+          const next = [...current, dateValue]
+          next.sort((a, b) => a.localeCompare(b))
+          return next
+        }
+        if (!alreadyIncluded) return current
+        return current.filter((value) => value !== dateValue)
+      })
+    },
+    [setOverrideDatesDraft]
+  )
+
+  const handleCalendarDayMouseDown = useCallback(
+    (event: MouseEvent<HTMLButtonElement>, dateValue: string) => {
+      if (!isDateWithinCycle(dateValue, selectedOverrideCycle)) return
+      event.preventDefault()
+      setOverrideDateError(null)
+      setOverrideDateDraft('')
+      const mode: 'add' | 'remove' = selectedOverrideDatesSet.has(dateValue) ? 'remove' : 'add'
+      setIsCalendarDragging(true)
+      setCalendarDragMode(mode)
+      calendarDragSeenRef.current = new Set([dateValue])
+      applyDateInBatch(dateValue, mode)
+    },
+    [selectedOverrideCycle, selectedOverrideDatesSet, applyDateInBatch]
+  )
+
+  const handleCalendarDayMouseEnter = useCallback(
+    (dateValue: string) => {
+      if (!isCalendarDragging || !calendarDragMode) return
+      if (!isDateWithinCycle(dateValue, selectedOverrideCycle)) return
+      if (calendarDragSeenRef.current.has(dateValue)) return
+      calendarDragSeenRef.current.add(dateValue)
+      applyDateInBatch(dateValue, calendarDragMode)
+    },
+    [isCalendarDragging, calendarDragMode, selectedOverrideCycle, applyDateInBatch]
+  )
+
+  function addDateToOverrideBatch() {
+    const dateValue = overrideDateDraft.trim()
+    if (!dateValue) {
+      setOverrideDateError('Choose a date first.')
+      return
+    }
+
+    if (!isDateWithinCycle(dateValue, selectedOverrideCycle)) {
+      const label = selectedOverrideCycle
+        ? `${formatEmployeeDate(selectedOverrideCycle.start_date)} to ${formatEmployeeDate(selectedOverrideCycle.end_date)}`
+        : ''
+      setOverrideDateError(
+        selectedOverrideCycle
+          ? `Date must be within the selected cycle (${label}).`
+          : 'Invalid date.'
+      )
+      return
+    }
+
+    setOverrideDatesDraft((current) => {
+      if (current.includes(dateValue)) {
+        setOverrideDateError('That date is already in the batch.')
+        return current
+      }
+      const next = [...current, dateValue]
+      next.sort((a, b) => a.localeCompare(b))
+      return next
+    })
+    setOverrideDateDraft('')
+    setOverrideDateError(null)
+  }
 
   return (
     <Card id="employee-directory">
@@ -747,8 +938,18 @@ export function EmployeeDirectory({
           if (open) return
           setEditState(null)
           setFocusAvailabilitySection(false)
-          setOverrideCycleIdDraft(selectedAvailabilityCycleId)
+          const resetCycleId = selectedAvailabilityCycleId
+          setOverrideCycleIdDraft(resetCycleId)
+          const resetCycle = cycles.find((cycle) => cycle.id === resetCycleId)
+          if (resetCycle) {
+            setOverrideCalendarMonthStart(toMonthStartKey(resetCycle.start_date))
+          }
+          setOverrideDateDraft('')
+          setOverrideDatesDraft([])
           setOverrideDateError(null)
+          setIsCalendarDragging(false)
+          setCalendarDragMode(null)
+          calendarDragSeenRef.current.clear()
         }}
       >
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
@@ -1101,38 +1302,84 @@ export function EmployeeDirectory({
                   action={saveEmployeeDateOverrideAction}
                   className="grid grid-cols-1 gap-2 md:grid-cols-12"
                   onSubmit={(event) => {
-                    const dateValue =
-                      (
-                        event.currentTarget.querySelector(
-                          '[name="date"]'
-                        ) as HTMLInputElement | null
-                      )?.value ?? ''
-                    const selectedCycle = cycles.find((c) => c.id === overrideCycleIdDraft)
-                    if (selectedCycle && dateValue) {
-                      if (
-                        dateValue < selectedCycle.start_date ||
-                        dateValue > selectedCycle.end_date
-                      ) {
-                        event.preventDefault()
-                        setOverrideDateError(
-                          `Date must be within the selected cycle (${formatEmployeeDate(selectedCycle.start_date)} to ${formatEmployeeDate(selectedCycle.end_date)}).`
-                        )
-                        return
-                      }
+                    const targetDates =
+                      overrideDatesDraft.length > 0
+                        ? overrideDatesDraft
+                        : overrideDateDraft
+                          ? [overrideDateDraft]
+                          : []
+                    if (targetDates.length === 0) {
+                      event.preventDefault()
+                      setOverrideDateError('Select at least one date.')
+                      return
                     }
+
+                    const outOfRangeDate = targetDates.find(
+                      (candidate) => !isDateWithinCycle(candidate, selectedOverrideCycle)
+                    )
+                    if (outOfRangeDate) {
+                      event.preventDefault()
+                      const label = selectedOverrideCycle
+                        ? `${formatEmployeeDate(selectedOverrideCycle.start_date)} to ${formatEmployeeDate(selectedOverrideCycle.end_date)}`
+                        : ''
+                      setOverrideDateError(
+                        selectedOverrideCycle
+                          ? `Date must be within the selected cycle (${label}).`
+                          : 'Date is outside the selected cycle.'
+                      )
+                      return
+                    }
+
                     setOverrideDateError(null)
                   }}
                 >
                   <input type="hidden" name="profile_id" value={editEmployee.id} />
+                  {overrideDatesDraft.map((dateValue) => (
+                    <input
+                      key={`override-date-${dateValue}`}
+                      type="hidden"
+                      name="dates"
+                      value={dateValue}
+                    />
+                  ))}
+                  {overrideDatesDraft.length === 0 && overrideDateDraft && (
+                    <input type="hidden" name="date" value={overrideDateDraft} />
+                  )}
                   <div className="space-y-1 md:col-span-3">
                     <Label htmlFor="override_date">Date</Label>
-                    <Input
-                      id="override_date"
-                      name="date"
-                      type="date"
-                      required
-                      onChange={() => setOverrideDateError(null)}
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        id="override_date"
+                        type="date"
+                        value={overrideDateDraft}
+                        onChange={(event) => {
+                          setOverrideDateDraft(event.target.value)
+                          setOverrideDateError(null)
+                        }}
+                      />
+                      <Button type="button" variant="outline" onClick={addDateToOverrideBatch}>
+                        Add
+                      </Button>
+                    </div>
+                    {overrideDatesDraft.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {overrideDatesDraft.map((dateValue) => (
+                          <button
+                            key={`override-chip-${dateValue}`}
+                            type="button"
+                            className="rounded-full border border-border bg-background px-2 py-0.5 text-xs hover:bg-secondary"
+                            onClick={() =>
+                              setOverrideDatesDraft((current) =>
+                                current.filter((value) => value !== dateValue)
+                              )
+                            }
+                            title="Remove date"
+                          >
+                            {formatEmployeeDate(dateValue)} x
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     {overrideDateError && (
                       <p className="rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]">
                         {overrideDateError}
@@ -1147,7 +1394,18 @@ export function EmployeeDirectory({
                       className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
                       value={overrideCycleIdDraft}
                       onChange={(event) => {
-                        setOverrideCycleIdDraft(event.target.value)
+                        const nextCycleId = event.target.value
+                        setOverrideCycleIdDraft(nextCycleId)
+                        const nextCycle = cycles.find((cycle) => cycle.id === nextCycleId) ?? null
+                        if (nextCycle) {
+                          setOverrideCalendarMonthStart(toMonthStartKey(nextCycle.start_date))
+                        }
+                        setOverrideDatesDraft((current) => {
+                          if (!nextCycle) return current
+                          return current.filter((dateValue) =>
+                            isDateWithinCycle(dateValue, nextCycle)
+                          )
+                        })
                         setOverrideDateError(null)
                       }}
                       required
@@ -1188,6 +1446,103 @@ export function EmployeeDirectory({
                       <option value="day">Day</option>
                       <option value="night">Night</option>
                     </select>
+                  </div>
+                  <div className="space-y-2 md:col-span-12">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label>Calendar multi-select</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setOverrideDatesDraft([])
+                          setOverrideDateError(null)
+                        }}
+                        disabled={overrideDatesDraft.length === 0}
+                      >
+                        Clear selected
+                      </Button>
+                    </div>
+                    <div className="rounded-md border border-border bg-background p-2">
+                      <div className="mb-2 flex items-center justify-between">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setOverrideCalendarMonthStart((current) => shiftMonthKey(current, -1))
+                          }
+                          aria-label="Previous month"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <p className="text-sm font-medium">{overrideCalendarTitle}</p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setOverrideCalendarMonthStart((current) => shiftMonthKey(current, 1))
+                          }
+                          aria-label="Next month"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="mb-1 grid grid-cols-7 gap-1">
+                        {WEEKDAY_OPTIONS.map((day) => (
+                          <p
+                            key={`override-weekday-${day.value}`}
+                            className="text-center text-[11px] font-medium text-muted-foreground"
+                          >
+                            {day.label}
+                          </p>
+                        ))}
+                      </div>
+                      <div className="space-y-1">
+                        {overrideCalendarWeeks.map((week, weekIndex) => (
+                          <div
+                            key={`override-week-${weekIndex}`}
+                            className="grid grid-cols-7 gap-1"
+                          >
+                            {week.map((day) => {
+                              const dayKey = toIsoDate(day)
+                              const isCurrentMonth = dayKey.slice(0, 7) === overrideCalendarMonthKey
+                              const isInCycle = isDateWithinCycle(dayKey, selectedOverrideCycle)
+                              const isSelected = selectedOverrideDatesSet.has(dayKey)
+                              return (
+                                <button
+                                  key={dayKey}
+                                  type="button"
+                                  disabled={!isInCycle}
+                                  onMouseDown={(event) => handleCalendarDayMouseDown(event, dayKey)}
+                                  onMouseEnter={() => handleCalendarDayMouseEnter(dayKey)}
+                                  className={cn(
+                                    'h-8 rounded-md text-xs transition-colors',
+                                    isSelected
+                                      ? 'bg-[#d97706] font-semibold text-white hover:bg-[#b45309]'
+                                      : 'bg-background',
+                                    !isSelected && isInCycle && 'hover:bg-secondary',
+                                    !isCurrentMonth && !isSelected && 'text-muted-foreground',
+                                    !isInCycle && 'cursor-not-allowed opacity-35'
+                                  )}
+                                  title={
+                                    isInCycle
+                                      ? formatEmployeeDate(dayKey)
+                                      : 'Outside selected cycle'
+                                  }
+                                >
+                                  {day.getDate()}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Click days to toggle selection. Click and drag across days to select quickly.
+                    </p>
                   </div>
                   <div className="space-y-1 md:col-span-9">
                     <Label htmlFor="override_note">Note (optional)</Label>
@@ -1236,6 +1591,7 @@ export function EmployeeDirectory({
                           <form action={deleteEmployeeDateOverrideAction}>
                             <input type="hidden" name="override_id" value={row.id} />
                             <input type="hidden" name="profile_id" value={editEmployee.id} />
+                            <input type="hidden" name="cycle_id" value={row.cycle_id} />
                             <FormSubmitButton
                               type="submit"
                               variant="ghost"
