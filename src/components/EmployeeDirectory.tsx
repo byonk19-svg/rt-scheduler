@@ -73,6 +73,7 @@ type EmployeeDirectoryProps = {
   setEmployeeActiveAction: (formData: FormData) => void | Promise<void>
   saveEmployeeDateOverrideAction: (formData: FormData) => void | Promise<void>
   deleteEmployeeDateOverrideAction: (formData: FormData) => void | Promise<void>
+  copyEmployeeShiftsAction: (formData: FormData) => void | Promise<void>
 }
 
 type DirectorySortKey = 'employee' | 'shift' | 'type' | 'tags'
@@ -245,6 +246,7 @@ export function EmployeeDirectory({
   setEmployeeActiveAction,
   saveEmployeeDateOverrideAction,
   deleteEmployeeDateOverrideAction,
+  copyEmployeeShiftsAction,
 }: EmployeeDirectoryProps) {
   const initialCycleId =
     initialOverrideCycleId && cycles.some((cycle) => cycle.id === initialOverrideCycleId)
@@ -266,6 +268,10 @@ export function EmployeeDirectory({
   })
   const [overrideDateDraft, setOverrideDateDraft] = useState<string>('')
   const [overrideDatesDraft, setOverrideDatesDraft] = useState<string[]>([])
+  const [copySourceCycleId, setCopySourceCycleId] = useState<string>(
+    cycles[1]?.id ?? cycles[0]?.id ?? ''
+  )
+  const [copyTargetCycleId, setCopyTargetCycleId] = useState<string>(cycles[0]?.id ?? '')
   const [isCalendarDragging, setIsCalendarDragging] = useState(false)
   const [calendarDragMode, setCalendarDragMode] = useState<'add' | 'remove' | null>(null)
   const calendarDragSeenRef = useRef<Set<string>>(new Set())
@@ -1633,6 +1639,62 @@ export function EmployeeDirectory({
                     </div>
                   )}
                 </div>
+              </div>
+              <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                  Copy shift pattern
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Copy this employee&apos;s scheduled shifts from one cycle to another. Shifts
+                  already in the target cycle are kept.
+                </p>
+                <form action={copyEmployeeShiftsAction} className="mt-3 space-y-2">
+                  <input type="hidden" name="employee_id" value={editEmployee.id} />
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-semibold text-slate-600">
+                      From cycle
+                      <select
+                        name="source_cycle_id"
+                        value={copySourceCycleId}
+                        onChange={(e) => setCopySourceCycleId(e.target.value)}
+                        className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700"
+                      >
+                        {cycles.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="text-xs font-semibold text-slate-600">
+                      To cycle
+                      <select
+                        name="target_cycle_id"
+                        value={copyTargetCycleId}
+                        onChange={(e) => setCopyTargetCycleId(e.target.value)}
+                        className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700"
+                      >
+                        {cycles.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  <FormSubmitButton
+                    type="submit"
+                    size="sm"
+                    disabled={
+                      !copySourceCycleId ||
+                      !copyTargetCycleId ||
+                      copySourceCycleId === copyTargetCycleId
+                    }
+                    pendingText="Copying..."
+                  >
+                    Copy shifts
+                  </FormSubmitButton>
+                </form>
               </div>
             </div>
           )}

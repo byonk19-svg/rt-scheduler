@@ -16,6 +16,7 @@ import {
   normalizeShiftType,
   type EmployeeDirectoryRecord,
 } from '@/lib/employee-directory'
+import { dateRange } from '@/lib/calendar-utils'
 import { createClient } from '@/lib/supabase/server'
 
 type DirectorySearchParams = {
@@ -26,6 +27,8 @@ type DirectorySearchParams = {
   edit_profile?: string | string[]
   focus?: string | string[]
   override_cycle_id?: string | string[]
+  copied?: string | string[]
+  skipped?: string | string[]
 }
 
 type DirectoryProfileRow = {
@@ -161,6 +164,8 @@ function getDirectoryFeedback(params?: DirectorySearchParams): {
   const realignedCount = Number.isFinite(realigned) && realigned >= 0 ? realigned : 0
   const overrideCount =
     Number.isFinite(overrideCountParam) && overrideCountParam >= 0 ? overrideCountParam : 0
+  const copiedCount = Number.parseInt(getSearchParam(params?.copied) ?? '0', 10)
+  const skippedCount = Number.parseInt(getSearchParam(params?.skipped) ?? '0', 10)
 
   if (error === 'missing_profile') {
     return { message: 'Select an employee first.', variant: 'error' }
@@ -244,6 +249,34 @@ function getDirectoryFeedback(params?: DirectorySearchParams): {
 
   if (success === 'override_deleted') {
     return { message: 'Date override deleted.', variant: 'success' }
+  }
+
+  if (success === 'shifts_copied') {
+    const safeCount = Number.isFinite(copiedCount) && copiedCount >= 0 ? copiedCount : 0
+    const safeSkipped = Number.isFinite(skippedCount) && skippedCount >= 0 ? skippedCount : 0
+    const skippedNote = safeSkipped > 0 ? ` (${safeSkipped} already existed)` : ''
+    return {
+      message: `Copied ${safeCount} shift${safeCount === 1 ? '' : 's'} to new cycle.${skippedNote}`,
+      variant: 'success',
+    }
+  }
+
+  if (error === 'no_source_shifts') {
+    return {
+      message: 'No scheduled shifts found for this employee in the selected source cycle.',
+      variant: 'error',
+    }
+  }
+
+  if (error === 'copy_failed') {
+    return { message: 'Failed to copy shifts. Please try again.', variant: 'error' }
+  }
+
+  if (error === 'copy_invalid_params') {
+    return {
+      message: 'Invalid copy request — check that source and target cycles are different.',
+      variant: 'error',
+    }
   }
 
   return null
@@ -646,6 +679,90 @@ async function deleteEmployeeDateOverrideAction(formData: FormData) {
   redirect(buildDirectoryUrl({ success: 'override_deleted', ...openAvailabilityParams }))
 }
 
+async function copyEmployeeShiftsAction(formData: FormData) {
+  'use server'
+
+  const { supabase } = await requireManager()
+  const employeeId = String(formData.get('employee_id') ?? '').trim()
+  const sourceCycleId = String(formData.get('source_cycle_id') ?? '').trim()
+  const targetCycleId = String(formData.get('target_cycle_id') ?? '').trim()
+
+  if (!employeeId || !sourceCycleId || !targetCycleId || sourceCycleId === targetCycleId) {
+    redirect(
+      buildDirectoryUrl({ error: 'copy_invalid_params', edit_profile: employeeId || undefined })
+    )
+  }
+
+  // Fetch both cycles
+  const { data: cycles } = await supabase
+    .from('schedule_cycles')
+    .select('id, start_date, end_date')
+    .in('id', [sourceCycleId, targetCycleId])
+  const sourceCycle = cycles?.find((c) => c.id === sourceCycleId)
+  const targetCycle = cycles?.find((c) => c.id === targetCycleId)
+  if (!sourceCycle || !targetCycle) {
+    redirect(buildDirectoryUrl({ error: 'copy_invalid_params', edit_profile: employeeId }))
+  }
+
+  // Fetch source shifts for this employee
+  const { data: sourceShifts } = await supabase
+    .from('shifts')
+    .select('date, shift_type, role')
+    .eq('cycle_id', sourceCycleId)
+    .eq('user_id', employeeId)
+    .eq('status', 'scheduled')
+    .is('unfilled_reason', null)
+
+  if (!sourceShifts || sourceShifts.length === 0) {
+    redirect(buildDirectoryUrl({ error: 'no_source_shifts', edit_profile: employeeId }))
+  }
+
+  // Build day-offset map (same pattern as createCycleAction)
+  const sourceDates = dateRange(sourceCycle.start_date, sourceCycle.end_date)
+  const targetDates = dateRange(targetCycle.start_date, targetCycle.end_date)
+  const sourceIndexByDate = new Map(sourceDates.map((d, i) => [d, i]))
+
+  const shiftsToInsert = sourceShifts.flatMap((shift) => {
+    const idx = sourceIndexByDate.get(shift.date)
+    if (idx === undefined) return []
+    const targetDate = targetDates[idx]
+    if (!targetDate) return [] // beyond target cycle end — silently skip
+    return [
+      {
+        cycle_id: targetCycleId,
+        user_id: employeeId,
+        date: targetDate,
+        shift_type: shift.shift_type as 'day' | 'night',
+        status: 'scheduled' as const,
+        role: shift.role as 'lead' | 'staff',
+      },
+    ]
+  })
+
+  if (shiftsToInsert.length === 0) {
+    redirect(buildDirectoryUrl({ error: 'no_source_shifts', edit_profile: employeeId }))
+  }
+
+  const { data: inserted, error } = await supabase
+    .from('shifts')
+    .upsert(shiftsToInsert, { onConflict: 'cycle_id,user_id,date', ignoreDuplicates: true })
+    .select('id')
+
+  if (error) {
+    console.error('Failed to copy employee shifts:', error)
+    redirect(buildDirectoryUrl({ error: 'copy_failed', edit_profile: employeeId }))
+  }
+
+  revalidatePath('/coverage')
+  revalidatePath('/schedule')
+
+  const copied = String(inserted?.length ?? 0)
+  const skipped = String(shiftsToInsert.length - (inserted?.length ?? 0))
+  redirect(
+    buildDirectoryUrl({ success: 'shifts_copied', copied, skipped, edit_profile: employeeId })
+  )
+}
+
 export default async function TeamPage({
   searchParams,
 }: {
@@ -801,6 +918,7 @@ export default async function TeamPage({
         setEmployeeActiveAction={setEmployeeActiveAction}
         saveEmployeeDateOverrideAction={saveEmployeeDateOverrideAction}
         deleteEmployeeDateOverrideAction={deleteEmployeeDateOverrideAction}
+        copyEmployeeShiftsAction={copyEmployeeShiftsAction}
       />
     </div>
   )
