@@ -23,6 +23,7 @@ type ShiftDrawerProps = {
   assignRole: 'lead' | 'staff'
   onAssignRoleChange: (role: 'lead' | 'staff') => void
   weeklyTherapistCounts: Map<string, number>
+  assignError: string
   onToggleExpanded: (shiftId: string) => void
   onChangeStatus: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
   onUnassign: (dayId: string, shiftId: string, isLead: boolean) => Promise<void> | void
@@ -104,6 +105,7 @@ export function ShiftDrawer({
   assignRole,
   onAssignRoleChange,
   weeklyTherapistCounts,
+  assignError,
   onToggleExpanded,
   onChangeStatus,
   onUnassign,
@@ -249,6 +251,14 @@ export function ShiftDrawer({
                       )
                     })()}
                   </>
+                )}
+                {assignError && (
+                  <p
+                    role="alert"
+                    className="mt-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-semibold text-red-700"
+                  >
+                    {assignError}
+                  </p>
                 )}
               </div>
               {selectedDayShifts.length === 0 && (

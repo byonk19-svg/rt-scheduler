@@ -12,6 +12,7 @@
     "prepare": "husky",
     "seed:demo": "node --env-file=.env.local scripts/seed-demo.mjs",
     "seed:users": "node --env-file=.env.local scripts/seed-users.mjs",
+    "verify:publish": "node --env-file=.env.local scripts/verify-publish-readiness.mjs",
     "test:e2e": "playwright test",
     "test:unit": "vitest run"
   },

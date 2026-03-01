@@ -105,6 +105,7 @@ export default function CoveragePage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [expandedShiftId, setExpandedShiftId] = useState<string | null>(null)
   const [error, setError] = useState<string>('')
+  const [assignError, setAssignError] = useState<string>('')
   const days = shiftTab === 'Day' ? dayDays : nightDays
   const setDays = shiftTab === 'Day' ? setDayDays : setNightDays
   const scheduleFeedbackParams = useMemo<ScheduleSearchParams>(
@@ -467,12 +468,14 @@ export default function CoveragePage() {
     setExpandedShiftId(null)
     setSelectedId(null)
     setAssignRole('staff')
+    setAssignError('')
   }
 
   const handleSelect = (id: string) => {
     setExpandedShiftId(null)
     setSelectedId((prev) => (prev === id ? null : id))
     setAssignRole('staff')
+    setAssignError('')
   }
   const handleClose = () => {
     setExpandedShiftId(null)
@@ -482,6 +485,7 @@ export default function CoveragePage() {
     setAssigned(false)
     setAssigning(false)
     setAssignRole('staff')
+    setAssignError('')
   }
 
   const handleAssign = useCallback(async () => {
@@ -506,14 +510,15 @@ export default function CoveragePage() {
     if (insertError || !inserted) {
       console.error('Assign failed:', insertError)
       if (insertError?.code === '23505') {
-        window.alert(`${selectedTherapist?.full_name ?? 'This therapist'} is already assigned on this day.`)
+        setAssignError(`${selectedTherapist?.full_name ?? 'This therapist'} is already assigned on this day.`)
       } else {
-        window.alert('Could not assign therapist. Please try again.')
+        setAssignError('Could not assign therapist. Please try again.')
       }
       setAssigning(false)
       return
     }
 
+    setAssignError('')
     const insertedRow = inserted as {
       id: string
       user_id: string
@@ -838,8 +843,15 @@ export default function CoveragePage() {
         weeklyTherapistCounts={weeklyTherapistCounts}
         onClose={handleClose}
         onAssignSubmit={handleAssign}
-        onAssignUserIdChange={setAssignUserId}
-        onAssignRoleChange={setAssignRole}
+        assignError={assignError}
+        onAssignUserIdChange={(value) => {
+          setAssignUserId(value)
+          setAssignError('')
+        }}
+        onAssignRoleChange={(role) => {
+          setAssignRole(role)
+          setAssignError('')
+        }}
         onToggleExpanded={(shiftId) =>
           setExpandedShiftId((previous) => (previous === shiftId ? null : shiftId))
         }
