@@ -12,6 +12,8 @@ type TestContext = {
   manager: { id: string; email: string; password: string; fullName: string }
   therapist: { id: string; email: string; fullName: string }
   cycle: { id: string; startDate: string; endDate: string }
+  emptySourceCycle: { id: string; startDate: string; endDate: string }
+  copyTargetCycle: { id: string; startDate: string; endDate: string }
   targetDate: string
   preSeededOverrideDate: string
   preSeededOverrideId: string
@@ -188,10 +190,124 @@ test.describe.serial('manager date-override workflow in /directory', () => {
 
     createdCycleIds.push(cycleInsert.data.id)
 
+    // Additional cycle intentionally left without shifts for copy-error coverage.
+    const emptyStart = new Date(end)
+    emptyStart.setDate(emptyStart.getDate() + 1)
+    const emptyEnd = new Date(emptyStart)
+    emptyEnd.setDate(emptyEnd.getDate() + 27)
+
+    const emptyCycleInsert = await supabase
+      .from('schedule_cycles')
+      .insert({
+        label: randomString('E2E Empty Source Cycle'),
+        start_date: formatDateKey(emptyStart),
+        end_date: formatDateKey(emptyEnd),
+        published: false,
+      })
+      .select('id, start_date, end_date')
+      .single()
+
+    if (emptyCycleInsert.error || !emptyCycleInsert.data) {
+      throw new Error(
+        `Could not create empty source cycle: ${emptyCycleInsert.error?.message ?? 'unknown error'}`
+      )
+    }
+
+    createdCycleIds.push(emptyCycleInsert.data.id)
+
+    // Target cycle used by copy-success tests.
+    const copyTargetStart = new Date(emptyEnd)
+    copyTargetStart.setDate(copyTargetStart.getDate() + 1)
+    const copyTargetEnd = new Date(copyTargetStart)
+    copyTargetEnd.setDate(copyTargetEnd.getDate() + 41)
+
+    const copyTargetCycleInsert = await supabase
+      .from('schedule_cycles')
+      .insert({
+        label: randomString('E2E Copy Target Cycle'),
+        start_date: formatDateKey(copyTargetStart),
+        end_date: formatDateKey(copyTargetEnd),
+        published: false,
+      })
+      .select('id, start_date, end_date')
+      .single()
+
+    if (copyTargetCycleInsert.error || !copyTargetCycleInsert.data) {
+      throw new Error(
+        `Could not create copy target cycle: ${copyTargetCycleInsert.error?.message ?? 'unknown error'}`
+      )
+    }
+
+    createdCycleIds.push(copyTargetCycleInsert.data.id)
+
     // Date used in the "add" test (start + 5 days)
     const targetDateObj = new Date(start)
     targetDateObj.setDate(targetDateObj.getDate() + 5)
     const targetDate = formatDateKey(targetDateObj)
+
+    // Source shifts for copy-success tests (in source cycle).
+    const sourceShiftDate1Obj = new Date(start)
+    sourceShiftDate1Obj.setDate(sourceShiftDate1Obj.getDate() + 8)
+    const sourceShiftDate1 = formatDateKey(sourceShiftDate1Obj)
+    const sourceShiftDate2Obj = new Date(start)
+    sourceShiftDate2Obj.setDate(sourceShiftDate2Obj.getDate() + 9)
+    const sourceShiftDate2 = formatDateKey(sourceShiftDate2Obj)
+    const sourceShiftsInsert = await supabase.from('shifts').insert([
+      {
+        cycle_id: cycleInsert.data.id,
+        user_id: therapist.id,
+        date: sourceShiftDate1,
+        shift_type: 'day',
+        role: 'staff',
+        status: 'scheduled',
+      },
+      {
+        cycle_id: cycleInsert.data.id,
+        user_id: therapist.id,
+        date: sourceShiftDate2,
+        shift_type: 'day',
+        role: 'staff',
+        status: 'scheduled',
+      },
+    ])
+
+    if (sourceShiftsInsert.error) {
+      throw new Error(
+        `Could not seed source shifts for copy tests: ${sourceShiftsInsert.error.message}`
+      )
+    }
+
+    // Pre-seed one matching target shift so copy path exercises duplicate-skip behavior.
+    const sourceDates = Array.from({ length: 42 }, (_, index) => {
+      const d = new Date(start)
+      d.setDate(d.getDate() + index)
+      return formatDateKey(d)
+    })
+    const sourceIndexByDate = new Map(sourceDates.map((d, i) => [d, i]))
+    const copyTargetDates = Array.from({ length: 42 }, (_, index) => {
+      const d = new Date(copyTargetStart)
+      d.setDate(d.getDate() + index)
+      return formatDateKey(d)
+    })
+    const firstShiftTargetDate = copyTargetDates[sourceIndexByDate.get(sourceShiftDate1) ?? -1]
+    if (!firstShiftTargetDate) {
+      throw new Error('Could not map source shift date into copy target cycle.')
+    }
+
+    const targetDuplicateInsert = await supabase.from('shifts').insert({
+      cycle_id: copyTargetCycleInsert.data.id,
+      user_id: therapist.id,
+      date: firstShiftTargetDate,
+      shift_type: 'day',
+      role: 'staff',
+      status: 'scheduled',
+    })
+
+    if (targetDuplicateInsert.error) {
+      throw new Error(
+        `Could not seed duplicate target shift for copy tests: ${targetDuplicateInsert.error.message}`
+      )
+    }
 
     // Pre-seed an override for the "delete" test (start + 3 days)
     const preSeededDateObj = new Date(start)
@@ -233,6 +349,16 @@ test.describe.serial('manager date-override workflow in /directory', () => {
         startDate: cycleInsert.data.start_date,
         endDate: cycleInsert.data.end_date,
       },
+      emptySourceCycle: {
+        id: emptyCycleInsert.data.id,
+        startDate: emptyCycleInsert.data.start_date,
+        endDate: emptyCycleInsert.data.end_date,
+      },
+      copyTargetCycle: {
+        id: copyTargetCycleInsert.data.id,
+        startDate: copyTargetCycleInsert.data.start_date,
+        endDate: copyTargetCycleInsert.data.end_date,
+      },
       targetDate,
       preSeededOverrideDate,
       preSeededOverrideId: overrideInsert.data.id,
@@ -242,6 +368,7 @@ test.describe.serial('manager date-override workflow in /directory', () => {
   test.afterAll(async () => {
     if (!ctx) return
     for (const cycleId of createdCycleIds) {
+      await ctx.supabase.from('shifts').delete().eq('cycle_id', cycleId)
       await ctx.supabase.from('availability_overrides').delete().eq('cycle_id', cycleId)
       await ctx.supabase.from('schedule_cycles').delete().eq('id', cycleId)
     }
@@ -357,7 +484,60 @@ test.describe.serial('manager date-override workflow in /directory', () => {
   })
 
   // -------------------------------------------------------------------------
-  // Test 3: "Enter availability" quick action opens drawer focused on overrides
+  // Test 3: Delete override inline error path stays in drawer
+  // -------------------------------------------------------------------------
+  test('shows inline error when delete override submit is missing override id', async ({
+    page,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    const tempDateObj = new Date(`${ctx!.cycle.startDate}T00:00:00`)
+    tempDateObj.setDate(tempDateObj.getDate() + 12)
+    const tempOverrideDate = formatDateKey(tempDateObj)
+    const tempOverrideInsert = await ctx!.supabase
+      .from('availability_overrides')
+      .insert({
+        therapist_id: ctx!.therapist.id,
+        cycle_id: ctx!.cycle.id,
+        date: tempOverrideDate,
+        shift_type: 'both',
+        override_type: 'force_off',
+        note: 'Temp row for inline delete error test',
+        created_by: ctx!.manager.id,
+        source: 'manager',
+      })
+      .select('id')
+      .single()
+
+    expect(tempOverrideInsert.error).toBeNull()
+    await login(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto('/directory')
+
+    await page.getByRole('row').filter({ hasText: ctx!.therapist.email }).click()
+    const drawer = page.getByRole('dialog', { name: 'Edit employee' })
+    await expect(drawer).toBeVisible({ timeout: 10_000 })
+
+    await drawer.getByRole('tab', { name: 'Overrides' }).click()
+    await expect(page.locator('#override_date')).toBeVisible({ timeout: 10_000 })
+
+    const deleteForm = drawer.locator('form:has(input[name="override_id"])').first()
+    await expect(deleteForm).toHaveCount(1)
+    const overrideIdInput = deleteForm.locator('input[name="override_id"]')
+    await overrideIdInput.evaluate((el) => {
+      ;(el as HTMLInputElement).value = ''
+    })
+    await deleteForm.evaluate((form) => {
+      ;(form as HTMLFormElement).requestSubmit()
+    })
+
+    await expect(
+      drawer.getByText('Could not delete override. Close and reopen the drawer, then try again.')
+    ).toBeVisible({ timeout: 10_000 })
+    await expect(page).not.toHaveURL(/success=override_deleted/, { timeout: 1_500 })
+  })
+
+  // -------------------------------------------------------------------------
+  // Test 4: "Enter availability" quick action opens drawer focused on overrides
   // -------------------------------------------------------------------------
   test('"Enter availability" quick action opens drawer with override form visible', async ({
     page,
@@ -385,7 +565,7 @@ test.describe.serial('manager date-override workflow in /directory', () => {
   })
 
   // -------------------------------------------------------------------------
-  // Test 4: Search filter narrows employee table rows
+  // Test 5: Search filter narrows employee table rows
   // -------------------------------------------------------------------------
   test('search filter hides non-matching rows and restores them on clear', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
@@ -414,7 +594,7 @@ test.describe.serial('manager date-override workflow in /directory', () => {
   })
 
   // -------------------------------------------------------------------------
-  // Test 5: Employment type filter pill buttons
+  // Test 6: Employment type filter pill buttons
   // -------------------------------------------------------------------------
   test('employment type filter hides full-time employee when PRN is selected', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
@@ -436,7 +616,7 @@ test.describe.serial('manager date-override workflow in /directory', () => {
   })
 
   // -------------------------------------------------------------------------
-  // Test 6: Lead-only checkbox hides non-lead-eligible employees
+  // Test 7: Lead-only checkbox hides non-lead-eligible employees
   // -------------------------------------------------------------------------
   test('lead-only checkbox hides employees who are not lead-eligible', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
@@ -458,7 +638,7 @@ test.describe.serial('manager date-override workflow in /directory', () => {
   })
 
   // -------------------------------------------------------------------------
-  // Test 7: Drawer tab navigation — Profile / Scheduling / Overrides
+  // Test 8: Drawer tab navigation — Profile / Scheduling / Overrides
   // -------------------------------------------------------------------------
   test('drawer tabs navigate between Profile, Scheduling, and Overrides panels', async ({
     page,
@@ -491,5 +671,156 @@ test.describe.serial('manager date-override workflow in /directory', () => {
     // Switch back to Profile tab
     await drawer.getByRole('tab', { name: 'Profile' }).click()
     await expect(page.locator('#edit_name')).toBeVisible()
+  })
+
+  // -------------------------------------------------------------------------
+  // Test 9: Copy shifts inline error path stays in drawer
+  // -------------------------------------------------------------------------
+  test('shows inline error when copying from a cycle with no scheduled shifts', async ({
+    page,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    await login(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto('/directory')
+
+    await page.getByRole('row').filter({ hasText: ctx!.therapist.email }).click()
+    const drawer = page.getByRole('dialog', { name: 'Edit employee' })
+    await expect(drawer).toBeVisible({ timeout: 10_000 })
+
+    await drawer.getByRole('tab', { name: 'Overrides' }).click()
+    await expect(page.locator('#override_date')).toBeVisible({ timeout: 10_000 })
+
+    const copyButton = drawer.getByRole('button', { name: 'Copy shifts' })
+    const copyForm = copyButton.locator('xpath=ancestor::form[1]')
+    await copyForm.locator('select[name="source_cycle_id"]').selectOption(ctx!.emptySourceCycle.id)
+    await copyForm.locator('select[name="target_cycle_id"]').selectOption(ctx!.cycle.id)
+    await copyButton.click()
+
+    await expect(
+      copyForm.getByText('No scheduled shifts were found in the source cycle for this therapist.')
+    ).toBeVisible({ timeout: 10_000 })
+    await expect(page).not.toHaveURL(/success=shifts_copied/, { timeout: 1_500 })
+  })
+
+  // -------------------------------------------------------------------------
+  // Test 10: Copy shifts success path reports copied/skipped and inserts rows
+  // -------------------------------------------------------------------------
+  test('copies source cycle shifts into target cycle and skips duplicates', async ({ page }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    await login(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto('/directory')
+
+    await page.getByRole('row').filter({ hasText: ctx!.therapist.email }).click()
+    const drawer = page.getByRole('dialog', { name: 'Edit employee' })
+    await expect(drawer).toBeVisible({ timeout: 10_000 })
+
+    await drawer.getByRole('tab', { name: 'Overrides' }).click()
+    await expect(page.locator('#override_date')).toBeVisible({ timeout: 10_000 })
+
+    const copyButton = drawer.getByRole('button', { name: 'Copy shifts' })
+    const copyForm = copyButton.locator('xpath=ancestor::form[1]')
+    await copyForm.locator('select[name="source_cycle_id"]').selectOption(ctx!.cycle.id)
+    await copyForm.locator('select[name="target_cycle_id"]').selectOption(ctx!.copyTargetCycle.id)
+    await copyButton.click()
+
+    await expect(page).toHaveURL(/success=shifts_copied/, { timeout: 15_000 })
+    await expect(page).toHaveURL(/copied=1/, { timeout: 10_000 })
+    await expect(page).toHaveURL(/skipped=1/, { timeout: 10_000 })
+
+    const targetResult = await ctx!.supabase
+      .from('shifts')
+      .select('id')
+      .eq('cycle_id', ctx!.copyTargetCycle.id)
+      .eq('user_id', ctx!.therapist.id)
+      .eq('status', 'scheduled')
+      .eq('shift_type', 'day')
+
+    expect(targetResult.error).toBeNull()
+    expect(targetResult.data?.length ?? 0).toBe(2)
+  })
+
+  // -------------------------------------------------------------------------
+  // Test 11: Save + realign removes future draft shifts for the employee
+  // -------------------------------------------------------------------------
+  test('save + realign shifts removes future draft shifts for the therapist', async ({ page }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    const realignDate = ctx!.copyTargetCycle.startDate
+    const seedResult = await ctx!.supabase.from('shifts').upsert(
+      {
+        cycle_id: ctx!.copyTargetCycle.id,
+        user_id: ctx!.therapist.id,
+        date: realignDate,
+        shift_type: 'day',
+        role: 'staff',
+        status: 'scheduled',
+      },
+      { onConflict: 'cycle_id,user_id,date' }
+    )
+    expect(seedResult.error).toBeNull()
+
+    const beforeResult = await ctx!.supabase
+      .from('shifts')
+      .select('id')
+      .eq('cycle_id', ctx!.copyTargetCycle.id)
+      .eq('user_id', ctx!.therapist.id)
+      .eq('date', realignDate)
+    expect(beforeResult.error).toBeNull()
+    expect(beforeResult.data?.length ?? 0).toBeGreaterThan(0)
+
+    await login(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto('/directory')
+    await page.getByRole('row').filter({ hasText: ctx!.therapist.email }).click()
+    const drawer = page.getByRole('dialog', { name: 'Edit employee' })
+    await expect(drawer).toBeVisible({ timeout: 10_000 })
+
+    await drawer.getByRole('button', { name: 'Save + realign shifts' }).click()
+    await expect(page).toHaveURL(/success=profile_saved/, { timeout: 15_000 })
+
+    const afterResult = await ctx!.supabase
+      .from('shifts')
+      .select('id')
+      .eq('cycle_id', ctx!.copyTargetCycle.id)
+      .eq('user_id', ctx!.therapist.id)
+      .eq('date', realignDate)
+
+    expect(afterResult.error).toBeNull()
+    expect(afterResult.data?.length ?? 0).toBe(0)
+  })
+
+  // -------------------------------------------------------------------------
+  // Test 12: Deactivate/Reactivate lifecycle toggles visibility as expected
+  // -------------------------------------------------------------------------
+  test('deactivate hides employee under Active filter and reactivate restores active state', async ({
+    page,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    await login(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto('/directory')
+
+    const therapistRow = page.getByRole('row').filter({ hasText: ctx!.therapist.email })
+    await expect(therapistRow).toBeVisible({ timeout: 15_000 })
+    await therapistRow.locator('summary').click()
+    await page.getByRole('button', { name: 'Deactivate' }).click()
+    await page
+      .getByRole('dialog', { name: 'Deactivate employee' })
+      .getByRole('button', { name: 'Deactivate' })
+      .click()
+    await expect(page).toHaveURL(/success=employee_deactivated/, { timeout: 15_000 })
+    await expect(page.getByRole('row').filter({ hasText: ctx!.therapist.email })).not.toBeVisible()
+
+    const statusGroup = page.getByText('Status:').locator('xpath=..')
+    await statusGroup.locator('button', { hasText: 'All' }).click()
+    const inactiveRow = page.getByRole('row').filter({ hasText: ctx!.therapist.email })
+    await expect(inactiveRow).toBeVisible({ timeout: 10_000 })
+    await inactiveRow.locator('summary').click()
+    await inactiveRow.getByRole('button', { name: 'Reactivate' }).click()
+    await expect(page).toHaveURL(/success=employee_reactivated/, { timeout: 15_000 })
+
+    await statusGroup.locator('button', { hasText: 'Active' }).click()
+    await expect(page.getByRole('row').filter({ hasText: ctx!.therapist.email })).toBeVisible()
   })
 })

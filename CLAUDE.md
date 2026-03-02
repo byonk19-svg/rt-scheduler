@@ -1,6 +1,30 @@
 # Teamwise Scheduler - Codex Handoff Context
 
-Updated: 2026-03-02 (PR #23 merged: CI stabilization + coverage e2e hardening + publish-route fixes)
+Updated: 2026-03-02 (session 2: directory E2E expansion + publish-process API E2E coverage)
+
+## Latest Completed Work (2026-03-02, session 2)
+
+- **Directory E2E coverage expansion** (`e2e/directory-date-override.spec.ts`):
+  - Added deterministic copy-path setup with dedicated seeded cycles:
+    - `emptySourceCycle` (no shifts) for copy-error validation
+    - `copyTargetCycle` with one pre-seeded duplicate shift for skip-path validation
+  - Added 5 tests (suite now **12 tests total**):
+    - inline delete error when `override_id` is missing (no redirect success URL)
+    - inline copy error when source cycle has no scheduled shifts
+    - copy success path verifies `copied=1&skipped=1` and DB row count in target cycle
+    - `Save + realign shifts` removes future draft shifts for the employee (DB assertion)
+    - deactivate/reactivate lifecycle toggles active-filter visibility and restores active state
+  - Full spec validation: `npx playwright test e2e/directory-date-override.spec.ts --workers=1` -> **12 passed**
+
+- **Coverage E2E stability fix** (`e2e/coverage-overlay.spec.ts`):
+  - Hardened unassign-delete DB assertion by switching to `expect.poll(...)` to wait for async server-action persistence.
+  - Removes intermittent false negatives where UI row was removed but DB check raced before delete commit.
+
+- **Publish process API E2E coverage** (`e2e/publish-process-api.spec.ts`):
+  - Added auth-boundary test for `POST /api/publish/process` without worker key (expects redirect-to-login or 401 unauthorized response path)
+  - Added worker-key test with safe idempotency assertion using a non-existent `publish_event_id` (no queued rows processed, repeated calls return identical `processed/sent/failed` counts)
+  - Validation: `npx playwright test e2e/publish-process-api.spec.ts --workers=1` -> **2 passed**
+  - Full suite validation: `npm run test:e2e` -> **39 passed, 1 skipped**
 
 ## Latest Completed Work (2026-03-02, session 1)
 
@@ -150,6 +174,10 @@ Updated: 2026-03-02 (PR #23 merged: CI stabilization + coverage e2e hardening + 
   - Changed `saveEmployeeDateOverrideAction` signature to `(prevState, formData)` for `useActionState` compatibility
   - Replaced all `redirect(error)` calls with `return { error: '<specific message>' }` on failures; keeps `redirect` on success
   - `EmployeeDirectory.tsx` uses `useActionState` to capture action state; inline red error banner inside Overrides tab form
+  - Expanded action-state handling to delete/copy paths:
+    - `deleteEmployeeDateOverrideAction` now returns inline error state
+    - `copyEmployeeShiftsAction` now returns inline error state
+    - delete/copy forms render drawer-local `role="alert"` banners on failure
   - Form keyed to `editEmployee.id + overrideCycleIdDraft` to auto-reset state between drawer opens
 
 - Quality: 195 unit tests pass (20 files); tsc, lint, format:check all green
@@ -549,12 +577,15 @@ Latest local checks:
 - `npm run format:check` pass (whole-repo Prettier; `.claude/**` excluded from ESLint)
 - `npm run build` pass
 - `npm run test:unit` pass (**200 tests** across 23 files)
-- `npm run test:e2e` pass (**32 passed**, 1 skipped; 33 total)
+- Targeted E2E reruns pass:
+  - `npx playwright test e2e/directory-date-override.spec.ts --workers=1` (**12 passed**)
+  - `npx playwright test e2e/publish-process-api.spec.ts --workers=1` (**2 passed**)
 - CI now gates on: format check -> lint -> **tsc --noEmit** -> build -> Playwright E2E
 - e2e specs:
   - `e2e/coverage-overlay.spec.ts` (14 tests)
-  - `e2e/directory-date-override.spec.ts` (7 tests: seeding, save override, delete override, search filter, employment filter, lead checkbox, drawer tabs)
+  - `e2e/directory-date-override.spec.ts` (12 tests: seeding, save override, delete override, inline delete error, search/filter coverage, drawer tabs, inline copy error, copy success, save+realign, deactivate/reactivate)
   - `e2e/availability-override.spec.ts` (2 tests: conflict warning + PRN disabled picker)
+  - `e2e/publish-process-api.spec.ts` (2 tests: auth boundary + worker-key idempotent empty processing)
 
 ## Resume Checklist
 
@@ -604,4 +635,4 @@ To activate:
 
 1. Publish flow production rollout — verify domain in Resend and switch `PUBLISH_EMAIL_FROM` to the verified domain sender
 2. Worker automation rollout — wire cron/webhook to `/api/publish/process` with `PUBLISH_WORKER_KEY`
-3. Server-side validation messages for cycle/date conflicts directly in the directory drawer (inline error banners vs. redirect-based toasts)
+3. Publish process API hardening tests — add E2E coverage for worker-key auth boundaries and safe idempotent processing behavior

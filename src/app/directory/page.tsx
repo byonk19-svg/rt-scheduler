@@ -97,6 +97,8 @@ type EmployeeCycleRecord = {
 }
 
 type ToastVariant = 'success' | 'error'
+type DirectoryDeleteOverrideActionState = { error: string; profileId: string } | null
+type DirectoryCopyShiftsActionState = { error: string; employeeId: string } | null
 
 function getSearchParam(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0]
@@ -652,7 +654,10 @@ async function saveEmployeeDateOverrideAction(
   )
 }
 
-async function deleteEmployeeDateOverrideAction(formData: FormData) {
+async function deleteEmployeeDateOverrideAction(
+  _prevState: DirectoryDeleteOverrideActionState,
+  formData: FormData
+): Promise<DirectoryDeleteOverrideActionState> {
   'use server'
 
   const { supabase } = await requireManager()
@@ -662,7 +667,10 @@ async function deleteEmployeeDateOverrideAction(formData: FormData) {
   const openAvailabilityParams = getOpenAvailabilityParams({ profileId, cycleId })
 
   if (!overrideId || !profileId) {
-    redirect(buildDirectoryUrl({ error: 'override_missing_fields', ...openAvailabilityParams }))
+    return {
+      error: 'Could not delete override. Close and reopen the drawer, then try again.',
+      profileId,
+    }
   }
 
   const { error: deleteError } = await supabase
@@ -673,10 +681,13 @@ async function deleteEmployeeDateOverrideAction(formData: FormData) {
 
   if (deleteError) {
     if (isMissingAvailabilityOverridesSchema(deleteError)) {
-      redirect(buildDirectoryUrl({ error: 'override_schema_missing', ...openAvailabilityParams }))
+      return {
+        error: 'Availability overrides feature is not yet set up. Run the pending migration.',
+        profileId,
+      }
     }
     console.error('Failed to delete employee date override:', deleteError)
-    redirect(buildDirectoryUrl({ error: 'override_delete_failed', ...openAvailabilityParams }))
+    return { error: 'Could not delete date override. Please try again.', profileId }
   }
 
   revalidatePath('/directory')
@@ -687,7 +698,10 @@ async function deleteEmployeeDateOverrideAction(formData: FormData) {
   redirect(buildDirectoryUrl({ success: 'override_deleted', ...openAvailabilityParams }))
 }
 
-async function copyEmployeeShiftsAction(formData: FormData) {
+async function copyEmployeeShiftsAction(
+  _prevState: DirectoryCopyShiftsActionState,
+  formData: FormData
+): Promise<DirectoryCopyShiftsActionState> {
   'use server'
 
   const { supabase } = await requireManager()
@@ -696,9 +710,10 @@ async function copyEmployeeShiftsAction(formData: FormData) {
   const targetCycleId = String(formData.get('target_cycle_id') ?? '').trim()
 
   if (!employeeId || !sourceCycleId || !targetCycleId || sourceCycleId === targetCycleId) {
-    redirect(
-      buildDirectoryUrl({ error: 'copy_invalid_params', edit_profile: employeeId || undefined })
-    )
+    return {
+      error: 'Choose two different cycles before copying shifts.',
+      employeeId,
+    }
   }
 
   // Fetch both cycles
@@ -709,7 +724,10 @@ async function copyEmployeeShiftsAction(formData: FormData) {
   const sourceCycle = cycles?.find((c) => c.id === sourceCycleId)
   const targetCycle = cycles?.find((c) => c.id === targetCycleId)
   if (!sourceCycle || !targetCycle) {
-    redirect(buildDirectoryUrl({ error: 'copy_invalid_params', edit_profile: employeeId }))
+    return {
+      error: 'Could not load one of the selected cycles. Refresh and try again.',
+      employeeId,
+    }
   }
 
   // Fetch source shifts for this employee
@@ -722,7 +740,10 @@ async function copyEmployeeShiftsAction(formData: FormData) {
     .is('unfilled_reason', null)
 
   if (!sourceShifts || sourceShifts.length === 0) {
-    redirect(buildDirectoryUrl({ error: 'no_source_shifts', edit_profile: employeeId }))
+    return {
+      error: 'No scheduled shifts were found in the source cycle for this therapist.',
+      employeeId,
+    }
   }
 
   // Build day-offset map (same pattern as createCycleAction)
@@ -748,7 +769,10 @@ async function copyEmployeeShiftsAction(formData: FormData) {
   })
 
   if (shiftsToInsert.length === 0) {
-    redirect(buildDirectoryUrl({ error: 'no_source_shifts', edit_profile: employeeId }))
+    return {
+      error: 'No matching source shifts could be copied into the selected target cycle.',
+      employeeId,
+    }
   }
 
   const { data: inserted, error } = await supabase
@@ -758,7 +782,10 @@ async function copyEmployeeShiftsAction(formData: FormData) {
 
   if (error) {
     console.error('Failed to copy employee shifts:', error)
-    redirect(buildDirectoryUrl({ error: 'copy_failed', edit_profile: employeeId }))
+    return {
+      error: 'Failed to copy shifts. Please try again.',
+      employeeId,
+    }
   }
 
   revalidatePath('/coverage')

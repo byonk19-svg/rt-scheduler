@@ -83,8 +83,14 @@ type EmployeeDirectoryProps = {
     prevState: { error: string } | null,
     formData: FormData
   ) => Promise<{ error: string } | null>
-  deleteEmployeeDateOverrideAction: (formData: FormData) => void | Promise<void>
-  copyEmployeeShiftsAction: (formData: FormData) => void | Promise<void>
+  deleteEmployeeDateOverrideAction: (
+    prevState: { error: string; profileId: string } | null,
+    formData: FormData
+  ) => Promise<{ error: string; profileId: string } | null>
+  copyEmployeeShiftsAction: (
+    prevState: { error: string; employeeId: string } | null,
+    formData: FormData
+  ) => Promise<{ error: string; employeeId: string } | null>
 }
 
 type DirectorySortKey = 'employee' | 'shift' | 'type' | 'tags'
@@ -356,6 +362,11 @@ export function EmployeeDirectory({
     saveEmployeeDateOverrideAction,
     null
   )
+  const [deleteOverrideFormState, deleteOverrideFormAction] = useActionState(
+    deleteEmployeeDateOverrideAction,
+    null
+  )
+  const [copyShiftsFormState, copyShiftsFormAction] = useActionState(copyEmployeeShiftsAction, null)
   const [drawerTab, setDrawerTab] = useState<DrawerTab>(
     initialEditEmployeeId && initialFocusAvailability ? 'overrides' : 'profile'
   )
@@ -1744,6 +1755,15 @@ export function EmployeeDirectory({
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         Current overrides
                       </p>
+                      {deleteOverrideFormState?.error &&
+                        deleteOverrideFormState.profileId === editEmployee.id && (
+                          <p
+                            role="alert"
+                            className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700"
+                          >
+                            {deleteOverrideFormState.error}
+                          </p>
+                        )}
                       {editEmployeeDateOverrides.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
                           No date overrides for this therapist yet.
@@ -1774,7 +1794,7 @@ export function EmployeeDirectory({
                                   </Badge>
                                 </div>
                               </div>
-                              <form action={deleteEmployeeDateOverrideAction}>
+                              <form action={deleteOverrideFormAction}>
                                 <input type="hidden" name="override_id" value={row.id} />
                                 <input type="hidden" name="profile_id" value={editEmployee.id} />
                                 <input type="hidden" name="cycle_id" value={row.cycle_id} />
@@ -1801,7 +1821,7 @@ export function EmployeeDirectory({
                       Copy this employee&apos;s scheduled shifts from one cycle to another. Shifts
                       already in the target cycle are kept.
                     </p>
-                    <form action={copyEmployeeShiftsAction} className="mt-3 space-y-2">
+                    <form action={copyShiftsFormAction} className="mt-3 space-y-2">
                       <input type="hidden" name="employee_id" value={editEmployee.id} />
                       <div className="flex flex-col gap-2">
                         <label className="text-xs font-semibold text-slate-600">
@@ -1847,6 +1867,15 @@ export function EmployeeDirectory({
                       >
                         Copy shifts
                       </FormSubmitButton>
+                      {copyShiftsFormState?.error &&
+                        copyShiftsFormState.employeeId === editEmployee.id && (
+                          <p
+                            role="alert"
+                            className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700"
+                          >
+                            {copyShiftsFormState.error}
+                          </p>
+                        )}
                     </form>
                   </div>
                 </div>

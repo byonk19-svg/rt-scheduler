@@ -787,14 +787,21 @@ test.describe.serial('coverage calendar overlay interactions', () => {
       page.locator('aside').getByRole('button', { name: new RegExp(ctx!.therapist2.fullName) })
     ).toHaveCount(0, { timeout: 10_000 })
 
-    // DB: no shift should remain for therapist2 on targetDate
-    const { data: remaining } = await ctx!.supabase
-      .from('shifts')
-      .select('id')
-      .eq('user_id', ctx!.therapist2.id)
-      .eq('cycle_id', ctx!.cycle.id)
-      .eq('date', ctx!.targetDate)
-    expect(remaining?.length ?? 0).toBe(0)
+    // DB delete is async behind a server action; poll until it settles.
+    await expect
+      .poll(
+        async () => {
+          const { data: remaining } = await ctx!.supabase
+            .from('shifts')
+            .select('id')
+            .eq('user_id', ctx!.therapist2.id)
+            .eq('cycle_id', ctx!.cycle.id)
+            .eq('date', ctx!.targetDate)
+          return remaining?.length ?? 0
+        },
+        { timeout: 10_000 }
+      )
+      .toBe(0)
   })
 
   // -------------------------------------------------------------------------
