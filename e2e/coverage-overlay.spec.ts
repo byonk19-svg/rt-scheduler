@@ -12,6 +12,9 @@ type TestContext = {
   manager: { id: string; email: string; password: string }
   therapist1: { id: string; fullName: string }
   therapist2: { id: string; fullName: string }
+  // PRN day-shift therapist; pre-seeded with one night shift on targetDate so their
+  // weekly count (1) equals their PRN limit (1) when the Day panel opens.
+  therapist3: { id: string; fullName: string }
   cycle: { id: string }
   targetDate: string
   assignDate2: string // clean day (start + 15) where both therapists are available
@@ -171,7 +174,20 @@ test.describe.serial('coverage calendar overlay interactions', () => {
       isLeadEligible: false,
     })
 
-    createdUserIds.push(manager.id, therapist1.id, therapist2.id)
+    // PRN therapist with max 1 shift/week — used for workload-warning test.
+    // Pre-seeded with a night shift on targetDate so their weekly count equals their limit.
+    const therapist3FullName = `E2E Cov PRN ${randomString('t3')}`
+    const therapist3 = await createUser(supabase, {
+      email: `${randomString('cov-t3')}@example.com`,
+      password: `Ther!${Math.random().toString(16).slice(2, 8)}`,
+      fullName: therapist3FullName,
+      role: 'therapist',
+      employmentType: 'prn',
+      shiftType: 'day',
+      isLeadEligible: false,
+    })
+
+    createdUserIds.push(manager.id, therapist1.id, therapist2.id, therapist3.id)
 
     // Cycle: yesterday → yesterday + 41 days
     const start = new Date()
@@ -208,7 +224,11 @@ test.describe.serial('coverage calendar overlay interactions', () => {
     assignDate2Obj.setDate(assignDate2Obj.getDate() + 15)
     const assignDate2 = formatDateKey(assignDate2Obj)
 
-    // Seed 2 shifts on targetDate so the accordion test has 2 rows to expand
+    // Seed shifts on targetDate:
+    //  - therapist1 as day-lead (accordion + lead tests)
+    //  - therapist2 as day-staff (accordion + status + unassign tests)
+    //  - therapist3 as night-staff (puts them at their PRN weekly limit for the workload-warning test
+    //    without changing the Day-tab cell count, which must stay 2/2 for earlier tests)
     const shiftsInsert = await supabase.from('shifts').insert([
       {
         cycle_id: cycleInsert.data.id,
@@ -226,6 +246,14 @@ test.describe.serial('coverage calendar overlay interactions', () => {
         role: 'staff',
         status: 'scheduled',
       },
+      {
+        cycle_id: cycleInsert.data.id,
+        user_id: therapist3.id,
+        date: targetDate,
+        shift_type: 'night',
+        role: 'staff',
+        status: 'scheduled',
+      },
     ])
 
     if (shiftsInsert.error) {
@@ -237,6 +265,7 @@ test.describe.serial('coverage calendar overlay interactions', () => {
       manager: { id: manager.id, email: managerEmail, password: managerPassword },
       therapist1: { id: therapist1.id, fullName: therapist1FullName },
       therapist2: { id: therapist2.id, fullName: therapist2FullName },
+      therapist3: { id: therapist3.id, fullName: therapist3FullName },
       cycle: { id: cycleInsert.data.id },
       targetDate,
       assignDate2,
@@ -569,5 +598,178 @@ test.describe.serial('coverage calendar overlay interactions', () => {
         .getByRole('button', { name: new RegExp(ctx!.therapist2.fullName) })
         .locator('p.text-xs.font-semibold')
     ).toContainText('On Call', { timeout: 5_000 })
+  })
+
+  // -------------------------------------------------------------------------
+  // Test 11: Assign as Lead role — Lead row appears and DB records role='lead'
+  // -------------------------------------------------------------------------
+  test('assigning as Lead role creates a lead row in the panel and persists to the DB', async ({
+    page,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    await login(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
+
+    await expect(page.locator('.grid-cols-7 button').first()).toBeVisible({ timeout: 15_000 })
+
+    // assignDate2 is at calendar index 15 (start + 15) — guaranteed clean
+    const assignCell = page.locator('.grid-cols-7 button').nth(15)
+    await expect(assignCell).toBeVisible({ timeout: 10_000 })
+    await assignCell.click()
+    await expect(panelCloseBtn(page)).toBeVisible({ timeout: 5_000 })
+
+    // Switch to Lead role in the assign panel
+    await page.locator('aside').getByRole('button', { name: 'Lead' }).click()
+
+    // Select therapist1 (lead-eligible) and assign
+    const select = page.locator('aside select')
+    await expect(select).toBeVisible()
+    await select.selectOption({ value: ctx!.therapist1.id })
+    await page.locator('aside').getByRole('button', { name: 'Assign' }).click()
+
+    // therapist1 should appear as a row in the panel
+    const t1Row = page
+      .locator('aside')
+      .getByRole('button', { name: new RegExp(ctx!.therapist1.fullName) })
+    await expect(t1Row).toBeVisible({ timeout: 10_000 })
+
+    // Expanding their row should show "Remove lead assignment" — confirming the Lead role
+    await t1Row.click()
+    await expect(
+      page.locator('aside').getByRole('button', { name: 'Remove lead assignment' })
+    ).toBeVisible({ timeout: 5_000 })
+
+    // DB: the inserted shift must have role='lead'
+    const { data: leadShifts } = await ctx!.supabase
+      .from('shifts')
+      .select('role')
+      .eq('user_id', ctx!.therapist1.id)
+      .eq('cycle_id', ctx!.cycle.id)
+      .eq('date', ctx!.assignDate2)
+      .eq('role', 'lead')
+    expect(leadShifts?.length).toBeGreaterThanOrEqual(1)
+  })
+
+  // -------------------------------------------------------------------------
+  // Test 12: Status change persists when the panel is closed and reopened
+  // -------------------------------------------------------------------------
+  test('On Call status set in test 10 persists when the panel is closed and reopened', async ({
+    page,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    await login(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
+
+    await expect(page.locator('.grid-cols-7 button').first()).toBeVisible({ timeout: 15_000 })
+
+    // targetDate still has 2/2 (test 13 hasn't unassigned therapist2 yet)
+    const targetCell = page.locator('.grid-cols-7 button').filter({ hasText: '2/2' }).first()
+    await expect(targetCell).toBeVisible({ timeout: 10_000 })
+    await targetCell.click()
+    await expect(panelCloseBtn(page)).toBeVisible({ timeout: 5_000 })
+
+    // Expand therapist2 — status should be "On Call" (saved to DB by test 10)
+    const t2Btn = page
+      .locator('aside')
+      .getByRole('button', { name: new RegExp(ctx!.therapist2.fullName) })
+    await t2Btn.click()
+    await expect(t2Btn.locator('p.text-xs.font-semibold')).toContainText('On Call', {
+      timeout: 5_000,
+    })
+
+    // Close the panel, then reopen the same day
+    await panelCloseBtn(page).click()
+    await expect(panelCloseBtn(page)).not.toBeVisible({ timeout: 5_000 })
+
+    await targetCell.click()
+    await expect(panelCloseBtn(page)).toBeVisible({ timeout: 5_000 })
+
+    // Status must still be "On Call" after re-open (not reset to Active)
+    const t2BtnReopen = page
+      .locator('aside')
+      .getByRole('button', { name: new RegExp(ctx!.therapist2.fullName) })
+    await t2BtnReopen.click()
+    await expect(t2BtnReopen.locator('p.text-xs.font-semibold')).toContainText('On Call', {
+      timeout: 5_000,
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // Test 13: Unassign therapist removes their row from the panel
+  // -------------------------------------------------------------------------
+  test('unassigning a therapist removes their row from the panel and deletes the DB shift', async ({
+    page,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    await login(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
+
+    await expect(page.locator('.grid-cols-7 button').first()).toBeVisible({ timeout: 15_000 })
+
+    const targetCell = page.locator('.grid-cols-7 button').filter({ hasText: '2/2' }).first()
+    await expect(targetCell).toBeVisible({ timeout: 10_000 })
+    await targetCell.click()
+    await expect(panelCloseBtn(page)).toBeVisible({ timeout: 5_000 })
+
+    // Expand therapist2 and unassign
+    await page
+      .locator('aside')
+      .getByRole('button', { name: new RegExp(ctx!.therapist2.fullName) })
+      .click()
+    await page.locator('aside').getByRole('button', { name: 'Unassign therapist' }).click()
+
+    // therapist2 row should disappear from the panel
+    await expect(
+      page.locator('aside').getByRole('button', { name: new RegExp(ctx!.therapist2.fullName) })
+    ).toHaveCount(0, { timeout: 10_000 })
+
+    // DB: no shift should remain for therapist2 on targetDate
+    const { data: remaining } = await ctx!.supabase
+      .from('shifts')
+      .select('id')
+      .eq('user_id', ctx!.therapist2.id)
+      .eq('cycle_id', ctx!.cycle.id)
+      .eq('date', ctx!.targetDate)
+    expect(remaining?.length ?? 0).toBe(0)
+  })
+
+  // -------------------------------------------------------------------------
+  // Test 14: Workload warning appears when a therapist is at their weekly limit
+  // -------------------------------------------------------------------------
+  test('selecting a therapist at their weekly limit shows the workload warning banner', async ({
+    page,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    // therapist3 (PRN, max 1 shift/week) has a pre-seeded night shift on targetDate.
+    // weeklyTherapistCounts spans dayDays + nightDays, so their weekly count = 1 = limit.
+    // Opening the Day tab for targetDate and selecting them triggers the role="status" warning.
+
+    await login(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
+
+    await expect(page.locator('.grid-cols-7 button').first()).toBeVisible({ timeout: 15_000 })
+
+    // targetDate is at calendar index 5 (cycle start + 5).
+    // After test 13 unassigned therapist2, this cell shows 1/1 (therapist1 only).
+    const targetCell = page.locator('.grid-cols-7 button').nth(5)
+    await expect(targetCell).toBeVisible({ timeout: 10_000 })
+    await targetCell.click()
+    await expect(panelCloseBtn(page)).toBeVisible({ timeout: 5_000 })
+
+    // Select therapist3 — they are eligible for day shifts (day profile) and not yet assigned
+    // to this day slot, so they appear in the dropdown.
+    const select = page.locator('aside select')
+    await expect(select).toBeVisible()
+    await select.selectOption({ value: ctx!.therapist3.id })
+
+    // Workload warning (role="status") should appear immediately after selection
+    const warning = page.locator('aside [role="status"]')
+    await expect(warning).toBeVisible({ timeout: 5_000 })
+    await expect(warning).toContainText(ctx!.therapist3.fullName)
+    await expect(warning).toContainText('1 of 1')
   })
 })

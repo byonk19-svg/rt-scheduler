@@ -1,6 +1,42 @@
 # Teamwise Scheduler - Codex Handoff Context
 
-Updated: 2026-03-01 (design system audit + brand alignment pass)
+Updated: 2026-03-01 (PageHeader + staff roster + weekly breakdown + directory e2e filters)
+
+## Latest Completed Work (2026-03-01, session 4)
+
+### PageHeader shared component
+
+- **`src/components/ui/page-header.tsx`** (new): shared surface card for page-level headers — props: `title`, `subtitle`, `badge?: ReactNode`, `actions?: ReactNode`, `className?`; uses `teamwise-surface`, `app-page-title`, `border-border` tokens; always-present sticky appearance without extra wrapper divs.
+- **`src/app/dashboard/manager/page.tsx`**: replaced inline header block with `<PageHeader>` — `actions` slot carries the `<Calendar>` Lucide icon; `className="fade-up mb-7"` preserves existing stagger timing.
+- **`src/app/dashboard/staff/page.tsx`**: replaced header div with `<PageHeader>` — `badge` slot holds Role + Team `<Badge>` chips.
+
+### Staff dashboard — upcoming shift roster
+
+- **`src/app/dashboard/staff/page.tsx`**: after the metrics banner, a new "Upcoming shifts" section shows the user's next 3 shifts with colleagues:
+  - Fetches `shifts` for the same dates (excluding self) using 2 extra SSR queries (roster shifts + roster profile names); zero client-side JS
+  - Each row: date label, shift type, **Lead** amber badge if user is lead that day
+  - Colleague chips: amber `★ First` for lead colleagues; muted `First` for staff colleagues; sorted leads-first
+  - Falls back to "No colleagues assigned yet." when the slot is otherwise empty
+
+### Manager dashboard — weekly progress breakdown
+
+- **`src/app/dashboard/manager/page.tsx`**: inside the existing Cycle Progress card, a new "Week by week" subsection shows a mini bar chart for fill rate per week:
+  - `WeekRow = { label: string; scheduled: number; total: number }` type
+  - Derived from existing coverage loop via `dateIndex` counter + `Map<number, bucket>` — **zero extra network requests**
+  - Bar color: green (`var(--success)`) ≥80 %, amber (`var(--warning)`) ≥50 %, red (`var(--error)`) <50 %
+  - Added to `DashboardData`, `DashboardDisplayData`, `INITIAL_DATA`, `setData` call
+
+### Directory e2e — filter bar + drawer tabs (4 new tests)
+
+- **`e2e/directory-date-override.spec.ts`** — grew from 3 tests to 7:
+  - **Test 4**: search filter hides non-matching rows, restores on clear, keeps exact match visible
+  - **Test 5**: PRN employment-type filter pill hides full-time employee; FT pill restores them
+  - **Test 6**: Lead-only checkbox hides non-lead-eligible employees; unchecking restores them
+  - **Test 7**: drawer tab navigation — Profile → Scheduling → Overrides → Profile; each tab shows correct panel, hides others via CSS `hidden`
+
+- Quality: 195 unit tests pass; tsc, lint, format:check all green
+
+---
 
 ## Latest Completed Work (2026-03-01, session 3 — Design System)
 
@@ -376,13 +412,12 @@ Manager information hierarchy is now schedule-first:
 
 ## Navbar / Branding (Current)
 
-- Navbar logo replaced with inline amber icon + Teamwise wordmark component in `AppShell`
+- Navbar logo: inline amber icon (`var(--attention)`) + Teamwise wordmark in `AppShell`
 - Plus Jakarta Sans (800) added at root layout via `next/font/google`
-- Amber accents:
-  - active nav pill: `#d97706`
-  - user avatar circle: `#d97706`
-  - manager badge: bg `#fffbeb`, text `#b45309`, border `#fde68a`
-- App shell header z-index lowered to `z-30` so coverage overlay correctly layers above it
+- Active nav pill: `var(--primary)` blue (was amber)
+- User avatar circle: `var(--attention)` amber (brand personality)
+- Manager badge: `bg-amber-50 text-amber-700 border-amber-200`
+- App shell header z-index: `z-30` (coverage slide-over sits above at `z-50`)
 - App shell includes `/coverage` route so top nav is present on coverage page
 - Manager nav order is schedule-first:
   - `Dashboard`, `Coverage`, `Team`, `Requests` (approvals moved later and renamed in nav)
@@ -479,7 +514,7 @@ Latest local checks:
 - CI now gates on: format check → lint → **tsc --noEmit** → build
 - e2e specs:
   - `e2e/coverage-overlay.spec.ts` (10 tests)
-  - `e2e/directory-date-override.spec.ts`
+  - `e2e/directory-date-override.spec.ts` (7 tests: seeding, save override, delete override, search filter, employment filter, lead checkbox, drawer tabs)
 
 ## Resume Checklist
 
@@ -526,6 +561,5 @@ To activate:
 ## Next High-Value Priorities
 
 1. Publish flow validation — activate env vars and validate queued email send + retry path
-2. Add e2e tests for employee directory drawer tabs and filter bar interactions
-3. Cycle progress visualization on manager dashboard (day-by-day fill rate heatmap or week breakdown)
-4. Staff-facing upcoming shift detail view (show who else is on shift, lead indicator)
+2. **Coverage e2e suite expansion** — add tests for: lead assignment end-to-end, workload warning when at weekly limit, unassign removes shift chip, status change persists across panel close/reopen
+3. Server-side validation messages for cycle/date conflicts directly in the directory drawer (inline error banners vs. redirect-based toasts)
