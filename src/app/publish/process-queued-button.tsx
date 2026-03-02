@@ -46,4 +46,3 @@ export function ProcessQueuedButton({ publishEventId }: ProcessQueuedButtonProps
     </button>
   )
 }
-

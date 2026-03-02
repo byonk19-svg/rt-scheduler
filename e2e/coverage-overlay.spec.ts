@@ -190,7 +190,9 @@ test.describe.serial('coverage calendar overlay interactions', () => {
       .single()
 
     if (cycleInsert.error || !cycleInsert.data) {
-      throw new Error(`Could not create test cycle: ${cycleInsert.error?.message ?? 'unknown error'}`)
+      throw new Error(
+        `Could not create test cycle: ${cycleInsert.error?.message ?? 'unknown error'}`
+      )
     }
 
     createdCycleIds.push(cycleInsert.data.id)

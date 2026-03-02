@@ -49,7 +49,9 @@ export default function LoginPage() {
           <div className="teamwise-grid-bg-subtle hidden border-r border-border p-8 md:block">
             <TeamwiseLogo />
             <div className="mt-8 space-y-5">
-              <p className="text-sm font-medium text-muted-foreground">The schedule your team trusts</p>
+              <p className="text-sm font-medium text-muted-foreground">
+                The schedule your team trusts
+              </p>
               <div className="rounded-xl border border-border/80 bg-white/80 p-3 shadow-sm">
                 <svg
                   viewBox="0 0 700 290"
@@ -57,7 +59,15 @@ export default function LoginPage() {
                   aria-label="Weekly schedule grid illustration"
                   className="h-auto w-full"
                 >
-                  <rect x="1" y="1" width="698" height="288" rx="14" fill="#f8fafc" stroke="#d6dce6" />
+                  <rect
+                    x="1"
+                    y="1"
+                    width="698"
+                    height="288"
+                    rx="14"
+                    fill="#f8fafc"
+                    stroke="#d6dce6"
+                  />
                   <line x1="1" y1="72" x2="699" y2="72" stroke="#d6dce6" />
                   <line x1="1" y1="144" x2="699" y2="144" stroke="#d6dce6" />
                   <line x1="1" y1="216" x2="699" y2="216" stroke="#d6dce6" />
@@ -70,12 +80,60 @@ export default function LoginPage() {
                   <line x1="600" y1="1" x2="600" y2="289" stroke="#d6dce6" />
 
                   <rect x="16" y="86" width="68" height="44" rx="8" fill="#0b79c8" opacity="0.9" />
-                  <rect x="114" y="158" width="72" height="44" rx="8" fill="#f59e0b" opacity="0.9" />
-                  <rect x="214" y="86" width="70" height="44" rx="8" fill="#0b79c8" opacity="0.82" />
-                  <rect x="314" y="230" width="70" height="44" rx="8" fill="#10b981" opacity="0.88" />
-                  <rect x="414" y="158" width="70" height="44" rx="8" fill="#0b79c8" opacity="0.82" />
-                  <rect x="514" y="86" width="70" height="44" rx="8" fill="#10b981" opacity="0.88" />
-                  <rect x="614" y="230" width="70" height="44" rx="8" fill="#f59e0b" opacity="0.9" />
+                  <rect
+                    x="114"
+                    y="158"
+                    width="72"
+                    height="44"
+                    rx="8"
+                    fill="#f59e0b"
+                    opacity="0.9"
+                  />
+                  <rect
+                    x="214"
+                    y="86"
+                    width="70"
+                    height="44"
+                    rx="8"
+                    fill="#0b79c8"
+                    opacity="0.82"
+                  />
+                  <rect
+                    x="314"
+                    y="230"
+                    width="70"
+                    height="44"
+                    rx="8"
+                    fill="#10b981"
+                    opacity="0.88"
+                  />
+                  <rect
+                    x="414"
+                    y="158"
+                    width="70"
+                    height="44"
+                    rx="8"
+                    fill="#0b79c8"
+                    opacity="0.82"
+                  />
+                  <rect
+                    x="514"
+                    y="86"
+                    width="70"
+                    height="44"
+                    rx="8"
+                    fill="#10b981"
+                    opacity="0.88"
+                  />
+                  <rect
+                    x="614"
+                    y="230"
+                    width="70"
+                    height="44"
+                    rx="8"
+                    fill="#f59e0b"
+                    opacity="0.9"
+                  />
                 </svg>
               </div>
             </div>
@@ -113,7 +171,11 @@ export default function LoginPage() {
                     required
                   />
                 </div>
-                {error && <p className="rounded-lg border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]">{error}</p>}
+                {error && (
+                  <p className="rounded-lg border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]">
+                    {error}
+                  </p>
+                )}
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
                   {loading ? 'Signing in...' : 'Sign in'}

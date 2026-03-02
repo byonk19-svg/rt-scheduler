@@ -66,7 +66,10 @@ type OpenRequest = {
   message: string
 }
 
-const REQUEST_STATUS_META: Record<RequestStatus, { label: string; color: string; bg: string; border: string }> = {
+const REQUEST_STATUS_META: Record<
+  RequestStatus,
+  { label: string; color: string; bg: string; border: string }
+> = {
   pending: { label: 'Pending', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
   approved: { label: 'Approved', color: '#065f46', bg: '#ecfdf5', border: '#a7f3d0' },
   denied: { label: 'Denied', color: '#991b1b', bg: '#fef2f2', border: '#fecaca' },
@@ -106,7 +109,11 @@ function formatRelativeTime(value: string): string {
   return rtf.format(Math.round(seconds / 86400), 'day')
 }
 
-function toUiStatus(status: PersistedRequestStatus, shiftDate: string | null, todayKey: string): RequestStatus {
+function toUiStatus(
+  status: PersistedRequestStatus,
+  shiftDate: string | null,
+  todayKey: string
+): RequestStatus {
   if (status === 'pending' && shiftDate !== null && shiftDate < todayKey) {
     return 'expired'
   }
@@ -114,7 +121,9 @@ function toUiStatus(status: PersistedRequestStatus, shiftDate: string | null, to
 }
 
 function defaultMessage(type: RequestType): string {
-  return type === 'swap' ? 'Requesting a swap for this shift.' : 'Requesting pickup coverage for this shift.'
+  return type === 'swap'
+    ? 'Requesting a swap for this shift.'
+    : 'Requesting pickup coverage for this shift.'
 }
 
 function slotKey(date: string, shiftType: ShiftType): string {
@@ -241,7 +250,11 @@ export default function SwapRequestPage() {
 
         const requestRows = (myRequestsResult.data ?? []) as ShiftPostRow[]
         const shiftIds = Array.from(
-          new Set(requestRows.map((row) => row.shift_id).filter((value): value is string => Boolean(value)))
+          new Set(
+            requestRows
+              .map((row) => row.shift_id)
+              .filter((value): value is string => Boolean(value))
+          )
         )
 
         let shiftById = new Map<string, ShiftRow>()
@@ -255,7 +268,11 @@ export default function SwapRequestPage() {
         }
 
         const requestedPartnerIds = Array.from(
-          new Set(requestRows.map((row) => row.claimed_by).filter((value): value is string => Boolean(value)))
+          new Set(
+            requestRows
+              .map((row) => row.claimed_by)
+              .filter((value): value is string => Boolean(value))
+          )
         )
 
         let partnerById = new Map<string, string>()
@@ -266,12 +283,15 @@ export default function SwapRequestPage() {
             .in('id', requestedPartnerIds)
 
           partnerById = new Map(
-            ((partnerRows ?? []) as ProfileRow[]).map((row) => [row.id, row.full_name ?? 'Unknown therapist'])
+            ((partnerRows ?? []) as ProfileRow[]).map((row) => [
+              row.id,
+              row.full_name ?? 'Unknown therapist',
+            ])
           )
         }
 
         const mappedOpenRequests = requestRows.map((row) => {
-          const shift = row.shift_id ? shiftById.get(row.shift_id) ?? null : null
+          const shift = row.shift_id ? (shiftById.get(row.shift_id) ?? null) : null
           const status = toUiStatus(row.status, shift?.date ?? null, todayKey)
 
           return {
@@ -279,7 +299,7 @@ export default function SwapRequestPage() {
             type: row.type,
             shift: shift ? formatShiftLabel(shift.date, shift.shift_type) : 'Shift unavailable',
             status,
-            swapWith: row.claimed_by ? partnerById.get(row.claimed_by) ?? null : null,
+            swapWith: row.claimed_by ? (partnerById.get(row.claimed_by) ?? null) : null,
             posted: formatRelativeTime(row.created_at),
             message: row.message,
           } satisfies OpenRequest
@@ -424,7 +444,10 @@ export default function SwapRequestPage() {
       return
     }
 
-    const destination = pathname.startsWith('/staff') || pathname === '/requests/new' ? '/staff/requests' : '/requests'
+    const destination =
+      pathname.startsWith('/staff') || pathname === '/requests/new'
+        ? '/staff/requests'
+        : '/requests'
     router.push(destination)
   }
 
@@ -569,7 +592,9 @@ export default function SwapRequestPage() {
               padding: '14px 16px',
             }}
           >
-            <p style={{ fontSize: 12, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>How swap requests work</p>
+            <p style={{ fontSize: 12, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
+              How swap requests work
+            </p>
             <p style={{ fontSize: 12, color: '#64748b' }}>
               Submit your request, wait for manager review, and check this list for updates.
             </p>
@@ -598,7 +623,9 @@ export default function SwapRequestPage() {
                 textAlign: 'center',
               }}
             >
-              <p style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>No requests yet</p>
+              <p style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
+                No requests yet
+              </p>
               <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>
                 Create a swap or pickup request to post it to the shift board.
               </p>
@@ -663,12 +690,18 @@ export default function SwapRequestPage() {
                     >
                       {statusMeta.label}
                     </span>
-                    <span style={{ marginLeft: 'auto', fontSize: 11, color: '#9ca3af' }}>{request.posted}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 11, color: '#9ca3af' }}>
+                      {request.posted}
+                    </span>
                   </div>
-                  <p style={{ marginTop: 8, fontSize: 13, color: '#0f172a', fontWeight: 700 }}>{request.shift}</p>
+                  <p style={{ marginTop: 8, fontSize: 13, color: '#0f172a', fontWeight: 700 }}>
+                    {request.shift}
+                  </p>
                   <p style={{ marginTop: 4, fontSize: 12, color: '#64748b' }}>{request.message}</p>
                   {request.swapWith && (
-                    <p style={{ marginTop: 6, fontSize: 11, color: '#64748b' }}>Requested swap with: {request.swapWith}</p>
+                    <p style={{ marginTop: 6, fontSize: 11, color: '#64748b' }}>
+                      Requested swap with: {request.swapWith}
+                    </p>
                   )}
                 </div>
               )
@@ -731,12 +764,23 @@ export default function SwapRequestPage() {
             </div>
           </div>
 
-          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: '18px 18px' }}>
+          <div
+            style={{
+              background: '#fff',
+              border: '1px solid #e5e7eb',
+              borderRadius: 10,
+              padding: '18px 18px',
+            }}
+          >
             {step === 1 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div>
-                  <p style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>Step 1: Request details</p>
-                  <p style={{ marginTop: 2, fontSize: 12, color: '#64748b' }}>Choose request type and your shift.</p>
+                  <p style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
+                    Step 1: Request details
+                  </p>
+                  <p style={{ marginTop: 2, fontSize: 12, color: '#64748b' }}>
+                    Choose request type and your shift.
+                  </p>
                 </div>
 
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -763,7 +807,10 @@ export default function SwapRequestPage() {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <label htmlFor="selected-shift" style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
+                  <label
+                    htmlFor="selected-shift"
+                    style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}
+                  >
                     Select shift
                   </label>
                   <select
@@ -823,8 +870,8 @@ export default function SwapRequestPage() {
                   >
                     <span>Lead:</span>
                     <span>
-                      This is currently the only lead assignment on this shift. Your replacement must
-                      be lead eligible.
+                      This is currently the only lead assignment on this shift. Your replacement
+                      must be lead eligible.
                     </span>
                   </div>
                 )}
@@ -834,7 +881,9 @@ export default function SwapRequestPage() {
             {step === 2 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div>
-                  <p style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>Step 2: Choose teammate</p>
+                  <p style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
+                    Step 2: Choose teammate
+                  </p>
                   <p style={{ marginTop: 2, fontSize: 12, color: '#64748b' }}>
                     Team members are filtered by shift type and lead eligibility when needed.
                   </p>
@@ -857,7 +906,10 @@ export default function SwapRequestPage() {
                 )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <label htmlFor="member-search" style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
+                  <label
+                    htmlFor="member-search"
+                    style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}
+                  >
                     Search team members
                   </label>
                   <input
@@ -925,7 +977,16 @@ export default function SwapRequestPage() {
                           {member.avatar}
                         </span>
                         <span style={{ flex: 1 }}>
-                          <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{member.name}</span>
+                          <span
+                            style={{
+                              display: 'block',
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: '#0f172a',
+                            }}
+                          >
+                            {member.name}
+                          </span>
                           <span style={{ display: 'block', fontSize: 11, color: '#64748b' }}>
                             {member.shift} {member.isLead ? '- Lead' : ''}
                           </span>
@@ -946,8 +1007,12 @@ export default function SwapRequestPage() {
             {step === 3 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div>
-                  <p style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>Step 3: Final message</p>
-                  <p style={{ marginTop: 2, fontSize: 12, color: '#64748b' }}>Add context before posting your request.</p>
+                  <p style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
+                    Step 3: Final message
+                  </p>
+                  <p style={{ marginTop: 2, fontSize: 12, color: '#64748b' }}>
+                    Add context before posting your request.
+                  </p>
                 </div>
 
                 <div
@@ -960,11 +1025,21 @@ export default function SwapRequestPage() {
                     gap: 4,
                   }}
                 >
-                  <p style={{ fontSize: 12, color: '#374151', fontWeight: 700, textTransform: 'capitalize' }}>
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: '#374151',
+                      fontWeight: 700,
+                      textTransform: 'capitalize',
+                    }}
+                  >
                     Type: {requestType}
                   </p>
                   <p style={{ fontSize: 12, color: '#374151' }}>
-                    Shift: {selectedShiftData ? `${selectedShiftData.date} - ${selectedShiftData.type}` : 'Not selected'}
+                    Shift:{' '}
+                    {selectedShiftData
+                      ? `${selectedShiftData.date} - ${selectedShiftData.type}`
+                      : 'Not selected'}
                   </p>
                   <p style={{ fontSize: 12, color: '#374151' }}>
                     Swap with: {selectedMember ? selectedMember.name : 'No specific teammate'}
@@ -972,7 +1047,10 @@ export default function SwapRequestPage() {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <label htmlFor="request-message" style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>
+                  <label
+                    htmlFor="request-message"
+                    style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}
+                  >
                     Message
                   </label>
                   <textarea

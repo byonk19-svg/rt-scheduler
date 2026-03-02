@@ -336,6 +336,7 @@ Latest local checks:
 Status: **Code fully implemented** — pending env var configuration and final validation before rollout.
 
 Key files:
+
 - `src/app/publish/page.tsx`, `src/app/publish/[id]/page.tsx`
 - `src/app/publish/actions.ts`, `src/app/publish/process-queued-button.tsx`
 - `src/lib/publish-events.ts`

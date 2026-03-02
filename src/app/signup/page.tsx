@@ -72,7 +72,9 @@ export default function SignupPage() {
             <CardHeader className="space-y-3 px-0 text-center md:text-left">
               <TeamwiseLogo className="justify-center md:justify-start" size="small" />
               <div className="space-y-1">
-                <CardTitle className="text-2xl font-semibold text-foreground">Request Access</CardTitle>
+                <CardTitle className="text-2xl font-semibold text-foreground">
+                  Request Access
+                </CardTitle>
                 <CardDescription>Join Teamwise to manage schedules and coverage.</CardDescription>
               </div>
             </CardHeader>
@@ -123,7 +125,11 @@ export default function SignupPage() {
                     <option value="night">Night Shift</option>
                   </select>
                 </div>
-                {error && <p className="rounded-lg border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]">{error}</p>}
+                {error && (
+                  <p className="rounded-lg border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]">
+                    {error}
+                  </p>
+                )}
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
                   {loading ? 'Creating account...' : 'Request Access'}

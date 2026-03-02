@@ -3,7 +3,9 @@
 ## Tables
 
 ### profiles
+
 Extends Supabase auth. One row per user.
+
 - id (uuid) — matches auth.users id
 - full_name (text)
 - email (text)
@@ -12,7 +14,9 @@ Extends Supabase auth. One row per user.
 - created_at (timestamp)
 
 ### schedule_cycles
+
 A 6-week scheduling period.
+
 - id (uuid)
 - label (text) — e.g. "Feb 8 – Mar 21"
 - start_date (date)
@@ -21,7 +25,9 @@ A 6-week scheduling period.
 - created_at (timestamp)
 
 ### shifts
+
 One row per person per working day.
+
 - id (uuid)
 - cycle_id (uuid) → schedule_cycles
 - user_id (uuid) → profiles
@@ -31,7 +37,9 @@ One row per person per working day.
 - created_at (timestamp)
 
 ### availability_requests
+
 Blackout dates submitted by therapists.
+
 - id (uuid)
 - user_id (uuid) → profiles
 - cycle_id (uuid) → schedule_cycles
@@ -40,7 +48,9 @@ Blackout dates submitted by therapists.
 - created_at (timestamp)
 
 ### shift_posts
+
 Swap or pickup requests on the board.
+
 - id (uuid)
 - shift_id (uuid) → shifts
 - posted_by (uuid) → profiles

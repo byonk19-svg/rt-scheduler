@@ -10,7 +10,14 @@ import type {
   WorksDowMode,
 } from '@/lib/shift-types'
 
-export type { ShiftStatus, ShiftRole, AssignmentStatus, EmploymentType, WeekendRotation, WorksDowMode }
+export type {
+  ShiftStatus,
+  ShiftRole,
+  AssignmentStatus,
+  EmploymentType,
+  WeekendRotation,
+  WorksDowMode,
+}
 
 export type Role = UiRole
 

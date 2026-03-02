@@ -17,18 +17,17 @@ type Scenario = {
 
 function makeSupabaseMock(scenario: Scenario) {
   const rpc = vi.fn().mockResolvedValue({
-    data:
-      scenario.rpcData ?? [
-        {
-          id: 'shift-1',
-          assignment_status: 'call_in',
-          status_note: 'Traffic',
-          left_early_time: null,
-          status_updated_at: '2026-02-23T18:00:00.000Z',
-          status_updated_by: scenario.userId ?? 'lead-1',
-          status_updated_by_name: 'Lead User',
-        },
-      ],
+    data: scenario.rpcData ?? [
+      {
+        id: 'shift-1',
+        assignment_status: 'call_in',
+        status_note: 'Traffic',
+        left_early_time: null,
+        status_updated_at: '2026-02-23T18:00:00.000Z',
+        status_updated_by: scenario.userId ?? 'lead-1',
+        status_updated_by_name: 'Lead User',
+      },
+    ],
     error: scenario.rpcError ?? null,
   })
 
@@ -87,7 +86,9 @@ describe('assignment status API', () => {
 
   it('allows a lead-equivalent therapist to update status', async () => {
     const supabase = makeSupabaseMock({ role: 'therapist', isLeadEligible: true, userId: 'lead-1' })
-    vi.mocked(createClient).mockResolvedValue(supabase as unknown as Awaited<ReturnType<typeof createClient>>)
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
 
     const response = await POST(
       new Request('http://localhost/api/schedule/assignment-status', {
@@ -111,8 +112,14 @@ describe('assignment status API', () => {
   })
 
   it('denies staff from updating status', async () => {
-    const supabase = makeSupabaseMock({ role: 'therapist', isLeadEligible: false, userId: 'staff-1' })
-    vi.mocked(createClient).mockResolvedValue(supabase as unknown as Awaited<ReturnType<typeof createClient>>)
+    const supabase = makeSupabaseMock({
+      role: 'therapist',
+      isLeadEligible: false,
+      userId: 'staff-1',
+    })
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
 
     const response = await POST(
       new Request('http://localhost/api/schedule/assignment-status', {
@@ -130,8 +137,14 @@ describe('assignment status API', () => {
   })
 
   it('allows manager to update status', async () => {
-    const supabase = makeSupabaseMock({ role: 'manager', isLeadEligible: false, userId: 'manager-1' })
-    vi.mocked(createClient).mockResolvedValue(supabase as unknown as Awaited<ReturnType<typeof createClient>>)
+    const supabase = makeSupabaseMock({
+      role: 'manager',
+      isLeadEligible: false,
+      userId: 'manager-1',
+    })
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
 
     const response = await POST(
       new Request('http://localhost/api/schedule/assignment-status', {
@@ -154,7 +167,9 @@ describe('assignment status API', () => {
       userId: 'manager-1',
       rpcError: { code: '42501', message: 'Assignment is outside your site scope.' },
     })
-    vi.mocked(createClient).mockResolvedValue(supabase as unknown as Awaited<ReturnType<typeof createClient>>)
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
 
     const response = await POST(
       new Request('http://localhost/api/schedule/assignment-status', {

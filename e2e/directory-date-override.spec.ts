@@ -180,7 +180,9 @@ test.describe.serial('manager date-override workflow in /directory', () => {
       .single()
 
     if (cycleInsert.error || !cycleInsert.data) {
-      throw new Error(`Could not create test cycle: ${cycleInsert.error?.message ?? 'unknown error'}`)
+      throw new Error(
+        `Could not create test cycle: ${cycleInsert.error?.message ?? 'unknown error'}`
+      )
     }
 
     createdCycleIds.push(cycleInsert.data.id)
@@ -212,7 +214,12 @@ test.describe.serial('manager date-override workflow in /directory', () => {
 
     ctx = {
       supabase,
-      manager: { id: manager.id, email: managerEmail, password: managerPassword, fullName: managerFullName },
+      manager: {
+        id: manager.id,
+        email: managerEmail,
+        password: managerPassword,
+        fullName: managerFullName,
+      },
       therapist: { id: therapist.id, email: therapistEmail, fullName: therapistFullName },
       cycle: {
         id: cycleInsert.data.id,
@@ -238,7 +245,9 @@ test.describe.serial('manager date-override workflow in /directory', () => {
   // -------------------------------------------------------------------------
   // Test 1: Add a date override via the employee drawer form
   // -------------------------------------------------------------------------
-  test('can add a date override for a therapist and see it reflected in the DB', async ({ page }) => {
+  test('can add a date override for a therapist and see it reflected in the DB', async ({
+    page,
+  }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await login(page, ctx!.manager.email, ctx!.manager.password)
@@ -246,10 +255,7 @@ test.describe.serial('manager date-override workflow in /directory', () => {
 
     // Open employee drawer by clicking the therapist's table row
     // Click the employee directory row (contains email); avoids the Missing Availability row
-    await page
-      .getByRole('row')
-      .filter({ hasText: ctx!.therapist.email })
-      .click()
+    await page.getByRole('row').filter({ hasText: ctx!.therapist.email }).click()
     const drawer = page.getByRole('dialog', { name: 'Edit employee' })
     await expect(drawer).toBeVisible({ timeout: 10_000 })
 
@@ -266,9 +272,7 @@ test.describe.serial('manager date-override workflow in /directory', () => {
     await expect(page).toHaveURL(/success=override_saved/, { timeout: 15_000 })
 
     // Assert success toast (filter to avoid matching Next.js route announcer)
-    await expect(
-      page.getByRole('alert').filter({ hasText: 'Date override saved.' })
-    ).toBeVisible()
+    await expect(page.getByRole('alert').filter({ hasText: 'Date override saved.' })).toBeVisible()
 
     // Verify DB: override exists with correct fields
     const result = await ctx!.supabase
@@ -290,7 +294,9 @@ test.describe.serial('manager date-override workflow in /directory', () => {
   // -------------------------------------------------------------------------
   // Test 2: Delete a date override from the employee drawer
   // -------------------------------------------------------------------------
-  test('can delete a pre-existing date override and see it removed from the DB', async ({ page }) => {
+  test('can delete a pre-existing date override and see it removed from the DB', async ({
+    page,
+  }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await login(page, ctx!.manager.email, ctx!.manager.password)
@@ -298,10 +304,7 @@ test.describe.serial('manager date-override workflow in /directory', () => {
 
     // Open employee drawer
     // Click the employee directory row (contains email); avoids the Missing Availability row
-    await page
-      .getByRole('row')
-      .filter({ hasText: ctx!.therapist.email })
-      .click()
+    await page.getByRole('row').filter({ hasText: ctx!.therapist.email }).click()
     const drawer = page.getByRole('dialog', { name: 'Edit employee' })
     await expect(drawer).toBeVisible({ timeout: 10_000 })
 
@@ -327,7 +330,9 @@ test.describe.serial('manager date-override workflow in /directory', () => {
   // -------------------------------------------------------------------------
   // Test 3: "Enter availability" quick action opens drawer focused on overrides
   // -------------------------------------------------------------------------
-  test('"Enter availability" quick action opens drawer with override form visible', async ({ page }) => {
+  test('"Enter availability" quick action opens drawer with override form visible', async ({
+    page,
+  }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await login(page, ctx!.manager.email, ctx!.manager.password)
@@ -335,9 +340,9 @@ test.describe.serial('manager date-override workflow in /directory', () => {
 
     // The Missing Availability section is expanded by default (collapsedMissing=false).
     // Wait for at least one "Enter availability" button to be visible, then click it.
-    await expect(
-      page.getByRole('button', { name: 'Enter availability' }).first()
-    ).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('button', { name: 'Enter availability' }).first()).toBeVisible({
+      timeout: 15_000,
+    })
 
     // Click "Enter availability" for the therapist
     await page.getByRole('button', { name: 'Enter availability' }).first().click()

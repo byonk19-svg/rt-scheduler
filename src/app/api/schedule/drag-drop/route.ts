@@ -282,7 +282,9 @@ function parseActionBody(raw: unknown): DragAction | null {
         availabilityOverride:
           typeof r.availabilityOverride === 'boolean' ? r.availabilityOverride : undefined,
         availabilityOverrideReason:
-          typeof r.availabilityOverrideReason === 'string' ? r.availabilityOverrideReason : undefined,
+          typeof r.availabilityOverrideReason === 'string'
+            ? r.availabilityOverrideReason
+            : undefined,
       }
     case 'move':
       if (typeof r.shiftId !== 'string') return null
@@ -298,7 +300,9 @@ function parseActionBody(raw: unknown): DragAction | null {
         availabilityOverride:
           typeof r.availabilityOverride === 'boolean' ? r.availabilityOverride : undefined,
         availabilityOverrideReason:
-          typeof r.availabilityOverrideReason === 'string' ? r.availabilityOverrideReason : undefined,
+          typeof r.availabilityOverrideReason === 'string'
+            ? r.availabilityOverrideReason
+            : undefined,
       }
     case 'remove':
       if (typeof r.shiftId === 'string') {
@@ -332,7 +336,9 @@ function parseActionBody(raw: unknown): DragAction | null {
         availabilityOverride:
           typeof r.availabilityOverride === 'boolean' ? r.availabilityOverride : undefined,
         availabilityOverrideReason:
-          typeof r.availabilityOverrideReason === 'string' ? r.availabilityOverrideReason : undefined,
+          typeof r.availabilityOverrideReason === 'string'
+            ? r.availabilityOverrideReason
+            : undefined,
       }
     default:
       return null
@@ -362,7 +368,10 @@ export async function POST(request: Request) {
   const payload = parseActionBody(await request.json().catch(() => null))
 
   if (!payload) {
-    return NextResponse.json({ error: 'Invalid request body', code: 'invalid_body' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Invalid request body', code: 'invalid_body' },
+      { status: 400 }
+    )
   }
 
   const { data: cycle, error: cycleError } = await supabase

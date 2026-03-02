@@ -6,6 +6,8 @@ export function normalizeEmploymentType(value: string | null | undefined): Emplo
   return 'full_time'
 }
 
-export function getAvailabilityEntryTypeForEmploymentType(employmentType: EmploymentType): AvailabilityEntryType {
+export function getAvailabilityEntryTypeForEmploymentType(
+  employmentType: EmploymentType
+): AvailabilityEntryType {
   return employmentType === 'prn' ? 'available' : 'unavailable'
 }

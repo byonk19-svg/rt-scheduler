@@ -26,7 +26,10 @@ function getEnvFromFile(key: string): string | undefined {
       if (eqIndex <= 0) continue
       const parsedKey = trimmed.slice(0, eqIndex).trim()
       let parsedValue = trimmed.slice(eqIndex + 1).trim()
-      if ((parsedValue.startsWith('"') && parsedValue.endsWith('"')) || (parsedValue.startsWith("'") && parsedValue.endsWith("'"))) {
+      if (
+        (parsedValue.startsWith('"') && parsedValue.endsWith('"')) ||
+        (parsedValue.startsWith("'") && parsedValue.endsWith("'"))
+      ) {
         parsedValue = parsedValue.slice(1, -1)
       }
       envCache.set(parsedKey, parsedValue)
@@ -72,7 +75,9 @@ async function createUser(
   })
 
   if (createResult.error || !createResult.data.user) {
-    throw new Error(`Could not create test user ${payload.email}: ${createResult.error?.message ?? 'unknown error'}`)
+    throw new Error(
+      `Could not create test user ${payload.email}: ${createResult.error?.message ?? 'unknown error'}`
+    )
   }
 
   const userId = createResult.data.user.id
@@ -179,7 +184,9 @@ test.describe.serial('availability override scheduling', () => {
       .single()
 
     if (cycleInsert.error || !cycleInsert.data) {
-      throw new Error(`Could not create test cycle: ${cycleInsert.error?.message ?? 'unknown error'}`)
+      throw new Error(
+        `Could not create test cycle: ${cycleInsert.error?.message ?? 'unknown error'}`
+      )
     }
 
     createdCycleIds.push(cycleInsert.data.id)
@@ -200,7 +207,12 @@ test.describe.serial('availability override scheduling', () => {
 
     ctx = {
       supabase,
-      manager: { id: manager.id, email: managerEmail, password: managerPassword, fullName: managerFullName },
+      manager: {
+        id: manager.id,
+        email: managerEmail,
+        password: managerPassword,
+        fullName: managerFullName,
+      },
       fullTimeTherapist: { id: therapist.id, fullName: therapistFullName },
       prnTherapist: { id: prnTherapist.id, fullName: prnFullName },
       cycle: {
@@ -226,7 +238,9 @@ test.describe.serial('availability override scheduling', () => {
     }
   })
 
-  test('unavailable assignment shows warning modal; cancel prevents assignment; confirm writes override', async ({ page }) => {
+  test('unavailable assignment shows warning modal; cancel prevents assignment; confirm writes override', async ({
+    page,
+  }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await login(page, ctx!.manager.email, ctx!.manager.password)
@@ -272,7 +286,9 @@ test.describe.serial('availability override scheduling', () => {
 
     const assignedShiftResult = await ctx!.supabase
       .from('shifts')
-      .select('availability_override, availability_override_reason, availability_override_by, availability_override_at')
+      .select(
+        'availability_override, availability_override_reason, availability_override_by, availability_override_at'
+      )
       .eq('cycle_id', ctx!.cycle.id)
       .eq('user_id', ctx!.fullTimeTherapist.id)
       .eq('date', ctx!.targetDate)

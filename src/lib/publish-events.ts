@@ -23,9 +23,7 @@ export function getPublishEmailConfig() {
   const resendApiKey = process.env.RESEND_API_KEY ?? null
   const fromEmail = process.env.PUBLISH_EMAIL_FROM ?? process.env.RESEND_FROM_EMAIL ?? null
   const appBaseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ??
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    'http://localhost:3000'
+    process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
 
   return {
     resendApiKey,
@@ -91,10 +89,7 @@ export async function refreshPublishEventCounts(
     throw new Error(rowsError.message)
   }
 
-  const counts = aggregatePublishDeliveryCounts(
-    (rows ?? []) as NotificationOutboxCountRow[],
-    ids
-  )
+  const counts = aggregatePublishDeliveryCounts((rows ?? []) as NotificationOutboxCountRow[], ids)
 
   for (const eventId of ids) {
     const count = counts.get(eventId) ?? {
@@ -134,4 +129,3 @@ export function buildPublishEmailPayload(params: {
 
   return { subject, text, html }
 }
-

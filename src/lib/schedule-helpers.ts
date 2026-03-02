@@ -154,14 +154,21 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
   }
 
   if (error === 'auto_generate_failed') {
-    return { message: 'Could not auto-generate draft schedule. Please try again.', variant: 'error' }
+    return {
+      message: 'Could not auto-generate draft schedule. Please try again.',
+      variant: 'error',
+    }
   }
   if (error === 'create_cycle_failed') {
-    return { message: 'Could not create schedule cycle. Please check inputs and try again.', variant: 'error' }
+    return {
+      message: 'Could not create schedule cycle. Please check inputs and try again.',
+      variant: 'error',
+    }
   }
   if (error === 'copy_from_last_cycle_failed') {
     return {
-      message: 'Cycle created, but we could not copy shifts from the previous cycle. Please try again.',
+      message:
+        'Cycle created, but we could not copy shifts from the previous cycle. Please try again.',
       variant: 'error',
     }
   }
@@ -169,11 +176,15 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
     return { message: 'Could not delete shift. Please try again.', variant: 'error' }
   }
   if (error === 'auto_generate_db_error') {
-    return { message: 'Database error while saving auto-generated shifts. Please try again.', variant: 'error' }
+    return {
+      message: 'Database error while saving auto-generated shifts. Please try again.',
+      variant: 'error',
+    }
   }
   if (error === 'auto_generate_coverage_incomplete') {
     const dropped = parseCount(getSearchParam(params?.dropped))
-    const detail = dropped > 0 ? ` (${dropped} shift${dropped !== 1 ? 's' : ''} skipped due to conflicts)` : ''
+    const detail =
+      dropped > 0 ? ` (${dropped} shift${dropped !== 1 ? 's' : ''} skipped due to conflicts)` : ''
     return {
       message: `Auto-generate completed but coverage may be incomplete${detail}. Verify shifts and retry if needed.`,
       variant: 'error',
@@ -215,7 +226,10 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
     }
   }
   if (error === 'duplicate_shift') {
-    return { message: 'That therapist is already assigned on that date in this cycle.', variant: 'error' }
+    return {
+      message: 'That therapist is already assigned on that date in this cycle.',
+      variant: 'error',
+    }
   }
   if (error === 'add_shift_failed') {
     return { message: 'Could not add shift. Please try again.', variant: 'error' }
@@ -262,7 +276,10 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
     return { message: 'Only lead-eligible therapists can be designated as lead.', variant: 'error' }
   }
   if (error === 'set_lead_weekly_limit') {
-    return { message: "Designated lead would exceed that therapist's weekly limit.", variant: 'error' }
+    return {
+      message: "Designated lead would exceed that therapist's weekly limit.",
+      variant: 'error',
+    }
   }
   if (error === 'set_lead_coverage_max') {
     return {
@@ -271,10 +288,16 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
     }
   }
   if (error === 'set_lead_failed') {
-    return { message: 'Could not set designated lead for that shift. Please try again.', variant: 'error' }
+    return {
+      message: 'Could not set designated lead for that shift. Please try again.',
+      variant: 'error',
+    }
   }
   if (error === 'set_lead_multiple') {
-    return { message: 'A designated lead already exists for that shift. Refresh and try again.', variant: 'error' }
+    return {
+      message: 'A designated lead already exists for that shift. Refresh and try again.',
+      variant: 'error',
+    }
   }
 
   if (auto === 'generated') {
@@ -302,7 +325,8 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
           ? `${constraintsUnfilled} slot${constraintsUnfilled !== 1 ? 's' : ''} were left unfilled due to constraints.`
           : ''
       return {
-        message: `Draft generated with ${added} new shifts. ${unfilledText} ${leadText} ${constraintText}`.trim(),
+        message:
+          `Draft generated with ${added} new shifts. ${unfilledText} ${leadText} ${constraintText}`.trim(),
         variant: 'error',
       }
     }
@@ -312,7 +336,10 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
   if (draft === 'reset') {
     const removed = parseCount(getSearchParam(params?.removed))
     if (removed === 0) {
-      return { message: 'Draft cleared. There were no assigned shifts to remove.', variant: 'success' }
+      return {
+        message: 'Draft cleared. There were no assigned shifts to remove.',
+        variant: 'success',
+      }
     }
     return { message: `Draft cleared. Removed ${removed} shift assignments.`, variant: 'success' }
   }
@@ -380,7 +407,8 @@ export function pickTherapistForDate(
     if (!patternDecision.allowed) continue
 
     const weeklyDates =
-      weeklyWorkedDatesByUserWeek.get(weeklyCountKey(therapist.id, bounds.weekStart)) ?? new Set<string>()
+      weeklyWorkedDatesByUserWeek.get(weeklyCountKey(therapist.id, bounds.weekStart)) ??
+      new Set<string>()
     const weeklyLimit = sanitizeWeeklyLimit(
       weeklyLimitByTherapist.get(therapist.id),
       getDefaultWeeklyLimitForEmploymentType(therapist.employment_type)
@@ -392,7 +420,9 @@ export function pickTherapistForDate(
       !best ||
       weeklyCount < best.weeklyCount ||
       (weeklyCount === best.weeklyCount && patternDecision.penalty < best.penalty) ||
-      (weeklyCount === best.weeklyCount && patternDecision.penalty === best.penalty && i < best.offset)
+      (weeklyCount === best.weeklyCount &&
+        patternDecision.penalty === best.penalty &&
+        i < best.offset)
     ) {
       best = { therapist, index, weeklyCount, penalty: patternDecision.penalty, offset: i }
     }

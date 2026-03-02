@@ -24,7 +24,10 @@ function inDateRange(date: string, startDate: string, endDate: string): boolean 
   return true
 }
 
-export function filterAndSortRows<T extends FilterableRow>(rows: T[], filters: TableToolbarFilters): T[] {
+export function filterAndSortRows<T extends FilterableRow>(
+  rows: T[],
+  filters: TableToolbarFilters
+): T[] {
   const filtered = rows.filter((row) => {
     const matchesSearch = includesSearch(row.searchText, filters.search.trim())
     const matchesStatus = filters.status === 'all' || row.status === filters.status

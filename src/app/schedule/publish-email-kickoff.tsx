@@ -23,4 +23,3 @@ export function PublishEmailKickoff({ publishEventId, enabled }: PublishEmailKic
 
   return null
 }
-

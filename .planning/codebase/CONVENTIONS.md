@@ -5,11 +5,13 @@
 ## Naming Patterns
 
 **Files:**
+
 - kebab-case for module files in `src/components` and `src/lib`.
 - Next.js route conventions in `src/app`: `page.tsx`, `layout.tsx`, `route.ts`.
 - unit tests: `*.test.ts` in `src/`.
 
 **Functions/variables/types:**
+
 - `camelCase` for functions and locals.
 - `PascalCase` for types/components.
 - constants often `UPPER_SNAKE_CASE` (`MAX_SHIFT_COVERAGE_PER_DAY`) in domain libs.
@@ -17,6 +19,7 @@
 ## Code Style
 
 **Formatting reality:**
+
 - No dedicated Prettier config found.
 - Style is mostly:
   - single quotes in TypeScript source
@@ -24,30 +27,36 @@
   - explicit type annotations for public/shared boundaries.
 
 **Linting:**
+
 - ESLint via `eslint.config.mjs` extending Next core-web-vitals + TypeScript.
 - run command: `npm run lint`.
 
 ## Import Organization
 
 Common pattern in source files:
+
 1. framework imports (`next/*`, `react`, third-party packages)
 2. internal alias imports (`@/lib/*`, `@/components/*`)
 3. type imports (sometimes inline, sometimes grouped)
 
 Path alias:
+
 - `@/*` maps to `./src/*` (`tsconfig.json`).
 
 ## Error Handling
 
 **Server actions:**
+
 - use `redirect(...)` with query params for success/error states.
 - often log server-side failure via `console.error` first.
 
 **Route handlers:**
+
 - return `NextResponse.json(...)` with status codes.
 - explicit branch-based validation and early returns.
 
 **Client mutations:**
+
 - optimistic UI where useful, rollback on failure.
 - surface issue via banner/toast/alert.
 
@@ -78,5 +87,5 @@ Path alias:
 
 ---
 
-*Convention analysis: 2026-02-25*
-*Update after lint/style policy changes*
+_Convention analysis: 2026-02-25_
+_Update after lint/style policy changes_

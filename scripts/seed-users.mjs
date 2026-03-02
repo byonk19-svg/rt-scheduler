@@ -15,7 +15,9 @@ let urlRef = ''
 let keyRef = ''
 try {
   urlRef = new URL(SUPABASE_URL).hostname.split('.')[0]
-  const payload = JSON.parse(Buffer.from(SUPABASE_SERVICE_ROLE_KEY.split('.')[1], 'base64url').toString('utf8'))
+  const payload = JSON.parse(
+    Buffer.from(SUPABASE_SERVICE_ROLE_KEY.split('.')[1], 'base64url').toString('utf8')
+  )
   keyRef = payload.ref ?? ''
 } catch {
   // Ignore parsing issues here; Supabase client will still report invalid API key.
@@ -124,7 +126,9 @@ async function upsertProfile({ id, fullName, email, role, shiftType }) {
 
 async function main() {
   const allUsers = await listAllAuthUsers()
-  const userByEmail = new Map(allUsers.map((user) => [String(user.email ?? '').toLowerCase(), user]))
+  const userByEmail = new Map(
+    allUsers.map((user) => [String(user.email ?? '').toLowerCase(), user])
+  )
 
   let createdCount = 0
   let reusedCount = 0
