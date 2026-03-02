@@ -112,6 +112,70 @@ export default async function StaffDashboardPage({
     : null
   const availabilitySubmitted = (overrideCountResult.count ?? 0) > 0
   const pendingPostCount = pendingPostCountResult.count ?? 0
+
+  // Upcoming shift roster — who else is scheduled on the next 3 shifts --------
+  type RosterShift = {
+    user_id: string | null
+    date: string
+    shift_type: string | null
+    role: string | null
+  }
+  const rosterDates = upcomingShifts.slice(0, 3).map((s) => s.date)
+  const rosterRawShifts: RosterShift[] =
+    rosterDates.length > 0 && activeCycle
+      ? (((
+          await supabase
+            .from('shifts')
+            .select('user_id, date, shift_type, role')
+            .eq('cycle_id', activeCycle.id)
+            .in('date', rosterDates)
+            .in('status', ['scheduled', 'on_call'])
+            .neq('user_id', user.id)
+        ).data as RosterShift[] | null) ?? [])
+      : []
+
+  const rosterUserIds = [
+    ...new Set(rosterRawShifts.map((s) => s.user_id).filter((id): id is string => Boolean(id))),
+  ]
+  const rosterNameById = new Map<string, string>()
+  if (rosterUserIds.length > 0) {
+    const { data: rosterProfiles } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', rosterUserIds)
+    for (const p of rosterProfiles ?? []) {
+      if (p.id && p.full_name) rosterNameById.set(p.id, p.full_name)
+    }
+  }
+
+  type ShiftColleague = { name: string; isLead: boolean }
+  type UpcomingShiftRoster = {
+    date: string
+    label: string
+    shiftType: string
+    myRole: string
+    colleagues: ShiftColleague[]
+  }
+  const upcomingRoster: UpcomingShiftRoster[] = upcomingShifts.slice(0, 3).map((myShift) => {
+    const colleagues = rosterRawShifts
+      .filter((s) => s.date === myShift.date && s.shift_type === myShift.shift_type)
+      .map((s) => ({
+        name: s.user_id ? (rosterNameById.get(s.user_id) ?? '?') : '?',
+        isLead: s.role === 'lead',
+      }))
+      .sort((a, b) => (b.isLead ? 1 : 0) - (a.isLead ? 1 : 0))
+    return {
+      date: myShift.date,
+      label: new Date(`${myShift.date}T00:00:00`).toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      }),
+      shiftType: myShift.shift_type ?? 'day',
+      myRole: myShift.role ?? 'staff',
+      colleagues,
+    }
+  })
   // --------------------------------------------------------------------------
 
   return (
@@ -156,6 +220,54 @@ export default async function StaffDashboardPage({
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">Availability</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upcoming shift roster */}
+      {upcomingRoster.length > 0 && (
+        <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+            Upcoming shifts
+          </p>
+          <div className="space-y-3">
+            {upcomingRoster.map((shift) => (
+              <div key={shift.date} className="flex items-start gap-3">
+                <div className="w-[96px] shrink-0">
+                  <p className="text-xs font-semibold text-foreground">{shift.label}</p>
+                  <p className="mt-0.5 text-[10px] capitalize text-muted-foreground">
+                    {shift.shiftType} shift
+                  </p>
+                  {shift.myRole === 'lead' && (
+                    <span className="mt-1 inline-block rounded border border-[var(--attention)] bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                      Lead
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1 pt-0.5">
+                  {shift.colleagues.length > 0 ? (
+                    shift.colleagues.map((c, i) => (
+                      <span
+                        key={i}
+                        className={cn(
+                          'rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+                          c.isLead
+                            ? 'border-[var(--attention)] bg-amber-50 text-amber-800'
+                            : 'border-border bg-muted text-muted-foreground'
+                        )}
+                      >
+                        {c.isLead ? '★ ' : ''}
+                        {c.name.split(' ')[0]}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      No colleagues assigned yet.
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
