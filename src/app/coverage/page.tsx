@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 import {
@@ -81,7 +81,7 @@ function timestamp(): string {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-export default function CoveragePage() {
+function CoveragePageContent() {
   const search = useSearchParams()
   const cycleFromUrl = search.get('cycle')
   const successParam = search.get('success')
@@ -859,5 +859,13 @@ export default function CoveragePage() {
         isManager
       />
     </div>
+  )
+}
+
+export default function CoveragePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <CoveragePageContent />
+    </Suspense>
   )
 }

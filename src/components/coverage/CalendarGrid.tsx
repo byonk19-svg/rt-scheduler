@@ -74,6 +74,7 @@ export function CalendarGrid({
             key={tab}
             type="button"
             onClick={() => onTabSwitch(tab)}
+            data-testid={`coverage-shift-tab-${tab.toLowerCase()}`}
             className={cn(
               'cursor-pointer rounded-[7px] border px-5 py-1.5 text-xs font-bold transition-all',
               shiftTab === tab
@@ -114,6 +115,7 @@ export function CalendarGrid({
                 key={day.id}
                 type="button"
                 onClick={() => onSelect(day.id)}
+                data-testid={`coverage-day-cell-${day.id}`}
                 className={cn(
                   'rounded-lg border border-slate-200 bg-white p-2 text-left hover:border-primary',
                   selectedId === day.id &&

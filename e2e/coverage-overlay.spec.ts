@@ -18,6 +18,7 @@ type TestContext = {
   cycle: { id: string }
   targetDate: string
   assignDate2: string // clean day (start + 15) where both therapists are available
+  assignDate3: string // clean day (start + 18) reserved for lead-toggle selector tests
 }
 
 const envCache = new Map<string, string>()
@@ -219,10 +220,14 @@ test.describe.serial('coverage calendar overlay interactions', () => {
     targetDateObj.setDate(targetDateObj.getDate() + 5)
     const targetDate = formatDateKey(targetDateObj)
 
-    // Assign date 2: start + 15 days — clean day, no pre-seeded shifts, for lead-toggle test
+    // Assign date 2: start + 15 days — clean day used by staff assign tests
     const assignDate2Obj = new Date(start)
     assignDate2Obj.setDate(assignDate2Obj.getDate() + 15)
     const assignDate2 = formatDateKey(assignDate2Obj)
+
+    const assignDate3Obj = new Date(start)
+    assignDate3Obj.setDate(assignDate3Obj.getDate() + 18)
+    const assignDate3 = formatDateKey(assignDate3Obj)
 
     // Seed shifts on targetDate:
     //  - therapist1 as day-lead (accordion + lead tests)
@@ -269,6 +274,7 @@ test.describe.serial('coverage calendar overlay interactions', () => {
       cycle: { id: cycleInsert.data.id },
       targetDate,
       assignDate2,
+      assignDate3,
     }
   })
 
@@ -286,7 +292,70 @@ test.describe.serial('coverage calendar overlay interactions', () => {
   // Helper: the Close button is only in the DOM when the panel is open
   // (content renders as `{selectedDay && (...)}` so leaving DOM on close)
   function panelCloseBtn(page: Page) {
-    return page.getByLabel('Close details panel')
+    return page.getByTestId('coverage-drawer-close')
+  }
+
+  function dayCell(page: Page, isoDate: string) {
+    return page.getByTestId(`coverage-day-cell-${isoDate}`)
+  }
+
+  async function waitForCalendar(page: Page, isoDate: string) {
+    await expect(dayCell(page, isoDate)).toBeVisible({ timeout: 15_000 })
+  }
+
+  async function seedTargetDayDayAssignments(therapist2OnCall: boolean) {
+    if (!ctx) return
+
+    const rows = [
+      {
+        cycle_id: ctx.cycle.id,
+        user_id: ctx.therapist1.id,
+        date: ctx.targetDate,
+        shift_type: 'day',
+        role: 'lead',
+        status: 'scheduled',
+        assignment_status: 'scheduled',
+      },
+      {
+        cycle_id: ctx.cycle.id,
+        user_id: ctx.therapist2.id,
+        date: ctx.targetDate,
+        shift_type: 'day',
+        role: 'staff',
+        status: therapist2OnCall ? 'on_call' : 'scheduled',
+        assignment_status: therapist2OnCall ? 'on_call' : 'scheduled',
+      },
+    ]
+
+    const { error } = await ctx.supabase.from('shifts').upsert(rows, {
+      onConflict: 'cycle_id,user_id,date',
+    })
+    if (error) {
+      throw new Error(`Could not seed day assignments for targetDate: ${error.message}`)
+    }
+  }
+
+  async function seedTherapist3NightShiftOnTargetDate() {
+    if (!ctx) return
+
+    const { error } = await ctx.supabase.from('shifts').upsert(
+      {
+        cycle_id: ctx.cycle.id,
+        user_id: ctx.therapist3.id,
+        date: ctx.targetDate,
+        shift_type: 'night',
+        role: 'staff',
+        status: 'scheduled',
+        assignment_status: 'scheduled',
+      },
+      {
+        onConflict: 'cycle_id,user_id,date',
+      }
+    )
+
+    if (error) {
+      throw new Error(`Could not seed therapist3 night shift on targetDate: ${error.message}`)
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -298,11 +367,8 @@ test.describe.serial('coverage calendar overlay interactions', () => {
     await login(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
 
-    // Wait for calendar grid to load
-    await expect(page.locator('.grid-cols-7 button').first()).toBeVisible({ timeout: 15_000 })
-
-    // Click the first day cell in the calendar
-    await page.locator('.grid-cols-7 button').first().click()
+    await waitForCalendar(page, ctx!.targetDate)
+    await dayCell(page, ctx!.targetDate).click()
 
     // Panel should open: Close button enters the DOM
     await expect(panelCloseBtn(page)).toBeVisible({ timeout: 5_000 })
@@ -317,8 +383,8 @@ test.describe.serial('coverage calendar overlay interactions', () => {
     await login(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
 
-    await expect(page.locator('.grid-cols-7 button').first()).toBeVisible({ timeout: 15_000 })
-    await page.locator('.grid-cols-7 button').first().click()
+    await waitForCalendar(page, ctx!.targetDate)
+    await dayCell(page, ctx!.targetDate).click()
     await expect(panelCloseBtn(page)).toBeVisible({ timeout: 5_000 })
 
     // Click ×
@@ -337,8 +403,8 @@ test.describe.serial('coverage calendar overlay interactions', () => {
     await login(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
 
-    await expect(page.locator('.grid-cols-7 button').first()).toBeVisible({ timeout: 15_000 })
-    await page.locator('.grid-cols-7 button').first().click()
+    await waitForCalendar(page, ctx!.targetDate)
+    await dayCell(page, ctx!.targetDate).click()
     await expect(panelCloseBtn(page)).toBeVisible({ timeout: 5_000 })
 
     // Click well to the left of the 360px-wide right panel (viewport ≥ 1280px)
@@ -356,18 +422,17 @@ test.describe.serial('coverage calendar overlay interactions', () => {
     await login(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
 
-    await expect(page.locator('.grid-cols-7 button').first()).toBeVisible({ timeout: 15_000 })
+    await waitForCalendar(page, ctx!.targetDate)
 
-    const firstCell = page.locator('.grid-cols-7 button').first()
+    const firstCell = dayCell(page, ctx!.targetDate)
     await firstCell.click()
     await expect(panelCloseBtn(page)).toBeVisible({ timeout: 5_000 })
 
-    // Click the same cell again — force: true because the backdrop (z-40, pointer-events-auto)
-    // overlays the calendar when the panel is open; force dispatches directly to the button,
-    // which triggers handleSelect(id) → selectedId === id → null (toggle closed).
-    await firstCell.click({ force: true })
+    // Click the same cell again. The open backdrop blocks real pointer clicks, so dispatch a
+    // click event directly to the day button to deterministically validate toggle-close behavior.
+    await firstCell.dispatchEvent('click')
 
-    await expect(panelCloseBtn(page)).not.toBeVisible({ timeout: 5_000 })
+    await expect(panelCloseBtn(page)).toHaveCount(0, { timeout: 5_000 })
   })
 
   // -------------------------------------------------------------------------
@@ -379,14 +444,14 @@ test.describe.serial('coverage calendar overlay interactions', () => {
     await login(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
 
-    await expect(page.locator('.grid-cols-7 button').first()).toBeVisible({ timeout: 15_000 })
-    await page.locator('.grid-cols-7 button').first().click()
+    await waitForCalendar(page, ctx!.targetDate)
+    await dayCell(page, ctx!.targetDate).click()
     await expect(panelCloseBtn(page)).toBeVisible({ timeout: 5_000 })
 
     // Switch shift tab — force: true because the backdrop (z-40) overlays the tab buttons
     // when the panel is open; force dispatches directly to the tab, triggering handleTabSwitch
     // which explicitly clears selectedId → panel closes.
-    await page.getByRole('button', { name: 'Night Shift' }).click({ force: true })
+    await page.getByTestId('coverage-shift-tab-night').click({ force: true })
 
     await expect(panelCloseBtn(page)).not.toBeVisible({ timeout: 5_000 })
   })
@@ -400,11 +465,9 @@ test.describe.serial('coverage calendar overlay interactions', () => {
     await login(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
 
-    // Wait for calendar grid; find the day cell that shows our 2 seeded shifts
-    await expect(page.locator('.grid-cols-7 button').first()).toBeVisible({ timeout: 15_000 })
+    await waitForCalendar(page, ctx!.targetDate)
 
-    // The targetDate cell should display "2/2" (2 active / 2 total)
-    const targetCell = page.locator('.grid-cols-7 button').filter({ hasText: '2/2' }).first()
+    const targetCell = dayCell(page, ctx!.targetDate)
     await expect(targetCell).toBeVisible({ timeout: 10_000 })
     await targetCell.click()
 
@@ -456,19 +519,18 @@ test.describe.serial('coverage calendar overlay interactions', () => {
     await login(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
 
-    await expect(page.locator('.grid-cols-7 button').first()).toBeVisible({ timeout: 15_000 })
+    await waitForCalendar(page, ctx!.assignDate2)
 
-    // Open the first clean (0/0) day cell
-    const cleanCell = page.locator('.grid-cols-7 button').filter({ hasText: '0/0' }).first()
+    const cleanCell = dayCell(page, ctx!.assignDate2)
     await expect(cleanCell).toBeVisible({ timeout: 10_000 })
     await cleanCell.click()
     await expect(panelCloseBtn(page)).toBeVisible({ timeout: 5_000 })
 
     // Select therapist2 in the dropdown and click Assign
-    const select = page.locator('aside select')
+    const select = page.getByTestId('coverage-assign-select')
     await expect(select).toBeVisible()
-    await select.selectOption({ label: ctx!.therapist2.fullName })
-    await page.locator('aside').getByRole('button', { name: 'Assign' }).click()
+    await select.selectOption({ value: ctx!.therapist2.id })
+    await page.getByTestId('coverage-assign-submit').click()
 
     // therapist2 should appear as a row in the panel list
     await expect(
@@ -508,21 +570,20 @@ test.describe.serial('coverage calendar overlay interactions', () => {
     await login(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
 
-    await expect(page.locator('.grid-cols-7 button').first()).toBeVisible({ timeout: 15_000 })
+    await waitForCalendar(page, ctx!.assignDate2)
 
-    // Open a clean day cell (Test 7 used .first(), so pick the next 0/0 cell)
-    const cleanCell = page.locator('.grid-cols-7 button').filter({ hasText: '0/0' }).first()
+    const cleanCell = dayCell(page, ctx!.assignDate2)
     await expect(cleanCell).toBeVisible({ timeout: 10_000 })
     await cleanCell.click()
     await expect(panelCloseBtn(page)).toBeVisible({ timeout: 5_000 })
 
     // Click Assign — the intercepted POST returns 23505
-    const select = page.locator('aside select')
+    const select = page.getByTestId('coverage-assign-select')
     await expect(select).toBeVisible()
-    await page.locator('aside').getByRole('button', { name: 'Assign' }).click()
+    await page.getByTestId('coverage-assign-submit').click()
 
     // Inline error should appear inside the panel (not a browser dialog)
-    const errorEl = page.locator('aside [role="alert"]')
+    const errorEl = page.getByTestId('coverage-assign-error')
     await expect(errorEl).toBeVisible({ timeout: 5_000 })
     await expect(errorEl).toContainText('already assigned')
   })
@@ -538,15 +599,15 @@ test.describe.serial('coverage calendar overlay interactions', () => {
     await login(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
 
-    await expect(page.locator('.grid-cols-7 button').first()).toBeVisible({ timeout: 15_000 })
+    await waitForCalendar(page, ctx!.assignDate3)
 
-    // assignDate2 = start + 15 — index 15 in the calendar grid, guaranteed clean
-    const cleanCell = page.locator('.grid-cols-7 button').nth(15)
+    // assignDate3 is a dedicated clean day used by lead-toggle tests.
+    const cleanCell = dayCell(page, ctx!.assignDate3)
     await expect(cleanCell).toBeVisible({ timeout: 10_000 })
     await cleanCell.click()
     await expect(panelCloseBtn(page)).toBeVisible({ timeout: 5_000 })
 
-    const select = page.locator('aside select')
+    const select = page.getByTestId('coverage-assign-select')
     await expect(select).toBeVisible()
 
     // In Staff mode (default): both therapists visible in dropdown
@@ -555,7 +616,7 @@ test.describe.serial('coverage calendar overlay interactions', () => {
     expect(staffOptionTexts.some((o) => o.includes(ctx!.therapist2.fullName))).toBe(true)
 
     // Switch to Lead role
-    await page.locator('aside').getByRole('button', { name: 'Lead' }).click()
+    await page.getByTestId('coverage-assign-role-lead').click()
 
     // In Lead mode: only lead-eligible therapist1 is in the dropdown
     const leadOptionTexts = await select.locator('option').allTextContents()
@@ -574,10 +635,9 @@ test.describe.serial('coverage calendar overlay interactions', () => {
     await login(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
 
-    await expect(page.locator('.grid-cols-7 button').first()).toBeVisible({ timeout: 15_000 })
+    await waitForCalendar(page, ctx!.targetDate)
 
-    // Open the targetDate cell (2 pre-seeded shifts)
-    const targetCell = page.locator('.grid-cols-7 button').filter({ hasText: '2/2' }).first()
+    const targetCell = dayCell(page, ctx!.targetDate)
     await expect(targetCell).toBeVisible({ timeout: 10_000 })
     await targetCell.click()
     await expect(panelCloseBtn(page)).toBeVisible({ timeout: 5_000 })
@@ -611,22 +671,22 @@ test.describe.serial('coverage calendar overlay interactions', () => {
     await login(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
 
-    await expect(page.locator('.grid-cols-7 button').first()).toBeVisible({ timeout: 15_000 })
+    await waitForCalendar(page, ctx!.assignDate3)
 
-    // assignDate2 is at calendar index 15 (start + 15) — guaranteed clean
-    const assignCell = page.locator('.grid-cols-7 button').nth(15)
+    // assignDate3 is a dedicated clean day used by lead-assignment tests.
+    const assignCell = dayCell(page, ctx!.assignDate3)
     await expect(assignCell).toBeVisible({ timeout: 10_000 })
     await assignCell.click()
     await expect(panelCloseBtn(page)).toBeVisible({ timeout: 5_000 })
 
     // Switch to Lead role in the assign panel
-    await page.locator('aside').getByRole('button', { name: 'Lead' }).click()
+    await page.getByTestId('coverage-assign-role-lead').click()
 
     // Select therapist1 (lead-eligible) and assign
-    const select = page.locator('aside select')
+    const select = page.getByTestId('coverage-assign-select')
     await expect(select).toBeVisible()
     await select.selectOption({ value: ctx!.therapist1.id })
-    await page.locator('aside').getByRole('button', { name: 'Assign' }).click()
+    await page.getByTestId('coverage-assign-submit').click()
 
     // therapist1 should appear as a row in the panel
     const t1Row = page
@@ -646,7 +706,7 @@ test.describe.serial('coverage calendar overlay interactions', () => {
       .select('role')
       .eq('user_id', ctx!.therapist1.id)
       .eq('cycle_id', ctx!.cycle.id)
-      .eq('date', ctx!.assignDate2)
+      .eq('date', ctx!.assignDate3)
       .eq('role', 'lead')
     expect(leadShifts?.length).toBeGreaterThanOrEqual(1)
   })
@@ -654,23 +714,24 @@ test.describe.serial('coverage calendar overlay interactions', () => {
   // -------------------------------------------------------------------------
   // Test 12: Status change persists when the panel is closed and reopened
   // -------------------------------------------------------------------------
-  test('On Call status set in test 10 persists when the panel is closed and reopened', async ({
-    page,
-  }) => {
+  test('On Call status persists when the panel is closed and reopened', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    // Keep this test independent from prior status-change tests.
+    await seedTargetDayDayAssignments(true)
 
     await login(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
 
-    await expect(page.locator('.grid-cols-7 button').first()).toBeVisible({ timeout: 15_000 })
+    await waitForCalendar(page, ctx!.targetDate)
 
-    // targetDate still has 2/2 (test 13 hasn't unassigned therapist2 yet)
-    const targetCell = page.locator('.grid-cols-7 button').filter({ hasText: '2/2' }).first()
+    // targetDate has 2/2 after explicit DB seed above
+    const targetCell = dayCell(page, ctx!.targetDate)
     await expect(targetCell).toBeVisible({ timeout: 10_000 })
     await targetCell.click()
     await expect(panelCloseBtn(page)).toBeVisible({ timeout: 5_000 })
 
-    // Expand therapist2 — status should be "On Call" (saved to DB by test 10)
+    // Expand therapist2 — status should be "On Call" from the explicit DB seed
     const t2Btn = page
       .locator('aside')
       .getByRole('button', { name: new RegExp(ctx!.therapist2.fullName) })
@@ -707,9 +768,9 @@ test.describe.serial('coverage calendar overlay interactions', () => {
     await login(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
 
-    await expect(page.locator('.grid-cols-7 button').first()).toBeVisible({ timeout: 15_000 })
+    await waitForCalendar(page, ctx!.targetDate)
 
-    const targetCell = page.locator('.grid-cols-7 button').filter({ hasText: '2/2' }).first()
+    const targetCell = dayCell(page, ctx!.targetDate)
     await expect(targetCell).toBeVisible({ timeout: 10_000 })
     await targetCell.click()
     await expect(panelCloseBtn(page)).toBeVisible({ timeout: 5_000 })
@@ -744,6 +805,10 @@ test.describe.serial('coverage calendar overlay interactions', () => {
   }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
+    // Keep this test independent from prior assignment/unassign tests.
+    await seedTargetDayDayAssignments(false)
+    await seedTherapist3NightShiftOnTargetDate()
+
     // therapist3 (PRN, max 1 shift/week) has a pre-seeded night shift on targetDate.
     // weeklyTherapistCounts spans dayDays + nightDays, so their weekly count = 1 = limit.
     // Opening the Day tab for targetDate and selecting them triggers the role="status" warning.
@@ -751,18 +816,16 @@ test.describe.serial('coverage calendar overlay interactions', () => {
     await login(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
 
-    await expect(page.locator('.grid-cols-7 button').first()).toBeVisible({ timeout: 15_000 })
+    await waitForCalendar(page, ctx!.targetDate)
 
-    // targetDate is at calendar index 5 (cycle start + 5).
-    // After test 13 unassigned therapist2, this cell shows 1/1 (therapist1 only).
-    const targetCell = page.locator('.grid-cols-7 button').nth(5)
+    const targetCell = dayCell(page, ctx!.targetDate)
     await expect(targetCell).toBeVisible({ timeout: 10_000 })
     await targetCell.click()
     await expect(panelCloseBtn(page)).toBeVisible({ timeout: 5_000 })
 
     // Select therapist3 — they are eligible for day shifts (day profile) and not yet assigned
     // to this day slot, so they appear in the dropdown.
-    const select = page.locator('aside select')
+    const select = page.getByTestId('coverage-assign-select')
     await expect(select).toBeVisible()
     await select.selectOption({ value: ctx!.therapist3.id })
 

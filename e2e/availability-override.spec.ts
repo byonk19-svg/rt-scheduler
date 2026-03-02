@@ -114,6 +114,17 @@ async function login(page: Page, email: string, password: string) {
   await expect(page).toHaveURL(/\/dashboard\//, { timeout: 30_000 })
 }
 
+async function pickTherapistInShiftDialog(
+  shiftDialog: ReturnType<Page['getByRole']>,
+  therapistName: string
+) {
+  await shiftDialog.getByPlaceholder('Search therapist').fill(therapistName)
+  await shiftDialog
+    .getByRole('button', { name: new RegExp(therapistName) })
+    .first()
+    .click()
+}
+
 test.describe.serial('availability override scheduling', () => {
   let ctx: TestContext | null = null
   const createdUserIds: string[] = []
@@ -250,12 +261,12 @@ test.describe.serial('availability override scheduling', () => {
     const shiftDialog = page.getByRole('dialog', { name: /Day Shift|Night Shift/ })
     await expect(shiftDialog).toBeVisible()
 
-    await shiftDialog.locator('select').nth(1).selectOption(ctx!.fullTimeTherapist.id)
-    await shiftDialog.getByRole('button', { name: 'Add staff' }).click()
+    await pickTherapistInShiftDialog(shiftDialog, ctx!.fullTimeTherapist.fullName)
+    await shiftDialog.getByRole('button', { name: 'Assign' }).click()
 
-    const conflictDialog = page.getByRole('dialog', { name: 'Conflicts with availability' })
+    const conflictDialog = page.getByRole('dialog', { name: 'Assignment warning' })
     await expect(conflictDialog).toBeVisible()
-    await expect(conflictDialog).toContainText('marked unavailable')
+    await expect(conflictDialog).toContainText('scheduling constraint')
     await conflictDialog.getByRole('button', { name: 'Cancel' }).click()
     await expect(conflictDialog).toBeHidden()
 
@@ -269,8 +280,8 @@ test.describe.serial('availability override scheduling', () => {
     expect(noShiftResult.error).toBeNull()
     expect(noShiftResult.data ?? []).toHaveLength(0)
 
-    await shiftDialog.locator('select').nth(1).selectOption(ctx!.fullTimeTherapist.id)
-    await shiftDialog.getByRole('button', { name: 'Add staff' }).click()
+    await pickTherapistInShiftDialog(shiftDialog, ctx!.fullTimeTherapist.fullName)
+    await shiftDialog.getByRole('button', { name: 'Assign' }).click()
     await expect(conflictDialog).toBeVisible()
     await conflictDialog.locator('#availability-override-reason').fill('Coverage emergency')
     const overrideResponsePromise = page.waitForResponse(
@@ -302,42 +313,32 @@ test.describe.serial('availability override scheduling', () => {
     expect(assignedShiftResult.data?.availability_override_at).toBeTruthy()
   })
 
-  test('PRN not offered is a soft warning only', async ({ page }) => {
+  test('PRN not offered therapist is disabled in the staffing picker', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await login(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/schedule?cycle=${ctx!.cycle.id}&view=calendar`)
 
-    await page.getByRole('button', { name: 'Show staffing pool' }).click()
-    await expect(page.getByText('Not offered (PRN)').first()).toBeVisible()
-
     await page.getByRole('button', { name: 'Manage shift staffing' }).click()
     const shiftDialog = page.getByRole('dialog', { name: /Day Shift|Night Shift/ })
     await expect(shiftDialog).toBeVisible()
 
-    await shiftDialog.locator('select').nth(1).selectOption(ctx!.prnTherapist.id)
-    const prnAssignResponsePromise = page.waitForResponse(
-      (response) =>
-        response.url().includes('/api/schedule/drag-drop') &&
-        response.request().method() === 'POST' &&
-        response.status() === 200
-    )
-    await shiftDialog.getByRole('button', { name: 'Add staff' }).click()
-    const prnAssignResponse = await prnAssignResponsePromise
-    const prnPayload = await prnAssignResponse.json()
-    expect(prnPayload?.message).toBe('Shift assigned.')
+    await shiftDialog.getByPlaceholder('Search therapist').fill(ctx!.prnTherapist.fullName)
+    const prnOption = shiftDialog.getByRole('button', {
+      name: new RegExp(ctx!.prnTherapist.fullName),
+    })
+    await expect(prnOption).toBeVisible()
+    await expect(prnOption).toBeDisabled()
 
     const assignedShiftResult = await ctx!.supabase
       .from('shifts')
-      .select('availability_override, availability_override_reason')
+      .select('id')
       .eq('cycle_id', ctx!.cycle.id)
       .eq('user_id', ctx!.prnTherapist.id)
       .eq('date', ctx!.targetDate)
       .eq('shift_type', 'day')
-      .single()
 
     expect(assignedShiftResult.error).toBeNull()
-    expect(assignedShiftResult.data?.availability_override).toBe(false)
-    expect(assignedShiftResult.data?.availability_override_reason).toBeNull()
+    expect(assignedShiftResult.data ?? []).toHaveLength(0)
   })
 })

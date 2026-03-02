@@ -510,11 +510,13 @@ Latest local checks:
 - `npx tsc --noEmit` pass
 - `npm run lint` pass
 - `npm run format:check` pass (whole-repo Prettier; `.claude/**` excluded from ESLint)
-- `npm run test:unit` pass (**195 tests** across 20 files)
-- CI now gates on: format check → lint → **tsc --noEmit** → build
+- `npm run test:unit` pass (**200 tests** across 23 files)
+- `npm run test:e2e` pass (**32 passed**, 1 skipped; 33 total)
+- CI now gates on: format check -> lint -> **tsc --noEmit** -> build
 - e2e specs:
-  - `e2e/coverage-overlay.spec.ts` (10 tests)
+  - `e2e/coverage-overlay.spec.ts` (14 tests)
   - `e2e/directory-date-override.spec.ts` (7 tests: seeding, save override, delete override, search filter, employment filter, lead checkbox, drawer tabs)
+  - `e2e/availability-override.spec.ts` (2 tests: conflict warning + PRN disabled picker)
 
 ## Resume Checklist
 
@@ -561,5 +563,5 @@ To activate:
 ## Next High-Value Priorities
 
 1. Publish flow validation — activate env vars and validate queued email send + retry path
-2. **Coverage e2e suite expansion** — add tests for: lead assignment end-to-end, workload warning when at weekly limit, unassign removes shift chip, status change persists across panel close/reopen
+2. **Coverage e2e hardening** — reduce selector brittleness (nth/count-text assumptions) with date-targeted selectors or explicit test ids for long-term stability
 3. Server-side validation messages for cycle/date conflicts directly in the directory drawer (inline error banners vs. redirect-based toasts)
