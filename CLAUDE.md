@@ -1,6 +1,43 @@
 # Teamwise Scheduler - Codex Handoff Context
 
-Updated: 2026-03-01 (PageHeader + staff roster + weekly breakdown + directory e2e filters)
+Updated: 2026-03-02 (PR #23 merged: CI stabilization + coverage e2e hardening + publish-route fixes)
+
+## Latest Completed Work (2026-03-02, session 1)
+
+### PR #23 merged to `main`
+
+- **PR:** https://github.com/byonk19-svg/rt-scheduler/pull/23
+- **Merge commit:** `091a6292ee263844109164487935aa5b1bf52cbf`
+- **Branch:** `fix/e2e-hardening-publish-route` (deleted on merge)
+
+### Coverage/schedule navigation + e2e hardening
+
+- Publish CTA/workflow links now route to schedule workspace by default:
+  - `MANAGER_WORKFLOW_LINKS.publish` -> `/schedule?view=week`
+  - manager attention links publish target -> `/schedule?cycle=...&view=week`
+  - manager dashboard publish button now uses schedule route (not coverage route)
+- Added shared route helper + tests:
+  - `src/lib/cycle-route.ts`
+  - `src/lib/cycle-route.test.ts`
+  - `src/lib/manager-workflow.test.ts`
+  - `src/lib/workflow-links.test.ts`
+- Coverage/calendar e2e suite hardened with stable `data-testid` selectors and deterministic date-targeted day-cell targeting.
+- Fixed flaky toggle-close interaction in `e2e/coverage-overlay.spec.ts` by dispatching DOM click for the second same-cell toggle assertion.
+
+### CI reliability fixes (GitHub Actions)
+
+- **Workflow startup failure fixed:** removed invalid secrets-based job `if` from `.github/workflows/ci.yml`.
+- **Typecheck failure fixed:** added missing dependency `@sentry/nextjs` to `package.json`/`package-lock.json`.
+- **Build stability fixes:**
+  - wrapped search-param consumer pages/components in `Suspense` where required:
+    - `src/app/layout.tsx`
+    - `src/app/coverage/page.tsx`
+    - `src/app/requests/new/page.tsx`
+  - adjusted login success-toast query param handling in `src/app/login/page.tsx` to avoid CI prerender/hook lint issues.
+- **No-secrets CI path stabilized:**
+  - quality job now sets placeholder Supabase env for build/typecheck.
+  - non-seeded e2e job path now exports placeholder Supabase env before running public/auth specs.
+- Result: `Lint and Build` and `Playwright E2E` checks both green on push + PR runs.
 
 ## Latest Completed Work (2026-03-01, session 4)
 
@@ -510,9 +547,10 @@ Latest local checks:
 - `npx tsc --noEmit` pass
 - `npm run lint` pass
 - `npm run format:check` pass (whole-repo Prettier; `.claude/**` excluded from ESLint)
+- `npm run build` pass
 - `npm run test:unit` pass (**200 tests** across 23 files)
 - `npm run test:e2e` pass (**32 passed**, 1 skipped; 33 total)
-- CI now gates on: format check -> lint -> **tsc --noEmit** -> build
+- CI now gates on: format check -> lint -> **tsc --noEmit** -> build -> Playwright E2E
 - e2e specs:
   - `e2e/coverage-overlay.spec.ts` (14 tests)
   - `e2e/directory-date-override.spec.ts` (7 tests: seeding, save override, delete override, search filter, employment filter, lead checkbox, drawer tabs)
@@ -532,7 +570,7 @@ Latest local checks:
 
 ### Publish flow with async email + publish history
 
-Status: **Code fully implemented** — pending env var configuration and final validation before rollout.
+Status: **Code fully implemented; mostly validated** — env + queue/retry path validated with local tests; remaining rollout item is production domain/sender setup in Resend.
 
 Key files:
 
@@ -549,6 +587,8 @@ To activate:
   - `PUBLISH_EMAIL_FROM`
   - `NEXT_PUBLIC_APP_URL`
   - optional `PUBLISH_WORKER_KEY`
+- Current rollout gap (2026-03-02):
+  - Resend test-mode restrictions still apply (`onboarding@resend.dev` sender): non-owner recipients can fail with 403 until a domain is verified and `PUBLISH_EMAIL_FROM` uses that domain.
 - Validate manager publish UX:
   - Publish shows "Published - visible to employees"
   - Publish shows queued/sent/failed counts
@@ -562,6 +602,6 @@ To activate:
 
 ## Next High-Value Priorities
 
-1. Publish flow validation — activate env vars and validate queued email send + retry path
-2. **Coverage e2e hardening** — reduce selector brittleness (nth/count-text assumptions) with date-targeted selectors or explicit test ids for long-term stability
+1. Publish flow production rollout — verify domain in Resend and switch `PUBLISH_EMAIL_FROM` to the verified domain sender
+2. Worker automation rollout — wire cron/webhook to `/api/publish/process` with `PUBLISH_WORKER_KEY`
 3. Server-side validation messages for cycle/date conflicts directly in the directory drawer (inline error banners vs. redirect-based toasts)
