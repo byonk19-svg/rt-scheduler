@@ -414,6 +414,9 @@ test.describe.serial('manager date-override workflow in /directory', () => {
     await page.getByRole('button', { name: 'Save date override' }).click()
     await expect(page).toHaveURL(/success=override_saved/, { timeout: 15_000 })
 
+    // Assert success toast (filter to avoid matching Next.js route announcer)
+    await expect(page.getByRole('alert').filter({ hasText: 'Date override saved.' })).toBeVisible()
+
     // Verify DB: override exists with correct fields
     const result = await ctx!.supabase
       .from('availability_overrides')

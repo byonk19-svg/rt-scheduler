@@ -418,60 +418,15 @@ export function pickTherapistForDate(
     if (!weeklyDates.has(date) && weeklyDates.size >= weeklyLimit) continue
 
     const weeklyCount = weeklyDates.size
-    const weeklyMinimum = weeklyMinimumByTherapist.get(therapist.id) ?? 0
-    const weeklyGap = Math.max(0, weeklyMinimum - weeklyCount)
-    if (!best) {
-      best = {
-        therapist,
-        index,
-        weeklyGap,
-        weeklyCount,
-        penalty: patternDecision.penalty,
-        offset: i,
-      }
-      continue
-    }
-
-    if (weeklyGap < best.weeklyGap) continue
-    if (weeklyGap > best.weeklyGap) {
-      best = {
-        therapist,
-        index,
-        weeklyGap,
-        weeklyCount,
-        penalty: patternDecision.penalty,
-        offset: i,
-      }
-      continue
-    }
-
-    if (weeklyCount > best.weeklyCount) continue
-    if (weeklyCount < best.weeklyCount) {
-      best = {
-        therapist,
-        index,
-        weeklyGap,
-        weeklyCount,
-        penalty: patternDecision.penalty,
-        offset: i,
-      }
-      continue
-    }
-
-    if (patternDecision.penalty > best.penalty) continue
-    if (patternDecision.penalty < best.penalty) {
-      best = {
-        therapist,
-        index,
-        weeklyGap,
-        weeklyCount,
-        penalty: patternDecision.penalty,
-        offset: i,
-      }
-      continue
-    }
-
-    if (i < best.offset) {
+    const weeklyGap = Math.max(0, weeklyLimit - weeklyCount)
+    if (
+      !best ||
+      weeklyCount < best.weeklyCount ||
+      (weeklyCount === best.weeklyCount && patternDecision.penalty < best.penalty) ||
+      (weeklyCount === best.weeklyCount &&
+        patternDecision.penalty === best.penalty &&
+        i < best.offset)
+    ) {
       best = {
         therapist,
         index,

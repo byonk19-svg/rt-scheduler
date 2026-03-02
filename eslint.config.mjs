@@ -12,9 +12,6 @@ const eslintConfig = defineConfig([
     'out/**',
     'build/**',
     'next-env.d.ts',
-    // Ignore git worktrees created by Claude Code — these contain their own
-    // build artifacts and generated files that should never be linted.
-    '.claude/**',
   ]),
 ])
 
