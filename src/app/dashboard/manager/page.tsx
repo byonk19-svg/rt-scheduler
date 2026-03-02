@@ -22,6 +22,7 @@ import { parseRole } from '@/lib/auth/roles'
 import { buildDateRange, dateKeyFromDate } from '@/lib/schedule-helpers'
 import { MAX_SHIFT_COVERAGE_PER_DAY, MIN_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
 import { createClient } from '@/lib/supabase/client'
+import { PageHeader } from '@/components/ui/page-header'
 import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 
 type DashboardData = {
@@ -464,14 +465,11 @@ export default function ManagerDashboardPage() {
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 28px' }}>
-      <div className="fade-up" style={{ marginBottom: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-          <div>
-            <h1 className="app-page-title">Manager Dashboard</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Welcome, {d.managerName}. Build coverage first, then publish confidently.
-            </p>
-          </div>
+      <PageHeader
+        className="fade-up mb-7"
+        title="Manager Dashboard"
+        subtitle={`Welcome, ${d.managerName}. Build coverage first, then publish confidently.`}
+        actions={
           <div
             style={{
               display: 'flex',
@@ -483,29 +481,13 @@ export default function ManagerDashboardPage() {
               padding: '7px 14px',
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <rect
-                x="1"
-                y="2"
-                width="12"
-                height="11"
-                rx="2"
-                stroke="var(--muted-foreground)"
-                strokeWidth="1.5"
-              />
-              <path
-                d="M5 1v2M9 1v2M1 6h12"
-                stroke="var(--muted-foreground)"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
+            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted-foreground)' }}>
               Cycle: {d.cycleStart} – {d.cycleEnd}
             </span>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       <div
         className="fade-up"

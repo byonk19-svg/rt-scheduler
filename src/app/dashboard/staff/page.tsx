@@ -5,6 +5,7 @@ import { FeedbackToast } from '@/components/feedback-toast'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { PageHeader } from '@/components/ui/page-header'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { cn } from '@/lib/utils'
@@ -118,16 +119,16 @@ export default async function StaffDashboardPage({
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
       {/* Header */}
-      <div className="teamwise-surface rounded-2xl border border-border p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-        <h1 className="app-page-title">Staff Home</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Welcome, {fullName}. Your self-service tools are prioritized below.
-        </p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">Role: therapist</Badge>
-          <Badge variant="outline">Team: Respiratory Therapy</Badge>
-        </div>
-      </div>
+      <PageHeader
+        title="Staff Home"
+        subtitle={`Welcome, ${fullName}. Your self-service tools are prioritized below.`}
+        badge={
+          <>
+            <Badge variant="secondary">Role: therapist</Badge>
+            <Badge variant="outline">Team: Respiratory Therapy</Badge>
+          </>
+        }
+      />
 
       {/* Metrics banner */}
       {activeCycle && (

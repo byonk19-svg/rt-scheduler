@@ -50,23 +50,26 @@ const SHIFT_STATUSES: Record<
 > = {
   active: {
     label: 'Active',
-    textClass: 'text-[#374151]',
-    activeButtonClass: 'border-[#e5e7eb] bg-[#f9fafb] text-[#374151]',
+    textClass: 'text-foreground',
+    activeButtonClass: 'border-border bg-muted text-foreground',
   },
   oncall: {
     label: 'On Call',
-    textClass: 'text-[#c2410c]',
-    activeButtonClass: 'border-[#fed7aa] bg-[#fff7ed] text-[#c2410c]',
+    textClass: 'text-[var(--warning-text)]',
+    activeButtonClass:
+      'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]',
   },
   leave_early: {
     label: 'Leave Early',
-    textClass: 'text-[#2563eb]',
-    activeButtonClass: 'border-[#e5e7eb] bg-[#f9fafb] text-[#2563eb]',
+    textClass: 'text-[var(--info-text)]',
+    activeButtonClass:
+      'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)]',
   },
   cancelled: {
     label: 'Cancelled',
-    textClass: 'text-[#dc2626]',
-    activeButtonClass: 'border-[#fecaca] bg-[#fef2f2] text-[#dc2626]',
+    textClass: 'text-[var(--error-text)]',
+    activeButtonClass:
+      'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]',
   },
 }
 
@@ -82,10 +85,10 @@ function initials(name: string): string {
 function Avatar({ name, status, expanded }: { name: string; status: UiStatus; expanded: boolean }) {
   const bgClass =
     status === 'cancelled'
-      ? 'bg-[#ef4444]'
+      ? 'bg-[var(--error)]'
       : status === 'oncall'
-        ? 'bg-[#ea580c]'
-        : 'bg-[#d97706]'
+        ? 'bg-orange-600'
+        : 'bg-[var(--attention)]'
   const sizeClass = expanded ? 'h-[34px] w-[34px] text-[13px]' : 'h-[28px] w-[28px] text-[11px]'
 
   return (
@@ -356,7 +359,7 @@ export function ShiftDrawer({
                                   'flex-1 rounded-md border px-2 py-1 text-xs font-bold disabled:cursor-default',
                                   activeStatus
                                     ? SHIFT_STATUSES[statusKey].activeButtonClass
-                                    : 'border-[#e5e7eb] bg-white text-[#9ca3af]'
+                                    : 'border-border bg-card text-muted-foreground'
                                 )}
                               >
                                 {SHIFT_STATUSES[statusKey].label}

@@ -39,10 +39,10 @@ function initials(name: string): string {
 function Avatar({ name, status }: { name: string; status: UiStatus }) {
   const bgClass =
     status === 'cancelled'
-      ? 'bg-[#ef4444]'
+      ? 'bg-[var(--error)]'
       : status === 'oncall'
-        ? 'bg-[#ea580c]'
-        : 'bg-[#d97706]'
+        ? 'bg-orange-600'
+        : 'bg-[var(--attention)]'
 
   return (
     <span
@@ -77,8 +77,8 @@ export function CalendarGrid({
             className={cn(
               'cursor-pointer rounded-[7px] border px-5 py-1.5 text-xs font-bold transition-all',
               shiftTab === tab
-                ? 'border-[#d97706] bg-[#d97706] text-white'
-                : 'border-[#e5e7eb] bg-white text-[#64748b]'
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-card text-muted-foreground'
             )}
           >
             {tab} Shift
@@ -115,9 +115,9 @@ export function CalendarGrid({
                 type="button"
                 onClick={() => onSelect(day.id)}
                 className={cn(
-                  'rounded-lg border border-slate-200 bg-white p-2 text-left hover:border-amber-600',
+                  'rounded-lg border border-slate-200 bg-white p-2 text-left hover:border-primary',
                   selectedId === day.id &&
-                    'border-[#d97706] shadow-[0_0_0_3px_rgba(217,119,6,0.15)]'
+                    'border-primary shadow-[0_0_0_3px_rgba(6,103,169,0.15)]'
                 )}
               >
                 <div className="mb-1 flex items-center justify-between">
@@ -133,8 +133,8 @@ export function CalendarGrid({
                     className={cn(
                       'rounded-full px-1.5 py-0.5 text-[10px] font-bold',
                       missingLead
-                        ? 'bg-[#fee2e2] text-[#dc2626]'
-                        : 'bg-[#ecfdf5] text-[#047857]'
+                        ? 'bg-[var(--error-subtle)] text-[var(--error-text)]'
+                        : 'bg-[var(--success-subtle)] text-[var(--success-text)]'
                     )}
                   >
                     {activeCount}/{totalCount}

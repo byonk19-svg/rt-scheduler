@@ -1,6 +1,57 @@
 # Teamwise Scheduler - Codex Handoff Context
 
-Updated: 2026-03-01 (four QoL improvements: manager workload, staff dashboard metrics, shift board, directory errors)
+Updated: 2026-03-01 (design system audit + brand alignment pass)
+
+## Latest Completed Work (2026-03-01, session 3 — Design System)
+
+### Design token system + brand alignment
+
+- **`src/app/globals.css`**: Added `--attention: #d97706` token (amber — attention signals only, not primary actions). Fixed global `tr:hover td` from amber `#fffbeb` → `var(--secondary)` blue tint.
+
+- **`src/components/AppShell.tsx`**: Nav active pill and publish CTA button now use `--primary` (blue). Logo wordmark accent and user avatar keep amber via `NAV_AMBER` / `var(--attention)` as brand personality touches.
+
+- **`src/app/dashboard/manager/page.tsx`** — full design pass:
+  - `AmberButton` background → `var(--primary)`, font → `var(--font-sans)`
+  - `GhostButton` border/bg/color → CSS vars
+  - `WorkloadBar` day/night bar colors → `var(--primary)` / `var(--tw-deep-blue)` (was amber/indigo)
+  - `FillRateBar` fill colors → `var(--success)` / `var(--warning)` / `var(--error)`
+  - Attention bar border: conditional green (`var(--success-border)` + `var(--success)` left border) when all clear, amber when issues — driven by `hasAnyIssues` derived flag
+  - Cycle badge SVG strokes → `var(--muted-foreground)` (was amber)
+  - Deleted redundant **Quick Actions** section (~40 lines)
+  - All `IssueRow` / `CheckRow` / `Stat` colors → CSS semantic vars
+  - `CardHeader` icon container bg → `var(--muted)` / `var(--border)` (was amber `#fffbeb`)
+  - All `#e5e7eb` / `#f1f5f9` borders → `var(--border)`; `#f8fafc` / `#f9fafb` tile backgrounds → `var(--muted)`
+  - Page title: inline `fontSize:26 fontFamily:Plus Jakarta Sans` → `className="app-page-title"`
+  - Section headers: inline `fontWeight:800` → `text-sm font-semibold text-foreground`
+  - All `fontFamily: 'Plus Jakarta Sans'` / `'DM Sans'` removed; `fontWeight 800` → `700`
+  - Emoji icons replaced with Lucide: `CardHeader` (ClipboardList / Rocket / SquareCheckBig), `SmallTile` (Calendar / Users), `CheckRow` (CheckCircle2 / XCircle), team stat tiles (Users / Sun / Moon / FileText)
+  - `SmallTile` `icon` prop: `string` → `ReactNode`; `CardHeader` `icon` prop: `string` → `ReactNode`
+  - All label text hardcodes (`#374151`, `#64748b`) → `var(--foreground)` / `var(--muted-foreground)`
+
+- **`src/app/shift-board/page.tsx`**: `STATUS_META` hardcoded hex → CSS var token families (`--warning-*`, `--success-*`, `--error-*`, `--muted`)
+
+- **`src/app/dashboard/staff/page.tsx`**: Role badge `variant="secondary"` (blue tint, was default)
+
+- **`src/components/coverage/CalendarGrid.tsx`**:
+  - Avatar bg: `#ef4444` → `var(--error)`, `#ea580c` → `bg-orange-600`, `#d97706` → `var(--attention)`
+  - Day/Night tab active: `#d97706` bg → `bg-primary text-primary-foreground`
+  - Tab inactive: `#e5e7eb` → `border-border bg-card text-muted-foreground`
+  - Selected day card: `border-[#d97706]` → `border-primary`; shadow RGB → primary blue; `hover:border-amber-600` → `hover:border-primary`
+  - Lead count badge: `#fee2e2/#dc2626` → `var(--error-subtle)/var(--error-text)`; `#ecfdf5/#047857` → `var(--success-subtle)/var(--success-text)`
+
+- **`src/components/coverage/ShiftDrawer.tsx`**:
+  - `SHIFT_STATUSES` mapping entirely → CSS vars: active → `text-foreground/border-border/bg-muted`; oncall → `warning-*`; leave_early → `info-*`; cancelled → `error-*`
+  - Avatar bg: same treatment as CalendarGrid avatar
+  - Inactive status button: `#e5e7eb/#9ca3af` → `border-border bg-card text-muted-foreground`
+
+### Design system rules (enforced going forward)
+
+- `--primary` (`#0667a9`) = all primary actions: buttons, nav pills, links, focus rings
+- `--attention` (`#d97706`) = attention-only semantic: avatar accent, logo wordmark, amber chip for truly attention-needed states
+- `--warning-*` / `--success-*` / `--error-*` / `--info-*` = all status badge families
+- No hardcoded hex colors in UI — use CSS vars or Tailwind semantic classes
+- No `fontFamily` string literals in JSX — use `font-sans` or `var(--font-sans)`
+- `fontWeight 800` reserved for display-level only; section headers use `600`/`700`
 
 ## Latest Completed Work (2026-03-01, session 2)
 
