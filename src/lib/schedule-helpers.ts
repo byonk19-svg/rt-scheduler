@@ -418,6 +418,7 @@ export function pickTherapistForDate(
     if (!weeklyDates.has(date) && weeklyDates.size >= weeklyLimit) continue
 
     const weeklyCount = weeklyDates.size
+    const weeklyGap = Math.max(0, weeklyLimit - weeklyCount)
     if (
       !best ||
       weeklyCount < best.weeklyCount ||
@@ -426,7 +427,14 @@ export function pickTherapistForDate(
         patternDecision.penalty === best.penalty &&
         i < best.offset)
     ) {
-      best = { therapist, index, weeklyCount, penalty: patternDecision.penalty, offset: i }
+      best = {
+        therapist,
+        index,
+        weeklyGap,
+        weeklyCount,
+        penalty: patternDecision.penalty,
+        offset: i,
+      }
     }
   }
 

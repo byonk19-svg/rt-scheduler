@@ -98,7 +98,8 @@ export function summarizePublishWeeklyViolations({
     const therapistMaxWorkDays = maxFromMap ?? MAX_WORK_DAYS_PER_WEEK
     const therapistMinWorkDays = minWorkDaysByTherapist.get(therapistId) ?? 0
     for (const [weekStart, weekDatesInCycle] of cycleWeekDates) {
-      const requiredDays = Math.min(therapistMaxWorkDays, weekDatesInCycle.size)
+      const requiredDays = Math.min(therapistMinWorkDays, weekDatesInCycle.size)
+      const maxDays = Math.min(therapistMaxWorkDays, weekDatesInCycle.size)
       const workedDatesFromMap = weeklyWorkedDatesByUserWeek.get(
         weeklyCountKey(therapistId, weekStart)
       )
