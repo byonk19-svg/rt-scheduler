@@ -24,9 +24,35 @@ type PublishEventLookupRow = {
   schedule_cycles: { label: string | null } | { label: string | null }[] | null
 }
 
+const RESEND_MIN_INTERVAL_MS = 600
+const RESEND_MAX_ATTEMPTS = 3
+
 function getOne<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null
   return value ?? null
+}
+
+function wait(ms: number): Promise<void> {
+  if (ms <= 0) return Promise.resolve()
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function parseRetryAfterMs(response: Response): number | null {
+  const retryAfter = response.headers.get('retry-after')
+  if (!retryAfter) return null
+
+  const seconds = Number(retryAfter)
+  if (Number.isFinite(seconds) && seconds > 0) {
+    return Math.ceil(seconds * 1000)
+  }
+
+  const dateMs = Date.parse(retryAfter)
+  if (!Number.isNaN(dateMs)) {
+    const delta = dateMs - Date.now()
+    return delta > 0 ? delta : null
+  }
+
+  return null
 }
 
 function parseBatchSize(value: unknown): number {
@@ -164,6 +190,7 @@ export async function POST(request: Request) {
 
   let sent = 0
   let failed = 0
+  let nextSendNotBefore = 0
 
   for (const row of rows) {
     const cycleLabel = cycleLabelByEventId.get(row.publish_event_id) ?? 'Current cycle'
@@ -175,24 +202,49 @@ export async function POST(request: Request) {
     })
 
     try {
-      const resendResponse = await fetch(emailConfig.resendApiUrl, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${emailConfig.resendApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: emailConfig.fromEmail,
-          to: [row.email],
-          subject: emailPayload.subject,
-          text: emailPayload.text,
-          html: emailPayload.html,
-        }),
-      })
+      let delivered = false
+      let lastErrorMessage = 'Unknown email delivery error'
 
-      if (!resendResponse.ok) {
+      for (let attempt = 1; attempt <= RESEND_MAX_ATTEMPTS; attempt += 1) {
+        const now = Date.now()
+        if (now < nextSendNotBefore) {
+          await wait(nextSendNotBefore - now)
+        }
+
+        const resendResponse = await fetch(emailConfig.resendApiUrl, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${emailConfig.resendApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: emailConfig.fromEmail,
+            to: [row.email],
+            subject: emailPayload.subject,
+            text: emailPayload.text,
+            html: emailPayload.html,
+          }),
+        })
+        nextSendNotBefore = Date.now() + RESEND_MIN_INTERVAL_MS
+
+        if (resendResponse.ok) {
+          delivered = true
+          break
+        }
+
         const resendError = await resendResponse.text()
-        throw new Error(`Resend request failed (${resendResponse.status}): ${resendError}`)
+        lastErrorMessage = `Resend request failed (${resendResponse.status}): ${resendError}`
+        const shouldRetryRateLimit = resendResponse.status === 429 && attempt < RESEND_MAX_ATTEMPTS
+        if (!shouldRetryRateLimit) {
+          break
+        }
+
+        const retryAfterMs = parseRetryAfterMs(resendResponse) ?? 1000
+        await wait(Math.max(retryAfterMs, RESEND_MIN_INTERVAL_MS))
+      }
+
+      if (!delivered) {
+        throw new Error(lastErrorMessage)
       }
 
       const { error: outboxUpdateError } = await admin
