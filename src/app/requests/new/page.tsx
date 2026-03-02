@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 import { dateKeyFromDate } from '@/lib/schedule-helpers'
@@ -130,7 +130,7 @@ function slotKey(date: string, shiftType: ShiftType): string {
   return `${date}:${shiftType}`
 }
 
-export default function SwapRequestPage() {
+function SwapRequestPageContent() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -1142,5 +1142,13 @@ export default function SwapRequestPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function SwapRequestPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <SwapRequestPageContent />
+    </Suspense>
   )
 }

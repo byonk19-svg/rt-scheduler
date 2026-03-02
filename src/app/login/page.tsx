@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase/client'
@@ -19,10 +19,14 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
-  const searchParams = useSearchParams()
   const supabase = createClient()
-  const success = searchParams.get('success')
-  const toastMessage = success === 'signed_out' ? 'Signed out successfully.' : null
+
+  const toastMessage = useMemo(() => {
+    if (typeof window === 'undefined') return null
+    const params = new URLSearchParams(window.location.search)
+    const success = params.get('success')
+    return success === 'signed_out' ? 'Signed out successfully.' : null
+  }, [])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
