@@ -124,7 +124,7 @@ export default async function StaffDashboardPage({
           Welcome, {fullName}. Your self-service tools are prioritized below.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Badge>Role: therapist</Badge>
+          <Badge variant="secondary">Role: therapist</Badge>
           <Badge variant="outline">Team: Respiratory Therapy</Badge>
         </div>
       </div>

@@ -442,6 +442,12 @@ export default function ManagerDashboardPage() {
   const approvalsClear = !loading && data.pendingApprovals === 0
   const coverageHasIssues = !loading && data.underCoverage > 0
   const leadHasIssues = !loading && data.missingLead > 0
+  const hasAnyIssues =
+    loading ||
+    !approvalsClear ||
+    coverageHasIssues ||
+    leadHasIssues ||
+    (!loading && data.unfilledShifts > 0)
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 28px' }}>
@@ -468,22 +474,30 @@ export default function ManagerDashboardPage() {
               display: 'flex',
               alignItems: 'center',
               gap: 8,
-              background: '#fff',
-              border: '1px solid #e5e7eb',
+              background: 'var(--card)',
+              border: '1px solid var(--border)',
               borderRadius: 8,
               padding: '7px 14px',
             }}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <rect x="1" y="2" width="12" height="11" rx="2" stroke="#d97706" strokeWidth="1.5" />
+              <rect
+                x="1"
+                y="2"
+                width="12"
+                height="11"
+                rx="2"
+                stroke="var(--muted-foreground)"
+                strokeWidth="1.5"
+              />
               <path
                 d="M5 1v2M9 1v2M1 6h12"
-                stroke="#d97706"
+                stroke="var(--muted-foreground)"
                 strokeWidth="1.5"
                 strokeLinecap="round"
               />
             </svg>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#92400e' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted-foreground)' }}>
               Cycle: {d.cycleStart} – {d.cycleEnd}
             </span>
           </div>
@@ -495,8 +509,10 @@ export default function ManagerDashboardPage() {
         style={{
           animationDelay: '0.05s',
           background: '#fff',
-          border: '1.5px solid #fde68a',
-          borderLeft: '4px solid #d97706',
+          border: hasAnyIssues
+            ? '1.5px solid var(--warning-border)'
+            : '1px solid var(--success-border)',
+          borderLeft: hasAnyIssues ? '4px solid var(--warning)' : '4px solid var(--success)',
           borderRadius: 10,
           padding: '16px 20px',
           marginBottom: 24,
@@ -507,13 +523,13 @@ export default function ManagerDashboardPage() {
         }}
       >
         <div style={{ display: 'flex', gap: 20, flex: 1, flexWrap: 'wrap' }}>
-          <Stat label="Unfilled shifts" value={d.unfilledShifts} color="#dc2626" />
-          <div style={{ width: 1, background: '#f1f5f9', alignSelf: 'stretch' }} />
-          <Stat label="Missing lead" value={d.missingLead} color="#dc2626" />
-          <div style={{ width: 1, background: '#f1f5f9', alignSelf: 'stretch' }} />
-          <Stat label="Under coverage" value={d.underCoverage} color="#c2410c" />
-          <div style={{ width: 1, background: '#f1f5f9', alignSelf: 'stretch' }} />
-          <Stat label="Pending approvals" value={d.pendingApprovals} color="#059669" />
+          <Stat label="Unfilled shifts" value={d.unfilledShifts} color="var(--error-text)" />
+          <div style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch' }} />
+          <Stat label="Missing lead" value={d.missingLead} color="var(--error-text)" />
+          <div style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch' }} />
+          <Stat label="Under coverage" value={d.underCoverage} color="var(--warning-text)" />
+          <div style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch' }} />
+          <Stat label="Pending approvals" value={d.pendingApprovals} color="var(--success-text)" />
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           <AmberButton onClick={() => router.push(coverageRoute)}>Fix coverage</AmberButton>
@@ -658,48 +674,6 @@ export default function ManagerDashboardPage() {
           border: '1px solid #e5e7eb',
           borderRadius: 10,
           padding: '18px 20px',
-          marginBottom: 24,
-        }}
-      >
-        <p style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>
-          Quick actions
-        </p>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {[
-            { label: 'Assign coverage', route: coverageRoute, active: true },
-            { label: 'Publish cycle', route: publishRoute, active: false },
-            { label: 'Review approvals', route: approvalsRoute, active: false },
-            { label: 'View team', route: teamRoute, active: false },
-          ].map(({ label, route, active }) => (
-            <button
-              key={label}
-              onClick={() => router.push(route)}
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                padding: '7px 16px',
-                borderRadius: 7,
-                border: `1px solid ${active ? '#d97706' : '#e5e7eb'}`,
-                background: active ? '#fffbeb' : '#fff',
-                color: active ? '#b45309' : '#374151',
-                cursor: 'pointer',
-                fontFamily: "'DM Sans', sans-serif",
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div
-        className="fade-up"
-        style={{
-          animationDelay: '0.3s',
-          background: '#fff',
-          border: '1px solid #e5e7eb',
-          borderRadius: 10,
-          padding: '18px 20px',
         }}
       >
         <div
@@ -790,8 +764,8 @@ function CardHeader({ icon, title, subtitle }: { icon: string; title: string; su
           width: 34,
           height: 34,
           borderRadius: 8,
-          background: '#fffbeb',
-          border: '1px solid #fde68a',
+          background: 'var(--muted)',
+          border: '1px solid var(--border)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -839,8 +813,18 @@ function IssueRow({
   value: number | string
   type: 'error' | 'warn' | 'ok'
 }) {
-  const color = type === 'error' ? '#dc2626' : type === 'warn' ? '#c2410c' : '#059669'
-  const bg = type === 'error' ? '#fee2e2' : type === 'warn' ? '#ffedd5' : '#ecfdf5'
+  const color =
+    type === 'error'
+      ? 'var(--error-text)'
+      : type === 'warn'
+        ? 'var(--warning-text)'
+        : 'var(--success-text)'
+  const bg =
+    type === 'error'
+      ? 'var(--error-subtle)'
+      : type === 'warn'
+        ? 'var(--warning-subtle)'
+        : 'var(--success-subtle)'
 
   return (
     <div
@@ -897,7 +881,7 @@ function CheckRow({
       <span
         style={{
           fontSize: 11,
-          color: isOk ? '#059669' : '#dc2626',
+          color: isOk ? 'var(--success-text)' : 'var(--error-text)',
           fontWeight: 600,
           marginLeft: 'auto',
           textAlign: 'right' as const,
@@ -927,11 +911,11 @@ function AmberButton({
         padding: '7px 16px',
         borderRadius: 7,
         border: 'none',
-        background: '#d97706',
-        color: '#fff',
+        background: 'var(--primary)',
+        color: 'var(--primary-foreground)',
         cursor: 'pointer',
         width: full ? '100%' : 'auto',
-        fontFamily: "'DM Sans', sans-serif",
+        fontFamily: 'var(--font-sans)',
       }}
     >
       {children}
@@ -956,12 +940,12 @@ function GhostButton({
         fontWeight: 600,
         padding: '7px 16px',
         borderRadius: 7,
-        border: '1px solid #e5e7eb',
-        background: '#fff',
-        color: '#374151',
+        border: '1px solid var(--border)',
+        background: 'var(--card)',
+        color: 'var(--foreground)',
         cursor: 'pointer',
         width: full ? '100%' : 'auto',
-        fontFamily: "'DM Sans', sans-serif",
+        fontFamily: 'var(--font-sans)',
       }}
     >
       {children}
@@ -978,7 +962,7 @@ function FillRateBar({ scheduled, total }: { scheduled: number | null; total: nu
     )
   }
   const pct = Math.round((scheduled / total) * 100)
-  const barColor = pct >= 80 ? '#059669' : pct >= 60 ? '#d97706' : '#dc2626'
+  const barColor = pct >= 80 ? 'var(--success)' : pct >= 60 ? 'var(--warning)' : 'var(--error)'
   return (
     <div>
       <p style={{ fontSize: 12, color: '#374151', fontWeight: 600, marginBottom: 6 }}>
@@ -1008,7 +992,7 @@ function FillRateBar({ scheduled, total }: { scheduled: number | null; total: nu
 
 function WorkloadBar({ row, max }: { row: WorkloadRow; max: number }) {
   const pct = max > 0 ? Math.round((row.count / max) * 100) : 0
-  const barColor = row.shiftType === 'day' ? '#d97706' : '#6366f1'
+  const barColor = row.shiftType === 'day' ? 'var(--primary)' : 'var(--tw-deep-blue)'
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <span

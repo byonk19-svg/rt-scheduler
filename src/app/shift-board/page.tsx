@@ -75,10 +75,30 @@ const STATUS_META: Record<
   RequestStatus,
   { label: string; color: string; bg: string; border: string }
 > = {
-  pending: { label: 'Pending', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
-  approved: { label: 'Approved', color: '#065f46', bg: '#ecfdf5', border: '#a7f3d0' },
-  denied: { label: 'Denied', color: '#991b1b', bg: '#fef2f2', border: '#fecaca' },
-  expired: { label: 'Expired', color: '#6b7280', bg: '#f9fafb', border: '#e5e7eb' },
+  pending: {
+    label: 'Pending',
+    color: 'var(--warning-text)',
+    bg: 'var(--warning-subtle)',
+    border: 'var(--warning-border)',
+  },
+  approved: {
+    label: 'Approved',
+    color: 'var(--success-text)',
+    bg: 'var(--success-subtle)',
+    border: 'var(--success-border)',
+  },
+  denied: {
+    label: 'Denied',
+    color: 'var(--error-text)',
+    bg: 'var(--error-subtle)',
+    border: 'var(--error-border)',
+  },
+  expired: {
+    label: 'Expired',
+    color: 'var(--muted-foreground)',
+    bg: 'var(--muted)',
+    border: 'var(--border)',
+  },
 }
 
 const TYPE_META: Record<RequestType, { label: string; color: string; bg: string; border: string }> =
