@@ -148,9 +148,10 @@ function CoveragePageContent() {
     if (!autoParam && !draftParam) return null
     return getScheduleFeedback(scheduleFeedbackParams)
   }, [autoParam, draftParam, scheduleFeedbackParams])
-  const publishedScheduleHref = activeCycleId
+  const weekRosterHref = activeCycleId
     ? `/schedule?cycle=${activeCycleId}&view=week`
     : '/schedule?view=week'
+  const publishHistoryHref = '/publish'
   const cycleRangeLabel = useMemo(() => {
     if (!printCycle) return 'Current 6-week window'
     return `${formatDateLabel(printCycle.start_date)} to ${formatDateLabel(printCycle.end_date)}`
@@ -705,6 +706,18 @@ function CoveragePageContent() {
             >
               Print schedule
             </button>
+            <Link
+              href={weekRosterHref}
+              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
+            >
+              Week roster
+            </Link>
+            <Link
+              href={publishHistoryHref}
+              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
+            >
+              Publish history
+            </Link>
             <form action={generateDraftScheduleAction}>
               <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
               <input type="hidden" name="view" value="week" />
@@ -755,7 +768,7 @@ function CoveragePageContent() {
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <Link
-                href={publishedScheduleHref}
+                href={weekRosterHref}
                 className="rounded-md border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
               >
                 View published schedule
