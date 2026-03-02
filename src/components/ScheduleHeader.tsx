@@ -80,6 +80,7 @@ export function ScheduleHeader({
   const canManageSchedule = can(role, 'manage_schedule')
   const hasActiveCycle = Boolean(activeCycleId)
   const canPublish = hasActiveCycle && !activeCyclePublished
+  const managerCoverageMonthHref = activeCycleId ? `/coverage?cycle=${activeCycleId}` : '/coverage'
   const autoGenerateHelperMessage = !hasActiveCycle
     ? 'Select a cycle to auto-generate a draft.'
     : activeCyclePublished
@@ -228,7 +229,11 @@ export function ScheduleHeader({
         </Link>
         {canViewMonth ? (
           <Link
-            href={buildScheduleUrl(activeCycleId, 'calendar')}
+            href={
+              canManageSchedule
+                ? managerCoverageMonthHref
+                : buildScheduleUrl(activeCycleId, 'calendar')
+            }
             className={tabClass(viewMode === 'calendar')}
           >
             Month

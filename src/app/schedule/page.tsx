@@ -206,6 +206,12 @@ export default async function SchedulePage({
   const role: Role = toUiRole(profile?.role)
   const canManageSchedule = can(role, 'manage_schedule')
   const canManageStaffing = can(role, 'manage_coverage')
+  if (canManageSchedule && viewMode === 'calendar') {
+    const coverageParams = new URLSearchParams()
+    const cycleId = getSearchParam(selectedCycleId)
+    if (cycleId) coverageParams.set('cycle', cycleId)
+    redirect(coverageParams.size > 0 ? `/coverage?${coverageParams.toString()}` : '/coverage')
+  }
   const canEditAssignmentStatus = can(parseRole(profile?.role), 'update_assignment_status', {
     isLeadEligible: profile?.is_lead_eligible === true,
   })
