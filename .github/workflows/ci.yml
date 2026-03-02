@@ -49,7 +49,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: quality
     timeout-minutes: 30
-    if: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL != '' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY != '' }}
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
@@ -69,11 +68,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check seeded e2e secret availability
+        id: seeded
+        shell: bash
+        run: |
+          if [[ -n "${NEXT_PUBLIC_SUPABASE_URL}" && -n "${NEXT_PUBLIC_SUPABASE_ANON_KEY}" ]]; then
+            echo "run_seeded=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_seeded=false" >> "$GITHUB_OUTPUT"
+            echo "Seeded Supabase secrets not set; running only non-seeded e2e coverage."
+          fi
+
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
       - name: Run e2e tests
-        run: npm run test:e2e
+        run: |
+          if [[ "${{ steps.seeded.outputs.run_seeded }}" == "true" ]]; then
+            npm run test:e2e
+          else
+            npx playwright test e2e/auth-redirect.spec.ts e2e/public-pages.spec.ts e2e/authenticated-flow.spec.ts
+          fi
 
       - name: Upload Playwright artifacts
         if: always()
