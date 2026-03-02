@@ -749,7 +749,25 @@ function CoveragePageContent() {
               <input type="hidden" name="view" value="week" />
               <input type="hidden" name="show_unavailable" value="false" />
               <input type="hidden" name="currently_published" value={activeCyclePublished ? 'true' : 'false'} />
+              <input type="hidden" name="override_weekly_rules" value="true" />
+              <input type="hidden" name="override_shift_rules" value="true" />
+              <input type="hidden" name="return_to" value="coverage" />
+              <button
+                type="submit"
+                disabled={!activeCycleId || activeCyclePublished}
+                className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 disabled:opacity-60"
+                title="Bypass weekly and coverage/lead publish guardrails for this publish."
+              >
+                Publish w/ full override
+              </button>
+            </form>
+            <form action={toggleCyclePublishedAction}>
+              <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+              <input type="hidden" name="view" value="week" />
+              <input type="hidden" name="show_unavailable" value="false" />
+              <input type="hidden" name="currently_published" value={activeCyclePublished ? 'true' : 'false'} />
               <input type="hidden" name="override_weekly_rules" value="false" />
+              <input type="hidden" name="override_shift_rules" value="false" />
               <input type="hidden" name="return_to" value="coverage" />
               <button
                 type="submit"

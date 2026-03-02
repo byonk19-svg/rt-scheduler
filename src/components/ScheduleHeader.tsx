@@ -145,13 +145,14 @@ export function ScheduleHeader({
                     />
                     <input type="hidden" name="currently_published" value="false" />
                     <input type="hidden" name="override_weekly_rules" value="true" />
+                    <input type="hidden" name="override_shift_rules" value="true" />
                     <FormMenuSubmitButton
                       type="submit"
                       className={menuActionClass}
                       disabled={!canPublish}
                       pendingText="Publishing..."
                     >
-                      Publish with overrides
+                      Publish with full override
                     </FormMenuSubmitButton>
                   </form>
                   <form action={toggleCyclePublishedAction}>
@@ -164,6 +165,7 @@ export function ScheduleHeader({
                     />
                     <input type="hidden" name="currently_published" value="false" />
                     <input type="hidden" name="override_weekly_rules" value="false" />
+                    <input type="hidden" name="override_shift_rules" value="false" />
                     <FormMenuSubmitButton
                       type="submit"
                       className={menuActionClass}
@@ -311,6 +313,7 @@ export function ScheduleHeader({
             />
             <input type="hidden" name="currently_published" value="false" />
             <input type="hidden" name="override_weekly_rules" value="false" />
+            <input type="hidden" name="override_shift_rules" value="false" />
 
             <div className="space-y-1">
               <label

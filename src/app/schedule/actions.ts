@@ -369,6 +369,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
   const returnTo = String(formData.get('return_to') ?? '').trim()
   const showUnavailable = String(formData.get('show_unavailable') ?? '').trim() === 'true'
   const overrideWeeklyRules = String(formData.get('override_weekly_rules') ?? '').trim() === 'true'
+  const overrideShiftRules = String(formData.get('override_shift_rules') ?? '').trim() === 'true'
   const viewParams = showUnavailable ? { show_unavailable: 'true' } : undefined
   const buildReturnUrl = (
     cycleIdOverride: string | undefined,
@@ -488,47 +489,49 @@ export async function toggleCyclePublishedAction(formData: FormData) {
       }
     }
 
-    const { data: shiftCoverageData, error: shiftCoverageError } = await supabase
-      .from('shifts')
-      .select(
-        'date, shift_type, status, role, user_id, profiles:profiles!shifts_user_id_fkey(full_name, is_lead_eligible)'
-      )
-      .eq('cycle_id', cycleId)
-      .gte('date', cycle.start_date)
-      .lte('date', cycle.end_date)
+    if (!overrideShiftRules) {
+      const { data: shiftCoverageData, error: shiftCoverageError } = await supabase
+        .from('shifts')
+        .select(
+          'date, shift_type, status, role, user_id, profiles:profiles!shifts_user_id_fkey(full_name, is_lead_eligible)'
+        )
+        .eq('cycle_id', cycleId)
+        .gte('date', cycle.start_date)
+        .lte('date', cycle.end_date)
 
-    if (shiftCoverageError) {
-      console.error('Failed to load shifts for coverage validation:', shiftCoverageError)
-      redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'publish_validation_failed' }))
-    }
+      if (shiftCoverageError) {
+        console.error('Failed to load shifts for coverage validation:', shiftCoverageError)
+        redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'publish_validation_failed' }))
+      }
 
-    const slotValidation = summarizeShiftSlotViolations({
-      cycleDates,
-      assignments: ((shiftCoverageData ?? []) as ShiftPublishValidationRow[]).map((row) => ({
-        date: row.date,
-        shiftType: row.shift_type,
-        status: row.status,
-        role: row.role,
-        therapistId: row.user_id,
-        therapistName: getOne(row.profiles)?.full_name ?? 'Unknown',
-        isLeadEligible: Boolean(getOne(row.profiles)?.is_lead_eligible),
-      })),
-      minCoveragePerShift: MIN_SHIFT_COVERAGE_PER_DAY,
-      maxCoveragePerShift: MAX_SHIFT_COVERAGE_PER_DAY,
-    })
+      const slotValidation = summarizeShiftSlotViolations({
+        cycleDates,
+        assignments: ((shiftCoverageData ?? []) as ShiftPublishValidationRow[]).map((row) => ({
+          date: row.date,
+          shiftType: row.shift_type,
+          status: row.status,
+          role: row.role,
+          therapistId: row.user_id,
+          therapistName: getOne(row.profiles)?.full_name ?? 'Unknown',
+          isLeadEligible: Boolean(getOne(row.profiles)?.is_lead_eligible),
+        })),
+        minCoveragePerShift: MIN_SHIFT_COVERAGE_PER_DAY,
+        maxCoveragePerShift: MAX_SHIFT_COVERAGE_PER_DAY,
+      })
 
-    if (slotValidation.violations > 0) {
-      redirect(
-        buildReturnUrl(cycleId, {
-          ...viewParams,
-          error: 'publish_shift_rule_violation',
-          under_coverage: String(slotValidation.underCoverage),
-          over_coverage: String(slotValidation.overCoverage),
-          lead_missing: String(slotValidation.missingLead),
-          lead_multiple: String(slotValidation.multipleLeads),
-          lead_ineligible: String(slotValidation.ineligibleLead),
-        })
-      )
+      if (slotValidation.violations > 0) {
+        redirect(
+          buildReturnUrl(cycleId, {
+            ...viewParams,
+            error: 'publish_shift_rule_violation',
+            under_coverage: String(slotValidation.underCoverage),
+            over_coverage: String(slotValidation.overCoverage),
+            lead_missing: String(slotValidation.missingLead),
+            lead_multiple: String(slotValidation.multipleLeads),
+            lead_ineligible: String(slotValidation.ineligibleLead),
+          })
+        )
+      }
     }
   }
 
