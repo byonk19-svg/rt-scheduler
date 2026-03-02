@@ -1,7 +1,20 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
+import {
+  Calendar,
+  CheckCircle2,
+  ClipboardList,
+  FileText,
+  Moon,
+  Rocket,
+  SquareCheckBig,
+  Sun,
+  Users,
+  XCircle,
+} from 'lucide-react'
 
 import type { Cycle, ShiftRole, ShiftStatus } from '@/app/schedule/types'
 import { can } from '@/lib/auth/can'
@@ -454,18 +467,8 @@ export default function ManagerDashboardPage() {
       <div className="fade-up" style={{ marginBottom: 28 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <div>
-            <h1
-              style={{
-                fontSize: 26,
-                fontWeight: 800,
-                color: '#0f172a',
-                letterSpacing: '-0.02em',
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
-              }}
-            >
-              Manager Dashboard
-            </h1>
-            <p style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
+            <h1 className="app-page-title">Manager Dashboard</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
               Welcome, {d.managerName}. Build coverage first, then publish confidently.
             </p>
           </div>
@@ -549,7 +552,11 @@ export default function ManagerDashboardPage() {
         }}
       >
         <Card>
-          <CardHeader icon="📋" title="Coverage" subtitle="Resolve gaps before publishing" />
+          <CardHeader
+            icon={<ClipboardList className="h-4 w-4 text-muted-foreground" />}
+            title="Coverage"
+            subtitle="Resolve gaps before publishing"
+          />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '14px 0' }}>
             <IssueRow label="Missing lead" value={d.missingLead} type="error" />
             <IssueRow label="Under coverage" value={d.underCoverage} type="warn" />
@@ -561,7 +568,11 @@ export default function ManagerDashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader icon="🚀" title="Publish" subtitle="Checklist must be clear to publish" />
+          <CardHeader
+            icon={<Rocket className="h-4 w-4 text-muted-foreground" />}
+            title="Publish"
+            subtitle="Checklist must be clear to publish"
+          />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '14px 0' }}>
             <CheckRow
               label="Approvals"
@@ -587,7 +598,11 @@ export default function ManagerDashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader icon="✅" title="Approvals" subtitle="Swap and pickup requests" />
+          <CardHeader
+            icon={<SquareCheckBig className="h-4 w-4 text-muted-foreground" />}
+            title="Approvals"
+            subtitle="Swap and pickup requests"
+          />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '14px 0' }}>
             <CheckRow
               label="Pending"
@@ -608,15 +623,13 @@ export default function ManagerDashboardPage() {
         style={{
           animationDelay: '0.15s',
           background: '#fff',
-          border: '1px solid #e5e7eb',
+          border: '1px solid var(--border)',
           borderRadius: 10,
           padding: '18px 20px',
           marginBottom: 24,
         }}
       >
-        <p style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>
-          Cycle progress
-        </p>
+        <p className="mb-3 text-sm font-semibold text-foreground">Cycle progress</p>
         <FillRateBar
           scheduled={loading ? null : data.scheduledSlots}
           total={loading ? null : data.totalSlots}
@@ -625,9 +638,13 @@ export default function ManagerDashboardPage() {
           <SmallTile
             label="Slots scheduled"
             value={loading ? '—' : `${String(d.scheduledSlots)} / ${String(d.totalSlots)}`}
-            icon="📅"
+            icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
           />
-          <SmallTile label="Therapists on cycle" value={d.therapistsScheduled} icon="🧑‍⚕️" />
+          <SmallTile
+            label="Therapists on cycle"
+            value={d.therapistsScheduled}
+            icon={<Users className="h-4 w-4 text-muted-foreground" />}
+          />
         </div>
       </div>
 
@@ -636,7 +653,7 @@ export default function ManagerDashboardPage() {
         style={{
           animationDelay: '0.2s',
           background: '#fff',
-          border: '1px solid #e5e7eb',
+          border: '1px solid var(--border)',
           borderRadius: 10,
           padding: '18px 20px',
           marginBottom: 24,
@@ -650,8 +667,8 @@ export default function ManagerDashboardPage() {
             marginBottom: 12,
           }}
         >
-          <p style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>Workload distribution</p>
-          <span style={{ fontSize: 11, color: '#64748b' }}>shifts this cycle · per therapist</span>
+          <p className="text-sm font-semibold text-foreground">Workload distribution</p>
+          <span className="text-xs text-muted-foreground">shifts this cycle · per therapist</span>
         </div>
         {loading ? (
           <p style={{ fontSize: 12, color: '#64748b' }}>—</p>
@@ -671,7 +688,7 @@ export default function ManagerDashboardPage() {
         style={{
           animationDelay: '0.25s',
           background: '#fff',
-          border: '1px solid #e5e7eb',
+          border: '1px solid var(--border)',
           borderRadius: 10,
           padding: '18px 20px',
         }}
@@ -685,42 +702,66 @@ export default function ManagerDashboardPage() {
           }}
         >
           <div>
-            <p style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>Team summary</p>
-            <p style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+            <p className="text-sm font-semibold text-foreground">Team summary</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
               Directory management on the Team page.
             </p>
           </div>
           <GhostButton onClick={() => router.push(teamRoute)}>Manage team</GhostButton>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-          {[
-            { label: 'Active employees', value: d.activeEmployees, icon: '👥' },
-            { label: 'Day shift', value: d.dayShift, icon: '☀️' },
-            { label: 'Night shift', value: d.nightShift, icon: '🌙' },
-            { label: 'On FMLA', value: d.onFmla, icon: '📋' },
-          ].map(({ label, value, icon }) => (
+          {(
+            [
+              {
+                label: 'Active employees',
+                value: d.activeEmployees,
+                icon: <Users className="h-4 w-4 text-muted-foreground" />,
+              },
+              {
+                label: 'Day shift',
+                value: d.dayShift,
+                icon: <Sun className="h-4 w-4 text-muted-foreground" />,
+              },
+              {
+                label: 'Night shift',
+                value: d.nightShift,
+                icon: <Moon className="h-4 w-4 text-muted-foreground" />,
+              },
+              {
+                label: 'On FMLA',
+                value: d.onFmla,
+                icon: <FileText className="h-4 w-4 text-muted-foreground" />,
+              },
+            ] as { label: string; value: string | number; icon: ReactNode }[]
+          ).map(({ label, value, icon }) => (
             <div
               key={label}
               style={{
-                background: '#f8fafc',
+                background: 'var(--muted)',
                 borderRadius: 8,
                 padding: '12px 14px',
-                border: '1px solid #f1f5f9',
+                border: '1px solid var(--border)',
               }}
             >
-              <div style={{ fontSize: 18, marginBottom: 6 }}>{icon}</div>
+              <div style={{ marginBottom: 6 }}>{icon}</div>
               <div
                 style={{
                   fontSize: 22,
-                  fontWeight: 800,
-                  color: '#0f172a',
+                  fontWeight: 700,
+                  color: 'var(--foreground)',
                   lineHeight: 1,
-                  fontFamily: "'Plus Jakarta Sans', sans-serif",
                 }}
               >
                 {value}
               </div>
-              <div style={{ fontSize: 11, color: '#64748b', marginTop: 3, fontWeight: 500 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: 'var(--muted-foreground)',
+                  marginTop: 3,
+                  fontWeight: 500,
+                }}
+              >
                 {label}
               </div>
             </div>
@@ -736,7 +777,7 @@ function Card({ children }: { children: React.ReactNode }) {
     <div
       style={{
         background: '#fff',
-        border: '1px solid #e5e7eb',
+        border: '1px solid var(--border)',
         borderRadius: 10,
         padding: '18px 20px',
         display: 'flex',
@@ -748,7 +789,15 @@ function Card({ children }: { children: React.ReactNode }) {
   )
 }
 
-function CardHeader({ icon, title, subtitle }: { icon: string; title: string; subtitle: string }) {
+function CardHeader({
+  icon,
+  title,
+  subtitle,
+}: {
+  icon: ReactNode
+  title: string
+  subtitle: string
+}) {
   return (
     <div
       style={{
@@ -756,7 +805,7 @@ function CardHeader({ icon, title, subtitle }: { icon: string; title: string; su
         alignItems: 'center',
         gap: 10,
         paddingBottom: 12,
-        borderBottom: '1px solid #f1f5f9',
+        borderBottom: '1px solid var(--border)',
       }}
     >
       <div
@@ -789,15 +838,21 @@ function Stat({ label, value, color }: { label: string; value: string | number; 
       <span
         style={{
           fontSize: 22,
-          fontWeight: 800,
+          fontWeight: 700,
           color,
           lineHeight: 1,
-          fontFamily: "'Plus Jakarta Sans', sans-serif",
         }}
       >
         {value}
       </span>
-      <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500, whiteSpace: 'nowrap' }}>
+      <span
+        style={{
+          fontSize: 11,
+          color: 'var(--muted-foreground)',
+          fontWeight: 500,
+          whiteSpace: 'nowrap',
+        }}
+      >
         {label}
       </span>
     </div>
@@ -833,11 +888,11 @@ function IssueRow({
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '7px 10px',
-        background: '#f8fafc',
+        background: 'var(--muted)',
         borderRadius: 7,
       }}
     >
-      <span style={{ fontSize: 12, color: '#374151', fontWeight: 500 }}>{label}</span>
+      <span style={{ fontSize: 12, color: 'var(--foreground)', fontWeight: 500 }}>{label}</span>
       <span
         style={{
           fontSize: 12,
@@ -872,12 +927,18 @@ function CheckRow({
         alignItems: 'center',
         gap: 8,
         padding: '7px 10px',
-        background: '#f8fafc',
+        background: 'var(--muted)',
         borderRadius: 7,
       }}
     >
-      <span style={{ fontSize: 13, flexShrink: 0 }}>{isOk ? '✅' : '❌'}</span>
-      <span style={{ fontSize: 12, fontWeight: 600, color: '#374151', minWidth: 70 }}>{label}</span>
+      {isOk ? (
+        <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-[var(--success-text)]" />
+      ) : (
+        <XCircle className="h-4 w-4 flex-shrink-0 text-[var(--error-text)]" />
+      )}
+      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--foreground)', minWidth: 70 }}>
+        {label}
+      </span>
       <span
         style={{
           fontSize: 11,
@@ -1051,30 +1112,33 @@ function SmallTile({
 }: {
   label: string
   value: string | number
-  icon: string
+  icon: ReactNode
 }) {
   return (
     <div
       style={{
-        background: '#f8fafc',
+        background: 'var(--muted)',
         borderRadius: 8,
         padding: '12px 14px',
-        border: '1px solid #f1f5f9',
+        border: '1px solid var(--border)',
       }}
     >
-      <div style={{ fontSize: 16, marginBottom: 4 }}>{icon}</div>
+      <div style={{ marginBottom: 4 }}>{icon}</div>
       <div
         style={{
           fontSize: 18,
-          fontWeight: 800,
-          color: '#0f172a',
+          fontWeight: 700,
+          color: 'var(--foreground)',
           lineHeight: 1,
-          fontFamily: "'Plus Jakarta Sans', sans-serif",
         }}
       >
         {value}
       </div>
-      <div style={{ fontSize: 11, color: '#64748b', marginTop: 3, fontWeight: 500 }}>{label}</div>
+      <div
+        style={{ fontSize: 11, color: 'var(--muted-foreground)', marginTop: 3, fontWeight: 500 }}
+      >
+        {label}
+      </div>
     </div>
   )
 }
