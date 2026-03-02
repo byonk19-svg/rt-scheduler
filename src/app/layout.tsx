@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { DM_Sans, Plus_Jakarta_Sans } from 'next/font/google'
+import { Suspense } from 'react'
 import { AppShell, type AppShellPublishCta, type AppShellUser } from '@/components/AppShell'
 import { can } from '@/lib/auth/can'
 import { parseRole, toUiRole } from '@/lib/auth/roles'
@@ -71,9 +72,11 @@ export default async function RootLayout({
   return (
     <html lang="en" className={plusJakarta.variable}>
       <body className={`${dmSans.className} antialiased`}>
-        <AppShell user={appShellUser} publishCta={appShellPublishCta}>
-          {children}
-        </AppShell>
+        <Suspense fallback={children}>
+          <AppShell user={appShellUser} publishCta={appShellPublishCta}>
+            {children}
+          </AppShell>
+        </Suspense>
       </body>
     </html>
   )

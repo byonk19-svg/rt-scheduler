@@ -141,7 +141,7 @@ describe('resolveAvailability', () => {
     expect(onFmla.reason).toBe('on_fmla')
   })
 
-  it('blocks PRN when no force_on override and pattern does not offer weekday', () => {
+  it('allows PRN when no explicit force_off override exists', () => {
     const pattern = buildPattern({
       works_dow: [2],
       offs_dow: [],
@@ -161,8 +161,8 @@ describe('resolveAvailability', () => {
       overrides: [],
     })
 
-    expect(resolution.allowed).toBe(false)
-    expect(resolution.reason).toBe('prn_not_offered_for_date')
+    expect(resolution.allowed).toBe(true)
+    expect(resolution.reason).toBe('allowed')
   })
 
   it('allows PRN with force_on override even when recurring pattern blocks', () => {

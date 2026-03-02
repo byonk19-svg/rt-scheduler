@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 import {
@@ -20,7 +20,16 @@ import {
   persistCoverageShiftStatus,
   unassignCoverageShift,
 } from '@/lib/coverage/mutations'
-import { flatten, type DayItem, type ShiftItem, type ShiftTab, type UiStatus } from '@/lib/coverage/selectors'
+import {
+  buildDayItems,
+  flatten,
+  toUiStatus,
+  type BuildDayRowInput,
+  type DayItem,
+  type ShiftItem,
+  type ShiftTab,
+  type UiStatus,
+} from '@/lib/coverage/selectors'
 import { addDays, dateRange, formatDateLabel, formatMonthLabel, toIsoDate } from '@/lib/calendar-utils'
 import { getOne, getScheduleFeedback, getWeekBoundsForDate } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/client'
@@ -30,7 +39,14 @@ import type { ScheduleSearchParams } from '@/app/schedule/types'
 type DayStatus = DayItem['dayStatus']
 
 type CycleRow = { id: string; label: string; start_date: string; end_date: string; published: boolean }
-type TherapistOption = { id: string; full_name: string; shift_type: 'day' | 'night'; isLeadEligible: boolean }
+type TherapistOption = {
+  id: string
+  full_name: string
+  shift_type: 'day' | 'night'
+  isLeadEligible: boolean
+  employment_type: string | null
+  max_work_days_per_week: number | null
+}
 type PrintTherapist = {
   id: string
   full_name: string
@@ -61,21 +77,11 @@ const SHIFT_STATUS_LABELS: Record<UiStatus, string> = {
 }
 const NO_ELIGIBLE_CONSTRAINT_REASON = 'no_eligible_candidates_due_to_constraints'
 
-function toUiStatus(assignment: AssignmentStatus | null, status: ShiftStatus): UiStatus {
-  if (assignment === 'on_call') return 'oncall'
-  if (assignment === 'left_early') return 'leave_early'
-  if (assignment === 'call_in' || assignment === 'cancelled') return 'cancelled'
-  if (assignment === 'scheduled') return 'active'
-  if (status === 'on_call') return 'oncall'
-  if (status === 'sick' || status === 'called_off') return 'cancelled'
-  return 'active'
-}
-
 function timestamp(): string {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-export default function CoveragePage() {
+function CoveragePageContent() {
   const search = useSearchParams()
   const cycleFromUrl = search.get('cycle')
   const successParam = search.get('success')
@@ -105,6 +111,7 @@ export default function CoveragePage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [expandedShiftId, setExpandedShiftId] = useState<string | null>(null)
   const [error, setError] = useState<string>('')
+  const [assignError, setAssignError] = useState<string>('')
   const days = shiftTab === 'Day' ? dayDays : nightDays
   const setDays = shiftTab === 'Day' ? setDayDays : setNightDays
   const scheduleFeedbackParams = useMemo<ScheduleSearchParams>(
@@ -141,9 +148,10 @@ export default function CoveragePage() {
     if (!autoParam && !draftParam) return null
     return getScheduleFeedback(scheduleFeedbackParams)
   }, [autoParam, draftParam, scheduleFeedbackParams])
-  const publishedScheduleHref = activeCycleId
+  const weekRosterHref = activeCycleId
     ? `/schedule?cycle=${activeCycleId}&view=week`
     : '/schedule?view=week'
+  const publishHistoryHref = '/publish'
   const cycleRangeLabel = useMemo(() => {
     if (!printCycle) return 'Current 6-week window'
     return `${formatDateLabel(printCycle.start_date)} to ${formatDateLabel(printCycle.end_date)}`
@@ -311,59 +319,19 @@ export default function CoveragePage() {
           setPrintShiftByUserDate(nextShiftByUserDate)
         }
 
-        const mapByShiftType = (shiftType: ShiftRow['shift_type']): DayItem[] => {
-          const byDate = new Map<string, AssignedShiftRow[]>()
-          for (const row of assignmentRows) {
-            if (row.shift_type !== shiftType) continue
-            const bucket = byDate.get(row.date) ?? []
-            bucket.push(row)
-            byDate.set(row.date, bucket)
-          }
+        const resolvedRows: BuildDayRowInput[] = assignmentRows.map((row) => ({
+          id: row.id,
+          user_id: row.user_id,
+          date: row.date,
+          shift_type: row.shift_type,
+          role: row.role,
+          status: row.status,
+          assignment_status: row.assignment_status,
+          name: getOne(row.profiles)?.full_name ?? 'Unknown',
+        }))
 
-          return dateRange(cycleStartDate, cycleEndDate).map((isoDate) => {
-            const slot = (byDate.get(isoDate) ?? []).slice().sort((a, b) => {
-              if (a.role !== b.role) return a.role === 'lead' ? -1 : 1
-              return (getOne(a.profiles)?.full_name ?? '').localeCompare(getOne(b.profiles)?.full_name ?? '')
-            })
-            const lead = slot.find((row) => row.role === 'lead') ?? null
-            const leadShift =
-              lead === null
-                ? null
-                : {
-                    id: lead.id,
-                    userId: lead.user_id,
-                    name: getOne(lead.profiles)?.full_name ?? 'Unknown',
-                    status: toUiStatus(lead.assignment_status, lead.status),
-                    log: [],
-                  }
-            const staffShifts = slot
-              .filter((row) => row.id !== lead?.id)
-              .map((row) => ({
-                id: row.id,
-                userId: row.user_id,
-                name: getOne(row.profiles)?.full_name ?? 'Unknown',
-                status: toUiStatus(row.assignment_status, row.status),
-                log: [],
-              }))
-            const hasOverride = slot.some((row) => row.status === 'called_off')
-            const hasDraft = slot.some((row) => row.status === 'sick')
-            const dayStatus: DayStatus = !leadShift ? 'missing_lead' : hasOverride ? 'override' : hasDraft ? 'draft' : 'published'
-            const date = new Date(`${isoDate}T00:00:00`)
-            return {
-              id: isoDate,
-              isoDate,
-              date: date.getDate(),
-              label: date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-              dayStatus,
-              constraintBlocked: constraintBlockedSlotKeys.has(`${isoDate}:${shiftType}`),
-              leadShift,
-              staffShifts,
-            } satisfies DayItem
-          })
-        }
-
-        setDayDays(mapByShiftType('day'))
-        setNightDays(mapByShiftType('night'))
+        setDayDays(buildDayItems('day', resolvedRows, cycleStartDate, cycleEndDate, constraintBlockedSlotKeys))
+        setNightDays(buildDayItems('night', resolvedRows, cycleStartDate, cycleEndDate, constraintBlockedSlotKeys))
       } catch (loadError) {
         console.error('Could not load coverage calendar data:', loadError)
         setError('Could not load coverage schedule.')
@@ -393,7 +361,7 @@ export default function CoveragePage() {
     void (async () => {
       const { data, error: loadError } = await supabase
         .from('profiles')
-        .select('id, full_name, shift_type, is_lead_eligible')
+        .select('id, full_name, shift_type, is_lead_eligible, employment_type, max_work_days_per_week')
         .eq('shift_type', shiftType)
         .eq('is_active', true)
         .eq('on_fmla', false)
@@ -407,9 +375,23 @@ export default function CoveragePage() {
         return
       }
       setAllTherapists(
-        ((data ?? []) as Array<{ id: string; full_name: string; shift_type: 'day' | 'night'; is_lead_eligible: boolean | null }>).map(
-          (row) => ({ id: row.id, full_name: row.full_name, shift_type: row.shift_type, isLeadEligible: row.is_lead_eligible ?? false })
-        )
+        (
+          (data ?? []) as Array<{
+            id: string
+            full_name: string
+            shift_type: 'day' | 'night'
+            is_lead_eligible: boolean | null
+            employment_type: string | null
+            max_work_days_per_week: number | null
+          }>
+        ).map((row) => ({
+          id: row.id,
+          full_name: row.full_name,
+          shift_type: row.shift_type,
+          isLeadEligible: row.is_lead_eligible ?? false,
+          employment_type: row.employment_type ?? null,
+          max_work_days_per_week: row.max_work_days_per_week ?? null,
+        }))
       )
     })()
 
@@ -445,7 +427,7 @@ export default function CoveragePage() {
   )
 
   // Compute how many shifts each therapist is working in the week that contains the selected day.
-  // Used in the assign dropdown so managers can avoid overscheduling.
+  // Used in the assign dropdown so managers can avoid overscheduling within a single week.
   const weeklyTherapistCounts = useMemo((): Map<string, number> => {
     if (!selectedId) return new Map()
     const bounds = getWeekBoundsForDate(selectedId)
@@ -462,17 +444,32 @@ export default function CoveragePage() {
     return counts
   }, [selectedId, dayDays, nightDays])
 
+  // Compute total shifts per therapist across the entire loaded cycle.
+  // Combined with weeklyTherapistCounts this gives managers a full load picture.
+  const cycleTherapistCounts = useMemo((): Map<string, number> => {
+    const counts = new Map<string, number>()
+    for (const item of [...dayDays, ...nightDays]) {
+      const shifts = [...(item.leadShift ? [item.leadShift] : []), ...item.staffShifts]
+      for (const shift of shifts) {
+        counts.set(shift.userId, (counts.get(shift.userId) ?? 0) + 1)
+      }
+    }
+    return counts
+  }, [dayDays, nightDays])
+
   const handleTabSwitch = (tab: ShiftTab) => {
     setShiftTab(tab)
     setExpandedShiftId(null)
     setSelectedId(null)
     setAssignRole('staff')
+    setAssignError('')
   }
 
   const handleSelect = (id: string) => {
     setExpandedShiftId(null)
     setSelectedId((prev) => (prev === id ? null : id))
     setAssignRole('staff')
+    setAssignError('')
   }
   const handleClose = () => {
     setExpandedShiftId(null)
@@ -482,6 +479,7 @@ export default function CoveragePage() {
     setAssigned(false)
     setAssigning(false)
     setAssignRole('staff')
+    setAssignError('')
   }
 
   const handleAssign = useCallback(async () => {
@@ -506,14 +504,15 @@ export default function CoveragePage() {
     if (insertError || !inserted) {
       console.error('Assign failed:', insertError)
       if (insertError?.code === '23505') {
-        window.alert(`${selectedTherapist?.full_name ?? 'This therapist'} is already assigned on this day.`)
+        setAssignError(`${selectedTherapist?.full_name ?? 'This therapist'} is already assigned on this day.`)
       } else {
-        window.alert('Could not assign therapist. Please try again.')
+        setAssignError('Could not assign therapist. Please try again.')
       }
       setAssigning(false)
       return
     }
 
+    setAssignError('')
     const insertedRow = inserted as {
       id: string
       user_id: string
@@ -687,9 +686,6 @@ export default function CoveragePage() {
       setDays(previousDays)
       setError('Could not unassign therapist. Changes were rolled back.')
       setUnassigningShiftId(null)
-      if (typeof window !== 'undefined') {
-        window.alert('Could not unassign therapist. Please try again.')
-      }
     },
     [days, setDays, supabase, unassigningShiftId]
   )
@@ -710,6 +706,18 @@ export default function CoveragePage() {
             >
               Print schedule
             </button>
+            <Link
+              href={weekRosterHref}
+              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
+            >
+              Week roster
+            </Link>
+            <Link
+              href={publishHistoryHref}
+              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
+            >
+              Publish history
+            </Link>
             <form action={generateDraftScheduleAction}>
               <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
               <input type="hidden" name="view" value="week" />
@@ -741,7 +749,25 @@ export default function CoveragePage() {
               <input type="hidden" name="view" value="week" />
               <input type="hidden" name="show_unavailable" value="false" />
               <input type="hidden" name="currently_published" value={activeCyclePublished ? 'true' : 'false'} />
+              <input type="hidden" name="override_weekly_rules" value="true" />
+              <input type="hidden" name="override_shift_rules" value="true" />
+              <input type="hidden" name="return_to" value="coverage" />
+              <button
+                type="submit"
+                disabled={!activeCycleId || activeCyclePublished}
+                className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 disabled:opacity-60"
+                title="Bypass weekly and coverage/lead publish guardrails for this publish."
+              >
+                Publish w/ full override
+              </button>
+            </form>
+            <form action={toggleCyclePublishedAction}>
+              <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+              <input type="hidden" name="view" value="week" />
+              <input type="hidden" name="show_unavailable" value="false" />
+              <input type="hidden" name="currently_published" value={activeCyclePublished ? 'true' : 'false'} />
               <input type="hidden" name="override_weekly_rules" value="false" />
+              <input type="hidden" name="override_shift_rules" value="false" />
               <input type="hidden" name="return_to" value="coverage" />
               <button
                 type="submit"
@@ -760,7 +786,7 @@ export default function CoveragePage() {
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <Link
-                href={publishedScheduleHref}
+                href={weekRosterHref}
                 className="rounded-md border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
               >
                 View published schedule
@@ -836,10 +862,18 @@ export default function CoveragePage() {
         expandedShiftId={expandedShiftId}
         unassigningShiftId={unassigningShiftId}
         weeklyTherapistCounts={weeklyTherapistCounts}
+        cycleTherapistCounts={cycleTherapistCounts}
         onClose={handleClose}
         onAssignSubmit={handleAssign}
-        onAssignUserIdChange={setAssignUserId}
-        onAssignRoleChange={setAssignRole}
+        assignError={assignError}
+        onAssignUserIdChange={(value) => {
+          setAssignUserId(value)
+          setAssignError('')
+        }}
+        onAssignRoleChange={(role) => {
+          setAssignRole(role)
+          setAssignError('')
+        }}
         onToggleExpanded={(shiftId) =>
           setExpandedShiftId((previous) => (previous === shiftId ? null : shiftId))
         }
@@ -856,5 +890,13 @@ export default function CoveragePage() {
         isManager
       />
     </div>
+  )
+}
+
+export default function CoveragePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <CoveragePageContent />
+    </Suspense>
   )
 }

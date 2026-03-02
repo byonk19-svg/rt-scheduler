@@ -89,6 +89,28 @@ Optional auth flow test uses:
 - `E2E_USER_EMAIL`
 - `E2E_USER_PASSWORD`
 
+## Publish Email Rollout
+
+Required env vars for publish queue + delivery:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `NEXT_PUBLIC_APP_URL`
+- `RESEND_API_KEY`
+- `PUBLISH_EMAIL_FROM`
+- optional `PUBLISH_WORKER_KEY` (for cron/webhook key auth)
+
+Run readiness check:
+
+```bash
+npm run verify:publish
+```
+
+If you only want in-app publish without email delivery, run:
+
+```bash
+npm run verify:publish -- --allow-no-email
+```
+
 ## CI (GitHub Actions)
 
 Workflow: `.github/workflows/ci.yml`

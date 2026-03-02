@@ -55,6 +55,25 @@ For optional authenticated e2e test:
 - `E2E_USER_EMAIL`
 - `E2E_USER_PASSWORD`
 
+For publish history + async email delivery:
+
+- `NEXT_PUBLIC_APP_URL`
+- `RESEND_API_KEY`
+- `PUBLISH_EMAIL_FROM`
+- optional `PUBLISH_WORKER_KEY` (key auth for cron/webhook caller)
+
+Validate publish rollout readiness:
+
+```bash
+npm run verify:publish
+```
+
+If email delivery is intentionally disabled and you only want in-app publishing:
+
+```bash
+npm run verify:publish -- --allow-no-email
+```
+
 ## Demo Seed Data
 
 Run:

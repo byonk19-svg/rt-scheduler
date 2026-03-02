@@ -15,7 +15,7 @@ export function PublishEmailKickoff({ publishEventId, enabled }: PublishEmailKic
     void fetch('/api/publish/process', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ publish_event_id: publishEventId, batch_size: 25 }),
+      body: JSON.stringify({ publish_event_id: publishEventId, batch_size: 10 }),
     }).catch((error) => {
       console.error('Failed to kick off publish email delivery:', error)
     })

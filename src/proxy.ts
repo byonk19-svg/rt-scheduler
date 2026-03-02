@@ -45,6 +45,17 @@ export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const pathWithQuery = `${pathname}${request.nextUrl.search}`
 
+  // Allow key-authenticated publish worker calls to bypass session auth middleware.
+  if (matchesRoute(pathname, '/api/publish/process')) {
+    const workerKeyHeader = request.headers.get('x-publish-worker-key')
+    const expectedWorkerKey = process.env.PUBLISH_WORKER_KEY
+    if (expectedWorkerKey && workerKeyHeader === expectedWorkerKey) {
+      return NextResponse.next({
+        request,
+      })
+    }
+  }
+
   if (isPublicRoute(pathname)) {
     return NextResponse.next({
       request,

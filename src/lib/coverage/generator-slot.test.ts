@@ -42,6 +42,10 @@ describe('fillCoverageSlot', () => {
         ['t-1', 3],
         ['t-2', 3],
       ]),
+      weeklyMinimumByTherapist: new Map([
+        ['t-1', 3],
+        ['t-2', 3],
+      ]),
       currentCoverage: 0,
       targetCoverage: 2,
       minCoverage: 1,
@@ -53,13 +57,11 @@ describe('fillCoverageSlot', () => {
     expect(result.unfilledReason).toBeNull()
   })
 
-  it('leaves slot unfilled and records reason when only disallowed therapists exist', () => {
+  it('leaves slot unfilled and records reason when no eligible therapists remain for the date', () => {
     const result = fillCoverageSlot({
       therapists: [
         therapist({
           id: 'blocked',
-          works_dow: [2],
-          works_dow_mode: 'hard',
         }),
       ],
       cursor: 0,
@@ -67,9 +69,10 @@ describe('fillCoverageSlot', () => {
       shiftType: 'day',
       cycleId: 'cycle-1',
       availabilityOverridesByTherapist: new Map<string, AvailabilityOverrideRow[]>(),
-      assignedUserIdsForDate: new Set<string>(),
+      assignedUserIdsForDate: new Set<string>(['blocked']),
       weeklyWorkedDatesByUserWeek: new Map<string, Set<string>>(),
       weeklyLimitByTherapist: new Map([['blocked', 3]]),
+      weeklyMinimumByTherapist: new Map([['blocked', 3]]),
       currentCoverage: 0,
       targetCoverage: 2,
       minCoverage: 1,

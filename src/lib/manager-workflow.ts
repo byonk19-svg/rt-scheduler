@@ -64,8 +64,8 @@ function getOne<T>(value: T | T[] | null | undefined): T | null {
   return value ?? null
 }
 
-function getLinks(activeCycle: CycleRow | null): DashboardLinks {
-  if (!activeCycle) {
+export function getManagerAttentionLinks(activeCycleId: string | null): DashboardLinks {
+  if (!activeCycleId) {
     return {
       approvals: MANAGER_WORKFLOW_LINKS.approvals,
       approvalsPending: '/approvals?status=pending',
@@ -79,7 +79,7 @@ function getLinks(activeCycle: CycleRow | null): DashboardLinks {
     }
   }
 
-  const cycleParam = `cycle=${activeCycle.id}`
+  const cycleParam = `cycle=${activeCycleId}`
   return {
     approvals: MANAGER_WORKFLOW_LINKS.approvals,
     approvalsPending: `/approvals?status=pending`,
@@ -89,7 +89,7 @@ function getLinks(activeCycle: CycleRow | null): DashboardLinks {
     coverageUnderCoverage: `/coverage?${cycleParam}&view=week&filter=under_coverage&focus=first`,
     coverageUnfilled: `/coverage?${cycleParam}&view=week&filter=unfilled&focus=first`,
     coverageNeedsAttention: `/coverage?${cycleParam}&view=week&filter=needs_attention&focus=first`,
-    publish: `/coverage?${cycleParam}&view=week`,
+    publish: `/schedule?${cycleParam}&view=week`,
   }
 }
 
@@ -110,7 +110,7 @@ export async function getManagerAttentionSnapshot(
     cycles[0] ??
     null
 
-  const links = getLinks(activeCycle)
+  const links = getManagerAttentionLinks(activeCycle?.id ?? null)
 
   const [pendingApprovalsResult, cycleShiftsResult] = await Promise.all([
     supabase.from('shift_posts').select('shift_id').eq('status', 'pending'),

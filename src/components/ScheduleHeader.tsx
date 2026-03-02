@@ -80,6 +80,7 @@ export function ScheduleHeader({
   const canManageSchedule = can(role, 'manage_schedule')
   const hasActiveCycle = Boolean(activeCycleId)
   const canPublish = hasActiveCycle && !activeCyclePublished
+  const managerCoverageMonthHref = activeCycleId ? `/coverage?cycle=${activeCycleId}` : '/coverage'
   const autoGenerateHelperMessage = !hasActiveCycle
     ? 'Select a cycle to auto-generate a draft.'
     : activeCyclePublished
@@ -145,13 +146,14 @@ export function ScheduleHeader({
                     />
                     <input type="hidden" name="currently_published" value="false" />
                     <input type="hidden" name="override_weekly_rules" value="true" />
+                    <input type="hidden" name="override_shift_rules" value="true" />
                     <FormMenuSubmitButton
                       type="submit"
                       className={menuActionClass}
                       disabled={!canPublish}
                       pendingText="Publishing..."
                     >
-                      Publish with overrides
+                      Publish with full override
                     </FormMenuSubmitButton>
                   </form>
                   <form action={toggleCyclePublishedAction}>
@@ -164,6 +166,7 @@ export function ScheduleHeader({
                     />
                     <input type="hidden" name="currently_published" value="false" />
                     <input type="hidden" name="override_weekly_rules" value="false" />
+                    <input type="hidden" name="override_shift_rules" value="false" />
                     <FormMenuSubmitButton
                       type="submit"
                       className={menuActionClass}
@@ -226,7 +229,11 @@ export function ScheduleHeader({
         </Link>
         {canViewMonth ? (
           <Link
-            href={buildScheduleUrl(activeCycleId, 'calendar')}
+            href={
+              canManageSchedule
+                ? managerCoverageMonthHref
+                : buildScheduleUrl(activeCycleId, 'calendar')
+            }
             className={tabClass(viewMode === 'calendar')}
           >
             Month
@@ -311,6 +318,7 @@ export function ScheduleHeader({
             />
             <input type="hidden" name="currently_published" value="false" />
             <input type="hidden" name="override_weekly_rules" value="false" />
+            <input type="hidden" name="override_shift_rules" value="false" />
 
             <div className="space-y-1">
               <label

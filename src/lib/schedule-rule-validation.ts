@@ -7,6 +7,7 @@ type PublishWeeklyInput = {
   cycleWeekDates: Map<string, Set<string>>
   weeklyWorkedDatesByUserWeek: Map<string, Set<string>>
   maxWorkDaysByTherapist: Map<string, number>
+  minWorkDaysByTherapist: Map<string, number>
 }
 
 type PublishWeeklyResult = {
@@ -82,6 +83,7 @@ export function summarizePublishWeeklyViolations({
   cycleWeekDates,
   weeklyWorkedDatesByUserWeek,
   maxWorkDaysByTherapist,
+  minWorkDaysByTherapist,
 }: PublishWeeklyInput): PublishWeeklyResult {
   let underCount = 0
   let overCount = 0
@@ -94,11 +96,10 @@ export function summarizePublishWeeklyViolations({
       )
     }
     const therapistMaxWorkDays = maxFromMap ?? MAX_WORK_DAYS_PER_WEEK
+    const therapistMinWorkDays = minWorkDaysByTherapist.get(therapistId) ?? 0
     for (const [weekStart, weekDatesInCycle] of cycleWeekDates) {
       const requiredDays = Math.min(therapistMaxWorkDays, weekDatesInCycle.size)
-      const workedDatesFromMap = weeklyWorkedDatesByUserWeek.get(
-        weeklyCountKey(therapistId, weekStart)
-      )
+      const workedDatesFromMap = weeklyWorkedDatesByUserWeek.get(weeklyCountKey(therapistId, weekStart))
       if (workedDatesFromMap === undefined && process.env.NODE_ENV !== 'production') {
         console.warn(
           `summarizePublishWeeklyViolations: no worked-dates entry for therapist ${therapistId} week ${weekStart}, assuming 0`
@@ -108,7 +109,7 @@ export function summarizePublishWeeklyViolations({
       const workedCount = workedDates.size
 
       if (workedCount < requiredDays) underCount += 1
-      if (workedCount > requiredDays) overCount += 1
+      if (workedCount > maxDays) overCount += 1
     }
   }
 

@@ -69,3 +69,27 @@ export function formatMonthLabel(value: string): string {
   if (Number.isNaN(parsed.getTime())) return value
   return parsed.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 }
+
+/** Returns the ISO date of the first day of the month containing `dateValue`. */
+export function toMonthStartKey(dateValue: string): string {
+  const parsed = new Date(`${dateValue}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return toIsoDate(new Date())
+  parsed.setDate(1)
+  return toIsoDate(parsed)
+}
+
+/** Returns the ISO date of the last day of the month whose first day is `monthStartKey`. */
+export function toMonthEndKey(monthStartKey: string): string {
+  const parsed = new Date(`${monthStartKey}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return monthStartKey
+  const monthEnd = new Date(parsed.getFullYear(), parsed.getMonth() + 1, 0)
+  return toIsoDate(monthEnd)
+}
+
+/** Shifts `monthStartKey` by `monthDelta` months and returns the resulting first-of-month ISO date. */
+export function shiftMonthKey(monthStartKey: string, monthDelta: number): string {
+  const parsed = new Date(`${monthStartKey}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return monthStartKey
+  const shifted = new Date(parsed.getFullYear(), parsed.getMonth() + monthDelta, 1)
+  return toIsoDate(shifted)
+}

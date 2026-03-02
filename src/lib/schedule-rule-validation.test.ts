@@ -57,6 +57,10 @@ describe('schedule rule validation', () => {
         ['t1', 3],
         ['t2', 3],
       ]),
+      minWorkDaysByTherapist: new Map([
+        ['t1', 3],
+        ['t2', 3],
+      ]),
     })
 
     expect(result).toEqual({

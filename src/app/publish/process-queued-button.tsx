@@ -18,7 +18,7 @@ export function ProcessQueuedButton({ publishEventId }: ProcessQueuedButtonProps
       const response = await fetch('/api/publish/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ publish_event_id: publishEventId, batch_size: 50 }),
+        body: JSON.stringify({ publish_event_id: publishEventId, batch_size: 20 }),
       })
 
       if (!response.ok) {

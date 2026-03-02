@@ -16,12 +16,19 @@ import {
   normalizeShiftType,
   type EmployeeDirectoryRecord,
 } from '@/lib/employee-directory'
+import { dateRange } from '@/lib/calendar-utils'
 import { createClient } from '@/lib/supabase/server'
 
 type DirectorySearchParams = {
   error?: string | string[]
   success?: string | string[]
   realigned?: string | string[]
+  override_count?: string | string[]
+  edit_profile?: string | string[]
+  focus?: string | string[]
+  override_cycle_id?: string | string[]
+  copied?: string | string[]
+  skipped?: string | string[]
 }
 
 type DirectoryProfileRow = {
@@ -90,6 +97,8 @@ type EmployeeCycleRecord = {
 }
 
 type ToastVariant = 'success' | 'error'
+type DirectoryDeleteOverrideActionState = { error: string; profileId: string } | null
+type DirectoryCopyShiftsActionState = { error: string; employeeId: string } | null
 
 function getSearchParam(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0]
@@ -153,7 +162,12 @@ function getDirectoryFeedback(params?: DirectorySearchParams): {
   const error = getSearchParam(params?.error)
   const success = getSearchParam(params?.success)
   const realigned = Number.parseInt(getSearchParam(params?.realigned) ?? '0', 10)
+  const overrideCountParam = Number.parseInt(getSearchParam(params?.override_count) ?? '0', 10)
   const realignedCount = Number.isFinite(realigned) && realigned >= 0 ? realigned : 0
+  const overrideCount =
+    Number.isFinite(overrideCountParam) && overrideCountParam >= 0 ? overrideCountParam : 0
+  const copiedCount = Number.parseInt(getSearchParam(params?.copied) ?? '0', 10)
+  const skippedCount = Number.parseInt(getSearchParam(params?.skipped) ?? '0', 10)
 
   if (error === 'missing_profile') {
     return { message: 'Select an employee first.', variant: 'error' }
@@ -226,11 +240,45 @@ function getDirectoryFeedback(params?: DirectorySearchParams): {
   }
 
   if (success === 'override_saved') {
+    if (overrideCount > 1) {
+      return {
+        message: `Saved ${overrideCount} date overrides.`,
+        variant: 'success',
+      }
+    }
     return { message: 'Date override saved.', variant: 'success' }
   }
 
   if (success === 'override_deleted') {
     return { message: 'Date override deleted.', variant: 'success' }
+  }
+
+  if (success === 'shifts_copied') {
+    const safeCount = Number.isFinite(copiedCount) && copiedCount >= 0 ? copiedCount : 0
+    const safeSkipped = Number.isFinite(skippedCount) && skippedCount >= 0 ? skippedCount : 0
+    const skippedNote = safeSkipped > 0 ? ` (${safeSkipped} already existed)` : ''
+    return {
+      message: `Copied ${safeCount} shift${safeCount === 1 ? '' : 's'} to new cycle.${skippedNote}`,
+      variant: 'success',
+    }
+  }
+
+  if (error === 'no_source_shifts') {
+    return {
+      message: 'No scheduled shifts found for this employee in the selected source cycle.',
+      variant: 'error',
+    }
+  }
+
+  if (error === 'copy_failed') {
+    return { message: 'Failed to copy shifts. Please try again.', variant: 'error' }
+  }
+
+  if (error === 'copy_invalid_params') {
+    return {
+      message: 'Invalid copy request — check that source and target cycles are different.',
+      variant: 'error',
+    }
   }
 
   return null
@@ -257,6 +305,30 @@ async function requireManager() {
   }
 
   return { supabase, managerId: user.id }
+}
+
+function buildDirectoryUrl(params: Record<string, string | undefined>): string {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (!value) continue
+    search.set(key, value)
+  }
+  const query = search.toString()
+  return query.length > 0 ? `/directory?${query}` : '/directory'
+}
+
+function getOpenAvailabilityParams(input: {
+  profileId: string
+  cycleId?: string
+}): Record<string, string> {
+  const params: Record<string, string> = {
+    edit_profile: input.profileId,
+    focus: 'availability',
+  }
+  if (input.cycleId) {
+    params.override_cycle_id = input.cycleId
+  }
+  return params
 }
 
 function isSaturdayDate(value: string): boolean {
@@ -474,13 +546,24 @@ async function setEmployeeActiveAction(formData: FormData) {
   redirect(`/directory?success=${setActive ? 'employee_reactivated' : 'employee_deactivated'}`)
 }
 
-async function saveEmployeeDateOverrideAction(formData: FormData) {
+async function saveEmployeeDateOverrideAction(
+  _prevState: { error: string } | null,
+  formData: FormData
+): Promise<{ error: string } | null> {
   'use server'
 
   const { supabase, managerId } = await requireManager()
   const profileId = String(formData.get('profile_id') ?? '').trim()
   const cycleId = String(formData.get('cycle_id') ?? '').trim()
   const date = String(formData.get('date') ?? '').trim()
+  const dates = Array.from(
+    new Set(
+      formData
+        .getAll('dates')
+        .map((value) => String(value ?? '').trim())
+        .filter((value) => value.length > 0)
+    )
+  )
   const shiftTypeRaw = String(formData.get('shift_type') ?? '').trim()
   const overrideTypeRaw = String(formData.get('override_type') ?? '').trim()
   const noteRaw = String(formData.get('note') ?? '').trim()
@@ -490,9 +573,13 @@ async function saveEmployeeDateOverrideAction(formData: FormData) {
       : ''
   const overrideType =
     overrideTypeRaw === 'force_off' || overrideTypeRaw === 'force_on' ? overrideTypeRaw : ''
+  const targetDates = Array.from(new Set([...dates, ...(date ? [date] : [])]))
+  const openAvailabilityParams = getOpenAvailabilityParams({ profileId, cycleId })
 
-  if (!profileId || !cycleId || !date || !shiftType || !overrideType) {
-    redirect('/directory?error=override_missing_fields')
+  if (!profileId || !cycleId || targetDates.length === 0 || !shiftType || !overrideType) {
+    return {
+      error: 'All fields are required. Select a cycle, override type, and at least one date.',
+    }
   }
 
   const { data: targetProfile, error: targetProfileError } = await supabase
@@ -503,7 +590,7 @@ async function saveEmployeeDateOverrideAction(formData: FormData) {
 
   if (targetProfileError || !targetProfile || targetProfile.role !== 'therapist') {
     console.error('Could not load therapist profile for date override update:', targetProfileError)
-    redirect('/directory?error=override_failed')
+    return { error: 'Therapist profile not found. Please close and reopen the drawer.' }
   }
 
   // Validate date is within the selected cycle's date range.
@@ -515,32 +602,42 @@ async function saveEmployeeDateOverrideAction(formData: FormData) {
 
   if (targetCycleError || !targetCycle) {
     console.error('Could not load cycle for date override validation:', targetCycleError)
-    redirect('/directory?error=override_failed')
+    return { error: 'Could not load the selected cycle. Please try again.' }
   }
 
-  if (date < targetCycle.start_date || date > targetCycle.end_date) {
-    redirect('/directory?error=override_date_out_of_range')
+  for (const targetDate of targetDates) {
+    if (targetDate < targetCycle.start_date || targetDate > targetCycle.end_date) {
+      return {
+        error:
+          'One or more selected dates are outside the chosen cycle. Please check your date selections.',
+      }
+    }
   }
 
-  const { error: overrideError } = await supabase.from('availability_overrides').upsert(
+  const upsertRows = targetDates.map((targetDate) =>
     buildManagerOverrideInput({
       cycleId,
       therapistId: profileId,
-      date,
+      date: targetDate,
       shiftType,
       overrideType,
       note: noteRaw,
       managerId,
-    }),
-    { onConflict: 'cycle_id,therapist_id,date,shift_type' }
+    })
   )
+
+  const { error: overrideError } = await supabase
+    .from('availability_overrides')
+    .upsert(upsertRows, { onConflict: 'cycle_id,therapist_id,date,shift_type' })
 
   if (overrideError) {
     if (isMissingAvailabilityOverridesSchema(overrideError)) {
-      redirect('/directory?error=override_schema_missing')
+      return {
+        error: 'Availability overrides feature is not yet set up. Run the pending migration.',
+      }
     }
     console.error('Failed to save employee date override:', overrideError)
-    redirect('/directory?error=override_failed')
+    return { error: 'Could not save override. Check for duplicate entries or contact support.' }
   }
 
   revalidatePath('/directory')
@@ -548,18 +645,32 @@ async function saveEmployeeDateOverrideAction(formData: FormData) {
   revalidatePath('/coverage')
   revalidatePath('/availability')
 
-  redirect('/directory?success=override_saved')
+  redirect(
+    buildDirectoryUrl({
+      success: 'override_saved',
+      override_count: String(targetDates.length),
+      ...openAvailabilityParams,
+    })
+  )
 }
 
-async function deleteEmployeeDateOverrideAction(formData: FormData) {
+async function deleteEmployeeDateOverrideAction(
+  _prevState: DirectoryDeleteOverrideActionState,
+  formData: FormData
+): Promise<DirectoryDeleteOverrideActionState> {
   'use server'
 
   const { supabase } = await requireManager()
   const overrideId = String(formData.get('override_id') ?? '').trim()
   const profileId = String(formData.get('profile_id') ?? '').trim()
+  const cycleId = String(formData.get('cycle_id') ?? '').trim()
+  const openAvailabilityParams = getOpenAvailabilityParams({ profileId, cycleId })
 
   if (!overrideId || !profileId) {
-    redirect('/directory?error=override_missing_fields')
+    return {
+      error: 'Could not delete override. Close and reopen the drawer, then try again.',
+      profileId,
+    }
   }
 
   const { error: deleteError } = await supabase
@@ -570,10 +681,13 @@ async function deleteEmployeeDateOverrideAction(formData: FormData) {
 
   if (deleteError) {
     if (isMissingAvailabilityOverridesSchema(deleteError)) {
-      redirect('/directory?error=override_schema_missing')
+      return {
+        error: 'Availability overrides feature is not yet set up. Run the pending migration.',
+        profileId,
+      }
     }
     console.error('Failed to delete employee date override:', deleteError)
-    redirect('/directory?error=override_delete_failed')
+    return { error: 'Could not delete date override. Please try again.', profileId }
   }
 
   revalidatePath('/directory')
@@ -581,7 +695,107 @@ async function deleteEmployeeDateOverrideAction(formData: FormData) {
   revalidatePath('/coverage')
   revalidatePath('/availability')
 
-  redirect('/directory?success=override_deleted')
+  redirect(buildDirectoryUrl({ success: 'override_deleted', ...openAvailabilityParams }))
+}
+
+async function copyEmployeeShiftsAction(
+  _prevState: DirectoryCopyShiftsActionState,
+  formData: FormData
+): Promise<DirectoryCopyShiftsActionState> {
+  'use server'
+
+  const { supabase } = await requireManager()
+  const employeeId = String(formData.get('employee_id') ?? '').trim()
+  const sourceCycleId = String(formData.get('source_cycle_id') ?? '').trim()
+  const targetCycleId = String(formData.get('target_cycle_id') ?? '').trim()
+
+  if (!employeeId || !sourceCycleId || !targetCycleId || sourceCycleId === targetCycleId) {
+    return {
+      error: 'Choose two different cycles before copying shifts.',
+      employeeId,
+    }
+  }
+
+  // Fetch both cycles
+  const { data: cycles } = await supabase
+    .from('schedule_cycles')
+    .select('id, start_date, end_date')
+    .in('id', [sourceCycleId, targetCycleId])
+  const sourceCycle = cycles?.find((c) => c.id === sourceCycleId)
+  const targetCycle = cycles?.find((c) => c.id === targetCycleId)
+  if (!sourceCycle || !targetCycle) {
+    return {
+      error: 'Could not load one of the selected cycles. Refresh and try again.',
+      employeeId,
+    }
+  }
+
+  // Fetch source shifts for this employee
+  const { data: sourceShifts } = await supabase
+    .from('shifts')
+    .select('date, shift_type, role')
+    .eq('cycle_id', sourceCycleId)
+    .eq('user_id', employeeId)
+    .eq('status', 'scheduled')
+    .is('unfilled_reason', null)
+
+  if (!sourceShifts || sourceShifts.length === 0) {
+    return {
+      error: 'No scheduled shifts were found in the source cycle for this therapist.',
+      employeeId,
+    }
+  }
+
+  // Build day-offset map (same pattern as createCycleAction)
+  const sourceDates = dateRange(sourceCycle.start_date, sourceCycle.end_date)
+  const targetDates = dateRange(targetCycle.start_date, targetCycle.end_date)
+  const sourceIndexByDate = new Map(sourceDates.map((d, i) => [d, i]))
+
+  const shiftsToInsert = sourceShifts.flatMap((shift) => {
+    const idx = sourceIndexByDate.get(shift.date)
+    if (idx === undefined) return []
+    const targetDate = targetDates[idx]
+    if (!targetDate) return [] // beyond target cycle end — silently skip
+    return [
+      {
+        cycle_id: targetCycleId,
+        user_id: employeeId,
+        date: targetDate,
+        shift_type: shift.shift_type as 'day' | 'night',
+        status: 'scheduled' as const,
+        role: shift.role as 'lead' | 'staff',
+      },
+    ]
+  })
+
+  if (shiftsToInsert.length === 0) {
+    return {
+      error: 'No matching source shifts could be copied into the selected target cycle.',
+      employeeId,
+    }
+  }
+
+  const { data: inserted, error } = await supabase
+    .from('shifts')
+    .upsert(shiftsToInsert, { onConflict: 'cycle_id,user_id,date', ignoreDuplicates: true })
+    .select('id')
+
+  if (error) {
+    console.error('Failed to copy employee shifts:', error)
+    return {
+      error: 'Failed to copy shifts. Please try again.',
+      employeeId,
+    }
+  }
+
+  revalidatePath('/coverage')
+  revalidatePath('/schedule')
+
+  const copied = String(inserted?.length ?? 0)
+  const skipped = String(shiftsToInsert.length - (inserted?.length ?? 0))
+  redirect(
+    buildDirectoryUrl({ success: 'shifts_copied', copied, skipped, edit_profile: employeeId })
+  )
 }
 
 export default async function TeamPage({
@@ -592,6 +806,9 @@ export default async function TeamPage({
   const { supabase } = await requireManager()
   const params = searchParams ? await searchParams : undefined
   const feedback = getDirectoryFeedback(params)
+  const initialEditEmployeeId = getSearchParam(params?.edit_profile) ?? null
+  const initialFocusAvailability = getSearchParam(params?.focus) === 'availability'
+  const initialOverrideCycleId = getSearchParam(params?.override_cycle_id) ?? null
 
   const { data, error } = await supabase
     .from('profiles')
@@ -729,10 +946,14 @@ export default async function TeamPage({
         employees={employees}
         cycles={cycles}
         dateOverrides={dateOverrides}
+        initialEditEmployeeId={initialEditEmployeeId}
+        initialFocusAvailability={initialFocusAvailability}
+        initialOverrideCycleId={initialOverrideCycleId}
         saveEmployeeAction={saveEmployeeAction}
         setEmployeeActiveAction={setEmployeeActiveAction}
         saveEmployeeDateOverrideAction={saveEmployeeDateOverrideAction}
         deleteEmployeeDateOverrideAction={deleteEmployeeDateOverrideAction}
+        copyEmployeeShiftsAction={copyEmployeeShiftsAction}
       />
     </div>
   )

@@ -356,7 +356,8 @@ export function pickTherapistForDate(
   cycleId: string,
   assignedUserIdsForDate: Set<string>,
   weeklyWorkedDatesByUserWeek: Map<string, Set<string>>,
-  weeklyLimitByTherapist: Map<string, number>
+  weeklyLimitByTherapist: Map<string, number>,
+  weeklyMinimumByTherapist: Map<string, number> = new Map()
 ): { therapist: Therapist | null; nextCursor: number } {
   if (therapists.length === 0) {
     return { therapist: null, nextCursor: cursor }
@@ -371,6 +372,7 @@ export function pickTherapistForDate(
   let best: {
     therapist: Therapist
     index: number
+    weeklyGap: number
     weeklyCount: number
     penalty: number
     offset: number
@@ -420,9 +422,7 @@ export function pickTherapistForDate(
       !best ||
       weeklyCount < best.weeklyCount ||
       (weeklyCount === best.weeklyCount && patternDecision.penalty < best.penalty) ||
-      (weeklyCount === best.weeklyCount &&
-        patternDecision.penalty === best.penalty &&
-        i < best.offset)
+      (weeklyCount === best.weeklyCount && patternDecision.penalty === best.penalty && i < best.offset)
     ) {
       best = { therapist, index, weeklyCount, penalty: patternDecision.penalty, offset: i }
     }
