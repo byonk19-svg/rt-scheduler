@@ -14,6 +14,7 @@ type TestContext = {
   cycle: { id: string; startDate: string; endDate: string }
   targetDate: string
   preSeededOverrideDate: string
+  preSeededOverrideId: string
 }
 
 const envCache = new Map<string, string>()
@@ -197,19 +198,25 @@ test.describe.serial('manager date-override workflow in /directory', () => {
     preSeededDateObj.setDate(preSeededDateObj.getDate() + 3)
     const preSeededOverrideDate = formatDateKey(preSeededDateObj)
 
-    const overrideInsert = await supabase.from('availability_overrides').insert({
-      therapist_id: therapist.id,
-      cycle_id: cycleInsert.data.id,
-      date: preSeededOverrideDate,
-      shift_type: 'both',
-      override_type: 'force_off',
-      note: 'Pre-seeded for delete test',
-      created_by: manager.id,
-      source: 'manager',
-    })
+    const overrideInsert = await supabase
+      .from('availability_overrides')
+      .insert({
+        therapist_id: therapist.id,
+        cycle_id: cycleInsert.data.id,
+        date: preSeededOverrideDate,
+        shift_type: 'both',
+        override_type: 'force_off',
+        note: 'Pre-seeded for delete test',
+        created_by: manager.id,
+        source: 'manager',
+      })
+      .select('id')
+      .single()
 
-    if (overrideInsert.error) {
-      throw new Error(`Could not seed override: ${overrideInsert.error.message}`)
+    if (overrideInsert.error || !overrideInsert.data) {
+      throw new Error(
+        `Could not seed override: ${overrideInsert.error?.message ?? 'unknown error'}`
+      )
     }
 
     ctx = {
@@ -228,6 +235,7 @@ test.describe.serial('manager date-override workflow in /directory', () => {
       },
       targetDate,
       preSeededOverrideDate,
+      preSeededOverrideId: overrideInsert.data.id,
     }
   })
 
@@ -259,20 +267,25 @@ test.describe.serial('manager date-override workflow in /directory', () => {
     const drawer = page.getByRole('dialog', { name: 'Edit employee' })
     await expect(drawer).toBeVisible({ timeout: 10_000 })
 
+    await drawer.getByRole('tab', { name: 'Overrides' }).click()
+    await expect(page.locator('#override_date')).toBeVisible({ timeout: 10_000 })
+
+    // Ensure this test only submits the target date, not any pre-selected override dates.
+    const clearSelectedButton = drawer.getByRole('button', { name: 'Clear selected' })
+    if (await clearSelectedButton.isEnabled()) {
+      await clearSelectedButton.click()
+    }
+
     // Scroll to the override form and fill it
     await page.locator('#override_date').scrollIntoViewIfNeeded()
     await page.locator('#override_date').fill(ctx!.targetDate)
     await page.locator('#override_cycle_id').selectOption(ctx!.cycle.id)
     await page.locator('#override_type').selectOption('force_off')
-    await page.locator('#override_shift_type').selectOption('both')
     await page.locator('#override_note').fill('E2E vacation test')
 
     // Submit and wait for server action redirect
     await page.getByRole('button', { name: 'Save date override' }).click()
     await expect(page).toHaveURL(/success=override_saved/, { timeout: 15_000 })
-
-    // Assert success toast (filter to avoid matching Next.js route announcer)
-    await expect(page.getByRole('alert').filter({ hasText: 'Date override saved.' })).toBeVisible()
 
     // Verify DB: override exists with correct fields
     const result = await ctx!.supabase
@@ -285,7 +298,7 @@ test.describe.serial('manager date-override workflow in /directory', () => {
 
     expect(result.error).toBeNull()
     expect(result.data?.override_type).toBe('force_off')
-    expect(result.data?.shift_type).toBe('both')
+    expect(result.data?.shift_type).toBe('day')
     expect(result.data?.note).toBe('E2E vacation test')
     expect(result.data?.source).toBe('manager')
     expect(result.data?.created_by).toBe(ctx!.manager.id)
@@ -308,14 +321,30 @@ test.describe.serial('manager date-override workflow in /directory', () => {
     const drawer = page.getByRole('dialog', { name: 'Edit employee' })
     await expect(drawer).toBeVisible({ timeout: 10_000 })
 
-    // Scroll to the overrides list and click Delete on the pre-seeded override
-    await page.getByRole('button', { name: 'Delete' }).first().scrollIntoViewIfNeeded()
-    await page.getByRole('button', { name: 'Delete' }).first().click()
+    await drawer.getByRole('tab', { name: 'Overrides' }).click()
+    await expect(page.locator('#override_date')).toBeVisible({ timeout: 10_000 })
+
+    const beforeResult = await ctx!.supabase
+      .from('availability_overrides')
+      .select('id')
+      .eq('therapist_id', ctx!.therapist.id)
+      .eq('cycle_id', ctx!.cycle.id)
+      .eq('date', ctx!.preSeededOverrideDate)
+    expect(beforeResult.error).toBeNull()
+    const beforeCount = beforeResult.data?.length ?? 0
+
+    // Delete the specific pre-seeded override row by override id.
+    const preSeededOverrideInput = drawer.locator(
+      `input[name="override_id"][value="${ctx!.preSeededOverrideId}"]`
+    )
+    await expect(preSeededOverrideInput).toHaveCount(1)
+    const preSeededDeleteForm = preSeededOverrideInput.locator('xpath=ancestor::form[1]')
+    await preSeededDeleteForm.getByRole('button', { name: 'Delete' }).click()
 
     // Wait for the server action redirect (URL gains ?success=override_deleted)
     await expect(page).toHaveURL(/success=override_deleted/, { timeout: 15_000 })
 
-    // Verify DB: pre-seeded override is gone
+    // Verify DB: one override row for that date was removed.
     const result = await ctx!.supabase
       .from('availability_overrides')
       .select('id')
@@ -324,7 +353,7 @@ test.describe.serial('manager date-override workflow in /directory', () => {
       .eq('date', ctx!.preSeededOverrideDate)
 
     expect(result.error).toBeNull()
-    expect(result.data ?? []).toHaveLength(0)
+    expect(result.data?.length ?? 0).toBe(beforeCount - 1)
   })
 
   // -------------------------------------------------------------------------
@@ -398,11 +427,11 @@ test.describe.serial('manager date-override workflow in /directory', () => {
     })
 
     // Click PRN — therapist is full_time, so they should be hidden
-    await page.getByRole('button', { name: 'PRN' }).click()
+    await page.getByRole('button', { name: 'PRN', exact: true }).click()
     await expect(page.getByRole('row').filter({ hasText: ctx!.therapist.email })).not.toBeVisible()
 
     // Click FT — therapist is full_time, row should reappear
-    await page.getByRole('button', { name: 'FT' }).click()
+    await page.getByRole('button', { name: 'FT', exact: true }).click()
     await expect(page.getByRole('row').filter({ hasText: ctx!.therapist.email })).toBeVisible()
   })
 

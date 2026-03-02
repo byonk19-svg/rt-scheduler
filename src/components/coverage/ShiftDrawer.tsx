@@ -170,6 +170,7 @@ export function ShiftDrawer({
                   type="button"
                   onClick={onClose}
                   aria-label="Close details panel"
+                  data-testid="coverage-drawer-close"
                   className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-lg text-slate-500 shadow-sm"
                 >
                   &times;
@@ -214,6 +215,7 @@ export function ShiftDrawer({
                           <button
                             type="button"
                             onClick={() => onAssignRoleChange('staff')}
+                            data-testid="coverage-assign-role-staff"
                             className={cn(
                               'rounded px-3 py-1 text-xs font-bold border',
                               assignRole === 'staff'
@@ -228,6 +230,7 @@ export function ShiftDrawer({
                             onClick={() => onAssignRoleChange('lead')}
                             disabled={leadDisabled}
                             title={leadTitle}
+                            data-testid="coverage-assign-role-lead"
                             className={cn(
                               'rounded px-3 py-1 text-xs font-bold border',
                               assignRole === 'lead'
@@ -258,6 +261,7 @@ export function ShiftDrawer({
                           <select
                             value={assignUserId}
                             onChange={(event) => onAssignUserIdChange(event.target.value)}
+                            data-testid="coverage-assign-select"
                             className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700"
                             required
                           >
@@ -289,6 +293,7 @@ export function ShiftDrawer({
                           <button
                             type="submit"
                             disabled={!activeCycleId || !assignUserId || assigning}
+                            data-testid="coverage-assign-submit"
                             className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60"
                           >
                             {assigning ? 'Assigning...' : assigned ? '\u2713 Added' : 'Assign'}
@@ -301,6 +306,7 @@ export function ShiftDrawer({
                 {weeklyLimitWarning && (
                   <p
                     role="status"
+                    data-testid="coverage-weekly-limit-warning"
                     className="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs font-semibold text-amber-700"
                   >
                     ⚠ {weeklyLimitWarning}
@@ -309,6 +315,7 @@ export function ShiftDrawer({
                 {assignError && (
                   <p
                     role="alert"
+                    data-testid="coverage-assign-error"
                     className="mt-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-semibold text-red-700"
                   >
                     {assignError}
@@ -327,6 +334,7 @@ export function ShiftDrawer({
                     <button
                       type="button"
                       onClick={() => onToggleExpanded(shift.id)}
+                      data-testid={`coverage-shift-row-${shift.id}`}
                       className="flex w-full items-center gap-2 px-3 py-2 text-left"
                     >
                       <Avatar name={shift.name} status={shift.status} expanded={expanded} />
@@ -355,6 +363,7 @@ export function ShiftDrawer({
                                 onClick={() =>
                                   onChangeStatus(selectedDay.id, shift.id, shift.isLead, statusKey)
                                 }
+                                data-testid={`coverage-status-${shift.id}-${statusKey}`}
                                 className={cn(
                                   'flex-1 rounded-md border px-2 py-1 text-xs font-bold disabled:cursor-default',
                                   activeStatus
@@ -371,6 +380,7 @@ export function ShiftDrawer({
                           type="button"
                           onClick={() => void onUnassign(selectedDay.id, shift.id, shift.isLead)}
                           disabled={unassigningShiftId === shift.id}
+                          data-testid={`coverage-unassign-${shift.id}`}
                           className="mb-2 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 disabled:opacity-60"
                         >
                           {unassigningShiftId === shift.id

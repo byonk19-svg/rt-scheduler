@@ -22,6 +22,7 @@ import { parseRole } from '@/lib/auth/roles'
 import { buildDateRange, dateKeyFromDate } from '@/lib/schedule-helpers'
 import { MAX_SHIFT_COVERAGE_PER_DAY, MIN_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
 import { createClient } from '@/lib/supabase/client'
+import { buildCycleRoute } from '@/lib/cycle-route'
 import { PageHeader } from '@/components/ui/page-header'
 import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 
@@ -149,12 +150,6 @@ function addDays(date: Date, days: number): Date {
 
 function countsTowardCoverage(status: ShiftStatus): boolean {
   return status === 'scheduled' || status === 'on_call'
-}
-
-function buildCycleRoute(path: '/coverage' | '/schedule', cycleId: string | null): string {
-  const params = new URLSearchParams({ view: 'week' })
-  if (cycleId) params.set('cycle', cycleId)
-  return `${path}?${params.toString()}`
 }
 
 export default function ManagerDashboardPage() {
@@ -479,7 +474,7 @@ export default function ManagerDashboardPage() {
     : data
 
   const coverageRoute = buildCycleRoute('/coverage', data.activeCycleId)
-  const publishRoute = buildCycleRoute('/coverage', data.activeCycleId)
+  const publishRoute = buildCycleRoute('/schedule', data.activeCycleId)
   const approvalsRoute = MANAGER_WORKFLOW_LINKS.approvals
   const teamRoute = MANAGER_WORKFLOW_LINKS.team
 
