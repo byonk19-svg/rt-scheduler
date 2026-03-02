@@ -422,7 +422,9 @@ export function pickTherapistForDate(
       !best ||
       weeklyCount < best.weeklyCount ||
       (weeklyCount === best.weeklyCount && patternDecision.penalty < best.penalty) ||
-      (weeklyCount === best.weeklyCount && patternDecision.penalty === best.penalty && i < best.offset)
+      (weeklyCount === best.weeklyCount &&
+        patternDecision.penalty === best.penalty &&
+        i < best.offset)
     ) {
       best = { therapist, index, weeklyCount, penalty: patternDecision.penalty, offset: i }
     }

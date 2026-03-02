@@ -99,7 +99,9 @@ export function summarizePublishWeeklyViolations({
     const therapistMinWorkDays = minWorkDaysByTherapist.get(therapistId) ?? 0
     for (const [weekStart, weekDatesInCycle] of cycleWeekDates) {
       const requiredDays = Math.min(therapistMaxWorkDays, weekDatesInCycle.size)
-      const workedDatesFromMap = weeklyWorkedDatesByUserWeek.get(weeklyCountKey(therapistId, weekStart))
+      const workedDatesFromMap = weeklyWorkedDatesByUserWeek.get(
+        weeklyCountKey(therapistId, weekStart)
+      )
       if (workedDatesFromMap === undefined && process.env.NODE_ENV !== 'production') {
         console.warn(
           `summarizePublishWeeklyViolations: no worked-dates entry for therapist ${therapistId} week ${weekStart}, assuming 0`
