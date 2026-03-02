@@ -354,4 +354,113 @@ test.describe.serial('manager date-override workflow in /directory', () => {
     // The override form date input must be visible (section was scrolled into view)
     await expect(page.locator('#override_date')).toBeVisible({ timeout: 5_000 })
   })
+
+  // -------------------------------------------------------------------------
+  // Test 4: Search filter narrows employee table rows
+  // -------------------------------------------------------------------------
+  test('search filter hides non-matching rows and restores them on clear', async ({ page }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    await login(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto('/directory')
+
+    // Wait for the therapist's row to be visible in the main table
+    await expect(page.getByRole('row').filter({ hasText: ctx!.therapist.email })).toBeVisible({
+      timeout: 15_000,
+    })
+
+    const searchInput = page.getByPlaceholder('Search name or email')
+
+    // Type a string that will never match any real user
+    await searchInput.fill('ZZZNO_MATCH_999_E2E')
+    await expect(page.getByRole('row').filter({ hasText: ctx!.therapist.email })).not.toBeVisible()
+
+    // Clear search — therapist row should reappear
+    await searchInput.clear()
+    await expect(page.getByRole('row').filter({ hasText: ctx!.therapist.email })).toBeVisible()
+
+    // Search by the therapist's full name — row stays visible
+    await searchInput.fill(ctx!.therapist.fullName)
+    await expect(page.getByRole('row').filter({ hasText: ctx!.therapist.email })).toBeVisible()
+  })
+
+  // -------------------------------------------------------------------------
+  // Test 5: Employment type filter pill buttons
+  // -------------------------------------------------------------------------
+  test('employment type filter hides full-time employee when PRN is selected', async ({ page }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    await login(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto('/directory')
+
+    await expect(page.getByRole('row').filter({ hasText: ctx!.therapist.email })).toBeVisible({
+      timeout: 15_000,
+    })
+
+    // Click PRN — therapist is full_time, so they should be hidden
+    await page.getByRole('button', { name: 'PRN' }).click()
+    await expect(page.getByRole('row').filter({ hasText: ctx!.therapist.email })).not.toBeVisible()
+
+    // Click FT — therapist is full_time, row should reappear
+    await page.getByRole('button', { name: 'FT' }).click()
+    await expect(page.getByRole('row').filter({ hasText: ctx!.therapist.email })).toBeVisible()
+  })
+
+  // -------------------------------------------------------------------------
+  // Test 6: Lead-only checkbox hides non-lead-eligible employees
+  // -------------------------------------------------------------------------
+  test('lead-only checkbox hides employees who are not lead-eligible', async ({ page }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    await login(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto('/directory')
+
+    await expect(page.getByRole('row').filter({ hasText: ctx!.therapist.email })).toBeVisible({
+      timeout: 15_000,
+    })
+
+    // Check Lead filter — therapist has isLeadEligible=false, should be hidden
+    await page.getByLabel('Lead').check()
+    await expect(page.getByRole('row').filter({ hasText: ctx!.therapist.email })).not.toBeVisible()
+
+    // Uncheck — therapist reappears
+    await page.getByLabel('Lead').uncheck()
+    await expect(page.getByRole('row').filter({ hasText: ctx!.therapist.email })).toBeVisible()
+  })
+
+  // -------------------------------------------------------------------------
+  // Test 7: Drawer tab navigation — Profile / Scheduling / Overrides
+  // -------------------------------------------------------------------------
+  test('drawer tabs navigate between Profile, Scheduling, and Overrides panels', async ({
+    page,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    await login(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto('/directory')
+
+    // Open drawer
+    await page.getByRole('row').filter({ hasText: ctx!.therapist.email }).click()
+    const drawer = page.getByRole('dialog', { name: 'Edit employee' })
+    await expect(drawer).toBeVisible({ timeout: 10_000 })
+
+    // Default tab is Profile — Name input visible
+    await expect(page.locator('#edit_name')).toBeVisible()
+
+    // Switch to Scheduling tab
+    await drawer.getByRole('tab', { name: 'Scheduling' }).click()
+    await expect(drawer.getByText('Works weekdays')).toBeVisible()
+    // Profile Name input hidden when not on Profile tab
+    await expect(page.locator('#edit_name')).not.toBeVisible()
+
+    // Switch to Overrides tab
+    await drawer.getByRole('tab', { name: 'Overrides' }).click()
+    await expect(page.locator('#override_date')).toBeVisible()
+    // Scheduling content hidden when on Overrides tab
+    await expect(drawer.getByText('Works weekdays')).not.toBeVisible()
+
+    // Switch back to Profile tab
+    await drawer.getByRole('tab', { name: 'Profile' }).click()
+    await expect(page.locator('#edit_name')).toBeVisible()
+  })
 })

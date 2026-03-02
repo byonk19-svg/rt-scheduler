@@ -41,6 +41,7 @@ type DashboardData = {
   totalSlots: number
   therapistsScheduled: number
   workloadRows: WorkloadRow[]
+  weeklyProgress: WeekRow[]
   cycleStart: string
   cycleEnd: string
   managerName: string
@@ -65,6 +66,7 @@ type DashboardDisplayData = {
   totalSlots: MetricValue
   therapistsScheduled: MetricValue
   workloadRows: WorkloadRow[]
+  weeklyProgress: WeekRow[]
   cycleStart: string
   cycleEnd: string
   managerName: string
@@ -85,6 +87,7 @@ type TeamProfileRow = {
 }
 
 type WorkloadRow = { id: string; name: string; shiftType: 'day' | 'night'; count: number }
+type WeekRow = { label: string; scheduled: number; total: number }
 
 type ShiftCoverageRow = {
   date: string
@@ -120,6 +123,7 @@ const INITIAL_DATA: DashboardData = {
   totalSlots: 0,
   therapistsScheduled: 0,
   workloadRows: [],
+  weeklyProgress: [],
   cycleStart: '—',
   cycleEnd: '—',
   managerName: 'Manager',
@@ -278,7 +282,14 @@ export default function ManagerDashboardPage() {
           shiftsBySlot.set(slotKey, rows)
         }
 
+        let dateIndex = 0
+        const weeklyBuckets = new Map<
+          number,
+          { scheduled: number; total: number; startDate: string }
+        >()
+
         for (const date of buildDateRange(cycleStartDate, cycleEndDate)) {
+          const weekIndex = Math.floor(dateIndex / 7)
           for (const shiftType of ['day', 'night'] as const) {
             const slotKey = `${date}:${shiftType}`
             const slotRows = shiftsBySlot.get(slotKey) ?? []
@@ -297,8 +308,26 @@ export default function ManagerDashboardPage() {
             if (leadCount === 0) missingLead += 1
             if (coverageCount < MIN_SHIFT_COVERAGE_PER_DAY) underCoverage += 1
             if (coverageCount > MAX_SHIFT_COVERAGE_PER_DAY) overCoverage += 1
+
+            const weekBucket = weeklyBuckets.get(weekIndex) ?? {
+              scheduled: 0,
+              total: 0,
+              startDate: date,
+            }
+            weekBucket.total += 1
+            if (coverageCount > 0) weekBucket.scheduled += 1
+            weeklyBuckets.set(weekIndex, weekBucket)
           }
+          dateIndex += 1
         }
+
+        const weeklyProgress: WeekRow[] = Array.from(weeklyBuckets.entries())
+          .sort((a, b) => a[0] - b[0])
+          .map(([, bucket]) => ({
+            label: formatCycleDate(bucket.startDate),
+            scheduled: bucket.scheduled,
+            total: bucket.total,
+          }))
 
         const therapistsScheduled = scheduledUserIds.size
 
@@ -404,6 +433,7 @@ export default function ManagerDashboardPage() {
           totalSlots,
           therapistsScheduled,
           workloadRows,
+          weeklyProgress,
           cycleStart: formatCycleDate(cycleStartDate),
           cycleEnd: formatCycleDate(cycleEndDate),
           managerName,
@@ -628,6 +658,64 @@ export default function ManagerDashboardPage() {
             icon={<Users className="h-4 w-4 text-muted-foreground" />}
           />
         </div>
+        {!loading && data.weeklyProgress.length > 0 && (
+          <div style={{ marginTop: 14 }}>
+            <p className="mb-2 text-xs font-semibold text-muted-foreground">Week by week</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {data.weeklyProgress.map((week) => {
+                const pct = week.total > 0 ? Math.round((week.scheduled / week.total) * 100) : 0
+                const barColor =
+                  pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--error)'
+                return (
+                  <div key={week.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: 'var(--muted-foreground)',
+                        width: 52,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {week.label}
+                    </span>
+                    <div
+                      style={{
+                        flex: 1,
+                        height: 5,
+                        borderRadius: 99,
+                        background: 'var(--muted)',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: '100%',
+                          width: `${String(pct)}%`,
+                          background: barColor,
+                          borderRadius: 99,
+                          transition: 'width 0.3s ease',
+                        }}
+                      />
+                    </div>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: 'var(--foreground)',
+                        width: 44,
+                        textAlign: 'right',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {week.scheduled}/{week.total}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       <div
