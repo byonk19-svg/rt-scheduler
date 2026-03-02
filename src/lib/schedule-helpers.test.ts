@@ -97,7 +97,45 @@ describe('pickTherapistForDate', () => {
     expect(pick.therapist?.id).toBe('b')
   })
 
-  it('blocks offs_dow weekday assignments', () => {
+  it('prioritizes therapists below weekly minimum target', () => {
+    const therapists: Therapist[] = [
+      buildTherapist({
+        id: 'prn',
+        full_name: 'PRN Therapist',
+        employment_type: 'prn',
+        max_work_days_per_week: 1,
+      }),
+      buildTherapist({
+        id: 'full-time',
+        full_name: 'Full Time Therapist',
+        employment_type: 'full_time',
+        max_work_days_per_week: 3,
+      }),
+    ]
+
+    const pick = pickTherapistForDate(
+      therapists,
+      0,
+      '2026-03-02',
+      'day',
+      new Map<string, AvailabilityOverrideRow[]>(),
+      'cycle-1',
+      new Set<string>(),
+      new Map(),
+      new Map([
+        ['prn', 1],
+        ['full-time', 3],
+      ]),
+      new Map([
+        ['prn', 0],
+        ['full-time', 3],
+      ])
+    )
+
+    expect(pick.therapist?.id).toBe('full-time')
+  })
+
+  it('allows weekday assignments even when offs_dow is set', () => {
     const therapist = buildTherapist({
       offs_dow: [1],
       works_dow_mode: 'soft',
@@ -115,10 +153,10 @@ describe('pickTherapistForDate', () => {
       new Map([['therapist-1', 3]])
     )
 
-    expect(pick.therapist).toBeNull()
+    expect(pick.therapist?.id).toBe('therapist-1')
   })
 
-  it('blocks non-works day when works_dow_mode is hard', () => {
+  it('allows non-works days even when works_dow_mode is hard', () => {
     const therapist = buildTherapist({
       works_dow: [2],
       works_dow_mode: 'hard',
@@ -136,10 +174,10 @@ describe('pickTherapistForDate', () => {
       new Map([['therapist-1', 3]])
     )
 
-    expect(pick.therapist).toBeNull()
+    expect(pick.therapist?.id).toBe('therapist-1')
   })
 
-  it('blocks PRN when date is not offered by recurring pattern', () => {
+  it('allows PRN when no explicit availability override blocks the date', () => {
     const therapist = buildTherapist({
       employment_type: 'prn',
       works_dow: [2],
@@ -158,7 +196,7 @@ describe('pickTherapistForDate', () => {
       new Map([['therapist-1', 3]])
     )
 
-    expect(pick.therapist).toBeNull()
+    expect(pick.therapist?.id).toBe('therapist-1')
   })
 
   it('allows PRN when recurring pattern offers the weekday', () => {
@@ -183,7 +221,7 @@ describe('pickTherapistForDate', () => {
     expect(pick.therapist?.id).toBe('therapist-1')
   })
 
-  it('prefers works_dow matches when mode is soft', () => {
+  it('falls back to cursor order when weekly counts are tied', () => {
     const therapists: Therapist[] = [
       buildTherapist({
         id: 'soft-non-match',
@@ -214,10 +252,10 @@ describe('pickTherapistForDate', () => {
       ])
     )
 
-    expect(pick.therapist?.id).toBe('soft-match')
+    expect(pick.therapist?.id).toBe('soft-non-match')
   })
 
-  it('supports every-other weekend parity', () => {
+  it('does not block alternating weekend dates without explicit overrides', () => {
     const therapist = buildTherapist({
       weekend_rotation: 'every_other',
       weekend_anchor_date: '2026-02-21',
@@ -238,7 +276,7 @@ describe('pickTherapistForDate', () => {
 
     expect(allowedWeekend.therapist?.id).toBe('therapist-1')
 
-    const blockedWeekend = pickTherapistForDate(
+    const secondWeekend = pickTherapistForDate(
       [therapist],
       0,
       '2026-02-28',
@@ -250,7 +288,7 @@ describe('pickTherapistForDate', () => {
       new Map([['therapist-1', 3]])
     )
 
-    expect(blockedWeekend.therapist).toBeNull()
+    expect(secondWeekend.therapist?.id).toBe('therapist-1')
   })
 
   it('force_on override allows scheduling outside hard recurring pattern', () => {

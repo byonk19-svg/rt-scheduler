@@ -8,6 +8,7 @@ import {
   MAX_WORK_DAYS_PER_WEEK,
   MIN_SHIFT_COVERAGE_PER_DAY,
   getDefaultWeeklyLimitForEmploymentType,
+  getWeeklyMinimumForEmploymentType,
   sanitizeWeeklyLimit,
 } from '@/lib/scheduling-constants'
 import {
@@ -43,10 +44,7 @@ import type {
 import { normalizeWorkPattern } from '@/lib/coverage/work-patterns'
 import { fillCoverageSlot, NO_ELIGIBLE_CANDIDATES_REASON } from '@/lib/coverage/generator-slot'
 
-const AUTO_GENERATE_TARGET_COVERAGE_PER_SHIFT = Math.min(
-  MAX_SHIFT_COVERAGE_PER_DAY,
-  Math.max(MIN_SHIFT_COVERAGE_PER_DAY, 4)
-)
+const AUTO_GENERATE_TARGET_COVERAGE_PER_SHIFT = MAX_SHIFT_COVERAGE_PER_DAY
 
 type ShiftPublishValidationRow = {
   date: string
@@ -441,6 +439,13 @@ export async function toggleCyclePublishedAction(formData: FormData) {
           }),
         ])
       )
+      const minWorkDaysByTherapist = new Map<string, number>(
+        therapists.map((therapist) => {
+          const weeklyLimit = maxWorkDaysByTherapist.get(therapist.id) ?? MAX_WORK_DAYS_PER_WEEK
+          const baselineMinimum = getWeeklyMinimumForEmploymentType(therapist.employment_type)
+          return [therapist.id, Math.min(weeklyLimit, baselineMinimum)]
+        })
+      )
       if (therapistIds.length > 0 && cycleWeekDates.size > 0) {
         const weekStarts = Array.from(cycleWeekDates.keys()).sort()
         const minWeekStart = weekStarts[0]
@@ -474,6 +479,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
           cycleWeekDates,
           weeklyWorkedDatesByUserWeek,
           maxWorkDaysByTherapist,
+          minWorkDaysByTherapist,
         })
         if (violations > 0) {
           redirect(
@@ -995,7 +1001,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
       patternByTherapist.get(therapist.id) ??
       normalizeWorkPattern({
         therapist_id: therapist.id,
-        works_dow: [],
+        works_dow: [0, 1, 2, 3, 4, 5, 6],
         offs_dow: [],
         weekend_rotation: 'none',
         weekend_anchor_date: null,
@@ -1004,11 +1010,12 @@ export async function generateDraftScheduleAction(formData: FormData) {
       })
     return {
       ...therapist,
-      works_dow: pattern.works_dow,
-      offs_dow: pattern.offs_dow,
-      weekend_rotation: pattern.weekend_rotation,
-      weekend_anchor_date: pattern.weekend_anchor_date,
-      works_dow_mode: pattern.works_dow_mode,
+      // Recurring day-of-week patterns should not block scheduling by default.
+      works_dow: [0, 1, 2, 3, 4, 5, 6],
+      offs_dow: [],
+      weekend_rotation: 'none',
+      weekend_anchor_date: null,
+      works_dow_mode: 'hard',
       shift_preference: pattern.shift_preference,
     }
   })
@@ -1020,6 +1027,13 @@ export async function generateDraftScheduleAction(formData: FormData) {
         getDefaultWeeklyLimitForEmploymentType(therapist.employment_type)
       ),
     ])
+  )
+  const weeklyMinimumByTherapist = new Map<string, number>(
+    therapists.map((therapist) => {
+      const weeklyLimit = weeklyLimitByTherapist.get(therapist.id) ?? MAX_WORK_DAYS_PER_WEEK
+      const baselineMinimum = getWeeklyMinimumForEmploymentType(therapist.employment_type)
+      return [therapist.id, Math.min(weeklyLimit, baselineMinimum)]
+    })
   )
   if (therapists.length === 0) {
     redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'auto_no_therapists' }))
@@ -1190,7 +1204,8 @@ export async function generateDraftScheduleAction(formData: FormData) {
         cycleId,
         assignedForDate,
         weeklyWorkedDatesByUserWeek,
-        weeklyLimitByTherapist
+        weeklyLimitByTherapist,
+        weeklyMinimumByTherapist
       )
       dayLeadCursor = dayLeadPick.nextCursor
 
@@ -1228,6 +1243,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
       assignedUserIdsForDate: assignedForDate,
       weeklyWorkedDatesByUserWeek,
       weeklyLimitByTherapist,
+      weeklyMinimumByTherapist,
       currentCoverage: dayCoverage,
       targetCoverage: AUTO_GENERATE_TARGET_COVERAGE_PER_SHIFT,
       minCoverage: MIN_SHIFT_COVERAGE_PER_DAY,
@@ -1297,7 +1313,8 @@ export async function generateDraftScheduleAction(formData: FormData) {
         cycleId,
         assignedForDate,
         weeklyWorkedDatesByUserWeek,
-        weeklyLimitByTherapist
+        weeklyLimitByTherapist,
+        weeklyMinimumByTherapist
       )
       nightLeadCursor = nightLeadPick.nextCursor
 
@@ -1335,6 +1352,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
       assignedUserIdsForDate: assignedForDate,
       weeklyWorkedDatesByUserWeek,
       weeklyLimitByTherapist,
+      weeklyMinimumByTherapist,
       currentCoverage: nightCoverage,
       targetCoverage: AUTO_GENERATE_TARGET_COVERAGE_PER_SHIFT,
       minCoverage: MIN_SHIFT_COVERAGE_PER_DAY,

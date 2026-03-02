@@ -13,6 +13,7 @@ export type FillCoverageSlotArgs = {
   assignedUserIdsForDate: Set<string>
   weeklyWorkedDatesByUserWeek: Map<string, Set<string>>
   weeklyLimitByTherapist: Map<string, number>
+  weeklyMinimumByTherapist: Map<string, number>
   currentCoverage: number
   targetCoverage: number
   minCoverage: number
@@ -41,7 +42,8 @@ export function fillCoverageSlot(args: FillCoverageSlotArgs): FillCoverageSlotRe
       args.cycleId,
       args.assignedUserIdsForDate,
       args.weeklyWorkedDatesByUserWeek,
-      args.weeklyLimitByTherapist
+      args.weeklyLimitByTherapist,
+      args.weeklyMinimumByTherapist
     )
     cursor = pick.nextCursor
 

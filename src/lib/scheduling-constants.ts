@@ -1,4 +1,5 @@
 export const MAX_WORK_DAYS_PER_WEEK = 3
+export const FULL_TIME_MIN_WORK_DAYS_PER_WEEK = 3
 export const MIN_SHIFT_COVERAGE_PER_DAY = 3
 export const MAX_SHIFT_COVERAGE_PER_DAY = 5
 
@@ -23,4 +24,13 @@ export function sanitizeWeeklyLimit(
   const rounded = Math.trunc(value)
   if (rounded < 1 || rounded > 7) return fallback
   return rounded
+}
+
+export function getWeeklyMinimumForEmploymentType(
+  employmentType: string | null | undefined
+): number {
+  if (employmentType === 'full_time' || employmentType === null || employmentType === undefined) {
+    return FULL_TIME_MIN_WORK_DAYS_PER_WEEK
+  }
+  return 0
 }

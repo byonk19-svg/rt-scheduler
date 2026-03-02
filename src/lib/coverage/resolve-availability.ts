@@ -1,6 +1,6 @@
 import type { AvailabilityOverrideRow, ShiftTypeForAvailability } from '@/lib/coverage/types'
 import type { WorkPattern } from '@/lib/coverage/work-patterns'
-import { isAllowedByPattern, shiftTypeMatches } from '@/lib/coverage/work-patterns'
+import { shiftTypeMatches } from '@/lib/coverage/work-patterns'
 
 export type EligibilityReason =
   | 'inactive'
@@ -53,12 +53,6 @@ export type ResolveAvailabilityParams = {
 }
 
 export type AvailabilityResolution = EligibilityResolution
-
-function getWeekdayIndex(value: string): number | null {
-  const parsed = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return null
-  return parsed.getDay()
-}
 
 function buildResolution(
   reason: EligibilityReason,
@@ -134,28 +128,7 @@ export function resolveEligibility(params: ResolveEligibilityParams): Eligibilit
     })
   }
 
-  if (!params.therapist.pattern) {
-    if (params.therapist.employment_type === 'prn') {
-      return buildResolution('prn_not_offered_for_date')
-    }
-    return buildResolution('allowed')
-  }
-
-  const patternDecision = isAllowedByPattern(params.therapist.pattern, params.date)
-  if (!patternDecision.allowed) {
-    return buildResolution(patternDecision.reason, { penalty: patternDecision.penalty })
-  }
-
-  if (params.therapist.employment_type === 'prn') {
-    const weekday = getWeekdayIndex(params.date)
-    const dayOfferedByPattern =
-      weekday !== null && params.therapist.pattern.works_dow.includes(weekday)
-    if (!dayOfferedByPattern) {
-      return buildResolution('prn_not_offered_for_date')
-    }
-  }
-
-  return buildResolution(patternDecision.reason, { penalty: patternDecision.penalty })
+  return buildResolution('allowed')
 }
 
 export function resolveAvailability(params: ResolveAvailabilityParams): AvailabilityResolution {
