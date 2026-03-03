@@ -259,7 +259,7 @@ export default function MySchedulePage() {
             My Schedule
           </h1>
           <p style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
-            View upcoming shifts and request swaps when needed.
+            View your upcoming shifts for the current cycle.
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -279,23 +279,6 @@ export default function MySchedulePage() {
             }}
           >
             Print schedule
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push('/staff/requests?new=1')}
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              padding: '7px 16px',
-              borderRadius: 7,
-              border: 'none',
-              background: '#d97706',
-              color: '#fff',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            + Request swap
           </button>
         </div>
       </div>
@@ -606,32 +589,10 @@ export default function MySchedulePage() {
                       )}
                     </div>
 
-                    {shift.status === 'cancelled' ? (
-                      <p style={{ fontSize: 12, color: '#dc2626', fontWeight: 600 }}>
-                        This shift is cancelled. Swap requests are unavailable.
-                      </p>
-                    ) : shift.swapRequested ? (
+                    {shift.swapRequested && (
                       <p style={{ fontSize: 12, color: '#b45309', fontWeight: 600 }}>
-                        You already have a pending swap request for this shift.
+                        Swap request pending.
                       </p>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/staff/requests?new=1&shiftId=${shift.id}`)}
-                        style={{
-                          justifySelf: 'start',
-                          fontSize: 12,
-                          fontWeight: 700,
-                          padding: '7px 14px',
-                          borderRadius: 7,
-                          border: 'none',
-                          background: '#d97706',
-                          color: '#fff',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Request swap for this shift
-                      </button>
                     )}
                   </div>
                 )}

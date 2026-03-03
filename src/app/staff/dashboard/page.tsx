@@ -547,23 +547,19 @@ export default function StaffDashboardPage() {
         </div>
         <button
           type="button"
-          onClick={() =>
-            router.push(
-              nextShift ? `/staff/requests?new=1&shiftId=${nextShift.id}` : '/staff/requests?new=1'
-            )
-          }
+          onClick={() => router.push('/availability')}
           style={{
             fontSize: 12,
             fontWeight: 700,
             padding: '7px 16px',
             borderRadius: 7,
             border: 'none',
-            background: '#d97706',
+            background: '#0667a9',
             color: '#fff',
             cursor: 'pointer',
           }}
         >
-          Request swap
+          Availability
         </button>
       </div>
 
@@ -584,9 +580,9 @@ export default function StaffDashboardPage() {
         />
         <StatTile label="Lead shifts" value={loading ? '—' : String(leadCount)} color="#b45309" />
         <StatTile
-          label="Open requests"
+          label="Pending swaps"
           value={loading ? '—' : String(openRequestCount)}
-          color="#d97706"
+          color="#64748b"
         />
       </div>
 
@@ -690,14 +686,14 @@ export default function StaffDashboardPage() {
               marginBottom: 10,
             }}
           >
-            <p style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>My requests</p>
+            <p style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>Swap requests</p>
             <button
               type="button"
-              onClick={() => router.push('/staff/requests')}
+              onClick={() => router.push('/shift-board')}
               style={{
                 fontSize: 11,
                 fontWeight: 700,
-                color: '#b45309',
+                color: '#64748b',
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',

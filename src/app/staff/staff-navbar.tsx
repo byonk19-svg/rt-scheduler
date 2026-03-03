@@ -13,7 +13,7 @@ type StaffNavbarProps = {
 const NAV_ITEMS = [
   { href: '/staff/dashboard', label: 'Dashboard' },
   { href: '/staff/schedule', label: 'My Schedule' },
-  { href: '/staff/requests', label: 'Requests' },
+  { href: '/availability', label: 'Availability' },
 ] as const
 
 function initials(name: string): string {
@@ -37,7 +37,7 @@ export function StaffNavbar({ fullName }: StaffNavbarProps) {
     <header className="sticky top-0 z-30 border-b border-border bg-white/95 backdrop-blur">
       <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3 md:px-8">
         <Link
-          href="/staff/dashboard"
+          href="/dashboard/staff"
           className="shrink-0 text-sm font-extrabold tracking-tight text-stone-900"
         >
           Team<span style={{ color: '#d97706' }}>wise</span>

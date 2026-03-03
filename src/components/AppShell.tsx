@@ -41,7 +41,7 @@ type NavItem = {
 const STAFF_NAV_ITEMS: readonly NavItem[] = [
   { href: '/dashboard/staff', label: 'Dashboard' },
   { href: '/schedule?view=week', label: 'My Schedule' },
-  { href: '/availability', label: 'Requests' },
+  { href: '/availability', label: 'Availability' },
   { href: '/shift-board', label: 'Shift Board' },
 ]
 

@@ -51,5 +51,5 @@ export default async function DashboardPage({
     redirect(`/staff/schedule${suffix}`)
   }
 
-  redirect(`${isManager ? '/dashboard/manager' : '/staff/dashboard'}${suffix}`)
+  redirect(`${isManager ? '/dashboard/manager' : '/dashboard/staff'}${suffix}`)
 }

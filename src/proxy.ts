@@ -141,19 +141,19 @@ export async function proxy(request: NextRequest) {
 
   if (matchesRoute(pathname, '/pending-setup')) {
     return NextResponse.redirect(
-      new URL(can(role, 'access_manager_ui') ? '/dashboard' : '/staff/dashboard', request.url)
+      new URL(can(role, 'access_manager_ui') ? '/dashboard' : '/dashboard/staff', request.url)
     )
   }
 
   if (role === 'staff' && pathname === '/dashboard') {
-    return NextResponse.redirect(new URL('/staff/dashboard', request.url))
+    return NextResponse.redirect(new URL('/dashboard/staff', request.url))
   }
 
   if (
     !can(role, 'access_manager_ui') &&
     MANAGER_ROUTES.some((route) => matchesRoute(pathname, route))
   ) {
-    return NextResponse.redirect(new URL('/staff/dashboard', request.url))
+    return NextResponse.redirect(new URL('/dashboard/staff', request.url))
   }
 
   if (
