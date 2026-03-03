@@ -136,6 +136,7 @@ function SwapRequestPageContent() {
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
   const shiftIdFromQuery = searchParams.get('shiftId')
+  const newFromParam = searchParams.get('new') === '1'
 
   const [view, setView] = useState<'list' | 'form'>('list')
   const [requestType, setRequestType] = useState<RequestType>('swap')
@@ -167,10 +168,10 @@ function SwapRequestPageContent() {
   }, [leadCountsBySlot, selectedShiftData])
 
   useEffect(() => {
-    if (pathname === '/requests/new') {
+    if (pathname === '/requests/new' || newFromParam) {
       setView('form')
     }
-  }, [pathname])
+  }, [pathname, newFromParam])
 
   useEffect(() => {
     let active = true

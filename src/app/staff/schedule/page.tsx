@@ -282,7 +282,7 @@ export default function MySchedulePage() {
           </button>
           <button
             type="button"
-            onClick={() => router.push('/requests/new')}
+            onClick={() => router.push('/staff/requests?new=1')}
             style={{
               fontSize: 12,
               fontWeight: 700,
@@ -617,7 +617,7 @@ export default function MySchedulePage() {
                     ) : (
                       <button
                         type="button"
-                        onClick={() => router.push(`/requests/new?shiftId=${shift.id}`)}
+                        onClick={() => router.push(`/staff/requests?new=1&shiftId=${shift.id}`)}
                         style={{
                           justifySelf: 'start',
                           fontSize: 12,
