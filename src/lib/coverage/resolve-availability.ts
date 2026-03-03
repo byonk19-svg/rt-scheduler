@@ -128,6 +128,21 @@ export function resolveEligibility(params: ResolveEligibilityParams): Eligibilit
     })
   }
 
+  if (params.therapist.employment_type === 'prn') {
+    const pattern = params.therapist.pattern
+    if (!pattern) {
+      return buildResolution('prn_not_offered_for_date')
+    }
+    if (pattern.works_dow_mode === 'hard') {
+      const weekdayParsed = new Date(`${params.date}T00:00:00`)
+      const weekday = Number.isNaN(weekdayParsed.getTime()) ? null : weekdayParsed.getDay()
+      const inWorksDow = weekday !== null && pattern.works_dow.includes(weekday)
+      if (!inWorksDow) {
+        return buildResolution('prn_not_offered_for_date')
+      }
+    }
+  }
+
   return buildResolution('allowed')
 }
 

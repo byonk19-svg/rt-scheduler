@@ -374,6 +374,7 @@ export function pickTherapistForDate(
     index: number
     weeklyGap: number
     weeklyCount: number
+    belowMin: boolean
     penalty: number
     offset: number
   } | null = null
@@ -419,11 +420,17 @@ export function pickTherapistForDate(
 
     const weeklyCount = weeklyDates.size
     const weeklyGap = Math.max(0, weeklyLimit - weeklyCount)
+    const weeklyMinimum = weeklyMinimumByTherapist.get(therapist.id) ?? 0
+    const isBelowMin = weeklyCount < weeklyMinimum
     if (
       !best ||
-      weeklyCount < best.weeklyCount ||
-      (weeklyCount === best.weeklyCount && patternDecision.penalty < best.penalty) ||
-      (weeklyCount === best.weeklyCount &&
+      (isBelowMin && !best.belowMin) ||
+      (isBelowMin === best.belowMin && weeklyCount < best.weeklyCount) ||
+      (isBelowMin === best.belowMin &&
+        weeklyCount === best.weeklyCount &&
+        patternDecision.penalty < best.penalty) ||
+      (isBelowMin === best.belowMin &&
+        weeklyCount === best.weeklyCount &&
         patternDecision.penalty === best.penalty &&
         i < best.offset)
     ) {
@@ -432,6 +439,7 @@ export function pickTherapistForDate(
         index,
         weeklyGap,
         weeklyCount,
+        belowMin: isBelowMin,
         penalty: patternDecision.penalty,
         offset: i,
       }

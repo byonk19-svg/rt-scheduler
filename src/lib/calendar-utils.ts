@@ -73,7 +73,11 @@ export function formatMonthLabel(value: string): string {
 /** Returns the ISO date of the first day of the month containing `dateValue`. */
 export function toMonthStartKey(dateValue: string): string {
   const parsed = new Date(`${dateValue}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return toIsoDate(new Date())
+  if (Number.isNaN(parsed.getTime())) {
+    const fallback = new Date()
+    fallback.setDate(1)
+    return toIsoDate(fallback)
+  }
   parsed.setDate(1)
   return toIsoDate(parsed)
 }
