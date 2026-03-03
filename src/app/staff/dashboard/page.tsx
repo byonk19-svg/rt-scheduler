@@ -548,7 +548,7 @@ export default function StaffDashboardPage() {
         <button
           type="button"
           onClick={() =>
-            router.push(nextShift ? `/requests/new?shiftId=${nextShift.id}` : '/requests/new')
+            router.push(nextShift ? `/staff/requests?shiftId=${nextShift.id}` : '/staff/requests')
           }
           style={{
             fontSize: 12,

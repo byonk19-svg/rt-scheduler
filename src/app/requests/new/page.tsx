@@ -452,10 +452,6 @@ function SwapRequestPageContent() {
   }
 
   const handleNew = () => {
-    if (pathname.startsWith('/staff/requests')) {
-      router.push('/requests/new')
-      return
-    }
     setView('form')
     setStep(1)
     setRequestType('swap')
