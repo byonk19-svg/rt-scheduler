@@ -53,7 +53,7 @@ export function TableToolbar({
   }
 
   return (
-    <div className="rounded-md border border-border bg-white p-3">
+    <div className="rounded-md border border-border bg-card p-3">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
         <div className="md:col-span-2">
           <Input
@@ -64,7 +64,7 @@ export function TableToolbar({
         </div>
 
         <select
-          className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+          className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm"
           value={filters.status}
           onChange={(event) => updateFilters({ status: event.target.value })}
         >
@@ -99,7 +99,7 @@ export function TableToolbar({
         </Label>
         <select
           id="table-sort"
-          className="h-9 rounded-md border border-border bg-white px-3 text-sm"
+          className="h-9 rounded-md border border-border bg-card px-3 text-sm"
           value={filters.sort}
           onChange={(event) => updateFilters({ sort: event.target.value as TableSortOption })}
         >

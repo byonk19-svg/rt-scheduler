@@ -56,7 +56,7 @@ export function CalendarToolbar({
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
-    <div className="rounded-xl border border-border bg-white/95 p-3 backdrop-blur">
+    <div className="rounded-xl border border-border bg-card/95 p-3 backdrop-blur">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-foreground">

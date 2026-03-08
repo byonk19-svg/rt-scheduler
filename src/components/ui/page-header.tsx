@@ -27,14 +27,24 @@ export function PageHeader({ title, subtitle, badge, actions, className }: PageH
   return (
     <div
       className={cn(
-        'teamwise-surface rounded-2xl border border-border p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]',
+        'relative overflow-hidden rounded-2xl border border-border bg-card px-6 py-5',
+        'shadow-[0_1px_3px_rgba(6,103,169,0.08),0_4px_16px_rgba(6,103,169,0.04)]',
         className
       )}
     >
+      {/* Primary blue left accent bar */}
+      <div
+        className="absolute inset-y-0 left-0 w-1 rounded-l-2xl"
+        style={{ background: 'linear-gradient(to bottom, #0667a9, #1d608e)' }}
+        aria-hidden="true"
+      />
+
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <h1 className="app-page-title">{title}</h1>
-          {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
+          {subtitle && (
+            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{subtitle}</p>
+          )}
           {badge && <div className="mt-3 flex flex-wrap items-center gap-2">{badge}</div>}
         </div>
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}

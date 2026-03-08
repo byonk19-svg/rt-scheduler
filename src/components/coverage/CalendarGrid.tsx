@@ -41,7 +41,7 @@ function Avatar({ name, status }: { name: string; status: UiStatus }) {
     status === 'cancelled'
       ? 'bg-[var(--error)]'
       : status === 'oncall'
-        ? 'bg-orange-600'
+        ? 'bg-[var(--warning)]'
         : 'bg-[var(--attention)]'
 
   return (
@@ -50,7 +50,7 @@ function Avatar({ name, status }: { name: string; status: UiStatus }) {
       className={cn(
         'inline-flex flex-shrink-0 items-center justify-center rounded-full font-extrabold text-white',
         bgClass,
-        'h-[14px] w-[14px] text-[5px]'
+        'h-4 w-4 text-[7px]'
       )}
     >
       {initials(name)}
@@ -87,104 +87,124 @@ export function CalendarGrid({
         ))}
       </div>
 
-      <div className="mb-1 grid grid-cols-7 gap-1.5">
-        {DOW.map((day) => (
-          <div
-            key={day}
-            className="text-center text-[10px] font-extrabold tracking-[0.07em] text-slate-400"
-          >
-            {day}
-          </div>
-        ))}
-      </div>
-
-      {loading ? (
-        <div className="rounded-lg border border-slate-200 bg-white px-3 py-6 text-center text-sm text-slate-500">
-          Loading schedule...
-        </div>
-      ) : (
-        <div className="grid grid-cols-7 gap-1.5">
-          {days.map((day, index) => {
-            const activeCount = countActive(day)
-            const totalCount = flatten(day).length
-            const missingLead = !day.leadShift
-            const showMonthTag = shouldShowMonthTag(index, day.isoDate)
-
-            return (
-              <button
-                key={day.id}
-                type="button"
-                onClick={() => onSelect(day.id)}
-                data-testid={`coverage-day-cell-${day.id}`}
-                className={cn(
-                  'rounded-lg border border-slate-200 bg-white p-2 text-left hover:border-primary',
-                  selectedId === day.id &&
-                    'border-primary shadow-[0_0_0_3px_rgba(6,103,169,0.15)]'
-                )}
+      <div className="overflow-x-auto pb-1">
+        <div className="min-w-[760px]">
+          <div className="mb-1 grid grid-cols-7 gap-1.5">
+            {DOW.map((day) => (
+              <div
+                key={day}
+                className="text-center text-xs font-extrabold tracking-[0.06em] text-muted-foreground"
               >
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="text-sm font-extrabold text-slate-900">{day.date}</span>
-                    {showMonthTag && (
-                      <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
-                        {formatMonthShort(day.isoDate)}
-                      </span>
-                    )}
-                  </span>
-                  <span
+                {day}
+              </div>
+            ))}
+          </div>
+
+          {loading ? (
+            <div className="rounded-lg border border-border bg-card px-3 py-6 text-center text-sm text-muted-foreground">
+              Loading schedule...
+            </div>
+          ) : (
+            <div className="grid grid-cols-7 gap-1.5">
+              {days.map((day, index) => {
+                const activeCount = countActive(day)
+                const totalCount = flatten(day).length
+                const missingLead = !day.leadShift
+                const showMonthTag = shouldShowMonthTag(index, day.isoDate)
+
+                return (
+                  <button
+                    key={day.id}
+                    type="button"
+                    onClick={() => onSelect(day.id)}
+                    data-testid={`coverage-day-cell-${day.id}`}
                     className={cn(
-                      'rounded-full px-1.5 py-0.5 text-[10px] font-bold',
-                      missingLead
-                        ? 'bg-[var(--error-subtle)] text-[var(--error-text)]'
-                        : 'bg-[var(--success-subtle)] text-[var(--success-text)]'
+                      'rounded-lg border border-border bg-card p-2.5 text-left hover:border-primary',
+                      selectedId === day.id &&
+                        'border-primary shadow-[0_0_0_3px_rgba(6,103,169,0.15)]'
                     )}
                   >
-                    {activeCount}/{totalCount}
-                  </span>
-                </div>
-
-                <div className="mb-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800">
-                  {day.leadShift ? `Lead: ${day.leadShift.name.split(' ')[0]}` : 'No lead'}
-                </div>
-
-                {day.constraintBlocked && (
-                  <div className="mb-1.5 rounded border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-medium text-red-700">
-                    No eligible therapists (constraints)
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-1">
-                  {day.staffShifts.map((shift) => {
-                    const tone =
-                      shift.status === 'cancelled'
-                        ? 'border-red-200 bg-red-50 text-red-700'
-                        : shift.status === 'oncall'
-                          ? 'border-orange-200 bg-orange-50 text-orange-700'
-                          : shift.status === 'leave_early'
-                            ? 'border-blue-200 bg-blue-50 text-blue-700'
-                            : 'border-slate-200 bg-slate-50 text-slate-700'
-
-                    return (
-                      <span
-                        key={shift.id}
-                        className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${tone}`}
-                      >
-                        <Avatar name={shift.name} status={shift.status} />
-                        <span className={shift.status === 'cancelled' ? 'line-through' : ''}>
-                          {shift.name.split(' ')[0]}
-                        </span>
-                        {shift.status === 'oncall' && <span className="font-extrabold">OC</span>}
-                        {shift.status === 'leave_early' && <span className="font-extrabold">LE</span>}
-                        {shift.status === 'cancelled' && <span className="font-extrabold">X</span>}
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="text-sm font-extrabold text-foreground">{day.date}</span>
+                        {showMonthTag && (
+                          <span className="rounded border border-border bg-muted px-1.5 py-0.5 text-xs font-bold text-muted-foreground">
+                            {formatMonthShort(day.isoDate)}
+                          </span>
+                        )}
                       </span>
-                    )
-                  })}
-                </div>
-              </button>
-            )
-          })}
+                      <span
+                        className={cn(
+                          'rounded-full px-1.5 py-0.5 text-xs font-bold',
+                          missingLead
+                            ? 'bg-[var(--error-subtle)] text-[var(--error-text)]'
+                            : 'bg-[var(--success-subtle)] text-[var(--success-text)]'
+                        )}
+                      >
+                        {activeCount}/{totalCount}
+                      </span>
+                    </div>
+
+                    <div
+                      className="mb-1.5 rounded border px-2 py-1 text-xs font-semibold"
+                      style={{
+                        borderColor: 'var(--warning-border)',
+                        backgroundColor: 'var(--warning-subtle)',
+                        color: 'var(--warning-text)',
+                      }}
+                    >
+                      {day.leadShift ? `Lead: ${day.leadShift.name.split(' ')[0]}` : 'No lead'}
+                    </div>
+
+                    {day.constraintBlocked && (
+                      <div
+                        className="mb-1.5 rounded border px-2 py-1 text-xs font-medium"
+                        style={{
+                          borderColor: 'var(--error-border)',
+                          backgroundColor: 'var(--error-subtle)',
+                          color: 'var(--error-text)',
+                        }}
+                      >
+                        No eligible therapists (constraints)
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-1">
+                      {day.staffShifts.map((shift) => {
+                        const tone =
+                          shift.status === 'cancelled'
+                            ? '[border-color:var(--error-border)] [background-color:var(--error-subtle)] [color:var(--error-text)]'
+                            : shift.status === 'oncall'
+                              ? '[border-color:var(--warning-border)] [background-color:var(--warning-subtle)] [color:var(--warning-text)]'
+                              : shift.status === 'leave_early'
+                                ? '[border-color:var(--info-border)] [background-color:var(--info-subtle)] [color:var(--info-text)]'
+                                : 'border-border bg-muted text-foreground'
+
+                        return (
+                          <span
+                            key={shift.id}
+                            className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs font-semibold ${tone}`}
+                          >
+                            <Avatar name={shift.name} status={shift.status} />
+                            <span className={shift.status === 'cancelled' ? 'line-through' : ''}>
+                              {shift.name.split(' ')[0]}
+                            </span>
+                            {shift.status === 'oncall' && <span className="font-extrabold">OC</span>}
+                            {shift.status === 'leave_early' && (
+                              <span className="font-extrabold">LE</span>
+                            )}
+                            {shift.status === 'cancelled' && <span className="font-extrabold">X</span>}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </>
   )
 }

@@ -53,6 +53,8 @@ type ScheduleHeaderProps = {
 
 const menuActionClass =
   'block w-full rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary disabled:opacity-50'
+const dangerMenuActionClass =
+  'block w-full rounded-sm px-3 py-2 text-left text-sm text-[var(--error-text)] hover:bg-[var(--error-subtle)] disabled:opacity-50'
 
 function tabClass(isActive: boolean): string {
   if (isActive) {
@@ -130,32 +132,12 @@ export function ScheduleHeader({
 
               <details className="relative">
                 <summary className="list-none [&::-webkit-details-marker]:hidden">
-                  <span className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-white px-3 py-2 text-sm text-foreground transition-colors hover:bg-secondary">
+                  <span className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground transition-colors hover:bg-secondary">
                     <ChevronDown className="h-4 w-4" />
                     Options
                   </span>
                 </summary>
-                <div className="absolute right-0 z-30 mt-2 w-56 rounded-md border border-border bg-white p-1 shadow-lg">
-                  <form action={toggleCyclePublishedAction}>
-                    <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
-                    <input type="hidden" name="view" value={viewMode} />
-                    <input
-                      type="hidden"
-                      name="show_unavailable"
-                      value={showUnavailable ? 'true' : 'false'}
-                    />
-                    <input type="hidden" name="currently_published" value="false" />
-                    <input type="hidden" name="override_weekly_rules" value="true" />
-                    <input type="hidden" name="override_shift_rules" value="true" />
-                    <FormMenuSubmitButton
-                      type="submit"
-                      className={menuActionClass}
-                      disabled={!canPublish}
-                      pendingText="Publishing..."
-                    >
-                      Publish with full override
-                    </FormMenuSubmitButton>
-                  </form>
+                <div className="absolute right-0 z-30 mt-2 w-56 rounded-md border border-border bg-card p-1 shadow-lg">
                   <form action={toggleCyclePublishedAction}>
                     <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
                     <input type="hidden" name="view" value={viewMode} />
@@ -176,6 +158,30 @@ export function ScheduleHeader({
                       Publish draft
                     </FormMenuSubmitButton>
                   </form>
+                  <div className="my-1 border-t border-border" />
+                  <form action={toggleCyclePublishedAction}>
+                    <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+                    <input type="hidden" name="view" value={viewMode} />
+                    <input
+                      type="hidden"
+                      name="show_unavailable"
+                      value={showUnavailable ? 'true' : 'false'}
+                    />
+                    <input type="hidden" name="currently_published" value="false" />
+                    <input type="hidden" name="override_weekly_rules" value="true" />
+                    <input type="hidden" name="override_shift_rules" value="true" />
+                    <FormMenuSubmitButton
+                      type="submit"
+                      className={dangerMenuActionClass}
+                      disabled={!canPublish}
+                      pendingText="Publishing..."
+                    >
+                      Publish with full override
+                    </FormMenuSubmitButton>
+                  </form>
+                  <p className="px-3 pb-1 pt-0.5 text-[11px] text-muted-foreground">
+                    Override bypasses weekly and shift publish guardrails.
+                  </p>
                 </div>
               </details>
 
@@ -220,7 +226,7 @@ export function ScheduleHeader({
         </div>
       </div>
 
-      <nav className="flex flex-wrap items-center gap-1 rounded-md border border-border bg-white p-1">
+      <nav className="flex flex-wrap items-center gap-1 rounded-md border border-border bg-card p-1">
         <Link
           href={buildScheduleUrl(activeCycleId, 'week')}
           className={tabClass(viewMode === 'week')}

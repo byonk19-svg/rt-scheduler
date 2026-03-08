@@ -169,10 +169,10 @@ function EmployeeRowBadges({ employee }: { employee: EmployeeDirectoryRecord }) 
         className={cn(
           'text-[10px]',
           employee.employment_type === 'full_time'
-            ? 'border-blue-300 bg-blue-50 text-blue-800'
+            ? 'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)]'
             : employee.employment_type === 'part_time'
-              ? 'border-violet-300 bg-violet-50 text-violet-800'
-              : 'border-orange-300 bg-orange-50 text-orange-800'
+              ? 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+              : 'border-border bg-muted text-muted-foreground'
         )}
       >
         {employee.employment_type === 'full_time'
@@ -247,10 +247,10 @@ function EmployeeActionsMenu({
 }) {
   return (
     <details className="relative" onClick={(event) => event.stopPropagation()}>
-      <summary className="flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-md border border-border bg-white text-sm hover:bg-secondary">
+      <summary className="flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-md border border-border bg-card text-sm hover:bg-secondary">
         ...
       </summary>
-      <div className="absolute right-0 z-20 mt-1 min-w-40 rounded-md border border-border bg-white p-1 shadow-sm">
+      <div className="absolute right-0 z-20 mt-1 min-w-40 rounded-md border border-border bg-card p-1 shadow-sm">
         <button
           type="button"
           className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-secondary"
@@ -810,7 +810,7 @@ export function EmployeeDirectory({
                 </Label>
                 <select
                   id="missing_cycle_id"
-                  className="mt-1 h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                  className="mt-1 h-9 w-full rounded-md border border-border bg-card px-3 text-sm"
                   value={selectedAvailabilityCycleId}
                   onChange={(event) => setAvailabilityCycleId(event.target.value)}
                 >
@@ -1124,7 +1124,7 @@ export function EmployeeDirectory({
             <>
               {/* Sticky tab bar */}
               <div
-                className="sticky top-0 z-10 flex border-b border-border bg-white"
+                className="sticky top-0 z-10 flex border-b border-border bg-card"
                 role="tablist"
                 aria-label="Employee drawer sections"
               >
@@ -1198,7 +1198,7 @@ export function EmployeeDirectory({
                       <select
                         id="edit_shift"
                         name="shift_type"
-                        className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                        className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm"
                         defaultValue={editEmployee.shift_type}
                       >
                         <option value="day">Day</option>
@@ -1210,7 +1210,7 @@ export function EmployeeDirectory({
                       <select
                         id="edit_employment"
                         name="employment_type"
-                        className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                        className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm"
                         defaultValue={editEmployee.employment_type}
                       >
                         <option value="full_time">Full-time</option>
@@ -1223,7 +1223,7 @@ export function EmployeeDirectory({
                       <select
                         id="edit_max_week"
                         name="max_work_days_per_week"
-                        className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                        className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm"
                         defaultValue={String(editEmployee.max_work_days_per_week)}
                       >
                         {Array.from({ length: 7 }, (_, index) => index + 1).map((value) => (
@@ -1442,7 +1442,7 @@ export function EmployeeDirectory({
                 </div>
 
                 {/* Sticky save footer — visible on Profile + Scheduling tabs */}
-                <div className="sticky bottom-0 z-10 flex justify-end gap-2 border-t border-border bg-white px-6 py-3">
+                <div className="sticky bottom-0 z-10 flex justify-end gap-2 border-t border-border bg-card px-6 py-3">
                   <FormSubmitButton type="submit" pendingText="Saving...">
                     Save
                   </FormSubmitButton>
@@ -1567,7 +1567,7 @@ export function EmployeeDirectory({
                         <select
                           id="override_cycle_id"
                           name="cycle_id"
-                          className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                          className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm"
                           value={overrideCycleIdDraft}
                           onChange={(event) => {
                             const nextCycleId = event.target.value
@@ -1607,7 +1607,7 @@ export function EmployeeDirectory({
                         <select
                           id="override_type"
                           name="override_type"
-                          className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                          className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm"
                           defaultValue="force_off"
                           required
                         >
@@ -1830,7 +1830,7 @@ export function EmployeeDirectory({
                             name="source_cycle_id"
                             value={copySourceCycleId}
                             onChange={(e) => setCopySourceCycleId(e.target.value)}
-                            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700"
+                            className="mt-1 w-full rounded-md border border-slate-300 bg-card px-2 py-1.5 text-xs text-slate-700"
                           >
                             {cycles.map((c) => (
                               <option key={c.id} value={c.id}>
@@ -1845,7 +1845,7 @@ export function EmployeeDirectory({
                             name="target_cycle_id"
                             value={copyTargetCycleId}
                             onChange={(e) => setCopyTargetCycleId(e.target.value)}
-                            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700"
+                            className="mt-1 w-full rounded-md border border-slate-300 bg-card px-2 py-1.5 text-xs text-slate-700"
                           >
                             {cycles.map((c) => (
                               <option key={c.id} value={c.id}>

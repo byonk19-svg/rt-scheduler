@@ -524,14 +524,14 @@ export function ManagerWeekCalendar({
   const shiftPalette =
     selectedShiftType === 'day'
       ? {
-          border: 'border-sky-200',
-          bg: 'bg-sky-50',
-          text: 'text-sky-900',
+          border: 'border-[var(--info-border)]',
+          bg: 'bg-[var(--info-subtle)]',
+          text: 'text-[var(--info-text)]',
         }
       : {
-          border: 'border-indigo-200',
-          bg: 'bg-indigo-50',
-          text: 'text-indigo-900',
+          border: 'border-border',
+          bg: 'bg-muted',
+          text: 'text-foreground',
         }
 
   const canGoPrev = selectedWeekIndex > 0
@@ -552,12 +552,12 @@ export function ManagerWeekCalendar({
         </p>
       )}
       {success && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-[var(--success-subtle)] px-3 py-2 text-sm text-[var(--success-text)]">
           <span>{success}</span>
           {statusUndoSnapshot && (
             <button
               type="button"
-              className="rounded-lg border border-emerald-300 bg-white px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+              className="rounded-lg border border-[var(--success-border)] bg-card px-2 py-1 text-xs font-semibold text-[var(--success-text)] hover:bg-[var(--success-subtle)]"
               onClick={runUndoStatusUpdate}
               disabled={isStatusSaving}
             >
@@ -663,7 +663,7 @@ export function ManagerWeekCalendar({
                   key={`${slotKey}-week`}
                   id={`week-slot-card-${date}-${selectedShiftType}`}
                   className={cn(
-                    'min-h-[280px] rounded-xl border border-border bg-white p-2 text-xs',
+                    'min-h-[280px] rounded-xl border border-border bg-card p-2 text-xs',
                     !inCycle ? 'bg-muted/40 text-muted-foreground' : '',
                     issueFilter !== 'all' && !filterMatch ? 'opacity-45' : '',
                     isFocused ? 'ring-2 ring-primary' : ''
@@ -683,7 +683,7 @@ export function ManagerWeekCalendar({
                               ? 'border-amber-300 bg-amber-50 text-amber-800'
                               : overCoverage
                                 ? 'border-red-300 bg-red-50 text-red-800'
-                                : 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                                : 'border-[var(--success-border)] bg-[var(--success-subtle)] text-emerald-800'
                           )}
                         >
                           {coverageCount}/{MAX_SHIFT_COVERAGE_PER_DAY}
@@ -693,7 +693,7 @@ export function ManagerWeekCalendar({
                             'rounded border px-1 py-0.5 text-[10px] font-semibold',
                             missingLead
                               ? 'border-amber-300 bg-amber-50 text-amber-800'
-                              : 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                              : 'border-[var(--success-border)] bg-[var(--success-subtle)] text-emerald-800'
                           )}
                         >
                           {missingLead ? 'Lead missing' : 'Lead set'}
@@ -776,7 +776,7 @@ export function ManagerWeekCalendar({
           ref={statusPopoverRef}
           role="dialog"
           aria-label={`Update assignment status for ${statusPopover.therapistName}`}
-          className="fixed z-50 rounded-xl border border-border bg-white p-3 shadow-lg"
+          className="fixed z-50 rounded-xl border border-border bg-card p-3 shadow-lg"
           style={{
             width: statusPopoverPosition.width,
             left: statusPopoverPosition.left,
@@ -803,7 +803,7 @@ export function ManagerWeekCalendar({
               value={statusDraft.status}
               onChange={(event) => handleStatusSelect(event.target.value as AssignmentStatus)}
               disabled={isStatusSaving}
-              className="h-8 w-full rounded-md border border-border bg-white px-2 text-xs"
+              className="h-8 w-full rounded-md border border-border bg-card px-2 text-xs"
             >
               <option value="scheduled">Scheduled</option>
               <option value="call_in">CI - Call in</option>
@@ -831,7 +831,7 @@ export function ManagerWeekCalendar({
               }
               onBlur={() => saveStatusDraft({ closePopover: false })}
               disabled={isStatusSaving}
-              className="w-full rounded-md border border-border bg-white px-2 py-1 text-xs"
+              className="w-full rounded-md border border-border bg-card px-2 py-1 text-xs"
               placeholder="Add context"
             />
           </div>
@@ -855,7 +855,7 @@ export function ManagerWeekCalendar({
                 }
                 onBlur={() => saveStatusDraft({ closePopover: false })}
                 disabled={isStatusSaving}
-                className="h-8 w-full rounded-md border border-border bg-white px-2 text-xs"
+                className="h-8 w-full rounded-md border border-border bg-card px-2 text-xs"
               />
             </div>
           )}

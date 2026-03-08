@@ -87,7 +87,7 @@ function Avatar({ name, status, expanded }: { name: string; status: UiStatus; ex
     status === 'cancelled'
       ? 'bg-[var(--error)]'
       : status === 'oncall'
-        ? 'bg-orange-600'
+        ? 'bg-[var(--warning)]'
         : 'bg-[var(--attention)]'
   const sizeClass = expanded ? 'h-[34px] w-[34px] text-[13px]' : 'h-[28px] w-[28px] text-[11px]'
 
@@ -154,7 +154,7 @@ export function ShiftDrawer({
       />
       <aside
         className={cn(
-          'no-print fixed bottom-0 right-0 top-0 z-50 w-[360px] bg-white shadow-2xl transition-transform',
+          'no-print fixed bottom-0 right-0 top-0 z-50 w-full sm:w-[420px] xl:w-[460px] bg-card shadow-2xl transition-transform',
           open ? 'translate-x-0' : 'translate-x-full'
         )}
       >
@@ -164,37 +164,39 @@ export function ShiftDrawer({
               <div className="mb-2 flex items-start justify-between">
                 <div>
                   <p className="text-lg font-extrabold text-stone-900">{selectedDay.label}</p>
-                  <p className="text-xs font-medium text-amber-800">{selectedDay.shiftType || 'Day'} Shift</p>
+                  <p className="text-sm font-medium text-amber-800">
+                    {selectedDay.shiftType || 'Day'} Shift
+                  </p>
                 </div>
                 <button
                   type="button"
                   onClick={onClose}
                   aria-label="Close details panel"
                   data-testid="coverage-drawer-close"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-lg text-slate-500 shadow-sm"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card text-lg text-muted-foreground shadow-sm"
                 >
                   &times;
                 </button>
               </div>
               <div className="flex flex-wrap gap-3 text-xs font-bold">
-                <span className="text-emerald-700">OK {countActive(selectedDay)} active</span>
+                <span className="text-[var(--success-text)]">OK {countActive(selectedDay)} active</span>
                 <span className="text-orange-700">OC {countBy(selectedDay, 'oncall')}</span>
                 <span className="text-blue-700">LE {countBy(selectedDay, 'leave_early')}</span>
                 <span className="text-red-700">X {countBy(selectedDay, 'cancelled')}</span>
               </div>
               {selectedDay.constraintBlocked && (
-                <p className="mt-2 rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700">
+                <p className="mt-2 rounded border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-700">
                   No eligible therapists (constraints)
                 </p>
               )}
             </div>
             <div className="flex-1 overflow-y-auto p-4">
-              <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
-                <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
+              <div className="mb-3 rounded-lg border border-border bg-muted px-3 py-3">
+                <p className="text-xs font-extrabold uppercase tracking-wide text-muted-foreground">
                   Assign Therapist
                 </p>
                 {availableTherapists.length === 0 ? (
-                  <p className="mt-2 text-xs text-slate-500">
+                  <p className="mt-2 text-xs text-muted-foreground">
                     No active {shiftTab.toLowerCase()}-shift therapists available.
                   </p>
                 ) : (
@@ -220,7 +222,7 @@ export function ShiftDrawer({
                               'rounded px-3 py-1 text-xs font-bold border',
                               assignRole === 'staff'
                                 ? 'bg-amber-600 text-white border-amber-600'
-                                : 'border-slate-300 text-slate-600 bg-white'
+                                : 'border-border text-muted-foreground bg-card'
                             )}
                           >
                             Staff
@@ -235,7 +237,7 @@ export function ShiftDrawer({
                               'rounded px-3 py-1 text-xs font-bold border',
                               assignRole === 'lead'
                                 ? 'bg-amber-600 text-white border-amber-600'
-                                : 'border-slate-300 text-slate-600 bg-white',
+                                : 'border-border text-muted-foreground bg-card',
                               leadDisabled && 'opacity-40 cursor-not-allowed'
                             )}
                           >
@@ -262,7 +264,7 @@ export function ShiftDrawer({
                             value={assignUserId}
                             onChange={(event) => onAssignUserIdChange(event.target.value)}
                             data-testid="coverage-assign-select"
-                            className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700"
+                            className="min-w-0 flex-1 rounded-md border border-border bg-card px-2 py-1.5 text-xs text-foreground"
                             required
                           >
                             {displayOptions.map((therapist) => {
@@ -323,14 +325,14 @@ export function ShiftDrawer({
                 )}
               </div>
               {selectedDayShifts.length === 0 && (
-                <p className="mb-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">
+                <p className="mb-2 rounded-md border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
                   No therapists assigned yet.
                 </p>
               )}
               {selectedDayShifts.map((shift) => {
                 const expanded = expandedShiftId === shift.id
                 return (
-                  <div key={shift.id} className="mb-2 overflow-hidden rounded-lg border border-slate-200">
+                  <div key={shift.id} className="mb-2 overflow-hidden rounded-lg border border-border">
                     <button
                       type="button"
                       onClick={() => onToggleExpanded(shift.id)}
@@ -339,19 +341,19 @@ export function ShiftDrawer({
                     >
                       <Avatar name={shift.name} status={shift.status} expanded={expanded} />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-bold text-slate-900">{shift.name}</p>
+                        <p className="truncate text-sm font-bold text-foreground">{shift.name}</p>
                         <p className={cn('text-xs font-semibold', SHIFT_STATUSES[shift.status].textClass)}>
                           {SHIFT_STATUSES[shift.status].label}
                         </p>
                       </div>
                       {shift.isLead && (
-                        <span className="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">
+                        <span className="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-xs font-bold uppercase text-amber-800">
                           Lead
                         </span>
                       )}
                     </button>
                     {expanded && (
-                      <div className="border-t border-slate-100 px-3 py-3">
+                      <div className="border-t border-border px-3 py-3">
                         <div className="mb-2 flex flex-wrap gap-1">
                           {STATUS_ORDER.map((statusKey) => {
                             const activeStatus = shift.status === statusKey
@@ -390,16 +392,16 @@ export function ShiftDrawer({
                               : 'Unassign therapist'}
                         </button>
                         {shift.log.length > 0 && (
-                          <div className="space-y-1 border-t border-slate-100 pt-2">
-                            <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-400">
+                          <div className="space-y-1 border-t border-border pt-2">
+                            <p className="text-xs font-extrabold uppercase tracking-wide text-muted-foreground">
                               Changes
                             </p>
                             {shift.log.map((entry, index) => (
                               <div
                                 key={`${shift.id}-log-${index}`}
-                                className="flex items-center gap-1.5 text-[11px] text-slate-500"
+                                className="flex items-center gap-1.5 text-xs text-muted-foreground"
                               >
-                                <span className="font-semibold text-slate-700">{entry.from}</span>
+                                <span className="font-semibold text-foreground">{entry.from}</span>
                                 <span>-&gt;</span>
                                 <span className={cn('font-bold', SHIFT_STATUSES[entry.to].textClass)}>
                                   {entry.toLabel}

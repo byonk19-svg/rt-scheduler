@@ -34,7 +34,7 @@ export function StaffNavbar({ fullName }: StaffNavbarProps) {
   const [signingOut, setSigningOut] = useState(false)
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-white/95 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur">
       <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3 md:px-8">
         <Link
           href="/dashboard/staff"
@@ -65,7 +65,7 @@ export function StaffNavbar({ fullName }: StaffNavbarProps) {
         <div className="ml-auto flex items-center gap-2">
           <NotificationBell variant="staff" />
 
-          <div className="inline-flex items-center gap-2 rounded-md border border-border bg-white px-3 py-2 text-sm">
+          <div className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm">
             <span
               className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold text-white"
               style={{ backgroundColor: '#d97706' }}
@@ -83,7 +83,7 @@ export function StaffNavbar({ fullName }: StaffNavbarProps) {
             <button
               type="submit"
               disabled={signingOut}
-              className="inline-flex items-center gap-2 rounded-md border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-70"
+              className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-70"
             >
               {signingOut && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
               {signingOut ? 'Signing out...' : 'Sign out'}

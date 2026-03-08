@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Bell } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase/client'
+import { Skeleton } from '@/components/ui/skeleton'
 
 type NotificationItem = {
   id: string
@@ -154,7 +155,7 @@ export function NotificationBell({ variant = 'default' }: NotificationBellProps)
             void loadNotifications()
           }
         }}
-        className={`relative inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-white text-foreground ${
+        className={`relative inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-foreground ${
           isStaffVariant ? '' : 'hover:bg-secondary'
         }`}
         aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
@@ -163,59 +164,91 @@ export function NotificationBell({ variant = 'default' }: NotificationBellProps)
         <Bell className="h-4 w-4" />
         {unreadCount > 0 &&
           (isStaffVariant ? (
-            <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border border-white bg-[#d97706]" />
+            <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-card bg-[var(--attention)]" />
           ) : (
-            <span className="absolute -top-1 -right-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+            <span className="absolute -right-1 -top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
               {unreadBadgeLabel}
             </span>
           ))}
       </button>
 
       {open && (
-        <div className="absolute right-0 z-40 mt-2 w-80 max-w-[calc(100vw-1rem)] rounded-md border border-border bg-white p-2 shadow-lg">
-          <div className="mb-2 flex items-center justify-between px-2">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="absolute right-0 z-40 mt-2 w-80 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
               Notifications
-            </div>
+            </p>
             {unreadCount > 0 && (
               <button
                 type="button"
                 onClick={() => {
                   void markAllAsRead()
                 }}
-                className="text-xs font-semibold text-[#d97706]"
+                className="text-xs font-semibold text-primary hover:underline"
               >
                 Mark all read
               </button>
             )}
           </div>
-          <div className="max-h-80 space-y-1 overflow-auto">
+
+          {/* Body */}
+          <div className="max-h-80 divide-y divide-border overflow-auto">
             {loading ? (
-              <p className="px-2 py-3 text-sm text-muted-foreground">Loading...</p>
+              <div className="space-y-0 divide-y divide-border">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex gap-3 px-4 py-3">
+                    <Skeleton className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-3 w-2/3" />
+                      <Skeleton className="h-2.5 w-full" />
+                      <Skeleton className="h-2 w-1/4" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : notifications.length === 0 ? (
-              <p className="px-2 py-3 text-sm text-muted-foreground">No notifications yet.</p>
-            ) : (
-              notifications.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => {
-                    void handleNotificationClick(item)
-                  }}
-                  className={`rounded-md border border-border px-2 py-2 ${
-                    item.read_at ? 'bg-card' : 'bg-[#fffbeb]'
-                  } ${getNotificationHref(item) ? 'cursor-pointer' : ''}`}
-                >
-                  <p
-                    className={`text-sm text-foreground ${item.read_at ? 'font-medium' : 'font-semibold'}`}
-                  >
-                    {item.title}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{item.message}</p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    {timeAgo(item.created_at)}
-                  </p>
+              <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-muted">
+                  <Bell className="h-4 w-4 text-muted-foreground" />
                 </div>
-              ))
+                <p className="text-sm font-medium text-foreground">You&apos;re all caught up</p>
+                <p className="text-xs text-muted-foreground">No notifications yet.</p>
+              </div>
+            ) : (
+              notifications.map((item) => {
+                const href = getNotificationHref(item)
+                const isUnread = !item.read_at
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => {
+                      void handleNotificationClick(item)
+                    }}
+                    className={`flex gap-3 px-4 py-3 transition-colors ${
+                      isUnread ? 'bg-muted/60' : 'bg-card'
+                    } ${href ? 'cursor-pointer hover:bg-muted/80' : ''}`}
+                  >
+                    {/* Unread indicator */}
+                    <div className="mt-1.5 flex w-2 shrink-0 items-start justify-center">
+                      {isUnread && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p
+                        className={`text-sm leading-snug text-foreground ${
+                          isUnread ? 'font-semibold' : 'font-medium'
+                        }`}
+                      >
+                        {item.title}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{item.message}</p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {timeAgo(item.created_at)}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })
             )}
           </div>
         </div>
