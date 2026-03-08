@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server'
 
+import { isTrustedMutationRequest } from '@/lib/security/request-origin'
 import { createClient } from '@/lib/supabase/server'
 
-export async function POST() {
+export async function POST(request: Request) {
+  if (!isTrustedMutationRequest(request)) {
+    return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 })
+  }
+
   const supabase = await createClient()
   const {
     data: { user },

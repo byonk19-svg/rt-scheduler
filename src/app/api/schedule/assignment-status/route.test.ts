@@ -84,6 +84,25 @@ describe('assignment status API', () => {
     vi.resetAllMocks()
   })
 
+  it('rejects cross-origin mutation requests', async () => {
+    const response = await POST(
+      new Request('http://localhost/api/schedule/assignment-status', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'https://evil.example' },
+        body: JSON.stringify({
+          assignmentId: 'shift-1',
+          status: 'call_in',
+        }),
+      })
+    )
+
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Invalid request origin.',
+    })
+    expect(createClient).not.toHaveBeenCalled()
+  })
+
   it('allows a lead-equivalent therapist to update status', async () => {
     const supabase = makeSupabaseMock({ role: 'therapist', isLeadEligible: true, userId: 'lead-1' })
     vi.mocked(createClient).mockResolvedValue(
@@ -93,7 +112,7 @@ describe('assignment status API', () => {
     const response = await POST(
       new Request('http://localhost/api/schedule/assignment-status', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
         body: JSON.stringify({
           assignmentId: 'shift-1',
           status: 'call_in',
@@ -124,7 +143,7 @@ describe('assignment status API', () => {
     const response = await POST(
       new Request('http://localhost/api/schedule/assignment-status', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
         body: JSON.stringify({
           assignmentId: 'shift-1',
           status: 'call_in',
@@ -149,7 +168,7 @@ describe('assignment status API', () => {
     const response = await POST(
       new Request('http://localhost/api/schedule/assignment-status', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
         body: JSON.stringify({
           assignmentId: 'shift-1',
           status: 'cancelled',
@@ -174,7 +193,7 @@ describe('assignment status API', () => {
     const response = await POST(
       new Request('http://localhost/api/schedule/assignment-status', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
         body: JSON.stringify({
           assignmentId: 'shift-1',
           status: 'on_call',
@@ -184,7 +203,7 @@ describe('assignment status API', () => {
 
     expect(response.status).toBe(403)
     await expect(response.json()).resolves.toMatchObject({
-      error: 'Assignment is outside your site scope.',
+      error: 'Not authorized to update this assignment status.',
     })
   })
 })

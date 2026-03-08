@@ -60,7 +60,21 @@ For publish history + async email delivery:
 - `NEXT_PUBLIC_APP_URL`
 - `RESEND_API_KEY`
 - `PUBLISH_EMAIL_FROM`
-- optional `PUBLISH_WORKER_KEY` (key auth for cron/webhook caller)
+- optional `PUBLISH_WORKER_KEY` + `PUBLISH_WORKER_SIGNING_KEY` (signed key auth for cron/webhook caller)
+
+Signed worker request headers for `POST /api/publish/process`:
+
+- `x-publish-worker-key: <PUBLISH_WORKER_KEY>`
+- `x-publish-worker-timestamp: <unix-seconds>`
+- `x-publish-worker-signature: <hex-hmac-sha256>`
+
+Signature payload:
+
+```text
+POST
+/api/publish/process
+<unix-seconds>
+```
 
 Validate publish rollout readiness:
 

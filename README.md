@@ -97,7 +97,21 @@ Required env vars for publish queue + delivery:
 - `NEXT_PUBLIC_APP_URL`
 - `RESEND_API_KEY`
 - `PUBLISH_EMAIL_FROM`
-- optional `PUBLISH_WORKER_KEY` (for cron/webhook key auth)
+- optional `PUBLISH_WORKER_KEY` + `PUBLISH_WORKER_SIGNING_KEY` (for signed cron/webhook auth)
+
+For signed worker calls to `POST /api/publish/process`, send:
+
+- `x-publish-worker-key: <PUBLISH_WORKER_KEY>`
+- `x-publish-worker-timestamp: <unix-seconds>`
+- `x-publish-worker-signature: <hex-hmac-sha256>`
+
+Signature payload format:
+
+```text
+POST
+/api/publish/process
+<unix-seconds>
+```
 
 Run readiness check:
 

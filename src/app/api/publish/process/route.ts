@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server'
 
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
+import { isTrustedMutationRequest } from '@/lib/security/request-origin'
+import { isValidPublishWorkerRequest } from '@/lib/security/worker-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
   buildPublishEmailPayload,
@@ -65,11 +67,13 @@ function parseBatchSize(value: unknown): number {
 }
 
 export async function POST(request: Request) {
-  const workerKeyHeader = request.headers.get('x-publish-worker-key')
-  const expectedWorkerKey = process.env.PUBLISH_WORKER_KEY
-  const allowWorkerKey = Boolean(expectedWorkerKey && workerKeyHeader === expectedWorkerKey)
+  const allowWorkerRequest = await isValidPublishWorkerRequest(request)
 
-  if (!allowWorkerKey) {
+  if (!allowWorkerRequest) {
+    if (!isTrustedMutationRequest(request)) {
+      return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 })
+    }
+
     const supabase = await createClient()
     const {
       data: { user },
@@ -109,8 +113,8 @@ export async function POST(request: Request) {
   try {
     admin = createAdminClient()
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Missing admin Supabase configuration.'
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('Failed to initialize admin client for publish processing:', error)
+    return NextResponse.json({ error: 'Could not initialize publish processing.' }, { status: 500 })
   }
 
   let outboxQuery = admin
@@ -128,7 +132,11 @@ export async function POST(request: Request) {
   const { data: queuedRows, error: queuedError } = await outboxQuery
 
   if (queuedError) {
-    return NextResponse.json({ error: queuedError.message }, { status: 500 })
+    console.error('Failed to load queued notification_outbox rows:', queuedError)
+    return NextResponse.json(
+      { error: 'Could not load queued publish notifications.' },
+      { status: 500 }
+    )
   }
 
   const rows = (queuedRows ?? []) as OutboxRow[]
@@ -178,7 +186,8 @@ export async function POST(request: Request) {
     .in('id', eventIds)
 
   if (publishEventError) {
-    return NextResponse.json({ error: publishEventError.message }, { status: 500 })
+    console.error('Failed to load publish event metadata for queued rows:', publishEventError)
+    return NextResponse.json({ error: 'Could not load publish metadata.' }, { status: 500 })
   }
 
   const cycleLabelByEventId = new Map(

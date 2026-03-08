@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
+import { isTrustedMutationRequest } from '@/lib/security/request-origin'
 import { createClient } from '@/lib/supabase/server'
 
 const ASSIGNMENT_STATUS_VALUES = [
@@ -41,6 +42,10 @@ function isAllowedAssignmentStatus(value: string): value is AssignmentStatus {
 }
 
 export async function POST(request: Request) {
+  if (!isTrustedMutationRequest(request)) {
+    return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 })
+  }
+
   const supabase = await createClient()
   const {
     data: { user },
@@ -94,11 +99,16 @@ export async function POST(request: Request) {
 
   if (error) {
     if (error.code === '42501') {
-      return NextResponse.json({ error: error.message }, { status: 403 })
+      console.warn('Assignment status RPC authorization denied:', error.message || error)
+      return NextResponse.json(
+        { error: 'Not authorized to update this assignment status.' },
+        { status: 403 }
+      )
     }
     if (error.code === 'P0002') {
       return NextResponse.json({ error: 'Assignment not found.' }, { status: 404 })
     }
+    console.error('Failed to update assignment status via RPC:', error)
     return NextResponse.json({ error: 'Could not update assignment status.' }, { status: 500 })
   }
 

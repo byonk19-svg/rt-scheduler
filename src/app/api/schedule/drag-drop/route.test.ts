@@ -283,6 +283,28 @@ describe('drag-drop API behavior', () => {
     vi.mocked(setDesignatedLeadMutation).mockResolvedValue({ ok: true })
   })
 
+  it('rejects cross-origin mutation requests', async () => {
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'https://evil.example' },
+        body: JSON.stringify({
+          action: 'assign',
+          cycleId: 'cycle-1',
+          userId: 'therapist-1',
+          shiftType: 'day',
+          date: '2026-03-10',
+        }),
+      })
+    )
+
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Invalid request origin.',
+    })
+    expect(createClient).not.toHaveBeenCalled()
+  })
+
   it('returns 409 when assign would exceed daily coverage', async () => {
     vi.mocked(createClient).mockResolvedValue(
       makeSupabaseMock({
@@ -294,7 +316,7 @@ describe('drag-drop API behavior', () => {
     const response = await POST(
       new Request('http://localhost/api/schedule/drag-drop', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
         body: JSON.stringify({
           action: 'assign',
           cycleId: 'cycle-1',
@@ -327,7 +349,7 @@ describe('drag-drop API behavior', () => {
     const response = await POST(
       new Request('http://localhost/api/schedule/drag-drop', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
         body: JSON.stringify({
           action: 'assign',
           cycleId: 'cycle-1',
@@ -372,7 +394,7 @@ describe('drag-drop API behavior', () => {
     const response = await POST(
       new Request('http://localhost/api/schedule/drag-drop', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
         body: JSON.stringify({
           action: 'assign',
           cycleId: 'cycle-1',
@@ -422,7 +444,7 @@ describe('drag-drop API behavior', () => {
     const response = await POST(
       new Request('http://localhost/api/schedule/drag-drop', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
         body: JSON.stringify({
           action: 'assign',
           cycleId: 'cycle-1',
@@ -465,7 +487,7 @@ describe('drag-drop API behavior', () => {
     const response = await POST(
       new Request('http://localhost/api/schedule/drag-drop', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
         body: JSON.stringify({
           action: 'assign',
           cycleId: 'cycle-1',
@@ -496,7 +518,7 @@ describe('drag-drop API behavior', () => {
     const response = await POST(
       new Request('http://localhost/api/schedule/drag-drop', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
         body: JSON.stringify({
           action: 'set_lead',
           cycleId: 'cycle-1',
@@ -532,7 +554,7 @@ describe('drag-drop API behavior', () => {
     const response = await POST(
       new Request('http://localhost/api/schedule/drag-drop', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
         body: JSON.stringify({
           action: 'set_lead',
           cycleId: 'cycle-1',
@@ -568,7 +590,7 @@ describe('drag-drop API behavior', () => {
     const response = await POST(
       new Request('http://localhost/api/schedule/drag-drop', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
         body: JSON.stringify({
           action: 'set_lead',
           cycleId: 'cycle-1',
@@ -605,7 +627,7 @@ describe('drag-drop API behavior', () => {
     const response = await POST(
       new Request('http://localhost/api/schedule/drag-drop', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
         body: JSON.stringify({
           action: 'remove',
           cycleId: 'cycle-1',

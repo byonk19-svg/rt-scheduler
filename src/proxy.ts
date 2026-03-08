@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
+import { isValidPublishWorkerRequest } from '@/lib/security/worker-auth'
 
 const PUBLIC_ROUTES = ['/', '/login', '/signup', '/auth/callback', '/auth/signout'] as const
 
@@ -47,9 +48,7 @@ export async function proxy(request: NextRequest) {
 
   // Allow key-authenticated publish worker calls to bypass session auth middleware.
   if (matchesRoute(pathname, '/api/publish/process')) {
-    const workerKeyHeader = request.headers.get('x-publish-worker-key')
-    const expectedWorkerKey = process.env.PUBLISH_WORKER_KEY
-    if (expectedWorkerKey && workerKeyHeader === expectedWorkerKey) {
+    if (await isValidPublishWorkerRequest(request)) {
       return NextResponse.next({
         request,
       })

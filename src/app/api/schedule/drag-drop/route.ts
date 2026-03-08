@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { setDesignatedLeadMutation } from '@/lib/set-designated-lead'
 import { exceedsCoverageLimit, exceedsWeeklyLimit } from '@/lib/schedule-rule-validation'
 import { notifyUsers } from '@/lib/notifications'
+import { isTrustedMutationRequest } from '@/lib/security/request-origin'
 import { writeAuditLog } from '@/lib/audit-log'
 import {
   MAX_WORK_DAYS_PER_WEEK,
@@ -346,6 +347,10 @@ function parseActionBody(raw: unknown): DragAction | null {
 }
 
 export async function POST(request: Request) {
+  if (!isTrustedMutationRequest(request)) {
+    return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 })
+  }
+
   const supabase = await createClient()
   const {
     data: { user },

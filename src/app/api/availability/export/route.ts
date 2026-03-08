@@ -25,10 +25,14 @@ function getOne<T>(value: T | T[] | null | undefined): T | null {
 }
 
 function escapeCsv(value: string): string {
-  if (value.includes('"') || value.includes(',') || value.includes('\n')) {
-    return `"${value.replaceAll('"', '""')}"`
+  const needsFormulaNeutralization =
+    /^[=+\-@]/.test(value) || /^[\t\r]/.test(value) || /^\s+[=+\-@]/.test(value)
+  const safeValue = needsFormulaNeutralization ? `'${value}` : value
+
+  if (safeValue.includes('"') || safeValue.includes(',') || safeValue.includes('\n')) {
+    return `"${safeValue.replaceAll('"', '""')}"`
   }
-  return value
+  return safeValue
 }
 
 export async function GET() {
