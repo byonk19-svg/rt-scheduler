@@ -1,8 +1,11 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { CalendarDays, Send } from 'lucide-react'
 
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
+import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/page-header'
 import { createClient } from '@/lib/supabase/server'
 
 type PublishEventRow = {
@@ -39,6 +42,35 @@ function getOne<T>(value: T | T[] | null | undefined): T | null {
   return value ?? null
 }
 
+function StatusChip({ status }: { status: 'success' | 'failed' }) {
+  if (status === 'success') {
+    return (
+      <span
+        className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+        style={{
+          borderColor: 'var(--success-border)',
+          backgroundColor: 'var(--success-subtle)',
+          color: 'var(--success-text)',
+        }}
+      >
+        Success
+      </span>
+    )
+  }
+  return (
+    <span
+      className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+      style={{
+        borderColor: 'var(--error-border)',
+        backgroundColor: 'var(--error-subtle)',
+        color: 'var(--error-text)',
+      }}
+    >
+      Failed
+    </span>
+  )
+}
+
 export default async function PublishHistoryPage() {
   const supabase = await createClient()
   const {
@@ -69,11 +101,18 @@ export default async function PublishHistoryPage() {
 
   if (eventsError) {
     return (
-      <div className="mx-auto w-full max-w-5xl space-y-4 py-6">
-        <h1 className="text-2xl font-bold text-foreground">Publish history</h1>
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-          Could not load publish history.
-        </p>
+      <div className="space-y-4">
+        <PageHeader title="Publish History" subtitle="Schedule email delivery log." />
+        <div
+          className="rounded-xl border px-4 py-3 text-sm font-medium"
+          style={{
+            borderColor: 'var(--error-border)',
+            backgroundColor: 'var(--error-subtle)',
+            color: 'var(--error-text)',
+          }}
+        >
+          Could not load publish history. Please try refreshing.
+        </div>
       </div>
     )
   }
@@ -81,66 +120,107 @@ export default async function PublishHistoryPage() {
   const events = (eventsData ?? []) as PublishEventRow[]
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-4 py-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-foreground">Publish history</h1>
-        <Link
-          href="/schedule?view=week"
-          className="rounded-md border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-secondary"
-        >
-          Back to schedule
-        </Link>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="Publish History"
+        subtitle="Track schedule email delivery for each publish event."
+        actions={
+          <Button asChild variant="outline" size="sm">
+            <Link href="/schedule?view=week">
+              <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
+              Back to schedule
+            </Link>
+          </Button>
+        }
+      />
 
-      <div className="overflow-hidden rounded-md border border-border bg-white">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <th className="px-3 py-2">Published at</th>
-              <th className="px-3 py-2">Cycle</th>
-              <th className="px-3 py-2">Published by</th>
-              <th className="px-3 py-2">Recipients</th>
-              <th className="px-3 py-2">Queued</th>
-              <th className="px-3 py-2">Sent</th>
-              <th className="px-3 py-2">Failed</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Details</th>
-            </tr>
-          </thead>
-          <tbody>
-            {events.length === 0 ? (
-              <tr>
-                <td className="px-3 py-6 text-sm text-muted-foreground" colSpan={9}>
-                  No publish events yet.
-                </td>
-              </tr>
-            ) : (
-              events.map((event) => (
-                <tr key={event.id} className="border-b border-border last:border-b-0">
-                  <td className="px-3 py-2 text-sm text-foreground">
-                    {new Date(event.published_at).toLocaleString('en-US')}
-                  </td>
-                  <td className="px-3 py-2 text-sm text-foreground">
-                    {getOne(event.schedule_cycles)?.label ?? event.cycle_id}
-                  </td>
-                  <td className="px-3 py-2 text-sm text-foreground">
-                    {getOne(event.profiles)?.full_name ?? 'Manager'}
-                  </td>
-                  <td className="px-3 py-2 text-sm text-foreground">{event.recipient_count}</td>
-                  <td className="px-3 py-2 text-sm text-foreground">{event.queued_count}</td>
-                  <td className="px-3 py-2 text-sm text-foreground">{event.sent_count}</td>
-                  <td className="px-3 py-2 text-sm text-foreground">{event.failed_count}</td>
-                  <td className="px-3 py-2 text-sm text-foreground">{event.status}</td>
-                  <td className="px-3 py-2 text-sm">
-                    <Link className="text-primary hover:underline" href={`/publish/${event.id}`}>
-                      View
-                    </Link>
-                  </td>
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+        {events.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 px-6 py-14 text-center">
+            <div className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-muted">
+              <Send className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-foreground">No publish events yet</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Publish a schedule from the schedule workspace to see delivery history here.
+              </p>
+            </div>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/schedule?view=week">Go to schedule</Link>
+            </Button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-border bg-secondary/40 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <th className="px-4 py-3">Published at</th>
+                  <th className="px-4 py-3">Cycle</th>
+                  <th className="px-4 py-3">Published by</th>
+                  <th className="px-4 py-3 text-right">Recipients</th>
+                  <th className="px-4 py-3 text-right">Queued</th>
+                  <th className="px-4 py-3 text-right">Sent</th>
+                  <th className="px-4 py-3 text-right">Failed</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3" />
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {events.map((event) => (
+                  <tr key={event.id} className="group">
+                    <td className="px-4 py-3 text-sm text-foreground">
+                      {new Date(event.published_at).toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-medium text-foreground">
+                      {getOne(event.schedule_cycles)?.label ?? event.cycle_id}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground">
+                      {getOne(event.profiles)?.full_name ?? 'Manager'}
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums text-foreground">
+                      {event.recipient_count}
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums text-muted-foreground">
+                      {event.queued_count}
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums text-[var(--success-text)]">
+                      {event.sent_count}
+                    </td>
+                    <td
+                      className="px-4 py-3 text-right text-sm tabular-nums"
+                      style={{ color: event.failed_count > 0 ? 'var(--error-text)' : undefined }}
+                    >
+                      <span
+                        className={
+                          event.failed_count > 0 ? 'font-semibold' : 'text-muted-foreground'
+                        }
+                      >
+                        {event.failed_count}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusChip status={event.status} />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Link
+                        href={`/publish/${event.id}`}
+                        className="text-xs font-semibold text-primary hover:underline"
+                      >
+                        Details →
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )

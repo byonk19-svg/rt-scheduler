@@ -24,6 +24,8 @@ import { MAX_SHIFT_COVERAGE_PER_DAY, MIN_SHIFT_COVERAGE_PER_DAY } from '@/lib/sc
 import { createClient } from '@/lib/supabase/client'
 import { buildCycleRoute } from '@/lib/cycle-route'
 import { PageHeader } from '@/components/ui/page-header'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 
 type DashboardData = {
@@ -243,18 +245,15 @@ export default function ManagerDashboardPage() {
             teamProfilesResult.error
           )
         }
-
         if (pendingPostsResult.error) {
           console.error(
             'Failed to load pending approval posts for dashboard:',
             pendingPostsResult.error
           )
         }
-
         if (reviewedPostsResult.error) {
           console.error('Failed to load reviewed posts for dashboard:', reviewedPostsResult.error)
         }
-
         if (shiftsResult.error) {
           console.error('Failed to load shifts for dashboard metrics:', shiftsResult.error)
         }
@@ -437,14 +436,11 @@ export default function ManagerDashboardPage() {
       } catch (error) {
         console.error('Failed to load manager dashboard data:', error)
       } finally {
-        if (isMounted) {
-          setLoading(false)
-        }
+        if (isMounted) setLoading(false)
       }
     }
 
     void loadDashboard()
-
     return () => {
       isMounted = false
     }
@@ -487,161 +483,258 @@ export default function ManagerDashboardPage() {
     coverageHasIssues ||
     leadHasIssues ||
     (!loading && data.unfilledShifts > 0)
+  const nextAction = (() => {
+    if (loading) {
+      return {
+        title: 'Review cycle health',
+        detail: 'Loading live coverage and approval signals for this cycle.',
+        href: coverageRoute,
+        cta: 'Open coverage',
+        tone: 'warn' as const,
+      }
+    }
+
+    if (data.unfilledShifts > 0 || leadHasIssues || coverageHasIssues) {
+      const issues: string[] = []
+      if (data.unfilledShifts > 0) issues.push(`${data.unfilledShifts} unfilled`)
+      if (data.missingLead > 0) issues.push(`${data.missingLead} missing lead`)
+      if (data.underCoverage > 0) issues.push(`${data.underCoverage} under coverage`)
+      return {
+        title: 'Fix coverage before publishing',
+        detail: `${issues.join(' | ')}.`,
+        href: coverageRoute,
+        cta: 'Resolve coverage gaps',
+        tone: 'critical' as const,
+      }
+    }
+
+    if (!approvalsClear) {
+      return {
+        title: 'Clear pending approvals',
+        detail: `${data.pendingApprovals} requests are still waiting for review.`,
+        href: approvalsRoute,
+        cta: 'Review approvals',
+        tone: 'warn' as const,
+      }
+    }
+
+    return {
+      title: 'Cycle is ready to publish',
+      detail: 'Coverage and approvals are clear for this cycle.',
+      href: publishRoute,
+      cta: 'Go to publish',
+      tone: 'ok' as const,
+    }
+  })()
+  const publishBlockers = (() => {
+    if (loading) return []
+    const blockers: string[] = []
+    if (data.unfilledShifts > 0) {
+      blockers.push(`${data.unfilledShifts} unfilled shift${data.unfilledShifts === 1 ? '' : 's'}`)
+    }
+    if (data.missingLead > 0) {
+      blockers.push(`${data.missingLead} shift${data.missingLead === 1 ? '' : 's'} missing lead`)
+    }
+    if (data.underCoverage > 0) {
+      blockers.push(
+        `${data.underCoverage} under-coverage slot${data.underCoverage === 1 ? '' : 's'}`
+      )
+    }
+    if (data.pendingApprovals > 0) {
+      blockers.push(
+        `${data.pendingApprovals} pending approval${data.pendingApprovals === 1 ? '' : 's'}`
+      )
+    }
+    return blockers
+  })()
+  const publishBlockedReason = loading
+    ? 'Checking publish blockers.'
+    : publishBlockers.length > 0
+      ? `Blocked by ${publishBlockers.join(', ')}.`
+      : 'No blockers detected. Cycle can be published.'
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 28px' }}>
+    <div className="space-y-5">
+      {/* Page header */}
       <PageHeader
-        className="fade-up mb-7"
+        className="fade-up"
         title="Manager Dashboard"
         subtitle={`Welcome, ${d.managerName}. Build coverage first, then publish confidently.`}
         actions={
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              background: 'var(--card)',
-              border: '1px solid var(--border)',
-              borderRadius: 8,
-              padding: '7px 14px',
-            }}
-          >
+          <div className="flex items-center gap-1.5 rounded-lg border border-border bg-muted px-3 py-1.5">
             <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted-foreground)' }}>
-              Cycle: {d.cycleStart} – {d.cycleEnd}
+            <span className="text-xs font-semibold text-muted-foreground">
+              {d.cycleStart} – {d.cycleEnd}
             </span>
           </div>
         }
       />
 
+      {/* Attention bar */}
       <div
-        className="fade-up"
-        style={{
-          animationDelay: '0.05s',
-          background: '#fff',
-          border: hasAnyIssues
-            ? '1.5px solid var(--warning-border)'
-            : '1px solid var(--success-border)',
-          borderLeft: hasAnyIssues ? '4px solid var(--warning)' : '4px solid var(--success)',
-          borderRadius: 10,
-          padding: '16px 20px',
-          marginBottom: 24,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 20,
-          flexWrap: 'wrap',
-        }}
+        className={cn(
+          'fade-up flex flex-wrap items-center gap-4 rounded-xl border bg-card px-4 py-4 sm:gap-5 sm:px-5',
+          hasAnyIssues
+            ? 'border-l-4 border-[var(--warning-border)] border-l-[var(--warning)]'
+            : 'border-l-4 border-[var(--success-border)] border-l-[var(--success)]'
+        )}
+        style={{ animationDelay: '0.05s' }}
       >
-        <div style={{ display: 'flex', gap: 20, flex: 1, flexWrap: 'wrap' }}>
+        <div className="flex flex-1 flex-wrap gap-4 sm:gap-5">
           <Stat label="Unfilled shifts" value={d.unfilledShifts} color="var(--error-text)" />
-          <div style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch' }} />
+          <div className="hidden w-px self-stretch bg-border sm:block" />
           <Stat label="Missing lead" value={d.missingLead} color="var(--error-text)" />
-          <div style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch' }} />
+          <div className="hidden w-px self-stretch bg-border sm:block" />
           <Stat label="Under coverage" value={d.underCoverage} color="var(--warning-text)" />
-          <div style={{ width: 1, background: 'var(--border)', alignSelf: 'stretch' }} />
+          <div className="hidden w-px self-stretch bg-border sm:block" />
           <Stat label="Pending approvals" value={d.pendingApprovals} color="var(--success-text)" />
         </div>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          <AmberButton onClick={() => router.push(coverageRoute)}>Fix coverage</AmberButton>
-          <GhostButton onClick={() => router.push(approvalsRoute)}>Review approvals</GhostButton>
-          <GhostButton onClick={() => router.push(publishRoute)}>Go to publish</GhostButton>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Button size="sm" onClick={() => router.push(coverageRoute)}>
+            Fix coverage
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => router.push(approvalsRoute)}>
+            Review approvals
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => router.push(publishRoute)}>
+            Go to publish
+          </Button>
         </div>
       </div>
 
+      {/* Primary workflow panels */}
       <div
-        className="fade-up"
-        style={{
-          animationDelay: '0.1s',
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
-          gap: 14,
-          marginBottom: 24,
-        }}
+        className="fade-up grid grid-cols-1 gap-3.5 lg:grid-cols-12"
+        style={{ animationDelay: '0.1s' }}
       >
-        <Card>
-          <CardHeader
-            icon={<ClipboardList className="h-4 w-4 text-muted-foreground" />}
-            title="Coverage"
-            subtitle="Resolve gaps before publishing"
-          />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '14px 0' }}>
-            <IssueRow label="Missing lead" value={d.missingLead} type="error" />
-            <IssueRow label="Under coverage" value={d.underCoverage} type="warn" />
-            <IssueRow label="Over coverage" value={d.overCoverage} type="ok" />
-          </div>
-          <AmberButton full onClick={() => router.push(coverageRoute)}>
-            Open coverage
-          </AmberButton>
-        </Card>
-
-        <Card>
+        <SectionCard className="lg:col-span-7">
           <CardHeader
             icon={<Rocket className="h-4 w-4 text-muted-foreground" />}
-            title="Publish"
-            subtitle="Checklist must be clear to publish"
+            title="Next action"
+            subtitle="Start with the highest-impact step for this cycle"
           />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '14px 0' }}>
-            <CheckRow
-              label="Approvals"
-              status={approvalsClear ? 'ok' : 'error'}
-              detail={loading ? '—' : approvalsClear ? 'clear' : `${data.pendingApprovals} pending`}
+          <div
+            className={cn(
+              'my-3.5 rounded-lg border px-3 py-3',
+              nextAction.tone === 'critical'
+                ? 'border-[var(--error-border)] bg-[var(--error-subtle)]'
+                : nextAction.tone === 'warn'
+                  ? 'border-[var(--warning-border)] bg-[var(--warning-subtle)]'
+                  : 'border-[var(--success-border)] bg-[var(--success-subtle)]'
+            )}
+          >
+            <p className="text-sm font-bold text-foreground">{nextAction.title}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{nextAction.detail}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-4">
+            <SmallTile
+              label="Slots scheduled"
+              value={loading ? '—' : `${String(d.scheduledSlots)} / ${String(d.totalSlots)}`}
+              icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
             />
-            <CheckRow
-              label="Coverage"
-              status={coverageHasIssues ? 'error' : 'ok'}
-              detail={loading ? '—' : coverageHasIssues ? `${data.underCoverage} issues` : 'clear'}
+            <SmallTile
+              label="Therapists on cycle"
+              value={d.therapistsScheduled}
+              icon={<Users className="h-4 w-4 text-muted-foreground" />}
             />
-            <CheckRow
-              label="Lead"
-              status={leadHasIssues ? 'error' : 'ok'}
-              detail={
-                loading ? '—' : leadHasIssues ? `${data.missingLead} shifts missing lead` : 'clear'
-              }
+            <SmallTile
+              label="Approved today"
+              value={d.approvedToday}
+              icon={<CheckCircle2 className="h-4 w-4 text-muted-foreground" />}
+            />
+            <SmallTile
+              label="Denied today"
+              value={d.deniedToday}
+              icon={<XCircle className="h-4 w-4 text-muted-foreground" />}
             />
           </div>
-          <AmberButton full onClick={() => router.push(publishRoute)}>
-            Resolve blockers
-          </AmberButton>
-        </Card>
+          <div className="mt-3.5 flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => router.push(nextAction.href)}>
+              {nextAction.cta}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => router.push(coverageRoute)}>
+              Open coverage
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => router.push(approvalsRoute)}>
+              Open approvals
+            </Button>
+          </div>
+        </SectionCard>
 
-        <Card>
-          <CardHeader
-            icon={<SquareCheckBig className="h-4 w-4 text-muted-foreground" />}
-            title="Approvals"
-            subtitle="Swap and pickup requests"
-          />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '14px 0' }}>
-            <CheckRow
-              label="Pending"
-              status={approvalsClear ? 'ok' : 'error'}
-              detail={loading ? '—' : `${data.pendingApprovals} waiting`}
+        <div className="grid gap-3.5 lg:col-span-5">
+          <SectionCard>
+            <CardHeader
+              icon={<ClipboardList className="h-4 w-4 text-muted-foreground" />}
+              title="Coverage diagnostics"
+              subtitle="Resolve gaps before publishing"
             />
-            <CheckRow label="Approved today" status="ok" detail={String(d.approvedToday)} />
-            <CheckRow label="Denied today" status="ok" detail={String(d.deniedToday)} />
-          </div>
-          <GhostButton full onClick={() => router.push(approvalsRoute)}>
-            Open approvals
-          </GhostButton>
-        </Card>
+            <div className="my-3.5 flex flex-col gap-2">
+              <IssueRow label="Missing lead" value={d.missingLead} type="error" />
+              <IssueRow label="Under coverage" value={d.underCoverage} type="warn" />
+              <IssueRow label="Over coverage" value={d.overCoverage} type="ok" />
+            </div>
+            <Button size="sm" className="w-full" onClick={() => router.push(coverageRoute)}>
+              Open coverage
+            </Button>
+          </SectionCard>
+
+          <SectionCard>
+            <CardHeader
+              icon={<SquareCheckBig className="h-4 w-4 text-muted-foreground" />}
+              title="Approvals and publish"
+              subtitle="Review requests and confirm publish readiness"
+            />
+            <div className="my-3.5 flex flex-col gap-2">
+              <CheckRow
+                label="Pending"
+                status={approvalsClear ? 'ok' : 'error'}
+                detail={loading ? '—' : `${data.pendingApprovals} waiting`}
+              />
+              <CheckRow label="Approved today" status="ok" detail={String(d.approvedToday)} />
+              <CheckRow label="Denied today" status="ok" detail={String(d.deniedToday)} />
+              <CheckRow
+                label="Publish ready"
+                status={hasAnyIssues ? 'error' : 'ok'}
+                detail={loading ? '—' : hasAnyIssues ? 'blocked' : 'ready'}
+              />
+              {!loading && (
+                <p
+                  className={cn(
+                    'hidden lg:block text-xs',
+                    publishBlockers.length > 0
+                      ? 'text-[var(--warning-text)]'
+                      : 'text-[var(--success-text)]'
+                  )}
+                >
+                  {publishBlockedReason}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1"
+                onClick={() => router.push(approvalsRoute)}
+              >
+                Open approvals
+              </Button>
+              <Button size="sm" className="flex-1" onClick={() => router.push(publishRoute)}>
+                Go to publish
+              </Button>
+            </div>
+          </SectionCard>
+        </div>
       </div>
 
-      <div
-        className="fade-up"
-        style={{
-          animationDelay: '0.15s',
-          background: '#fff',
-          border: '1px solid var(--border)',
-          borderRadius: 10,
-          padding: '18px 20px',
-          marginBottom: 24,
-        }}
-      >
+      {/* Cycle progress */}
+      <SectionCard className="fade-up" style={{ animationDelay: '0.15s' }}>
         <p className="mb-3 text-sm font-semibold text-foreground">Cycle progress</p>
         <FillRateBar
           scheduled={loading ? null : data.scheduledSlots}
           total={loading ? null : data.totalSlots}
         />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+        <div className="mt-2.5 grid grid-cols-2 gap-2.5">
           <SmallTile
             label="Slots scheduled"
             value={loading ? '—' : `${String(d.scheduledSlots)} / ${String(d.totalSlots)}`}
@@ -654,55 +747,25 @@ export default function ManagerDashboardPage() {
           />
         </div>
         {!loading && data.weeklyProgress.length > 0 && (
-          <div style={{ marginTop: 14 }}>
+          <div className="mt-3.5">
             <p className="mb-2 text-xs font-semibold text-muted-foreground">Week by week</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div className="flex flex-col gap-1">
               {data.weeklyProgress.map((week) => {
                 const pct = week.total > 0 ? Math.round((week.scheduled / week.total) * 100) : 0
                 const barColor =
                   pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--error)'
                 return (
-                  <div key={week.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 600,
-                        color: 'var(--muted-foreground)',
-                        width: 52,
-                        flexShrink: 0,
-                      }}
-                    >
+                  <div key={week.label} className="flex items-center gap-2.5">
+                    <span className="w-14 shrink-0 text-xs font-semibold text-muted-foreground">
                       {week.label}
                     </span>
-                    <div
-                      style={{
-                        flex: 1,
-                        height: 5,
-                        borderRadius: 99,
-                        background: 'var(--muted)',
-                        overflow: 'hidden',
-                      }}
-                    >
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                       <div
-                        style={{
-                          height: '100%',
-                          width: `${String(pct)}%`,
-                          background: barColor,
-                          borderRadius: 99,
-                          transition: 'width 0.3s ease',
-                        }}
+                        className="h-full rounded-full transition-[width] duration-300 ease-out"
+                        style={{ width: `${String(pct)}%`, background: barColor }}
                       />
                     </div>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: 'var(--foreground)',
-                        width: 44,
-                        textAlign: 'right',
-                        flexShrink: 0,
-                      }}
-                    >
+                    <span className="w-14 shrink-0 text-right text-xs font-bold text-foreground">
                       {week.scheduled}/{week.total}
                     </span>
                   </div>
@@ -711,70 +774,41 @@ export default function ManagerDashboardPage() {
             </div>
           </div>
         )}
-      </div>
+      </SectionCard>
 
-      <div
-        className="fade-up"
-        style={{
-          animationDelay: '0.2s',
-          background: '#fff',
-          border: '1px solid var(--border)',
-          borderRadius: 10,
-          padding: '18px 20px',
-          marginBottom: 24,
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 12,
-          }}
-        >
+      {/* Workload distribution */}
+      <SectionCard className="fade-up" style={{ animationDelay: '0.2s' }}>
+        <div className="mb-3 flex items-center justify-between">
           <p className="text-sm font-semibold text-foreground">Workload distribution</p>
           <span className="text-xs text-muted-foreground">shifts this cycle · per therapist</span>
         </div>
         {loading ? (
-          <p style={{ fontSize: 12, color: '#64748b' }}>—</p>
+          <p className="text-xs text-muted-foreground">—</p>
         ) : data.workloadRows.length === 0 ? (
-          <p style={{ fontSize: 12, color: '#64748b' }}>No scheduled shifts yet.</p>
+          <p className="text-xs text-muted-foreground">No scheduled shifts yet.</p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div className="flex flex-col gap-1.5">
             {data.workloadRows.map((row) => (
               <WorkloadBar key={row.id} row={row} max={data.workloadRows[0]?.count ?? 1} />
             ))}
           </div>
         )}
-      </div>
+      </SectionCard>
 
-      <div
-        className="fade-up"
-        style={{
-          animationDelay: '0.25s',
-          background: '#fff',
-          border: '1px solid var(--border)',
-          borderRadius: 10,
-          padding: '18px 20px',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            marginBottom: 14,
-          }}
-        >
+      {/* Team summary */}
+      <SectionCard className="fade-up" style={{ animationDelay: '0.25s' }}>
+        <div className="mb-3.5 flex items-start justify-between">
           <div>
             <p className="text-sm font-semibold text-foreground">Team summary</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               Directory management on the Team page.
             </p>
           </div>
-          <GhostButton onClick={() => router.push(teamRoute)}>Manage team</GhostButton>
+          <Button size="sm" variant="outline" onClick={() => router.push(teamRoute)}>
+            Manage team
+          </Button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+        <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
           {(
             [
               {
@@ -799,55 +833,32 @@ export default function ManagerDashboardPage() {
               },
             ] as { label: string; value: string | number; icon: ReactNode }[]
           ).map(({ label, value, icon }) => (
-            <div
-              key={label}
-              style={{
-                background: 'var(--muted)',
-                borderRadius: 8,
-                padding: '12px 14px',
-                border: '1px solid var(--border)',
-              }}
-            >
-              <div style={{ marginBottom: 6 }}>{icon}</div>
-              <div
-                style={{
-                  fontSize: 22,
-                  fontWeight: 700,
-                  color: 'var(--foreground)',
-                  lineHeight: 1,
-                }}
-              >
-                {value}
-              </div>
-              <div
-                style={{
-                  fontSize: 11,
-                  color: 'var(--muted-foreground)',
-                  marginTop: 3,
-                  fontWeight: 500,
-                }}
-              >
-                {label}
-              </div>
-            </div>
+            <SmallTile key={label} label={label} value={value} icon={icon} />
           ))}
         </div>
-      </div>
+      </SectionCard>
     </div>
   )
 }
 
-function Card({ children }: { children: React.ReactNode }) {
+// Sub-components
+
+function SectionCard({
+  children,
+  className,
+  style,
+}: {
+  children: React.ReactNode
+  className?: string
+  style?: React.CSSProperties
+}) {
   return (
     <div
-      style={{
-        background: '#fff',
-        border: '1px solid var(--border)',
-        borderRadius: 10,
-        padding: '18px 20px',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
+      className={cn(
+        'rounded-xl border border-border bg-card p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]',
+        className
+      )}
+      style={style}
     >
       {children}
     </div>
@@ -864,34 +875,13 @@ function CardHeader({
   subtitle: string
 }) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        paddingBottom: 12,
-        borderBottom: '1px solid var(--border)',
-      }}
-    >
-      <div
-        style={{
-          width: 34,
-          height: 34,
-          borderRadius: 8,
-          background: 'var(--muted)',
-          border: '1px solid var(--border)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 16,
-          flexShrink: 0,
-        }}
-      >
+    <div className="flex items-center gap-2.5 border-b border-border pb-3">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
         {icon}
       </div>
       <div>
-        <p style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>{title}</p>
-        <p style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{subtitle}</p>
+        <p className="text-[13px] font-bold leading-none text-foreground">{title}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
       </div>
     </div>
   )
@@ -899,27 +889,11 @@ function CardHeader({
 
 function Stat({ label, value, color }: { label: string; value: string | number; color: string }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <span
-        style={{
-          fontSize: 22,
-          fontWeight: 700,
-          color,
-          lineHeight: 1,
-        }}
-      >
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[22px] font-bold leading-none" style={{ color }}>
         {value}
       </span>
-      <span
-        style={{
-          fontSize: 11,
-          color: 'var(--muted-foreground)',
-          fontWeight: 500,
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {label}
-      </span>
+      <span className="whitespace-nowrap text-xs font-medium text-muted-foreground">{label}</span>
     </div>
   )
 }
@@ -947,26 +921,11 @@ function IssueRow({
         : 'var(--success-subtle)'
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '7px 10px',
-        background: 'var(--muted)',
-        borderRadius: 7,
-      }}
-    >
-      <span style={{ fontSize: 12, color: 'var(--foreground)', fontWeight: 500 }}>{label}</span>
+    <div className="flex items-center justify-between rounded-lg bg-muted px-2.5 py-1.5">
+      <span className="text-xs font-medium text-foreground">{label}</span>
       <span
-        style={{
-          fontSize: 12,
-          fontWeight: 800,
-          color,
-          background: bg,
-          padding: '1px 8px',
-          borderRadius: 20,
-        }}
+        className="rounded-full px-2 py-0.5 text-xs font-bold"
+        style={{ color, background: bg }}
       >
         {value}
       </span>
@@ -984,34 +943,17 @@ function CheckRow({
   detail: string
 }) {
   const isOk = status === 'ok'
-
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '7px 10px',
-        background: 'var(--muted)',
-        borderRadius: 7,
-      }}
-    >
+    <div className="flex items-center gap-2 rounded-lg bg-muted px-2.5 py-1.5">
       {isOk ? (
-        <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-[var(--success-text)]" />
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--success-text)]" />
       ) : (
-        <XCircle className="h-4 w-4 flex-shrink-0 text-[var(--error-text)]" />
+        <XCircle className="h-4 w-4 shrink-0 text-[var(--error-text)]" />
       )}
-      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--foreground)', minWidth: 70 }}>
-        {label}
-      </span>
+      <span className="min-w-[70px] text-xs font-semibold text-foreground">{label}</span>
       <span
-        style={{
-          fontSize: 11,
-          color: isOk ? 'var(--success-text)' : 'var(--error-text)',
-          fontWeight: 600,
-          marginLeft: 'auto',
-          textAlign: 'right' as const,
-        }}
+        className="ml-auto text-right text-xs font-semibold"
+        style={{ color: isOk ? 'var(--success-text)' : 'var(--error-text)' }}
       >
         {detail}
       </span>
@@ -1019,70 +961,10 @@ function CheckRow({
   )
 }
 
-function AmberButton({
-  children,
-  onClick,
-  full = false,
-}: {
-  children: React.ReactNode
-  onClick?: () => void
-  full?: boolean
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        fontSize: 12,
-        fontWeight: 700,
-        padding: '7px 16px',
-        borderRadius: 7,
-        border: 'none',
-        background: 'var(--primary)',
-        color: 'var(--primary-foreground)',
-        cursor: 'pointer',
-        width: full ? '100%' : 'auto',
-        fontFamily: 'var(--font-sans)',
-      }}
-    >
-      {children}
-    </button>
-  )
-}
-
-function GhostButton({
-  children,
-  onClick,
-  full = false,
-}: {
-  children: React.ReactNode
-  onClick?: () => void
-  full?: boolean
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        fontSize: 12,
-        fontWeight: 600,
-        padding: '7px 16px',
-        borderRadius: 7,
-        border: '1px solid var(--border)',
-        background: 'var(--card)',
-        color: 'var(--foreground)',
-        cursor: 'pointer',
-        width: full ? '100%' : 'auto',
-        fontFamily: 'var(--font-sans)',
-      }}
-    >
-      {children}
-    </button>
-  )
-}
-
 function FillRateBar({ scheduled, total }: { scheduled: number | null; total: number | null }) {
   if (scheduled === null || total === null || total === 0) {
     return (
-      <p style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>
+      <p className="text-xs font-medium text-muted-foreground">
         {total === 0 ? 'No slots in cycle' : '—'}
       </p>
     )
@@ -1091,25 +973,13 @@ function FillRateBar({ scheduled, total }: { scheduled: number | null; total: nu
   const barColor = pct >= 80 ? 'var(--success)' : pct >= 60 ? 'var(--warning)' : 'var(--error)'
   return (
     <div>
-      <p style={{ fontSize: 12, color: '#374151', fontWeight: 600, marginBottom: 6 }}>
+      <p className="mb-1.5 text-xs font-semibold text-foreground">
         {scheduled} of {total} slots scheduled ({pct}%)
       </p>
-      <div
-        style={{
-          height: 6,
-          borderRadius: 99,
-          background: '#f1f5f9',
-          overflow: 'hidden',
-        }}
-      >
+      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
         <div
-          style={{
-            height: '100%',
-            width: `${String(pct)}%`,
-            borderRadius: 99,
-            background: barColor,
-            transition: 'width 0.4s ease',
-          }}
+          className="h-full rounded-full transition-[width] duration-500 ease-out"
+          style={{ width: `${String(pct)}%`, background: barColor }}
         />
       </div>
     </div>
@@ -1120,52 +990,17 @@ function WorkloadBar({ row, max }: { row: WorkloadRow; max: number }) {
   const pct = max > 0 ? Math.round((row.count / max) * 100) : 0
   const barColor = row.shiftType === 'day' ? 'var(--primary)' : 'var(--tw-deep-blue)'
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <span
-        style={{
-          fontSize: 11,
-          fontWeight: 600,
-          color: '#374151',
-          width: 140,
-          flexShrink: 0,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-      >
+    <div className="flex items-center gap-2.5">
+      <span className="w-36 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-semibold text-foreground">
         {row.name}
       </span>
-      <div
-        style={{
-          flex: 1,
-          height: 6,
-          borderRadius: 99,
-          background: '#f1f5f9',
-          overflow: 'hidden',
-        }}
-      >
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
         <div
-          style={{
-            height: '100%',
-            width: `${String(pct)}%`,
-            background: barColor,
-            borderRadius: 99,
-            transition: 'width 0.3s ease',
-          }}
+          className="h-full rounded-full transition-[width] duration-300 ease-out"
+          style={{ width: `${String(pct)}%`, background: barColor }}
         />
       </div>
-      <span
-        style={{
-          fontSize: 11,
-          fontWeight: 700,
-          color: '#374151',
-          width: 24,
-          textAlign: 'right' as const,
-          flexShrink: 0,
-        }}
-      >
-        {row.count}
-      </span>
+      <span className="w-7 shrink-0 text-right text-xs font-bold text-foreground">{row.count}</span>
     </div>
   )
 }
@@ -1180,30 +1015,10 @@ function SmallTile({
   icon: ReactNode
 }) {
   return (
-    <div
-      style={{
-        background: 'var(--muted)',
-        borderRadius: 8,
-        padding: '12px 14px',
-        border: '1px solid var(--border)',
-      }}
-    >
-      <div style={{ marginBottom: 4 }}>{icon}</div>
-      <div
-        style={{
-          fontSize: 18,
-          fontWeight: 700,
-          color: 'var(--foreground)',
-          lineHeight: 1,
-        }}
-      >
-        {value}
-      </div>
-      <div
-        style={{ fontSize: 11, color: 'var(--muted-foreground)', marginTop: 3, fontWeight: 500 }}
-      >
-        {label}
-      </div>
+    <div className="rounded-lg border border-border bg-muted p-3">
+      <div className="mb-1">{icon}</div>
+      <div className="text-[22px] font-bold leading-none text-foreground">{value}</div>
+      <div className="mt-1 text-xs font-medium text-muted-foreground">{label}</div>
     </div>
   )
 }

@@ -1,10 +1,10 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { ArrowLeftRight, CalendarDays, CheckCircle2, Clock } from 'lucide-react'
 
 import { FeedbackToast } from '@/components/feedback-toast'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { PageHeader } from '@/components/ui/page-header'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
@@ -113,7 +113,7 @@ export default async function StaffDashboardPage({
   const availabilitySubmitted = (overrideCountResult.count ?? 0) > 0
   const pendingPostCount = pendingPostCountResult.count ?? 0
 
-  // Upcoming shift roster — who else is scheduled on the next 3 shifts --------
+  // Upcoming shift roster - who else is scheduled on the next 3 shifts --------
   type RosterShift = {
     user_id: string | null
     date: string
@@ -196,50 +196,95 @@ export default async function StaffDashboardPage({
 
       {/* Metrics banner */}
       {activeCycle && (
-        <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
-          <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+        <div className="rounded-xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(6,103,169,0.06),0_4px_12px_rgba(6,103,169,0.03)]">
+          <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
             {activeCycle.label}
           </p>
           <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-lg bg-slate-50 p-3 text-center">
-              <p className="font-display text-xl font-extrabold text-foreground">{upcomingCount}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">Upcoming shifts</p>
+            {/* Upcoming shifts */}
+            <div className="flex flex-col items-center gap-1 rounded-lg bg-muted p-3 text-center">
+              <CalendarDays className="h-4 w-4 text-primary" />
+              <p className="text-xl font-bold text-foreground">{upcomingCount}</p>
+              <p className="text-xs text-muted-foreground">Upcoming shifts</p>
             </div>
-            <div className="rounded-lg bg-slate-50 p-3 text-center">
-              <p className="text-xs font-semibold text-foreground">{nextShiftLabel ?? 'None'}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">Next shift</p>
+
+            {/* Next shift */}
+            <div className="flex flex-col items-center gap-1 rounded-lg bg-muted p-3 text-center">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <p className="text-sm font-semibold text-foreground">{nextShiftLabel ?? 'None'}</p>
+              <p className="text-xs text-muted-foreground">Next shift</p>
             </div>
-            <div className="rounded-lg bg-slate-50 p-3 text-center">
+
+            {/* Availability */}
+            <div className="flex flex-col items-center gap-1 rounded-lg bg-muted p-3 text-center">
+              <CheckCircle2
+                className={cn(
+                  'h-4 w-4',
+                  availabilitySubmitted
+                    ? 'text-[var(--success-text)]'
+                    : 'text-[var(--warning-text)]'
+                )}
+              />
               <p
                 className={cn(
                   'text-xs font-semibold',
-                  availabilitySubmitted ? 'text-emerald-700' : 'text-amber-700'
+                  availabilitySubmitted
+                    ? 'text-[var(--success-text)]'
+                    : 'text-[var(--warning-text)]'
                 )}
               >
-                {availabilitySubmitted ? '✓ Submitted' : 'Not submitted'}
+                {availabilitySubmitted ? 'Submitted' : 'Not submitted'}
               </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">Availability</p>
+              <p className="text-xs text-muted-foreground">Future availability</p>
             </div>
           </div>
         </div>
       )}
 
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-xs font-semibold text-foreground">Before schedule is published</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Use Future Availability to submit upcoming cycle requests.
+          </p>
+          <Button asChild size="sm" variant="outline" className="mt-3">
+            <Link href="/availability">Open future availability</Link>
+          </Button>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-xs font-semibold text-foreground">After schedule is published</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Use Shift Swaps to swap or pick up already published shifts.
+          </p>
+          <Button asChild size="sm" variant="outline" className="mt-3">
+            <Link href="/shift-board">Open shift swaps</Link>
+          </Button>
+        </div>
+      </div>
+
       {/* Upcoming shift roster */}
       {upcomingRoster.length > 0 && (
-        <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
-          <p className="mb-3 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+        <div className="rounded-xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(6,103,169,0.06),0_4px_12px_rgba(6,103,169,0.03)]">
+          <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
             Upcoming shifts
           </p>
-          <div className="space-y-3">
+          <div className="divide-y divide-border">
             {upcomingRoster.map((shift) => (
-              <div key={shift.date} className="flex items-start gap-3">
+              <div key={shift.date} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
                 <div className="w-[96px] shrink-0">
                   <p className="text-xs font-semibold text-foreground">{shift.label}</p>
                   <p className="mt-0.5 text-[10px] capitalize text-muted-foreground">
                     {shift.shiftType} shift
                   </p>
                   {shift.myRole === 'lead' && (
-                    <span className="mt-1 inline-block rounded border border-[var(--attention)] bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                    <span
+                      className="mt-1 inline-block rounded border px-1.5 py-0.5 text-[10px] font-bold"
+                      style={{
+                        borderColor: 'var(--warning-border)',
+                        backgroundColor: 'var(--warning-subtle)',
+                        color: 'var(--warning-text)',
+                      }}
+                    >
                       Lead
                     </span>
                   )}
@@ -249,14 +294,22 @@ export default async function StaffDashboardPage({
                     shift.colleagues.map((c, i) => (
                       <span
                         key={i}
-                        className={cn(
-                          'rounded-full border px-2 py-0.5 text-[10px] font-semibold',
+                        className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+                        style={
                           c.isLead
-                            ? 'border-[var(--attention)] bg-amber-50 text-amber-800'
-                            : 'border-border bg-muted text-muted-foreground'
-                        )}
+                            ? {
+                                borderColor: 'var(--warning-border)',
+                                backgroundColor: 'var(--warning-subtle)',
+                                color: 'var(--warning-text)',
+                              }
+                            : {
+                                borderColor: 'var(--border)',
+                                backgroundColor: 'var(--muted)',
+                                color: 'var(--muted-foreground)',
+                              }
+                        }
                       >
-                        {c.isLead ? '★ ' : ''}
+                        {c.isLead ? 'Lead: ' : ''}
                         {c.name.split(' ')[0]}
                       </span>
                     ))
@@ -274,50 +327,73 @@ export default async function StaffDashboardPage({
 
       {/* Nav cards */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="space-y-3 pt-4">
-            <h3 className="app-section-title">My Schedule</h3>
-            <p className="text-sm text-muted-foreground">
-              {upcomingCount > 0
-                ? `${String(upcomingCount)} upcoming shift${upcomingCount === 1 ? '' : 's'} this cycle.`
-                : 'No upcoming shifts scheduled yet.'}
-            </p>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/schedule">Open schedule</Link>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="space-y-3 pt-4">
-            <h3 className="app-section-title">Availability Requests</h3>
-            <p className="text-sm text-muted-foreground">
-              {activeCycle
-                ? availabilitySubmitted
-                  ? `Submitted for ${activeCycle.label}.`
-                  : 'Availability not yet submitted for this cycle.'
-                : 'Submit days you cannot work in upcoming cycles.'}
-            </p>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/availability">Open requests</Link>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="space-y-3 pt-4">
-            <h3 className="app-section-title">Shift Board</h3>
-            <p className="text-sm text-muted-foreground">
-              {pendingPostCount > 0
-                ? `${String(pendingPostCount)} pending request${pendingPostCount === 1 ? '' : 's'}.`
-                : 'No pending swap or pickup requests.'}
-            </p>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/shift-board">Open shift board</Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <NavCard
+          icon={<CalendarDays className="h-5 w-5 text-primary" />}
+          title="My Schedule"
+          description={
+            upcomingCount > 0
+              ? `${String(upcomingCount)} upcoming shift${upcomingCount === 1 ? '' : 's'} this cycle.`
+              : 'No upcoming shifts scheduled yet.'
+          }
+          href="/schedule"
+          cta="Open schedule"
+        />
+        <NavCard
+          icon={<CheckCircle2 className="h-5 w-5 text-primary" />}
+          title="Future Availability"
+          description={
+            activeCycle
+              ? availabilitySubmitted
+                ? `Submitted for ${activeCycle.label}.`
+                : 'Not submitted for this upcoming cycle yet.'
+              : 'Submit days you cannot work in upcoming cycles before publish.'
+          }
+          href="/availability"
+          cta="Open future availability"
+        />
+        <NavCard
+          icon={<ArrowLeftRight className="h-5 w-5 text-primary" />}
+          title="Shift Swaps (Published)"
+          description={
+            pendingPostCount > 0
+              ? `${String(pendingPostCount)} pending request${pendingPostCount === 1 ? '' : 's'}.`
+              : 'Use this for swaps or pickups in published schedules.'
+          }
+          href="/shift-board"
+          cta="Open shift swaps"
+        />
       </div>
+    </div>
+  )
+}
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+function NavCard({
+  icon,
+  title,
+  description,
+  href,
+  cta,
+}: {
+  icon: React.ReactNode
+  title: string
+  description: string
+  href: string
+  cta: string
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-shadow hover:shadow-[0_2px_8px_rgba(6,103,169,0.10)]">
+      <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-muted">
+        {icon}
+      </div>
+      <div className="flex-1">
+        <h3 className="app-section-title">{title}</h3>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      </div>
+      <Button asChild variant="outline" size="sm" className="self-start">
+        <Link href={href}>{cta}</Link>
+      </Button>
     </div>
   )
 }

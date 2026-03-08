@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 
 import { EmployeeDirectory } from '@/components/EmployeeDirectory'
 import { FeedbackToast } from '@/components/feedback-toast'
+import { PageHeader } from '@/components/ui/page-header'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import {
@@ -937,10 +938,7 @@ export default async function TeamPage({
     <div className="space-y-6">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
-      <div>
-        <h1 className="app-page-title">Team Directory</h1>
-        <p className="text-muted-foreground">Manage staffing details for your team.</p>
-      </div>
+      <PageHeader title="Team Directory" subtitle="Manage staffing details for your team." />
 
       <EmployeeDirectory
         employees={employees}

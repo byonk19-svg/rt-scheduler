@@ -2,9 +2,14 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { AlertCircle, CalendarDays, CheckCircle2, ChevronLeft, Plus, Star } from 'lucide-react'
 
 import { dateKeyFromDate } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/client'
+import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/page-header'
+import { SkeletonCard, SkeletonListItem } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 
 type RequestType = 'swap' | 'pickup'
 type PersistedRequestStatus = 'pending' | 'approved' | 'denied' | 'expired'
@@ -66,14 +71,34 @@ type OpenRequest = {
   message: string
 }
 
-const REQUEST_STATUS_META: Record<
+const STATUS_META: Record<
   RequestStatus,
-  { label: string; color: string; bg: string; border: string }
+  { label: string; colorClass: string; bgClass: string; borderClass: string }
 > = {
-  pending: { label: 'Pending', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
-  approved: { label: 'Approved', color: '#065f46', bg: '#ecfdf5', border: '#a7f3d0' },
-  denied: { label: 'Denied', color: '#991b1b', bg: '#fef2f2', border: '#fecaca' },
-  expired: { label: 'Expired', color: '#6b7280', bg: '#f9fafb', border: '#e5e7eb' },
+  pending: {
+    label: 'Pending',
+    colorClass: 'text-[var(--warning-text)]',
+    bgClass: 'bg-[var(--warning-subtle)]',
+    borderClass: 'border-[var(--warning-border)]',
+  },
+  approved: {
+    label: 'Approved',
+    colorClass: 'text-[var(--success-text)]',
+    bgClass: 'bg-[var(--success-subtle)]',
+    borderClass: 'border-[var(--success-border)]',
+  },
+  denied: {
+    label: 'Denied',
+    colorClass: 'text-[var(--error-text)]',
+    bgClass: 'bg-[var(--error-subtle)]',
+    borderClass: 'border-[var(--error-border)]',
+  },
+  expired: {
+    label: 'Expired',
+    colorClass: 'text-muted-foreground',
+    bgClass: 'bg-muted',
+    borderClass: 'border-border',
+  },
 }
 
 function initials(name: string): string {
@@ -475,7 +500,6 @@ function SwapRequestPageContent() {
 
   const handleNextStep = () => {
     setError(null)
-
     if (step === 1) {
       if (!selectedShift) {
         setError('Choose a shift before continuing.')
@@ -484,7 +508,6 @@ function SwapRequestPageContent() {
       setStep(2)
       return
     }
-
     if (step === 2) {
       setStep(3)
     }
@@ -496,209 +519,148 @@ function SwapRequestPageContent() {
       handleBack()
       return
     }
-
     if (step === 2) {
       setStep(1)
       return
     }
-
     setStep(2)
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: '32px 28px' }}>
-      <div className="fade-up" style={{ marginBottom: 24 }}>
-        <h1
-          style={{
-            fontSize: 26,
-            fontWeight: 800,
-            color: '#0f172a',
-            letterSpacing: '-0.02em',
-            fontFamily: "'Plus Jakarta Sans', sans-serif",
-          }}
-        >
-          Swap Request Form
-        </h1>
-        <p style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
-          Submit swap or pickup requests for your upcoming shifts.
-        </p>
-      </div>
+    <div className="space-y-6">
+      {view === 'list' && (
+        <PageHeader
+          title="My Requests"
+          subtitle="Track your swap and pickup requests."
+          actions={
+            <Button size="sm" onClick={handleNew}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" />
+              New request
+            </Button>
+          }
+        />
+      )}
+
+      {view === 'form' && (
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={handleBack}>
+            <ChevronLeft className="mr-1 h-3.5 w-3.5" />
+            Back
+          </Button>
+          <div className="flex items-center gap-2">
+            {([1, 2, 3] as const).map((n) => (
+              <span
+                key={n}
+                className={cn(
+                  'flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold',
+                  step >= n
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-border bg-card text-muted-foreground'
+                )}
+              >
+                {n}
+              </span>
+            ))}
+          </div>
+          <span className="text-sm font-semibold text-foreground">
+            {step === 1 ? 'Request details' : step === 2 ? 'Choose teammate' : 'Final message'}
+          </span>
+        </div>
+      )}
 
       {error && (
-        <div
-          className="fade-up"
-          style={{
-            marginBottom: 16,
-            border: '1px solid #fecaca',
-            background: '#fef2f2',
-            color: '#991b1b',
-            borderRadius: 10,
-            padding: '12px 14px',
-            fontSize: 12,
-            fontWeight: 600,
-          }}
-        >
+        <div className="flex items-center gap-2 rounded-lg border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 py-3 text-sm font-medium text-[var(--error-text)]">
+          <AlertCircle className="h-4 w-4 shrink-0" />
           {error}
         </div>
       )}
 
+      {/* ── LIST VIEW ── */}
       {view === 'list' && (
-        <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div
-            style={{
-              background: '#fff',
-              border: '1px solid #e5e7eb',
-              borderRadius: 10,
-              padding: '16px 18px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 12,
-            }}
-          >
-            <div>
-              <p style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>My Requests</p>
-              <p style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-                Track your pending, approved, denied, and expired requests.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleNew}
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                padding: '7px 16px',
-                borderRadius: 7,
-                border: 'none',
-                background: '#d97706',
-                color: '#fff',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              New request
-            </button>
-          </div>
-
-          <div
-            style={{
-              background: '#fff',
-              border: '1px solid #e5e7eb',
-              borderRadius: 10,
-              padding: '14px 16px',
-            }}
-          >
-            <p style={{ fontSize: 12, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
-              How swap requests work
-            </p>
-            <p style={{ fontSize: 12, color: '#64748b' }}>
-              Submit your request, wait for manager review, and check this list for updates.
+        <div className="space-y-3">
+          {/* How it works hint */}
+          <div className="rounded-xl border border-border bg-card px-4 py-3">
+            <p className="text-xs font-semibold text-foreground">How requests work</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Submit a swap or pickup request and your manager will review it. Check this page for
+              status updates.
             </p>
           </div>
 
           {loading ? (
-            <div
-              style={{
-                background: '#fff',
-                border: '1px solid #e5e7eb',
-                borderRadius: 10,
-                padding: '24px 18px',
-                fontSize: 13,
-                color: '#64748b',
-              }}
-            >
-              Loading your requests...
+            <div className="space-y-3">
+              <SkeletonListItem />
+              <SkeletonListItem />
+              <SkeletonListItem />
             </div>
           ) : myOpenRequests.length === 0 ? (
-            <div
-              style={{
-                background: '#fff',
-                border: '1px solid #e5e7eb',
-                borderRadius: 10,
-                padding: '40px 24px',
-                textAlign: 'center',
-              }}
-            >
-              <p style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
-                No requests yet
-              </p>
-              <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>
+            <div className="rounded-xl border border-border bg-card px-6 py-10 text-center">
+              <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full border border-border bg-muted">
+                <CalendarDays className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p className="mb-1 text-sm font-bold text-foreground">No requests yet</p>
+              <p className="mb-4 text-xs text-muted-foreground">
                 Create a swap or pickup request to post it to the shift board.
               </p>
-              <button
-                type="button"
-                onClick={handleNew}
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  padding: '7px 16px',
-                  borderRadius: 7,
-                  border: 'none',
-                  background: '#d97706',
-                  color: '#fff',
-                  cursor: 'pointer',
-                }}
-              >
+              <Button size="sm" onClick={handleNew}>
                 Start request
-              </button>
+              </Button>
             </div>
           ) : (
             myOpenRequests.map((request) => {
-              const statusMeta = REQUEST_STATUS_META[request.status]
+              const meta = STATUS_META[request.status]
+              const isPending = request.status === 'pending'
               return (
                 <div
                   key={request.id}
-                  style={{
-                    background: '#fff',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: 10,
-                    padding: '14px 16px',
-                  }}
+                  className={cn(
+                    'rounded-xl border bg-card p-4',
+                    isPending ? 'border-[var(--warning-border)] shadow-sm' : 'border-border'
+                  )}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
                     <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 800,
-                        color: request.type === 'swap' ? '#6d28d9' : '#0369a1',
-                        background: request.type === 'swap' ? '#f5f3ff' : '#f0f9ff',
-                        border: `1px solid ${request.type === 'swap' ? '#ddd6fe' : '#bae6fd'}`,
-                        padding: '1px 7px',
-                        borderRadius: 20,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.04em',
-                      }}
+                      className={cn(
+                        'rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+                        request.type === 'swap'
+                          ? 'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)]'
+                          : 'border-border bg-secondary text-foreground'
+                      )}
                     >
                       {request.type}
                     </span>
                     <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 800,
-                        color: statusMeta.color,
-                        background: statusMeta.bg,
-                        border: `1px solid ${statusMeta.border}`,
-                        padding: '1px 7px',
-                        borderRadius: 20,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.04em',
-                      }}
+                      className={cn(
+                        'rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+                        meta.borderClass,
+                        meta.bgClass,
+                        meta.colorClass
+                      )}
                     >
-                      {statusMeta.label}
+                      {meta.label}
                     </span>
-                    <span style={{ marginLeft: 'auto', fontSize: 11, color: '#9ca3af' }}>
-                      {request.posted}
-                    </span>
+                    <span className="ml-auto text-xs text-muted-foreground">{request.posted}</span>
                   </div>
-                  <p style={{ marginTop: 8, fontSize: 13, color: '#0f172a', fontWeight: 700 }}>
-                    {request.shift}
-                  </p>
-                  <p style={{ marginTop: 4, fontSize: 12, color: '#64748b' }}>{request.message}</p>
+
+                  <div className="mb-1.5 inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/60 px-2 py-1">
+                    <CalendarDays className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-xs font-medium text-foreground">{request.shift}</span>
+                  </div>
+
+                  <p className="text-sm text-muted-foreground">{request.message}</p>
+
                   {request.swapWith && (
-                    <p style={{ marginTop: 6, fontSize: 11, color: '#64748b' }}>
-                      Requested swap with: {request.swapWith}
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Swap with:{' '}
+                      <span className="font-medium text-foreground">{request.swapWith}</span>
                     </p>
+                  )}
+
+                  {request.status === 'approved' && (
+                    <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-[var(--success-text)]">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Approved by manager
+                    </div>
                   )}
                 </div>
               )
@@ -707,433 +669,212 @@ function SwapRequestPageContent() {
         </div>
       )}
 
+      {/* ── FORM VIEW ── */}
       {view === 'form' && (
-        <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div
-            style={{
-              background: '#fff',
-              border: '1px solid #e5e7eb',
-              borderRadius: 10,
-              padding: '14px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 12,
-            }}
-          >
-            <button
-              type="button"
-              onClick={handleBack}
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                padding: '7px 14px',
-                borderRadius: 7,
-                border: '1px solid #e5e7eb',
-                background: '#fff',
-                color: '#374151',
-                cursor: 'pointer',
-              }}
-            >
-              Back to list
-            </button>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {[1, 2, 3].map((value) => (
-                <span
-                  key={value}
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 999,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 11,
-                    fontWeight: 800,
-                    border: `1px solid ${step >= value ? '#d97706' : '#e5e7eb'}`,
-                    color: step >= value ? '#b45309' : '#9ca3af',
-                    background: step >= value ? '#fffbeb' : '#fff',
-                  }}
-                >
-                  {value}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div
-            style={{
-              background: '#fff',
-              border: '1px solid #e5e7eb',
-              borderRadius: 10,
-              padding: '18px 18px',
-            }}
-          >
+        <div className="space-y-4">
+          <div className="rounded-xl border border-border bg-card p-5">
             {step === 1 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="space-y-4">
                 <div>
-                  <p style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
-                    Step 1: Request details
-                  </p>
-                  <p style={{ marginTop: 2, fontSize: 12, color: '#64748b' }}>
+                  <p className="text-sm font-bold text-foreground">Step 1: Request details</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
                     Choose request type and your shift.
                   </p>
                 </div>
 
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div className="flex gap-2">
                   {(['swap', 'pickup'] as const).map((type) => (
                     <button
                       key={type}
                       type="button"
                       onClick={() => setRequestType(type)}
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        padding: '7px 16px',
-                        borderRadius: 7,
-                        border: `1px solid ${requestType === type ? '#d97706' : '#e5e7eb'}`,
-                        background: requestType === type ? '#fffbeb' : '#fff',
-                        color: requestType === type ? '#b45309' : '#64748b',
-                        cursor: 'pointer',
-                        textTransform: 'capitalize',
-                      }}
+                      className={cn(
+                        'rounded-lg border px-4 py-2 text-xs font-semibold capitalize transition-colors',
+                        requestType === type
+                          ? 'border-primary bg-primary/5 text-primary'
+                          : 'border-border bg-card text-muted-foreground hover:bg-secondary'
+                      )}
                     >
                       {type}
                     </button>
                   ))}
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <label
-                    htmlFor="selected-shift"
-                    style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}
-                  >
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground" htmlFor="selected-shift">
                     Select shift
                   </label>
                   <select
                     id="selected-shift"
                     value={selectedShift ?? ''}
-                    onChange={(event) => setSelectedShift(event.target.value || null)}
-                    style={{
-                      border: '1px solid #e5e7eb',
-                      borderRadius: 7,
-                      padding: '8px 10px',
-                      fontSize: 12,
-                      color: '#374151',
-                      background: '#fff',
-                    }}
+                    onChange={(e) => setSelectedShift(e.target.value || null)}
+                    className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 outline-none"
                   >
-                    <option value="">Choose an upcoming shift...</option>
+                    <option value="">Choose an upcoming shift…</option>
                     {myShifts.map((shift) => (
                       <option key={shift.id} value={shift.id}>
-                        {shift.date} - {shift.type} {shift.isLead ? '(Lead)' : ''}
+                        {shift.date} — {shift.type}
+                        {shift.isLead ? ' (Lead)' : ''}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 {selectedShiftData && (
-                  <div
-                    style={{
-                      border: '1px solid #f1f5f9',
-                      background: '#f8fafc',
-                      borderRadius: 8,
-                      padding: '10px 12px',
-                    }}
-                  >
-                    <p style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>
-                      {selectedShiftData.date} - {selectedShiftData.type}
+                  <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5">
+                    <p className="text-sm font-semibold text-foreground">
+                      {selectedShiftData.date} — {selectedShiftData.type}
                     </p>
-                    <p style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
-                      {selectedShiftData.dow} {selectedShiftData.isLead ? '- Lead assignment' : ''}
+                    <p className="text-xs text-muted-foreground">
+                      {selectedShiftData.dow}
+                      {selectedShiftData.isLead ? ' · Lead assignment' : ''}
                     </p>
                   </div>
                 )}
+
                 {selectedShiftRequiresLeadEligibleReplacement && (
-                  <div
-                    style={{
-                      marginTop: 10,
-                      padding: '10px 14px',
-                      background: '#fffbeb',
-                      border: '1px solid #fde68a',
-                      borderRadius: 8,
-                      fontSize: 12,
-                      color: '#92400e',
-                      fontWeight: 600,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                    }}
-                  >
-                    <span>Lead:</span>
-                    <span>
-                      This is currently the only lead assignment on this shift. Your replacement
-                      must be lead eligible.
-                    </span>
+                  <div className="flex items-start gap-2 rounded-lg border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-2.5">
+                    <Star className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--warning-text)]" />
+                    <p className="text-xs font-semibold text-[var(--warning-text)]">
+                      This is the only lead assignment on this shift. Your replacement must be lead
+                      eligible.
+                    </p>
                   </div>
                 )}
               </div>
             )}
 
             {step === 2 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="space-y-4">
                 <div>
-                  <p style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
-                    Step 2: Choose teammate
-                  </p>
-                  <p style={{ marginTop: 2, fontSize: 12, color: '#64748b' }}>
-                    Team members are filtered by shift type and lead eligibility when needed.
+                  <p className="text-sm font-bold text-foreground">Step 2: Choose teammate</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Team members are filtered by shift type
+                    {selectedShiftRequiresLeadEligibleReplacement ? ' and lead eligibility' : ''}.
                   </p>
                 </div>
+
                 {selectedShiftRequiresLeadEligibleReplacement && (
-                  <p
-                    style={{
-                      fontSize: 11,
-                      color: '#92400e',
-                      fontWeight: 600,
-                      marginBottom: 8,
-                      background: '#fffbeb',
-                      padding: '6px 10px',
-                      borderRadius: 6,
-                      border: '1px solid #fde68a',
-                    }}
-                  >
-                    Lead filter active: showing lead-eligible staff only
-                  </p>
+                  <div className="flex items-center gap-1.5 rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-1.5">
+                    <Star className="h-3 w-3 text-[var(--warning-text)]" />
+                    <p className="text-xs font-semibold text-[var(--warning-text)]">
+                      Lead filter active — showing lead-eligible staff only
+                    </p>
+                  </div>
                 )}
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <label
-                    htmlFor="member-search"
-                    style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}
-                  >
-                    Search team members
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground" htmlFor="member-search">
+                    Search teammates
                   </label>
                   <input
                     id="member-search"
                     value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search by teammate name..."
-                    style={{
-                      border: '1px solid #e5e7eb',
-                      borderRadius: 7,
-                      padding: '8px 10px',
-                      fontSize: 12,
-                      color: '#374151',
-                      background: '#fff',
-                    }}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search by name…"
+                    className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 outline-none"
                   />
                 </div>
 
-                <div style={{ display: 'grid', gap: 8 }}>
+                <div className="space-y-2">
                   {eligibleMembers.length === 0 ? (
-                    <div
-                      style={{
-                        border: '1px solid #e5e7eb',
-                        borderRadius: 8,
-                        padding: '12px 10px',
-                        fontSize: 12,
-                        color: '#64748b',
-                        background: '#f8fafc',
-                      }}
-                    >
+                    <p className="rounded-md border border-border bg-muted/50 px-3 py-3 text-xs text-muted-foreground">
                       No eligible teammates found for this shift.
-                    </div>
+                    </p>
                   ) : (
                     eligibleMembers.map((member) => (
                       <button
                         key={member.id}
                         type="button"
                         onClick={() => setSwapWith(member.id)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 10,
-                          border: `1px solid ${swapWith === member.id ? '#d97706' : '#e5e7eb'}`,
-                          borderRadius: 8,
-                          padding: '9px 10px',
-                          background: swapWith === member.id ? '#fffbeb' : '#fff',
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                        }}
+                        className={cn(
+                          'flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors',
+                          swapWith === member.id
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border bg-card hover:bg-secondary'
+                        )}
                       >
-                        <span
-                          style={{
-                            width: 30,
-                            height: 30,
-                            borderRadius: 999,
-                            background: '#d97706',
-                            color: '#fff',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: 11,
-                            fontWeight: 800,
-                          }}
-                        >
-                          {member.avatar}
-                        </span>
-                        <span style={{ flex: 1 }}>
-                          <span
-                            style={{
-                              display: 'block',
-                              fontSize: 12,
-                              fontWeight: 700,
-                              color: '#0f172a',
-                            }}
-                          >
-                            {member.name}
-                          </span>
-                          <span style={{ display: 'block', fontSize: 11, color: '#64748b' }}>
-                            {member.shift} {member.isLead ? '- Lead' : ''}
-                          </span>
-                        </span>
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--attention)]">
+                          <span className="text-xs font-bold text-white">{member.avatar}</span>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-foreground">{member.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {member.shift}
+                            {member.isLead ? ' · Lead eligible' : ''}
+                          </p>
+                        </div>
+                        {member.isLead && <Star className="h-3.5 w-3.5 text-[var(--attention)]" />}
                       </button>
                     ))
                   )}
                 </div>
 
-                <p style={{ fontSize: 11, color: '#64748b' }}>
+                <p className="text-xs text-muted-foreground">
                   {requestType === 'swap'
-                    ? 'Selecting a swap partner is optional. You can leave it blank to request an open swap.'
+                    ? 'Selecting a swap partner is optional. Leave blank to post an open swap.'
                     : 'Pickup requests usually do not need a specific teammate.'}
                 </p>
               </div>
             )}
 
             {step === 3 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="space-y-4">
                 <div>
-                  <p style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
-                    Step 3: Final message
-                  </p>
-                  <p style={{ marginTop: 2, fontSize: 12, color: '#64748b' }}>
+                  <p className="text-sm font-bold text-foreground">Step 3: Final message</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
                     Add context before posting your request.
                   </p>
                 </div>
 
-                <div
-                  style={{
-                    border: '1px solid #f1f5f9',
-                    background: '#f8fafc',
-                    borderRadius: 8,
-                    padding: '10px 12px',
-                    display: 'grid',
-                    gap: 4,
-                  }}
-                >
-                  <p
-                    style={{
-                      fontSize: 12,
-                      color: '#374151',
-                      fontWeight: 700,
-                      textTransform: 'capitalize',
-                    }}
-                  >
+                <div className="rounded-lg border border-border bg-muted/50 px-3 py-3 space-y-1">
+                  <p className="text-xs font-semibold text-foreground capitalize">
                     Type: {requestType}
                   </p>
-                  <p style={{ fontSize: 12, color: '#374151' }}>
+                  <p className="text-xs text-muted-foreground">
                     Shift:{' '}
                     {selectedShiftData
-                      ? `${selectedShiftData.date} - ${selectedShiftData.type}`
+                      ? `${selectedShiftData.date} — ${selectedShiftData.type}`
                       : 'Not selected'}
                   </p>
-                  <p style={{ fontSize: 12, color: '#374151' }}>
-                    Swap with: {selectedMember ? selectedMember.name : 'No specific teammate'}
+                  <p className="text-xs text-muted-foreground">
+                    With: {selectedMember ? selectedMember.name : 'No specific teammate'}
                   </p>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div className="space-y-1.5">
                   <label
+                    className="text-xs font-semibold text-foreground"
                     htmlFor="request-message"
-                    style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}
                   >
                     Message
                   </label>
                   <textarea
                     id="request-message"
                     value={message}
-                    onChange={(event) => setMessage(event.target.value)}
+                    onChange={(e) => setMessage(e.target.value)}
                     rows={4}
-                    placeholder="Add details for your manager and team..."
-                    style={{
-                      border: '1px solid #e5e7eb',
-                      borderRadius: 7,
-                      padding: '9px 10px',
-                      fontSize: 12,
-                      color: '#374151',
-                      background: '#fff',
-                    }}
+                    placeholder="Add details for your manager and team…"
+                    className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 outline-none"
                   />
                 </div>
               </div>
             )}
           </div>
 
-          <div
-            style={{
-              background: '#fff',
-              border: '1px solid #e5e7eb',
-              borderRadius: 10,
-              padding: '14px 16px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              gap: 8,
-            }}
-          >
-            <button
-              type="button"
-              onClick={handlePrevStep}
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                padding: '7px 14px',
-                borderRadius: 7,
-                border: '1px solid #e5e7eb',
-                background: '#fff',
-                color: '#374151',
-                cursor: 'pointer',
-              }}
-            >
+          {/* Nav footer */}
+          <div className="flex justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
+            <Button variant="outline" size="sm" onClick={handlePrevStep}>
               {step === 1 ? 'Cancel' : 'Back'}
-            </button>
-
+            </Button>
             {step < 3 ? (
-              <button
-                type="button"
-                onClick={handleNextStep}
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  padding: '7px 16px',
-                  borderRadius: 7,
-                  border: 'none',
-                  background: '#d97706',
-                  color: '#fff',
-                  cursor: 'pointer',
-                }}
-              >
+              <Button size="sm" onClick={handleNextStep}>
                 Continue
-              </button>
+              </Button>
             ) : (
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => void handleSubmit()}
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  padding: '7px 16px',
-                  borderRadius: 7,
-                  border: 'none',
-                  background: '#d97706',
-                  color: '#fff',
-                  cursor: 'pointer',
-                  opacity: submitting ? 0.7 : 1,
-                }}
-              >
-                {submitting ? 'Submitting...' : 'Submit request'}
-              </button>
+              <Button size="sm" disabled={submitting} onClick={() => void handleSubmit()}>
+                {submitting ? 'Submitting…' : 'Submit request'}
+              </Button>
             )}
           </div>
         </div>
@@ -1142,9 +883,22 @@ function SwapRequestPageContent() {
   )
 }
 
+function RequestPageSkeleton() {
+  return (
+    <div className="space-y-6">
+      <SkeletonCard className="h-24" rows={1} />
+      <div className="space-y-3">
+        <SkeletonListItem />
+        <SkeletonListItem />
+        <SkeletonListItem />
+      </div>
+    </div>
+  )
+}
+
 export default function SwapRequestPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+    <Suspense fallback={<RequestPageSkeleton />}>
       <SwapRequestPageContent />
     </Suspense>
   )

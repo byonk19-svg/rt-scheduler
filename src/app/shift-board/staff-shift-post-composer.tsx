@@ -130,7 +130,7 @@ export function StaffShiftPostComposer({
                 id="staff-post-message"
                 name="message"
                 rows={3}
-                className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm"
+                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
                 placeholder="Add context for your team (optional)."
               />
             </div>

@@ -50,7 +50,7 @@ type AvailabilityEntriesTableProps = {
 const STATUS_OPTIONS: TableStatusOption[] = [
   { value: 'all', label: 'All' },
   { value: 'force_off', label: 'Need off' },
-  { value: 'force_on', label: 'Available to work (PRN)' },
+  { value: 'force_on', label: 'Available to work' },
 ]
 
 function formatDateTime(value: string): string {
@@ -60,7 +60,7 @@ function formatDateTime(value: string): string {
 }
 
 function formatEntryLabel(entryType: AvailabilityEntryTableRow['entryType']): string {
-  return entryType === 'force_on' ? 'Available to work (PRN)' : 'Need off'
+  return entryType === 'force_on' ? 'Available to work' : 'Need off'
 }
 
 function formatShiftTypeLabel(shiftType: AvailabilityEntryTableRow['shiftType']): string {
@@ -134,14 +134,14 @@ export function AvailabilityEntriesTable({
         <CardTitle>
           {canManageAvailability
             ? scope === 'all-staff'
-              ? 'All Staff Availability'
-              : 'My Availability'
-            : 'My Availability'}
+              ? 'All Staff Availability Requests'
+              : 'My Saved Availability Requests'
+            : 'My Saved Availability Requests'}
         </CardTitle>
         <CardDescription>
           {canManageAvailability
-            ? 'Availability constraints for schedule planning. No approval workflow.'
-            : 'Your submitted availability entries for upcoming cycles.'}
+            ? 'Requests used for schedule planning before publish. No approval workflow.'
+            : 'Your saved requests for upcoming cycles.'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -169,8 +169,13 @@ export function AvailabilityEntriesTable({
         <TableToolbar
           filters={filters}
           onFiltersChange={setFilters}
-          searchPlaceholder="Search by requester, reason, cycle, or type"
+          searchPlaceholder={
+            canManageAvailability
+              ? 'Search by requester, note, cycle, or request type'
+              : 'Search by note, cycle, or request type'
+          }
           statusOptions={STATUS_OPTIONS}
+          showDateRange={canManageAvailability}
         />
 
         <Table>
@@ -180,9 +185,9 @@ export function AvailabilityEntriesTable({
               {canManageAvailability && (
                 <TableHead className="hidden md:table-cell">Therapist</TableHead>
               )}
-              <TableHead>Type</TableHead>
-              <TableHead className="hidden md:table-cell">Shift scope</TableHead>
-              <TableHead>Summary</TableHead>
+              <TableHead>Request type</TableHead>
+              <TableHead className="hidden md:table-cell">Shift</TableHead>
+              <TableHead>Note</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -192,7 +197,7 @@ export function AvailabilityEntriesTable({
                   colSpan={emptyColSpan}
                   className="py-6 text-center text-muted-foreground"
                 >
-                  No availability entries match the current filters.
+                  No availability requests match your filters.
                 </TableCell>
               </TableRow>
             )}
@@ -295,7 +300,7 @@ export function AvailabilityEntriesTable({
                                   size="sm"
                                   pendingText="Deleting..."
                                 >
-                                  Delete entry
+                                  Delete request
                                 </FormSubmitButton>
                               </form>
                             ) : (

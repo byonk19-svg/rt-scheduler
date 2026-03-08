@@ -1,7 +1,10 @@
-﻿'use client'
+'use client'
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { Loader2 } from 'lucide-react'
+
+import { Button } from '@/components/ui/button'
 
 type ProcessQueuedButtonProps = {
   publishEventId: string
@@ -10,9 +13,11 @@ type ProcessQueuedButtonProps = {
 export function ProcessQueuedButton({ publishEventId }: ProcessQueuedButtonProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const run = async () => {
     setLoading(true)
+    setError(null)
 
     try {
       const response = await fetch('/api/publish/process', {
@@ -27,22 +32,34 @@ export function ProcessQueuedButton({ publishEventId }: ProcessQueuedButtonProps
       }
 
       router.refresh()
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to process queued emails.'
-      window.alert(message)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to process queued emails.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <button
-      type="button"
-      onClick={() => void run()}
-      disabled={loading}
-      className="rounded-md border border-border bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-secondary disabled:opacity-60"
-    >
-      {loading ? 'Processing...' : 'Process queued emails'}
-    </button>
+    <div className="flex flex-col items-end gap-1.5">
+      <Button size="sm" variant="outline" onClick={() => void run()} disabled={loading}>
+        {loading ? (
+          <>
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            Processing…
+          </>
+        ) : (
+          'Process queued'
+        )}
+      </Button>
+      {error && (
+        <p
+          className="text-right text-[11px] font-medium"
+          style={{ color: 'var(--error-text)' }}
+          role="alert"
+        >
+          {error}
+        </p>
+      )}
+    </div>
   )
 }

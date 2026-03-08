@@ -5,6 +5,7 @@ import { FeedbackToast } from '@/components/feedback-toast'
 import { FormSubmitButton } from '@/components/form-submit-button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { PageHeader } from '@/components/ui/page-header'
 import { can } from '@/lib/auth/can'
 import { toUiRole } from '@/lib/auth/roles'
 import { EMPLOYEE_META_BADGE_CLASS, LEAD_ELIGIBLE_BADGE_CLASS } from '@/lib/employee-tag-badges'
@@ -191,15 +192,17 @@ export default async function ProfilePage({
     <div className="space-y-6">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Profile</h1>
-        <p className="text-muted-foreground">Your account details and role configuration.</p>
-        {feedback?.variant === 'error' && (
-          <p className="mt-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]">
-            {feedback.message}
-          </p>
-        )}
-      </div>
+      <PageHeader
+        title="Profile"
+        subtitle="Your account details and role configuration."
+        badge={
+          feedback?.variant === 'error' ? (
+            <p className="rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]">
+              {feedback.message}
+            </p>
+          ) : undefined
+        }
+      />
 
       <Card>
         <CardHeader>
@@ -215,7 +218,10 @@ export default async function ProfilePage({
               variant="outline"
               className={
                 canAccessManagerUi
-                  ? cn('capitalize', 'border-[#fde68a] bg-[#fffbeb] text-[#b45309]')
+                  ? cn(
+                      'capitalize',
+                      'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+                    )
                   : 'capitalize'
               }
             >
@@ -261,7 +267,7 @@ export default async function ProfilePage({
                   id="default_calendar_view"
                   name="default_calendar_view"
                   defaultValue={defaultCalendarView}
-                  className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                  className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 >
                   <option value="day">Day</option>
                   <option value="night">Night</option>
@@ -278,18 +284,14 @@ export default async function ProfilePage({
                   id="default_landing_page"
                   name="default_landing_page"
                   defaultValue={defaultLandingPage}
-                  className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
+                  className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 >
                   <option value="dashboard">Dashboard</option>
                   <option value="coverage">Coverage</option>
                 </select>
               </div>
             </div>
-            <FormSubmitButton
-              type="submit"
-              pendingText="Saving..."
-              className="bg-[#d97706] text-white hover:bg-[#b45309]"
-            >
+            <FormSubmitButton type="submit" pendingText="Saving...">
               Save preferences
             </FormSubmitButton>
           </form>

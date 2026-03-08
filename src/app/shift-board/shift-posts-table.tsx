@@ -142,7 +142,7 @@ export function ShiftPostsTable({
             <select
               name="swap_shift_id"
               required
-              className="h-8 rounded-md border border-border bg-white px-2 text-xs"
+              className="h-8 rounded-md border border-border bg-card px-2 text-xs"
             >
               <option value="">My shift...</option>
               {shiftOptions.map((option) => (

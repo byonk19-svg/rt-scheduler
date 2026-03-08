@@ -691,33 +691,34 @@ function CoveragePageContent() {
   )
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background">
       <div className="no-print px-7 py-6">
-        <div className="mb-5 flex items-start justify-between">
+        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-extrabold text-slate-900">Coverage</h1>
-            <p className="mt-1 text-sm text-slate-500">Click a day to edit therapist statuses</p>
+            <h1 className="app-page-title">Coverage</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Click a day to edit therapist statuses</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-1.5">
             <button
               type="button"
               onClick={() => window.print()}
-              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
+              className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary transition-colors"
             >
               Print schedule
             </button>
             <Link
               href={weekRosterHref}
-              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
+              className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary transition-colors"
             >
               Week roster
             </Link>
             <Link
               href={publishHistoryHref}
-              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
+              className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary transition-colors"
             >
               Publish history
             </Link>
+            <div className="w-px self-stretch bg-border mx-0.5" />
             <form action={generateDraftScheduleAction}>
               <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
               <input type="hidden" name="view" value="week" />
@@ -726,7 +727,7 @@ function CoveragePageContent() {
               <button
                 type="submit"
                 disabled={!activeCycleId || activeCyclePublished}
-                className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-60"
+                className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
               >
                 Auto-draft
               </button>
@@ -739,7 +740,7 @@ function CoveragePageContent() {
               <button
                 type="submit"
                 disabled={!activeCycleId || activeCyclePublished}
-                className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-60"
+                className="rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--error-text)] hover:opacity-80 transition-opacity disabled:opacity-50"
               >
                 Clear draft
               </button>
@@ -755,12 +756,13 @@ function CoveragePageContent() {
               <button
                 type="submit"
                 disabled={!activeCycleId || activeCyclePublished}
-                className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 disabled:opacity-60"
+                className="rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--warning-text)] hover:opacity-80 transition-opacity disabled:opacity-50"
                 title="Bypass weekly and coverage/lead publish guardrails for this publish."
               >
                 Publish w/ full override
               </button>
             </form>
+            <div className="w-px self-stretch bg-border mx-0.5" />
             <form action={toggleCyclePublishedAction}>
               <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
               <input type="hidden" name="view" value="week" />
@@ -772,7 +774,7 @@ function CoveragePageContent() {
               <button
                 type="submit"
                 disabled={!activeCycleId || activeCyclePublished}
-                className="rounded-md bg-amber-600 px-4 py-1.5 text-xs font-bold text-white disabled:opacity-60"
+                className="rounded-md bg-primary px-4 py-1.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
                 {activeCyclePublished ? 'Published' : 'Publish'}
               </button>
@@ -780,21 +782,21 @@ function CoveragePageContent() {
           </div>
         </div>
         {activeCyclePublished && (
-          <div className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
-            <p className="text-xs font-semibold text-emerald-800">
+          <div className="mb-3 rounded-md border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-2">
+            <p className="text-xs font-semibold text-[var(--success-text)]">
               This cycle is published and visible to employees.
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <Link
                 href={weekRosterHref}
-                className="rounded-md border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+                className="rounded-md border border-[var(--success-border)] bg-card px-3 py-1.5 text-xs font-semibold text-[var(--success-text)] hover:bg-[var(--success-subtle)] transition-colors"
               >
                 View published schedule
               </Link>
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="rounded-md border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+                className="rounded-md border border-[var(--success-border)] bg-card px-3 py-1.5 text-xs font-semibold text-[var(--success-text)] hover:bg-[var(--success-subtle)] transition-colors"
               >
                 Print published schedule
               </button>
@@ -802,17 +804,17 @@ function CoveragePageContent() {
           </div>
         )}
         {successParam === 'cycle_published' && (
-          <p className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+          <p className="mb-3 rounded-md border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-2 text-xs font-semibold text-[var(--success-text)]">
             Published - visible to employees.
           </p>
         )}
         {successParam === 'cycle_unpublished' && (
-          <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+          <p className="mb-3 rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-2 text-xs font-semibold text-[var(--warning-text)]">
             Cycle unpublished.
           </p>
         )}
         {successParam === 'shift_added' && (
-          <p className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+          <p className="mb-3 rounded-md border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-2 text-xs font-semibold text-[var(--success-text)]">
             Shift assigned.
           </p>
         )}
@@ -820,24 +822,24 @@ function CoveragePageContent() {
           <p
             className={`mb-3 rounded-md px-3 py-2 text-xs font-semibold ${
               autoDraftFeedback.variant === 'error'
-                ? 'border border-red-200 bg-red-50 text-red-800'
-                : 'border border-emerald-200 bg-emerald-50 text-emerald-800'
+                ? 'border border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]'
+                : 'border border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
             }`}
           >
             {autoDraftFeedback.message}
           </p>
         )}
         {publishErrorMessage && (
-          <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800">
+          <p className="mb-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs font-semibold text-[var(--error-text)]">
             {publishErrorMessage}
           </p>
         )}
-        {error && <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
-        <div className="mb-3 rounded-md border border-slate-200 bg-white px-3 py-2">
-          <p className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-slate-500">Cycle</p>
-          <p className="text-sm font-extrabold text-slate-900">{printCycle?.label ?? 'Current coverage window'}</p>
-          <p className="text-xs font-medium text-slate-600">{cycleRangeLabel}</p>
-          <p className="mt-1 text-xs text-slate-500">Months in view: {visibleMonths.join(' • ') || 'N/A'}</p>
+        {error && <p className="mb-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs text-[var(--error-text)]">{error}</p>}
+        <div className="mb-3 rounded-md border border-border bg-card px-3 py-2">
+          <p className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">Cycle</p>
+          <p className="text-sm font-bold text-foreground">{printCycle?.label ?? 'Current coverage window'}</p>
+          <p className="text-xs text-muted-foreground">{cycleRangeLabel}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Months in view: {visibleMonths.join(' • ') || 'N/A'}</p>
         </div>
         <CalendarGrid
           days={days}
