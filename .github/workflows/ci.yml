@@ -48,10 +48,43 @@ jobs:
       - name: Build
         run: npm run build
 
+  security_regressions:
+    name: Security Regressions
+    runs-on: ubuntu-latest
+    needs: quality
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run security regression unit tests
+        run: >
+          npm run test:unit --
+          src/lib/security/request-origin.test.ts
+          src/lib/security/worker-auth.test.ts
+          src/app/auth/signout/route.test.ts
+          src/app/api/schedule/assignment-status/route.test.ts
+          src/app/api/schedule/drag-drop/route.test.ts
+
   e2e:
     name: Playwright E2E
     runs-on: ubuntu-latest
-    needs: quality
+    needs:
+      - quality
+      - security_regressions
     timeout-minutes: 30
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
