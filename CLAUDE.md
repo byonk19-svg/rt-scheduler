@@ -1,18 +1,27 @@
-# Teamwise Scheduler
+﻿# Teamwise Scheduler
 
-Updated: 2026-03-08
+Updated: 2026-03-10
 
 ## What This App Is
 
 Teamwise is a respiratory therapy scheduling app replacing paper workflows.
 Core domains: coverage planning, cycles, availability requests, shift board, approvals, publish flow, directory.
 
-## Latest Updates (2026-03-08)
+## Latest Updates (2026-03-10)
 
-- Staff can now access `/shift-board` directly (no manager-only middleware block).
-- Staff navigation wording is clearer:
-  - `Future Availability`
-  - `Shift Swaps (Published)`
+- Lovable UI is now the baseline visual direction across manager-facing scheduling routes.
+- `/coverage` is the canonical manager scheduling workspace and was restyled to match the new design.
+- `/schedule` now acts as a compatibility redirect:
+  - managers -> `/coverage`
+  - staff -> `/therapist/schedule`
+- Legacy schedule shell components were retired to prevent old UI from rendering:
+  - `src/components/AttentionBar.tsx`
+  - `src/components/ScheduleHeader.tsx`
+  - `src/components/CalendarToolbar.tsx`
+  - `src/components/manager-month-calendar.tsx`
+  - `src/components/manager-week-calendar.tsx`
+- Legacy `/staff/*` pages now redirect into current routes so only one shell remains active.
+- Added tooling for future merge audits: `tools/design_merge_audit.py`.
 - Shift Board now separates use-cases more explicitly for non-technical users:
   - published schedule changes (swap/pickup) vs upcoming cycle planning.
 - Availability flow was simplified for all employees:
@@ -50,10 +59,10 @@ All checks currently green:
 - `npm run lint` pass
 - `npm run format:check` pass (whole-repo Prettier; `.claude/**` excluded from ESLint)
 - `npm run build` pass
-- `npm run test:unit` pass (**201 tests** across 23 files)
+- `npm run test:unit` pass (**212 tests** across 26 files)
 - `npm run test:e2e` pass (39 passed, 1 skipped)
 
-CI gates: format check → lint → tsc → build → Playwright E2E
+CI gates: format check â†’ lint â†’ tsc â†’ build â†’ Playwright E2E
 
 E2E specs:
 
@@ -72,7 +81,7 @@ E2E specs:
 - `/dashboard` role redirect
 - `/dashboard/manager`, `/dashboard/staff`
 - `/coverage` dedicated coverage UI (client page, full-width calendar + slide-over panel)
-- `/schedule` schedule workspace (Week/Month views only; Grid/List removed)
+- `/schedule` role-aware redirect entrypoint (manager -> `/coverage`, staff -> `/therapist/schedule`)
 - `/approvals`
 - `/availability`
 - `/shift-board`
@@ -80,7 +89,7 @@ E2E specs:
 - `/profile`
 - `/requests`, `/requests/new` shift request workflow
 - `/publish`, `/publish/[id]` publish history + async email queue
-- `/staff/` staff-scoped layout with staff-specific schedule and requests sub-routes
+- `/staff/*` legacy compatibility routes (redirects)
 
 ## Role Model
 
@@ -93,42 +102,42 @@ Lead capability: `profiles.is_lead_eligible`. All permission checks go through `
 
 ## Key Shared Components
 
-- `src/components/ui/page-header.tsx` — `<PageHeader title subtitle badge? actions?>` used on every page
-- `src/components/ui/skeleton.tsx` — `<Skeleton>`, `<SkeletonLine>`, `<SkeletonCard>`, `<SkeletonListItem>` loading states
-- `src/components/NotificationBell.tsx` — real-time bell with Supabase subscription; variants: `default` | `staff`
-- `src/components/AppShell.tsx` — nav shell; add routes to `MANAGER_NAV` / `STAFF_NAV` arrays
-- `src/components/feedback-toast.tsx` — `<FeedbackToast message variant>` for success/error toasts
-- `src/lib/auth/can.ts` — `can(role, permission)` — all permission checks go through here
-- `src/lib/coverage/selectors.ts` — `buildDayItems`, `toUiStatus`
-- `src/lib/coverage/mutations.ts` — `assignCoverageShift`, `unassignCoverageShift`
-- `src/lib/calendar-utils.ts` — `toIsoDate`, `dateRange`, `buildCalendarWeeks`, etc.
+- `src/components/ui/page-header.tsx` â€” `<PageHeader title subtitle badge? actions?>` used on every page
+- `src/components/ui/skeleton.tsx` â€” `<Skeleton>`, `<SkeletonLine>`, `<SkeletonCard>`, `<SkeletonListItem>` loading states
+- `src/components/NotificationBell.tsx` â€” real-time bell with Supabase subscription; variants: `default` | `staff`
+- `src/components/AppShell.tsx` â€” nav shell; add routes to `MANAGER_NAV` / `STAFF_NAV` arrays
+- `src/components/feedback-toast.tsx` â€” `<FeedbackToast message variant>` for success/error toasts
+- `src/lib/auth/can.ts` â€” `can(role, permission)` â€” all permission checks go through here
+- `src/lib/coverage/selectors.ts` â€” `buildDayItems`, `toUiStatus`
+- `src/lib/coverage/mutations.ts` â€” `assignCoverageShift`, `unassignCoverageShift`
+- `src/lib/calendar-utils.ts` â€” `toIsoDate`, `dateRange`, `buildCalendarWeeks`, etc.
 
 ## Design System
 
 CSS tokens (defined in `src/app/globals.css`):
 
-- `--primary` (`#0667a9`) — all primary actions: buttons, nav pills, links, focus rings
-- `--attention` (`#d97706`) — brand personality only: user avatar, logo accent; **not** for primary actions
-- `--warning-*` / `--success-*` / `--error-*` / `--info-*` — all status badge families
-- `--foreground`, `--muted-foreground`, `--border`, `--card`, `--muted`, `--secondary` — layout tokens
+- `--primary` (`#0667a9`) â€” all primary actions: buttons, nav pills, links, focus rings
+- `--attention` (`#d97706`) â€” brand personality only: user avatar, logo accent; **not** for primary actions
+- `--warning-*` / `--success-*` / `--error-*` / `--info-*` â€” all status badge families
+- `--foreground`, `--muted-foreground`, `--border`, `--card`, `--muted`, `--secondary` â€” layout tokens
 
 Rules (enforced):
 
-- No hardcoded hex colors — use CSS vars or Tailwind semantic classes
-- No `fontFamily` JSX literals — use `font-sans` or `var(--font-sans)`
-- `bg-white` → `bg-card`
-- Focus rings → `focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 outline-none`
+- No hardcoded hex colors â€” use CSS vars or Tailwind semantic classes
+- No `fontFamily` JSX literals â€” use `font-sans` or `var(--font-sans)`
+- `bg-white` â†’ `bg-card`
+- Focus rings â†’ `focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 outline-none`
 - `fontWeight 800` reserved for display-level; section headers use `600`/`700`
-- All Lucide icons — no emoji icons in UI
+- All Lucide icons â€” no emoji icons in UI
 
 Typography classes:
 
-- `app-page-title` — page-level h1
-- `app-section-title` — card/section headers
+- `app-page-title` â€” page-level h1
+- `app-section-title` â€” card/section headers
 
 ## Scheduling Rules
 
-- Coverage target: 3–5 per shift slot
+- Coverage target: 3â€“5 per shift slot
 - Weekly therapist limits from profile/defaults
 - Exactly one designated lead (`shifts.role='lead'`) per slot; lead must be eligible
 - Recurring pattern constraints (from `work_patterns` table):
@@ -162,14 +171,14 @@ Assignment status is informational only (does not affect coverage counts or publ
 - Day/Night shift tabs; accordion therapist rows in panel
 - Optimistic status updates with rollback on save failure
 - Assignment picker: Staff/Lead pill toggle; Lead filters to eligible therapists only
-- Workload shown per therapist: `· N this wk, M this cyc` (zero extra network requests)
+- Workload shown per therapist: `Â· N this wk, M this cyc` (zero extra network requests)
 - Calendar chips reflect assignment status: `OC` (on call), `LE` (leave early), `X` (cancelled)
 - PRN not offered for date is disabled in picker with tooltip; override-enabled PRN labeled `Offered`
 
 ## Schedule UX
 
-`/schedule`: Week and Month views only.
-Legacy `view=grid` and `view=list` URLs normalize to `view=week`.
+`/coverage` is the manager editing workspace.
+`/schedule` is retained as a compatibility route and redirects by role.
 
 ## Navbar / Branding
 
@@ -178,7 +187,7 @@ Legacy `view=grid` and `view=list` URLs normalize to `view=week`.
 - User avatar: `var(--attention)` amber
 - Manager badge: `bg-[var(--warning-subtle)] text-[var(--warning-text)] border-[var(--warning-border)]`
 - App shell header `z-30`; coverage slide-over `z-50`
-- Manager nav order: Dashboard → Coverage → Team → Requests
+- Manager nav order: Dashboard -> Schedule -> Availability -> Shift Swaps -> Team
 
 ## Assignment Status
 
@@ -196,7 +205,7 @@ Write path: `POST /api/schedule/assignment-status` with optimistic local update 
 
 ## Publish Flow
 
-- Manager publishes from `/schedule` → triggers email queue via `notification_outbox`
+- Manager publishes from `/coverage` -> triggers email queue via `notification_outbox`
 - `POST /api/publish/process` processes queued rows (batch_size param)
 - History at `/publish`; detail + retry at `/publish/[id]`
 - Key files: `src/app/publish/`, `src/lib/publish-events.ts`, `src/app/publish/actions.ts`
@@ -225,11 +234,11 @@ Supabase Auth (production):
 
 Core tables:
 
-- `profiles` — `full_name`, `email`, `role`, `shift_type`, `employment_type`, `max_work_days_per_week`, `is_lead_eligible`, `on_fmla`, `is_active`, `default_calendar_view`, `default_landing_page`, `site_id`
+- `profiles` â€” `full_name`, `email`, `role`, `shift_type`, `employment_type`, `max_work_days_per_week`, `is_lead_eligible`, `on_fmla`, `is_active`, `default_calendar_view`, `default_landing_page`, `site_id`
 - `schedule_cycles`
-- `shifts` — `cycle_id`, `user_id`, `date`, `shift_type`, `status`, `role`, `unfilled_reason`, assignment-status fields, `site_id`
-- `work_patterns` — `works_dow`, `offs_dow`, `weekend_rotation`, `weekend_anchor_date`, `works_dow_mode`
-- `availability_overrides` — active cycle-scoped override model (`force_off` / `force_on`, `source`)
+- `shifts` â€” `cycle_id`, `user_id`, `date`, `shift_type`, `status`, `role`, `unfilled_reason`, assignment-status fields, `site_id`
+- `work_patterns` â€” `works_dow`, `offs_dow`, `weekend_rotation`, `weekend_anchor_date`, `works_dow_mode`
+- `availability_overrides` â€” active cycle-scoped override model (`force_off` / `force_on`, `source`)
 - `shift_posts`, `notifications`, `audit_log`
 - `publish_events`, `notification_outbox`
 - `availability_requests` (legacy), `availability_entries` (legacy transitional)
@@ -248,5 +257,5 @@ Core tables:
 
 ## Next High-Value Priorities
 
-1. **Publish flow production rollout** — verify domain in Resend, set `PUBLISH_EMAIL_FROM` to verified sender, run `vercel --prod`
-2. **Worker automation** — wire cron/webhook to `POST /api/publish/process` with signed headers using `PUBLISH_WORKER_KEY` + `PUBLISH_WORKER_SIGNING_KEY`
+1. **Publish flow production rollout** â€” verify domain in Resend, set `PUBLISH_EMAIL_FROM` to verified sender, run `vercel --prod`
+2. **Worker automation** â€” wire cron/webhook to `POST /api/publish/process` with signed headers using `PUBLISH_WORKER_KEY` + `PUBLISH_WORKER_SIGNING_KEY`
