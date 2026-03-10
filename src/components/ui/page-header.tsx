@@ -27,19 +27,30 @@ export function PageHeader({ title, subtitle, badge, actions, className }: PageH
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-2xl border border-border bg-card px-6 py-5',
-        'shadow-[0_1px_3px_rgba(6,103,169,0.08),0_4px_16px_rgba(6,103,169,0.04)]',
+        'relative overflow-hidden rounded-2xl border border-border/90 px-6 py-5',
+        'bg-[color-mix(in_oklch,var(--card)_92%,var(--secondary))]',
+        'shadow-[0_1px_3px_rgba(15,23,42,0.08),0_16px_40px_rgba(15,23,42,0.06)]',
         className
       )}
     >
-      {/* Primary blue left accent bar */}
+      <div
+        className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full blur-2xl"
+        style={{ backgroundColor: 'color-mix(in oklch, var(--accent) 24%, transparent)' }}
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute -left-10 -bottom-16 h-36 w-36 rounded-full blur-2xl"
+        style={{ backgroundColor: 'color-mix(in oklch, var(--info-subtle) 55%, transparent)' }}
+        aria-hidden="true"
+      />
+
       <div
         className="absolute inset-y-0 left-0 w-1 rounded-l-2xl"
         style={{ background: 'linear-gradient(to bottom, #0667a9, #1d608e)' }}
         aria-hidden="true"
       />
 
-      <div className="flex items-start justify-between gap-4">
+      <div className="relative flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <h1 className="app-page-title">{title}</h1>
           {subtitle && (

@@ -1,6 +1,7 @@
 import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { CalendarCheck2, Download, Plus, UserCheck, UserX, Users } from 'lucide-react'
 
 import {
   AvailabilityEntriesTable,
@@ -15,7 +16,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { PageHeader } from '@/components/ui/page-header'
 import { can } from '@/lib/auth/can'
 import { toUiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
@@ -232,6 +232,15 @@ export default async function AvailabilityPage({
 
   const role = toUiRole(profile?.role)
   const canManageAvailability = can(role, 'access_manager_ui')
+  let activeTeamCount: number | null = null
+  if (canManageAvailability) {
+    const { count } = await supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .in('role', ['therapist', 'staff'])
+      .eq('is_active', true)
+    activeTeamCount = count ?? null
+  }
 
   const today = new Date()
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -405,58 +414,106 @@ export default async function AvailabilityPage({
       </CardContent>
     </Card>
   )
+  const totalRequests = availabilityRows.length
+  const needOffRequests = availabilityRows.filter((row) => row.entryType === 'force_off').length
+  const availableToWorkRequests = availabilityRows.filter(
+    (row) => row.entryType === 'force_on'
+  ).length
+  const uniqueRequesters = new Set(availabilityRows.map((row) => row.requestedBy)).size
+  const responseRatio =
+    canManageAvailability && activeTeamCount && activeTeamCount > 0
+      ? `${uniqueRequesters}/${activeTeamCount}`
+      : null
 
   return (
     <div className="space-y-6">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
-      <PageHeader
-        title={canManageAvailability ? 'Availability Planning' : 'Future Availability'}
-        subtitle={
-          canManageAvailability
-            ? 'Use this page for upcoming-cycle planning before publish. Shift Board is for published schedule changes.'
-            : 'Use this page before publish to submit availability for the next cycle.'
-        }
-        actions={
-          <div className="flex items-center gap-2">
+      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_2px_18px_rgba(15,23,42,0.06)]">
+        <div className="flex flex-col gap-4 border-b border-border px-5 py-5 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Availability Planning
+            </p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+              {canManageAvailability ? 'Manager Availability Queue' : 'Future Availability'}
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {selectedCycle
+                ? `${selectedCycle.label} | ${selectedCycle.start_date} to ${selectedCycle.end_date}`
+                : 'No upcoming cycle selected'}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
             <Button asChild>
-              <a href="#submit-entry">Add availability</a>
+              <a href="#submit-entry">
+                <Plus className="mr-1.5 h-4 w-4" />
+                Add availability
+              </a>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/shift-board">Open shift board</Link>
             </Button>
             <MoreActionsMenu>
               <a
                 href="/api/availability/export"
-                className="block rounded-sm px-3 py-2 text-sm hover:bg-secondary"
+                className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-secondary"
               >
+                <Download className="h-3.5 w-3.5" />
                 Export CSV
               </a>
               <PrintMenuItem />
             </MoreActionsMenu>
           </div>
-        }
-      />
-
-      <section className="rounded-xl border border-border bg-card p-4">
-        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-          Use the right page
-        </p>
-        <div className="mt-2 grid gap-3 md:grid-cols-2">
-          <div className="rounded-lg border border-border bg-muted/40 p-3">
-            <p className="text-xs font-semibold text-foreground">This page: Future Availability</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Use before the schedule is published, for upcoming cycle planning.
-            </p>
-          </div>
-          <div className="rounded-lg border border-border bg-muted/40 p-3">
-            <p className="text-xs font-semibold text-foreground">Other page: Shift Board</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Use after schedule publish to swap or pick up shifts.
-            </p>
-          </div>
         </div>
-        <div className="mt-3">
-          <Button asChild size="sm" variant="outline">
-            <Link href="/shift-board">Open Shift Board (published schedule)</Link>
-          </Button>
+
+        <div className="grid grid-cols-1 gap-3 px-5 py-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-xl border border-border bg-muted/30 px-3.5 py-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Total requests</span>
+              <CalendarCheck2 className="h-3.5 w-3.5" />
+            </div>
+            <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">
+              {totalRequests}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Entries in selected cycle</p>
+          </div>
+
+          <div className="rounded-xl border border-border bg-muted/30 px-3.5 py-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Need off</span>
+              <UserX className="h-3.5 w-3.5" />
+            </div>
+            <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">
+              {needOffRequests}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Unavailable requests</p>
+          </div>
+
+          <div className="rounded-xl border border-border bg-muted/30 px-3.5 py-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Available to work</span>
+              <UserCheck className="h-3.5 w-3.5" />
+            </div>
+            <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">
+              {availableToWorkRequests}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Extra availability offered</p>
+          </div>
+
+          <div className="rounded-xl border border-border bg-muted/30 px-3.5 py-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Team responses</span>
+              <Users className="h-3.5 w-3.5" />
+            </div>
+            <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">
+              {responseRatio ?? uniqueRequesters}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {responseRatio ? 'Responded staff / active staff' : 'Unique staff with requests'}
+            </p>
+          </div>
         </div>
       </section>
 

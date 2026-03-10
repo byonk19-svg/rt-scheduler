@@ -50,66 +50,65 @@
 :root {
   --font-geist-mono:
     'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-  --radius: 0.5rem;
-  --tw-primary-blue: #0667a9;
-  --tw-deep-blue: #1d608e;
-  --tw-light-blue: #6aa5c8;
-  --tw-accent-orange: #e27f3f;
-  --tw-soft-tint: #cedfe3;
-  --tw-background: #f8fafc;
-  --tw-surface: #ffffff;
-  --tw-text: #0f172a;
-  --tw-muted-text: #475569;
-  --tw-border: #e8eef6;
-  --background: #f0f4f8;
-  --foreground: #0d1726;
-  --card: #ffffff;
-  --card-foreground: #0d1726;
-  --popover: #ffffff;
-  --popover-foreground: #0d1726;
-  --primary: #0667a9;
-  --primary-foreground: #ffffff;
-  --secondary: #d4e4ec;
-  --secondary-foreground: #0d1726;
-  --muted: #f4f7fa;
-  --muted-foreground: #4a5568;
-  --accent: #e27f3f;
-  --accent-foreground: #ffffff;
-  --attention: #d97706;
-  --destructive: #ef4444;
-  --border: #dce8f0;
-  --input: #dce8f0;
-  --ring: #0667a9;
-  --chart-1: #0667a9;
-  --chart-2: #6aa5c8;
-  --chart-3: #e27f3f;
-  --chart-4: #1d608e;
-  --chart-5: #cedfe3;
-  --sidebar: #ffffff;
-  --sidebar-foreground: #0d1726;
-  --sidebar-primary: #0667a9;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f4f7fa;
-  --sidebar-accent-foreground: #0d1726;
-  --sidebar-border: #dce8f0;
-  --sidebar-ring: #0667a9;
-  --highlight: #0667a9;
-  --success: #22c55e;
-  --success-subtle: #dcfce7;
-  --success-border: #bbf7d0;
-  --success-text: #15803d;
-  --warning: #f59e0b;
-  --warning-subtle: #fef3c7;
-  --warning-border: #fde68a;
-  --warning-text: #b45309;
-  --error: #ef4444;
-  --error-subtle: #fee2e2;
-  --error-border: #fecaca;
-  --error-text: #b91c1c;
-  --info: #0ea5e9;
-  --info-subtle: #e0f2fe;
-  --info-border: #bae6fd;
-  --info-text: #0369a1;
+  --radius: 0.625rem;
+
+  /* Lovable core theme */
+  --background: hsl(38 18% 96%);
+  --foreground: hsl(220 25% 12%);
+  --card: hsl(38 14% 99%);
+  --card-foreground: hsl(220 25% 12%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(220 25% 12%);
+  --primary: hsl(187 55% 28%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(32 18% 91%);
+  --secondary-foreground: hsl(220 25% 12%);
+  --muted: hsl(32 12% 93%);
+  --muted-foreground: hsl(220 10% 45%);
+  --accent: hsl(38 90% 55%);
+  --accent-foreground: hsl(220 25% 12%);
+  --destructive: hsl(0 65% 55%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(32 14% 86%);
+  --input: hsl(32 14% 86%);
+  --input-background: hsl(38 14% 99%);
+  --ring: hsl(187 55% 28%);
+
+  --sidebar: hsl(192 30% 20%);
+  --sidebar-foreground: hsl(190 10% 78%);
+  --sidebar-primary: hsl(0 0% 100%);
+  --sidebar-primary-foreground: hsl(192 30% 20%);
+  --sidebar-accent: hsl(192 35% 28%);
+  --sidebar-accent-foreground: hsl(38 25% 96%);
+  --sidebar-border: hsl(192 20% 26%);
+  --sidebar-ring: hsl(38 90% 55%);
+  --sidebar-muted: hsl(192 14% 52%);
+
+  --chart-1: hsl(187 55% 28%);
+  --chart-2: hsl(192 35% 28%);
+  --chart-3: hsl(38 90% 55%);
+  --chart-4: hsl(220 25% 12%);
+  --chart-5: hsl(32 12% 93%);
+
+  --success: hsl(152 50% 38%);
+  --success-subtle: hsl(150 45% 93%);
+  --success-border: hsl(150 30% 82%);
+  --success-text: hsl(152 50% 30%);
+  --warning: hsl(38 90% 55%);
+  --warning-subtle: hsl(45 95% 90%);
+  --warning-border: hsl(40 85% 76%);
+  --warning-text: hsl(35 70% 35%);
+  --error: hsl(0 65% 55%);
+  --error-subtle: hsl(0 70% 94%);
+  --error-border: hsl(0 60% 83%);
+  --error-text: hsl(0 55% 38%);
+  --info: hsl(187 55% 35%);
+  --info-subtle: hsl(187 50% 92%);
+  --info-border: hsl(187 35% 80%);
+  --info-text: hsl(187 60% 30%);
+
+  --highlight: hsl(187 55% 28%);
+  --attention: hsl(38 90% 55%);
 }
 
 /* Dark mode is not yet implemented — tokens are intentionally absent.
@@ -121,9 +120,6 @@
   }
   body {
     @apply bg-background text-foreground;
-    background-image:
-      radial-gradient(ellipse at 10% 0%, rgba(6, 103, 169, 0.08) 0%, transparent 50%),
-      radial-gradient(ellipse at 90% 5%, rgba(206, 223, 227, 0.35) 0%, transparent 50%);
     min-height: 100vh;
   }
 
@@ -177,6 +173,10 @@
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--foreground);
+  font-family: var(--font-plus-jakarta), 'DM Sans', sans-serif;
+}
+
+.font-heading {
   font-family: var(--font-plus-jakarta), 'DM Sans', sans-serif;
 }
 

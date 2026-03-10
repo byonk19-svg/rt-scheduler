@@ -52,3 +52,4 @@ test-results/
 .claude/
 .planning/
 security_best_practices_report.md
+.tmp_lovable_import_*/

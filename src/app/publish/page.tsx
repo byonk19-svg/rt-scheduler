@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { CalendarDays, Send } from 'lucide-react'
+import { ArrowRight, CalendarDays, CheckCircle2, CircleX, Clock3, Send } from 'lucide-react'
 
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
@@ -118,15 +118,34 @@ export default async function PublishHistoryPage() {
   }
 
   const events = (eventsData ?? []) as PublishEventRow[]
+  const successCount = events.filter((event) => event.status === 'success').length
+  const failedCount = events.filter((event) => event.status === 'failed').length
+  const queuedCount = events.reduce((total, event) => total + Math.max(event.queued_count, 0), 0)
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Publish History"
         subtitle="Track schedule email delivery for each publish event."
+        badge={
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold text-foreground">
+              <CheckCircle2 className="h-3.5 w-3.5 text-[var(--success-text)]" />
+              {successCount} successful
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold text-foreground">
+              <CircleX className="h-3.5 w-3.5 text-[var(--error-text)]" />
+              {failedCount} failed
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold text-foreground">
+              <Clock3 className="h-3.5 w-3.5 text-[var(--warning-text)]" />
+              {queuedCount} queued
+            </span>
+          </div>
+        }
         actions={
           <Button asChild variant="outline" size="sm">
-            <Link href="/schedule?view=week">
+            <Link href="/coverage?view=week">
               <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
               Back to schedule
             </Link>
@@ -147,7 +166,7 @@ export default async function PublishHistoryPage() {
               </p>
             </div>
             <Button asChild size="sm" variant="outline">
-              <Link href="/schedule?view=week">Go to schedule</Link>
+              <Link href="/coverage?view=week">Go to schedule</Link>
             </Button>
           </div>
         ) : (
@@ -210,9 +229,10 @@ export default async function PublishHistoryPage() {
                     <td className="px-4 py-3 text-right">
                       <Link
                         href={`/publish/${event.id}`}
-                        className="text-xs font-semibold text-primary hover:underline"
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
                       >
-                        Details →
+                        Details
+                        <ArrowRight className="h-3 w-3" aria-hidden="true" />
                       </Link>
                     </td>
                   </tr>

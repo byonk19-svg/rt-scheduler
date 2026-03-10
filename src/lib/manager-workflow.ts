@@ -89,7 +89,7 @@ export function getManagerAttentionLinks(activeCycleId: string | null): Dashboar
     coverageUnderCoverage: `/coverage?${cycleParam}&view=week&filter=under_coverage&focus=first`,
     coverageUnfilled: `/coverage?${cycleParam}&view=week&filter=unfilled&focus=first`,
     coverageNeedsAttention: `/coverage?${cycleParam}&view=week&filter=needs_attention&focus=first`,
-    publish: `/schedule?${cycleParam}&view=week`,
+    publish: `/coverage?${cycleParam}&view=week`,
   }
 }
 

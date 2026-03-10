@@ -1,5 +1,6 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { AlertCircle } from 'lucide-react'
 
 import { EmployeeDirectory } from '@/components/EmployeeDirectory'
 import { FeedbackToast } from '@/components/feedback-toast'
@@ -934,11 +935,43 @@ export default async function TeamPage({
     }
   })
 
+  const activeEmployeeCount = employees.filter((employee) => employee.is_active).length
+  const leadEligibleCount = employees.filter((employee) => employee.is_lead_eligible).length
+  const onFmlaCount = employees.filter((employee) => employee.on_fmla).length
+
   return (
     <div className="space-y-6">
-      {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
+      {feedback?.variant === 'success' && (
+        <FeedbackToast message={feedback.message} variant={feedback.variant} />
+      )}
 
-      <PageHeader title="Team Directory" subtitle="Manage staffing details for your team." />
+      <PageHeader
+        title="Team Directory"
+        subtitle="Manage staffing details for your team."
+        badge={
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold text-foreground">
+              {employees.length} total
+            </span>
+            <span className="inline-flex items-center rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold text-foreground">
+              {activeEmployeeCount} active
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[var(--info-border)] bg-[var(--info-subtle)] px-2.5 py-1 text-[11px] font-semibold text-[var(--info-text)]">
+              {leadEligibleCount} lead eligible
+            </span>
+            <span className="inline-flex items-center rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2.5 py-1 text-[11px] font-semibold text-[var(--warning-text)]">
+              {onFmlaCount} on FMLA
+            </span>
+          </div>
+        }
+      />
+
+      {feedback?.variant === 'error' && (
+        <p className="inline-flex items-center gap-2 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm font-medium text-[var(--error-text)]">
+          <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+          {feedback.message}
+        </p>
+      )}
 
       <EmployeeDirectory
         employees={employees}

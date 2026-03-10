@@ -1,1 +1,5 @@
-﻿export { default } from '@/app/requests/new/page'
+﻿import { redirect } from 'next/navigation'
+
+export default function StaffLegacyRequestsRoute() {
+  redirect('/requests/new')
+}

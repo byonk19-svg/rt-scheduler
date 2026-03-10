@@ -2,15 +2,23 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, CalendarDays, CheckCircle2, Search } from 'lucide-react'
+import {
+  AlertCircle,
+  ArrowRightLeft,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  Search,
+  ShieldAlert,
+} from 'lucide-react'
 
 import { can } from '@/lib/auth/can'
 import { toUiRole, type UiRole } from '@/lib/auth/roles'
 import { dateKeyFromDate, buildDateRange } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { PageHeader } from '@/components/ui/page-header'
 import { cn } from '@/lib/utils'
 
 type Role = UiRole
@@ -410,6 +418,10 @@ export default function ShiftBoardPage() {
 
   const pending = pendingCount
   const canReview = can(role, 'review_shift_posts')
+  const openPostCount = requests.filter((request) => request.status === 'pending').length
+  const approvedCount = requests.filter((request) => request.status === 'approved').length
+  const deniedCount = requests.filter((request) => request.status === 'denied').length
+  const needsCoverageAttention = canReview && (metrics.unfilled > 0 || metrics.missingLead > 0)
 
   const filtered = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase()
@@ -573,44 +585,63 @@ export default function ShiftBoardPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Shift Board"
-        subtitle={
-          canReview
-            ? 'Review and approve swap and pickup requests for the published schedule.'
-            : 'Use this page only for changes to the published schedule: swap or pick up a shift.'
-        }
-      />
-
       <section
-        className="fade-up rounded-xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(6,103,169,0.06),0_4px_12px_rgba(6,103,169,0.03)]"
+        className="fade-up overflow-hidden rounded-2xl border border-border bg-card shadow-[0_2px_18px_rgba(15,23,42,0.06)]"
         style={{ animationDelay: '0.03s' }}
-        aria-label="Workflow guidance"
+        aria-label="Shift board overview"
       >
-        <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-          Use the right page
-        </p>
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
-          <div className="rounded-lg border border-border bg-muted/40 p-3">
-            <p className="text-xs font-semibold text-foreground">This page: Shift Board</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              For shifts in an already published schedule. Staff can post swap or pickup requests.
+        <div className="flex flex-col gap-4 border-b border-border px-5 py-5 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Published Schedule Changes
+            </p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Shift Board</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {canReview
+                ? 'Review and approve swap and pickup requests in the live schedule.'
+                : 'Post swaps or pickups for the published schedule only.'}
             </p>
           </div>
-          <div className="rounded-lg border border-border bg-muted/40 p-3">
-            <p className="text-xs font-semibold text-foreground">Other page: Future Availability</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              For upcoming cycles before publish. Use Availability to submit days off or PRN offers.
-            </p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => router.push('/requests/new')}>
+              <ArrowRightLeft className="mr-1.5 h-3.5 w-3.5" />
+              Post request
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/availability">Future availability</Link>
+            </Button>
+            {canReview && (
+              <Button asChild size="sm" variant="outline">
+                <Link href="/coverage">Open coverage</Link>
+              </Button>
+            )}
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => router.push('/requests/new')}>
-            Post swap or pickup request
-          </Button>
-          <Button asChild size="sm" variant="outline">
-            <Link href="/availability">Open future availability</Link>
-          </Button>
+        <div className="grid grid-cols-1 gap-3 px-5 py-4 sm:grid-cols-2 xl:grid-cols-4">
+          <KpiTile
+            label="Open posts"
+            value={loading ? '--' : openPostCount}
+            detail="Pending swap or pickup requests"
+            icon={<Clock3 className="h-3.5 w-3.5" />}
+          />
+          <KpiTile
+            label="Pending approvals"
+            value={loading ? '--' : pending}
+            detail="Requests awaiting manager decision"
+            icon={<CalendarDays className="h-3.5 w-3.5" />}
+          />
+          <KpiTile
+            label="Approved / denied"
+            value={loading ? '--' : `${approvedCount}/${deniedCount}`}
+            detail="Resolution history in this view"
+            icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+          />
+          <KpiTile
+            label="Coverage risk"
+            value={loading ? '--' : `${metrics.unfilled + metrics.missingLead}`}
+            detail={needsCoverageAttention ? 'Coverage needs attention' : 'Coverage stable'}
+            icon={<ShieldAlert className="h-3.5 w-3.5" />}
+          />
         </div>
       </section>
 
@@ -633,13 +664,13 @@ export default function ShiftBoardPage() {
                 value={loading ? '--' : pending}
                 variant={!loading && pending > 0 ? 'warning' : 'success'}
               />
-              <div className="w-px self-stretch bg-border" />
+              <div className="hidden h-8 w-px self-center bg-border lg:block" />
               <SummaryItem
                 label="Unfilled shifts"
                 value={loading ? '--' : metrics.unfilled}
                 variant={!loading && metrics.unfilled > 0 ? 'error' : 'success'}
               />
-              <div className="w-px self-stretch bg-border" />
+              <div className="hidden h-8 w-px self-center bg-border lg:block" />
               <SummaryItem
                 label="Missing lead"
                 value={loading ? '--' : metrics.missingLead}
@@ -694,7 +725,7 @@ export default function ShiftBoardPage() {
 
       {/* Filter bar */}
       <div
-        className="fade-up flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3"
+        className="fade-up flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm"
         style={{ animationDelay: '0.1s' }}
       >
         <div className="relative min-w-[200px] flex-1">
@@ -703,7 +734,7 @@ export default function ShiftBoardPage() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search by name, message, or shift..."
-            className="h-9 w-full rounded-md border border-border bg-muted/50 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 outline-none"
+            className="h-9 w-full rounded-md border border-border bg-[var(--input-background)] pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
           />
         </div>
         <div className="flex gap-1">
@@ -795,6 +826,29 @@ function SummaryItem({
   )
 }
 
+function KpiTile({
+  label,
+  value,
+  detail,
+  icon,
+}: {
+  label: string
+  value: number | string
+  detail: string
+  icon: ReactNode
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-muted/30 px-3.5 py-3">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span className="font-medium uppercase tracking-wide">{label}</span>
+        <span className="text-muted-foreground">{icon}</span>
+      </div>
+      <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">{value}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+    </div>
+  )
+}
+
 function FilterPill({
   label,
   active,
@@ -811,7 +865,7 @@ function FilterPill({
       className={cn(
         'rounded-md border px-3 py-1 text-xs font-semibold transition-colors',
         active
-          ? 'border-primary bg-primary/10 text-primary'
+          ? 'border-primary bg-primary/10 text-primary shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--primary)_35%,transparent)]'
           : 'border-border bg-card text-muted-foreground hover:bg-secondary'
       )}
     >
@@ -868,7 +922,7 @@ function RequestCard({
   return (
     <div
       className={cn(
-        'fade-up rounded-xl border bg-card p-4 transition-shadow',
+        'fade-up rounded-xl border bg-card p-4 transition-shadow hover:shadow-sm',
         isPending ? 'border-[var(--warning-border)] shadow-sm' : 'border-border'
       )}
       style={{ animationDelay: `${delay}s` }}
@@ -903,7 +957,7 @@ function RequestCard({
             >
               {statusMeta.label}
             </span>
-            <span className="text-xs text-muted-foreground">{req.posted}</span>
+            <span className="text-xs font-medium text-muted-foreground">{req.posted}</span>
           </div>
 
           {/* Shift chip */}
@@ -945,7 +999,7 @@ function RequestCard({
               disabled={saving}
               className="h-8 w-full rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 outline-none disabled:opacity-60"
             >
-              <option value="">- Choose a therapist -</option>
+              <option value="">-- Choose a therapist --</option>
               {eligibleTherapists.map((t) => {
                 const isLeadEligible = t.is_lead_eligible === true
                 const disabled = needsLeadPartner && !isLeadEligible
@@ -973,7 +1027,7 @@ function RequestCard({
         <div className="mt-3 flex gap-2 border-t border-border pt-3">
           <Button
             size="sm"
-            className="flex-1"
+            className="min-h-9 flex-1"
             disabled={saving || (needsPartner && !swapPartnerId)}
             onClick={() => onAction('approve')}
           >
@@ -982,7 +1036,7 @@ function RequestCard({
           <Button
             size="sm"
             variant="outline"
-            className="flex-1 border-[var(--error-border)] text-[var(--error-text)] hover:bg-[var(--error-subtle)]"
+            className="min-h-9 flex-1 border-[var(--error-border)] text-[var(--error-text)] hover:bg-[var(--error-subtle)]"
             disabled={saving}
             onClick={() => onAction('deny')}
           >

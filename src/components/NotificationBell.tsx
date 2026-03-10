@@ -19,7 +19,7 @@ type NotificationItem = {
 }
 
 type NotificationBellProps = {
-  variant?: 'default' | 'staff'
+  variant?: 'default' | 'staff' | 'shell'
 }
 
 function timeAgo(iso: string): string {
@@ -144,6 +144,7 @@ export function NotificationBell({ variant = 'default' }: NotificationBellProps)
   )
 
   const isStaffVariant = variant === 'staff'
+  const isShellVariant = variant === 'shell'
 
   return (
     <div ref={wrapperRef} className="bell-wrapper relative">
@@ -155,8 +156,10 @@ export function NotificationBell({ variant = 'default' }: NotificationBellProps)
             void loadNotifications()
           }
         }}
-        className={`relative inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-foreground ${
-          isStaffVariant ? '' : 'hover:bg-secondary'
+        className={`relative inline-flex h-9 w-9 items-center justify-center rounded-md border ${
+          isShellVariant
+            ? 'border-sidebar-border bg-sidebar-accent/35 text-sidebar-foreground hover:bg-sidebar-accent'
+            : `border-border bg-card text-foreground ${isStaffVariant ? '' : 'hover:bg-secondary'}`
         }`}
         aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
         aria-expanded={open}

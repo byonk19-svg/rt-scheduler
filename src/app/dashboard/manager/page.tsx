@@ -4,14 +4,15 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import {
+  AlertTriangle,
+  ArrowRight,
   Calendar,
+  CalendarDays,
   CheckCircle2,
+  Clock,
   ClipboardList,
-  FileText,
-  Moon,
-  Rocket,
-  SquareCheckBig,
-  Sun,
+  Send,
+  Shield,
   Users,
   XCircle,
 } from 'lucide-react'
@@ -23,7 +24,6 @@ import { buildDateRange, dateKeyFromDate } from '@/lib/schedule-helpers'
 import { MAX_SHIFT_COVERAGE_PER_DAY, MIN_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
 import { createClient } from '@/lib/supabase/client'
 import { buildCycleRoute } from '@/lib/cycle-route'
-import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
@@ -51,7 +51,7 @@ type DashboardData = {
   activeCycleId: string | null
 }
 
-type MetricValue = number | '—'
+type MetricValue = number | '--'
 
 type DashboardDisplayData = {
   unfilledShifts: MetricValue
@@ -127,8 +127,8 @@ const INITIAL_DATA: DashboardData = {
   therapistsScheduled: 0,
   workloadRows: [],
   weeklyProgress: [],
-  cycleStart: '—',
-  cycleEnd: '—',
+  cycleStart: '--',
+  cycleEnd: '--',
   managerName: 'Manager',
   activeCycleId: null,
 }
@@ -449,23 +449,23 @@ export default function ManagerDashboardPage() {
   const d: DashboardDisplayData = loading
     ? {
         ...data,
-        unfilledShifts: '—',
-        missingLead: '—',
-        underCoverage: '—',
-        overCoverage: '—',
-        pendingApprovals: '—',
-        approvedToday: '—',
-        deniedToday: '—',
-        activeEmployees: '—',
-        dayShift: '—',
-        nightShift: '—',
-        onFmla: '—',
-        scheduledSlots: '—',
-        totalSlots: '—',
-        therapistsScheduled: '—',
+        unfilledShifts: '--',
+        missingLead: '--',
+        underCoverage: '--',
+        overCoverage: '--',
+        pendingApprovals: '--',
+        approvedToday: '--',
+        deniedToday: '--',
+        activeEmployees: '--',
+        dayShift: '--',
+        nightShift: '--',
+        onFmla: '--',
+        scheduledSlots: '--',
+        totalSlots: '--',
+        therapistsScheduled: '--',
         workloadRows: [],
-        cycleStart: '—',
-        cycleEnd: '—',
+        cycleStart: '--',
+        cycleEnd: '--',
       }
     : data
 
@@ -474,551 +474,491 @@ export default function ManagerDashboardPage() {
   const approvalsRoute = MANAGER_WORKFLOW_LINKS.approvals
   const teamRoute = MANAGER_WORKFLOW_LINKS.team
 
-  const approvalsClear = !loading && data.pendingApprovals === 0
-  const coverageHasIssues = !loading && data.underCoverage > 0
-  const leadHasIssues = !loading && data.missingLead > 0
-  const hasAnyIssues =
-    loading ||
-    !approvalsClear ||
-    coverageHasIssues ||
-    leadHasIssues ||
-    (!loading && data.unfilledShifts > 0)
-  const nextAction = (() => {
-    if (loading) {
-      return {
-        title: 'Review cycle health',
-        detail: 'Loading live coverage and approval signals for this cycle.',
+  const coverageRisks = [
+    {
+      label: 'Unfilled shifts',
+      value: d.unfilledShifts,
+      detail: 'Shifts with no assigned therapist',
+      severity: 'error' as const,
+    },
+    {
+      label: 'Missing lead',
+      value: d.missingLead,
+      detail: 'Shifts without lead therapist coverage',
+      severity: 'error' as const,
+    },
+    {
+      label: 'Under coverage',
+      value: d.underCoverage,
+      detail: 'Shifts below minimum staffing target',
+      severity: 'warning' as const,
+    },
+  ]
+
+  const publishChecklist = [
+    {
+      label: 'Pending approvals resolved',
+      done: typeof d.pendingApprovals === 'number' && d.pendingApprovals === 0,
+      detail:
+        typeof d.pendingApprovals === 'number'
+          ? `${d.pendingApprovals} waiting`
+          : 'Loading approval status',
+    },
+    {
+      label: 'Coverage meets minimum staffing',
+      done:
+        typeof d.unfilledShifts === 'number' &&
+        typeof d.underCoverage === 'number' &&
+        d.unfilledShifts === 0 &&
+        d.underCoverage === 0,
+      detail:
+        typeof d.unfilledShifts === 'number' && typeof d.underCoverage === 'number'
+          ? `${d.unfilledShifts} unfilled, ${d.underCoverage} under-covered`
+          : 'Loading coverage checks',
+    },
+    {
+      label: 'Lead assigned on all shifts',
+      done: typeof d.missingLead === 'number' && d.missingLead === 0,
+      detail:
+        typeof d.missingLead === 'number' ? `${d.missingLead} missing lead` : 'Loading lead checks',
+    },
+    {
+      label: 'Cycle reviewed and ready to publish',
+      done: !loading && typeof d.scheduledSlots === 'number' && d.scheduledSlots > 0,
+      detail:
+        typeof d.scheduledSlots === 'number' && typeof d.totalSlots === 'number'
+          ? `${d.scheduledSlots} of ${d.totalSlots} slots scheduled`
+          : 'Loading cycle progress',
+    },
+  ]
+
+  const publishReadyCount = publishChecklist.filter((item) => item.done).length
+  const publishReadinessPercent = loading
+    ? '--'
+    : Math.round((publishReadyCount / publishChecklist.length) * 100)
+
+  const unresolvedCoverage = coverageRisks.reduce((total, item) => {
+    if (typeof item.value === 'number') return total + item.value
+    return total
+  }, 0)
+
+  const pendingTeamMembers =
+    typeof d.activeEmployees === 'number' && typeof d.therapistsScheduled === 'number'
+      ? Math.max(d.activeEmployees - d.therapistsScheduled, 0)
+      : '--'
+
+  const nextAction = loading
+    ? {
+        title: 'Loading cycle health',
+        detail: 'Pulling live staffing, approvals, and publish readiness data.',
         href: coverageRoute,
         cta: 'Open coverage',
-        tone: 'warn' as const,
       }
-    }
+    : unresolvedCoverage > 0
+      ? {
+          title: 'Fix coverage gaps before publishing',
+          detail: `${unresolvedCoverage} total unresolved staffing blockers across this cycle.`,
+          href: coverageRoute,
+          cta: 'Fix coverage',
+        }
+      : typeof d.pendingApprovals === 'number' && d.pendingApprovals > 0
+        ? {
+            title: 'Review pending approvals',
+            detail: `${d.pendingApprovals} approval requests are waiting for decision.`,
+            href: approvalsRoute,
+            cta: 'Review approvals',
+          }
+        : {
+            title: 'Publish schedule',
+            detail: 'Coverage and approvals are in good shape. Proceed to publish.',
+            href: publishRoute,
+            cta: 'Go to publish',
+          }
 
-    if (data.unfilledShifts > 0 || leadHasIssues || coverageHasIssues) {
-      const issues: string[] = []
-      if (data.unfilledShifts > 0) issues.push(`${data.unfilledShifts} unfilled`)
-      if (data.missingLead > 0) issues.push(`${data.missingLead} missing lead`)
-      if (data.underCoverage > 0) issues.push(`${data.underCoverage} under coverage`)
-      return {
-        title: 'Fix coverage before publishing',
-        detail: `${issues.join(' | ')}.`,
-        href: coverageRoute,
-        cta: 'Resolve coverage gaps',
-        tone: 'critical' as const,
-      }
-    }
-
-    if (!approvalsClear) {
-      return {
-        title: 'Clear pending approvals',
-        detail: `${data.pendingApprovals} requests are still waiting for review.`,
-        href: approvalsRoute,
-        cta: 'Review approvals',
-        tone: 'warn' as const,
-      }
-    }
-
-    return {
-      title: 'Cycle is ready to publish',
-      detail: 'Coverage and approvals are clear for this cycle.',
-      href: publishRoute,
-      cta: 'Go to publish',
-      tone: 'ok' as const,
-    }
-  })()
-  const publishBlockers = (() => {
-    if (loading) return []
-    const blockers: string[] = []
-    if (data.unfilledShifts > 0) {
-      blockers.push(`${data.unfilledShifts} unfilled shift${data.unfilledShifts === 1 ? '' : 's'}`)
-    }
-    if (data.missingLead > 0) {
-      blockers.push(`${data.missingLead} shift${data.missingLead === 1 ? '' : 's'} missing lead`)
-    }
-    if (data.underCoverage > 0) {
-      blockers.push(
-        `${data.underCoverage} under-coverage slot${data.underCoverage === 1 ? '' : 's'}`
-      )
-    }
-    if (data.pendingApprovals > 0) {
-      blockers.push(
-        `${data.pendingApprovals} pending approval${data.pendingApprovals === 1 ? '' : 's'}`
-      )
-    }
-    return blockers
-  })()
-  const publishBlockedReason = loading
-    ? 'Checking publish blockers.'
-    : publishBlockers.length > 0
-      ? `Blocked by ${publishBlockers.join(', ')}.`
-      : 'No blockers detected. Cycle can be published.'
+  function getGreeting(): string {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Good morning'
+    if (hour < 18) return 'Good afternoon'
+    return 'Good evening'
+  }
 
   return (
-    <div className="space-y-5">
-      {/* Page header */}
-      <PageHeader
-        className="fade-up"
-        title="Manager Dashboard"
-        subtitle={`Welcome, ${d.managerName}. Build coverage first, then publish confidently.`}
-        actions={
-          <div className="flex items-center gap-1.5 rounded-lg border border-border bg-muted px-3 py-1.5">
-            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-xs font-semibold text-muted-foreground">
-              {d.cycleStart} – {d.cycleEnd}
-            </span>
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-border bg-card px-5 py-5 shadow-[0_2px_18px_rgba(15,23,42,0.06)] md:px-6 md:py-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              {getGreeting()}, {d.managerName}
+            </h1>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
+                <Calendar className="h-3.5 w-3.5" />
+                {d.cycleStart} - {d.cycleEnd}
+              </span>
+              <SeverityBadge
+                tone={
+                  typeof unresolvedCoverage === 'number' && unresolvedCoverage > 0 ? 'error' : 'ok'
+                }
+                label={
+                  loading
+                    ? 'Loading coverage'
+                    : unresolvedCoverage > 0
+                      ? `${unresolvedCoverage} coverage gaps`
+                      : 'Coverage clear'
+                }
+              />
+              <SeverityBadge
+                tone={
+                  typeof d.pendingApprovals === 'number' && d.pendingApprovals > 0
+                    ? 'warning'
+                    : 'ok'
+                }
+                label={
+                  loading
+                    ? 'Loading approvals'
+                    : typeof d.pendingApprovals === 'number' && d.pendingApprovals > 0
+                      ? `${d.pendingApprovals} pending approvals`
+                      : 'Approvals clear'
+                }
+              />
+            </div>
           </div>
-        }
-      />
 
-      {/* Attention bar */}
-      <div
-        className={cn(
-          'fade-up flex flex-wrap items-center gap-4 rounded-xl border bg-card px-4 py-4 sm:gap-5 sm:px-5',
-          hasAnyIssues
-            ? 'border-l-4 border-[var(--warning-border)] border-l-[var(--warning)]'
-            : 'border-l-4 border-[var(--success-border)] border-l-[var(--success)]'
-        )}
-        style={{ animationDelay: '0.05s' }}
-      >
-        <div className="flex flex-1 flex-wrap gap-4 sm:gap-5">
-          <Stat label="Unfilled shifts" value={d.unfilledShifts} color="var(--error-text)" />
-          <div className="hidden w-px self-stretch bg-border sm:block" />
-          <Stat label="Missing lead" value={d.missingLead} color="var(--error-text)" />
-          <div className="hidden w-px self-stretch bg-border sm:block" />
-          <Stat label="Under coverage" value={d.underCoverage} color="var(--warning-text)" />
-          <div className="hidden w-px self-stretch bg-border sm:block" />
-          <Stat label="Pending approvals" value={d.pendingApprovals} color="var(--success-text)" />
-        </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
-          <Button size="sm" onClick={() => router.push(coverageRoute)}>
-            Fix coverage
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => router.push(approvalsRoute)}>
-            Review approvals
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => router.push(publishRoute)}>
-            Go to publish
-          </Button>
-        </div>
-      </div>
-
-      {/* Primary workflow panels */}
-      <div
-        className="fade-up grid grid-cols-1 gap-3.5 lg:grid-cols-12"
-        style={{ animationDelay: '0.1s' }}
-      >
-        <SectionCard className="lg:col-span-7">
-          <CardHeader
-            icon={<Rocket className="h-4 w-4 text-muted-foreground" />}
-            title="Next action"
-            subtitle="Start with the highest-impact step for this cycle"
-          />
-          <div
-            className={cn(
-              'my-3.5 rounded-lg border px-3 py-3',
-              nextAction.tone === 'critical'
-                ? 'border-[var(--error-border)] bg-[var(--error-subtle)]'
-                : nextAction.tone === 'warn'
-                  ? 'border-[var(--warning-border)] bg-[var(--warning-subtle)]'
-                  : 'border-[var(--success-border)] bg-[var(--success-subtle)]'
-            )}
-          >
-            <p className="text-sm font-bold text-foreground">{nextAction.title}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{nextAction.detail}</p>
-          </div>
-          <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-4">
-            <SmallTile
-              label="Slots scheduled"
-              value={loading ? '—' : `${String(d.scheduledSlots)} / ${String(d.totalSlots)}`}
-              icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
-            />
-            <SmallTile
-              label="Therapists on cycle"
-              value={d.therapistsScheduled}
-              icon={<Users className="h-4 w-4 text-muted-foreground" />}
-            />
-            <SmallTile
-              label="Approved today"
-              value={d.approvedToday}
-              icon={<CheckCircle2 className="h-4 w-4 text-muted-foreground" />}
-            />
-            <SmallTile
-              label="Denied today"
-              value={d.deniedToday}
-              icon={<XCircle className="h-4 w-4 text-muted-foreground" />}
-            />
-          </div>
-          <div className="mt-3.5 flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => router.push(coverageRoute)}>
+              <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
+              Open coverage
+            </Button>
             <Button size="sm" onClick={() => router.push(nextAction.href)}>
+              <Send className="mr-1.5 h-3.5 w-3.5" />
               {nextAction.cta}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => router.push(coverageRoute)}>
-              Open coverage
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => router.push(approvalsRoute)}>
-              Open approvals
-            </Button>
           </div>
-        </SectionCard>
-
-        <div className="grid gap-3.5 lg:col-span-5">
-          <SectionCard>
-            <CardHeader
-              icon={<ClipboardList className="h-4 w-4 text-muted-foreground" />}
-              title="Coverage diagnostics"
-              subtitle="Resolve gaps before publishing"
-            />
-            <div className="my-3.5 flex flex-col gap-2">
-              <IssueRow label="Missing lead" value={d.missingLead} type="error" />
-              <IssueRow label="Under coverage" value={d.underCoverage} type="warn" />
-              <IssueRow label="Over coverage" value={d.overCoverage} type="ok" />
-            </div>
-            <Button size="sm" className="w-full" onClick={() => router.push(coverageRoute)}>
-              Open coverage
-            </Button>
-          </SectionCard>
-
-          <SectionCard>
-            <CardHeader
-              icon={<SquareCheckBig className="h-4 w-4 text-muted-foreground" />}
-              title="Approvals and publish"
-              subtitle="Review requests and confirm publish readiness"
-            />
-            <div className="my-3.5 flex flex-col gap-2">
-              <CheckRow
-                label="Pending"
-                status={approvalsClear ? 'ok' : 'error'}
-                detail={loading ? '—' : `${data.pendingApprovals} waiting`}
-              />
-              <CheckRow label="Approved today" status="ok" detail={String(d.approvedToday)} />
-              <CheckRow label="Denied today" status="ok" detail={String(d.deniedToday)} />
-              <CheckRow
-                label="Publish ready"
-                status={hasAnyIssues ? 'error' : 'ok'}
-                detail={loading ? '—' : hasAnyIssues ? 'blocked' : 'ready'}
-              />
-              {!loading && (
-                <p
-                  className={cn(
-                    'hidden lg:block text-xs',
-                    publishBlockers.length > 0
-                      ? 'text-[var(--warning-text)]'
-                      : 'text-[var(--success-text)]'
-                  )}
-                >
-                  {publishBlockedReason}
-                </p>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-1"
-                onClick={() => router.push(approvalsRoute)}
-              >
-                Open approvals
-              </Button>
-              <Button size="sm" className="flex-1" onClick={() => router.push(publishRoute)}>
-                Go to publish
-              </Button>
-            </div>
-          </SectionCard>
         </div>
-      </div>
 
-      {/* Cycle progress */}
-      <SectionCard className="fade-up" style={{ animationDelay: '0.15s' }}>
-        <p className="mb-3 text-sm font-semibold text-foreground">Cycle progress</p>
-        <FillRateBar
-          scheduled={loading ? null : data.scheduledSlots}
-          total={loading ? null : data.totalSlots}
+        <div className="mt-4 rounded-xl border border-border bg-muted/35 px-4 py-3">
+          <p className="text-sm font-semibold text-foreground">{nextAction.title}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{nextAction.detail}</p>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          title="Coverage issues"
+          value={loading ? '--' : unresolvedCoverage}
+          subtitle={
+            loading
+              ? 'Loading staffing diagnostics'
+              : `${formatMetric(d.missingLead)} missing lead, ${formatMetric(d.underCoverage)} under coverage`
+          }
+          icon={<Shield className="h-4 w-4" />}
+          tone={loading || unresolvedCoverage > 0 ? 'error' : 'ok'}
+          onClick={() => router.push(coverageRoute)}
         />
-        <div className="mt-2.5 grid grid-cols-2 gap-2.5">
-          <SmallTile
-            label="Slots scheduled"
-            value={loading ? '—' : `${String(d.scheduledSlots)} / ${String(d.totalSlots)}`}
-            icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
-          />
-          <SmallTile
-            label="Therapists on cycle"
-            value={d.therapistsScheduled}
-            icon={<Users className="h-4 w-4 text-muted-foreground" />}
-          />
-        </div>
-        {!loading && data.weeklyProgress.length > 0 && (
-          <div className="mt-3.5">
-            <p className="mb-2 text-xs font-semibold text-muted-foreground">Week by week</p>
-            <div className="flex flex-col gap-1">
-              {data.weeklyProgress.map((week) => {
-                const pct = week.total > 0 ? Math.round((week.scheduled / week.total) * 100) : 0
-                const barColor =
-                  pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--error)'
-                return (
-                  <div key={week.label} className="flex items-center gap-2.5">
-                    <span className="w-14 shrink-0 text-xs font-semibold text-muted-foreground">
-                      {week.label}
-                    </span>
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full transition-[width] duration-300 ease-out"
-                        style={{ width: `${String(pct)}%`, background: barColor }}
-                      />
-                    </div>
-                    <span className="w-14 shrink-0 text-right text-xs font-bold text-foreground">
-                      {week.scheduled}/{week.total}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-      </SectionCard>
+        <MetricCard
+          title="Pending approvals"
+          value={d.pendingApprovals}
+          subtitle={
+            loading
+              ? 'Loading approval inbox'
+              : `${formatMetric(d.approvedToday)} approved today, ${formatMetric(d.deniedToday)} denied`
+          }
+          icon={<ClipboardList className="h-4 w-4" />}
+          tone={typeof d.pendingApprovals === 'number' && d.pendingApprovals > 0 ? 'warning' : 'ok'}
+          onClick={() => router.push(approvalsRoute)}
+        />
+        <MetricCard
+          title="Availability received"
+          value={
+            loading ||
+            typeof d.activeEmployees !== 'number' ||
+            typeof d.therapistsScheduled !== 'number'
+              ? '--'
+              : `${d.therapistsScheduled}/${d.activeEmployees}`
+          }
+          subtitle={
+            loading
+              ? 'Loading therapist responses'
+              : `${formatMetric(pendingTeamMembers)} still pending response`
+          }
+          icon={<Users className="h-4 w-4" />}
+          tone="default"
+          onClick={() => router.push(teamRoute)}
+        />
+        <MetricCard
+          title="Publish readiness"
+          value={publishReadinessPercent}
+          valueSuffix={publishReadinessPercent === '--' ? '' : '%'}
+          subtitle={
+            loading
+              ? 'Loading readiness checks'
+              : `${publishReadyCount}/${publishChecklist.length} checks complete`
+          }
+          icon={<CheckCircle2 className="h-4 w-4" />}
+          tone={
+            typeof publishReadinessPercent === 'number' && publishReadinessPercent >= 75
+              ? 'ok'
+              : 'warning'
+          }
+          onClick={() => router.push(publishRoute)}
+        />
+      </section>
 
-      {/* Workload distribution */}
-      <SectionCard className="fade-up" style={{ animationDelay: '0.2s' }}>
-        <div className="mb-3 flex items-center justify-between">
-          <p className="text-sm font-semibold text-foreground">Workload distribution</p>
-          <span className="text-xs text-muted-foreground">shifts this cycle · per therapist</span>
-        </div>
-        {loading ? (
-          <p className="text-xs text-muted-foreground">—</p>
-        ) : data.workloadRows.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No scheduled shifts yet.</p>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            {data.workloadRows.map((row) => (
-              <WorkloadBar key={row.id} row={row} max={data.workloadRows[0]?.count ?? 1} />
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <SectionPanel className="xl:col-span-2">
+          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4 text-[var(--error-text)]" />
+              <h2 className="text-sm font-semibold text-foreground">Coverage risks</h2>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs"
+              onClick={() => router.push(coverageRoute)}
+            >
+              Resolve coverage
+              <ArrowRight className="ml-1 h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <div className="divide-y divide-border">
+            {coverageRisks.map((item) => (
+              <div key={item.label} className="flex items-center justify-between gap-3 px-5 py-3.5">
+                <div className="flex items-center gap-3">
+                  {item.severity === 'error' ? (
+                    <AlertTriangle className="h-4 w-4 text-[var(--error-text)]" />
+                  ) : (
+                    <Clock className="h-4 w-4 text-[var(--warning-text)]" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{item.label}</p>
+                    <p className="text-xs text-muted-foreground">{item.detail}</p>
+                  </div>
+                </div>
+                <SeverityBadge
+                  tone={
+                    loading
+                      ? 'warning'
+                      : typeof item.value === 'number' && item.value > 0
+                        ? item.severity
+                        : 'ok'
+                  }
+                  label={loading ? '--' : `${item.value}`}
+                />
+              </div>
             ))}
           </div>
-        )}
-      </SectionCard>
+        </SectionPanel>
 
-      {/* Team summary */}
-      <SectionCard className="fade-up" style={{ animationDelay: '0.25s' }}>
-        <div className="mb-3.5 flex items-start justify-between">
-          <div>
-            <p className="text-sm font-semibold text-foreground">Team summary</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Directory management on the Team page.
+        <SectionPanel>
+          <div className="px-5 py-4">
+            <h2 className="text-sm font-semibold text-foreground">Cycle progress</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Live scheduling progress for this cycle
             </p>
           </div>
-          <Button size="sm" variant="outline" onClick={() => router.push(teamRoute)}>
-            Manage team
-          </Button>
-        </div>
-        <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-          {(
-            [
-              {
-                label: 'Active employees',
-                value: d.activeEmployees,
-                icon: <Users className="h-4 w-4 text-muted-foreground" />,
-              },
-              {
-                label: 'Day shift',
-                value: d.dayShift,
-                icon: <Sun className="h-4 w-4 text-muted-foreground" />,
-              },
-              {
-                label: 'Night shift',
-                value: d.nightShift,
-                icon: <Moon className="h-4 w-4 text-muted-foreground" />,
-              },
-              {
-                label: 'On FMLA',
-                value: d.onFmla,
-                icon: <FileText className="h-4 w-4 text-muted-foreground" />,
-              },
-            ] as { label: string; value: string | number; icon: ReactNode }[]
-          ).map(({ label, value, icon }) => (
-            <SmallTile key={label} label={label} value={value} icon={icon} />
-          ))}
-        </div>
-      </SectionCard>
+          <div className="px-5 pb-5">
+            <ProgressMeter
+              scheduled={loading ? null : data.scheduledSlots}
+              total={loading ? null : data.totalSlots}
+            />
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Scheduled slots</span>
+                <span className="font-semibold text-foreground">
+                  {loading ? '--' : `${d.scheduledSlots}/${d.totalSlots}`}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Therapists on cycle</span>
+                <span className="font-semibold text-foreground">{d.therapistsScheduled}</span>
+              </div>
+            </div>
+            <Button className="mt-4 w-full" size="sm" onClick={() => router.push(publishRoute)}>
+              Continue to publish
+            </Button>
+          </div>
+        </SectionPanel>
+      </section>
+
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <SectionPanel>
+          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+            <h2 className="text-sm font-semibold text-foreground">Approval snapshot</h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs"
+              onClick={() => router.push(approvalsRoute)}
+            >
+              Review all
+            </Button>
+          </div>
+          <div className="space-y-2 px-5 py-4">
+            <ChecklistRow
+              label="Pending requests"
+              done={typeof d.pendingApprovals === 'number' && d.pendingApprovals === 0}
+              detail={loading ? '--' : `${d.pendingApprovals} waiting`}
+            />
+            <ChecklistRow label="Approved today" done detail={formatMetric(d.approvedToday)} />
+            <ChecklistRow
+              label="Denied today"
+              done={typeof d.deniedToday === 'number' && d.deniedToday === 0}
+              detail={formatMetric(d.deniedToday)}
+            />
+          </div>
+        </SectionPanel>
+
+        <SectionPanel className="xl:col-span-2">
+          <div className="border-b border-border px-5 py-4">
+            <h2 className="text-sm font-semibold text-foreground">Publish readiness checklist</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Clear these items to publish the next cycle safely.
+            </p>
+          </div>
+          <div className="space-y-3 px-5 py-5">
+            {publishChecklist.map((item) => (
+              <ChecklistRow
+                key={item.label}
+                label={item.label}
+                done={item.done}
+                detail={item.detail}
+              />
+            ))}
+          </div>
+        </SectionPanel>
+      </section>
     </div>
   )
 }
 
-// Sub-components
-
-function SectionCard({
-  children,
-  className,
-  style,
-}: {
-  children: React.ReactNode
-  className?: string
-  style?: React.CSSProperties
-}) {
+function SectionPanel({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div
+    <section
       className={cn(
-        'rounded-xl border border-border bg-card p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]',
+        'overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(15,23,42,0.06)]',
         className
       )}
-      style={style}
     >
       {children}
-    </div>
+    </section>
   )
 }
 
-function CardHeader({
-  icon,
+function MetricCard({
   title,
-  subtitle,
-}: {
-  icon: ReactNode
-  title: string
-  subtitle: string
-}) {
-  return (
-    <div className="flex items-center gap-2.5 border-b border-border pb-3">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-muted">
-        {icon}
-      </div>
-      <div>
-        <p className="text-[13px] font-bold leading-none text-foreground">{title}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
-      </div>
-    </div>
-  )
-}
-
-function Stat({ label, value, color }: { label: string; value: string | number; color: string }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-[22px] font-bold leading-none" style={{ color }}>
-        {value}
-      </span>
-      <span className="whitespace-nowrap text-xs font-medium text-muted-foreground">{label}</span>
-    </div>
-  )
-}
-
-function IssueRow({
-  label,
   value,
-  type,
+  subtitle,
+  icon,
+  tone,
+  valueSuffix,
+  onClick,
 }: {
-  label: string
-  value: number | string
-  type: 'error' | 'warn' | 'ok'
+  title: string
+  value: string | number
+  subtitle: string
+  icon: ReactNode
+  tone: 'default' | 'warning' | 'error' | 'ok'
+  valueSuffix?: string
+  onClick?: () => void
 }) {
-  const color =
-    type === 'error'
-      ? 'var(--error-text)'
-      : type === 'warn'
-        ? 'var(--warning-text)'
-        : 'var(--success-text)'
-  const bg =
-    type === 'error'
-      ? 'var(--error-subtle)'
-      : type === 'warn'
-        ? 'var(--warning-subtle)'
-        : 'var(--success-subtle)'
-
   return (
-    <div className="flex items-center justify-between rounded-lg bg-muted px-2.5 py-1.5">
-      <span className="text-xs font-medium text-foreground">{label}</span>
-      <span
-        className="rounded-full px-2 py-0.5 text-xs font-bold"
-        style={{ color, background: bg }}
-      >
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-xl border border-border bg-card px-4 py-4 text-left shadow-[0_1px_3px_rgba(15,23,42,0.05)] transition-colors hover:bg-muted/25"
+    >
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {title}
+        </p>
+        <span
+          className={cn(
+            'inline-flex h-7 w-7 items-center justify-center rounded-md',
+            tone === 'error' && 'bg-[var(--error-subtle)] text-[var(--error-text)]',
+            tone === 'warning' && 'bg-[var(--warning-subtle)] text-[var(--warning-text)]',
+            tone === 'ok' && 'bg-[var(--success-subtle)] text-[var(--success-text)]',
+            tone === 'default' && 'bg-muted text-muted-foreground'
+          )}
+        >
+          {icon}
+        </span>
+      </div>
+      <p className="mt-3 text-3xl font-bold tracking-tight text-foreground">
         {value}
-      </span>
-    </div>
-  )
-}
-
-function CheckRow({
-  label,
-  status,
-  detail,
-}: {
-  label: string
-  status: 'ok' | 'error'
-  detail: string
-}) {
-  const isOk = status === 'ok'
-  return (
-    <div className="flex items-center gap-2 rounded-lg bg-muted px-2.5 py-1.5">
-      {isOk ? (
-        <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--success-text)]" />
-      ) : (
-        <XCircle className="h-4 w-4 shrink-0 text-[var(--error-text)]" />
-      )}
-      <span className="min-w-[70px] text-xs font-semibold text-foreground">{label}</span>
-      <span
-        className="ml-auto text-right text-xs font-semibold"
-        style={{ color: isOk ? 'var(--success-text)' : 'var(--error-text)' }}
-      >
-        {detail}
-      </span>
-    </div>
-  )
-}
-
-function FillRateBar({ scheduled, total }: { scheduled: number | null; total: number | null }) {
-  if (scheduled === null || total === null || total === 0) {
-    return (
-      <p className="text-xs font-medium text-muted-foreground">
-        {total === 0 ? 'No slots in cycle' : '—'}
+        {valueSuffix}
       </p>
+      <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
+    </button>
+  )
+}
+
+function SeverityBadge({ tone, label }: { tone: 'warning' | 'error' | 'ok'; label: string }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold',
+        tone === 'error' && 'bg-[var(--error-subtle)] text-[var(--error-text)]',
+        tone === 'warning' && 'bg-[var(--warning-subtle)] text-[var(--warning-text)]',
+        tone === 'ok' && 'bg-[var(--success-subtle)] text-[var(--success-text)]'
+      )}
+    >
+      {label}
+    </span>
+  )
+}
+
+function ChecklistRow({ label, done, detail }: { label: string; done: boolean; detail: string }) {
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/25 px-3 py-2.5">
+      {done ? (
+        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--success-text)]" />
+      ) : (
+        <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--warning-text)]" />
+      )}
+      <div className="min-w-0 flex-1">
+        <p
+          className={cn(
+            'text-sm',
+            done ? 'text-muted-foreground line-through' : 'font-medium text-foreground'
+          )}
+        >
+          {label}
+        </p>
+        <p className="text-xs text-muted-foreground">{detail}</p>
+      </div>
+    </div>
+  )
+}
+
+function ProgressMeter({ scheduled, total }: { scheduled: number | null; total: number | null }) {
+  if (scheduled === null || total === null || total <= 0) {
+    return (
+      <div className="rounded-lg border border-border bg-muted/35 px-3 py-2.5 text-xs text-muted-foreground">
+        Loading cycle progress.
+      </div>
     )
   }
-  const pct = Math.round((scheduled / total) * 100)
-  const barColor = pct >= 80 ? 'var(--success)' : pct >= 60 ? 'var(--warning)' : 'var(--error)'
+
+  const percentage = Math.round((scheduled / total) * 100)
+  const meterColor =
+    percentage >= 80 ? 'var(--success)' : percentage >= 60 ? 'var(--warning)' : 'var(--error)'
+
   return (
     <div>
-      <p className="mb-1.5 text-xs font-semibold text-foreground">
-        {scheduled} of {total} slots scheduled ({pct}%)
+      <p className="text-xs font-semibold text-foreground">
+        {scheduled} of {total} slots scheduled ({percentage}%)
       </p>
-      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
         <div
           className="h-full rounded-full transition-[width] duration-500 ease-out"
-          style={{ width: `${String(pct)}%`, background: barColor }}
+          style={{ width: `${percentage}%`, background: meterColor }}
         />
       </div>
     </div>
   )
 }
 
-function WorkloadBar({ row, max }: { row: WorkloadRow; max: number }) {
-  const pct = max > 0 ? Math.round((row.count / max) * 100) : 0
-  const barColor = row.shiftType === 'day' ? 'var(--primary)' : 'var(--tw-deep-blue)'
-  return (
-    <div className="flex items-center gap-2.5">
-      <span className="w-36 shrink-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-semibold text-foreground">
-        {row.name}
-      </span>
-      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-        <div
-          className="h-full rounded-full transition-[width] duration-300 ease-out"
-          style={{ width: `${String(pct)}%`, background: barColor }}
-        />
-      </div>
-      <span className="w-7 shrink-0 text-right text-xs font-bold text-foreground">{row.count}</span>
-    </div>
-  )
-}
-
-function SmallTile({
-  label,
-  value,
-  icon,
-}: {
-  label: string
-  value: string | number
-  icon: ReactNode
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-muted p-3">
-      <div className="mb-1">{icon}</div>
-      <div className="text-[22px] font-bold leading-none text-foreground">{value}</div>
-      <div className="mt-1 text-xs font-medium text-muted-foreground">{label}</div>
-    </div>
-  )
+function formatMetric(value: string | number): string {
+  return typeof value === 'number' ? String(value) : value
 }

@@ -1,11 +1,9 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowLeftRight, CalendarDays, CheckCircle2, Clock } from 'lucide-react'
+import { ArrowLeftRight, CalendarDays, CheckCircle2, Clock, Send } from 'lucide-react'
 
 import { FeedbackToast } from '@/components/feedback-toast'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { PageHeader } from '@/components/ui/page-header'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { cn } from '@/lib/utils'
@@ -182,64 +180,90 @@ export default async function StaffDashboardPage({
     <div className="space-y-6">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
-      {/* Header */}
-      <PageHeader
-        title="Staff Home"
-        subtitle={`Welcome, ${fullName}. Your self-service tools are prioritized below.`}
-        badge={
-          <>
-            <Badge variant="secondary">Role: therapist</Badge>
-            <Badge variant="outline">Team: Respiratory Therapy</Badge>
-          </>
-        }
-      />
-
-      {/* Metrics banner */}
-      {activeCycle && (
-        <div className="rounded-xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(6,103,169,0.06),0_4px_12px_rgba(6,103,169,0.03)]">
-          <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            {activeCycle.label}
-          </p>
-          <div className="grid grid-cols-3 gap-3">
-            {/* Upcoming shifts */}
-            <div className="flex flex-col items-center gap-1 rounded-lg bg-muted p-3 text-center">
-              <CalendarDays className="h-4 w-4 text-primary" />
-              <p className="text-xl font-bold text-foreground">{upcomingCount}</p>
-              <p className="text-xs text-muted-foreground">Upcoming shifts</p>
+      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_2px_18px_rgba(15,23,42,0.06)]">
+        <div className="flex flex-col gap-4 border-b border-border px-5 py-5 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Staff Home
+            </p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+              Welcome, {fullName}
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {activeCycle
+                ? `${activeCycle.label} | ${activeCycle.start_date} to ${activeCycle.end_date}`
+                : 'No active cycle selected'}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild size="sm">
+              <Link href="/availability">
+                <Send className="mr-1.5 h-3.5 w-3.5" />
+                Submit availability
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/shift-board">Open shift board</Link>
+            </Button>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-3 px-5 py-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-xl border border-border bg-muted/30 px-3.5 py-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Upcoming shifts</span>
+              <CalendarDays className="h-3.5 w-3.5" />
             </div>
-
-            {/* Next shift */}
-            <div className="flex flex-col items-center gap-1 rounded-lg bg-muted p-3 text-center">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm font-semibold text-foreground">{nextShiftLabel ?? 'None'}</p>
-              <p className="text-xs text-muted-foreground">Next shift</p>
+            <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">
+              {upcomingCount}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">In the current cycle</p>
+          </div>
+          <div className="rounded-xl border border-border bg-muted/30 px-3.5 py-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Next shift</span>
+              <Clock className="h-3.5 w-3.5" />
             </div>
-
-            {/* Availability */}
-            <div className="flex flex-col items-center gap-1 rounded-lg bg-muted p-3 text-center">
+            <p className="mt-2 text-xl font-bold tracking-tight text-foreground">
+              {nextShiftLabel ?? '--'}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Earliest scheduled shift</p>
+          </div>
+          <div className="rounded-xl border border-border bg-muted/30 px-3.5 py-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Availability status</span>
               <CheckCircle2
                 className={cn(
-                  'h-4 w-4',
+                  'h-3.5 w-3.5',
                   availabilitySubmitted
                     ? 'text-[var(--success-text)]'
                     : 'text-[var(--warning-text)]'
                 )}
               />
-              <p
-                className={cn(
-                  'text-xs font-semibold',
-                  availabilitySubmitted
-                    ? 'text-[var(--success-text)]'
-                    : 'text-[var(--warning-text)]'
-                )}
-              >
-                {availabilitySubmitted ? 'Submitted' : 'Not submitted'}
-              </p>
-              <p className="text-xs text-muted-foreground">Future availability</p>
             </div>
+            <p
+              className={cn(
+                'mt-2 text-3xl font-bold tracking-tight',
+                availabilitySubmitted ? 'text-[var(--success-text)]' : 'text-[var(--warning-text)]'
+              )}
+            >
+              {availabilitySubmitted ? 'Ready' : 'Pending'}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">Future-cycle submission</p>
+          </div>
+          <div className="rounded-xl border border-border bg-muted/30 px-3.5 py-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>My pending posts</span>
+              <ArrowLeftRight className="h-3.5 w-3.5" />
+            </div>
+            <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">
+              {pendingPostCount}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Swap or pickup requests awaiting action
+            </p>
           </div>
         </div>
-      )}
+      </section>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="rounded-xl border border-border bg-card p-4">

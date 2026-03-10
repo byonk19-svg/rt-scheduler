@@ -48,6 +48,6 @@ describe('auth signout route', () => {
 
     expect(signOut).toHaveBeenCalledOnce()
     expect(response.status).toBe(303)
-    expect(response.headers.get('location')).toBe('http://localhost/login?success=signed_out')
+    expect(response.headers.get('location')).toBe('http://localhost/')
   })
 })

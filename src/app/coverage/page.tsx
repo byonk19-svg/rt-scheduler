@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { Printer, Send, Sparkles } from 'lucide-react'
 
 import {
   generateDraftScheduleAction,
@@ -30,7 +31,7 @@ import {
   type ShiftTab,
   type UiStatus,
 } from '@/lib/coverage/selectors'
-import { addDays, dateRange, formatDateLabel, formatMonthLabel, toIsoDate } from '@/lib/calendar-utils'
+import { addDays, dateRange, formatDateLabel, toIsoDate } from '@/lib/calendar-utils'
 import { getOne, getScheduleFeedback, getWeekBoundsForDate } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/client'
 import type { AssignmentStatus, ShiftRole, ShiftStatus } from '@/lib/shift-types'
@@ -149,26 +150,13 @@ function CoveragePageContent() {
     return getScheduleFeedback(scheduleFeedbackParams)
   }, [autoParam, draftParam, scheduleFeedbackParams])
   const weekRosterHref = activeCycleId
-    ? `/schedule?cycle=${activeCycleId}&view=week`
-    : '/schedule?view=week'
-  const publishHistoryHref = '/publish'
-  const cycleRangeLabel = useMemo(() => {
-    if (!printCycle) return 'Current 6-week window'
-    return `${formatDateLabel(printCycle.start_date)} to ${formatDateLabel(printCycle.end_date)}`
-  }, [printCycle])
-  const visibleMonths = useMemo(() => {
-    const labels: string[] = []
-    const seen = new Set<string>()
-    for (const day of days) {
-      const parsed = new Date(`${day.isoDate}T00:00:00`)
-      if (Number.isNaN(parsed.getTime())) continue
-      const key = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      labels.push(formatMonthLabel(day.isoDate))
-    }
-    return labels
-  }, [days])
+    ? `/coverage?cycle=${activeCycleId}&view=week`
+    : '/coverage?view=week'
+  const cycleSummaryLabel = useMemo(() => {
+    if (!printCycle) return 'Current 6-week window - Click a day to edit'
+    const totalWeeks = Math.max(1, Math.round((printCycleDates.length || 42) / 7))
+    return `${formatDateLabel(printCycle.start_date)} - ${formatDateLabel(printCycle.end_date)} · ${totalWeeks} weeks · Click a day to edit`
+  }, [printCycle, printCycleDates.length])
 
   useEffect(() => {
     let active = true
@@ -692,33 +680,22 @@ function CoveragePageContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="no-print px-7 py-6">
-        <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+      <div className="no-print border-b border-border bg-card px-6 pb-5 pt-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="app-page-title">Coverage</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Click a day to edit therapist statuses</p>
+            <h1 className="font-heading text-4xl font-bold tracking-tight text-foreground">Coverage</h1>
+            <p className="mt-1 text-base text-muted-foreground">{cycleSummaryLabel}</p>
           </div>
-          <div className="flex flex-wrap gap-1.5">
+
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => window.print()}
-              className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-2xl border border-border bg-card px-5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
             >
-              Print schedule
+              <Printer className="h-3.5 w-3.5" />
+              Print
             </button>
-            <Link
-              href={weekRosterHref}
-              className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary transition-colors"
-            >
-              Week roster
-            </Link>
-            <Link
-              href={publishHistoryHref}
-              className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary transition-colors"
-            >
-              Publish history
-            </Link>
-            <div className="w-px self-stretch bg-border mx-0.5" />
             <form action={generateDraftScheduleAction}>
               <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
               <input type="hidden" name="view" value="week" />
@@ -727,8 +704,9 @@ function CoveragePageContent() {
               <button
                 type="submit"
                 disabled={!activeCycleId || activeCyclePublished}
-                className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-2xl border border-border bg-card px-5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
               >
+                <Sparkles className="h-3.5 w-3.5" />
                 Auto-draft
               </button>
             </form>
@@ -740,7 +718,7 @@ function CoveragePageContent() {
               <button
                 type="submit"
                 disabled={!activeCycleId || activeCyclePublished}
-                className="rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--error-text)] hover:opacity-80 transition-opacity disabled:opacity-50"
+                className="rounded-2xl border border-[var(--error-border)] bg-[var(--error-subtle)] px-5 py-2.5 text-sm font-semibold text-[var(--error-text)] transition-opacity hover:opacity-80 disabled:opacity-50"
               >
                 Clear draft
               </button>
@@ -749,38 +727,28 @@ function CoveragePageContent() {
               <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
               <input type="hidden" name="view" value="week" />
               <input type="hidden" name="show_unavailable" value="false" />
-              <input type="hidden" name="currently_published" value={activeCyclePublished ? 'true' : 'false'} />
-              <input type="hidden" name="override_weekly_rules" value="true" />
-              <input type="hidden" name="override_shift_rules" value="true" />
-              <input type="hidden" name="return_to" value="coverage" />
-              <button
-                type="submit"
-                disabled={!activeCycleId || activeCyclePublished}
-                className="rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--warning-text)] hover:opacity-80 transition-opacity disabled:opacity-50"
-                title="Bypass weekly and coverage/lead publish guardrails for this publish."
-              >
-                Publish w/ full override
-              </button>
-            </form>
-            <div className="w-px self-stretch bg-border mx-0.5" />
-            <form action={toggleCyclePublishedAction}>
-              <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
-              <input type="hidden" name="view" value="week" />
-              <input type="hidden" name="show_unavailable" value="false" />
-              <input type="hidden" name="currently_published" value={activeCyclePublished ? 'true' : 'false'} />
+              <input
+                type="hidden"
+                name="currently_published"
+                value={activeCyclePublished ? 'true' : 'false'}
+              />
               <input type="hidden" name="override_weekly_rules" value="false" />
               <input type="hidden" name="override_shift_rules" value="false" />
               <input type="hidden" name="return_to" value="coverage" />
               <button
                 type="submit"
                 disabled={!activeCycleId || activeCyclePublished}
-                className="rounded-md bg-primary px-4 py-1.5 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-2xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
               >
+                <Send className="h-3.5 w-3.5" />
                 {activeCyclePublished ? 'Published' : 'Publish'}
               </button>
             </form>
           </div>
         </div>
+      </div>
+
+      <div className="no-print px-6 py-4">
         {activeCyclePublished && (
           <div className="mb-3 rounded-md border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-2">
             <p className="text-xs font-semibold text-[var(--success-text)]">
@@ -834,13 +802,11 @@ function CoveragePageContent() {
             {publishErrorMessage}
           </p>
         )}
-        {error && <p className="mb-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs text-[var(--error-text)]">{error}</p>}
-        <div className="mb-3 rounded-md border border-border bg-card px-3 py-2">
-          <p className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">Cycle</p>
-          <p className="text-sm font-bold text-foreground">{printCycle?.label ?? 'Current coverage window'}</p>
-          <p className="text-xs text-muted-foreground">{cycleRangeLabel}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Months in view: {visibleMonths.join(' • ') || 'N/A'}</p>
-        </div>
+        {error && (
+          <p className="mb-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs text-[var(--error-text)]">
+            {error}
+          </p>
+        )}
         <CalendarGrid
           days={days}
           loading={loading}
@@ -902,3 +868,4 @@ export default function CoveragePage() {
     </Suspense>
   )
 }
+

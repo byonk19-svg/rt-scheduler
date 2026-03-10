@@ -1,310 +1,630 @@
-import Link from 'next/link'
+'use client'
+
+import { useMemo, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import {
-  Activity,
   ArrowRight,
+  ArrowRightLeft,
   CalendarDays,
   CheckCircle2,
+  Clock,
+  Loader2,
   ShieldCheck,
-  Sparkles,
+  TrendingUp,
   Users,
 } from 'lucide-react'
-import { TeamwiseLogo } from '@/components/teamwise-logo'
+
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { createClient } from '@/lib/supabase/client'
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'] as const
-const DAY_COUNTS = [5, 4, 3, 5, 4] as const
-const NIGHT_COUNTS = [3, 3, 3, 3, 3] as const
-const TODAY_IDX = 1
-
-const TOTAL_FILLED = DAY_COUNTS.reduce((a, b) => a + b, 0) + NIGHT_COUNTS.reduce((a, b) => a + b, 0)
-const TOTAL_SLOTS = DAYS.length * 5 + DAYS.length * 4
-const FILL_PCT = Math.round((TOTAL_FILLED / TOTAL_SLOTS) * 100)
-
-const STEPS = [
-  {
-    step: 1,
-    icon: Users,
-    title: 'Team submits availability',
-    desc: 'Therapists add blackout dates and requests before each cycle closes.',
-  },
-  {
-    step: 2,
-    icon: Sparkles,
-    title: 'Manager auto-generates draft',
-    desc: 'Teamwise creates balanced day/night schedules based on rules and requests.',
-  },
-  {
-    step: 3,
-    icon: CalendarDays,
-    title: 'Fill holes and publish',
-    desc: 'Drag and drop final adjustments, review violations, and publish final schedules.',
-  },
+const WEEK_DAYS = [
+  { d: 'S', n: 9, staff: 4, status: 'filled' as const },
+  { d: 'M', n: 10, staff: 6, status: 'filled' as const },
+  { d: 'T', n: 11, staff: 5, status: 'filled' as const },
+  { d: 'W', n: 12, staff: 6, status: 'today' as const },
+  { d: 'T', n: 13, staff: 3, status: 'warning' as const },
+  { d: 'F', n: 14, staff: 5, status: 'filled' as const },
+  { d: 'S', n: 15, staff: 0, status: 'empty' as const },
 ]
 
-export default function Home() {
+function toFriendlyLoginError(message: string): string {
+  const normalized = message.toLowerCase()
+  if (normalized.includes('invalid login credentials')) {
+    return 'Email or password is incorrect. Check both fields and try again.'
+  }
+  if (normalized.includes('email not confirmed')) {
+    return 'Check your email for the confirmation link, then try signing in again.'
+  }
+  return message
+}
+
+function toFriendlySignupError(message: string): string {
+  const normalized = message.toLowerCase()
+  if (normalized.includes('user already registered')) {
+    return 'An account with this email already exists. Sign in instead.'
+  }
+  if (normalized.includes('password')) {
+    return 'Password must meet security requirements. Use at least 8 characters.'
+  }
+  return message
+}
+
+export default function HomePage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const supabase = useMemo(() => createClient(), [])
+  const startsInSignupMode = pathname === '/signup'
+
+  const [isLogin, setIsLogin] = useState(!startsInSignupMode)
+  const [isForgot, setIsForgot] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [role, setRole] = useState<'manager' | 'therapist'>('therapist')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
+
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (typeof window !== 'undefined' ? window.location.origin : undefined)
+  const authCallbackUrl = baseUrl ? `${baseUrl}/auth/callback` : undefined
+  const resetPasswordUrl = baseUrl ? `${baseUrl}/reset-password` : undefined
+
+  async function handleForgotPassword(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+    setMessage(null)
+
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: resetPasswordUrl,
+    })
+
+    if (resetError) {
+      setError(resetError.message)
+      setLoading(false)
+      return
+    }
+
+    setMessage('Check your email. We sent a password reset link.')
+    setLoading(false)
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+    setMessage(null)
+
+    if (isLogin) {
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+
+      if (signInError) {
+        setError(toFriendlyLoginError(signInError.message))
+        setLoading(false)
+        return
+      }
+
+      router.push('/dashboard?success=signed_in')
+      router.refresh()
+      return
+    }
+
+    const fullName = `${firstName} ${lastName}`.trim()
+    const { error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: authCallbackUrl,
+        data: {
+          full_name: fullName,
+          phone_number: phone,
+          role,
+          shift_type: 'day',
+        },
+      },
+    })
+
+    if (signUpError) {
+      setError(toFriendlySignupError(signUpError.message))
+      setLoading(false)
+      return
+    }
+
+    router.push('/pending-setup?success=access_requested')
+    router.refresh()
+  }
+
   return (
-    <main className="teamwise-aurora-bg min-h-screen">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 p-4 md:p-8">
-        {/* ── Nav ─────────────────────────────────────────────── */}
-        <header className="teamwise-surface flex items-center justify-between rounded-2xl border border-border px-4 py-3 shadow-sm md:px-6 md:py-4">
-          <TeamwiseLogo size="default" />
-          <div className="flex items-center gap-3">
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/login">Sign in</Link>
-            </Button>
-            <Button asChild size="sm">
-              <Link href="/signup">Request access</Link>
-            </Button>
-          </div>
-        </header>
-
-        {/* ── Hero ─────────────────────────────────────────────── */}
-        <section className="teamwise-grid-bg teamwise-surface grid gap-8 rounded-3xl border border-border px-6 py-10 shadow-sm md:grid-cols-2 md:px-10 md:py-14">
-          <div className="space-y-5">
-            <div className="inline-flex items-center gap-2 rounded-md border border-[var(--primary)]/20 bg-[var(--tw-soft-tint)] px-3 py-1 text-xs font-semibold text-[var(--tw-deep-blue)]">
-              <Activity className="h-3.5 w-3.5 text-primary" />
-              Built for Healthcare Teams
-            </div>
-            <h1 className="text-4xl font-bold tracking-tight text-foreground md:text-6xl">
-              Manage smarter,
-              <span className="block text-primary">not harder.</span>
-            </h1>
-            <p className="text-base text-muted-foreground md:text-lg">
-              Centralize approvals and coverage in one dashboard. Give your team the self-service
-              convenience they deserve.
-            </p>
-            <div className="flex flex-wrap gap-3 pt-1">
-              <Button asChild size="lg" className="gap-2">
-                <Link href="/login">
-                  Open Teamwise
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link href="/signup">Request account</Link>
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-4 pt-2 text-sm text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-primary" />
-                Auto-generate drafts
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-primary" />
-                Drag/drop hole filling
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-primary" />
-                Coverage rules built in
-              </span>
-            </div>
-          </div>
-
-          {/* Mock schedule preview */}
-          <Card className="overflow-hidden border-[var(--tw-soft-tint)] p-0">
-            {/* Card header */}
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <span className="text-sm font-semibold text-foreground">Coverage Snapshot</span>
-              <span className="flex items-center gap-1.5 rounded-full bg-[var(--success-subtle)] px-2.5 py-0.5 text-xs font-medium text-[var(--success-text)]">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--success)]" />
-                Live
-              </span>
-            </div>
-            {/* Day column headers */}
-            <div className="flex border-b border-border">
-              <div className="w-14 shrink-0 border-r border-border" />
-              {DAYS.map((day, i) => (
-                <div
-                  key={day}
-                  className={`flex-1 py-2 text-center text-xs font-semibold ${
-                    i === TODAY_IDX ? 'bg-primary/5 text-primary' : 'text-muted-foreground'
-                  }`}
-                >
-                  {day}
-                </div>
-              ))}
-            </div>
-            {/* Day shift row */}
-            <div className="flex border-b border-border/60">
-              <div className="flex w-14 shrink-0 items-center justify-center border-r border-border py-5 text-xs font-medium text-muted-foreground">
-                Day
-              </div>
-              {DAY_COUNTS.map((count, i) => (
-                <div
-                  key={i}
-                  className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-5 ${
-                    i === TODAY_IDX ? 'bg-primary/5' : ''
-                  }`}
-                >
-                  <span
-                    className={`text-base font-bold leading-none ${
-                      count < 4 ? 'text-[var(--warning-text)]' : 'text-foreground'
-                    }`}
-                  >
-                    {count}
-                  </span>
-                  <span className="text-xs leading-none text-muted-foreground">/5</span>
-                </div>
-              ))}
-            </div>
-            {/* Night shift row */}
-            <div className="flex">
-              <div className="flex w-14 shrink-0 items-center justify-center border-r border-border py-5 text-xs font-medium text-muted-foreground">
-                Night
-              </div>
-              {NIGHT_COUNTS.map((count, i) => (
-                <div
-                  key={i}
-                  className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-5 ${
-                    i === TODAY_IDX ? 'bg-primary/5' : ''
-                  }`}
-                >
-                  <span className="text-base font-bold leading-none text-foreground">{count}</span>
-                  <span className="text-xs leading-none text-muted-foreground">/4</span>
-                </div>
-              ))}
-            </div>
-            {/* Fill rate footer */}
-            <div className="flex items-center gap-3 border-t border-border bg-muted/60 px-4 py-3">
-              <span className="shrink-0 text-xs text-muted-foreground">Fill rate</span>
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border">
-                <div
-                  className="h-full rounded-full bg-[var(--success)]"
-                  style={{ width: `${FILL_PCT}%` }}
-                />
-              </div>
-              <span className="shrink-0 text-xs font-semibold text-[var(--success-text)]">
-                {FILL_PCT}%
-              </span>
-            </div>
-          </Card>
-        </section>
-
-        {/* ── Stats strip ─────────────────────────────────────── */}
-        <div className="teamwise-surface grid grid-cols-3 divide-x divide-border rounded-2xl border border-border shadow-sm">
-          {[
-            { value: '14', label: 'Active staff' },
-            { value: '3–5', label: 'Coverage target per slot' },
-            { value: '28-day', label: 'Planning cycles' },
-          ].map((stat) => (
-            <div
-              key={stat.label}
-              className="flex flex-col items-center gap-1 px-4 py-5 text-center"
-            >
-              <span className="text-xl font-bold text-foreground md:text-2xl">{stat.value}</span>
-              <span className="text-xs text-muted-foreground">{stat.label}</span>
-            </div>
-          ))}
+    <main className="flex h-screen overflow-hidden">
+      <section className="relative hidden flex-col overflow-hidden bg-sidebar lg:flex lg:w-[52%]">
+        <div className="absolute inset-0">
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'radial-gradient(ellipse 80% 60% at 20% 0%, hsl(187 55% 32% / 0.4), transparent 65%), radial-gradient(ellipse 50% 50% at 80% 100%, hsl(38 90% 55% / 0.05), transparent 65%), linear-gradient(175deg, hsl(192 48% 17%) 0%, hsl(192 48% 11%) 100%)',
+            }}
+          />
+          <div
+            className="absolute inset-0 opacity-[0.03]"
+            style={{
+              backgroundImage: 'radial-gradient(circle, hsl(0 0% 100%) 0.5px, transparent 0.5px)',
+              backgroundSize: '20px 20px',
+            }}
+          />
+          <div className="absolute left-[3%] top-[8%] h-96 w-96 rounded-full bg-sidebar-ring/6 blur-[120px]" />
+          <div className="absolute bottom-[10%] right-[8%] h-72 w-72 rounded-full bg-primary/8 blur-[100px]" />
         </div>
 
-        {/* ── Feature cards ────────────────────────────────────── */}
-        <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <Card className="border-t-2 border-t-primary transition-shadow hover:shadow-md">
-            <CardContent className="space-y-3 pt-6">
-              <div className="inline-flex items-center justify-center rounded-lg bg-primary/10 p-2.5">
-                <CalendarDays className="h-5 w-5 text-primary" />
-              </div>
-              <h2 className="text-xl font-semibold text-foreground">Collect requests once</h2>
-              <p className="text-sm text-muted-foreground">
-                Blackout dates and reasons are submitted in one place with duplicate protection.
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="border-t-2 border-t-[var(--success)] transition-shadow hover:shadow-md">
-            <CardContent className="space-y-3 pt-6">
-              <div className="inline-flex items-center justify-center rounded-lg bg-[var(--success-subtle)] p-2.5">
-                <Sparkles className="h-5 w-5 text-[var(--success-text)]" />
-              </div>
-              <h2 className="text-xl font-semibold text-foreground">Generate faster schedules</h2>
-              <p className="text-sm text-muted-foreground">
-                Start with auto-generated schedules, then use drag-and-drop to patch coverage gaps.
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="border-t-2 border-t-[var(--warning)] transition-shadow hover:shadow-md">
-            <CardContent className="space-y-3 pt-6">
-              <div className="inline-flex items-center justify-center rounded-lg bg-[var(--warning-subtle)] p-2.5">
-                <ShieldCheck className="h-5 w-5 text-[var(--warning-text)]" />
-              </div>
-              <h2 className="text-xl font-semibold text-foreground">Keep staffing safe</h2>
-              <p className="text-sm text-muted-foreground">
-                Enforce per-therapist weekly limits and 3–5 shift coverage with manager override.
-              </p>
-            </CardContent>
-          </Card>
-        </section>
+        <div className="relative z-10 flex h-full flex-col px-10 py-10 xl:px-14">
+          <div className="fade-up flex items-center gap-3" style={{ animationDelay: '0.1s' }}>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-sidebar-ring/25 bg-sidebar-ring/15">
+              <CalendarDays className="h-4 w-4 text-sidebar-ring" />
+            </div>
+            <span
+              className="text-[15px] font-bold tracking-tight text-sidebar-primary/90"
+              style={{ fontFamily: 'var(--font-plus-jakarta), DM Sans, sans-serif' }}
+            >
+              Teamwise
+            </span>
+          </div>
 
-        {/* ── How it works ─────────────────────────────────────── */}
-        <section className="teamwise-surface rounded-3xl border border-border p-6 shadow-sm md:p-10">
-          <div className="mb-8 text-center">
-            <h2 className="text-2xl font-bold text-foreground">How Teamwise works</h2>
-            <p className="mt-1.5 text-sm text-muted-foreground">
-              From availability to published schedule in three steps
+          <div className="mb-8 mt-12 max-w-[380px]">
+            <p
+              className="fade-up mb-4 text-[10px] font-bold uppercase tracking-[0.25em] text-sidebar-ring/70"
+              style={{ animationDelay: '0.15s' }}
+            >
+              Team Scheduling Hub
+            </p>
+            <h1
+              className="fade-up text-[1.55rem] font-bold leading-[1.2] tracking-tight text-sidebar-primary/80 xl:text-[1.7rem]"
+              style={{
+                animationDelay: '0.22s',
+                fontFamily: 'var(--font-plus-jakarta), DM Sans, sans-serif',
+              }}
+            >
+              Scheduling, availability, and
+              <br />
+              coverage - <span className="text-sidebar-ring">in sync.</span>
+            </h1>
+            <p
+              className="fade-up mt-3 text-[13px] leading-relaxed text-sidebar-primary/30"
+              style={{ animationDelay: '0.28s' }}
+            >
+              Built for the teams that keep things running.
             </p>
           </div>
-          <div className="grid gap-8 md:grid-cols-3">
-            {STEPS.map(({ step, icon: Icon, title, desc }) => (
-              <div key={step} className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground ring-4 ring-primary/10">
-                    {step}
-                  </div>
-                  <Icon className="h-4 w-4 text-primary" />
-                </div>
-                <h3 className="text-lg font-semibold text-foreground">{title}</h3>
-                <p className="text-sm text-muted-foreground">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
 
-      {/* ── CTA Banner ───────────────────────────────────────────── */}
-      <section className="mt-8 bg-primary px-4 py-14">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-2xl font-bold text-white md:text-3xl">
-            Ready to build better schedules?
-          </h2>
-          <p className="mt-2 text-sm text-white/80">
-            Join Teamwise and eliminate scheduling chaos for good.
-          </p>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <Button asChild size="lg" variant="secondary" className="gap-2 font-semibold">
-              <Link href="/login">
-                Open Teamwise
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </Button>
-            <Button
-              asChild
-              size="lg"
-              variant="ghost"
-              className="text-white hover:bg-card/10 hover:text-white"
-            >
-              <Link href="/signup">Request account</Link>
-            </Button>
+          <div className="fade-up flex min-h-0 flex-1 flex-col" style={{ animationDelay: '0.34s' }}>
+            <div className="relative flex min-h-0 flex-1 flex-col">
+              <div className="absolute -inset-4 rounded-[28px] bg-sidebar-ring/[0.04] blur-2xl" />
+
+              <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/[0.1] bg-white/[0.07] shadow-2xl shadow-black/25 backdrop-blur-xl">
+                <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.06] bg-white/[0.03] px-4 py-2.5">
+                  <div className="flex gap-1.5">
+                    <div className="h-2 w-2 rounded-full bg-red-400/30" />
+                    <div className="h-2 w-2 rounded-full bg-yellow-400/30" />
+                    <div className="h-2 w-2 rounded-full bg-green-400/30" />
+                  </div>
+                  <div className="flex flex-1 justify-center">
+                    <div className="flex h-5 w-40 items-center justify-center rounded-md bg-white/[0.05]">
+                      <span className="text-[9px] font-medium tracking-wide text-sidebar-primary/30">
+                        teamwise / schedule
+                      </span>
+                    </div>
+                  </div>
+                  <div className="w-10" />
+                </div>
+
+                <div className="flex-1 space-y-3 overflow-hidden p-4 xl:p-5">
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { icon: Users, label: 'On Shift', val: '6', color: 'text-sidebar-ring' },
+                      { icon: ArrowRightLeft, label: 'Swaps', val: '2', color: 'text-blue-300' },
+                      {
+                        icon: TrendingUp,
+                        label: 'Coverage',
+                        val: '92%',
+                        color: 'text-emerald-300',
+                      },
+                      { icon: Clock, label: 'Open Slots', val: '3', color: 'text-amber-300' },
+                    ].map((metric) => (
+                      <div
+                        key={metric.label}
+                        className="rounded-lg border border-white/[0.07] bg-white/[0.05] px-3 py-2.5"
+                      >
+                        <metric.icon className="mb-1.5 h-3.5 w-3.5 text-sidebar-primary/25" />
+                        <p className={`text-lg font-bold leading-none ${metric.color}`}>
+                          {metric.val}
+                        </p>
+                        <p className="mt-1 text-[9px] font-medium text-sidebar-primary/35">
+                          {metric.label}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="rounded-lg border border-white/[0.07] bg-white/[0.04] p-3.5">
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-sidebar-primary/35">
+                        This Week
+                      </span>
+                      <span className="rounded-full bg-sidebar-ring/10 px-2 py-0.5 text-[9px] font-semibold text-sidebar-ring/70">
+                        Mar 9 - 15
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-7 gap-1.5">
+                      {WEEK_DAYS.map((cell, i) => (
+                        <div key={i} className="text-center">
+                          <span className="mb-1 block text-[8px] font-semibold text-sidebar-primary/25">
+                            {cell.d}
+                          </span>
+                          <div
+                            className={`flex h-11 flex-col items-center justify-center gap-1 rounded-lg border transition-all ${
+                              cell.status === 'today'
+                                ? 'border-sidebar-ring/40 bg-sidebar-ring/20 ring-1 ring-sidebar-ring/25 shadow-sm shadow-sidebar-ring/10'
+                                : cell.status === 'warning'
+                                  ? 'border-amber-400/20 bg-amber-400/10'
+                                  : cell.status === 'empty'
+                                    ? 'border-white/[0.04] bg-white/[0.015]'
+                                    : 'border-white/[0.08] bg-white/[0.05]'
+                            }`}
+                          >
+                            <span
+                              className={`text-[11px] font-bold leading-none ${
+                                cell.status === 'today'
+                                  ? 'text-sidebar-ring'
+                                  : cell.status === 'warning'
+                                    ? 'text-amber-300/80'
+                                    : cell.status === 'empty'
+                                      ? 'text-sidebar-primary/15'
+                                      : 'text-sidebar-primary/55'
+                              }`}
+                            >
+                              {cell.n}
+                            </span>
+                            {cell.staff > 0 && (
+                              <span
+                                className={`text-[7px] font-medium ${
+                                  cell.status === 'today'
+                                    ? 'text-sidebar-ring/70'
+                                    : cell.status === 'warning'
+                                      ? 'text-amber-300/50'
+                                      : 'text-sidebar-primary/25'
+                                }`}
+                              >
+                                {cell.staff} staff
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-center gap-2.5 rounded-lg border border-white/[0.07] bg-white/[0.04] px-3 py-2.5">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-400/15">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-300/80" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-[10px] font-semibold text-sidebar-primary/50">
+                          Swap approved
+                        </p>
+                        <p className="text-[8px] text-sidebar-primary/25">Mon to Wed shift</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2.5 rounded-lg border border-white/[0.07] bg-white/[0.04] px-3 py-2.5">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-400/12">
+                        <CalendarDays className="h-3.5 w-3.5 text-blue-300/70" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-[10px] font-semibold text-sidebar-primary/50">
+                          Draft published
+                        </p>
+                        <p className="text-[8px] text-sidebar-primary/25">Week of Mar 16</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ── Footer ───────────────────────────────────────────────── */}
-      <footer className="bg-primary/5 px-4 py-6">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 text-center md:flex-row md:text-left">
-          <TeamwiseLogo size="small" />
-          <p className="text-xs text-muted-foreground">
-            © 2026 Teamwise. Built for respiratory therapy teams.
-          </p>
-          <div className="flex gap-4 text-xs text-muted-foreground">
-            <Link href="/login" className="hover:text-foreground">
-              Sign in
-            </Link>
-            <Link href="/signup" className="hover:text-foreground">
-              Request access
-            </Link>
+      <section className="relative flex flex-1 flex-col overflow-y-auto bg-background">
+        <div className="absolute bottom-0 left-0 top-0 hidden w-px bg-gradient-to-b from-border/0 via-border/60 to-border/0 lg:block" />
+        <div className="absolute -right-32 -top-32 h-[400px] w-[400px] rounded-full bg-primary/[0.02] blur-[100px]" />
+        <div className="absolute -bottom-32 -left-32 h-[300px] w-[300px] rounded-full bg-accent/[0.02] blur-[80px]" />
+        <div
+          className="absolute inset-0 opacity-[0.015]"
+          style={{
+            backgroundImage:
+              'radial-gradient(circle, rgba(13, 23, 38, 0.7) 0.3px, transparent 0.3px)',
+            backgroundSize: '24px 24px',
+          }}
+        />
+
+        <div className="flex flex-1 items-center justify-center px-8 py-10 sm:px-12">
+          <div
+            className="fade-up relative z-10 w-full max-w-[400px]"
+            style={{ animationDelay: '0.15s' }}
+          >
+            <div className="mb-10 flex flex-col items-center lg:hidden">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl border border-primary/15 bg-primary/10">
+                <CalendarDays className="h-5 w-5 text-primary" />
+              </div>
+              <span className="text-xl font-bold tracking-tight text-foreground">Teamwise</span>
+              <span className="mt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                Team Scheduling Hub
+              </span>
+            </div>
+
+            <div className="rounded-2xl border border-border/50 bg-card/60 p-7 pb-6 shadow-sm backdrop-blur-sm">
+              <p className="mb-2.5 hidden text-[10px] font-bold uppercase tracking-[0.2em] text-primary/60 lg:block">
+                Team Scheduling Hub
+              </p>
+
+              <h2
+                className="text-[1.6rem] font-bold leading-snug tracking-tight text-foreground"
+                style={{ fontFamily: 'var(--font-plus-jakarta), DM Sans, sans-serif' }}
+              >
+                {isForgot
+                  ? 'Reset your password'
+                  : isLogin
+                    ? 'Access your Teamwise workspace'
+                    : 'Create your employee account'}
+              </h2>
+              <p className="mb-6 mt-1.5 text-[14px] leading-relaxed text-muted-foreground">
+                {isForgot
+                  ? "Enter your email and we'll send you a link to reset your password."
+                  : isLogin
+                    ? 'Sign in to view your schedule, manage availability, and coordinate with your team.'
+                    : 'Set up your account to access schedules, shifts, and team coordination tools.'}
+              </p>
+
+              {message && (
+                <p className="mb-3 rounded-md border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-2 text-sm text-[var(--success-text)]">
+                  {message}
+                </p>
+              )}
+              {error && (
+                <p className="mb-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]">
+                  {error}
+                </p>
+              )}
+
+              {isForgot ? (
+                <form onSubmit={handleForgotPassword} className="space-y-3.5">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="email" className="text-[13px] font-medium text-foreground/70">
+                      Email address
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      autoComplete="email"
+                      required
+                      className="h-11 rounded-lg border-border/70 bg-background/80 text-sm placeholder:text-muted-foreground/40 shadow-sm focus:ring-2 focus:ring-primary/15 focus:border-primary/30 transition-all"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full h-11 rounded-lg text-sm font-semibold gap-2 shadow-md hover:shadow-lg hover:brightness-110 transition-all mt-1"
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        Send reset link
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </>
+                    )}
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-3.5">
+                  {!isLogin && (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label
+                            htmlFor="first_name"
+                            className="text-[13px] font-medium text-foreground/70"
+                          >
+                            First name
+                          </Label>
+                          <Input
+                            id="first_name"
+                            placeholder="Jane"
+                            value={firstName}
+                            onChange={(e) => setFirstName(e.target.value)}
+                            autoComplete="given-name"
+                            required
+                            className="h-11 rounded-lg border-border/70 bg-background/80 text-sm placeholder:text-muted-foreground/40 shadow-sm focus:ring-2 focus:ring-primary/15 focus:border-primary/30 transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label
+                            htmlFor="last_name"
+                            className="text-[13px] font-medium text-foreground/70"
+                          >
+                            Last name
+                          </Label>
+                          <Input
+                            id="last_name"
+                            placeholder="Smith"
+                            value={lastName}
+                            onChange={(e) => setLastName(e.target.value)}
+                            autoComplete="family-name"
+                            required
+                            className="h-11 rounded-lg border-border/70 bg-background/80 text-sm placeholder:text-muted-foreground/40 shadow-sm focus:ring-2 focus:ring-primary/15 focus:border-primary/30 transition-all"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="phone"
+                          className="text-[13px] font-medium text-foreground/70"
+                        >
+                          Phone number
+                        </Label>
+                        <Input
+                          id="phone"
+                          type="tel"
+                          placeholder="(555) 123-4567"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          autoComplete="tel"
+                          className="h-11 rounded-lg border-border/70 bg-background/80 text-sm placeholder:text-muted-foreground/40 shadow-sm focus:ring-2 focus:ring-primary/15 focus:border-primary/30 transition-all"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="role"
+                          className="text-[13px] font-medium text-foreground/70"
+                        >
+                          Your role
+                        </Label>
+                        <select
+                          id="role"
+                          value={role}
+                          onChange={(e) => setRole(e.target.value as 'manager' | 'therapist')}
+                          className="h-11 w-full rounded-lg border border-border/70 bg-background/80 px-3 text-sm shadow-sm outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/15"
+                        >
+                          <option value="therapist">Therapist / Staff</option>
+                          <option value="manager">Manager</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="email_main"
+                      className="text-[13px] font-medium text-foreground/70"
+                    >
+                      Email address
+                    </Label>
+                    <Input
+                      id="email_main"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      autoComplete="email"
+                      required
+                      className="h-11 rounded-lg border-border/70 bg-background/80 text-sm placeholder:text-muted-foreground/40 shadow-sm focus:ring-2 focus:ring-primary/15 focus:border-primary/30 transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label
+                        htmlFor="password_main"
+                        className="text-[13px] font-medium text-foreground/70"
+                      >
+                        Password
+                      </Label>
+                      {isLogin && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsForgot(true)
+                            setError(null)
+                            setMessage(null)
+                          }}
+                          className="text-[12px] font-medium text-primary/70 transition-colors hover:text-primary"
+                        >
+                          Forgot password?
+                        </button>
+                      )}
+                    </div>
+                    <Input
+                      id="password_main"
+                      type="password"
+                      placeholder="********"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      autoComplete={isLogin ? 'current-password' : 'new-password'}
+                      required
+                      minLength={6}
+                      className="h-11 rounded-lg border-border/70 bg-background/80 text-sm placeholder:text-muted-foreground/40 shadow-sm focus:ring-2 focus:ring-primary/15 focus:border-primary/30 transition-all"
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full h-11 rounded-lg text-sm font-semibold gap-2 shadow-md hover:shadow-lg hover:brightness-110 transition-all mt-1"
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        {isLogin ? 'Sign in' : 'Create account'}
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </>
+                    )}
+                  </Button>
+                </form>
+              )}
+
+              <div className="mt-5 border-t border-border/40 pt-4 text-center">
+                <p className="text-[13px] text-muted-foreground">
+                  {isForgot ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsForgot(false)
+                        setError(null)
+                        setMessage(null)
+                      }}
+                      className="font-semibold text-primary transition-colors hover:text-primary/80"
+                    >
+                      Back to sign in
+                    </button>
+                  ) : (
+                    <>
+                      {isLogin ? 'Need access? ' : 'Already have an account? '}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsLogin((current) => !current)
+                          setIsForgot(false)
+                          setError(null)
+                          setMessage(null)
+                        }}
+                        className="font-semibold text-primary transition-colors hover:text-primary/80"
+                      >
+                        {isLogin ? 'Create your employee account' : 'Sign in instead'}
+                      </button>
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-center gap-1.5 text-muted-foreground/50">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              <span className="text-[11px] font-medium">Secured & encrypted</span>
+            </div>
           </div>
         </div>
-      </footer>
+      </section>
     </main>
   )
 }

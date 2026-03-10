@@ -1,366 +1,27 @@
-# Teamwise Scheduler - Codex Handoff Context
+# Teamwise Scheduler
 
-Updated: 2026-03-02 (session 2: directory E2E expansion + publish-process API E2E coverage)
-
-## Latest Completed Work (2026-03-02, session 2)
-
-- **Directory E2E coverage expansion** (`e2e/directory-date-override.spec.ts`):
-  - Added deterministic copy-path setup with dedicated seeded cycles:
-    - `emptySourceCycle` (no shifts) for copy-error validation
-    - `copyTargetCycle` with one pre-seeded duplicate shift for skip-path validation
-  - Added 5 tests (suite now **12 tests total**):
-    - inline delete error when `override_id` is missing (no redirect success URL)
-    - inline copy error when source cycle has no scheduled shifts
-    - copy success path verifies `copied=1&skipped=1` and DB row count in target cycle
-    - `Save + realign shifts` removes future draft shifts for the employee (DB assertion)
-    - deactivate/reactivate lifecycle toggles active-filter visibility and restores active state
-  - Full spec validation: `npx playwright test e2e/directory-date-override.spec.ts --workers=1` -> **12 passed**
-
-- **Coverage E2E stability fix** (`e2e/coverage-overlay.spec.ts`):
-  - Hardened unassign-delete DB assertion by switching to `expect.poll(...)` to wait for async server-action persistence.
-  - Removes intermittent false negatives where UI row was removed but DB check raced before delete commit.
-
-- **Publish process API E2E coverage** (`e2e/publish-process-api.spec.ts`):
-  - Added auth-boundary test for `POST /api/publish/process` without worker key (expects redirect-to-login or 401 unauthorized response path)
-  - Added worker-key test with safe idempotency assertion using a non-existent `publish_event_id` (no queued rows processed, repeated calls return identical `processed/sent/failed` counts)
-  - Validation: `npx playwright test e2e/publish-process-api.spec.ts --workers=1` -> **2 passed**
-  - Full suite validation: `npm run test:e2e` -> **39 passed, 1 skipped**
-
-## Latest Completed Work (2026-03-02, session 1)
-
-### PR #23 merged to `main`
-
-- **PR:** https://github.com/byonk19-svg/rt-scheduler/pull/23
-- **Merge commit:** `091a6292ee263844109164487935aa5b1bf52cbf`
-- **Branch:** `fix/e2e-hardening-publish-route` (deleted on merge)
-
-### Coverage/schedule navigation + e2e hardening
-
-- Publish CTA/workflow links now route to schedule workspace by default:
-  - `MANAGER_WORKFLOW_LINKS.publish` -> `/schedule?view=week`
-  - manager attention links publish target -> `/schedule?cycle=...&view=week`
-  - manager dashboard publish button now uses schedule route (not coverage route)
-- Added shared route helper + tests:
-  - `src/lib/cycle-route.ts`
-  - `src/lib/cycle-route.test.ts`
-  - `src/lib/manager-workflow.test.ts`
-  - `src/lib/workflow-links.test.ts`
-- Coverage/calendar e2e suite hardened with stable `data-testid` selectors and deterministic date-targeted day-cell targeting.
-- Fixed flaky toggle-close interaction in `e2e/coverage-overlay.spec.ts` by dispatching DOM click for the second same-cell toggle assertion.
-
-### CI reliability fixes (GitHub Actions)
-
-- **Workflow startup failure fixed:** removed invalid secrets-based job `if` from `.github/workflows/ci.yml`.
-- **Typecheck failure fixed:** added missing dependency `@sentry/nextjs` to `package.json`/`package-lock.json`.
-- **Build stability fixes:**
-  - wrapped search-param consumer pages/components in `Suspense` where required:
-    - `src/app/layout.tsx`
-    - `src/app/coverage/page.tsx`
-    - `src/app/requests/new/page.tsx`
-  - adjusted login success-toast query param handling in `src/app/login/page.tsx` to avoid CI prerender/hook lint issues.
-- **No-secrets CI path stabilized:**
-  - quality job now sets placeholder Supabase env for build/typecheck.
-  - non-seeded e2e job path now exports placeholder Supabase env before running public/auth specs.
-- Result: `Lint and Build` and `Playwright E2E` checks both green on push + PR runs.
-
-## Latest Completed Work (2026-03-01, session 4)
-
-### PageHeader shared component
-
-- **`src/components/ui/page-header.tsx`** (new): shared surface card for page-level headers — props: `title`, `subtitle`, `badge?: ReactNode`, `actions?: ReactNode`, `className?`; uses `teamwise-surface`, `app-page-title`, `border-border` tokens; always-present sticky appearance without extra wrapper divs.
-- **`src/app/dashboard/manager/page.tsx`**: replaced inline header block with `<PageHeader>` — `actions` slot carries the `<Calendar>` Lucide icon; `className="fade-up mb-7"` preserves existing stagger timing.
-- **`src/app/dashboard/staff/page.tsx`**: replaced header div with `<PageHeader>` — `badge` slot holds Role + Team `<Badge>` chips.
-
-### Staff dashboard — upcoming shift roster
-
-- **`src/app/dashboard/staff/page.tsx`**: after the metrics banner, a new "Upcoming shifts" section shows the user's next 3 shifts with colleagues:
-  - Fetches `shifts` for the same dates (excluding self) using 2 extra SSR queries (roster shifts + roster profile names); zero client-side JS
-  - Each row: date label, shift type, **Lead** amber badge if user is lead that day
-  - Colleague chips: amber `★ First` for lead colleagues; muted `First` for staff colleagues; sorted leads-first
-  - Falls back to "No colleagues assigned yet." when the slot is otherwise empty
-
-### Manager dashboard — weekly progress breakdown
-
-- **`src/app/dashboard/manager/page.tsx`**: inside the existing Cycle Progress card, a new "Week by week" subsection shows a mini bar chart for fill rate per week:
-  - `WeekRow = { label: string; scheduled: number; total: number }` type
-  - Derived from existing coverage loop via `dateIndex` counter + `Map<number, bucket>` — **zero extra network requests**
-  - Bar color: green (`var(--success)`) ≥80 %, amber (`var(--warning)`) ≥50 %, red (`var(--error)`) <50 %
-  - Added to `DashboardData`, `DashboardDisplayData`, `INITIAL_DATA`, `setData` call
-
-### Directory e2e — filter bar + drawer tabs (4 new tests)
-
-- **`e2e/directory-date-override.spec.ts`** — grew from 3 tests to 7:
-  - **Test 4**: search filter hides non-matching rows, restores on clear, keeps exact match visible
-  - **Test 5**: PRN employment-type filter pill hides full-time employee; FT pill restores them
-  - **Test 6**: Lead-only checkbox hides non-lead-eligible employees; unchecking restores them
-  - **Test 7**: drawer tab navigation — Profile → Scheduling → Overrides → Profile; each tab shows correct panel, hides others via CSS `hidden`
-
-- Quality: 195 unit tests pass; tsc, lint, format:check all green
-
----
-
-## Latest Completed Work (2026-03-01, session 3 — Design System)
-
-### Design token system + brand alignment
-
-- **`src/app/globals.css`**: Added `--attention: #d97706` token (amber — attention signals only, not primary actions). Fixed global `tr:hover td` from amber `#fffbeb` → `var(--secondary)` blue tint.
-
-- **`src/components/AppShell.tsx`**: Nav active pill and publish CTA button now use `--primary` (blue). Logo wordmark accent and user avatar keep amber via `NAV_AMBER` / `var(--attention)` as brand personality touches.
-
-- **`src/app/dashboard/manager/page.tsx`** — full design pass:
-  - `AmberButton` background → `var(--primary)`, font → `var(--font-sans)`
-  - `GhostButton` border/bg/color → CSS vars
-  - `WorkloadBar` day/night bar colors → `var(--primary)` / `var(--tw-deep-blue)` (was amber/indigo)
-  - `FillRateBar` fill colors → `var(--success)` / `var(--warning)` / `var(--error)`
-  - Attention bar border: conditional green (`var(--success-border)` + `var(--success)` left border) when all clear, amber when issues — driven by `hasAnyIssues` derived flag
-  - Cycle badge SVG strokes → `var(--muted-foreground)` (was amber)
-  - Deleted redundant **Quick Actions** section (~40 lines)
-  - All `IssueRow` / `CheckRow` / `Stat` colors → CSS semantic vars
-  - `CardHeader` icon container bg → `var(--muted)` / `var(--border)` (was amber `#fffbeb`)
-  - All `#e5e7eb` / `#f1f5f9` borders → `var(--border)`; `#f8fafc` / `#f9fafb` tile backgrounds → `var(--muted)`
-  - Page title: inline `fontSize:26 fontFamily:Plus Jakarta Sans` → `className="app-page-title"`
-  - Section headers: inline `fontWeight:800` → `text-sm font-semibold text-foreground`
-  - All `fontFamily: 'Plus Jakarta Sans'` / `'DM Sans'` removed; `fontWeight 800` → `700`
-  - Emoji icons replaced with Lucide: `CardHeader` (ClipboardList / Rocket / SquareCheckBig), `SmallTile` (Calendar / Users), `CheckRow` (CheckCircle2 / XCircle), team stat tiles (Users / Sun / Moon / FileText)
-  - `SmallTile` `icon` prop: `string` → `ReactNode`; `CardHeader` `icon` prop: `string` → `ReactNode`
-  - All label text hardcodes (`#374151`, `#64748b`) → `var(--foreground)` / `var(--muted-foreground)`
-
-- **`src/app/shift-board/page.tsx`**: `STATUS_META` hardcoded hex → CSS var token families (`--warning-*`, `--success-*`, `--error-*`, `--muted`)
-
-- **`src/app/dashboard/staff/page.tsx`**: Role badge `variant="secondary"` (blue tint, was default)
-
-- **`src/components/coverage/CalendarGrid.tsx`**:
-  - Avatar bg: `#ef4444` → `var(--error)`, `#ea580c` → `bg-orange-600`, `#d97706` → `var(--attention)`
-  - Day/Night tab active: `#d97706` bg → `bg-primary text-primary-foreground`
-  - Tab inactive: `#e5e7eb` → `border-border bg-card text-muted-foreground`
-  - Selected day card: `border-[#d97706]` → `border-primary`; shadow RGB → primary blue; `hover:border-amber-600` → `hover:border-primary`
-  - Lead count badge: `#fee2e2/#dc2626` → `var(--error-subtle)/var(--error-text)`; `#ecfdf5/#047857` → `var(--success-subtle)/var(--success-text)`
-
-- **`src/components/coverage/ShiftDrawer.tsx`**:
-  - `SHIFT_STATUSES` mapping entirely → CSS vars: active → `text-foreground/border-border/bg-muted`; oncall → `warning-*`; leave_early → `info-*`; cancelled → `error-*`
-  - Avatar bg: same treatment as CalendarGrid avatar
-  - Inactive status button: `#e5e7eb/#9ca3af` → `border-border bg-card text-muted-foreground`
-
-### Design system rules (enforced going forward)
-
-- `--primary` (`#0667a9`) = all primary actions: buttons, nav pills, links, focus rings
-- `--attention` (`#d97706`) = attention-only semantic: avatar accent, logo wordmark, amber chip for truly attention-needed states
-- `--warning-*` / `--success-*` / `--error-*` / `--info-*` = all status badge families
-- No hardcoded hex colors in UI — use CSS vars or Tailwind semantic classes
-- No `fontFamily` string literals in JSX — use `font-sans` or `var(--font-sans)`
-- `fontWeight 800` reserved for display-level only; section headers use `600`/`700`
-
-## Latest Completed Work (2026-03-01, session 2)
-
-- **Manager dashboard — workload distribution section** (`src/app/dashboard/manager/page.tsx`):
-  - Added `full_name` to team profiles query (zero extra network requests)
-  - Derives per-therapist shift count from already-loaded shifts data after coverage loop
-  - New `WorkloadRow` type + `WorkloadBar` component: amber bars for day-shift, indigo for night-shift, sorted highest-to-lowest
-  - Section animates in as part of the existing `fade-up` sequence (delays bumped +0.05s to accommodate)
-
-- **Staff dashboard — live metrics** (`src/app/dashboard/staff/page.tsx`):
-  - Converted from plain 3-nav-card hub to SSR page with real Supabase data
-  - Fetches: active/next cycle, user's upcoming shifts, availability override count, pending shift post count
-  - New metrics banner above nav cards: upcoming shifts count, next shift date, availability submitted status (green ✓ / amber warning)
-  - Card descriptions now show live context (e.g. "5 upcoming shifts this cycle", "Submitted for Mar cycle")
-
-- **Shift board — remove `window.alert()`** (`src/app/shift-board/page.tsx`):
-  - Added `requestErrors: Record<string, string>` state
-  - Replaced 3 `window.alert()` calls in `handleAction` with `setRequestErrors`
-  - Specific messages for Lead coverage gap and Double booking errors
-  - Error clears on retry + on board reload; renders inline below action buttons via `role="alert"` paragraph
-
-- **Directory drawer — inline server-side error banners** (`src/app/directory/page.tsx` + `src/components/EmployeeDirectory.tsx`):
-  - Changed `saveEmployeeDateOverrideAction` signature to `(prevState, formData)` for `useActionState` compatibility
-  - Replaced all `redirect(error)` calls with `return { error: '<specific message>' }` on failures; keeps `redirect` on success
-  - `EmployeeDirectory.tsx` uses `useActionState` to capture action state; inline red error banner inside Overrides tab form
-  - Expanded action-state handling to delete/copy paths:
-    - `deleteEmployeeDateOverrideAction` now returns inline error state
-    - `copyEmployeeShiftsAction` now returns inline error state
-    - delete/copy forms render drawer-local `role="alert"` banners on failure
-  - Form keyed to `editEmployee.id + overrideCycleIdDraft` to auto-reset state between drawer opens
-
-- Quality: 195 unit tests pass (20 files); tsc, lint, format:check all green
-
-## Latest Completed Work (2026-03-01)
-
-- Employee directory UX overhaul — `src/components/EmployeeDirectory.tsx` only, no behavior changes to data layer:
-  - **Tabbed drawer** — Profile / Scheduling / Overrides tabs with sticky amber-underline tab bar
-    - Profile + Scheduling panels use CSS `hidden` (not unmounted) so all FormData fields are always present on submit regardless of active tab
-    - Overrides panel rendered outside the `saveEmployeeAction` form with its own `saveEmployeeDateOverrideAction` / `copyEmployeeShiftsAction` nested forms
-    - Drawer tab resets to `'profile'` on close; "Enter availability" quick-action opens directly to `'overrides'` tab
-  - **Sticky Save footer** — `sticky bottom-0` footer with Save + "Save + realign shifts" buttons always visible while scrolling long panels
-  - **`EmployeeRowBadges` component** — Day/Night (amber/slate), FT/PT/PRN (blue/violet/orange), Lead, and Inactive chips rendered below each employee name in both desktop table rows and mobile cards
-  - **Unified filter bar** — single compact row replacing the old dual TABS + checkbox row layout:
-    - Shift toggle (All / Day / Night)
-    - Status toggle (Active / All)
-    - Employment type toggle (All / FT / PT / PRN) — added `employmentFilter` state + post-filter step in `filteredEmployees` useMemo
-    - Lead and FMLA checkboxes inline in the same bar
-  - **Override calendar pre-population** — calendar dates pre-loaded from existing `dateOverrides` whenever the drawer opens or cycle selector changes; no stale empty calendar
-  - **`openEditForEmployee` updated** — added `dateOverrides` to deps; computes and sets `overrideDatesDraft` from existing overrides for the resolved cycle on open
-
-- Quality: 195 unit tests pass (20 files); tsc, lint, format:check all green
-
-## Latest Completed Work (2026-02-28, session 2)
-
-- CI/tooling hardening:
-  - `package.json` — `format` and `format:check` scripts now run `prettier . / prettier --check .` (whole repo, not a hardcoded path subset)
-  - `.github/workflows/ci.yml` — added `npx tsc --noEmit` step between lint and build; TypeScript is now a CI gate
-  - `eslint.config.mjs` — added `.claude/**` to global ESLint ignores so worktree build artifacts are never scanned
-
-- Cycle workload counts in assign dropdown:
-  - `src/app/coverage/page.tsx` — added `cycleTherapistCounts` useMemo (total shifts per therapist across full cycle, derived from already-loaded `dayDays`/`nightDays`, zero extra network requests)
-  - `src/components/coverage/ShiftDrawer.tsx` — dropdown now shows `· N this wk, M this cyc` when both counts are available, `· M this cyc` when only cycle data exists; gives managers a complete scheduling load picture at a glance
-
-- Extracted `buildDayItems` + `toUiStatus` from `page.tsx` into `selectors.ts`:
-  - `src/lib/coverage/selectors.ts` — new exports: `buildDayItems`, `toUiStatus`, `BuildDayRowInput`
-  - `mapByShiftType` closure in `page.tsx` replaced by `buildDayItems` call; callers pre-resolve names from DB profile join
-  - `src/lib/coverage/selectors.test.ts` — 21 new tests covering `toUiStatus` (9 cases) and `buildDayItems` (12 cases): lead/staff sorting, constraint blocking, dayStatus derivation, assignment_status mapping; total unit tests: 171
-
-- Removed final `window.alert` call:
-  - `src/app/coverage/page.tsx` `handleUnassign` — removed redundant `window.alert` (error was already shown inline via `setError`; now consistent with assign/status error patterns)
-
-- Inline assign error + 4 new e2e tests (session 1 recap):
-  - `src/components/coverage/ShiftDrawer.tsx` — `assignError: string` prop renders inline `<p role="alert">` error banner
-  - `src/app/coverage/page.tsx` — `window.alert` in `handleAssign` replaced with `setAssignError`; clears on role/user/tab/day/close
-  - `e2e/coverage-overlay.spec.ts` — 4 new tests: assign therapist, duplicate-assign inline error (via `page.route` mock), lead-toggle filtering, status change label update; total: 10 tests
-
-## Latest Completed Work (2026-02-28, session 1)
-
-- Extracted shared calendar utilities — no behavior changes, net -87 lines:
-  - `src/lib/calendar-utils.ts` extended with 4 new exports:
-    - `dateFromKey`, `startOfWeek`, `endOfWeek`, `buildCalendarWeeks`
-  - `src/lib/schedule-helpers.ts` — replaced 3 duplicate function bodies with re-exports from `calendar-utils`:
-    - `dateKeyFromDate` → re-export of `toIsoDate`
-    - `buildDateRange` → re-export of `dateRange`
-    - `formatDate` → re-export of `formatDateLabel`
-  - `src/components/manager-week-calendar.tsx` — removed 5 private calendar fns, imported from `calendar-utils`
-  - `src/components/manager-month-calendar.tsx` — removed 6 private calendar fns, imported from `calendar-utils`
-  - `src/lib/therapist-picker-metrics.ts` — removed private `keyFromDate`, uses `toIsoDate`
-- Extracted shared domain primitive types:
-  - new `src/lib/shift-types.ts` with 6 core types:
-    `ShiftStatus`, `ShiftRole`, `AssignmentStatus`, `EmploymentType`, `WeekendRotation`, `WorksDowMode`
-  - `src/app/schedule/types.ts` re-exports all 6 for backward compat (17 importers untouched)
-  - `src/app/coverage/page.tsx` imports domain types from `@/lib/shift-types` directly
-
-- Coverage assign panel: lead role toggle + weekly workload counts:
-  - `src/lib/coverage/mutations.ts` — `assignCoverageShift` accepts optional `role?: 'lead' | 'staff'` (default `'staff'`)
-  - `src/app/coverage/page.tsx`:
-    - `TherapistOption` now includes `isLeadEligible: boolean` (fetched via `is_lead_eligible`)
-    - `assignRole` state (`'staff'` default), resets on day change / tab switch / close
-    - `weeklyTherapistCounts` useMemo — derives per-therapist shift count for the selected day's week from already-loaded `dayDays`/`nightDays` (zero extra network requests)
-    - `handleAssign` passes `role: assignRole`; optimistic update routes to `leadShift` vs `staffShifts` based on role
-  - `src/components/coverage/ShiftDrawer.tsx`:
-    - Staff / Lead pill toggle above the dropdown
-    - Lead disabled (with tooltip) when slot already has a lead or no lead-eligible therapists exist
-    - Dropdown filters to lead-eligible therapists when Lead is active
-    - Each option shows `· N this wk` for therapists with ≥1 shift scheduled that week
-
-## Latest Completed Work (2026-02-27, follow-up)
-
-- Centralized RBAC model and permission checks:
-  - added shared auth helpers:
-    - `src/lib/auth/roles.ts`
-    - `src/lib/auth/can.ts`
-  - replaced scattered role string checks in UI gating with `can(...)`
-  - enforced matching checks in server actions and APIs (schedule/drag-drop/publish/directory/availability export/assignment status paths)
-  - middleware/proxy route gating aligned to centralized permission helpers
-- Added security documentation:
-  - `docs/SECURITY.md` now includes a concise role-permission matrix
-- Refactored coverage page into smaller units without behavior changes:
-  - `src/components/coverage/CalendarGrid.tsx`
-  - `src/components/coverage/ShiftDrawer.tsx`
-  - `src/lib/coverage/selectors.ts`
-  - `src/lib/coverage/mutations.ts`
-  - `src/app/coverage/page.tsx` now composes these modules
-- Hardened assignment status optimistic-update flow against stale closures:
-  - extracted helper:
-    - `src/lib/coverage/updateAssignmentStatus.ts`
-  - added unit test coverage:
-    - `src/lib/coverage/updateAssignmentStatus.test.ts`
-    - success path asserts no rollback
-    - failure path asserts rollback is executed
-- Added and enforced formatting tooling:
-  - `.prettierrc`, `.prettierignore`
-  - npm scripts: `format`, `format:check`
-  - Husky + lint-staged pre-commit formatting
-  - CI updated to run `npm run format:check`
-
-## Latest Completed Work (2026-02-27)
-
-- Enforced PRN strict eligibility end-to-end:
-  - Added shared eligibility resolver used by auto-generate + picker/API paths:
-    - `resolveEligibility(...)` in `src/lib/coverage/resolve-availability.ts`
-    - PRN can be scheduled only when:
-      - cycle override has `force_on`, OR
-      - recurring work pattern explicitly offers that weekday (`works_dow`) and other hard constraints pass.
-    - new blocked reason surfaced: `PRN not offered for this date`
-  - Auto-generate candidate selection now honors PRN strict policy through shared resolver:
-    - `src/lib/schedule-helpers.ts`
-  - Assignment/move/set-lead drag-drop API now hard-blocks PRN-not-offered (not override-confirmable):
-    - `src/app/api/schedule/drag-drop/route.ts`
-- Picker and availability UX aligned to strict policy:
-  - Manager month smart picker:
-    - PRN-not-offered rows are disabled with tooltip `PRN not offered for this date`
-    - override-enabled PRN rows show badge `Offered`
-    - file: `src/components/manager-month-calendar.tsx`
-  - Therapist availability page:
-    - PRN therapists can submit only `Available to work (PRN)` (`force_on`)
-    - non-PRN therapists submit `Need off` (`force_off`)
-    - server-side validation enforces employment-type override policy
-    - files:
-      - `src/app/availability/page.tsx`
-      - `src/app/availability/availability-requests-table.tsx`
-  - Manager directory wording clarified for override type labels:
-    - `src/components/EmployeeDirectory.tsx`
-- Introduced recurring work-pattern model:
-  - New `work_patterns` table (manager-managed):
-    - `works_dow`, `offs_dow`
-    - `weekend_rotation` + `weekend_anchor_date`
-    - `works_dow_mode` (`hard`/`soft`)
-  - New typed helpers and unit tests:
-    - `src/lib/coverage/work-patterns.ts`
-    - `src/lib/coverage/resolve-availability.ts`
-    - `src/lib/coverage/generator-slot.ts`
-- Replaced legacy availability entry flow with one cycle-scoped source of truth:
-  - `availability_overrides` now used for therapist + manager overrides.
-  - Supports `force_off` and `force_on` by cycle/date/shift.
-  - Added `source` metadata (`therapist`/`manager`) with source-aware RLS.
-- Auto-generate now enforces hard constraints and records constraint-based unfilled slots:
-  - Never violates `offs_dow`
-  - Never violates off-weekend parity
-  - Honors `works_dow_mode='hard'` as strict
-  - Applies penalty when `works_dow_mode='soft'`
-  - Writes `shifts.unfilled_reason='no_eligible_candidates_due_to_constraints'`
-- Coverage and schedule feedback updated:
-  - `constraints_unfilled` summary surfaced post-generation
-  - slot-level badge: `No eligible therapists (constraints)`
-- Team Directory manager workflow expanded:
-  - Employee drawer includes cycle-scoped Date Overrides editor:
-    - add/update/delete `Need off` / `Available to work`
-    - manager saves with `source='manager'`
-    - rows show badge: `Entered by manager`
-  - Added cycle-scoped `Missing availability` table with quick action:
-    - shows overrides count, last updated, submitted/not submitted
-    - `Enter availability` opens drawer focused on override section
-- Coverage assignment status update logic extracted + tested:
-  - `src/lib/coverage/updateAssignmentStatus.ts`
-  - includes proper rollback + user-facing error + real error logging
-
-## Previous Milestone (2026-02-24)
-
-- Availability workflow moved to `availability_entries` with role-based input:
-  - full-time/part-time submit `unavailable`
-  - PRN submit `available`
-- Availability override metadata and confirmation flow added to `shifts`.
-- Approvals flow narrowed to post-publish shift posts.
-- Manager dashboard redesign shipped with live Supabase metrics.
-- e2e coverage added for availability override + PRN soft-warning paths.
+Updated: 2026-03-08
 
 ## What This App Is
 
 Teamwise is a respiratory therapy scheduling app replacing paper workflows.
 Core domains: coverage planning, cycles, availability requests, shift board, approvals, publish flow, directory.
+
+## Latest Updates (2026-03-08)
+
+- Staff can now access `/shift-board` directly (no manager-only middleware block).
+- Staff navigation wording is clearer:
+  - `Future Availability`
+  - `Shift Swaps (Published)`
+- Shift Board now separates use-cases more explicitly for non-technical users:
+  - published schedule changes (swap/pickup) vs upcoming cycle planning.
+- Availability flow was simplified for all employees:
+  - PRN-specific labels removed from staff UI.
+  - All staff can submit either `Need off` or `Available to work`.
+  - Form copy uses plain language (`Request type`, `Save request`).
+- Desktop clarity pass completed on Availability:
+  - 2-step form structure (`Step 1` cycle/date, `Step 2` request details).
+  - Staff saved-requests section simplified (`My Saved Availability Requests`).
 
 ## Current Stack
 
@@ -369,9 +30,40 @@ Core domains: coverage planning, cycles, availability requests, shift board, app
 - Tailwind + shadcn/ui patterns
 - Vitest (unit) + Playwright (e2e)
 
-## Current Product Shape
+## Resume Checklist
 
-Primary routes:
+```bash
+git status -sb
+supabase db push
+npm install
+npx tsc --noEmit
+npm run lint
+npm run test:unit
+npm run dev
+```
+
+## Quality Status
+
+All checks currently green:
+
+- `npx tsc --noEmit` pass
+- `npm run lint` pass
+- `npm run format:check` pass (whole-repo Prettier; `.claude/**` excluded from ESLint)
+- `npm run build` pass
+- `npm run test:unit` pass (**201 tests** across 23 files)
+- `npm run test:e2e` pass (39 passed, 1 skipped)
+
+CI gates: format check → lint → tsc → build → Playwright E2E
+
+E2E specs:
+
+- `e2e/coverage-overlay.spec.ts` (14 tests)
+- `e2e/directory-date-override.spec.ts` (12 tests)
+- `e2e/availability-override.spec.ts` (2 tests)
+- `e2e/publish-process-api.spec.ts` (2 tests)
+- `e2e/auth-redirect.spec.ts`, `e2e/authenticated-flow.spec.ts`, `e2e/public-pages.spec.ts`
+
+## Primary Routes
 
 - `/` public marketing
 - `/login`, `/signup`
@@ -380,14 +72,14 @@ Primary routes:
 - `/dashboard` role redirect
 - `/dashboard/manager`, `/dashboard/staff`
 - `/coverage` dedicated coverage UI (client page, full-width calendar + slide-over panel)
-- `/schedule` schedule workspace (Week/Month views)
+- `/schedule` schedule workspace (Week/Month views only; Grid/List removed)
 - `/approvals`
 - `/availability`
 - `/shift-board`
 - `/directory` (manager team directory)
 - `/profile`
 - `/requests`, `/requests/new` shift request workflow
-- `/publish`, `/publish/[id]` publish history + async email queue (implemented; requires env vars)
+- `/publish`, `/publish/[id]` publish history + async email queue
 - `/staff/` staff-scoped layout with staff-specific schedule and requests sub-routes
 
 ## Role Model
@@ -397,167 +89,152 @@ Role source: `profiles.role`.
 - `manager`: full scheduling + publish + directory controls
 - `therapist`: staff experience
 
-Lead capability is represented by `profiles.is_lead_eligible`.
+Lead capability: `profiles.is_lead_eligible`. All permission checks go through `can(role, permission)` in `src/lib/auth/can.ts`.
 
-## Scheduling Rules (Active)
+## Key Shared Components
 
-- Coverage target: 3-5 per shift slot
+- `src/components/ui/page-header.tsx` — `<PageHeader title subtitle badge? actions?>` used on every page
+- `src/components/ui/skeleton.tsx` — `<Skeleton>`, `<SkeletonLine>`, `<SkeletonCard>`, `<SkeletonListItem>` loading states
+- `src/components/NotificationBell.tsx` — real-time bell with Supabase subscription; variants: `default` | `staff`
+- `src/components/AppShell.tsx` — nav shell; add routes to `MANAGER_NAV` / `STAFF_NAV` arrays
+- `src/components/feedback-toast.tsx` — `<FeedbackToast message variant>` for success/error toasts
+- `src/lib/auth/can.ts` — `can(role, permission)` — all permission checks go through here
+- `src/lib/coverage/selectors.ts` — `buildDayItems`, `toUiStatus`
+- `src/lib/coverage/mutations.ts` — `assignCoverageShift`, `unassignCoverageShift`
+- `src/lib/calendar-utils.ts` — `toIsoDate`, `dateRange`, `buildCalendarWeeks`, etc.
+
+## Design System
+
+CSS tokens (defined in `src/app/globals.css`):
+
+- `--primary` (`#0667a9`) — all primary actions: buttons, nav pills, links, focus rings
+- `--attention` (`#d97706`) — brand personality only: user avatar, logo accent; **not** for primary actions
+- `--warning-*` / `--success-*` / `--error-*` / `--info-*` — all status badge families
+- `--foreground`, `--muted-foreground`, `--border`, `--card`, `--muted`, `--secondary` — layout tokens
+
+Rules (enforced):
+
+- No hardcoded hex colors — use CSS vars or Tailwind semantic classes
+- No `fontFamily` JSX literals — use `font-sans` or `var(--font-sans)`
+- `bg-white` → `bg-card`
+- Focus rings → `focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 outline-none`
+- `fontWeight 800` reserved for display-level; section headers use `600`/`700`
+- All Lucide icons — no emoji icons in UI
+
+Typography classes:
+
+- `app-page-title` — page-level h1
+- `app-section-title` — card/section headers
+
+## Scheduling Rules
+
+- Coverage target: 3–5 per shift slot
 - Weekly therapist limits from profile/defaults
-- Exactly one designated lead (`shifts.role='lead'`) and lead must be eligible
-- Recurring pattern constraints:
+- Exactly one designated lead (`shifts.role='lead'`) per slot; lead must be eligible
+- Recurring pattern constraints (from `work_patterns` table):
   - `offs_dow` is hard block
   - every-other-weekend off parity is hard block
   - `works_dow` is hard when `works_dow_mode='hard'`
   - `works_dow` is soft preference when `works_dow_mode='soft'`
-- Cycle-scoped date overrides precedence:
+- Cycle-scoped date overrides (`availability_overrides` table):
   - inactive/FMLA blocks first
   - `force_off` blocks date in that cycle
   - `force_on` allows date in that cycle (except inactive/FMLA)
   - fallback to recurring pattern if no override
 - PRN strict policy:
-  - PRN is eligible only when:
-    - cycle override matches with `force_on`, OR
-    - recurring pattern offers that date (`works_dow`) and hard constraints pass.
-  - PRN without `force_on` and without an offered recurring day is not eligible.
+  - eligible only when cycle override `force_on` exists, OR recurring pattern offers that weekday (`works_dow`) and hard constraints pass
+  - PRN without `force_on` and without offered recurring day = not eligible
 
-Auto-generate:
+Auto-generate (`src/lib/schedule-helpers.ts`):
 
-- Targets 4 therapists first when feasible
-- Treats slot as unfilled only when below 3
+- Targets 4 therapists first; slot is "unfilled" only below 3
 - Excludes inactive + FMLA by default
-- Leaves remaining slots unfilled when constraints eliminate candidates
-- Marks constraint-caused unfilled slots for UI messaging and auditability
+- Marks constraint-caused unfilled slots: `unfilled_reason='no_eligible_candidates_due_to_constraints'`
 
-Assignment status remains informational only:
+Assignment status is informational only (does not affect coverage counts or publish blockers).
 
-- Does not change coverage counts, attention metrics, or publish blockers
+## Coverage UX
 
-## Coverage UX (Current)
+`/coverage` (`src/app/coverage/page.tsx` + `src/components/coverage/`):
 
-`/coverage` now uses:
-
-- Full-width 7-column day calendar (no side panel shrinking layout)
-- Fixed right slide-over detail panel (`z-50`)
-- Click backdrop (`z-40`) or close button to dismiss
-- Click same day again toggles panel closed
-- Accordion therapist rows in panel (single expanded row)
-- Day/Night shift tabs in coverage view
+- Full-width 7-column day calendar; fixed right slide-over panel (`z-50`)
+- Click backdrop (`z-40`) or close button to dismiss; click same day again toggles panel closed
+- Day/Night shift tabs; accordion therapist rows in panel
 - Optimistic status updates with rollback on save failure
-- Unassign therapist action from expanded row in the right panel
-- Calendar chips now visibly reflect assignment status updates immediately:
-  - `OC` (on call), `LE` (leave early), `X` (cancelled), with distinct chip colors
-- Constraint visibility:
-  - slot badge and detail note for `No eligible therapists (constraints)`
-- Assignment picker behavior:
-  - PRN not offered for date is disabled in smart picker with tooltip
-  - PRN enabled via cycle override is labeled `Offered`
-- Lead role assign:
-  - Staff / Lead pill toggle in assign panel
-  - Lead button disabled when slot already has a lead or no lead-eligible therapists available
-  - Dropdown filtered to lead-eligible therapists when Lead mode is active
-  - Assigns `shifts.role='lead'`; optimistic update sets `leadShift` on the day
-- Workload visibility in assign dropdown:
-  - Each therapist option shows `· N this wk` when they have ≥1 shift scheduled that week
-  - Derived from already-loaded calendar state — no extra network requests
+- Assignment picker: Staff/Lead pill toggle; Lead filters to eligible therapists only
+- Workload shown per therapist: `· N this wk, M this cyc` (zero extra network requests)
+- Calendar chips reflect assignment status: `OC` (on call), `LE` (leave early), `X` (cancelled)
+- PRN not offered for date is disabled in picker with tooltip; override-enabled PRN labeled `Offered`
 
-## Schedule UX (Current)
+## Schedule UX
 
-`/schedule` navigation now exposes only:
+`/schedule`: Week and Month views only.
+Legacy `view=grid` and `view=list` URLs normalize to `view=week`.
 
-- `Week`
-- `Month`
+## Navbar / Branding
 
-Grid/List tabs were removed from header navigation.
-Legacy URLs with `view=grid` and `view=list` normalize to `view=week`.
+- Logo: amber icon (`var(--attention)`) + Teamwise wordmark
+- Active nav pill: `var(--primary)` blue
+- User avatar: `var(--attention)` amber
+- Manager badge: `bg-[var(--warning-subtle)] text-[var(--warning-text)] border-[var(--warning-border)]`
+- App shell header `z-30`; coverage slide-over `z-50`
+- Manager nav order: Dashboard → Coverage → Team → Requests
 
-Manager information hierarchy is now schedule-first:
+## Assignment Status
 
-- Coverage and publish are primary
-- Approvals are intentionally secondary
+Backend values: `scheduled`, `call_in`, `cancelled`, `on_call`, `left_early`
 
-## Navbar / Branding (Current)
+Shift fields: `assignment_status`, `status_note`, `left_early_time`, `status_updated_at`, `status_updated_by`
 
-- Navbar logo: inline amber icon (`var(--attention)`) + Teamwise wordmark in `AppShell`
-- Plus Jakarta Sans (800) added at root layout via `next/font/google`
-- Active nav pill: `var(--primary)` blue (was amber)
-- User avatar circle: `var(--attention)` amber (brand personality)
-- Manager badge: `bg-amber-50 text-amber-700 border-amber-200`
-- App shell header z-index: `z-30` (coverage slide-over sits above at `z-50`)
-- App shell includes `/coverage` route so top nav is present on coverage page
-- Manager nav order is schedule-first:
-  - `Dashboard`, `Coverage`, `Team`, `Requests` (approvals moved later and renamed in nav)
+Write path: `POST /api/schedule/assignment-status` with optimistic local update + rollback.
 
-## Assignment Status Feature
+## Notifications
 
-Backend status values:
+- `NotificationBell` in top nav: unread badge, divider-based list, "mark all read" CTA
+- Real-time updates via Supabase postgres_changes subscription
+- APIs: `GET /api/notifications`, `POST /api/notifications/mark-read`
 
-- `scheduled`, `call_in`, `cancelled`, `on_call`, `left_early`
+## Publish Flow
 
-Stored fields on shifts:
+- Manager publishes from `/schedule` → triggers email queue via `notification_outbox`
+- `POST /api/publish/process` processes queued rows (batch_size param)
+- History at `/publish`; detail + retry at `/publish/[id]`
+- Key files: `src/app/publish/`, `src/lib/publish-events.ts`, `src/app/publish/actions.ts`
 
-- `assignment_status`
-- `status_note`
-- `left_early_time`
-- `status_updated_at`
-- `status_updated_by`
+Required env vars:
 
-Write path:
+```
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
+NEXT_PUBLIC_APP_URL
+RESEND_API_KEY
+PUBLISH_EMAIL_FROM
+PUBLISH_WORKER_KEY            # optional; worker key id/header
+PUBLISH_WORKER_SIGNING_KEY    # optional; required with worker key for signed processing endpoint
+```
 
-- `POST /api/schedule/assignment-status`
-- Optimistic local update with rollback on failure in client views
+Supabase Auth (production):
 
-## Notifications and Audit
+- Site URL: `https://www.teamwise.work`
+- Redirect URL: `https://www.teamwise.work/auth/callback`
 
-Notifications:
-
-- Bell in top nav
-- unread badge + list + mark-read behavior
-- APIs: `/api/notifications`, `/api/notifications/mark-read`
-
-Audit:
-
-- `public.audit_log`
-- recent activity panel available in schedule coverage flows
+**Current blocker:** Resend test-mode restricts non-owner recipients until a verified domain is set as `PUBLISH_EMAIL_FROM`.
 
 ## Data Model Snapshot
 
 Core tables:
 
-- `profiles`
+- `profiles` — `full_name`, `email`, `role`, `shift_type`, `employment_type`, `max_work_days_per_week`, `is_lead_eligible`, `on_fmla`, `is_active`, `default_calendar_view`, `default_landing_page`, `site_id`
 - `schedule_cycles`
-- `shifts`
-- `availability_requests` (legacy)
-- `availability_entries` (legacy transitional model)
-- `work_patterns` (active recurring rules model)
-- `availability_overrides` (active cycle-scoped override model)
-- `shift_posts`
-- `notifications`
-- `audit_log`
+- `shifts` — `cycle_id`, `user_id`, `date`, `shift_type`, `status`, `role`, `unfilled_reason`, assignment-status fields, `site_id`
+- `work_patterns` — `works_dow`, `offs_dow`, `weekend_rotation`, `weekend_anchor_date`, `works_dow_mode`
+- `availability_overrides` — active cycle-scoped override model (`force_off` / `force_on`, `source`)
+- `shift_posts`, `notifications`, `audit_log`
+- `publish_events`, `notification_outbox`
+- `availability_requests` (legacy), `availability_entries` (legacy transitional)
 
-Common profile fields used:
-
-- `full_name`, `email`, `phone_number`
-- `role`, `shift_type`, `employment_type`
-- `max_work_days_per_week`
-- `is_lead_eligible`, `on_fmla`, `fmla_return_date`, `is_active`
-- `default_calendar_view`, `default_landing_page`
-- `site_id`
-
-Common shift fields used:
-
-- `cycle_id`, `user_id`, `date`, `shift_type`
-- `status` (`scheduled|on_call|sick|called_off`)
-- `role` (`lead|staff`)
-- `unfilled_reason`
-- availability override fields:
-  - `availability_override`
-  - `availability_override_reason`
-  - `availability_override_by`
-  - `availability_override_at`
-- assignment-status fields listed above
-- `site_id`
-
-## Recent Migrations (Relevant)
+## Recent Migrations
 
 - `20260223091500_add_profile_view_and_landing_preferences.sql`
 - `20260223104500_add_notifications_and_audit_log.sql`
@@ -565,74 +242,11 @@ Common shift fields used:
 - `20260223191000_harden_role_and_lead_permissions.sql`
 - `20260224103000_add_shift_status_changes_audit.sql`
 - `20260224121500_add_availability_entries_and_override_metadata.sql`
+- `20260225190000_add_publish_events_and_notification_outbox.sql`
 - `20260227143000_add_work_patterns_and_cycle_overrides.sql`
 - `20260227184500_add_source_to_availability_overrides.sql`
 
-## Quality Status
-
-Latest local checks:
-
-- `npx tsc --noEmit` pass
-- `npm run lint` pass
-- `npm run format:check` pass (whole-repo Prettier; `.claude/**` excluded from ESLint)
-- `npm run build` pass
-- `npm run test:unit` pass (**200 tests** across 23 files)
-- Targeted E2E reruns pass:
-  - `npx playwright test e2e/directory-date-override.spec.ts --workers=1` (**12 passed**)
-  - `npx playwright test e2e/publish-process-api.spec.ts --workers=1` (**2 passed**)
-- CI now gates on: format check -> lint -> **tsc --noEmit** -> build -> Playwright E2E
-- e2e specs:
-  - `e2e/coverage-overlay.spec.ts` (14 tests)
-  - `e2e/directory-date-override.spec.ts` (12 tests: seeding, save override, delete override, inline delete error, search/filter coverage, drawer tabs, inline copy error, copy success, save+realign, deactivate/reactivate)
-  - `e2e/availability-override.spec.ts` (2 tests: conflict warning + PRN disabled picker)
-  - `e2e/publish-process-api.spec.ts` (2 tests: auth boundary + worker-key idempotent empty processing)
-
-## Resume Checklist
-
-1. `git status -sb`
-2. `supabase db push`
-3. `npm install`
-4. `npx tsc --noEmit`
-5. `npm run lint`
-6. `npm run test:unit`
-7. `npm run dev`
-
-## Paused Work
-
-### Publish flow with async email + publish history
-
-Status: **Code fully implemented; mostly validated** — env + queue/retry path validated with local tests; remaining rollout item is production domain/sender setup in Resend.
-
-Key files:
-
-- `src/app/publish/page.tsx`, `src/app/publish/[id]/page.tsx`
-- `src/app/publish/actions.ts`, `src/app/publish/process-queued-button.tsx`
-- `src/lib/publish-events.ts`
-
-To activate:
-
-- Run migration: `supabase/migrations/20260225190000_add_publish_events_and_notification_outbox.sql`
-- Set env vars:
-  - `SUPABASE_SERVICE_ROLE_KEY`
-  - `RESEND_API_KEY`
-  - `PUBLISH_EMAIL_FROM`
-  - `NEXT_PUBLIC_APP_URL`
-  - optional `PUBLISH_WORKER_KEY`
-- Current rollout gap (2026-03-02):
-  - Resend test-mode restrictions still apply (`onboarding@resend.dev` sender): non-owner recipients can fail with 403 until a domain is verified and `PUBLISH_EMAIL_FROM` uses that domain.
-- Validate manager publish UX:
-  - Publish shows "Published - visible to employees"
-  - Publish shows queued/sent/failed counts
-- Validate async queue processing:
-  - `POST /api/publish/process` processes queued rows
-  - counts update on `/publish` and `/publish/[id]`
-- Validate retry path:
-  - Use "Re-send failed" on `/publish/[id]`
-  - Reprocess queue and confirm failures can move to sent
-- Optional: add scheduled worker/cron to call `/api/publish/process`
-
 ## Next High-Value Priorities
 
-1. Publish flow production rollout — verify domain in Resend and switch `PUBLISH_EMAIL_FROM` to the verified domain sender
-2. Worker automation rollout — wire cron/webhook to `/api/publish/process` with `PUBLISH_WORKER_KEY`
-3. Publish process API hardening tests — add E2E coverage for worker-key auth boundaries and safe idempotent processing behavior
+1. **Publish flow production rollout** — verify domain in Resend, set `PUBLISH_EMAIL_FROM` to verified sender, run `vercel --prod`
+2. **Worker automation** — wire cron/webhook to `POST /api/publish/process` with signed headers using `PUBLISH_WORKER_KEY` + `PUBLISH_WORKER_SIGNING_KEY`

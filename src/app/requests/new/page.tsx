@@ -526,12 +526,31 @@ function SwapRequestPageContent() {
     setStep(2)
   }
 
+  const pendingCount = myOpenRequests.filter((request) => request.status === 'pending').length
+  const approvedCount = myOpenRequests.filter((request) => request.status === 'approved').length
+  const totalRequests = myOpenRequests.length
+  const stepTitle =
+    step === 1 ? 'Request details' : step === 2 ? 'Choose teammate' : 'Final message'
+
   return (
     <div className="space-y-6">
       {view === 'list' && (
         <PageHeader
           title="My Requests"
           subtitle="Track your swap and pickup requests."
+          badge={
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold text-foreground">
+                {totalRequests} open total
+              </span>
+              <span className="inline-flex items-center rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2.5 py-1 text-[11px] font-semibold text-[var(--warning-text)]">
+                {pendingCount} pending
+              </span>
+              <span className="inline-flex items-center rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] px-2.5 py-1 text-[11px] font-semibold text-[var(--success-text)]">
+                {approvedCount} approved
+              </span>
+            </div>
+          }
           actions={
             <Button size="sm" onClick={handleNew}>
               <Plus className="mr-1.5 h-3.5 w-3.5" />
@@ -542,29 +561,37 @@ function SwapRequestPageContent() {
       )}
 
       {view === 'form' && (
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={handleBack}>
-            <ChevronLeft className="mr-1 h-3.5 w-3.5" />
-            Back
-          </Button>
-          <div className="flex items-center gap-2">
-            {([1, 2, 3] as const).map((n) => (
-              <span
-                key={n}
-                className={cn(
-                  'flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold',
-                  step >= n
-                    ? 'border-primary bg-primary text-white'
-                    : 'border-border bg-card text-muted-foreground'
-                )}
-              >
-                {n}
-              </span>
-            ))}
+        <div className="rounded-2xl border border-border/90 bg-[color-mix(in_oklch,var(--card)_92%,var(--secondary))] px-4 py-4 shadow-[0_1px_3px_rgba(15,23,42,0.08),0_10px_28px_rgba(15,23,42,0.06)] sm:px-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" onClick={handleBack}>
+                <ChevronLeft className="mr-1 h-3.5 w-3.5" />
+                Back
+              </Button>
+              <div className="flex items-center gap-2">
+                {([1, 2, 3] as const).map((n) => (
+                  <span
+                    key={n}
+                    className={cn(
+                      'flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold',
+                      step >= n
+                        ? 'border-primary bg-primary text-white'
+                        : 'border-border bg-card text-muted-foreground'
+                    )}
+                  >
+                    {n}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Step {step} of 3
+            </span>
           </div>
-          <span className="text-sm font-semibold text-foreground">
-            {step === 1 ? 'Request details' : step === 2 ? 'Choose teammate' : 'Final message'}
-          </span>
+          <p className="mt-3 text-sm font-semibold text-foreground">{stepTitle}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Complete each step to submit your request for manager review.
+          </p>
         </div>
       )}
 

@@ -9,7 +9,14 @@ import {
   useRef,
   useState,
 } from 'react'
-import { ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react'
+import {
+  ArrowUpDown,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Search,
+} from 'lucide-react'
 
 import {
   buildMissingAvailabilityRows,
@@ -684,7 +691,7 @@ export function EmployeeDirectory({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-border bg-secondary/10 px-3 py-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-border/90 bg-secondary/10 px-3 py-2.5">
             <div className="flex items-center gap-1">
               <span className="text-xs font-semibold text-muted-foreground">Shift:</span>
               {(['all', 'day', 'night'] as const).map((value) => (
@@ -703,7 +710,7 @@ export function EmployeeDirectory({
                 </button>
               ))}
             </div>
-            <div className="h-4 w-px bg-border" />
+            <div className="hidden h-4 w-px bg-border sm:block" />
             <div className="flex items-center gap-1">
               <span className="text-xs font-semibold text-muted-foreground">Status:</span>
               <button
@@ -731,7 +738,7 @@ export function EmployeeDirectory({
                 All
               </button>
             </div>
-            <div className="h-4 w-px bg-border" />
+            <div className="hidden h-4 w-px bg-border sm:block" />
             <div className="flex items-center gap-1">
               <span className="text-xs font-semibold text-muted-foreground">Type:</span>
               {(['all', 'full_time', 'part_time', 'prn'] as const).map((value) => (
@@ -756,13 +763,14 @@ export function EmployeeDirectory({
                 </button>
               ))}
             </div>
-            <div className="h-4 w-px bg-border" />
+            <div className="hidden h-4 w-px bg-border sm:block" />
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-1.5 text-xs font-medium">
                 <input
                   type="checkbox"
                   checked={leadOnly}
                   onChange={(event) => setLeadOnly(event.target.checked)}
+                  className="h-4 w-4 accent-[var(--primary)]"
                 />
                 Lead
               </label>
@@ -771,20 +779,26 @@ export function EmployeeDirectory({
                   type="checkbox"
                   checked={fmlaOnly}
                   onChange={(event) => setFmlaOnly(event.target.checked)}
+                  className="h-4 w-4 accent-[var(--primary)]"
                 />
                 FMLA
               </label>
             </div>
           </div>
-          <Input
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            placeholder="Search name or email"
-            className="w-full"
-          />
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              placeholder="Search name or email"
+              className="w-full pl-9"
+            />
+          </div>
         </div>
 
-        <p className="text-xs text-muted-foreground">{sortedEmployees.length} employee(s)</p>
+        <p className="text-xs font-medium text-muted-foreground">
+          {sortedEmployees.length} employee(s)
+        </p>
 
         <div className="space-y-2 rounded-md border border-border bg-secondary/20 p-3">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -792,10 +806,14 @@ export function EmployeeDirectory({
               <button
                 type="button"
                 onClick={() => setCollapsedMissing((prev) => !prev)}
-                className="text-sm font-semibold text-foreground hover:text-muted-foreground"
+                className="inline-flex items-center gap-1 text-sm font-semibold text-foreground hover:text-muted-foreground"
               >
-                {collapsedMissing ? '▸' : '▾'} Missing availability (
-                {missingAvailabilityRows.length})
+                {collapsedMissing ? (
+                  <ChevronRight className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                )}
+                Missing availability ({missingAvailabilityRows.length})
               </button>
               {collapsedMissing && (
                 <span className="text-xs text-muted-foreground">
@@ -845,12 +863,18 @@ export function EmployeeDirectory({
                     </TableRow>
                   ) : (
                     missingAvailabilityRows.map((row) => (
-                      <TableRow key={`missing-${row.therapistId}`}>
+                      <TableRow
+                        key={`missing-${row.therapistId}`}
+                        className="hover:bg-secondary/20"
+                      >
                         <TableCell className="font-medium">{row.therapistName}</TableCell>
                         <TableCell>{row.overridesCount}</TableCell>
                         <TableCell>{formatDateTime(row.lastUpdatedAt)}</TableCell>
                         <TableCell>
-                          <Badge variant={row.submitted ? 'outline' : 'destructive'}>
+                          <Badge
+                            variant={row.submitted ? 'outline' : 'destructive'}
+                            className="whitespace-nowrap"
+                          >
                             {row.submitted ? 'Submitted' : 'Not submitted'}
                           </Badge>
                         </TableCell>
@@ -1037,7 +1061,7 @@ export function EmployeeDirectory({
             sortedEmployees.map((employee) => (
               <div
                 key={employee.id}
-                className="rounded-md border border-border p-3"
+                className="rounded-md border border-border p-3 transition-colors hover:bg-secondary/15"
                 onClick={() => openEditForEmployee(employee.id)}
               >
                 <div className="flex items-start justify-between gap-2">
