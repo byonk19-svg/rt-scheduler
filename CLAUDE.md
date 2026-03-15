@@ -1,13 +1,26 @@
 ﻿# Teamwise Scheduler
 
-Updated: 2026-03-10
+Updated: 2026-03-14
 
 ## What This App Is
 
 Teamwise is a respiratory therapy scheduling app replacing paper workflows.
 Core domains: coverage planning, cycles, availability requests, shift board, approvals, publish flow, directory.
 
-## Latest Updates (2026-03-10)
+## Latest Updates (2026-03-14)
+
+- `/coverage` now uses the Lovable interaction model:
+  - clicking a day opens a centered edit dialog
+  - clicking an assigned therapist opens an inline status popover
+  - legacy `ShiftDrawer` was removed
+- Coverage status UI was normalized so `call_in` stays distinct from `cancelled`.
+- Added coverage-specific UI helpers and tests:
+  - `src/lib/coverage/status-ui.ts`
+  - `src/lib/coverage/status-ui.test.ts`
+  - updated `e2e/coverage-overlay.spec.ts`
+- Important handoff: the interaction model is correct, but the visual shell is still not matching the Lovable reference closely enough.
+  - Do **not** keep doing tiny font/spacing tweaks in place.
+  - Next pass should be a direct visual rebuild of the `/coverage` shell and day-card composition against the Lovable screenshot/reference.
 
 - Lovable UI is now the baseline visual direction across manager-facing scheduling routes.
 - `/coverage` is the canonical manager scheduling workspace and was restyled to match the new design.
@@ -80,7 +93,7 @@ E2E specs:
 - `/pending-setup` post-signup onboarding gate
 - `/dashboard` role redirect
 - `/dashboard/manager`, `/dashboard/staff`
-- `/coverage` dedicated coverage UI (client page, full-width calendar + slide-over panel)
+- `/coverage` dedicated coverage UI (client page, full-width calendar + dialog/popover editing model)
 - `/schedule` role-aware redirect entrypoint (manager -> `/coverage`, staff -> `/therapist/schedule`)
 - `/approvals`
 - `/availability`
@@ -166,14 +179,15 @@ Assignment status is informational only (does not affect coverage counts or publ
 
 `/coverage` (`src/app/coverage/page.tsx` + `src/components/coverage/`):
 
-- Full-width 7-column day calendar; fixed right slide-over panel (`z-50`)
-- Click backdrop (`z-40`) or close button to dismiss; click same day again toggles panel closed
-- Day/Night shift tabs; accordion therapist rows in panel
+- Full-width 7-column day calendar; centered shift editor dialog + inline status popovers
+- Clicking a day opens the editor dialog
+- Clicking an assigned therapist opens the status popover without opening the editor
+- Day/Night shift tabs; therapist assignment rows live in the dialog
 - Optimistic status updates with rollback on save failure
-- Assignment picker: Staff/Lead pill toggle; Lead filters to eligible therapists only
-- Workload shown per therapist: `Â· N this wk, M this cyc` (zero extra network requests)
-- Calendar chips reflect assignment status: `OC` (on call), `LE` (leave early), `X` (cancelled)
-- PRN not offered for date is disabled in picker with tooltip; override-enabled PRN labeled `Offered`
+- Lead/staff assignment actions still use current Teamwise mutations and rules
+- Coverage E2E now validates dialog/popover workflow instead of the removed drawer
+
+**Current coverage UI note:** business logic and interactions are aligned, but visual fidelity to the Lovable reference is still incomplete. The next agent should rebuild the top shell and card geometry directly from the reference instead of continuing incremental density adjustments.
 
 ## Schedule UX
 
