@@ -71,4 +71,35 @@ describe('updateCoverageAssignmentStatus', () => {
     expect(showError).toHaveBeenCalledWith('Could not save status update. Changes were rolled back.')
     expect(logError).toHaveBeenCalledWith('Failed to persist coverage status change:', dbError)
   })
+
+  it('persists call_in as call_in plus called_off', async () => {
+    type TestState = { status: 'active' | 'call_in' }
+    let state: TestState = { status: 'active' }
+
+    const persistAssignmentStatus = vi.fn().mockResolvedValue({ error: null })
+    const setState = vi.fn((updater: (current: TestState) => TestState) => {
+      state = updater(state)
+    })
+    const clearError = vi.fn()
+    const showError = vi.fn()
+
+    const updated = await updateCoverageAssignmentStatus({
+      shiftId: 'shift-3',
+      nextStatus: 'call_in',
+      setState,
+      persistAssignmentStatus,
+      applyOptimisticUpdate: (current): TestState => ({ ...current, status: 'call_in' }),
+      rollbackOptimisticUpdate: (current): TestState => ({ ...current, status: 'active' }),
+      clearError,
+      showError,
+    })
+
+    expect(updated).toBe(true)
+    expect(state).toEqual({ status: 'call_in' })
+    expect(persistAssignmentStatus).toHaveBeenCalledWith('shift-3', {
+      assignment_status: 'call_in',
+      status: 'called_off',
+    })
+    expect(showError).not.toHaveBeenCalled()
+  })
 })

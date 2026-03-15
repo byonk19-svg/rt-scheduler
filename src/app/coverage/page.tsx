@@ -3,7 +3,11 @@
 import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Printer, Send, Sparkles } from 'lucide-react'
+import { AlertTriangle, Printer, Send, Sparkles } from 'lucide-react'
+
+import { Button } from '@/components/ui/button'
+import { StatusBadge } from '@/components/ui/status-badge'
+import { cn } from '@/lib/utils'
 
 import {
   generateDraftScheduleAction,
@@ -11,11 +15,9 @@ import {
   toggleCyclePublishedAction,
 } from '@/app/schedule/actions'
 import { CalendarGrid } from '@/components/coverage/CalendarGrid'
-import { ShiftDrawer } from '@/components/coverage/ShiftDrawer'
+import { ShiftEditorDialog } from '@/components/coverage/ShiftEditorDialog'
 import { PrintSchedule } from '@/components/print-schedule'
-import {
-  updateCoverageAssignmentStatus,
-} from '@/lib/coverage/updateAssignmentStatus'
+import { updateCoverageAssignmentStatus } from '@/lib/coverage/updateAssignmentStatus'
 import {
   assignCoverageShift,
   persistCoverageShiftStatus,
@@ -23,7 +25,6 @@ import {
 } from '@/lib/coverage/mutations'
 import {
   buildDayItems,
-  flatten,
   toUiStatus,
   type BuildDayRowInput,
   type DayItem,
@@ -31,6 +32,7 @@ import {
   type ShiftTab,
   type UiStatus,
 } from '@/lib/coverage/selectors'
+import { getCoverageStatusLabel } from '@/lib/coverage/status-ui'
 import { addDays, dateRange, formatDateLabel, toIsoDate } from '@/lib/calendar-utils'
 import { getOne, getScheduleFeedback, getWeekBoundsForDate } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/client'
@@ -70,12 +72,6 @@ type ShiftRow = {
 }
 type AssignedShiftRow = Omit<ShiftRow, 'user_id'> & { user_id: string }
 
-const SHIFT_STATUS_LABELS: Record<UiStatus, string> = {
-  active: 'Active',
-  oncall: 'On Call',
-  leave_early: 'Leave Early',
-  cancelled: 'Cancelled',
-}
 const NO_ELIGIBLE_CONSTRAINT_REASON = 'no_eligible_candidates_due_to_constraints'
 
 function timestamp(): string {
@@ -102,15 +98,10 @@ function CoveragePageContent() {
   const [printUsers, setPrintUsers] = useState<PrintTherapist[]>([])
   const [printShiftByUserDate, setPrintShiftByUserDate] = useState<Record<string, ShiftStatus>>({})
   const [allTherapists, setAllTherapists] = useState<TherapistOption[]>([])
-  const [availableTherapists, setAvailableTherapists] = useState<TherapistOption[]>([])
-  const [assignUserId, setAssignUserId] = useState('')
   const [assigning, setAssigning] = useState(false)
-  const [assigned, setAssigned] = useState(false)
   const [unassigningShiftId, setUnassigningShiftId] = useState<string | null>(null)
-  const [assignRole, setAssignRole] = useState<'lead' | 'staff'>('staff')
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [expandedShiftId, setExpandedShiftId] = useState<string | null>(null)
   const [error, setError] = useState<string>('')
   const [assignError, setAssignError] = useState<string>('')
   const days = shiftTab === 'Day' ? dayDays : nightDays
@@ -149,6 +140,11 @@ function CoveragePageContent() {
     if (!autoParam && !draftParam) return null
     return getScheduleFeedback(scheduleFeedbackParams)
   }, [autoParam, draftParam, scheduleFeedbackParams])
+  const issueCount = useMemo(
+    () => days.filter((d) => d.dayStatus === 'missing_lead').length,
+    [days]
+  )
+
   const weekRosterHref = activeCycleId
     ? `/coverage?cycle=${activeCycleId}&view=week`
     : '/coverage?view=week'
@@ -388,23 +384,6 @@ function CoveragePageContent() {
     }
   }, [shiftTab, supabase])
 
-  // Filter cached list by already-assigned users whenever the selected day changes.
-  useEffect(() => {
-    const selectedDay = days.find((row) => row.id === selectedId) ?? null
-    if (!selectedDay) {
-      setAvailableTherapists([])
-      setAssignUserId('')
-      return
-    }
-    const assignedUserIds = new Set(flatten(selectedDay).map((shift) => shift.userId))
-    const options = allTherapists.filter((therapist) => !assignedUserIds.has(therapist.id))
-    setAvailableTherapists(options)
-    setAssignUserId((current) => {
-      if (current && options.some((therapist) => therapist.id === current)) return current
-      return options[0]?.id ?? ''
-    })
-  }, [days, selectedId, allTherapists])
-
   const selectedDayBase = useMemo(
     () => days.find((row) => row.id === selectedId) ?? null,
     [days, selectedId]
@@ -432,117 +411,95 @@ function CoveragePageContent() {
     return counts
   }, [selectedId, dayDays, nightDays])
 
-  // Compute total shifts per therapist across the entire loaded cycle.
-  // Combined with weeklyTherapistCounts this gives managers a full load picture.
-  const cycleTherapistCounts = useMemo((): Map<string, number> => {
-    const counts = new Map<string, number>()
-    for (const item of [...dayDays, ...nightDays]) {
-      const shifts = [...(item.leadShift ? [item.leadShift] : []), ...item.staffShifts]
-      for (const shift of shifts) {
-        counts.set(shift.userId, (counts.get(shift.userId) ?? 0) + 1)
-      }
-    }
-    return counts
-  }, [dayDays, nightDays])
 
   const handleTabSwitch = (tab: ShiftTab) => {
     setShiftTab(tab)
-    setExpandedShiftId(null)
     setSelectedId(null)
-    setAssignRole('staff')
     setAssignError('')
   }
 
   const handleSelect = (id: string) => {
-    setExpandedShiftId(null)
-    setSelectedId((prev) => (prev === id ? null : id))
-    setAssignRole('staff')
+    window.requestAnimationFrame(() => {
+      setSelectedId((prev) => (prev === id ? null : id))
+    })
     setAssignError('')
   }
   const handleClose = () => {
-    setExpandedShiftId(null)
     setSelectedId(null)
-    setAvailableTherapists([])
-    setAssignUserId('')
-    setAssigned(false)
     setAssigning(false)
-    setAssignRole('staff')
     setAssignError('')
   }
 
-  const handleAssign = useCallback(async () => {
-    if (!selectedDay || !assignUserId || !activeCycleId) return
+  const handleAssignTherapist = useCallback(
+    async (userId: string, role: 'lead' | 'staff') => {
+      if (!selectedDay || !userId || !activeCycleId) return
 
-    setAssigning(true)
-    setError('')
-    setAssigned(false)
+      setAssigning(true)
+      setError('')
 
-    const selectedTherapist =
-      availableTherapists.find((therapist) => therapist.id === assignUserId) ?? null
-    const shiftType = selectedDay.shiftType === 'Day' ? 'day' : 'night'
+      const selectedTherapist = allTherapists.find((t) => t.id === userId) ?? null
+      const shiftType = selectedDay.shiftType === 'Day' ? 'day' : 'night'
 
-    const { data: inserted, error: insertError } = await assignCoverageShift(supabase, {
-      cycleId: activeCycleId,
-      userId: assignUserId,
-      isoDate: selectedDay.isoDate,
-      shiftType,
-      role: assignRole,
-    })
+      const { data: inserted, error: insertError } = await assignCoverageShift(supabase, {
+        cycleId: activeCycleId,
+        userId,
+        isoDate: selectedDay.isoDate,
+        shiftType,
+        role,
+      })
 
-    if (insertError || !inserted) {
-      console.error('Assign failed:', insertError)
-      if (insertError?.code === '23505') {
-        setAssignError(`${selectedTherapist?.full_name ?? 'This therapist'} is already assigned on this day.`)
-      } else {
-        setAssignError('Could not assign therapist. Please try again.')
+      if (insertError || !inserted) {
+        console.error('Assign failed:', insertError)
+        if (insertError?.code === '23505') {
+          setAssignError(`${selectedTherapist?.full_name ?? 'This therapist'} is already assigned on this day.`)
+        } else {
+          setAssignError('Could not assign therapist. Please try again.')
+        }
+        setAssigning(false)
+        return
       }
+
+      setAssignError('')
+      const insertedRow = inserted as {
+        id: string
+        user_id: string
+        status: ShiftStatus
+        assignment_status: AssignmentStatus | null
+      }
+      const name = selectedTherapist?.full_name ?? 'Unknown'
+      const nextShift: ShiftItem = {
+        id: insertedRow.id,
+        userId: insertedRow.user_id,
+        name,
+        status: toUiStatus(insertedRow.assignment_status, insertedRow.status),
+        log: [],
+      }
+
+      if (role === 'lead') {
+        setDays((current) =>
+          current.map((day) => {
+            if (day.id !== selectedDay.id) return day
+            return { ...day, leadShift: nextShift, dayStatus: 'published' as DayStatus }
+          })
+        )
+      } else {
+        setDays((current) =>
+          current.map((day) => {
+            if (day.id !== selectedDay.id) return day
+            return {
+              ...day,
+              staffShifts: [...day.staffShifts, nextShift].sort((a, b) =>
+                a.name.localeCompare(b.name)
+              ),
+            }
+          })
+        )
+      }
+
       setAssigning(false)
-      return
-    }
-
-    setAssignError('')
-    const insertedRow = inserted as {
-      id: string
-      user_id: string
-      status: ShiftStatus
-      assignment_status: AssignmentStatus | null
-    }
-    const name = selectedTherapist?.full_name ?? 'Unknown'
-    const nextShift: ShiftItem = {
-      id: insertedRow.id,
-      userId: insertedRow.user_id,
-      name,
-      status: toUiStatus(insertedRow.assignment_status, insertedRow.status),
-      log: [],
-    }
-
-    if (assignRole === 'lead') {
-      setDays((current) =>
-        current.map((day) => {
-          if (day.id !== selectedDay.id) return day
-          return { ...day, leadShift: nextShift, dayStatus: 'published' as DayStatus }
-        })
-      )
-    } else {
-      setDays((current) =>
-        current.map((day) => {
-          if (day.id !== selectedDay.id) return day
-          return {
-            ...day,
-            staffShifts: [...day.staffShifts, nextShift].sort((a, b) => a.name.localeCompare(b.name)),
-          }
-        })
-      )
-    }
-
-    setAvailableTherapists((current) =>
-      current.filter((therapist) => therapist.id !== insertedRow.user_id)
-    )
-    setAssignUserId('')
-    setAssigned(true)
-    setTimeout(() => setAssigned(false), 2000)
-    setAssigning(false)
-  }, [activeCycleId, assignRole, assignUserId, availableTherapists, selectedDay, setDays, supabase])
+    },
+    [activeCycleId, allTherapists, selectedDay, setDays, supabase]
+  )
 
   const handleChangeStatus = useCallback(
     async (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => {
@@ -564,8 +521,8 @@ function CoveragePageContent() {
 
       const previousStatus = targetShift.status
       const changeTime = timestamp()
-      const optimisticFromLabel = SHIFT_STATUS_LABELS[previousStatus]
-      const optimisticToLabel = SHIFT_STATUS_LABELS[nextStatus]
+      const optimisticFromLabel = getCoverageStatusLabel(previousStatus)
+      const optimisticToLabel = getCoverageStatusLabel(nextStatus)
 
       const applyShiftStatus = (
         shift: ShiftItem | null,
@@ -648,7 +605,6 @@ function CoveragePageContent() {
       const previousDays = days
       setError('')
       setUnassigningShiftId(shiftId)
-      setExpandedShiftId((current) => (current === shiftId ? null : current))
 
       setDays((current) =>
         current.map((day) => {
@@ -680,35 +636,42 @@ function CoveragePageContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="no-print border-b border-border bg-card px-6 pb-5 pt-6">
+      <div className="no-print border-b border-border bg-card px-6 pb-5 pt-6 lg:px-9 lg:pb-6 lg:pt-7">
+        {/* Title row */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="font-heading text-4xl font-bold tracking-tight text-foreground">Coverage</h1>
-            <p className="mt-1 text-base text-muted-foreground">{cycleSummaryLabel}</p>
+            <h1 className="font-heading text-[2.1rem] font-bold tracking-[-0.04em] text-foreground">
+              Coverage
+            </h1>
+            <p className="mt-1 text-[1.08rem] text-muted-foreground">{cycleSummaryLabel}</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
+              className="h-12 rounded-2xl px-5 text-[1.05rem] font-medium"
               onClick={() => window.print()}
-              className="inline-flex items-center gap-1.5 rounded-2xl border border-border bg-card px-5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
             >
-              <Printer className="h-3.5 w-3.5" />
+              <Printer className="h-4 w-4" />
               Print
-            </button>
+            </Button>
             <form action={generateDraftScheduleAction}>
               <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
               <input type="hidden" name="view" value="week" />
               <input type="hidden" name="show_unavailable" value="false" />
               <input type="hidden" name="return_to" value="coverage" />
-              <button
+              <Button
                 type="submit"
+                variant="outline"
+                size="sm"
+                className="h-12 rounded-2xl px-5 text-[1.05rem] font-medium"
                 disabled={!activeCycleId || activeCyclePublished}
-                className="inline-flex items-center gap-1.5 rounded-2xl border border-border bg-card px-5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
               >
-                <Sparkles className="h-3.5 w-3.5" />
+                <Sparkles className="h-4 w-4" />
                 Auto-draft
-              </button>
+              </Button>
             </form>
             <form action={resetDraftScheduleAction}>
               <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
@@ -718,7 +681,7 @@ function CoveragePageContent() {
               <button
                 type="submit"
                 disabled={!activeCycleId || activeCyclePublished}
-                className="rounded-2xl border border-[var(--error-border)] bg-[var(--error-subtle)] px-5 py-2.5 text-sm font-semibold text-[var(--error-text)] transition-opacity hover:opacity-80 disabled:opacity-50"
+                className="inline-flex h-12 items-center gap-1.5 rounded-2xl border border-[var(--error-border)] bg-[var(--error-subtle)] px-5 text-[1.05rem] font-medium text-[var(--error-text)] transition-opacity hover:opacity-80 disabled:opacity-50"
               >
                 Clear draft
               </button>
@@ -735,36 +698,72 @@ function CoveragePageContent() {
               <input type="hidden" name="override_weekly_rules" value="false" />
               <input type="hidden" name="override_shift_rules" value="false" />
               <input type="hidden" name="return_to" value="coverage" />
-              <button
+              <Button
                 type="submit"
+                size="sm"
+                className="h-12 rounded-2xl px-5 text-[1.05rem] font-medium"
                 disabled={!activeCycleId || activeCyclePublished}
-                className="inline-flex items-center gap-1.5 rounded-2xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
               >
-                <Send className="h-3.5 w-3.5" />
+                <Send className="h-4 w-4" />
                 {activeCyclePublished ? 'Published' : 'Publish'}
-              </button>
+              </Button>
             </form>
           </div>
         </div>
+
+        {/* Controls row: Day/Night tabs + issue count + published badge */}
+        <div className="mt-5 flex flex-wrap items-center gap-4">
+          <div className="inline-flex overflow-hidden rounded-2xl border border-border">
+            {(['Day', 'Night'] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => handleTabSwitch(tab)}
+                data-testid={`coverage-shift-tab-${tab.toLowerCase()}`}
+                className={cn(
+                  'px-6 py-3 text-[1.05rem] font-medium transition-colors',
+                  shiftTab === tab
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-card text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {tab} Shift
+              </button>
+            ))}
+          </div>
+
+          {!loading && issueCount > 0 && (
+            <span className="inline-flex items-center gap-1.5 rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-4 py-2 text-[1.02rem] font-medium text-[var(--warning-text)]">
+              <AlertTriangle className="h-4 w-4" />
+              {issueCount} {issueCount === 1 ? 'issue' : 'issues'}
+            </span>
+          )}
+
+          {activeCyclePublished && (
+            <StatusBadge variant="success" dot={false}>
+              Published
+            </StatusBadge>
+          )}
+        </div>
       </div>
 
-      <div className="no-print px-6 py-4">
+      <div className="no-print px-6 py-5 lg:px-9">
         {activeCyclePublished && (
-          <div className="mb-3 rounded-md border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-2">
-            <p className="text-xs font-semibold text-[var(--success-text)]">
+          <div className="mb-5 rounded-[24px] border border-[var(--success-border)] bg-[var(--success-subtle)] px-5 py-4">
+            <p className="text-[1.05rem] font-semibold text-[var(--success-text)]">
               This cycle is published and visible to employees.
             </p>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-3">
               <Link
                 href={weekRosterHref}
-                className="rounded-md border border-[var(--success-border)] bg-card px-3 py-1.5 text-xs font-semibold text-[var(--success-text)] hover:bg-[var(--success-subtle)] transition-colors"
+                className="rounded-2xl border border-[var(--success-border)] bg-card px-5 py-2.5 text-[1rem] font-semibold text-[var(--success-text)] transition-colors hover:bg-[var(--success-subtle)]"
               >
                 View published schedule
               </Link>
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="rounded-md border border-[var(--success-border)] bg-card px-3 py-1.5 text-xs font-semibold text-[var(--success-text)] hover:bg-[var(--success-subtle)] transition-colors"
+                className="rounded-2xl border border-[var(--success-border)] bg-card px-5 py-2.5 text-[1rem] font-semibold text-[var(--success-text)] transition-colors hover:bg-[var(--success-subtle)]"
               >
                 Print published schedule
               </button>
@@ -811,41 +810,24 @@ function CoveragePageContent() {
           days={days}
           loading={loading}
           selectedId={selectedId}
-          shiftTab={shiftTab}
-          onTabSwitch={handleTabSwitch}
           onSelect={handleSelect}
+          onChangeStatus={handleChangeStatus}
         />
       </div>
 
-      <ShiftDrawer
+      <ShiftEditorDialog
         open={Boolean(selectedDay)}
         selectedDay={selectedDay}
-        activeCycleId={activeCycleId}
-        shiftTab={shiftTab}
-        availableTherapists={availableTherapists}
-        assignUserId={assignUserId}
-        assignRole={assignRole}
+        therapists={allTherapists}
+        canEdit={Boolean(activeCycleId)}
         assigning={assigning}
-        assigned={assigned}
-        expandedShiftId={expandedShiftId}
         unassigningShiftId={unassigningShiftId}
         weeklyTherapistCounts={weeklyTherapistCounts}
-        cycleTherapistCounts={cycleTherapistCounts}
-        onClose={handleClose}
-        onAssignSubmit={handleAssign}
+        onOpenChange={(open) => {
+          if (!open) handleClose()
+        }}
+        onAssignTherapist={handleAssignTherapist}
         assignError={assignError}
-        onAssignUserIdChange={(value) => {
-          setAssignUserId(value)
-          setAssignError('')
-        }}
-        onAssignRoleChange={(role) => {
-          setAssignRole(role)
-          setAssignError('')
-        }}
-        onToggleExpanded={(shiftId) =>
-          setExpandedShiftId((previous) => (previous === shiftId ? null : shiftId))
-        }
-        onChangeStatus={handleChangeStatus}
         onUnassign={handleUnassign}
       />
       <PrintSchedule
@@ -868,4 +850,3 @@ export default function CoveragePage() {
     </Suspense>
   )
 }
-

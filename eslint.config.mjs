@@ -13,6 +13,7 @@ const eslintConfig = defineConfig([
     'build/**',
     'next-env.d.ts',
     '.tmp_lovable_import_*/**',
+    '.reference/**',
   ]),
 ])
 

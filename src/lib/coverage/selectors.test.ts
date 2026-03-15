@@ -118,6 +118,15 @@ describe('countActive', () => {
     })
     expect(countActive(day)).toBe(0)
   })
+
+  it('excludes call_in shifts from the active count', () => {
+    const day = makeDay({
+      leadShift: makeShift({ status: 'call_in' }),
+      staffShifts: [makeShift({ status: 'active' })],
+    })
+
+    expect(countActive(day)).toBe(1)
+  })
 })
 
 describe('shouldShowMonthTag', () => {
@@ -154,8 +163,8 @@ describe('toUiStatus', () => {
     expect(toUiStatus('left_early', 'scheduled')).toBe('leave_early')
   })
 
-  it('maps call_in assignment → cancelled', () => {
-    expect(toUiStatus('call_in', 'scheduled')).toBe('cancelled')
+  it('maps call_in assignment → call_in', () => {
+    expect(toUiStatus('call_in', 'scheduled')).toBe('call_in')
   })
 
   it('maps cancelled assignment → cancelled', () => {

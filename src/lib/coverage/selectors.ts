@@ -1,6 +1,9 @@
 import { dateRange } from '@/lib/calendar-utils'
 import type { AssignmentStatus, ShiftRole, ShiftStatus } from '@/lib/shift-types'
-import type { CoverageUiStatus } from '@/lib/coverage/updateAssignmentStatus'
+import {
+  toCoverageUiStatus,
+  type CoverageUiStatus,
+} from '@/lib/coverage/status-ui'
 
 export type UiStatus = CoverageUiStatus
 export type DayStatus = 'published' | 'draft' | 'override' | 'missing_lead'
@@ -110,13 +113,7 @@ export function buildDayItems(
  * Exported so callers can re-use the same mapping (e.g. optimistic updates).
  */
 export function toUiStatus(assignment: AssignmentStatus | null, status: ShiftStatus): UiStatus {
-  if (assignment === 'on_call') return 'oncall'
-  if (assignment === 'left_early') return 'leave_early'
-  if (assignment === 'call_in' || assignment === 'cancelled') return 'cancelled'
-  if (assignment === 'scheduled') return 'active'
-  if (status === 'on_call') return 'oncall'
-  if (status === 'sick' || status === 'called_off') return 'cancelled'
-  return 'active'
+  return toCoverageUiStatus(assignment, status)
 }
 
 export function flatten(day: DayItem): Array<ShiftItem & { isLead: boolean }> {
@@ -129,7 +126,7 @@ export function countBy(day: DayItem, status: UiStatus): number {
 }
 
 export function countActive(day: DayItem): number {
-  return flatten(day).filter((row) => row.status !== 'cancelled').length
+  return flatten(day).filter((row) => row.status !== 'cancelled' && row.status !== 'call_in').length
 }
 
 export function shouldShowMonthTag(index: number, isoDate: string): boolean {

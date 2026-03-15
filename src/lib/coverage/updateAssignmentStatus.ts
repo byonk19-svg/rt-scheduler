@@ -1,10 +1,11 @@
-import type { AssignmentStatus, ShiftStatus } from '@/app/schedule/types'
-
-export type CoverageUiStatus = 'active' | 'oncall' | 'leave_early' | 'cancelled'
+import {
+  toCoverageAssignmentPayload,
+  type CoverageUiStatus,
+} from '@/lib/coverage/status-ui'
 
 export type CoverageAssignmentPayload = {
-  assignment_status: AssignmentStatus
-  status: ShiftStatus
+  assignment_status: import('@/lib/shift-types').AssignmentStatus
+  status: import('@/lib/shift-types').ShiftStatus
 }
 
 export type PersistCoverageAssignmentStatus = (
@@ -27,19 +28,6 @@ type UpdateCoverageAssignmentStatusOptions<TState> = {
   failureMessage?: string
 }
 
-export function toAssignmentStatus(value: CoverageUiStatus): AssignmentStatus {
-  if (value === 'oncall') return 'on_call'
-  if (value === 'leave_early') return 'left_early'
-  if (value === 'cancelled') return 'cancelled'
-  return 'scheduled'
-}
-
-export function toShiftStatus(value: CoverageUiStatus): ShiftStatus {
-  if (value === 'oncall') return 'on_call'
-  if (value === 'cancelled') return 'called_off'
-  return 'scheduled'
-}
-
 export async function updateCoverageAssignmentStatus<TState>({
   shiftId,
   nextStatus,
@@ -55,10 +43,9 @@ export async function updateCoverageAssignmentStatus<TState>({
   clearError()
   setState(applyOptimisticUpdate)
 
-  const { error } = await persistAssignmentStatus(shiftId, {
-    assignment_status: toAssignmentStatus(nextStatus),
-    status: toShiftStatus(nextStatus),
-  })
+  const payload = toCoverageAssignmentPayload(nextStatus)
+
+  const { error } = await persistAssignmentStatus(shiftId, payload)
 
   if (!error) {
     return true
