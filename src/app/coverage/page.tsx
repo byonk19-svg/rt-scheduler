@@ -636,27 +636,27 @@ function CoveragePageContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="no-print border-b border-border bg-card px-6 pb-4 pt-5 lg:px-8 lg:pb-5 lg:pt-5.5">
+      <div className="no-print border-b border-border bg-card px-6 pb-3 pt-4 lg:px-8 lg:pb-4 lg:pt-4.5">
         {/* Title row */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="font-heading text-[1.52rem] font-bold tracking-[-0.04em] text-foreground lg:text-[1.65rem]">
+            <h1 className="font-heading text-[1.38rem] font-bold tracking-[-0.04em] text-foreground lg:text-[1.5rem]">
               Coverage
             </h1>
-            <p className="mt-1 max-w-3xl text-[0.9rem] leading-7 text-muted-foreground lg:text-[0.94rem] lg:leading-7">
+            <p className="mt-0.5 max-w-3xl text-[0.84rem] leading-6 text-muted-foreground lg:text-[0.88rem] lg:leading-6">
               {cycleSummaryLabel}
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="h-9 rounded-2xl px-4 text-[0.86rem] font-medium"
+              className="h-8.5 rounded-[18px] px-3.5 text-[0.8rem] font-medium"
               onClick={() => window.print()}
             >
-              <Printer className="h-3.25 w-3.25" />
+              <Printer className="h-3 w-3" />
               Print
             </Button>
             <form action={generateDraftScheduleAction}>
@@ -668,10 +668,10 @@ function CoveragePageContent() {
                 type="submit"
                 variant="outline"
                 size="sm"
-                className="h-9 rounded-2xl px-4 text-[0.86rem] font-medium"
+                className="h-8.5 rounded-[18px] px-3.5 text-[0.8rem] font-medium"
                 disabled={!activeCycleId || activeCyclePublished}
               >
-                <Sparkles className="h-3.25 w-3.25" />
+                <Sparkles className="h-3 w-3" />
                 Auto-draft
               </Button>
             </form>
@@ -683,7 +683,7 @@ function CoveragePageContent() {
               <button
                 type="submit"
                 disabled={!activeCycleId || activeCyclePublished}
-                className="inline-flex h-9 items-center gap-1.5 rounded-2xl border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 text-[0.86rem] font-medium text-[var(--error-text)] transition-opacity hover:opacity-80 disabled:opacity-50"
+                className="inline-flex h-8.5 items-center gap-1.5 rounded-[18px] border border-[var(--error-border)] bg-[var(--error-subtle)] px-3.5 text-[0.8rem] font-medium text-[var(--error-text)] transition-opacity hover:opacity-80 disabled:opacity-50"
               >
                 Clear draft
               </button>
@@ -703,10 +703,10 @@ function CoveragePageContent() {
               <Button
                 type="submit"
                 size="sm"
-                className="h-9 rounded-2xl px-4 text-[0.86rem] font-medium"
+                className="h-8.5 rounded-[18px] px-3.5 text-[0.8rem] font-medium"
                 disabled={!activeCycleId || activeCyclePublished}
               >
-                <Send className="h-3.25 w-3.25" />
+                <Send className="h-3 w-3" />
                 {activeCyclePublished ? 'Published' : 'Publish'}
               </Button>
             </form>
@@ -714,8 +714,8 @@ function CoveragePageContent() {
         </div>
 
         {/* Controls row: Day/Night tabs + issue count + published badge */}
-        <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
-          <div className="inline-flex overflow-hidden rounded-2xl border border-border">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="inline-flex overflow-hidden rounded-[18px] border border-border">
             {(['Day', 'Night'] as const).map((tab) => (
               <button
                 key={tab}
@@ -723,7 +723,7 @@ function CoveragePageContent() {
                 onClick={() => handleTabSwitch(tab)}
                 data-testid={`coverage-shift-tab-${tab.toLowerCase()}`}
                 className={cn(
-                  'px-4.5 py-2 text-[0.88rem] font-medium transition-colors',
+                  'px-4 py-1.75 text-[0.8rem] font-medium transition-colors',
                   shiftTab === tab
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-card text-muted-foreground hover:text-foreground'
@@ -735,8 +735,8 @@ function CoveragePageContent() {
           </div>
 
           {!loading && issueCount > 0 && (
-            <span className="inline-flex items-center gap-1.5 rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-1.5 text-[0.84rem] font-medium text-[var(--warning-text)]">
-              <AlertTriangle className="h-3.25 w-3.25" />
+            <span className="inline-flex items-center gap-1.5 rounded-[18px] border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-1.25 text-[0.76rem] font-medium text-[var(--warning-text)]">
+              <AlertTriangle className="h-3 w-3" />
               {issueCount} {issueCount === 1 ? 'issue' : 'issues'}
             </span>
           )}
@@ -749,23 +749,23 @@ function CoveragePageContent() {
         </div>
       </div>
 
-      <div className="no-print px-6 py-4 lg:px-8">
+      <div className="no-print px-6 py-3.5 lg:px-8">
         {activeCyclePublished && (
-          <div className="mb-4 rounded-[24px] border border-[var(--success-border)] bg-[var(--success-subtle)] px-5 py-4">
-            <p className="text-[0.9rem] font-semibold text-[var(--success-text)]">
+          <div className="mb-3.5 rounded-[22px] border border-[var(--success-border)] bg-[var(--success-subtle)] px-4.5 py-3.5">
+            <p className="text-[0.82rem] font-semibold text-[var(--success-text)]">
               This cycle is published and visible to employees.
             </p>
-            <div className="mt-3 flex flex-wrap gap-3">
+            <div className="mt-2.5 flex flex-wrap gap-2.5">
               <Link
                 href={weekRosterHref}
-                className="rounded-2xl border border-[var(--success-border)] bg-card px-4 py-2 text-[0.84rem] font-semibold text-[var(--success-text)] transition-colors hover:bg-[var(--success-subtle)]"
+                className="rounded-[18px] border border-[var(--success-border)] bg-card px-3.5 py-1.75 text-[0.76rem] font-semibold text-[var(--success-text)] transition-colors hover:bg-[var(--success-subtle)]"
               >
                 View published schedule
               </Link>
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="rounded-2xl border border-[var(--success-border)] bg-card px-4 py-2 text-[0.84rem] font-semibold text-[var(--success-text)] transition-colors hover:bg-[var(--success-subtle)]"
+                className="rounded-[18px] border border-[var(--success-border)] bg-card px-3.5 py-1.75 text-[0.76rem] font-semibold text-[var(--success-text)] transition-colors hover:bg-[var(--success-subtle)]"
               >
                 Print published schedule
               </button>
