@@ -54,11 +54,11 @@ export function CalendarGrid({
   return (
     <div className="overflow-x-auto pb-2">
       <div className="min-w-[980px]">
-        <div className="mb-5 grid grid-cols-7 gap-4 border-y border-border/80 py-5">
+        <div className="mb-4 grid grid-cols-7 gap-4 border-y border-border/80 py-3.5">
           {DOW.map((day) => (
             <div
               key={day}
-              className="text-center text-[0.95rem] font-semibold tracking-[0.1em] text-muted-foreground"
+              className="text-center text-[0.74rem] font-semibold tracking-[0.1em] text-muted-foreground"
             >
               {day}
             </div>
@@ -72,9 +72,9 @@ export function CalendarGrid({
         ) : (
           <div className="space-y-6">
             {weeks.map((week, weekIndex) => (
-              <section key={`week-${weekIndex}`} className="space-y-3.5">
+              <section key={`week-${weekIndex}`} className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <p className="text-sm font-semibold uppercase tracking-[0.09em] text-muted-foreground">
+                  <p className="text-[0.74rem] font-semibold uppercase tracking-[0.09em] text-muted-foreground">
                     WEEK {weekIndex + 1}
                   </p>
                   <div className="h-px flex-1 bg-border/90" />
@@ -93,7 +93,7 @@ export function CalendarGrid({
                         key={day.id}
                         data-testid={`coverage-day-panel-${day.id}`}
                         className={cn(
-                          'relative min-h-[238px] rounded-[26px] border border-border/80 bg-card px-4 py-4 text-left shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-[border-color,box-shadow,transform] duration-200',
+                          'relative min-h-[208px] rounded-[26px] border border-border/80 bg-card px-4 py-3 text-left shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-[border-color,box-shadow,transform] duration-200',
                           'hover:-translate-y-px hover:border-primary/35 hover:shadow-[0_18px_36px_-28px_rgba(15,23,42,0.42)]',
                           selectedId === day.id &&
                             'border-primary/60 shadow-[0_0_0_1px_rgba(6,103,169,0.3),0_18px_36px_-30px_rgba(6,103,169,0.4)]'
@@ -111,18 +111,18 @@ export function CalendarGrid({
                         <div className="pointer-events-none relative z-10">
                         <div className="flex items-start justify-between gap-2">
                           <div className="inline-flex items-center gap-2">
-                            <span className="text-[2.2rem] font-bold leading-none tracking-[-0.04em] text-foreground">
+                            <span className="text-[1.65rem] font-bold leading-none tracking-[-0.04em] text-foreground">
                               {day.date}
                             </span>
                             {showMonthTag && (
-                              <span className="rounded-xl border border-border bg-muted px-2 py-1 text-[0.95rem] font-semibold text-muted-foreground">
+                              <span className="rounded-xl border border-border bg-muted px-2 py-1 text-[0.72rem] font-semibold text-muted-foreground">
                                 {formatMonthShort(day.isoDate)}
                               </span>
                             )}
                           </div>
                           <span
                             className={cn(
-                              'rounded-full px-3 py-1 text-[1.05rem] font-bold leading-none',
+                              'rounded-full px-3 py-1 text-[0.82rem] font-bold leading-none',
                               missingLead || day.constraintBlocked
                                 ? 'bg-[var(--error-subtle)] text-[var(--error-text)]'
                                 : 'bg-[var(--success-subtle)] text-[var(--success-text)]'
@@ -134,13 +134,13 @@ export function CalendarGrid({
 
                         <div
                           className={cn(
-                            'mt-3 rounded-[22px] border px-4 py-3.5',
+                            'mt-3 rounded-[22px] border px-3.5 py-2.5',
                             day.leadShift
                               ? 'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)]'
                               : 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
                           )}
                         >
-                          <p className="text-[0.78rem] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                          <p className="text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
                             LEAD
                           </p>
                           {day.leadShift ? (
@@ -155,7 +155,7 @@ export function CalendarGrid({
                             >
                               <span
                                 className={cn(
-                                  'mt-1 inline-flex items-center gap-2 text-[1.05rem] font-semibold leading-tight',
+                                  'mt-1 inline-flex items-center gap-2 text-[0.84rem] font-semibold leading-tight',
                                   isUnavailableStatus(day.leadShift.status) &&
                                     'line-through decoration-[var(--error-text)]/50'
                                 )}
@@ -165,19 +165,19 @@ export function CalendarGrid({
                               </span>
                             </AssignmentStatusPopover>
                           ) : (
-                            <p className="mt-1 text-[1.05rem] font-semibold leading-tight">No lead</p>
+                            <p className="mt-1 text-[0.84rem] font-semibold leading-tight">No lead</p>
                           )}
                         </div>
 
                         {day.constraintBlocked && (
-                          <div className="mt-3 rounded-[22px] border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 py-3 text-[1rem] leading-tight text-[var(--error-text)]">
+                          <div className="mt-3 rounded-[22px] border border-[var(--error-border)] bg-[var(--error-subtle)] px-3.5 py-2.5 text-[0.8rem] leading-tight text-[var(--error-text)]">
                             No eligible therapists (constraints)
                           </div>
                         )}
 
-                        <div className="mt-4 space-y-2.5">
+                        <div className="mt-3 space-y-1.5">
                           {day.staffShifts.map((shift) => (
-                            <div key={shift.id} className="flex items-center gap-2 text-[1rem]">
+                            <div key={shift.id} className="flex items-center gap-1.5 text-[0.82rem]">
                               <AssignmentStatusPopover
                                 therapistName={shift.name}
                                 currentStatus={shift.status}
@@ -188,7 +188,7 @@ export function CalendarGrid({
                               >
                                 <span
                                   className={cn(
-                                    'inline-flex items-center gap-2 text-[1rem] text-muted-foreground',
+                                    'inline-flex items-center gap-1.5 text-[0.82rem] text-muted-foreground',
                                     isUnavailableStatus(shift.status) &&
                                       'line-through decoration-[var(--error-text)]/50'
                                   )}
