@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Send,
   Users,
   Settings,
   X,
@@ -72,6 +73,12 @@ const MANAGER_NAV_ITEMS: readonly NavItem[] = [
     label: 'Team',
     icon: Users,
     isActive: (pathname) => pathname === '/team' || pathname === '/directory',
+  },
+  {
+    href: '/publish',
+    label: 'Publish History',
+    icon: Send,
+    isActive: (pathname) => pathname === '/publish' || pathname.startsWith('/publish/'),
   },
 ]
 
@@ -207,7 +214,7 @@ export function AppShell({ user, children }: AppShellProps) {
         <aside
           className={cn(
             'no-print hidden shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex',
-            canAccessManagerUi ? 'w-[20.5rem]' : 'w-64'
+            canAccessManagerUi ? 'w-60' : 'w-60'
           )}
         >
           <div className="flex items-center justify-between gap-2 px-4 py-5">
@@ -217,20 +224,7 @@ export function AppShell({ user, children }: AppShellProps) {
             >
               <Logo />
             </Link>
-            <div className="flex items-center gap-1.5">
-              <NotificationBell variant="shell" />
-              <form action="/auth/signout" method="post">
-                <Button
-                  type="submit"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  aria-label="Log out"
-                >
-                  <LogOut className="h-4 w-4" />
-                </Button>
-              </form>
-            </div>
+            <NotificationBell variant="shell" />
           </div>
 
           <nav className="flex-1 space-y-0.5 px-3 py-3" aria-label="Main navigation">
@@ -245,12 +239,12 @@ export function AppShell({ user, children }: AppShellProps) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'flex min-h-[48px] items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium',
+                    'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
                     navLinkClass(active)
                   )}
                   aria-current={active ? 'page' : undefined}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className="h-4 w-4" />
                   {item.label}
                 </Link>
               )
@@ -266,12 +260,12 @@ export function AppShell({ user, children }: AppShellProps) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'flex min-h-[44px] items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium',
+                    'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
                     navLinkClass(active)
                   )}
                   aria-current={active ? 'page' : undefined}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className="h-4 w-4" />
                   {item.label}
                 </Link>
               )

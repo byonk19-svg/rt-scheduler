@@ -4,7 +4,7 @@ import { AlertCircle } from 'lucide-react'
 
 import { EmployeeDirectory } from '@/components/EmployeeDirectory'
 import { FeedbackToast } from '@/components/feedback-toast'
-import { PageHeader } from '@/components/ui/page-header'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import {
@@ -945,26 +945,24 @@ export default async function TeamPage({
         <FeedbackToast message={feedback.message} variant={feedback.variant} />
       )}
 
-      <PageHeader
-        title="Team Directory"
-        subtitle="Manage staffing details for your team."
-        badge={
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold text-foreground">
-              {employees.length} total
-            </span>
-            <span className="inline-flex items-center rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold text-foreground">
-              {activeEmployeeCount} active
-            </span>
-            <span className="inline-flex items-center rounded-full border border-[var(--info-border)] bg-[var(--info-subtle)] px-2.5 py-1 text-[11px] font-semibold text-[var(--info-text)]">
-              {leadEligibleCount} lead eligible
-            </span>
-            <span className="inline-flex items-center rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2.5 py-1 text-[11px] font-semibold text-[var(--warning-text)]">
-              {onFmlaCount} on FMLA
-            </span>
+      <div className="border-b border-border bg-card px-6 pb-4 pt-5">
+        <div className="mb-3 flex items-start justify-between">
+          <div>
+            <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">
+              Team Directory
+            </h1>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Manage staffing details for your team.
+            </p>
           </div>
-        }
-      />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge variant="neutral">{employees.length} total</StatusBadge>
+          <StatusBadge variant="neutral">{activeEmployeeCount} active</StatusBadge>
+          <StatusBadge variant="info">{leadEligibleCount} lead eligible</StatusBadge>
+          <StatusBadge variant="warning">{onFmlaCount} on FMLA</StatusBadge>
+        </div>
+      </div>
 
       {feedback?.variant === 'error' && (
         <p className="inline-flex items-center gap-2 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm font-medium text-[var(--error-text)]">

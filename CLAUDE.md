@@ -1,6 +1,6 @@
 ﻿# Teamwise Scheduler
 
-Updated: 2026-03-14
+Updated: 2026-03-16
 
 ## What This App Is
 
@@ -115,7 +115,8 @@ Lead capability: `profiles.is_lead_eligible`. All permission checks go through `
 
 ## Key Shared Components
 
-- `src/components/ui/page-header.tsx` â€” `<PageHeader title subtitle badge? actions?>` used on every page
+- `src/components/ui/page-header.tsx` â€” `<PageHeader>` is DEPRECATED for new pages; only remaining on legacy pages not yet migrated
+- **Compact header pattern** (Coverage, Availability, Directory, Publish, Profile, Shift Board): `<div className=”border-b border-border bg-card px-6 pb-4 pt-5”>` + `<StatusBadge>` chips for metadata; import from `@/components/ui/status-badge`
 - `src/components/ui/skeleton.tsx` â€” `<Skeleton>`, `<SkeletonLine>`, `<SkeletonCard>`, `<SkeletonListItem>` loading states
 - `src/components/NotificationBell.tsx` â€” real-time bell with Supabase subscription; variants: `default` | `staff`
 - `src/components/AppShell.tsx` â€” nav shell; add routes to `MANAGER_NAV` / `STAFF_NAV` arrays
@@ -147,6 +148,12 @@ Typography classes:
 
 - `app-page-title` â€” page-level h1
 - `app-section-title` â€” card/section headers
+
+## Tooling Gotchas
+
+- **framer-motion `ease`:** `ease: 'easeOut'` fails `tsc` — the `Easing` type requires specific literals. Omit `ease` entirely to use framer-motion's safe default.
+- **Preview MCP on Windows:** `preview_start` server tracking doesn't persist between tool calls. Use `tabs_context_mcp` + Chrome browser MCP tools (`computer screenshot`, `navigate`) for visual verification instead.
+- **Responsive stat grids:** Always `grid-cols-2 lg:grid-cols-4` — never bare `grid-cols-4` which clips on narrower viewports.
 
 ## Scheduling Rules
 
@@ -186,8 +193,7 @@ Assignment status is informational only (does not affect coverage counts or publ
 - Optimistic status updates with rollback on save failure
 - Lead/staff assignment actions still use current Teamwise mutations and rules
 - Coverage E2E now validates dialog/popover workflow instead of the removed drawer
-
-**Current coverage UI note:** business logic and interactions are aligned, but visual fidelity to the Lovable reference is still incomplete. The next agent should rebuild the top shell and card geometry directly from the reference instead of continuing incremental density adjustments.
+- **Constraint warning gotcha:** `constraintBlockedSlotKeys` in `coverage/page.tsx` is built from unfilled shift rows (`user_id IS NULL`). After the loop, any slot key that also has an assigned therapist is deleted from the set — so "No eligible therapists (constraints)" only appears for truly empty slots; manually assigned therapists suppress it.
 
 ## Schedule UX
 
@@ -201,7 +207,7 @@ Assignment status is informational only (does not affect coverage counts or publ
 - User avatar: `var(--attention)` amber
 - Manager badge: `bg-[var(--warning-subtle)] text-[var(--warning-text)] border-[var(--warning-border)]`
 - App shell header `z-30`; coverage slide-over `z-50`
-- Manager nav order: Dashboard -> Schedule -> Availability -> Shift Swaps -> Team
+- Manager nav order: Dashboard -> Schedule -> Availability -> Shift Swaps -> Team -> Publish History
 
 ## Assignment Status
 
@@ -271,5 +277,7 @@ Core tables:
 
 ## Next High-Value Priorities
 
-1. **Publish flow production rollout** â€” verify domain in Resend, set `PUBLISH_EMAIL_FROM` to verified sender, run `vercel --prod`
-2. **Worker automation** â€” wire cron/webhook to `POST /api/publish/process` with signed headers using `PUBLISH_WORKER_KEY` + `PUBLISH_WORKER_SIGNING_KEY`
+1. **Publish flow production rollout** â€” verify domain in Resend, set `PUBLISH_EMAIL_FROM` to verified sender, deploy via `vercel --prod`
+2. **Worker automation** â€” create `/api/cron/process-publish` route handler; `vercel.json` cron schedule already exists; add `CRON_SECRET` env var; sign requests via `PUBLISH_WORKER_KEY` + `PUBLISH_WORKER_SIGNING_KEY`
+
+UI audit (2026-03-16) complete: all manager pages normalized to compact header pattern, dashboard grid responsive, Publish History added to nav, denial reason surfaced on Shift Board.

@@ -6,7 +6,7 @@ import { FeedbackToast } from '@/components/feedback-toast'
 import { FormSubmitButton } from '@/components/form-submit-button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { PageHeader } from '@/components/ui/page-header'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { can } from '@/lib/auth/can'
 import { toUiRole } from '@/lib/auth/roles'
 import { EMPLOYEE_META_BADGE_CLASS, LEAD_ELIGIBLE_BADGE_CLASS } from '@/lib/employee-tag-badges'
@@ -195,28 +195,26 @@ export default async function ProfilePage({
         <FeedbackToast message={feedback.message} variant={feedback.variant} />
       )}
 
-      <PageHeader
-        title="Profile"
-        subtitle="Your account details and role configuration."
-        badge={
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold capitalize text-foreground">
-              {role}
-            </span>
-            <span className="inline-flex items-center rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold capitalize text-foreground">
-              {shiftType} shift
-            </span>
-            <span className="inline-flex items-center rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold capitalize text-foreground">
-              {employmentType.replace('_', ' ')}
-            </span>
-            {isTherapist && (
-              <span className="inline-flex items-center rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold text-foreground">
-                Max {weeklyLimit}/week
-              </span>
-            )}
-          </div>
-        }
-      />
+      <div className="border-b border-border bg-card px-6 pb-4 pt-5">
+        <div className="mb-3">
+          <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">Profile</h1>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Your account details and role configuration.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge variant="neutral" className="capitalize">
+            {role}
+          </StatusBadge>
+          <StatusBadge variant="neutral" className="capitalize">
+            {shiftType} shift
+          </StatusBadge>
+          <StatusBadge variant="neutral" className="capitalize">
+            {employmentType.replace('_', ' ')}
+          </StatusBadge>
+          {isTherapist && <StatusBadge variant="neutral">Max {weeklyLimit}/week</StatusBadge>}
+        </div>
+      </div>
 
       {feedback?.variant === 'error' && (
         <p className="inline-flex items-center gap-2 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm font-medium text-[var(--error-text)]">

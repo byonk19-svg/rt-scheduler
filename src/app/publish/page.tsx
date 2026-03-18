@@ -5,7 +5,7 @@ import { ArrowRight, CalendarDays, CheckCircle2, CircleX, Clock3, Send } from 'l
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { Button } from '@/components/ui/button'
-import { PageHeader } from '@/components/ui/page-header'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { createClient } from '@/lib/supabase/server'
 
 type PublishEventRow = {
@@ -102,7 +102,12 @@ export default async function PublishHistoryPage() {
   if (eventsError) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Publish History" subtitle="Schedule email delivery log." />
+        <div className="border-b border-border bg-card px-6 pb-4 pt-5">
+          <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">
+            Publish History
+          </h1>
+          <p className="mt-0.5 text-xs text-muted-foreground">Schedule email delivery log.</p>
+        </div>
         <div
           className="rounded-xl border px-4 py-3 text-sm font-medium"
           style={{
@@ -124,34 +129,38 @@ export default async function PublishHistoryPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="Publish History"
-        subtitle="Track schedule email delivery for each publish event."
-        badge={
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold text-foreground">
-              <CheckCircle2 className="h-3.5 w-3.5 text-[var(--success-text)]" />
-              {successCount} successful
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold text-foreground">
-              <CircleX className="h-3.5 w-3.5 text-[var(--error-text)]" />
-              {failedCount} failed
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold text-foreground">
-              <Clock3 className="h-3.5 w-3.5 text-[var(--warning-text)]" />
-              {queuedCount} queued
-            </span>
+      <div className="border-b border-border bg-card px-6 pb-4 pt-5">
+        <div className="mb-3 flex items-start justify-between">
+          <div>
+            <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">
+              Publish History
+            </h1>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Track schedule email delivery for each publish event.
+            </p>
           </div>
-        }
-        actions={
-          <Button asChild variant="outline" size="sm">
-            <Link href="/coverage?view=week">
-              <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
+          <Button asChild variant="outline" size="sm" className="text-xs">
+            <Link href="/coverage">
+              <CalendarDays className="h-3.5 w-3.5" />
               Back to schedule
             </Link>
           </Button>
-        }
-      />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge variant="success">
+            <CheckCircle2 className="h-3 w-3" />
+            {successCount} successful
+          </StatusBadge>
+          <StatusBadge variant="error">
+            <CircleX className="h-3 w-3" />
+            {failedCount} failed
+          </StatusBadge>
+          <StatusBadge variant="warning">
+            <Clock3 className="h-3 w-3" />
+            {queuedCount} queued
+          </StatusBadge>
+        </div>
+      </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
         {events.length === 0 ? (

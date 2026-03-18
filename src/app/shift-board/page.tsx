@@ -83,6 +83,7 @@ type ShiftBoardRequest = {
   swapWithId: string | null
   shiftType: ShiftType | null
   shiftRole: ShiftRole | null
+  overrideReason: string | null
 }
 
 type MetricState = {
@@ -247,7 +248,9 @@ export default function ShiftBoardPage() {
         const todayKey = dateKeyFromDate(new Date())
         let postsQuery = supabase
           .from('shift_posts')
-          .select('id, shift_id, posted_by, claimed_by, message, type, status, created_at')
+          .select(
+            'id, shift_id, posted_by, claimed_by, message, type, status, created_at, override_reason'
+          )
           .order('created_at', { ascending: false })
 
         if (tab === 'open') {
@@ -397,6 +400,7 @@ export default function ShiftBoardPage() {
             swapWithId: row.claimed_by ?? null,
             shiftType: shift?.shift_type ?? null,
             shiftRole: shift?.role ?? null,
+            overrideReason: (row as { override_reason?: string | null }).override_reason ?? null,
           } satisfies ShiftBoardRequest
         })
 
@@ -585,65 +589,65 @@ export default function ShiftBoardPage() {
 
   return (
     <div className="space-y-6">
-      <section
-        className="fade-up overflow-hidden rounded-2xl border border-border bg-card shadow-[0_2px_18px_rgba(15,23,42,0.06)]"
-        style={{ animationDelay: '0.03s' }}
-        aria-label="Shift board overview"
-      >
-        <div className="flex flex-col gap-4 border-b border-border px-5 py-5 lg:flex-row lg:items-start lg:justify-between">
+      <div className="border-b border-border bg-card px-6 pb-4 pt-5">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Published Schedule Changes
-            </p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Shift Board</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">
+              Shift Board
+            </h1>
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {canReview
                 ? 'Review and approve swap and pickup requests in the live schedule.'
                 : 'Post swaps or pickups for the published schedule only.'}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => router.push('/requests/new')}>
-              <ArrowRightLeft className="mr-1.5 h-3.5 w-3.5" />
+            <Button
+              size="sm"
+              className="gap-1.5 text-xs"
+              onClick={() => router.push('/requests/new')}
+            >
+              <ArrowRightLeft className="h-3.5 w-3.5" />
               Post request
             </Button>
-            <Button asChild size="sm" variant="outline">
+            <Button asChild size="sm" variant="outline" className="text-xs">
               <Link href="/availability">Future availability</Link>
             </Button>
             {canReview && (
-              <Button asChild size="sm" variant="outline">
+              <Button asChild size="sm" variant="outline" className="text-xs">
                 <Link href="/coverage">Open coverage</Link>
               </Button>
             )}
           </div>
         </div>
-        <div className="grid grid-cols-1 gap-3 px-5 py-4 sm:grid-cols-2 xl:grid-cols-4">
-          <KpiTile
-            label="Open posts"
-            value={loading ? '--' : openPostCount}
-            detail="Pending swap or pickup requests"
-            icon={<Clock3 className="h-3.5 w-3.5" />}
-          />
-          <KpiTile
-            label="Pending approvals"
-            value={loading ? '--' : pending}
-            detail="Requests awaiting manager decision"
-            icon={<CalendarDays className="h-3.5 w-3.5" />}
-          />
-          <KpiTile
-            label="Approved / denied"
-            value={loading ? '--' : `${approvedCount}/${deniedCount}`}
-            detail="Resolution history in this view"
-            icon={<CheckCircle2 className="h-3.5 w-3.5" />}
-          />
-          <KpiTile
-            label="Coverage risk"
-            value={loading ? '--' : `${metrics.unfilled + metrics.missingLead}`}
-            detail={needsCoverageAttention ? 'Coverage needs attention' : 'Coverage stable'}
-            icon={<ShieldAlert className="h-3.5 w-3.5" />}
-          />
-        </div>
-      </section>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 px-6 lg:grid-cols-4">
+        <KpiTile
+          label="Open posts"
+          value={loading ? '--' : openPostCount}
+          detail="Pending swap or pickup requests"
+          icon={<Clock3 className="h-3.5 w-3.5" />}
+        />
+        <KpiTile
+          label="Pending approvals"
+          value={loading ? '--' : pending}
+          detail="Requests awaiting manager decision"
+          icon={<CalendarDays className="h-3.5 w-3.5" />}
+        />
+        <KpiTile
+          label="Approved / denied"
+          value={loading ? '--' : `${approvedCount}/${deniedCount}`}
+          detail="Resolution history in this view"
+          icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+        />
+        <KpiTile
+          label="Coverage risk"
+          value={loading ? '--' : `${metrics.unfilled + metrics.missingLead}`}
+          detail={needsCoverageAttention ? 'Coverage needs attention' : 'Coverage stable'}
+          icon={<ShieldAlert className="h-3.5 w-3.5" />}
+        />
+      </div>
 
       {error && (
         <div className="flex items-center gap-2 rounded-lg border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 py-3 text-sm font-medium text-[var(--error-text)]">
@@ -970,6 +974,11 @@ function RequestCard({
           {req.swapWithName && (
             <p className="mt-1 text-xs text-muted-foreground">
               Swap with: <span className="font-medium text-foreground">{req.swapWithName}</span>
+            </p>
+          )}
+          {req.status === 'denied' && req.overrideReason && (
+            <p className="mt-1.5 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-2.5 py-1.5 text-xs text-[var(--error-text)]">
+              Reason: {req.overrideReason}
             </p>
           )}
         </div>

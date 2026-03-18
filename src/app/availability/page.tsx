@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { can } from '@/lib/auth/can'
 import { toUiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
@@ -429,31 +430,28 @@ export default async function AvailabilityPage({
     <div className="space-y-6">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
-      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_2px_18px_rgba(15,23,42,0.06)]">
-        <div className="flex flex-col gap-4 border-b border-border px-5 py-5 lg:flex-row lg:items-start lg:justify-between">
+      <div className="border-b border-border bg-card px-6 pb-4 pt-5">
+        <div className="mb-3 flex items-start justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Availability Planning
-            </p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
-              {canManageAvailability ? 'Manager Availability Queue' : 'Future Availability'}
+            <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">
+              {canManageAvailability ? 'Availability Requests' : 'Future Availability'}
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {selectedCycle
-                ? `${selectedCycle.label} | ${selectedCycle.start_date} to ${selectedCycle.end_date}`
+                ? `${selectedCycle.label} · ${selectedCycle.start_date} to ${selectedCycle.end_date}`
                 : 'No upcoming cycle selected'}
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button asChild>
+          <div className="flex items-center gap-2">
+            <Button asChild size="sm" className="gap-1.5 text-xs">
               <a href="#submit-entry">
-                <Plus className="mr-1.5 h-4 w-4" />
+                <Plus className="h-3.5 w-3.5" />
                 Add availability
               </a>
             </Button>
-            <Button asChild variant="outline">
-              <Link href="/shift-board">Open shift board</Link>
+            <Button asChild variant="outline" size="sm" className="text-xs">
+              <Link href="/shift-board">Shift board</Link>
             </Button>
             <MoreActionsMenu>
               <a
@@ -468,54 +466,27 @@ export default async function AvailabilityPage({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 px-5 py-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-xl border border-border bg-muted/30 px-3.5 py-3">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Total requests</span>
-              <CalendarCheck2 className="h-3.5 w-3.5" />
-            </div>
-            <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">
-              {totalRequests}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">Entries in selected cycle</p>
-          </div>
-
-          <div className="rounded-xl border border-border bg-muted/30 px-3.5 py-3">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Need off</span>
-              <UserX className="h-3.5 w-3.5" />
-            </div>
-            <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">
-              {needOffRequests}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">Unavailable requests</p>
-          </div>
-
-          <div className="rounded-xl border border-border bg-muted/30 px-3.5 py-3">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Available to work</span>
-              <UserCheck className="h-3.5 w-3.5" />
-            </div>
-            <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">
-              {availableToWorkRequests}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">Extra availability offered</p>
-          </div>
-
-          <div className="rounded-xl border border-border bg-muted/30 px-3.5 py-3">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Team responses</span>
-              <Users className="h-3.5 w-3.5" />
-            </div>
-            <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">
-              {responseRatio ?? uniqueRequesters}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {responseRatio ? 'Responded staff / active staff' : 'Unique staff with requests'}
-            </p>
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge variant="info">
+            <CalendarCheck2 className="h-3 w-3" />
+            {totalRequests} total requests
+          </StatusBadge>
+          <StatusBadge variant="error">
+            <UserX className="h-3 w-3" />
+            {needOffRequests} need off
+          </StatusBadge>
+          <StatusBadge variant="success">
+            <UserCheck className="h-3 w-3" />
+            {availableToWorkRequests} available to work
+          </StatusBadge>
+          {responseRatio && (
+            <StatusBadge variant="neutral">
+              <Users className="h-3 w-3" />
+              {responseRatio} responded
+            </StatusBadge>
+          )}
         </div>
-      </section>
+      </div>
 
       {canManageAvailability ? (
         <>
