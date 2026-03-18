@@ -50,6 +50,7 @@ test-results/
 
 # local agent/tooling state
 .claude/
+.superpowers/
 .planning/
 security_best_practices_report.md
 .tmp_lovable_import_*/

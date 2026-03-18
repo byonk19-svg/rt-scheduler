@@ -3,6 +3,7 @@
 import { AlertCircle, Check, Clock } from 'lucide-react'
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { shiftEditorDialogLayout } from '@/components/coverage/shift-editor-dialog-layout'
 import { countActive, type DayItem, type ShiftTab } from '@/lib/coverage/selectors'
 import {
   getDefaultWeeklyLimitForEmploymentType,
@@ -90,20 +91,20 @@ function TherapistRow({
     <div
       data-testid={`coverage-therapist-row-${therapist.id}-${role}`}
       className={cn(
-        'flex items-center gap-3 rounded-[24px] border px-4 py-4 transition-colors',
+        shiftEditorDialogLayout.row,
         assignedInThisRole
           ? 'border-[var(--info-border)] bg-[var(--info-subtle)]/70'
           : 'border-border/90 bg-card',
         disabled && !assignedInThisRole && 'opacity-60'
       )}
     >
-      <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-extrabold text-muted-foreground">
+      <span className={shiftEditorDialogLayout.avatar}>
         {initials(therapist.full_name)}
       </span>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[1.05rem] font-semibold text-foreground">{therapist.full_name}</p>
-        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+        <p className={shiftEditorDialogLayout.name}>{therapist.full_name}</p>
+        <div className={shiftEditorDialogLayout.meta}>
           <span>{weekCount} shifts this week</span>
           {assignedElsewhere && (
             <>
@@ -122,7 +123,7 @@ function TherapistRow({
       </div>
 
       {role === 'lead' && (
-        <span className="rounded-md border border-[var(--info-border)] bg-[var(--info-subtle)] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--info-text)]">
+        <span className={shiftEditorDialogLayout.leadBadge}>
           Lead
         </span>
       )}
@@ -141,7 +142,7 @@ function TherapistRow({
             : `Assign ${therapist.full_name} as ${role}`
         }
         className={cn(
-          'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
+          shiftEditorDialogLayout.action,
           assignedInThisRole
             ? 'border-primary bg-primary text-primary-foreground'
             : 'border-border bg-background hover:border-primary/50',
@@ -201,44 +202,52 @@ export function ShiftEditorDialog({
           selectedDay ? `${selectedDay.label} ${selectedDay.shiftType} Shift` : 'Shift editor'
         }
         data-testid="coverage-shift-editor-dialog"
-        className="max-h-[calc(100vh-2rem)] overflow-y-auto px-0 pb-0 pt-0 sm:max-w-[640px]"
+        className={shiftEditorDialogLayout.dialogContent}
       >
         {selectedDay && (
           <>
-            <DialogHeader className="gap-1 border-b border-border px-6 pb-5 pt-6">
-              <DialogTitle className="font-heading text-[2rem] font-bold tracking-[-0.04em] text-foreground">
+            <DialogHeader className={shiftEditorDialogLayout.header}>
+              <DialogTitle className={shiftEditorDialogLayout.title}>
                 {selectedDay.label}
               </DialogTitle>
-              <p className="text-[1.1rem] text-foreground/80">{selectedDay.shiftType} Shift</p>
-              <p className="pt-2 text-[1.1rem] font-semibold text-[var(--success-text)]">
+              <p className={shiftEditorDialogLayout.shiftLabel}>{selectedDay.shiftType} Shift</p>
+              <p className={shiftEditorDialogLayout.activeSummary}>
                 OK {countActive(selectedDay)} active
               </p>
             </DialogHeader>
 
-            <div className="space-y-5 px-6 py-5">
+            <div className={shiftEditorDialogLayout.body}>
               {assignError && (
               <div
                 role="alert"
                 data-testid="coverage-assign-error"
-                className="rounded-xl border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm font-medium text-[var(--error-text)]"
+                className={cn(
+                  shiftEditorDialogLayout.alert,
+                  'border border-[var(--error-border)] bg-[var(--error-subtle)] font-medium text-[var(--error-text)]'
+                )}
               >
                 {assignError}
               </div>
               )}
 
               {!canEdit && (
-              <div className="rounded-xl border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-2 text-sm font-medium text-[var(--warning-text)]">
+              <div
+                className={cn(
+                  shiftEditorDialogLayout.alert,
+                  'border border-[var(--warning-border)] bg-[var(--warning-subtle)] font-medium text-[var(--warning-text)]'
+                )}
+              >
                 This view has no active schedule cycle, so assignments are read-only.
               </div>
               )}
 
-              <section className="space-y-3">
+              <section className={shiftEditorDialogLayout.section}>
                 <div className="flex items-center gap-2">
                   <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                   Lead Therapists
                   </h2>
                 </div>
-                <div className="space-y-2.5">
+                <div className={shiftEditorDialogLayout.rowList}>
                   {leadTherapists.map((therapist) => (
                     <TherapistRow
                       key={`lead-${therapist.id}`}
@@ -258,13 +267,13 @@ export function ShiftEditorDialog({
                 </div>
               </section>
 
-              <section className="space-y-3">
+              <section className={shiftEditorDialogLayout.section}>
                 <div className="flex items-center gap-2">
                   <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                   Staff Therapists
                   </h2>
                 </div>
-                <div className="space-y-2.5">
+                <div className={shiftEditorDialogLayout.rowList}>
                   {therapists.map((therapist) => (
                     <TherapistRow
                       key={`staff-${therapist.id}`}
@@ -285,7 +294,12 @@ export function ShiftEditorDialog({
               </section>
 
               {selectedDay.constraintBlocked && (
-                <div className="flex items-start gap-2 rounded-xl border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]">
+                <div
+                  className={cn(
+                    shiftEditorDialogLayout.alert,
+                    'flex items-start gap-2 border border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]'
+                  )}
+                >
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>No eligible therapists for this shift because of current constraints.</span>
                 </div>

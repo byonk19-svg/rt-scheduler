@@ -1,11 +1,45 @@
 ﻿# Teamwise Scheduler
 
-Updated: 2026-03-18 (session 3)
+Updated: 2026-03-18 (session 4)
 
 ## What This App Is
 
 Teamwise is a respiratory therapy scheduling app replacing paper workflows.
 Core domains: coverage planning, cycles, availability requests, shift board, approvals, publish flow, directory.
+
+## Latest Updates (2026-03-18)
+
+- **Coverage dialog compaction pass complete**:
+  - `src/components/coverage/ShiftEditorDialog.tsx` now uses extracted layout tokens from `src/components/coverage/shift-editor-dialog-layout.ts`
+  - The day editor dialog was tightened twice and currently sits at the approved "even compact" density:
+    - narrower modal (`sm:max-w-[540px]`)
+    - smaller header/title rhythm
+    - smaller therapist rows, avatars, lead badge, and assign toggles
+  - Guardrail: if the user asks to make it even smaller again, the next step starts trading away readability and tap comfort.
+  - Targeted regression test added: `src/components/coverage/shift-editor-dialog-layout.test.ts`
+
+- **`/team` now supports click-to-edit quick therapist updates**:
+  - Clicking a therapist card on `/team` opens a centered modal instead of bouncing to `/directory`
+  - Quick edit covers:
+    - name
+    - role
+    - shift type
+    - employment type
+    - lead eligible
+    - FMLA
+    - active
+  - New files:
+    - `src/app/team/actions.ts`
+    - `src/components/team/TeamDirectory.tsx`
+    - `src/lib/team-quick-edit.ts`
+    - `src/lib/team-quick-edit.test.ts`
+  - The old header CTA on `/team` was relabeled from `Edit directory` to `Full directory`
+  - The modal still links to the full directory for heavier edits, but availability is no longer referenced there because it lives on its own screen
+  - Behavioral note: if quick edit changes someone away from therapist, marks them inactive, or marks them on FMLA, future draft shifts are realigned the same way directory edits already do
+
+- **Windows build gotcha confirmed**:
+  - On this repo, `next build` can fail with `EPERM ... unlink .next/...` if a repo-local Next dev server is still running and holding `.next`
+  - Fix: stop the repo's `next dev` worker processes first, then rerun `npm run build`
 
 ## Latest Updates (2026-03-16)
 
@@ -188,6 +222,7 @@ Typography classes:
 - **framer-motion `ease`:** `ease: 'easeOut'` fails `tsc` — the `Easing` type requires specific literals. Omit `ease` entirely to use framer-motion's safe default.
 - **Preview MCP on Windows:** `preview_start` server tracking doesn't persist between tool calls. Use `tabs_context_mcp` + Chrome browser MCP tools (`computer screenshot`, `navigate`) for visual verification instead.
 - **Responsive stat grids:** Always `grid-cols-2 lg:grid-cols-4` — never bare `grid-cols-4` which clips on narrower viewports.
+- **Repo-local Next build lock on Windows:** if `npm run build` throws `EPERM` under `.next`, check for a running `next dev` process from this repo and stop it before rebuilding.
 - **Session end workflow:** update CLAUDE.md with learnings → `git add CLAUDE.md && git commit && git push`
 
 ## Scheduling Rules
@@ -228,7 +263,25 @@ Assignment status is informational only (does not affect coverage counts or publ
 - Optimistic status updates with rollback on save failure
 - Lead/staff assignment actions still use current Teamwise mutations and rules
 - Coverage E2E now validates dialog/popover workflow instead of the removed drawer
+- Dialog density is controlled centrally in `src/components/coverage/shift-editor-dialog-layout.ts`
 - **Constraint warning gotcha:** `constraintBlockedSlotKeys` in `coverage/page.tsx` is built from unfilled shift rows (`user_id IS NULL`). After the loop, any slot key that also has an assigned therapist is deleted from the set — so "No eligible therapists (constraints)" only appears for truly empty slots; manually assigned therapists suppress it.
+
+## Team UX
+
+`/team` is now a lightweight roster management surface, not just a link-out page.
+
+- Clicking a therapist card opens a quick-edit modal on the same page
+- Quick edit is meant for roster fields only:
+  - name
+  - role
+  - shift type
+  - employment type
+  - lead eligibility
+  - FMLA
+  - active/inactive
+- Heavy workflows still belong elsewhere:
+  - `/directory` for fuller employee management
+  - availability editing on its dedicated screen, not in the `/team` modal
 
 ## Schedule UX
 
