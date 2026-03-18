@@ -238,7 +238,7 @@ export default async function AvailabilityPage({
     const { count } = await supabase
       .from('profiles')
       .select('id', { count: 'exact', head: true })
-      .in('role', ['therapist', 'staff'])
+      .in('role', ['therapist', 'lead'])
       .eq('is_active', true)
     activeTeamCount = count ?? null
   }

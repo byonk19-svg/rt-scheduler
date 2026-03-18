@@ -249,7 +249,7 @@ export async function createCycleAction(formData: FormData) {
           .from('profiles')
           .select('id')
           .in('id', sourceTherapistIds)
-          .eq('role', 'therapist')
+          .in('role', ['therapist', 'lead'])
           .eq('is_active', true)
           .eq('on_fmla', false)
 
@@ -415,7 +415,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
       const { data: therapistsData, error: therapistsError } = await supabase
         .from('profiles')
         .select('id, max_work_days_per_week, employment_type')
-        .eq('role', 'therapist')
+        .in('role', ['therapist', 'lead'])
         .eq('is_active', true)
         .eq('on_fmla', false)
 
@@ -570,7 +570,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
     const { data: therapistProfiles, error: therapistProfilesError } = await supabase
       .from('profiles')
       .select('id, email, full_name')
-      .in('role', ['therapist', 'staff', 'lead'])
+      .in('role', ['therapist', 'lead'])
       .eq('is_active', true)
 
     if (therapistProfilesError) {
@@ -936,7 +936,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
     .select(
       'id, full_name, shift_type, is_lead_eligible, employment_type, max_work_days_per_week, on_fmla, fmla_return_date, is_active'
     )
-    .eq('role', 'therapist')
+    .in('role', ['therapist', 'lead'])
     .order('full_name', { ascending: true })
 
   if (therapistsError) {

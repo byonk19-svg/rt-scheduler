@@ -222,7 +222,7 @@ export default function ShiftBoardPage() {
       const { data } = await supabase
         .from('profiles')
         .select('id, full_name, is_lead_eligible')
-        .eq('role', 'therapist')
+        .in('role', ['therapist', 'lead'])
         .eq('is_active', true)
         .order('full_name')
       setTherapists((data ?? []) as ProfileLookupRow[])

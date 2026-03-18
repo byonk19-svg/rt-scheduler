@@ -1,4 +1,6 @@
-export const ROLE_VALUES = ['manager', 'therapist', 'staff', 'lead'] as const
+export const ROLE_VALUES = ['manager', 'therapist', 'lead'] as const
+export const TEAM_MEMBER_ROLE_VALUES = ['therapist', 'lead'] as const
+export const MANAGED_TEAM_ROLE_VALUES = ['manager', 'therapist', 'lead'] as const
 
 export type Role = (typeof ROLE_VALUES)[number]
 export type UiRole = 'manager' | 'therapist'

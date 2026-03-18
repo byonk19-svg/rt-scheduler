@@ -20,6 +20,7 @@ function isManagerRole(role: Role | null): boolean {
 
 export function can(roleInput: unknown, permission: Permission, context: CanContext = {}): boolean {
   const role = parseRole(roleInput)
+  void context
 
   if (
     permission === 'access_manager_ui' ||
@@ -34,9 +35,7 @@ export function can(roleInput: unknown, permission: Permission, context: CanCont
   }
 
   if (permission === 'update_assignment_status') {
-    if (isManagerRole(role) || role === 'lead') return true
-    if (role === 'therapist' || role === 'staff') return context.isLeadEligible === true
-    return false
+    return isManagerRole(role) || role === 'lead'
   }
 
   return false

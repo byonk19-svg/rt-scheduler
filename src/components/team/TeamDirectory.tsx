@@ -1,7 +1,6 @@
 'use client'
 
-import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Shield, User } from 'lucide-react'
 
 import { FormSubmitButton } from '@/components/form-submit-button'
@@ -16,17 +15,19 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { formatEmployeeDate } from '@/lib/employee-directory'
 import { cn } from '@/lib/utils'
 
 export type TeamProfileRecord = {
   id: string
   full_name: string | null
-  role: 'manager' | 'therapist' | 'staff' | null
+  role: 'manager' | 'therapist' | 'lead' | null
   shift_type: 'day' | 'night' | null
   employment_type: 'full_time' | 'part_time' | 'prn' | null
   is_lead_eligible: boolean | null
   is_active: boolean | null
   on_fmla: boolean | null
+  fmla_return_date: string | null
 }
 
 type TeamDirectoryProps = {
@@ -34,6 +35,8 @@ type TeamDirectoryProps = {
   initialEditProfileId?: string | null
   saveTeamQuickEditAction: (formData: FormData) => void | Promise<void>
 }
+
+type EditableRole = 'manager' | 'lead' | 'therapist'
 
 function initials(name: string | null): string {
   if (!name) return '??'
@@ -52,27 +55,41 @@ function employmentLabel(type: TeamProfileRecord['employment_type']): string {
 
 function roleLabel(role: TeamProfileRecord['role']): string {
   if (role === 'manager') return 'Manager'
-  if (role === 'staff') return 'Staff'
+  if (role === 'lead') return 'Lead'
   return 'Therapist'
 }
 
-function TherapistCard({ profile, onClick }: { profile: TeamProfileRecord; onClick: () => void }) {
-  const isLead = profile.is_lead_eligible === true
-  const emp = employmentLabel(profile.employment_type)
-  const shift = profile.shift_type === 'night' ? 'Night' : 'Day'
+function roleBadgeClass(role: TeamProfileRecord['role']): string {
+  if (role === 'manager') return 'bg-secondary text-secondary-foreground'
+  if (role === 'lead') return 'bg-primary/10 text-primary'
+  return 'bg-muted text-muted-foreground'
+}
+
+function shiftLabel(type: TeamProfileRecord['shift_type']): string {
+  return type === 'night' ? 'Night shift' : 'Day shift'
+}
+
+function TeamMemberCard({ profile, onClick }: { profile: TeamProfileRecord; onClick: () => void }) {
+  const isActive = profile.is_active !== false
+  const hasCoverageLead = profile.is_lead_eligible === true
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group flex w-full items-start gap-4 rounded-xl border border-border bg-card p-5 text-left shadow-[0_1px_3px_rgba(15,23,42,0.05)] transition-all hover:border-primary/20 hover:shadow-md"
+      className={cn(
+        'group flex w-full items-start gap-4 rounded-xl border border-border bg-card p-5 text-left shadow-[0_1px_3px_rgba(15,23,42,0.05)] transition-all hover:border-primary/20 hover:shadow-md',
+        !isActive && 'opacity-75'
+      )}
     >
       <div
         className={cn(
           'flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold',
-          isLead
+          profile.role === 'lead'
             ? 'border border-primary/20 bg-primary/10 text-primary'
-            : 'bg-muted text-muted-foreground'
+            : profile.role === 'manager'
+              ? 'bg-secondary text-secondary-foreground'
+              : 'bg-muted text-muted-foreground'
         )}
       >
         {initials(profile.full_name)}
@@ -86,25 +103,70 @@ function TherapistCard({ profile, onClick }: { profile: TeamProfileRecord; onCli
           <span
             className={cn(
               'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
-              isLead ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+              roleBadgeClass(profile.role)
             )}
           >
-            {isLead ? <Shield className="h-2.5 w-2.5" /> : <User className="h-2.5 w-2.5" />}
-            {isLead ? 'Lead' : roleLabel(profile.role)}
+            {profile.role === 'lead' ? (
+              <Shield className="h-2.5 w-2.5" />
+            ) : (
+              <User className="h-2.5 w-2.5" />
+            )}
+            {roleLabel(profile.role)}
           </span>
+          {hasCoverageLead && profile.role !== 'lead' && (
+            <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+              Coverage lead
+            </span>
+          )}
           {profile.on_fmla && (
             <span className="inline-flex items-center rounded-full bg-[var(--warning-subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--warning-text)]">
               FMLA
             </span>
           )}
+          {!isActive && (
+            <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              Inactive
+            </span>
+          )}
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{shift} shift</span>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          <span>{shiftLabel(profile.shift_type)}</span>
           <span className="h-1 w-1 rounded-full bg-border" />
-          <span>{emp}</span>
+          <span>{employmentLabel(profile.employment_type)}</span>
+          {profile.on_fmla && profile.fmla_return_date && (
+            <>
+              <span className="h-1 w-1 rounded-full bg-border" />
+              <span>Return {formatEmployeeDate(profile.fmla_return_date)}</span>
+            </>
+          )}
         </div>
       </div>
     </button>
+  )
+}
+
+function TeamSection({
+  title,
+  profiles,
+  onOpen,
+}: {
+  title: string
+  profiles: TeamProfileRecord[]
+  onOpen: (profileId: string) => void
+}) {
+  if (profiles.length === 0) return null
+
+  return (
+    <section className="mb-8 last:mb-0">
+      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {title}
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {profiles.map((profile) => (
+          <TeamMemberCard key={profile.id} profile={profile} onClick={() => onOpen(profile.id)} />
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -114,80 +176,61 @@ export function TeamDirectory({
   saveTeamQuickEditAction,
 }: TeamDirectoryProps) {
   const [editProfileId, setEditProfileId] = useState<string | null>(initialEditProfileId)
+  const [draftRole, setDraftRole] = useState<EditableRole>('therapist')
+  const [onFmla, setOnFmla] = useState(false)
 
   const activeProfiles = useMemo(
     () => profiles.filter((profile) => profile.is_active !== false),
     [profiles]
   )
-  const leads = useMemo(
-    () => activeProfiles.filter((profile) => profile.is_lead_eligible === true),
+  const inactiveProfiles = useMemo(
+    () => profiles.filter((profile) => profile.is_active === false),
+    [profiles]
+  )
+  const managers = useMemo(
+    () => activeProfiles.filter((profile) => profile.role === 'manager'),
     [activeProfiles]
   )
-  const staff = useMemo(
-    () => activeProfiles.filter((profile) => profile.is_lead_eligible !== true),
+  const leads = useMemo(
+    () => activeProfiles.filter((profile) => profile.role === 'lead'),
+    [activeProfiles]
+  )
+  const therapists = useMemo(
+    () => activeProfiles.filter((profile) => profile.role !== 'manager' && profile.role !== 'lead'),
     [activeProfiles]
   )
   const editProfile = useMemo(
     () => profiles.find((profile) => profile.id === editProfileId) ?? null,
     [profiles, editProfileId]
   )
+  const coverageLeadDisabled = draftRole === 'manager'
+
+  useEffect(() => {
+    if (!editProfile) return
+    setDraftRole((editProfile.role as EditableRole | null) ?? 'therapist')
+    setOnFmla(editProfile.on_fmla === true)
+  }, [editProfile])
 
   return (
     <>
-      {leads.length > 0 && (
-        <section className="mb-8">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Lead Therapists
-          </h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {leads.map((profile) => (
-              <TherapistCard
-                key={profile.id}
-                profile={profile}
-                onClick={() => setEditProfileId(profile.id)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
+      <TeamSection title="Managers" profiles={managers} onOpen={setEditProfileId} />
+      <TeamSection title="Leads" profiles={leads} onOpen={setEditProfileId} />
+      <TeamSection title="Therapists" profiles={therapists} onOpen={setEditProfileId} />
+      <TeamSection title="Inactive" profiles={inactiveProfiles} onOpen={setEditProfileId} />
 
-      {staff.length > 0 && (
-        <section>
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Staff Therapists
-          </h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {staff.map((profile) => (
-              <TherapistCard
-                key={profile.id}
-                profile={profile}
-                onClick={() => setEditProfileId(profile.id)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {activeProfiles.length === 0 && (
+      {profiles.length === 0 && (
         <div className="rounded-xl border border-border bg-card px-6 py-12 text-center">
-          <p className="text-sm text-muted-foreground">No active team members found.</p>
-          <Link
-            href="/directory"
-            className="mt-2 inline-block text-xs text-primary hover:underline"
-          >
-            Add team members in the directory
-          </Link>
+          <p className="text-sm text-muted-foreground">No team members found.</p>
         </div>
       )}
 
       <Dialog open={Boolean(editProfile)} onOpenChange={(open) => !open && setEditProfileId(null)}>
         {editProfile && (
-          <DialogContent className="sm:max-w-[520px]">
+          <DialogContent className="sm:max-w-[560px]">
             <DialogHeader>
-              <DialogTitle>Quick Edit Therapist</DialogTitle>
+              <DialogTitle>Quick Edit Team Member</DialogTitle>
               <DialogDescription>
-                Update the roster fields here. Use the full directory for contact info or scheduling
-                settings.
+                Update access, staffing, and leave details without leaving the team roster.
               </DialogDescription>
             </DialogHeader>
 
@@ -204,7 +247,7 @@ export function TeamDirectory({
                       {editProfile.full_name ?? 'Unknown'}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {editProfile.shift_type === 'night' ? 'Night' : 'Day'} shift ·{' '}
+                      {shiftLabel(editProfile.shift_type)} ·{' '}
                       {employmentLabel(editProfile.employment_type)}
                     </p>
                   </div>
@@ -227,11 +270,12 @@ export function TeamDirectory({
                   <select
                     id="role"
                     name="role"
-                    defaultValue={editProfile.role ?? 'therapist'}
+                    value={draftRole}
+                    onChange={(event) => setDraftRole(event.target.value as EditableRole)}
                     className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
                   >
                     <option value="therapist">Therapist</option>
-                    <option value="staff">Staff</option>
+                    <option value="lead">Lead</option>
                     <option value="manager">Manager</option>
                   </select>
                 </div>
@@ -262,17 +306,34 @@ export function TeamDirectory({
                     <option value="prn">PRN</option>
                   </select>
                 </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="fmla_return_date">FMLA Return Date</Label>
+                  <Input
+                    id="fmla_return_date"
+                    name="fmla_return_date"
+                    type="date"
+                    defaultValue={editProfile.fmla_return_date ?? ''}
+                    disabled={!onFmla}
+                  />
+                </div>
               </div>
 
               <div className="grid gap-2 sm:grid-cols-3">
-                <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
+                <label
+                  className={cn(
+                    'flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm',
+                    coverageLeadDisabled && 'bg-muted/50 text-muted-foreground'
+                  )}
+                >
                   <input
                     type="checkbox"
                     name="is_lead_eligible"
                     defaultChecked={editProfile.is_lead_eligible === true}
                     className="h-4 w-4"
+                    disabled={coverageLeadDisabled}
                   />
-                  Lead eligible
+                  Coverage lead
                 </label>
                 <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
                   <input
@@ -280,6 +341,7 @@ export function TeamDirectory({
                     name="on_fmla"
                     defaultChecked={editProfile.on_fmla === true}
                     className="h-4 w-4"
+                    onChange={(event) => setOnFmla(event.target.checked)}
                   />
                   On FMLA
                 </label>
@@ -294,21 +356,13 @@ export function TeamDirectory({
                 </label>
               </div>
 
-              <DialogFooter className="gap-2 sm:items-center sm:justify-between">
-                <Link
-                  href={`/directory?edit_profile=${editProfile.id}`}
-                  className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                >
-                  Open full directory
-                </Link>
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={() => setEditProfileId(null)}>
-                    Cancel
-                  </Button>
-                  <FormSubmitButton type="submit" pendingText="Saving...">
-                    Save changes
-                  </FormSubmitButton>
-                </div>
+              <DialogFooter className="gap-2">
+                <Button type="button" variant="outline" onClick={() => setEditProfileId(null)}>
+                  Cancel
+                </Button>
+                <FormSubmitButton type="submit" pendingText="Saving...">
+                  Save changes
+                </FormSubmitButton>
               </DialogFooter>
             </form>
           </DialogContent>

@@ -38,7 +38,7 @@ function normalizeRole(value: unknown): AppRole | null {
   const role = parseRole(value)
   if (!role) return null
   if (role === 'manager') return 'manager'
-  if (role === 'staff' || role === 'therapist' || role === 'lead') return 'staff'
+  if (role === 'therapist' || role === 'lead') return 'staff'
   return null
 }
 

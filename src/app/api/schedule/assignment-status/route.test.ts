@@ -10,7 +10,6 @@ vi.mock('@/lib/supabase/server', () => ({
 type Scenario = {
   userId?: string | null
   role?: string
-  isLeadEligible?: boolean
   rpcError?: { code?: string; message: string } | null
   rpcData?: Array<Record<string, unknown>>
 }
@@ -62,7 +61,6 @@ function makeSupabaseMock(scenario: Scenario) {
         return {
           data: {
             role: scenario.role ?? 'therapist',
-            is_lead_eligible: scenario.isLeadEligible ?? false,
           },
           error: null,
         }
@@ -103,8 +101,8 @@ describe('assignment status API', () => {
     expect(createClient).not.toHaveBeenCalled()
   })
 
-  it('allows a lead-equivalent therapist to update status', async () => {
-    const supabase = makeSupabaseMock({ role: 'therapist', isLeadEligible: true, userId: 'lead-1' })
+  it('allows a lead to update status', async () => {
+    const supabase = makeSupabaseMock({ role: 'lead', userId: 'lead-1' })
     vi.mocked(createClient).mockResolvedValue(
       supabase as unknown as Awaited<ReturnType<typeof createClient>>
     )
@@ -133,7 +131,6 @@ describe('assignment status API', () => {
   it('denies staff from updating status', async () => {
     const supabase = makeSupabaseMock({
       role: 'therapist',
-      isLeadEligible: false,
       userId: 'staff-1',
     })
     vi.mocked(createClient).mockResolvedValue(
@@ -158,7 +155,6 @@ describe('assignment status API', () => {
   it('allows manager to update status', async () => {
     const supabase = makeSupabaseMock({
       role: 'manager',
-      isLeadEligible: false,
       userId: 'manager-1',
     })
     vi.mocked(createClient).mockResolvedValue(

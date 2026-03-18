@@ -387,7 +387,7 @@ function SwapRequestPageContent() {
       let membersQuery = supabase
         .from('profiles')
         .select('id, full_name, role, shift_type, is_lead_eligible, is_active')
-        .in('role', ['therapist', 'staff', 'lead'])
+        .in('role', ['therapist', 'lead'])
         .eq('shift_type', selectedShiftData.shiftType)
         .eq('is_active', true)
         .neq('id', currentUserId)

@@ -254,7 +254,7 @@ export default function ManagerDashboardPage() {
             supabase
               .from('profiles')
               .select('id, full_name, shift_type, is_active, on_fmla')
-              .in('role', ['therapist', 'staff']),
+              .in('role', ['therapist', 'lead']),
             supabase.from('shift_posts').select('shift_id').eq('status', 'pending'),
             supabase
               .from('shift_posts')

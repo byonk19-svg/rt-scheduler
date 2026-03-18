@@ -1,6 +1,10 @@
-import type { EmployeeEmploymentType, EmployeeShiftType } from '@/lib/employee-directory'
+import {
+  normalizeFmlaReturnDate,
+  type EmployeeEmploymentType,
+  type EmployeeShiftType,
+} from '@/lib/employee-directory'
 
-export type TeamQuickEditRole = 'manager' | 'therapist' | 'staff'
+export type TeamQuickEditRole = 'manager' | 'lead' | 'therapist'
 export type TeamQuickEditError =
   | 'missing_profile'
   | 'missing_name'
@@ -16,6 +20,7 @@ export type TeamQuickEditInput = {
   employmentType: EmployeeEmploymentType
   isLeadEligible: boolean
   onFmla: boolean
+  fmlaReturnDate: string | null
   isActive: boolean
 }
 
@@ -24,7 +29,7 @@ type TeamQuickEditResult =
   | { ok: false; error: TeamQuickEditError; profileId?: string }
 
 function normalizeRole(raw: string): TeamQuickEditRole | null {
-  if (raw === 'manager' || raw === 'therapist' || raw === 'staff') return raw
+  if (raw === 'manager' || raw === 'lead' || raw === 'therapist') return raw
   return null
 }
 
@@ -65,6 +70,8 @@ export function parseTeamQuickEditFormData(formData: FormData): TeamQuickEditRes
     return { ok: false, error: 'invalid_employment', profileId }
   }
 
+  const onFmla = formData.get('on_fmla') === 'on'
+
   return {
     ok: true,
     value: {
@@ -73,8 +80,12 @@ export function parseTeamQuickEditFormData(formData: FormData): TeamQuickEditRes
       role,
       shiftType,
       employmentType,
-      isLeadEligible: role === 'therapist' && formData.get('is_lead_eligible') === 'on',
-      onFmla: formData.get('on_fmla') === 'on',
+      isLeadEligible: role !== 'manager' && formData.get('is_lead_eligible') === 'on',
+      onFmla,
+      fmlaReturnDate: normalizeFmlaReturnDate(
+        String(formData.get('fmla_return_date') ?? ''),
+        onFmla
+      ),
       isActive: formData.get('is_active') === 'on',
     },
   }

@@ -364,7 +364,7 @@ function CoveragePageContent() {
         .eq('shift_type', shiftType)
         .eq('is_active', true)
         .eq('on_fmla', false)
-        .in('role', ['therapist', 'staff'])
+        .in('role', ['therapist', 'lead'])
         .order('full_name', { ascending: true })
 
       if (!active) return

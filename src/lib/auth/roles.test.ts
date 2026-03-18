@@ -6,7 +6,6 @@ describe('isRole', () => {
   it('returns true for valid roles', () => {
     expect(isRole('manager')).toBe(true)
     expect(isRole('therapist')).toBe(true)
-    expect(isRole('staff')).toBe(true)
     expect(isRole('lead')).toBe(true)
   })
 
@@ -29,7 +28,6 @@ describe('parseRole', () => {
   it('returns the role for valid role strings', () => {
     expect(parseRole('manager')).toBe('manager')
     expect(parseRole('therapist')).toBe('therapist')
-    expect(parseRole('staff')).toBe('staff')
     expect(parseRole('lead')).toBe('lead')
   })
 
@@ -49,7 +47,6 @@ describe('toUiRole', () => {
 
   it('returns "therapist" for all non-manager roles', () => {
     expect(toUiRole('therapist')).toBe('therapist')
-    expect(toUiRole('staff')).toBe('therapist')
     expect(toUiRole('lead')).toBe('therapist')
   })
 

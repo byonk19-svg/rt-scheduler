@@ -116,6 +116,7 @@ export async function saveTeamQuickEditAction(formData: FormData) {
       employment_type: input.employmentType,
       is_lead_eligible: input.isLeadEligible,
       on_fmla: input.onFmla,
+      fmla_return_date: input.fmlaReturnDate,
       is_active: input.isActive,
     })
     .eq('id', input.profileId)
@@ -130,12 +131,11 @@ export async function saveTeamQuickEditAction(formData: FormData) {
     )
   }
 
-  if (!input.isActive || input.onFmla || input.role !== 'therapist') {
+  if (!input.isActive || input.onFmla || input.role === 'manager') {
     await realignFutureDraftShiftsForEmployee(supabase, input.profileId)
   }
 
   revalidatePath('/team')
-  revalidatePath('/directory')
   revalidatePath('/schedule')
   revalidatePath('/coverage')
   revalidatePath('/dashboard/manager')

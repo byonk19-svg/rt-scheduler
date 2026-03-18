@@ -3,5 +3,5 @@ export const MANAGER_WORKFLOW_LINKS = {
   approvals: '/approvals?status=pending',
   coverage: '/coverage?view=week',
   publish: '/coverage?view=week',
-  team: '/directory',
+  team: '/team',
 } as const

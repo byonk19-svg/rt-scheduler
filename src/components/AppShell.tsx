@@ -72,7 +72,7 @@ const MANAGER_NAV_ITEMS: readonly NavItem[] = [
     href: '/team',
     label: 'Team',
     icon: Users,
-    isActive: (pathname) => pathname === '/team' || pathname === '/directory',
+    isActive: (pathname) => pathname === '/team',
   },
   {
     href: '/publish',
@@ -103,7 +103,6 @@ const SHELL_ROUTES = [
   '/shift-board',
   '/publish',
   '/profile',
-  '/directory',
   '/approvals',
   '/requests',
   '/notifications',

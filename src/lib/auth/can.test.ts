@@ -21,10 +21,6 @@ describe('can — manager-only permissions', () => {
     expect(can('therapist', permission)).toBe(false)
   })
 
-  it.each(MANAGER_ONLY_PERMISSIONS)('%s: denies access to staff', (permission) => {
-    expect(can('staff', permission)).toBe(false)
-  })
-
   it.each(MANAGER_ONLY_PERMISSIONS)('%s: denies access to lead', (permission) => {
     expect(can('lead', permission)).toBe(false)
   })
@@ -47,8 +43,8 @@ describe('can — update_assignment_status', () => {
     expect(can('lead', 'update_assignment_status')).toBe(true)
   })
 
-  it('grants access to therapist with isLeadEligible: true', () => {
-    expect(can('therapist', 'update_assignment_status', { isLeadEligible: true })).toBe(true)
+  it('denies access to therapist with isLeadEligible: true', () => {
+    expect(can('therapist', 'update_assignment_status', { isLeadEligible: true })).toBe(false)
   })
 
   it('denies access to therapist with isLeadEligible: false', () => {
@@ -57,14 +53,6 @@ describe('can — update_assignment_status', () => {
 
   it('denies access to therapist with no context', () => {
     expect(can('therapist', 'update_assignment_status')).toBe(false)
-  })
-
-  it('grants access to staff with isLeadEligible: true', () => {
-    expect(can('staff', 'update_assignment_status', { isLeadEligible: true })).toBe(true)
-  })
-
-  it('denies access to staff with isLeadEligible: false', () => {
-    expect(can('staff', 'update_assignment_status', { isLeadEligible: false })).toBe(false)
   })
 
   it('denies access when role is null', () => {

@@ -29,6 +29,7 @@ describe('parseTeamQuickEditFormData', () => {
       buildFormData({
         is_lead_eligible: true,
         on_fmla: true,
+        fmla_return_date: '2026-05-12',
         is_active: true,
       })
     )
@@ -43,15 +44,16 @@ describe('parseTeamQuickEditFormData', () => {
         employmentType: 'full_time',
         isLeadEligible: true,
         onFmla: true,
+        fmlaReturnDate: '2026-05-12',
         isActive: true,
       },
     })
   })
 
-  it('drops lead eligibility when the role is not therapist', () => {
+  it('parses the lead app role separately from coverage lead eligibility', () => {
     const result = parseTeamQuickEditFormData(
       buildFormData({
-        role: 'manager',
+        role: 'lead',
         is_lead_eligible: true,
       })
     )
@@ -59,8 +61,25 @@ describe('parseTeamQuickEditFormData', () => {
     expect(result).toEqual({
       ok: true,
       value: expect.objectContaining({
-        role: 'manager',
-        isLeadEligible: false,
+        role: 'lead',
+        isLeadEligible: true,
+      }),
+    })
+  })
+
+  it('clears the FMLA return date when FMLA is unchecked', () => {
+    const result = parseTeamQuickEditFormData(
+      buildFormData({
+        on_fmla: false,
+        fmla_return_date: '2026-05-12',
+      })
+    )
+
+    expect(result).toEqual({
+      ok: true,
+      value: expect.objectContaining({
+        onFmla: false,
+        fmlaReturnDate: null,
       }),
     })
   })
@@ -72,7 +91,7 @@ describe('parseTeamQuickEditFormData', () => {
       profileId: 'therapist-1',
     })
 
-    expect(parseTeamQuickEditFormData(buildFormData({ role: 'lead' }))).toEqual({
+    expect(parseTeamQuickEditFormData(buildFormData({ role: 'staff' }))).toEqual({
       ok: false,
       error: 'invalid_role',
       profileId: 'therapist-1',
