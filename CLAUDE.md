@@ -1,11 +1,11 @@
 ﻿# Teamwise Scheduler
 
-Updated: 2026-03-18 (session 4)
+Updated: 2026-03-18 (session 5)
 
 ## What This App Is
 
 Teamwise is a respiratory therapy scheduling app replacing paper workflows.
-Core domains: coverage planning, cycles, availability requests, shift board, approvals, publish flow, directory.
+Core domains: coverage planning, cycles, availability requests, shift board, approvals, publish flow, team management.
 
 ## Latest Updates (2026-03-18)
 
@@ -18,24 +18,39 @@ Core domains: coverage planning, cycles, availability requests, shift board, app
   - Guardrail: if the user asks to make it even smaller again, the next step starts trading away readability and tap comfort.
   - Targeted regression test added: `src/components/coverage/shift-editor-dialog-layout.test.ts`
 
-- **`/team` now supports click-to-edit quick therapist updates**:
-  - Clicking a therapist card on `/team` opens a centered modal instead of bouncing to `/directory`
-  - Quick edit covers:
+- **`/team` is now the manager-facing staff management surface**:
+  - Clicking a team member card opens a centered quick-edit modal on `/team`
+  - `/team` now shows:
+    - managers
+    - leads
+    - therapists
+    - inactive team members
+  - Quick edit now covers:
     - name
-    - role
+    - role (`manager`, `lead`, `therapist`)
     - shift type
     - employment type
-    - lead eligible
+    - coverage lead eligibility
     - FMLA
-    - active
-  - New files:
-    - `src/app/team/actions.ts`
-    - `src/components/team/TeamDirectory.tsx`
-    - `src/lib/team-quick-edit.ts`
-    - `src/lib/team-quick-edit.test.ts`
-  - The old header CTA on `/team` was relabeled from `Edit directory` to `Full directory`
-  - The modal still links to the full directory for heavier edits, but availability is no longer referenced there because it lives on its own screen
-  - Behavioral note: if quick edit changes someone away from therapist, marks them inactive, or marks them on FMLA, future draft shifts are realigned the same way directory edits already do
+    - FMLA return date
+    - active/inactive
+  - Team cards now show FMLA return date and inactive state directly in the roster
+  - Behavioral note: if quick edit marks someone inactive, on FMLA, or manager, future draft shifts are realigned
+
+- **App role model moved to `manager` / `lead` / `therapist`**:
+  - `lead` is now a real app role in code, not just implied by `is_lead_eligible`
+  - Assignment status updates are now permissioned by role:
+    - `manager` and `lead` can update assignment status
+    - `therapist` cannot, even if coverage-lead eligible
+  - `is_lead_eligible` still exists separately for staffing/coverage rules
+  - New migration required for live DBs:
+    - `supabase/migrations/20260318143000_add_lead_role_to_profiles.sql`
+    - This updates `profiles_role_check` to allow `lead`
+
+- **`/directory` retired from normal manager flow**:
+  - Manager nav and workflow links now point to `/team`
+  - `src/app/directory/page.tsx` is now only a redirect to `/team`
+  - Redirect coverage added in `src/app/directory/page.test.ts`
 
 - **Windows build gotcha confirmed**:
   - On this repo, `next build` can fail with `EPERM ... unlink .next/...` if a repo-local Next dev server is still running and holding `.next`
@@ -166,7 +181,7 @@ E2E specs:
 - `/approvals`
 - `/availability`
 - `/shift-board`
-- `/directory` (manager team directory)
+- `/directory` compatibility redirect to `/team`
 - `/profile`
 - `/requests`, `/requests/new` shift request workflow
 - `/publish`, `/publish/[id]` publish history + async email queue
@@ -176,10 +191,12 @@ E2E specs:
 
 Role source: `profiles.role`.
 
-- `manager`: full scheduling + publish + directory controls
-- `therapist`: staff experience
+- `manager`: full scheduling + publish + team management controls
+- `lead`: therapist experience plus assignment-status updates
+- `therapist`: standard staff experience
 
-Lead capability: `profiles.is_lead_eligible`. All permission checks go through `can(role, permission)` in `src/lib/auth/can.ts`.
+Coverage lead eligibility remains separate at `profiles.is_lead_eligible`.
+All permission checks go through `can(role, permission)` in `src/lib/auth/can.ts`.
 
 ## Key Shared Components
 
@@ -268,20 +285,24 @@ Assignment status is informational only (does not affect coverage counts or publ
 
 ## Team UX
 
-`/team` is now a lightweight roster management surface, not just a link-out page.
+`/team` is now the canonical manager roster-management surface.
 
-- Clicking a therapist card opens a quick-edit modal on the same page
-- Quick edit is meant for roster fields only:
+- Clicking a team member card opens a quick-edit modal on the same page
+- Sections are grouped by:
+  - managers
+  - leads
+  - therapists
+  - inactive
+- Quick edit is meant for roster/access fields:
   - name
-  - role
+  - app role
   - shift type
   - employment type
-  - lead eligibility
+  - coverage lead eligibility
   - FMLA
+  - FMLA return date
   - active/inactive
-- Heavy workflows still belong elsewhere:
-  - `/directory` for fuller employee management
-  - availability editing on its dedicated screen, not in the `/team` modal
+- `/directory` should be treated as a compatibility redirect only, not a feature surface
 
 ## Schedule UX
 
