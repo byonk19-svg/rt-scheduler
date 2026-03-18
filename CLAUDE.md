@@ -1,6 +1,6 @@
 ﻿# Teamwise Scheduler
 
-Updated: 2026-03-16 (session 2)
+Updated: 2026-03-18 (session 3)
 
 ## What This App Is
 
@@ -89,6 +89,14 @@ npm run lint
 npm run test:unit
 npm run dev
 ```
+
+## Deploy to Production
+
+```bash
+vercel --prod   # GitHub → Vercel auto-deploy is NOT wired; CLI is the only deploy method
+```
+
+Generate new HMAC/cron secrets: `openssl rand -hex 32`
 
 ## Quality Status
 
@@ -180,6 +188,7 @@ Typography classes:
 - **framer-motion `ease`:** `ease: 'easeOut'` fails `tsc` — the `Easing` type requires specific literals. Omit `ease` entirely to use framer-motion's safe default.
 - **Preview MCP on Windows:** `preview_start` server tracking doesn't persist between tool calls. Use `tabs_context_mcp` + Chrome browser MCP tools (`computer screenshot`, `navigate`) for visual verification instead.
 - **Responsive stat grids:** Always `grid-cols-2 lg:grid-cols-4` — never bare `grid-cols-4` which clips on narrower viewports.
+- **Session end workflow:** update CLAUDE.md with learnings → `git add CLAUDE.md && git commit && git push`
 
 ## Scheduling Rules
 
