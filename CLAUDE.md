@@ -1,11 +1,37 @@
 ﻿# Teamwise Scheduler
 
-Updated: 2026-03-16
+Updated: 2026-03-16 (session 2)
 
 ## What This App Is
 
 Teamwise is a respiratory therapy scheduling app replacing paper workflows.
 Core domains: coverage planning, cycles, availability requests, shift board, approvals, publish flow, directory.
+
+## Latest Updates (2026-03-16)
+
+- **Coverage constraint warning fix**: "No eligible therapists (constraints)" badge no longer appears on slots that have manually-assigned therapists.
+  - Root cause: `constraintBlockedSlotKeys` was built from unfilled rows but never cleared when therapists were manually assigned.
+  - Fix: track `assignedSlotKeys` in the same loop; after the loop, delete overlapping keys from `constraintBlockedSlotKeys`.
+  - See **Coverage UX** section for full gotcha note.
+
+- **Worker automation complete** — publish email queue now runs automatically on a 1-minute Vercel cron:
+  - `vercel.json` cron schedule: `"* * * * *"` → `/api/cron/process-publish`
+  - New route: `src/app/api/cron/process-publish/route.ts`
+    - Verifies `Authorization: Bearer <CRON_SECRET>` (Vercel cron standard)
+    - Builds HMAC-SHA256 signed request (method + path + timestamp) using `PUBLISH_WORKER_SIGNING_KEY`
+    - POSTs to `/api/publish/process` with `batch_size: 25`
+  - All required env vars are now set in Vercel (production):
+    - `NEXT_PUBLIC_APP_URL` = `https://www.teamwise.work` (was incorrectly `http://localhost:3000`)
+    - `PUBLISH_WORKER_KEY`, `PUBLISH_WORKER_SIGNING_KEY`, `CRON_SECRET` — all set
+    - `PUBLISH_EMAIL_FROM` = `Teamwise <noreply@mail.teamwise.work>` (matches verified Resend domain)
+    - `RESEND_API_KEY` — set
+  - `.env.example` updated with `CRON_SECRET`
+
+- **Production deployment**: code pushed to GitHub (`byonk19-svg/rt-scheduler`, commit c776059). Vercel GitHub auto-deploy is **not** wired — run `vercel --prod` from the project root to deploy latest code.
+
+- **Resend domain**: `mail.teamwise.work` is **Verified** in Resend. No longer in test-mode restriction. Emails will go to all recipients once deployed.
+
+- **Vercel project**: `rt-scheduler` (prj_rmfvUgtS9OFcH6ZBbylK14qFxPX3), team "bri's projects" (team_WrUwb5MAzpsjazNeTVAidXLA). Domains: `teamwise.work`, `www.teamwise.work`.
 
 ## Latest Updates (2026-03-14)
 
@@ -236,19 +262,22 @@ Required env vars:
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
-NEXT_PUBLIC_APP_URL
+NEXT_PUBLIC_APP_URL              # must be https://www.teamwise.work in production (not localhost)
 RESEND_API_KEY
-PUBLISH_EMAIL_FROM
-PUBLISH_WORKER_KEY            # optional; worker key id/header
-PUBLISH_WORKER_SIGNING_KEY    # optional; required with worker key for signed processing endpoint
+PUBLISH_EMAIL_FROM               # must match verified Resend domain: Teamwise <noreply@mail.teamwise.work>
+PUBLISH_WORKER_KEY               # worker key id sent in x-publish-worker-key header
+PUBLISH_WORKER_SIGNING_KEY       # HMAC-SHA256 signing secret for cron → process requests
+CRON_SECRET                      # Vercel cron auth secret (Authorization: Bearer <CRON_SECRET>)
 ```
+
+All 9 vars above are confirmed set in Vercel production environment (2026-03-16).
 
 Supabase Auth (production):
 
 - Site URL: `https://www.teamwise.work`
 - Redirect URL: `https://www.teamwise.work/auth/callback`
 
-**Current blocker:** Resend test-mode restricts non-owner recipients until a verified domain is set as `PUBLISH_EMAIL_FROM`.
+Resend: `mail.teamwise.work` is **Verified**. No test-mode restriction — emails go to all recipients.
 
 ## Data Model Snapshot
 
@@ -277,7 +306,9 @@ Core tables:
 
 ## Next High-Value Priorities
 
-1. **Publish flow production rollout** â€” verify domain in Resend, set `PUBLISH_EMAIL_FROM` to verified sender, deploy via `vercel --prod`
-2. **Worker automation** â€” create `/api/cron/process-publish` route handler; `vercel.json` cron schedule already exists; add `CRON_SECRET` env var; sign requests via `PUBLISH_WORKER_KEY` + `PUBLISH_WORKER_SIGNING_KEY`
+1. **Deploy to production** — run `vercel --prod` from project root. GitHub auto-deploy is NOT wired to Vercel; CLI deploy is the current method. All env vars and code are ready.
+2. **Verify end-to-end publish email flow in production** — publish a schedule from `/coverage`, check `/publish` for queue status, confirm recipient receives email from `noreply@mail.teamwise.work`.
+3. **Wire GitHub → Vercel auto-deploy** (optional) — connect `byonk19-svg/rt-scheduler` repo in Vercel dashboard under Git Integration so pushes trigger builds automatically.
+4. **Coverage visual shell rebuild** — interaction model is correct; next pass is a direct visual rebuild of the `/coverage` shell and day-card composition against the Lovable screenshot/reference. Do NOT do tiny font/spacing tweaks; do a full shell rebuild.
 
 UI audit (2026-03-16) complete: all manager pages normalized to compact header pattern, dashboard grid responsive, Publish History added to nav, denial reason surfaced on Shift Board.
