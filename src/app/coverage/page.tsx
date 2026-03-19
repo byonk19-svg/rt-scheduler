@@ -22,9 +22,9 @@ import { PrintSchedule } from '@/components/print-schedule'
 import { getPublishedCoverageBannerContent } from '@/lib/coverage/published-cycle-ui'
 import { updateCoverageAssignmentStatus } from '@/lib/coverage/updateAssignmentStatus'
 import {
-  assignCoverageShift,
+  assignCoverageShiftViaApi,
   persistCoverageShiftStatus,
-  unassignCoverageShift,
+  unassignCoverageShiftViaApi,
 } from '@/lib/coverage/mutations'
 import {
   buildDayItems,
@@ -493,7 +493,7 @@ function CoveragePageContent() {
       const selectedTherapist = allTherapists.find((t) => t.id === userId) ?? null
       const shiftType = selectedDay.shiftType === 'Day' ? 'day' : 'night'
 
-      const { data: inserted, error: insertError } = await assignCoverageShift(supabase, {
+      const { data: inserted, error: insertError } = await assignCoverageShiftViaApi({
         cycleId: activeCycleId,
         userId,
         isoDate: selectedDay.isoDate,
@@ -653,7 +653,7 @@ function CoveragePageContent() {
 
   const handleUnassign = useCallback(
     async (dayId: string, shiftId: string, isLead: boolean) => {
-      if (!shiftId || unassigningShiftId) return
+      if (!shiftId || !activeCycleId || unassigningShiftId) return
 
       const previousDays = days
       setError('')
@@ -672,7 +672,10 @@ function CoveragePageContent() {
         })
       )
 
-      const { error: deleteError } = await unassignCoverageShift(supabase, shiftId)
+      const { error: deleteError } = await unassignCoverageShiftViaApi({
+        cycleId: activeCycleId ?? '',
+        shiftId,
+      })
 
       if (!deleteError) {
         setUnassigningShiftId(null)
@@ -684,7 +687,7 @@ function CoveragePageContent() {
       setError('Could not unassign therapist. Changes were rolled back.')
       setUnassigningShiftId(null)
     },
-    [days, setDays, supabase, unassigningShiftId]
+    [activeCycleId, days, setDays, unassigningShiftId]
   )
 
   return (
