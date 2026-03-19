@@ -46,6 +46,12 @@ type NavItem = {
 const STAFF_NAV_ITEMS: readonly NavItem[] = [
   { href: '/dashboard/staff', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/therapist/schedule', label: 'My Schedule', icon: CalendarDays },
+  {
+    href: '/preliminary',
+    label: 'Preliminary',
+    icon: CalendarRange,
+    isActive: (pathname) => pathname === '/preliminary',
+  },
   { href: '/availability', label: 'Future Availability', icon: CalendarRange },
   { href: '/shift-board', label: 'Shift Swaps', icon: ArrowLeftRight },
   { href: '/notifications', label: 'Notifications', icon: Bell },
@@ -73,6 +79,12 @@ const MANAGER_NAV_ITEMS: readonly NavItem[] = [
     label: 'Team',
     icon: Users,
     isActive: (pathname) => pathname === '/team',
+  },
+  {
+    href: '/approvals',
+    label: 'Approvals',
+    icon: Bell,
+    isActive: (pathname) => pathname === '/approvals',
   },
   {
     href: '/publish',
@@ -104,6 +116,7 @@ const SHELL_ROUTES = [
   '/publish',
   '/profile',
   '/approvals',
+  '/preliminary',
   '/requests',
   '/notifications',
   '/swaps',

@@ -1,49 +1,242 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { renderToStaticMarkup } from 'react-dom/server'
 
-const { redirectMock } = vi.hoisted(() => ({
+const {
+  redirectMock,
+  revalidatePathMock,
+  createClientMock,
+  approvePreliminaryRequestMock,
+  denyPreliminaryRequestMock,
+  notifyUsersMock,
+} = vi.hoisted(() => ({
   redirectMock: vi.fn((url: string) => {
     throw new Error(`REDIRECT:${url}`)
   }),
+  revalidatePathMock: vi.fn(),
+  createClientMock: vi.fn(),
+  approvePreliminaryRequestMock: vi.fn(),
+  denyPreliminaryRequestMock: vi.fn(),
+  notifyUsersMock: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
   redirect: redirectMock,
 }))
 
+vi.mock('next/cache', () => ({
+  revalidatePath: revalidatePathMock,
+}))
+
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: createClientMock,
+}))
+
+vi.mock('@/lib/preliminary-schedule/mutations', () => ({
+  approvePreliminaryRequest: approvePreliminaryRequestMock,
+  denyPreliminaryRequest: denyPreliminaryRequestMock,
+}))
+
+vi.mock('@/lib/notifications', () => ({
+  notifyUsers: notifyUsersMock,
+}))
+
 import ApprovalsPage from '@/app/approvals/page'
+import {
+  approvePreliminaryRequestAction,
+  denyPreliminaryRequestAction,
+} from '@/app/approvals/actions'
 
-describe('approvals redirect behavior', () => {
-  it('redirects to shift-board with published_only scope', async () => {
-    await expect(
-      ApprovalsPage({
-        searchParams: Promise.resolve({ status: 'pending' }),
-      })
-    ).rejects.toThrow('REDIRECT:')
+type TestContext = {
+  userId?: string | null
+  role?: string | null
+}
 
-    const redirectedUrl = String(redirectMock.mock.calls[0]?.[0] ?? '')
-    const [, queryAndHash = ''] = redirectedUrl.split('?')
-    const [queryString = ''] = queryAndHash.split('#')
-    const params = new URLSearchParams(queryString)
+function createSupabaseMock(context: TestContext) {
+  return {
+    auth: {
+      getUser: vi.fn(async () => ({
+        data: {
+          user: context.userId ? { id: context.userId } : null,
+        },
+      })),
+    },
+    from(table: string) {
+      const filters = new Map<string, unknown>()
+      let selected = '*'
 
-    expect(params.get('status')).toBe('pending')
-    expect(params.get('published_only')).toBe('true')
+      const builder = {
+        select(selection?: string) {
+          selected = selection ?? '*'
+          return builder
+        },
+        eq(column: string, value: unknown) {
+          filters.set(column, value)
+          return builder
+        },
+        in(column: string, value: unknown[]) {
+          filters.set(column, value)
+          return builder
+        },
+        order() {
+          return builder
+        },
+        async maybeSingle() {
+          if (table === 'profiles' && selected === 'role' && filters.get('id') === context.userId) {
+            return { data: { role: context.role }, error: null }
+          }
+
+          return { data: null, error: null }
+        },
+        then(resolve: (value: { data: unknown; error: null }) => unknown) {
+          if (table === 'preliminary_requests') {
+            return Promise.resolve(
+              resolve({
+                data: [
+                  {
+                    id: 'request-1',
+                    snapshot_id: 'snapshot-1',
+                    shift_id: 'shift-1',
+                    requester_id: 'therapist-1',
+                    type: 'claim_open_shift',
+                    status: 'pending',
+                    note: 'I can fill this shift.',
+                    decision_note: null,
+                    approved_by: null,
+                    approved_at: null,
+                    created_at: '2026-03-19T10:00:00.000Z',
+                  },
+                ],
+                error: null,
+              })
+            )
+          }
+
+          if (table === 'shifts') {
+            return Promise.resolve(
+              resolve({
+                data: [
+                  {
+                    id: 'shift-1',
+                    cycle_id: 'cycle-1',
+                    user_id: null,
+                    date: '2026-03-22',
+                    shift_type: 'day',
+                    status: 'scheduled',
+                    role: 'staff',
+                    profiles: null,
+                  },
+                ],
+                error: null,
+              })
+            )
+          }
+
+          if (table === 'profiles' && Array.isArray(filters.get('id'))) {
+            return Promise.resolve(
+              resolve({
+                data: [{ id: 'therapist-1', full_name: 'Barbara C.' }],
+                error: null,
+              })
+            )
+          }
+
+          return Promise.resolve(resolve({ data: [], error: null }))
+        },
+        update() {
+          return {
+            eq() {
+              return Promise.resolve({ data: null, error: null })
+            },
+          }
+        },
+      }
+
+      return builder
+    },
+  }
+}
+
+function makeFormData() {
+  const formData = new FormData()
+  formData.set('request_id', 'request-1')
+  return formData
+}
+
+describe('approvals preliminary queue', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    approvePreliminaryRequestMock.mockResolvedValue({
+      data: {
+        id: 'request-1',
+        requester_id: 'therapist-1',
+        snapshot_id: 'snapshot-1',
+        shift_id: 'shift-1',
+        type: 'claim_open_shift',
+        status: 'approved',
+        note: 'I can fill this shift.',
+      },
+      error: null,
+    })
+    denyPreliminaryRequestMock.mockResolvedValue({
+      data: {
+        id: 'request-1',
+        requester_id: 'therapist-1',
+        snapshot_id: 'snapshot-1',
+        shift_id: 'shift-1',
+        type: 'claim_open_shift',
+        status: 'denied',
+        note: 'I can fill this shift.',
+      },
+      error: null,
+    })
   })
 
-  it('applies default status pending when none is provided', async () => {
-    redirectMock.mockClear()
-
-    await expect(
-      ApprovalsPage({
-        searchParams: Promise.resolve({}),
+  it('renders pending preliminary requests for managers', async () => {
+    createClientMock.mockResolvedValue(
+      createSupabaseMock({
+        userId: 'manager-1',
+        role: 'manager',
       })
-    ).rejects.toThrow('REDIRECT:')
+    )
 
-    const redirectedUrl = String(redirectMock.mock.calls[0]?.[0] ?? '')
-    const [, queryAndHash = ''] = redirectedUrl.split('?')
-    const [queryString = ''] = queryAndHash.split('#')
-    const params = new URLSearchParams(queryString)
+    const html = renderToStaticMarkup(await ApprovalsPage({ searchParams: Promise.resolve({}) }))
 
-    expect(params.get('status')).toBe('pending')
-    expect(params.get('published_only')).toBe('true')
+    expect(html).toContain('Preliminary approvals')
+    expect(html).toContain('Barbara C.')
+    expect(html).toContain('Approve')
+    expect(html).toContain('I can fill this shift.')
+  })
+
+  it('redirects non-managers away from approvals', async () => {
+    createClientMock.mockResolvedValue(
+      createSupabaseMock({
+        userId: 'therapist-1',
+        role: 'therapist',
+      })
+    )
+
+    await expect(ApprovalsPage({ searchParams: Promise.resolve({}) })).rejects.toThrow(
+      'REDIRECT:/dashboard'
+    )
+  })
+
+  it('approves and denies preliminary requests through server actions', async () => {
+    createClientMock.mockResolvedValue(
+      createSupabaseMock({
+        userId: 'manager-1',
+        role: 'manager',
+      })
+    )
+
+    await expect(approvePreliminaryRequestAction(makeFormData())).rejects.toThrow(
+      'REDIRECT:/approvals?success=preliminary_request_approved'
+    )
+    await expect(denyPreliminaryRequestAction(makeFormData())).rejects.toThrow(
+      'REDIRECT:/approvals?success=preliminary_request_denied'
+    )
+
+    expect(approvePreliminaryRequestMock).toHaveBeenCalledTimes(1)
+    expect(denyPreliminaryRequestMock).toHaveBeenCalledTimes(1)
+    expect(revalidatePathMock).toHaveBeenCalledWith('/preliminary')
   })
 })

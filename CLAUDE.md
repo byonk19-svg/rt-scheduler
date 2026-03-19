@@ -1,6 +1,6 @@
 ﻿# Teamwise Scheduler
 
-Updated: 2026-03-19 (session 6)
+Updated: 2026-03-19 (session 7)
 
 ## What This App Is
 
@@ -74,6 +74,87 @@ Core domains: coverage planning, cycles, availability requests, shift board, app
 - **Windows build gotcha confirmed**:
   - On this repo, `next build` can fail with `EPERM ... unlink .next/...` if a repo-local Next dev server is still running and holding `.next`
   - Fix: stop the repo's `next dev` worker processes first, then rerun `npm run build`
+
+## Latest Updates (2026-03-19)
+
+- **Preliminary schedule workflow added**:
+  - Managers can now send a staff-visible preliminary schedule from `/coverage`
+  - A sent preliminary snapshot stays live and can be refreshed in place from the same page
+  - The coverage header now shows:
+    - `Send preliminary`
+    - `Refresh preliminary`
+    - `Preliminary live` status badge
+  - New server action lives in:
+    - `src/app/schedule/actions.ts` -> `sendPreliminaryScheduleAction`
+
+- **New preliminary schedule data model**:
+  - New migration:
+    - `supabase/migrations/20260319113000_add_preliminary_schedule_tables.sql`
+  - Adds:
+    - `public.preliminary_snapshots`
+    - `public.preliminary_shift_states`
+    - `public.preliminary_requests`
+  - Purpose:
+    - separate staff-visible preliminary workflow from final publish
+    - lock open-slot claims live
+    - keep manager approval as the source of truth
+  - This migration was pushed successfully with `supabase db push` on 2026-03-19
+
+- **Shared preliminary schedule logic added**:
+  - `src/lib/preliminary-schedule/types.ts`
+  - `src/lib/preliminary-schedule/selectors.ts`
+  - `src/lib/preliminary-schedule/mutations.ts`
+  - Core helpers now handle:
+    - sending or refreshing one active snapshot per cycle
+    - immediate reservation of open-slot claims
+    - change requests on tentative assignments
+    - manager approve/deny
+    - therapist cancel of pending requests
+
+- **`/approvals` is now a real manager queue**:
+  - Old redirect-to-shift-board behavior was removed
+  - `/approvals` now shows pending preliminary requests directly
+  - Managers can approve or deny from the queue
+  - Approval actions live in:
+    - `src/app/approvals/actions.ts`
+  - Current behavior:
+    - approving a claim assigns that therapist onto the draft shift
+    - approving a change request clears the draft assignment for manager follow-up
+    - denying leaves the draft assignment unchanged or releases the slot appropriately
+
+- **New therapist-facing `/preliminary` route**:
+  - Therapists and leads can now review the active preliminary schedule in-app
+  - They can:
+    - claim open help-needed slots
+    - request change on their own tentative assignment
+    - cancel their own pending preliminary requests
+  - Main files:
+    - `src/app/preliminary/page.tsx`
+    - `src/app/preliminary/actions.ts`
+    - `src/components/preliminary/PreliminaryScheduleView.tsx`
+    - `src/components/preliminary/PreliminaryShiftCard.tsx`
+    - `src/components/preliminary/PreliminaryRequestHistory.tsx`
+
+- **Notifications and navigation updated for preliminary flow**:
+  - Therapist nav now includes `/preliminary`
+  - Manager nav now includes `/approvals`
+  - `src/components/NotificationBell.tsx` now routes:
+    - preliminary-request manager notifications -> `/approvals`
+    - other preliminary notifications -> `/preliminary`
+  - Product decision:
+    - preliminary notifications are in-app only
+    - no extra email or push notification layer was added
+
+- **Verification for the preliminary feature**:
+  - Unit tests added:
+    - `src/lib/preliminary-schedule/selectors.test.ts`
+    - `src/lib/preliminary-schedule/mutations.test.ts`
+    - `src/app/schedule/preliminary-actions.test.ts`
+    - `src/app/approvals/page.test.ts`
+    - `src/components/preliminary/PreliminaryScheduleView.test.ts`
+  - Verified passing during implementation:
+    - `npm run test:unit -- src/lib/preliminary-schedule/selectors.test.ts src/lib/preliminary-schedule/mutations.test.ts src/app/schedule/preliminary-actions.test.ts src/app/approvals/page.test.ts src/components/preliminary/PreliminaryScheduleView.test.ts`
+    - `npm run build`
 
 ## Latest Updates (2026-03-16)
 

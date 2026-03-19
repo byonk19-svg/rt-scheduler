@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 import {
   generateDraftScheduleAction,
   resetDraftScheduleAction,
+  sendPreliminaryScheduleAction,
   toggleCyclePublishedAction,
 } from '@/app/schedule/actions'
 import { CalendarGrid } from '@/components/coverage/CalendarGrid'
@@ -72,6 +73,10 @@ type ShiftRow = {
     | null
 }
 type AssignedShiftRow = Omit<ShiftRow, 'user_id'> & { user_id: string }
+type PreliminarySnapshotRow = {
+  id: string
+  sent_at: string
+}
 
 const NO_ELIGIBLE_CONSTRAINT_REASON = 'no_eligible_candidates_due_to_constraints'
 
@@ -101,6 +106,8 @@ function CoveragePageContent() {
   const [nightDays, setNightDays] = useState<DayItem[]>([])
   const [activeCycleId, setActiveCycleId] = useState<string | null>(cycleFromUrl)
   const [activeCyclePublished, setActiveCyclePublished] = useState(false)
+  const [activePreliminarySnapshot, setActivePreliminarySnapshot] =
+    useState<PreliminarySnapshotRow | null>(null)
   const [printCycle, setPrintCycle] = useState<{ label: string; start_date: string; end_date: string } | null>(null)
   const [printCycleDates, setPrintCycleDates] = useState<string[]>([])
   const [printDayTeam, setPrintDayTeam] = useState<PrintTherapist[]>([])
@@ -158,6 +165,16 @@ function CoveragePageContent() {
   const weekRosterHref = activeCycleId
     ? `/coverage?cycle=${activeCycleId}&view=week`
     : '/coverage?view=week'
+  const preliminaryLive = Boolean(activePreliminarySnapshot)
+  const preliminarySentLabel = useMemo(() => {
+    if (!activePreliminarySnapshot) return null
+    return new Date(activePreliminarySnapshot.sent_at).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+  }, [activePreliminarySnapshot])
   const cycleSummaryLabel = useMemo(() => {
     if (!printCycle) return 'Current 6-week window - Click a day to edit'
     const totalWeeks = Math.max(1, Math.round((printCycleDates.length || 42) / 7))
@@ -205,6 +222,7 @@ function CoveragePageContent() {
         if (active) {
           setActiveCycleId(cycleId)
           setActiveCyclePublished(Boolean(selectedCycle?.published))
+          setActivePreliminarySnapshot(null)
           setPrintCycle(
             selectedCycle
               ? {
@@ -216,9 +234,26 @@ function CoveragePageContent() {
                   label: 'Coverage schedule',
                   start_date: cycleStartDate,
                   end_date: cycleEndDate,
-                }
+              }
           )
           setPrintCycleDates(dateRange(cycleStartDate, cycleEndDate))
+        }
+
+        if (cycleId) {
+          const { data: preliminaryData, error: preliminaryError } = await supabase
+            .from('preliminary_snapshots')
+            .select('id, sent_at')
+            .eq('cycle_id', cycleId)
+            .eq('status', 'active')
+            .maybeSingle()
+
+          if (!active) return
+          if (preliminaryError) {
+            console.error('Could not load preliminary schedule state:', preliminaryError)
+            setActivePreliminarySnapshot(null)
+          } else {
+            setActivePreliminarySnapshot((preliminaryData ?? null) as PreliminarySnapshotRow | null)
+          }
         }
 
         let shiftsQuery = supabase
@@ -706,6 +741,22 @@ function CoveragePageContent() {
                 Clear draft
               </button>
             </form>
+            <form action={sendPreliminaryScheduleAction}>
+              <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+              <input type="hidden" name="view" value="week" />
+              <input type="hidden" name="show_unavailable" value="false" />
+              <input type="hidden" name="return_to" value="coverage" />
+              <Button
+                type="submit"
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs"
+                disabled={!activeCycleId || activeCyclePublished}
+              >
+                <Send className="h-3.5 w-3.5" />
+                {preliminaryLive ? 'Refresh preliminary' : 'Send preliminary'}
+              </Button>
+            </form>
             <form action={toggleCyclePublishedAction}>
               <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
               <input type="hidden" name="view" value="week" />
@@ -766,6 +817,11 @@ function CoveragePageContent() {
               Published
             </StatusBadge>
           )}
+          {preliminaryLive && (
+            <StatusBadge variant="warning" dot={false} className="text-[10px]">
+              Preliminary live
+            </StatusBadge>
+          )}
         </div>
       </motion.div>
 
@@ -803,6 +859,16 @@ function CoveragePageContent() {
             Published - visible to employees.
           </p>
         )}
+        {successParam === 'preliminary_sent' && (
+          <p className="mb-3 rounded-md border border-[var(--info-border)] bg-[var(--info-subtle)] px-3 py-2 text-xs font-semibold text-[var(--info-text)]">
+            Preliminary schedule sent. Therapists can now review it in the app.
+          </p>
+        )}
+        {successParam === 'preliminary_refreshed' && (
+          <p className="mb-3 rounded-md border border-[var(--info-border)] bg-[var(--info-subtle)] px-3 py-2 text-xs font-semibold text-[var(--info-text)]">
+            Preliminary schedule refreshed with the latest staffing draft.
+          </p>
+        )}
         {successParam === 'cycle_unpublished' && (
           <p className="mb-3 rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-2 text-xs font-semibold text-[var(--warning-text)]">
             Cycle unpublished.
@@ -829,10 +895,30 @@ function CoveragePageContent() {
             {publishErrorMessage}
           </p>
         )}
+        {errorParam === 'preliminary_cycle_published' && (
+          <p className="mb-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs font-semibold text-[var(--error-text)]">
+            Preliminary schedules can only be sent while the cycle is still a draft.
+          </p>
+        )}
+        {errorParam === 'preliminary_send_failed' && (
+          <p className="mb-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs font-semibold text-[var(--error-text)]">
+            Could not send the preliminary schedule. Please try again.
+          </p>
+        )}
         {error && (
           <p className="mb-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs text-[var(--error-text)]">
             {error}
           </p>
+        )}
+        {preliminaryLive && !activeCyclePublished && (
+          <div className="mb-3 rounded-lg border border-[var(--info-border)] bg-[var(--info-subtle)] px-4 py-3">
+            <p className="text-xs font-semibold text-[var(--info-text)]">
+              Preliminary schedule is live{preliminarySentLabel ? ` as of ${preliminarySentLabel}` : ''}.
+            </p>
+            <p className="mt-1 text-xs text-[var(--info-text)]/85">
+              Therapists can review tentative shifts, claim open help-needed slots, and send change requests while you keep approval control.
+            </p>
+          </div>
         )}
         <CalendarGrid
           days={days}

@@ -35,6 +35,8 @@ function timeAgo(iso: string): string {
 }
 
 function getNotificationHref(item: NotificationItem): string | null {
+  if (item.event_type === 'preliminary_request_submitted') return '/approvals'
+  if (item.event_type.startsWith('preliminary_')) return '/preliminary'
   if (item.target_type === 'shift_post') return '/requests'
   if (item.target_type === 'shift') return '/coverage'
   if (item.target_type === 'schedule_cycle') return '/schedule'
