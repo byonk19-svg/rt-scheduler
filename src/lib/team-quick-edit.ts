@@ -80,7 +80,7 @@ export function parseTeamQuickEditFormData(formData: FormData): TeamQuickEditRes
       role,
       shiftType,
       employmentType,
-      isLeadEligible: role !== 'manager' && formData.get('is_lead_eligible') === 'on',
+      isLeadEligible: role === 'lead',
       onFmla,
       fmlaReturnDate: normalizeFmlaReturnDate(
         String(formData.get('fmla_return_date') ?? ''),

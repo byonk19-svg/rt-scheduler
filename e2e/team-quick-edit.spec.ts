@@ -167,9 +167,9 @@ test.describe.serial('/team quick edit modal', () => {
 
     const dialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
     await expect(dialog).toBeVisible({ timeout: 10_000 })
+    await expect(dialog.getByText('Coverage lead')).toHaveCount(0)
 
     await dialog.getByLabel('Name').fill(updatedName)
-    await dialog.getByLabel('Coverage lead').uncheck()
     await dialog.getByLabel('Role').selectOption('manager')
     await dialog.getByLabel('Shift').selectOption('night')
     await dialog.getByLabel('Employment Type').selectOption('part_time')

@@ -27,7 +27,6 @@ describe('parseTeamQuickEditFormData', () => {
   it('parses the quick edit fields for a therapist', () => {
     const result = parseTeamQuickEditFormData(
       buildFormData({
-        is_lead_eligible: true,
         on_fmla: true,
         fmla_return_date: '2026-05-12',
         is_active: true,
@@ -42,7 +41,7 @@ describe('parseTeamQuickEditFormData', () => {
         role: 'therapist',
         shiftType: 'day',
         employmentType: 'full_time',
-        isLeadEligible: true,
+        isLeadEligible: false,
         onFmla: true,
         fmlaReturnDate: '2026-05-12',
         isActive: true,
@@ -50,11 +49,10 @@ describe('parseTeamQuickEditFormData', () => {
     })
   })
 
-  it('parses the lead app role separately from coverage lead eligibility', () => {
+  it('derives lead eligibility from the lead role', () => {
     const result = parseTeamQuickEditFormData(
       buildFormData({
         role: 'lead',
-        is_lead_eligible: true,
       })
     )
 
@@ -63,6 +61,23 @@ describe('parseTeamQuickEditFormData', () => {
       value: expect.objectContaining({
         role: 'lead',
         isLeadEligible: true,
+      }),
+    })
+  })
+
+  it('does not allow therapists to force lead eligibility from form data', () => {
+    const result = parseTeamQuickEditFormData(
+      buildFormData({
+        role: 'therapist',
+        is_lead_eligible: true,
+      })
+    )
+
+    expect(result).toEqual({
+      ok: true,
+      value: expect.objectContaining({
+        role: 'therapist',
+        isLeadEligible: false,
       }),
     })
   })

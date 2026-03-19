@@ -39,6 +39,10 @@ type TeamDirectoryProps = {
 
 type EditableRole = 'manager' | 'lead' | 'therapist'
 
+export const TEAM_QUICK_EDIT_DIALOG_CLASS =
+  'max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-[560px]'
+export const TEAM_LEAD_ROLE_LABEL = 'Lead Therapist'
+
 function initials(name: string | null): string {
   if (!name) return '??'
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -56,7 +60,7 @@ function employmentLabel(type: TeamProfileRecord['employment_type']): string {
 
 function roleLabel(role: TeamProfileRecord['role']): string {
   if (role === 'manager') return 'Manager'
-  if (role === 'lead') return 'Lead'
+  if (role === 'lead') return TEAM_LEAD_ROLE_LABEL
   return 'Therapist'
 }
 
@@ -72,7 +76,6 @@ function shiftLabel(type: TeamProfileRecord['shift_type']): string {
 
 function TeamMemberCard({ profile, onClick }: { profile: TeamProfileRecord; onClick: () => void }) {
   const isActive = profile.is_active !== false
-  const hasCoverageLead = profile.is_lead_eligible === true
 
   return (
     <button
@@ -114,11 +117,6 @@ function TeamMemberCard({ profile, onClick }: { profile: TeamProfileRecord; onCl
             )}
             {roleLabel(profile.role)}
           </span>
-          {hasCoverageLead && profile.role !== 'lead' && (
-            <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-              Coverage lead
-            </span>
-          )}
           {profile.on_fmla && (
             <span className="inline-flex items-center rounded-full bg-[var(--warning-subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--warning-text)]">
               FMLA
@@ -237,7 +235,6 @@ export function TeamDirectory({
     () => profiles.find((profile) => profile.id === editProfileId) ?? null,
     [profiles, editProfileId]
   )
-  const coverageLeadDisabled = draftRole === 'manager'
 
   useEffect(() => {
     if (!editProfile) return
@@ -248,7 +245,7 @@ export function TeamDirectory({
   return (
     <>
       <TeamSection title="Managers" profiles={managers} onOpen={setEditProfileId} />
-      <TeamSection title="Leads" profiles={leads} onOpen={setEditProfileId} />
+      <TeamSection title="Lead Therapists" profiles={leads} onOpen={setEditProfileId} />
       <TeamSection title="Therapists" profiles={therapists} onOpen={setEditProfileId} />
       <TeamSection title="Inactive" profiles={inactiveProfiles} onOpen={setEditProfileId} />
 
@@ -260,7 +257,7 @@ export function TeamDirectory({
 
       <Dialog open={Boolean(editProfile)} onOpenChange={(open) => !open && setEditProfileId(null)}>
         {editProfile && (
-          <DialogContent className="sm:max-w-[560px]">
+          <DialogContent className={TEAM_QUICK_EDIT_DIALOG_CLASS}>
             <DialogHeader>
               <DialogTitle>Quick Edit Team Member</DialogTitle>
               <DialogDescription>
@@ -309,7 +306,7 @@ export function TeamDirectory({
                     className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
                   >
                     <option value="therapist">Therapist</option>
-                    <option value="lead">Lead</option>
+                    <option value="lead">{TEAM_LEAD_ROLE_LABEL}</option>
                     <option value="manager">Manager</option>
                   </select>
                 </div>
@@ -353,22 +350,7 @@ export function TeamDirectory({
                 </div>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-3">
-                <label
-                  className={cn(
-                    'flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm',
-                    coverageLeadDisabled && 'bg-muted/50 text-muted-foreground'
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    name="is_lead_eligible"
-                    defaultChecked={editProfile.is_lead_eligible === true}
-                    className="h-4 w-4"
-                    disabled={coverageLeadDisabled}
-                  />
-                  Coverage lead
-                </label>
+              <div className="grid gap-2 sm:grid-cols-2">
                 <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
                   <input
                     type="checkbox"
