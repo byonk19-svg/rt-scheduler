@@ -24,6 +24,8 @@ type UpdateAssignmentStatusRequest = {
 
 type ActorProfile = {
   role: string | null
+  is_active: boolean | null
+  archived_at: string | null
 }
 
 type RpcAssignmentStatusRow = {
@@ -73,12 +75,17 @@ export async function POST(request: Request) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, is_active, archived_at')
     .eq('id', user.id)
     .maybeSingle()
 
   const actorProfile = (profile ?? null) as ActorProfile | null
-  if (!can(parseRole(actorProfile?.role), 'update_assignment_status')) {
+  if (
+    !can(parseRole(actorProfile?.role), 'update_assignment_status', {
+      isActive: actorProfile?.is_active !== false,
+      archivedAt: actorProfile?.archived_at ?? null,
+    })
+  ) {
     return NextResponse.json(
       { error: 'Only leads or managers can update assignment statuses.' },
       { status: 403 }

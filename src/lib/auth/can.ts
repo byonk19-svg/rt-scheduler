@@ -12,6 +12,8 @@ export type Permission =
 
 type CanContext = {
   isLeadEligible?: boolean
+  isActive?: boolean
+  archivedAt?: string | null
 }
 
 function isManagerRole(role: Role | null): boolean {
@@ -21,6 +23,10 @@ function isManagerRole(role: Role | null): boolean {
 export function can(roleInput: unknown, permission: Permission, context: CanContext = {}): boolean {
   const role = parseRole(roleInput)
   void context
+
+  if (context.isActive === false || context.archivedAt) {
+    return false
+  }
 
   if (
     permission === 'access_manager_ui' ||

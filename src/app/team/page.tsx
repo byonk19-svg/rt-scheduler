@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 
-import { saveTeamQuickEditAction } from '@/app/team/actions'
+import { archiveTeamMemberAction, saveTeamQuickEditAction } from '@/app/team/actions'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { TeamDirectory } from '@/components/team/TeamDirectory'
 import { can } from '@/lib/auth/can'
@@ -41,6 +41,10 @@ function getTeamFeedback(params?: TeamSearchParams): {
     return { message: 'Team member updated.', variant: 'success' }
   }
 
+  if (success === 'profile_archived') {
+    return { message: 'Team member archived.', variant: 'success' }
+  }
+
   if (error === 'missing_profile') {
     return { message: 'Could not find that team member.', variant: 'error' }
   }
@@ -63,6 +67,14 @@ function getTeamFeedback(params?: TeamSearchParams): {
 
   if (error === 'update_failed') {
     return { message: 'Could not save team member changes. Please try again.', variant: 'error' }
+  }
+
+  if (error === 'archive_requires_inactive') {
+    return { message: 'Only inactive team members can be archived.', variant: 'error' }
+  }
+
+  if (error === 'archive_failed') {
+    return { message: 'Could not archive that team member. Please try again.', variant: 'error' }
   }
 
   return null
@@ -95,6 +107,7 @@ export default async function TeamPage({
       'id, full_name, role, shift_type, employment_type, is_lead_eligible, is_active, on_fmla, fmla_return_date'
     )
     .in('role', [...MANAGED_TEAM_ROLE_VALUES])
+    .is('archived_at', null)
     .order('full_name', { ascending: true })
 
   const allProfiles = (profiles ?? []) as ProfileRow[]
@@ -114,7 +127,7 @@ export default async function TeamPage({
       <div className="mb-6">
         <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">Team</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {allProfiles.length} team members · {managerCount} managers, {leadCount} leads,{' '}
+          {allProfiles.length} team members · {managerCount} managers, {leadCount} lead therapists,{' '}
           {therapistCount} therapists
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -125,6 +138,7 @@ export default async function TeamPage({
       <TeamDirectory
         profiles={allProfiles}
         initialEditProfileId={initialEditProfileId}
+        archiveTeamMemberAction={archiveTeamMemberAction}
         saveTeamQuickEditAction={saveTeamQuickEditAction}
       />
     </div>

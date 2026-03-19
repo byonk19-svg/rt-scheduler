@@ -30,15 +30,20 @@ async function requireManager() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, is_active, archived_at')
     .eq('id', user.id)
     .maybeSingle()
 
-  if (!can(parseRole(profile?.role), 'manage_directory')) {
+  if (
+    !can(parseRole(profile?.role), 'manage_directory', {
+      isActive: profile?.is_active !== false,
+      archivedAt: profile?.archived_at ?? null,
+    })
+  ) {
     redirect('/dashboard/staff')
   }
 
-  return { supabase }
+  return { supabase, userId: user.id }
 }
 
 function getTodayKey(): string {
@@ -98,11 +103,11 @@ export async function saveTeamQuickEditAction(formData: FormData) {
 
   const { data: existingProfile, error: profileError } = await supabase
     .from('profiles')
-    .select('id')
+    .select('id, archived_at')
     .eq('id', input.profileId)
     .maybeSingle()
 
-  if (profileError || !existingProfile) {
+  if (profileError || !existingProfile || existingProfile.archived_at) {
     console.error('Failed to load team quick edit profile:', profileError)
     redirect(buildTeamUrl({ error: 'missing_profile' }))
   }
@@ -141,4 +146,51 @@ export async function saveTeamQuickEditAction(formData: FormData) {
   revalidatePath('/dashboard/manager')
 
   redirect(buildTeamUrl({ success: 'profile_saved' }))
+}
+
+export async function archiveTeamMemberAction(formData: FormData) {
+  const profileId = String(formData.get('profile_id') ?? '').trim()
+  if (!profileId) {
+    redirect(buildTeamUrl({ error: 'missing_profile' }))
+  }
+
+  const { supabase, userId } = await requireManager()
+  const { data: existingProfile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, is_active, archived_at')
+    .eq('id', profileId)
+    .maybeSingle()
+
+  if (profileError || !existingProfile || existingProfile.archived_at) {
+    console.error('Failed to load team member for archive:', profileError)
+    redirect(buildTeamUrl({ error: 'missing_profile' }))
+  }
+
+  if (existingProfile.is_active !== false) {
+    redirect(buildTeamUrl({ error: 'archive_requires_inactive', edit_profile: profileId }))
+  }
+
+  const archivedAt = new Date().toISOString()
+  const { error: archiveError } = await supabase
+    .from('profiles')
+    .update({
+      archived_at: archivedAt,
+      archived_by: userId,
+      is_active: false,
+    })
+    .eq('id', profileId)
+
+  if (archiveError) {
+    console.error('Failed to archive team member:', archiveError)
+    redirect(buildTeamUrl({ error: 'archive_failed', edit_profile: profileId }))
+  }
+
+  await realignFutureDraftShiftsForEmployee(supabase, profileId)
+
+  revalidatePath('/team')
+  revalidatePath('/schedule')
+  revalidatePath('/coverage')
+  revalidatePath('/dashboard/manager')
+
+  redirect(buildTeamUrl({ success: 'profile_archived' }))
 }

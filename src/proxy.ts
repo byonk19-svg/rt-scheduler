@@ -21,7 +21,11 @@ const MANAGER_ROUTES = [
 const STAFF_ROUTES = ['/staff', '/dashboard/staff', '/requests/new'] as const
 
 type AppRole = 'manager' | 'staff'
-type ProfileRoleRow = { role: string | null }
+type ProfileAccessRow = {
+  role: string | null
+  is_active: boolean | null
+  archived_at: string | null
+}
 
 function matchesRoute(pathname: string, route: string): boolean {
   return pathname === route || pathname.startsWith(`${route}/`)
@@ -112,24 +116,25 @@ export async function proxy(request: NextRequest) {
   }
 
   const claimRole = user.app_metadata?.user_role ?? user.user_metadata?.user_role
-  let role = normalizeRole(claimRole)
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role, is_active, archived_at')
+    .eq('id', user.id)
+    .maybeSingle()
 
-  if (!role) {
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle()
-
-    if (profileError) {
-      console.warn(
-        'Role fallback lookup failed in proxy middleware:',
-        profileError.message || profileError
-      )
-    } else {
-      role = normalizeRole((profile as ProfileRoleRow | null)?.role)
-    }
+  if (profileError) {
+    console.warn('Profile lookup failed in proxy middleware:', profileError.message || profileError)
   }
+
+  const profileRow = (profile as ProfileAccessRow | null) ?? null
+  if (profileRow && (profileRow.is_active === false || profileRow.archived_at)) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/auth/signout'
+    url.searchParams.set('next', '/?error=account_inactive')
+    return NextResponse.redirect(url)
+  }
+
+  const role = normalizeRole(profileRow?.role ?? claimRole)
 
   if (!role) {
     if (!matchesRoute(pathname, '/pending-setup')) {

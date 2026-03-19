@@ -34,10 +34,21 @@ export type TeamProfileRecord = {
 type TeamDirectoryProps = {
   profiles: TeamProfileRecord[]
   initialEditProfileId?: string | null
+  archiveTeamMemberAction: (formData: FormData) => void | Promise<void>
   saveTeamQuickEditAction: (formData: FormData) => void | Promise<void>
 }
 
 type EditableRole = 'manager' | 'lead' | 'therapist'
+type ShiftBucket = 'day' | 'night'
+
+type TeamDirectorySections = {
+  managers: TeamProfileRecord[]
+  inactive: TeamProfileRecord[]
+  dayLeads: TeamProfileRecord[]
+  dayTherapists: TeamProfileRecord[]
+  nightLeads: TeamProfileRecord[]
+  nightTherapists: TeamProfileRecord[]
+}
 
 export const TEAM_QUICK_EDIT_DIALOG_CLASS =
   'max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-[560px]'
@@ -74,8 +85,51 @@ function shiftLabel(type: TeamProfileRecord['shift_type']): string {
   return type === 'night' ? 'Night shift' : 'Day shift'
 }
 
+function shiftBucket(type: TeamProfileRecord['shift_type']): ShiftBucket {
+  return type === 'night' ? 'night' : 'day'
+}
+
+export function teamMemberHasAppAccess(profile: Pick<TeamProfileRecord, 'is_active'>): boolean {
+  return profile.is_active !== false
+}
+
+export function partitionTeamProfiles(profiles: TeamProfileRecord[]): TeamDirectorySections {
+  const sections: TeamDirectorySections = {
+    managers: [],
+    inactive: [],
+    dayLeads: [],
+    dayTherapists: [],
+    nightLeads: [],
+    nightTherapists: [],
+  }
+
+  for (const profile of profiles) {
+    if (!teamMemberHasAppAccess(profile)) {
+      sections.inactive.push(profile)
+      continue
+    }
+
+    if (profile.role === 'manager') {
+      sections.managers.push(profile)
+      continue
+    }
+
+    const bucket = shiftBucket(profile.shift_type)
+    if (profile.role === 'lead') {
+      if (bucket === 'night') sections.nightLeads.push(profile)
+      else sections.dayLeads.push(profile)
+      continue
+    }
+
+    if (bucket === 'night') sections.nightTherapists.push(profile)
+    else sections.dayTherapists.push(profile)
+  }
+
+  return sections
+}
+
 function TeamMemberCard({ profile, onClick }: { profile: TeamProfileRecord; onClick: () => void }) {
-  const isActive = profile.is_active !== false
+  const isActive = teamMemberHasAppAccess(profile)
 
   return (
     <button
@@ -169,6 +223,28 @@ function TeamSection({
   )
 }
 
+function ShiftGroup({
+  title,
+  leads,
+  therapists,
+  onOpen,
+}: {
+  title: string
+  leads: TeamProfileRecord[]
+  therapists: TeamProfileRecord[]
+  onOpen: (profileId: string) => void
+}) {
+  if (leads.length === 0 && therapists.length === 0) return null
+
+  return (
+    <section className="mb-8 rounded-2xl border border-border bg-muted/20 p-4 last:mb-0 sm:p-5">
+      <h2 className="mb-4 text-sm font-semibold tracking-tight text-foreground">{title}</h2>
+      <TeamSection title="Lead Therapists" profiles={leads} onOpen={onOpen} />
+      <TeamSection title="Therapists" profiles={therapists} onOpen={onOpen} />
+    </section>
+  )
+}
+
 function AccessChecklist({ role }: { role: EditableRole }) {
   const permissions = getTeamRolePermissions(role)
 
@@ -202,39 +278,35 @@ function AccessChecklist({ role }: { role: EditableRole }) {
   )
 }
 
+function InactiveAccessNotice() {
+  return (
+    <div className="rounded-xl border border-border bg-muted/30 p-3">
+      <p className="text-sm font-semibold text-foreground">App access</p>
+      <p className="mt-1 text-sm text-muted-foreground">No app access while inactive.</p>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Inactive team members cannot sign in or use manager, lead, or therapist tools until they are
+        reactivated.
+      </p>
+    </div>
+  )
+}
+
 export function TeamDirectory({
   profiles,
   initialEditProfileId = null,
+  archiveTeamMemberAction,
   saveTeamQuickEditAction,
 }: TeamDirectoryProps) {
   const [editProfileId, setEditProfileId] = useState<string | null>(initialEditProfileId)
   const [draftRole, setDraftRole] = useState<EditableRole>('therapist')
   const [onFmla, setOnFmla] = useState(false)
 
-  const activeProfiles = useMemo(
-    () => profiles.filter((profile) => profile.is_active !== false),
-    [profiles]
-  )
-  const inactiveProfiles = useMemo(
-    () => profiles.filter((profile) => profile.is_active === false),
-    [profiles]
-  )
-  const managers = useMemo(
-    () => activeProfiles.filter((profile) => profile.role === 'manager'),
-    [activeProfiles]
-  )
-  const leads = useMemo(
-    () => activeProfiles.filter((profile) => profile.role === 'lead'),
-    [activeProfiles]
-  )
-  const therapists = useMemo(
-    () => activeProfiles.filter((profile) => profile.role !== 'manager' && profile.role !== 'lead'),
-    [activeProfiles]
-  )
+  const sections = useMemo(() => partitionTeamProfiles(profiles), [profiles])
   const editProfile = useMemo(
     () => profiles.find((profile) => profile.id === editProfileId) ?? null,
     [profiles, editProfileId]
   )
+  const editProfileIsActive = editProfile ? teamMemberHasAppAccess(editProfile) : false
 
   useEffect(() => {
     if (!editProfile) return
@@ -244,10 +316,20 @@ export function TeamDirectory({
 
   return (
     <>
-      <TeamSection title="Managers" profiles={managers} onOpen={setEditProfileId} />
-      <TeamSection title="Lead Therapists" profiles={leads} onOpen={setEditProfileId} />
-      <TeamSection title="Therapists" profiles={therapists} onOpen={setEditProfileId} />
-      <TeamSection title="Inactive" profiles={inactiveProfiles} onOpen={setEditProfileId} />
+      <TeamSection title="Managers" profiles={sections.managers} onOpen={setEditProfileId} />
+      <ShiftGroup
+        title="Day Shift"
+        leads={sections.dayLeads}
+        therapists={sections.dayTherapists}
+        onOpen={setEditProfileId}
+      />
+      <ShiftGroup
+        title="Night Shift"
+        leads={sections.nightLeads}
+        therapists={sections.nightTherapists}
+        onOpen={setEditProfileId}
+      />
+      <TeamSection title="Inactive" profiles={sections.inactive} onOpen={setEditProfileId} />
 
       {profiles.length === 0 && (
         <div className="rounded-xl border border-border bg-card px-6 py-12 text-center">
@@ -372,15 +454,28 @@ export function TeamDirectory({
                 </label>
               </div>
 
-              <AccessChecklist role={draftRole} />
+              {editProfileIsActive ? (
+                <AccessChecklist role={draftRole} />
+              ) : (
+                <InactiveAccessNotice />
+              )}
 
-              <DialogFooter className="gap-2">
-                <Button type="button" variant="outline" onClick={() => setEditProfileId(null)}>
-                  Cancel
-                </Button>
-                <FormSubmitButton type="submit" pendingText="Saving...">
-                  Save changes
-                </FormSubmitButton>
+              <DialogFooter className="gap-2 sm:justify-between">
+                {!editProfileIsActive ? (
+                  <Button type="submit" formAction={archiveTeamMemberAction} variant="outline">
+                    Archive employee
+                  </Button>
+                ) : (
+                  <span className="hidden sm:block" />
+                )}
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button type="button" variant="outline" onClick={() => setEditProfileId(null)}>
+                    Cancel
+                  </Button>
+                  <FormSubmitButton type="submit" pendingText="Saving...">
+                    Save changes
+                  </FormSubmitButton>
+                </div>
               </DialogFooter>
             </form>
           </DialogContent>

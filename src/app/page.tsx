@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   ArrowRight,
@@ -51,6 +51,18 @@ function toFriendlySignupError(message: string): string {
   return message
 }
 
+function toFriendlyQueryError(code: string | null): string | null {
+  if (code === 'account_inactive') {
+    return 'This account no longer has app access. Contact your manager if you need to be reactivated.'
+  }
+
+  if (code === 'auth_callback_failed') {
+    return 'We could not complete sign-in. Try again.'
+  }
+
+  return null
+}
+
 export default function HomePage() {
   const router = useRouter()
   const pathname = usePathname()
@@ -74,6 +86,17 @@ export default function HomePage() {
     (typeof window !== 'undefined' ? window.location.origin : undefined)
   const authCallbackUrl = baseUrl ? `${baseUrl}/auth/callback` : undefined
   const resetPasswordUrl = baseUrl ? `${baseUrl}/reset-password` : undefined
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const queryError = toFriendlyQueryError(
+      new URLSearchParams(window.location.search).get('error')
+    )
+    if (queryError) {
+      setError(queryError)
+      setMessage(null)
+    }
+  }, [])
 
   async function handleForgotPassword(e: React.FormEvent) {
     e.preventDefault()

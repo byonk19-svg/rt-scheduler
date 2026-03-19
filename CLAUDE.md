@@ -1,6 +1,6 @@
 ﻿# Teamwise Scheduler
 
-Updated: 2026-03-18 (session 5)
+Updated: 2026-03-19 (session 6)
 
 ## What This App Is
 
@@ -8,6 +8,23 @@ Teamwise is a respiratory therapy scheduling app replacing paper workflows.
 Core domains: coverage planning, cycles, availability requests, shift board, approvals, publish flow, team management.
 
 ## Latest Updates (2026-03-18)
+
+- **`/team` roster is now shift-grouped and supports soft archive**:
+  - Managers remain in a top-level section with no shift designation
+  - Active non-managers are now split visually into:
+    - `Day Shift` -> `Lead Therapists`, `Therapists`
+    - `Night Shift` -> `Lead Therapists`, `Therapists`
+  - Inactive team members remain in a separate `Inactive` section
+  - Inactive team members no longer show the normal app-permissions checklist in quick edit; the modal now states they have no app access while inactive
+  - Inactive team members can now be soft archived from `/team`
+    - archive keeps historical data
+    - archive removes the user from `/team`
+    - archive removes app access
+  - New migration required for live DBs:
+    - `supabase/migrations/20260319101500_add_profile_archival_fields.sql`
+    - adds `profiles.archived_at` and `profiles.archived_by`
+  - Middleware and permission checks now treat inactive or archived users as having no app access
+  - Login/signout flow now redirects inactive or archived users out of the app with an account-inactive message on `/`
 
 - **Coverage dialog compaction pass complete**:
   - `src/components/coverage/ShiftEditorDialog.tsx` now uses extracted layout tokens from `src/components/coverage/shift-editor-dialog-layout.ts`
@@ -22,18 +39,20 @@ Core domains: coverage planning, cycles, availability requests, shift board, app
   - Clicking a team member card opens a centered quick-edit modal on `/team`
   - `/team` now shows:
     - managers
-    - leads
-    - therapists
+    - day-shift lead therapists
+    - day-shift therapists
+    - night-shift lead therapists
+    - night-shift therapists
     - inactive team members
   - Quick edit now covers:
     - name
     - role (`manager`, `lead`, `therapist`)
     - shift type
     - employment type
-    - coverage lead eligibility
     - FMLA
     - FMLA return date
     - active/inactive
+    - archive action for inactive team members
   - Team cards now show FMLA return date and inactive state directly in the roster
   - Behavioral note: if quick edit marks someone inactive, on FMLA, or manager, future draft shifts are realigned
 
@@ -196,7 +215,8 @@ Role source: `profiles.role`.
 - `therapist`: standard staff experience
 
 Coverage lead eligibility remains separate at `profiles.is_lead_eligible`.
-All permission checks go through `can(role, permission)` in `src/lib/auth/can.ts`.
+On the `/team` surface, lead eligibility is derived from the selected role when saving quick edit.
+All permission checks go through `can(role, permission)` in `src/lib/auth/can.ts`, and inactive or archived users should be denied there.
 
 ## Key Shared Components
 

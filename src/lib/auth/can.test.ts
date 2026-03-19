@@ -12,7 +12,7 @@ const MANAGER_ONLY_PERMISSIONS: Permission[] = [
   'export_all_availability',
 ]
 
-describe('can — manager-only permissions', () => {
+describe('can - manager-only permissions', () => {
   it.each(MANAGER_ONLY_PERMISSIONS)('%s: grants access to manager', (permission) => {
     expect(can('manager', permission)).toBe(true)
   })
@@ -32,9 +32,17 @@ describe('can — manager-only permissions', () => {
   it.each(MANAGER_ONLY_PERMISSIONS)('%s: denies access to unknown role string', (permission) => {
     expect(can('admin', permission)).toBe(false)
   })
+
+  it.each(MANAGER_ONLY_PERMISSIONS)('%s: denies access to inactive managers', (permission) => {
+    expect(can('manager', permission, { isActive: false })).toBe(false)
+  })
+
+  it.each(MANAGER_ONLY_PERMISSIONS)('%s: denies access to archived managers', (permission) => {
+    expect(can('manager', permission, { archivedAt: '2026-03-19T08:00:00.000Z' })).toBe(false)
+  })
 })
 
-describe('can — update_assignment_status', () => {
+describe('can - update_assignment_status', () => {
   it('grants access to manager without context', () => {
     expect(can('manager', 'update_assignment_status')).toBe(true)
   })
@@ -62,9 +70,13 @@ describe('can — update_assignment_status', () => {
   it('denies access for unknown role string', () => {
     expect(can('admin', 'update_assignment_status')).toBe(false)
   })
+
+  it('denies access to inactive leads', () => {
+    expect(can('lead', 'update_assignment_status', { isActive: false })).toBe(false)
+  })
 })
 
-describe('can — raw string role input', () => {
+describe('can - raw string role input', () => {
   it('accepts a raw string role value and resolves it', () => {
     expect(can('manager', 'manage_schedule')).toBe(true)
     expect(can('therapist', 'manage_schedule')).toBe(false)
