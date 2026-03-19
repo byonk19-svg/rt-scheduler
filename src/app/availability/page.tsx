@@ -308,15 +308,10 @@ export default async function AvailabilityPage({
   const submitEntryCard = (
     <Card id="submit-entry">
       <CardHeader>
-        <CardTitle>
-          {canManageAvailability
-            ? 'Add therapist-reported availability'
-            : 'Submit availability for an upcoming cycle'}
-        </CardTitle>
+        <CardTitle>Submit availability for an upcoming cycle</CardTitle>
         <CardDescription>
-          {canManageAvailability
-            ? 'Use this only when you need to enter a therapist-submitted request manually. For manager planning, use Staff Scheduling Inputs above.'
-            : 'Use this before publish. First choose a date and cycle, then choose Need off or Available to work.'}
+          Use this before publish. First choose a date and cycle, then choose Need off or Available
+          to work.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -400,9 +395,7 @@ export default async function AvailabilityPage({
 
           <div className="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-muted-foreground">
-              {canManageAvailability
-                ? 'Need off means the therapist cannot work. Available to work means they are open for shifts.'
-                : 'Need off means you cannot work. Available to work means you are open for shifts.'}
+              Need off means you cannot work. Available to work means you are open for shifts.
             </p>
             <FormSubmitButton type="submit" pendingText="Saving...">
               Save request
@@ -502,7 +495,6 @@ export default async function AvailabilityPage({
             deleteManagerPlannerDateAction={deleteManagerPlannerDateAction}
           />
           {entriesCard}
-          {submitEntryCard}
         </>
       ) : (
         <>
