@@ -2,10 +2,14 @@ import { NextResponse } from 'next/server'
 
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
+import {
+  notifyPublishedShiftAdded,
+  notifyPublishedShiftMoved,
+  notifyPublishedShiftRemoved,
+} from '@/lib/published-schedule-notifications'
 import { createClient } from '@/lib/supabase/server'
 import { setDesignatedLeadMutation } from '@/lib/set-designated-lead'
 import { exceedsCoverageLimit, exceedsWeeklyLimit } from '@/lib/schedule-rule-validation'
-import { notifyUsers } from '@/lib/notifications'
 import { isTrustedMutationRequest } from '@/lib/security/request-origin'
 import { writeAuditLog } from '@/lib/audit-log'
 import {
@@ -49,6 +53,7 @@ type DragAction =
       userId: string
       shiftType: 'day' | 'night'
       date: string
+      role?: ShiftRole
       overrideWeeklyRules: boolean
       availabilityOverride?: boolean
       availabilityOverrideReason?: string
@@ -381,7 +386,7 @@ export async function POST(request: Request) {
 
   const { data: cycle, error: cycleError } = await supabase
     .from('schedule_cycles')
-    .select('id, start_date, end_date')
+    .select('id, start_date, end_date, published')
     .eq('id', payload.cycleId)
     .maybeSingle()
 
@@ -489,7 +494,7 @@ export async function POST(request: Request) {
         date: payload.date,
         shift_type: payload.shiftType,
         status: 'scheduled',
-        role: 'staff',
+        role: payload.role ?? 'staff',
         availability_override: shouldSetAvailabilityOverride,
         availability_override_reason: shouldSetAvailabilityOverride
           ? normalizedAvailabilityOverrideReason
@@ -519,12 +524,11 @@ export async function POST(request: Request) {
       })
     }
 
-    await notifyUsers(supabase, {
-      userIds: [payload.userId],
-      eventType: 'shift_assigned',
-      title: 'New shift assigned',
-      message: `You were assigned a ${payload.shiftType} shift on ${payload.date}.`,
-      targetType: 'shift',
+    await notifyPublishedShiftAdded(supabase, {
+      cyclePublished: Boolean(cycle.published),
+      userId: payload.userId,
+      date: payload.date,
+      shiftType: payload.shiftType,
       targetId: insertedShift?.id ?? `${payload.cycleId}:${payload.userId}:${payload.date}`,
     })
 
@@ -536,7 +540,18 @@ export async function POST(request: Request) {
       shiftType: payload.shiftType,
     }
 
-    return NextResponse.json({ message: 'Shift assigned.', undoAction })
+    return NextResponse.json({
+      message: 'Shift assigned.',
+      undoAction,
+      shift: {
+        id: insertedShift?.id ?? `${payload.cycleId}:${payload.userId}:${payload.date}`,
+        user_id: payload.userId,
+        date: payload.date,
+        shift_type: payload.shiftType,
+        status: 'scheduled',
+        assignment_status: null,
+      },
+    })
   }
 
   if (payload.action === 'move') {
@@ -679,6 +694,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Incomplete shift data' }, { status: 422 })
     }
 
+    await notifyPublishedShiftMoved(supabase, {
+      cyclePublished: Boolean(cycle.published),
+      userId: shift.user_id,
+      fromDate: shift.date,
+      fromShiftType: shift.shift_type as 'day' | 'night',
+      toDate: payload.targetDate,
+      toShiftType: payload.targetShiftType,
+      targetId: shift.id,
+    })
+
     const undoAction: DragAction = {
       action: 'move',
       cycleId: payload.cycleId,
@@ -729,6 +754,14 @@ export async function POST(request: Request) {
       userId: user.id,
       action: 'shift_removed',
       targetType: 'shift',
+      targetId: shift.id,
+    })
+
+    await notifyPublishedShiftRemoved(supabase, {
+      cyclePublished: Boolean(cycle.published),
+      userId: shift.user_id,
+      date: shift.date,
+      shiftType: shift.shift_type,
       targetId: shift.id,
     })
 
@@ -921,6 +954,16 @@ export async function POST(request: Request) {
         { error: 'Could not record availability override metadata.' },
         { status: 500 }
       )
+    }
+
+    if (!existingShift) {
+      await notifyPublishedShiftAdded(supabase, {
+        cyclePublished: Boolean(cycle.published),
+        userId: payload.therapistId,
+        date: payload.date,
+        shiftType: payload.shiftType,
+        targetId: `${payload.cycleId}:${payload.therapistId}:${payload.date}:${payload.shiftType}`,
+      })
     }
 
     return NextResponse.json({ message: 'Designated lead updated.' })

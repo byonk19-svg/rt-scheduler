@@ -85,6 +85,7 @@ export type ScheduleSearchParams = {
   added?: string
   unfilled?: string
   constraints_unfilled?: string
+  forced_misses?: string
   copied?: string
   skipped?: string
   error?: string
@@ -137,6 +138,7 @@ export type AvailabilityOverrideRow = {
   date: string
   shift_type: 'day' | 'night' | 'both'
   override_type: 'force_off' | 'force_on'
+  source?: 'manager' | 'therapist'
   note?: string | null
 }
 

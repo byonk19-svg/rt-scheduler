@@ -57,6 +57,50 @@ describe('fillCoverageSlot', () => {
     expect(result.unfilledReason).toBeNull()
   })
 
+  it('fills a legal manager-forced therapist before ordinary candidates', () => {
+    const result = fillCoverageSlot({
+      therapists: [
+        therapist({ id: 'ordinary', full_name: 'Ordinary Therapist' }),
+        therapist({ id: 'forced', full_name: 'Forced Therapist' }),
+      ],
+      cursor: 0,
+      date: '2026-03-02',
+      shiftType: 'day',
+      cycleId: 'cycle-1',
+      availabilityOverridesByTherapist: new Map<string, AvailabilityOverrideRow[]>([
+        [
+          'forced',
+          [
+            {
+              therapist_id: 'forced',
+              cycle_id: 'cycle-1',
+              date: '2026-03-02',
+              shift_type: 'day',
+              override_type: 'force_on',
+              source: 'manager',
+            },
+          ],
+        ],
+      ]),
+      assignedUserIdsForDate: new Set<string>(),
+      weeklyWorkedDatesByUserWeek: new Map<string, Set<string>>(),
+      weeklyLimitByTherapist: new Map([
+        ['ordinary', 3],
+        ['forced', 3],
+      ]),
+      weeklyMinimumByTherapist: new Map([
+        ['ordinary', 0],
+        ['forced', 0],
+      ]),
+      currentCoverage: 0,
+      targetCoverage: 1,
+      minCoverage: 1,
+    })
+
+    expect(result.pickedTherapists.map((row) => row.id)).toEqual(['forced'])
+    expect(result.coverage).toBe(1)
+  })
+
   it('leaves slot unfilled and records reason when no eligible therapists remain for the date', () => {
     const result = fillCoverageSlot({
       therapists: [

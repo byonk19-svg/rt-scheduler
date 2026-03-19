@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   assignCoverageShift,
+  assignCoverageShiftViaApi,
   persistCoverageShiftStatus,
   unassignCoverageShift,
+  unassignCoverageShiftViaApi,
 } from '@/lib/coverage/mutations'
 import type { CoverageMutationError } from '@/lib/coverage/mutations'
 
@@ -91,6 +93,40 @@ describe('assignCoverageShift', () => {
   })
 })
 
+describe('assignCoverageShiftViaApi', () => {
+  it('returns inserted shift data from the drag-drop API', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            shift: {
+              id: 'shift-api-1',
+              user_id: 'user-1',
+              date: '2026-03-01',
+              shift_type: 'day',
+              status: 'scheduled',
+              assignment_status: null,
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        )
+      )
+    )
+
+    const result = await assignCoverageShiftViaApi({
+      cycleId: 'cycle-1',
+      userId: 'user-1',
+      isoDate: '2026-03-01',
+      shiftType: 'day',
+      role: 'lead',
+    })
+
+    expect(result.error).toBe(null)
+    expect(result.data).toMatchObject({ id: 'shift-api-1', user_id: 'user-1' })
+  })
+})
+
 describe('unassignCoverageShift', () => {
   it('returns no error on success', async () => {
     const supabase = makeSupabase({ deleteResult: { error: null } })
@@ -103,6 +139,27 @@ describe('unassignCoverageShift', () => {
     const supabase = makeSupabase({ deleteResult: { error: dbError } })
     const result = await unassignCoverageShift(supabase, 'shift-1')
     expect(result.error).toEqual(dbError)
+  })
+})
+
+describe('unassignCoverageShiftViaApi', () => {
+  it('surfaces the API error when delete fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(JSON.stringify({ error: 'Could not remove shift' }), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        })
+      )
+    )
+
+    const result = await unassignCoverageShiftViaApi({
+      cycleId: 'cycle-1',
+      shiftId: 'shift-1',
+    })
+
+    expect(result.error).toEqual({ message: 'Could not remove shift' })
   })
 })
 

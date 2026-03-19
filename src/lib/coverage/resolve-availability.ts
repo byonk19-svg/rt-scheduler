@@ -38,6 +38,7 @@ export type EligibilityResolution = {
   overrideNote?: string | null
   offeredByOverride: boolean
   prnNotOffered: boolean
+  forcedByManager: boolean
 }
 
 export type ResolveAvailabilityParams = {
@@ -74,6 +75,7 @@ function buildResolution(
     overrideNote: options?.overrideNote,
     offeredByOverride: reason === 'override_force_on',
     prnNotOffered: reason === 'prn_not_offered_for_date',
+    forcedByManager: false,
   }
 }
 
@@ -92,11 +94,21 @@ function findMatchingOverride(
       shiftTypeMatches(override.shift_type, shiftType)
   )
   if (sameScope.length === 0) return null
+  const ranked = sameScope
+    .slice()
+    .sort((a, b) => {
+      const aExact = a.shift_type === shiftType ? 1 : 0
+      const bExact = b.shift_type === shiftType ? 1 : 0
+      if (aExact !== bExact) return bExact - aExact
 
-  const exact = sameScope.find((override) => override.shift_type === shiftType)
-  if (exact) return exact
+      const aManager = a.source === 'manager' ? 1 : 0
+      const bManager = b.source === 'manager' ? 1 : 0
+      if (aManager !== bManager) return bManager - aManager
 
-  return sameScope[0] ?? null
+      return 0
+    })
+
+  return ranked[0] ?? null
 }
 
 export function resolveEligibility(params: ResolveEligibilityParams): EligibilityResolution {
@@ -117,30 +129,23 @@ export function resolveEligibility(params: ResolveEligibilityParams): Eligibilit
   )
 
   if (override?.override_type === 'force_off') {
-    return buildResolution('override_force_off', {
+    const resolution = buildResolution('override_force_off', {
       overrideNote: override.note ?? null,
     })
+    resolution.forcedByManager = override.source === 'manager'
+    return resolution
   }
 
   if (override?.override_type === 'force_on') {
-    return buildResolution('override_force_on', {
+    const resolution = buildResolution('override_force_on', {
       overrideNote: override.note ?? null,
     })
+    resolution.forcedByManager = override.source === 'manager'
+    return resolution
   }
 
   if (params.therapist.employment_type === 'prn') {
-    const pattern = params.therapist.pattern
-    if (!pattern) {
-      return buildResolution('prn_not_offered_for_date')
-    }
-    if (pattern.works_dow_mode === 'hard') {
-      const weekdayParsed = new Date(`${params.date}T00:00:00`)
-      const weekday = Number.isNaN(weekdayParsed.getTime()) ? null : weekdayParsed.getDay()
-      const inWorksDow = weekday !== null && pattern.works_dow.includes(weekday)
-      if (!inWorksDow) {
-        return buildResolution('prn_not_offered_for_date')
-      }
-    }
+    return buildResolution('prn_not_offered_for_date')
   }
 
   return buildResolution('allowed')

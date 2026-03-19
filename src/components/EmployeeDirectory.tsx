@@ -1494,8 +1494,8 @@ export function EmployeeDirectory({
                     <div>
                       <p className="text-sm font-semibold">Date Overrides (Manager)</p>
                       <p className="text-xs text-muted-foreground">
-                        Add or update cycle-specific dates for this therapist. Same cycle/date/shift
-                        updates existing entry.
+                        Availability is now the primary manager planner. Use this drawer only for
+                        quick exceptions when you do not want to leave Team.
                       </p>
                     </div>
 

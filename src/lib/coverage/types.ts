@@ -9,6 +9,7 @@ export type AvailabilityOverrideRow = {
   date: string
   shift_type: ShiftTypeForAvailability
   override_type: AvailabilityOverrideType
+  source?: 'manager' | 'therapist'
   note?: string | null
   created_by?: string
   created_at?: string

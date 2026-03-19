@@ -31,6 +31,7 @@ function buildOverride(overrides?: Partial<AvailabilityOverrideRow>): Availabili
     date: '2026-03-06',
     shift_type: 'both',
     override_type: 'force_off',
+    source: 'therapist',
     note: null,
     ...overrides,
   }
@@ -66,6 +67,22 @@ describe('schedule feedback messaging', () => {
 
     expect(feedback?.variant).toBe('error')
     expect(feedback?.message).toContain('2 slots were left unfilled due to constraints.')
+  })
+
+  it('includes forced manager-date misses after auto-generate', () => {
+    const feedback = getScheduleFeedback({
+      auto: 'generated',
+      added: '6',
+      unfilled: '0',
+      lead_missing: '0',
+      constraints_unfilled: '0',
+      forced_misses: '2',
+    })
+
+    expect(feedback?.variant).toBe('error')
+    expect(feedback?.message).toContain(
+      '2 manager-selected Will work dates could not be honored automatically.'
+    )
   })
 })
 
@@ -177,7 +194,7 @@ describe('pickTherapistForDate', () => {
     expect(pick.therapist?.id).toBe('therapist-1')
   })
 
-  it('allows PRN when no explicit availability override blocks the date', () => {
+  it('blocks PRN when no explicit availability override exists for the date', () => {
     const therapist = buildTherapist({
       employment_type: 'prn',
       works_dow: [2],
@@ -196,10 +213,10 @@ describe('pickTherapistForDate', () => {
       new Map([['therapist-1', 3]])
     )
 
-    expect(pick.therapist?.id).toBe('therapist-1')
+    expect(pick.therapist).toBeNull()
   })
 
-  it('allows PRN when recurring pattern offers the weekday', () => {
+  it('blocks PRN even when the recurring pattern offers the weekday', () => {
     const therapist = buildTherapist({
       employment_type: 'prn',
       works_dow: [1],
@@ -218,7 +235,7 @@ describe('pickTherapistForDate', () => {
       new Map([['therapist-1', 3]])
     )
 
-    expect(pick.therapist?.id).toBe('therapist-1')
+    expect(pick.therapist).toBeNull()
   })
 
   it('falls back to cursor order when weekly counts are tied', () => {
@@ -313,6 +330,45 @@ describe('pickTherapistForDate', () => {
     )
 
     expect(pick.therapist?.id).toBe('therapist-1')
+  })
+
+  it('prioritizes a legal manager-forced date over ordinary eligible candidates', () => {
+    const forcedTherapist = buildTherapist({
+      id: 'forced-therapist',
+      full_name: 'Forced Therapist',
+    })
+    const ordinaryTherapist = buildTherapist({
+      id: 'ordinary-therapist',
+      full_name: 'Ordinary Therapist',
+    })
+
+    const pick = pickTherapistForDate(
+      [ordinaryTherapist, forcedTherapist],
+      0,
+      '2026-03-06',
+      'day',
+      new Map<string, AvailabilityOverrideRow[]>([
+        [
+          'forced-therapist',
+          [
+            buildOverride({
+              therapist_id: 'forced-therapist',
+              override_type: 'force_on',
+              source: 'manager',
+            }),
+          ],
+        ],
+      ]),
+      'cycle-1',
+      new Set<string>(),
+      new Map(),
+      new Map([
+        ['ordinary-therapist', 3],
+        ['forced-therapist', 3],
+      ])
+    )
+
+    expect(pick.therapist?.id).toBe('forced-therapist')
   })
 
   it('force_off override blocks even on normal works day', () => {

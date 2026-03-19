@@ -25,6 +25,7 @@ vi.mock('@/lib/audit-log', () => ({
 type Scenario = {
   coverageStatuses: Array<'scheduled' | 'on_call' | 'sick' | 'called_off'>
   weeklyShifts: Array<{ date: string; status: 'scheduled' | 'on_call' | 'sick' | 'called_off' }>
+  cyclePublished?: boolean
   leadTherapistEligible?: boolean
   leadTherapistRole?: 'therapist' | 'manager'
   existingShiftForLead?: {
@@ -65,6 +66,7 @@ function makeSupabaseMock(scenario: Scenario) {
     id: 'cycle-1',
     start_date: '2026-03-01',
     end_date: '2026-03-31',
+    published: scenario.cyclePublished ?? false,
   }
 
   const insertedShiftPayloads: Array<Record<string, unknown>> = []
@@ -420,6 +422,7 @@ describe('drag-drop API behavior', () => {
     const supabase = makeSupabaseMock({
       coverageStatuses: ['scheduled', 'scheduled'],
       weeklyShifts: [],
+      cyclePublished: true,
       therapistProfiles: {
         'therapist-1': {
           full_name: 'Alex Jones',
@@ -465,7 +468,13 @@ describe('drag-drop API behavior', () => {
       availability_override_by: 'manager-1',
     })
     expect(writeAuditLog).toHaveBeenCalled()
-    expect(notifyUsers).toHaveBeenCalled()
+    expect(notifyUsers).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        eventType: 'published_schedule_changed',
+        message: 'Your published schedule changed: you were added to a day shift on Mar 10.',
+      })
+    )
   })
 
   it('blocks PRN assignment when no force_on override and no offered pattern day exists', async () => {
@@ -613,6 +622,7 @@ describe('drag-drop API behavior', () => {
       makeSupabaseMock({
         coverageStatuses: [],
         weeklyShifts: [],
+        cyclePublished: true,
         removableShift: {
           id: 'shift-1',
           cycle_id: 'cycle-1',
@@ -648,5 +658,58 @@ describe('drag-drop API behavior', () => {
         overrideWeeklyRules: true,
       },
     })
+    expect(notifyUsers).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        eventType: 'published_schedule_changed',
+        message: 'Your published schedule changed: your night shift on Mar 12 was removed.',
+      })
+    )
+  })
+
+  it('notifies the affected therapist when a published shift is moved', async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      makeSupabaseMock({
+        coverageStatuses: ['scheduled'],
+        weeklyShifts: [],
+        cyclePublished: true,
+        removableShift: {
+          id: 'shift-1',
+          cycle_id: 'cycle-1',
+          user_id: 'therapist-2',
+          date: '2026-03-12',
+          shift_type: 'day',
+          role: 'staff',
+        },
+      }) as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          action: 'move',
+          cycleId: 'cycle-1',
+          shiftId: 'shift-1',
+          targetDate: '2026-03-13',
+          targetShiftType: 'night',
+          overrideWeeklyRules: false,
+        }),
+      })
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      message: 'Shift moved.',
+    })
+    expect(notifyUsers).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        eventType: 'published_schedule_changed',
+        message:
+          'Your published schedule changed: your shift moved from Mar 12 day to Mar 13 night.',
+      })
+    )
   })
 })

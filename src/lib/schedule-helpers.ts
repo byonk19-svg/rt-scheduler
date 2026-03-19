@@ -305,15 +305,22 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
     const unfilled = parseCount(getSearchParam(params?.unfilled))
     const leadMissing = parseCount(getSearchParam(params?.lead_missing))
     const constraintsUnfilled = parseCount(getSearchParam(params?.constraints_unfilled))
+    const forcedMisses = parseCount(getSearchParam(params?.forced_misses))
 
-    if (added === 0 && unfilled === 0 && leadMissing === 0 && constraintsUnfilled === 0) {
+    if (
+      added === 0 &&
+      unfilled === 0 &&
+      leadMissing === 0 &&
+      constraintsUnfilled === 0 &&
+      forcedMisses === 0
+    ) {
       return {
         message:
           'Auto-generate made no changes because this draft already has assignment coverage. Use "Clear draft and start over" to rebuild it.',
         variant: 'success',
       }
     }
-    if (unfilled > 0 || leadMissing > 0 || constraintsUnfilled > 0) {
+    if (unfilled > 0 || leadMissing > 0 || constraintsUnfilled > 0 || forcedMisses > 0) {
       const unfilledText =
         unfilled > 0 ? `${unfilled} slot${unfilled !== 1 ? 's' : ''} still need manual fill.` : ''
       const leadText =
@@ -324,9 +331,13 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
         constraintsUnfilled > 0
           ? `${constraintsUnfilled} slot${constraintsUnfilled !== 1 ? 's' : ''} were left unfilled due to constraints.`
           : ''
+      const forcedText =
+        forcedMisses > 0
+          ? `${forcedMisses} manager-selected Will work date${forcedMisses !== 1 ? 's could not' : ' could not'} be honored automatically.`
+          : ''
       return {
         message:
-          `Draft generated with ${added} new shifts. ${unfilledText} ${leadText} ${constraintText}`.trim(),
+          `Draft generated with ${added} new shifts. ${unfilledText} ${leadText} ${constraintText} ${forcedText}`.trim(),
         variant: 'error',
       }
     }
@@ -375,6 +386,7 @@ export function pickTherapistForDate(
     weeklyGap: number
     weeklyCount: number
     belowMin: boolean
+    forcedByManager: boolean
     penalty: number
     offset: number
   } | null = null
@@ -424,12 +436,17 @@ export function pickTherapistForDate(
     const isBelowMin = weeklyCount < weeklyMinimum
     if (
       !best ||
-      (isBelowMin && !best.belowMin) ||
-      (isBelowMin === best.belowMin && weeklyCount < best.weeklyCount) ||
-      (isBelowMin === best.belowMin &&
+      (patternDecision.forcedByManager && !best.forcedByManager) ||
+      (patternDecision.forcedByManager === best.forcedByManager && isBelowMin && !best.belowMin) ||
+      (patternDecision.forcedByManager === best.forcedByManager &&
+        isBelowMin === best.belowMin &&
+        weeklyCount < best.weeklyCount) ||
+      (patternDecision.forcedByManager === best.forcedByManager &&
+        isBelowMin === best.belowMin &&
         weeklyCount === best.weeklyCount &&
         patternDecision.penalty < best.penalty) ||
-      (isBelowMin === best.belowMin &&
+      (patternDecision.forcedByManager === best.forcedByManager &&
+        isBelowMin === best.belowMin &&
         weeklyCount === best.weeklyCount &&
         patternDecision.penalty === best.penalty &&
         i < best.offset)
@@ -440,6 +457,7 @@ export function pickTherapistForDate(
         weeklyGap,
         weeklyCount,
         belowMin: isBelowMin,
+        forcedByManager: patternDecision.forcedByManager,
         penalty: patternDecision.penalty,
         offset: i,
       }

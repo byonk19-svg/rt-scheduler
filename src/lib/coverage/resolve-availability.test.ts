@@ -25,6 +25,7 @@ function buildOverride(overrides?: Partial<AvailabilityOverrideRow>): Availabili
     shift_type: 'both',
     override_type: 'force_off',
     note: null,
+    source: 'therapist',
     ...overrides,
   }
 }
@@ -107,6 +108,7 @@ describe('resolveAvailability', () => {
 
     expect(resolution.allowed).toBe(true)
     expect(resolution.reason).toBe('override_force_on')
+    expect(resolution.forcedByManager).toBe(false)
   })
 
   it('does not bypass inactive or FMLA with force_on', () => {
@@ -141,7 +143,7 @@ describe('resolveAvailability', () => {
     expect(onFmla.reason).toBe('on_fmla')
   })
 
-  it('allows PRN when no explicit force_off override exists', () => {
+  it('blocks PRN when no explicit available-to-work date exists', () => {
     const pattern = buildPattern({
       works_dow: [2],
       offs_dow: [],
@@ -161,8 +163,8 @@ describe('resolveAvailability', () => {
       overrides: [],
     })
 
-    expect(resolution.allowed).toBe(true)
-    expect(resolution.reason).toBe('allowed')
+    expect(resolution.allowed).toBe(false)
+    expect(resolution.reason).toBe('prn_not_offered_for_date')
   })
 
   it('allows PRN with force_on override even when recurring pattern blocks', () => {
@@ -190,7 +192,67 @@ describe('resolveAvailability', () => {
     expect(resolution.reason).toBe('override_force_on')
   })
 
-  it('allows PRN when recurring pattern offers the weekday', () => {
+  it('flags manager force_on as a forced scheduling signal', () => {
+    const resolution = resolveAvailability({
+      therapistId: 'therapist-1',
+      cycleId: 'cycle-a',
+      date: '2026-03-06',
+      shiftType: 'day',
+      isActive: true,
+      onFmla: false,
+      pattern: buildPattern({
+        works_dow: [1],
+        offs_dow: [5],
+        weekend_rotation: 'every_other',
+        weekend_anchor_date: '2026-02-21',
+        works_dow_mode: 'hard',
+      }),
+      overrides: [
+        buildOverride({
+          override_type: 'force_on',
+          source: 'manager',
+        }),
+      ],
+    })
+
+    expect(resolution.allowed).toBe(true)
+    expect(resolution.reason).toBe('override_force_on')
+    expect(resolution.offeredByOverride).toBe(true)
+    expect(resolution.forcedByManager).toBe(true)
+  })
+
+  it('prefers manager overrides when exact and broad rows both match the date', () => {
+    const resolution = resolveAvailability({
+      therapistId: 'therapist-1',
+      cycleId: 'cycle-a',
+      date: '2026-03-06',
+      shiftType: 'day',
+      isActive: true,
+      onFmla: false,
+      pattern: buildPattern({ works_dow: [5], offs_dow: [], works_dow_mode: 'hard' }),
+      overrides: [
+        buildOverride({
+          shift_type: 'day',
+          override_type: 'force_off',
+          source: 'manager',
+          note: 'manager block',
+        }),
+        buildOverride({
+          shift_type: 'both',
+          override_type: 'force_on',
+          source: 'therapist',
+          note: 'therapist available',
+        }),
+      ],
+    })
+
+    expect(resolution.allowed).toBe(false)
+    expect(resolution.reason).toBe('override_force_off')
+    expect(resolution.overrideNote).toBe('manager block')
+    expect(resolution.forcedByManager).toBe(true)
+  })
+
+  it('blocks PRN even when recurring pattern offers the weekday without explicit availability', () => {
     const pattern = buildPattern({
       works_dow: [1],
       offs_dow: [],
@@ -210,7 +272,7 @@ describe('resolveAvailability', () => {
       overrides: [],
     })
 
-    expect(resolution.allowed).toBe(true)
-    expect(resolution.reason).toBe('allowed')
+    expect(resolution.allowed).toBe(false)
+    expect(resolution.reason).toBe('prn_not_offered_for_date')
   })
 })

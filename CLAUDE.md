@@ -77,6 +77,41 @@ Core domains: coverage planning, cycles, availability requests, shift board, app
 
 ## Latest Updates (2026-03-19)
 
+- **`/availability` now has a manager scheduling planner**:
+  - Managers now get a dedicated `Staff Scheduling Inputs` workspace at the top of `/availability`
+  - The planner is cycle-scoped and therapist-specific
+  - Manager-facing labels are now:
+    - `Will work`
+    - `Cannot work`
+  - Planner saves still use `availability_overrides`:
+    - `Will work` -> `force_on`
+    - `Cannot work` -> `force_off`
+    - `source='manager'`
+  - Main files:
+    - `src/app/availability/actions.ts`
+    - `src/components/availability/ManagerSchedulingInputs.tsx`
+    - `src/lib/availability-planner.ts`
+  - The older override UI in `EmployeeDirectory` is now secondary copy-wise; `/availability` is the primary manager planning surface
+
+- **Auto-draft now honors manager hard dates more explicitly**:
+  - Manager `force_on` dates are treated as forced scheduling signals and prioritized over ordinary eligible candidates when legal
+  - Manager `force_off` still blocks
+  - Forced manager dates do **not** bypass:
+    - weekly cap
+    - one shift per day
+    - inactive/FMLA blocks
+    - lead rules
+  - If auto-draft cannot honor every manager `Will work` date, the draft still saves and the feedback now reports how many forced dates were missed
+  - Main files:
+    - `src/lib/coverage/resolve-availability.ts`
+    - `src/lib/schedule-helpers.ts`
+    - `src/app/schedule/actions.ts`
+
+- **PRN rule tightened to explicit-date-only for auto-draft**:
+  - PRN should only enter auto-draft on explicit `force_on` dates
+  - Recurring PRN weekday patterns are no longer enough by themselves for auto-draft eligibility
+  - This now lines up with the new manager planner workflow on `/availability`
+
 - **Preliminary schedule workflow added**:
   - Managers can now send a staff-visible preliminary schedule from `/coverage`
   - A sent preliminary snapshot stays live and can be refreshed in place from the same page
@@ -355,18 +390,22 @@ Typography classes:
   - `works_dow` is soft preference when `works_dow_mode='soft'`
 - Cycle-scoped date overrides (`availability_overrides` table):
   - inactive/FMLA blocks first
-  - `force_off` blocks date in that cycle
-  - `force_on` allows date in that cycle (except inactive/FMLA)
+  - manager `force_off` blocks date in that cycle
+  - manager `force_on` forces eligibility and is prioritized by auto-draft when legal
+  - therapist `force_off` / `force_on` still affect date eligibility, but manager planner is the strongest operational signal
   - fallback to recurring pattern if no override
 - PRN strict policy:
-  - eligible only when cycle override `force_on` exists, OR recurring pattern offers that weekday (`works_dow`) and hard constraints pass
-  - PRN without `force_on` and without offered recurring day = not eligible
+  - eligible only when cycle override `force_on` exists
+  - recurring weekday patterns alone are not enough for PRN auto-draft eligibility
+  - PRN without explicit `force_on` = not eligible
 
 Auto-generate (`src/lib/schedule-helpers.ts`):
 
 - Targets 4 therapists first; slot is "unfilled" only below 3
 - Excludes inactive + FMLA by default
+- Prioritizes manager `force_on` dates when legal
 - Marks constraint-caused unfilled slots: `unfilled_reason='no_eligible_candidates_due_to_constraints'`
+- Reports forced-date misses back to manager feedback instead of failing the whole draft
 
 Assignment status is informational only (does not affect coverage counts or publish blockers).
 

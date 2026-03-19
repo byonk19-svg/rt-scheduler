@@ -36,6 +36,12 @@ export type AssignedCoverageShiftRow = {
   assignment_status: AssignmentStatus | null
 }
 
+type CoverageApiErrorResponse = {
+  error?: string
+  code?: string
+  shift?: AssignedCoverageShiftRow
+}
+
 export async function assignCoverageShift(
   supabase: SupabaseLike,
   params: AssignCoverageShiftParams
@@ -64,6 +70,71 @@ export async function unassignCoverageShift(
   shiftId: string
 ): Promise<{ error: CoverageMutationError }> {
   return await supabase.from('shifts').delete().eq('id', shiftId)
+}
+
+export async function assignCoverageShiftViaApi(
+  params: AssignCoverageShiftParams
+): Promise<{ data: AssignedCoverageShiftRow | null; error: CoverageMutationError }> {
+  const response = await fetch('/api/schedule/drag-drop', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      action: 'assign',
+      cycleId: params.cycleId,
+      userId: params.userId,
+      date: params.isoDate,
+      shiftType: params.shiftType,
+      role: params.role ?? 'staff',
+      overrideWeeklyRules: false,
+    }),
+  })
+
+  const payload = (await response.json().catch(() => null)) as CoverageApiErrorResponse | null
+  if (!response.ok) {
+    return {
+      data: null,
+      error: {
+        code: payload?.code,
+        message: payload?.error ?? 'Could not assign therapist.',
+      },
+    }
+  }
+
+  return {
+    data: (payload?.shift ?? null) as AssignedCoverageShiftRow | null,
+    error: null,
+  }
+}
+
+export async function unassignCoverageShiftViaApi(params: {
+  cycleId: string
+  shiftId: string
+}): Promise<{ error: CoverageMutationError }> {
+  const response = await fetch('/api/schedule/drag-drop', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      action: 'remove',
+      cycleId: params.cycleId,
+      shiftId: params.shiftId,
+    }),
+  })
+
+  if (response.ok) {
+    return { error: null }
+  }
+
+  const payload = (await response.json().catch(() => null)) as CoverageApiErrorResponse | null
+  return {
+    error: {
+      code: payload?.code,
+      message: payload?.error ?? 'Could not remove shift.',
+    },
+  }
 }
 
 export async function persistCoverageShiftStatus(
