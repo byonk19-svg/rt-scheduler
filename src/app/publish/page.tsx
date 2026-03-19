@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { ArrowRight, CalendarDays, CheckCircle2, CircleX, Clock3, Send } from 'lucide-react'
 
+import { restartPublishedCycleAction } from '@/app/publish/actions'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { Button } from '@/components/ui/button'
@@ -22,9 +23,11 @@ type PublishEventRow = {
   schedule_cycles:
     | {
         label: string
+        published: boolean
       }
     | {
         label: string
+        published: boolean
       }[]
     | null
   profiles:
@@ -40,6 +43,13 @@ type PublishEventRow = {
 function getOne<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null
   return value ?? null
+}
+
+type PublishHistoryPageProps = {
+  searchParams?: Promise<{
+    success?: string
+    error?: string
+  }>
 }
 
 function StatusChip({ status }: { status: 'success' | 'failed' }) {
@@ -71,7 +81,8 @@ function StatusChip({ status }: { status: 'success' | 'failed' }) {
   )
 }
 
-export default async function PublishHistoryPage() {
+export default async function PublishHistoryPage({ searchParams }: PublishHistoryPageProps = {}) {
+  const resolvedSearchParams = (await searchParams) ?? {}
   const supabase = await createClient()
   const {
     data: { user },
@@ -94,7 +105,7 @@ export default async function PublishHistoryPage() {
   const { data: eventsData, error: eventsError } = await supabase
     .from('publish_events')
     .select(
-      'id, cycle_id, published_at, status, recipient_count, channel, queued_count, sent_count, failed_count, error_message, schedule_cycles(label), profiles!publish_events_published_by_fkey(full_name)'
+      'id, cycle_id, published_at, status, recipient_count, channel, queued_count, sent_count, failed_count, error_message, schedule_cycles(label,published), profiles!publish_events_published_by_fkey(full_name)'
     )
     .order('published_at', { ascending: false })
     .limit(50)
@@ -162,6 +173,36 @@ export default async function PublishHistoryPage() {
         </div>
       </div>
 
+      {resolvedSearchParams.success === 'cycle_restarted' && (
+        <div
+          className="rounded-xl border px-4 py-3 text-sm font-medium"
+          style={{
+            borderColor: 'var(--warning-border)',
+            backgroundColor: 'var(--warning-subtle)',
+            color: 'var(--warning-text)',
+          }}
+        >
+          Cycle restarted. The published version was taken offline and the cycle is back in draft
+          schedule mode.
+        </div>
+      )}
+
+      {(resolvedSearchParams.error === 'missing_cycle' ||
+        resolvedSearchParams.error === 'cycle_restart_failed') && (
+        <div
+          className="rounded-xl border px-4 py-3 text-sm font-medium"
+          style={{
+            borderColor: 'var(--error-border)',
+            backgroundColor: 'var(--error-subtle)',
+            color: 'var(--error-text)',
+          }}
+        >
+          {resolvedSearchParams.error === 'missing_cycle'
+            ? 'Could not restart that cycle because no cycle was selected.'
+            : 'Could not restart that published cycle. Please try again.'}
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
         {events.length === 0 ? (
           <div className="flex flex-col items-center gap-3 px-6 py-14 text-center">
@@ -196,7 +237,7 @@ export default async function PublishHistoryPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {events.map((event) => (
-                  <tr key={event.id} className="group">
+                  <tr key={event.id} className="group align-top">
                     <td className="px-4 py-3 text-sm text-foreground">
                       {new Date(event.published_at).toLocaleString('en-US', {
                         month: 'short',
@@ -233,16 +274,40 @@ export default async function PublishHistoryPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <StatusChip status={event.status} />
+                      <div className="flex flex-col items-start gap-1.5">
+                        <StatusChip status={event.status} />
+                        {getOne(event.schedule_cycles)?.published ? (
+                          <span className="text-[11px] font-medium text-[var(--success-text)]">
+                            Currently live
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-medium text-muted-foreground">
+                            No longer live
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Link
-                        href={`/publish/${event.id}`}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                      >
-                        Details
-                        <ArrowRight className="h-3 w-3" aria-hidden="true" />
-                      </Link>
+                      <div className="flex justify-end gap-2">
+                        {getOne(event.schedule_cycles)?.published && (
+                          <form action={restartPublishedCycleAction}>
+                            <input type="hidden" name="cycle_id" value={event.cycle_id} />
+                            <button
+                              type="submit"
+                              className="inline-flex h-8 items-center rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 text-xs font-semibold text-[var(--warning-text)] transition-opacity hover:opacity-80"
+                            >
+                              Start over
+                            </button>
+                          </form>
+                        )}
+                        <Link
+                          href={`/publish/${event.id}`}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                        >
+                          Details
+                          <ArrowRight className="h-3 w-3" aria-hidden="true" />
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -94,6 +94,15 @@ type PreliminaryShiftLookupRow = {
   profiles: { full_name: string | null } | { full_name: string | null }[] | null
 }
 
+type PreliminaryShiftInsertRow = {
+  cycle_id: string
+  user_id: null
+  date: string
+  shift_type: 'day' | 'night'
+  status: ShiftStatus
+  role: ShiftRole
+}
+
 function getOne<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null
   return value ?? null
@@ -155,6 +164,43 @@ async function getTherapistWeeklyLimit(
   if (error) return MAX_WORK_DAYS_PER_WEEK
 
   return getWeeklyLimitFromProfile((data ?? null) as TherapistWeeklyLimitProfile | null)
+}
+
+function buildPreliminaryOpenShiftRows(params: {
+  cycleId: string
+  cycleStartDate: string
+  cycleEndDate: string
+  shifts: PreliminaryShiftLookupRow[]
+}): PreliminaryShiftInsertRow[] {
+  const coverageBySlot = new Map<string, number>()
+
+  for (const shift of params.shifts) {
+    if (!countsTowardWeeklyLimit(shift.status)) continue
+    const key = coverageSlotKey(shift.date, shift.shift_type)
+    coverageBySlot.set(key, (coverageBySlot.get(key) ?? 0) + 1)
+  }
+
+  const placeholders: PreliminaryShiftInsertRow[] = []
+  for (const date of buildDateRange(params.cycleStartDate, params.cycleEndDate)) {
+    for (const shiftType of ['day', 'night'] as const) {
+      const slotKey = coverageSlotKey(date, shiftType)
+      const existingCoverage = coverageBySlot.get(slotKey) ?? 0
+      const missingCoverage = Math.max(0, MIN_SHIFT_COVERAGE_PER_DAY - existingCoverage)
+
+      for (let index = 0; index < missingCoverage; index += 1) {
+        placeholders.push({
+          cycle_id: params.cycleId,
+          user_id: null,
+          date,
+          shift_type: shiftType,
+          status: 'scheduled',
+          role: 'staff',
+        })
+      }
+    }
+  }
+
+  return placeholders
 }
 
 export async function sendPreliminaryScheduleAction(formData: FormData) {
@@ -230,7 +276,43 @@ export async function sendPreliminaryScheduleAction(formData: FormData) {
     redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'preliminary_send_failed' }))
   }
 
-  const mappedShifts = ((shiftsData ?? []) as PreliminaryShiftLookupRow[]).map((shift) => ({
+  const draftShifts = (shiftsData ?? []) as PreliminaryShiftLookupRow[]
+  const missingOpenShifts = buildPreliminaryOpenShiftRows({
+    cycleId,
+    cycleStartDate: cycle.start_date,
+    cycleEndDate: cycle.end_date,
+    shifts: draftShifts,
+  })
+
+  let insertedOpenShifts: PreliminaryShiftLookupRow[] = []
+  if (missingOpenShifts.length > 0) {
+    const { data: insertedData, error: insertedError } = await supabase
+      .from('shifts')
+      .insert(missingOpenShifts)
+      .select('id, cycle_id, user_id, date, shift_type, status, role')
+
+    if (insertedError) {
+      console.error('Failed to create preliminary open slots:', insertedError)
+      redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'preliminary_send_failed' }))
+    }
+
+    insertedOpenShifts = (
+      (insertedData ?? []) as Array<{
+        id: string
+        cycle_id: string | null
+        user_id: string | null
+        date: string
+        shift_type: 'day' | 'night'
+        status: ShiftStatus
+        role: ShiftRole
+      }>
+    ).map((shift) => ({
+      ...shift,
+      profiles: null,
+    }))
+  }
+
+  const mappedShifts = [...draftShifts, ...insertedOpenShifts].map((shift) => ({
     id: shift.id,
     cycle_id: shift.cycle_id,
     user_id: shift.user_id,

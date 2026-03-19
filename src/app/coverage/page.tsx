@@ -19,6 +19,7 @@ import {
 import { CalendarGrid } from '@/components/coverage/CalendarGrid'
 import { ShiftEditorDialog } from '@/components/coverage/ShiftEditorDialog'
 import { PrintSchedule } from '@/components/print-schedule'
+import { getPublishedCoverageBannerContent } from '@/lib/coverage/published-cycle-ui'
 import { updateCoverageAssignmentStatus } from '@/lib/coverage/updateAssignmentStatus'
 import {
   assignCoverageShift,
@@ -180,6 +181,8 @@ function CoveragePageContent() {
     const totalWeeks = Math.max(1, Math.round((printCycleDates.length || 42) / 7))
     return `${formatDateLabel(printCycle.start_date)} - ${formatDateLabel(printCycle.end_date)} · ${totalWeeks} weeks · Click a day to edit`
   }, [printCycle, printCycleDates.length])
+
+  const publishedCoverageBanner = useMemo(() => getPublishedCoverageBannerContent(), [])
 
   useEffect(() => {
     let active = true
@@ -835,7 +838,10 @@ function CoveragePageContent() {
         {activeCyclePublished && (
           <div className="mb-3 rounded-lg border border-[var(--success-border)] bg-[var(--success-subtle)] px-4 py-3">
             <p className="text-xs font-semibold text-[var(--success-text)]">
-              This cycle is published and visible to employees.
+              {publishedCoverageBanner.title}
+            </p>
+            <p className="mt-1 text-xs text-[var(--success-text)]/85">
+              {publishedCoverageBanner.description}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <Link

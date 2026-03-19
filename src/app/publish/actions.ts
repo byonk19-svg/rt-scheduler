@@ -73,3 +73,68 @@ export async function requeueFailedPublishEmailsAction(formData: FormData) {
   const requeued = requeuedRows?.length ?? 0
   redirect(`/publish/${publishEventId}?success=failed_requeued&requeued=${requeued}`)
 }
+
+export async function restartPublishedCycleAction(formData: FormData) {
+  await requireManagerUser()
+
+  const cycleId = String(formData.get('cycle_id') ?? '').trim()
+  if (!cycleId) {
+    redirect('/publish?error=missing_cycle')
+  }
+
+  const supabase = await createClient()
+
+  const { data: cycle, error: cycleError } = await supabase
+    .from('schedule_cycles')
+    .select('id, published')
+    .eq('id', cycleId)
+    .maybeSingle()
+
+  if (cycleError || !cycle) {
+    console.error('Failed to load cycle for restart:', cycleError)
+    redirect('/publish?error=cycle_restart_failed')
+  }
+
+  const { error: cycleUpdateError } = await supabase
+    .from('schedule_cycles')
+    .update({ published: false })
+    .eq('id', cycleId)
+
+  if (cycleUpdateError) {
+    console.error('Failed to unpublish cycle during restart:', cycleUpdateError)
+    redirect('/publish?error=cycle_restart_failed')
+  }
+
+  const { data: deletedShifts, error: deleteShiftsError } = await supabase
+    .from('shifts')
+    .delete()
+    .eq('cycle_id', cycleId)
+    .select('id')
+
+  if (deleteShiftsError) {
+    console.error('Failed to clear shifts during cycle restart:', deleteShiftsError)
+    redirect('/publish?error=cycle_restart_failed')
+  }
+
+  const { error: closeSnapshotError } = await supabase
+    .from('preliminary_snapshots')
+    .update({ status: 'closed' })
+    .eq('cycle_id', cycleId)
+    .eq('status', 'active')
+
+  if (closeSnapshotError) {
+    console.error('Failed to close preliminary snapshot during cycle restart:', closeSnapshotError)
+    redirect('/publish?error=cycle_restart_failed')
+  }
+
+  void deletedShifts
+
+  revalidatePath('/publish')
+  revalidatePath('/coverage')
+  revalidatePath('/schedule')
+  revalidatePath('/preliminary')
+  revalidatePath('/approvals')
+  revalidatePath('/therapist/schedule')
+
+  redirect('/publish?success=cycle_restarted')
+}

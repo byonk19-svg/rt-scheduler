@@ -49,6 +49,18 @@ type TestContext = {
   role?: string | null
   cyclePublished?: boolean
   activeSnapshotId?: string | null
+  cycleStartDate?: string
+  cycleEndDate?: string
+  shifts?: Array<{
+    id: string
+    cycle_id: string
+    user_id: string | null
+    date: string
+    shift_type: 'day' | 'night'
+    status: 'scheduled' | 'on_call' | 'sick' | 'called_off'
+    role: 'lead' | 'staff'
+    profiles: { full_name: string } | null
+  }>
 }
 
 function makeFormData() {
@@ -61,6 +73,7 @@ function makeFormData() {
 }
 
 function createSupabaseMock(context: TestContext) {
+  const insertedShifts: Array<Record<string, unknown>> = []
   return {
     auth: {
       getUser: vi.fn(async () => ({
@@ -99,8 +112,8 @@ function createSupabaseMock(context: TestContext) {
               data: {
                 id: 'cycle-1',
                 label: 'April schedule',
-                start_date: '2026-04-01',
-                end_date: '2026-04-30',
+                start_date: context.cycleStartDate ?? '2026-04-01',
+                end_date: context.cycleEndDate ?? '2026-04-30',
                 published: Boolean(context.cyclePublished),
               },
               error: null,
@@ -127,7 +140,7 @@ function createSupabaseMock(context: TestContext) {
           if (table === 'shifts') {
             return Promise.resolve(
               resolve({
-                data: [
+                data: context.shifts ?? [
                   {
                     id: 'shift-1',
                     cycle_id: 'cycle-1',
@@ -169,10 +182,23 @@ function createSupabaseMock(context: TestContext) {
 
           return Promise.resolve(resolve({ data: [], error: null }))
         },
+        insert(payload: Record<string, unknown> | Array<Record<string, unknown>>) {
+          const rows = Array.isArray(payload) ? payload : [payload]
+          insertedShifts.push(...rows)
+          return {
+            select() {
+              return Promise.resolve({
+                data: rows,
+                error: null,
+              })
+            },
+          }
+        },
       }
 
       return builder
     },
+    __insertedShifts: insertedShifts,
   }
 }
 
@@ -244,5 +270,42 @@ describe('sendPreliminaryScheduleAction', () => {
     )
 
     expect(sendPreliminarySnapshotMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('creates open placeholder shifts so underfilled drafts can still be sent preliminarily', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      cycleStartDate: '2026-04-01',
+      cycleEndDate: '2026-04-01',
+      shifts: [
+        {
+          id: 'shift-1',
+          cycle_id: 'cycle-1',
+          user_id: 'therapist-1',
+          date: '2026-04-01',
+          shift_type: 'day',
+          status: 'scheduled',
+          role: 'staff',
+          profiles: { full_name: 'Barbara C.' },
+        },
+      ],
+    })
+    createClientMock.mockResolvedValue(supabase)
+
+    await expect(sendPreliminaryScheduleAction(makeFormData())).rejects.toThrow(
+      'REDIRECT:/coverage?cycle=cycle-1&success=preliminary_sent'
+    )
+
+    expect(supabase.__insertedShifts).toHaveLength(5)
+    expect(sendPreliminarySnapshotMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        shifts: expect.arrayContaining([
+          expect.objectContaining({ id: 'shift-1', user_id: 'therapist-1' }),
+          expect.objectContaining({ user_id: null, shift_type: 'night' }),
+        ]),
+      })
+    )
   })
 })
