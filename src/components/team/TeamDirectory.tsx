@@ -16,6 +16,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { formatEmployeeDate } from '@/lib/employee-directory'
+import { getTeamRolePermissions } from '@/lib/team-role-permissions'
 import { cn } from '@/lib/utils'
 
 export type TeamProfileRecord = {
@@ -167,6 +168,39 @@ function TeamSection({
         ))}
       </div>
     </section>
+  )
+}
+
+function AccessChecklist({ role }: { role: EditableRole }) {
+  const permissions = getTeamRolePermissions(role)
+
+  return (
+    <div className="rounded-xl border border-border bg-muted/30 p-3">
+      <div className="mb-2">
+        <p className="text-sm font-semibold text-foreground">App access</p>
+        <p className="text-xs text-muted-foreground">
+          This updates automatically from the selected role.
+        </p>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {permissions.map((permission) => (
+          <div
+            key={permission.label}
+            className={cn(
+              'flex items-center justify-between rounded-lg border px-3 py-2 text-sm',
+              permission.allowed
+                ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
+                : 'border-border bg-card text-muted-foreground'
+            )}
+          >
+            <span>{permission.label}</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wide">
+              {permission.allowed ? 'Yes' : 'No'}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -355,6 +389,8 @@ export function TeamDirectory({
                   Active
                 </label>
               </div>
+
+              <AccessChecklist role={draftRole} />
 
               <DialogFooter className="gap-2">
                 <Button type="button" variant="outline" onClick={() => setEditProfileId(null)}>
