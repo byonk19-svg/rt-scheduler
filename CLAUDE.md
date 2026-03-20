@@ -1,8 +1,30 @@
 ﻿# Teamwise Scheduler
 
-Updated: 2026-03-20 (session 8)
+Updated: 2026-03-20 (session 9)
 
 ## Latest Updates (2026-03-20)
+
+- **`/dashboard/manager` is now being repositioned as a manager inbox, not a KPI dashboard**:
+  - The page was intentionally stripped away from coverage/team/availability summary reporting.
+  - Current inbox signals are:
+    - `Pending approvals`
+    - `Current cycle`
+    - `Next 6-week cycle`
+    - `Needs review`
+  - Current implementation files:
+    - `src/app/dashboard/manager/page.tsx`
+    - `src/components/manager/ManagerTriageDashboard.tsx`
+    - `src/lib/manager-inbox.ts`
+  - Important data rules now encoded in the inbox:
+    - `Pending approvals` comes from `preliminary_requests` with `status='pending'` and should match `/approvals`, not legacy `shift_posts`.
+    - `Current cycle` shows draft/published state plus `publish by` using the active cycle `end_date`.
+    - `Next 6-week cycle` planning dates are currently derived, not stored:
+      - `collect availability` = 42 days before the next cycle `start_date`
+      - `publish by` = 1 day before the next cycle `start_date`
+    - `Needs review` currently uses unread manager notifications as the lightweight inbox feed.
+  - Product note:
+    - the nav label is still `Dashboard`, but the page concept is now much closer to `Inbox`.
+    - if the product keeps this direction, renaming the nav item from `Dashboard` to `Inbox` is likely the right follow-up.
 
 - **Manager-facing routes now share one quieter workspace header language**:
   - New shared component:
@@ -350,6 +372,7 @@ E2E specs:
 - `/pending-setup` post-signup onboarding gate
 - `/dashboard` role redirect
 - `/dashboard/manager`, `/dashboard/staff`
+  - `/dashboard/manager` is now conceptually a manager inbox, not a traditional analytics dashboard
 - `/coverage` dedicated coverage UI (client page, full-width calendar + dialog/popover editing model)
 - `/schedule` role-aware redirect entrypoint (manager -> `/coverage`, staff -> `/therapist/schedule`)
 - `/approvals`
@@ -499,6 +522,7 @@ Assignment status is informational only (does not affect coverage counts or publ
 - Manager badge: `bg-[var(--warning-subtle)] text-[var(--warning-text)] border-[var(--warning-border)]`
 - App shell header `z-30`; coverage slide-over `z-50`
 - Manager nav order: Dashboard -> Schedule -> Availability -> Shift Swaps -> Team -> Publish History
+  - Note: `Dashboard` still appears in nav text, but the underlying page is now behaving like an inbox
 
 ## Assignment Status
 
