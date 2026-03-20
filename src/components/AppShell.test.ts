@@ -1,0 +1,25 @@
+import { describe, expect, it } from 'vitest'
+
+import {
+  APP_SHELL_ACTIVE_NAV_CLASS,
+  APP_SHELL_PROFILE_CARD_CLASS,
+  APP_SHELL_SIDEBAR_CLASS,
+} from '@/components/AppShell'
+
+describe('AppShell sidebar styling', () => {
+  it('keeps the sidebar present but less dominant than the content area', () => {
+    expect(APP_SHELL_SIDEBAR_CLASS).toContain('border-sidebar-border/70')
+    expect(APP_SHELL_SIDEBAR_CLASS).toContain('shadow-none')
+  })
+
+  it('uses a calmer active nav state without the old heavy shadow treatment', () => {
+    expect(APP_SHELL_ACTIVE_NAV_CLASS).toContain('bg-sidebar-accent/60')
+    expect(APP_SHELL_ACTIVE_NAV_CLASS).toContain('ring-1')
+    expect(APP_SHELL_ACTIVE_NAV_CLASS).not.toContain('shadow-sm')
+  })
+
+  it('tones down the profile block at the bottom of the sidebar', () => {
+    expect(APP_SHELL_PROFILE_CARD_CLASS).toContain('bg-sidebar-accent/15')
+    expect(APP_SHELL_PROFILE_CARD_CLASS).toContain('border-sidebar-border/70')
+  })
+})

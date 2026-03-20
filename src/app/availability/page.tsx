@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { CalendarCheck2, Download, Plus, UserCheck, UserX, Users } from 'lucide-react'
+import { Download, Plus } from 'lucide-react'
 
 import {
   AvailabilityEntriesTable,
@@ -12,6 +12,8 @@ import {
   saveManagerPlannerDatesAction,
   submitAvailabilityEntryAction,
 } from '@/app/availability/actions'
+import { AvailabilityOverviewHeader } from '@/components/availability/AvailabilityOverviewHeader'
+import { AvailabilityStatusSummary } from '@/components/availability/AvailabilityStatusSummary'
 import { ManagerSchedulingInputs } from '@/components/availability/ManagerSchedulingInputs'
 import type { TableToolbarFilters } from '@/components/TableToolbar'
 import { FeedbackToast } from '@/components/feedback-toast'
@@ -22,8 +24,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { StatusBadge } from '@/components/ui/status-badge'
 import { can } from '@/lib/auth/can'
+import { buildMissingAvailabilityRows } from '@/lib/employee-directory'
 import { toUiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 type ToastVariant = 'success' | 'error'
@@ -276,6 +278,29 @@ export default async function AvailabilityPage({
     plannerTherapists.find((therapist) => therapist.id === selectedTherapistIdFromParams)?.id ??
     plannerTherapists[0]?.id ??
     ''
+  const availabilityStatusRows = canManageAvailability
+    ? buildMissingAvailabilityRows(
+        plannerTherapists.map((therapist) => ({
+          id: therapist.id,
+          full_name: therapist.full_name,
+          is_active: true,
+        })),
+        entries.map((entry) => ({
+          id: entry.id,
+          therapist_id: entry.therapist_id,
+          cycle_id: entry.cycle_id,
+          date: entry.date,
+          shift_type: entry.shift_type,
+          override_type: entry.override_type,
+          note: entry.note,
+          created_at: entry.created_at,
+          source: 'therapist',
+        })),
+        selectedCycleId
+      )
+    : []
+  const submittedAvailabilityRows = availabilityStatusRows.filter((row) => row.submitted)
+  const missingAvailabilityRows = availabilityStatusRows.filter((row) => !row.submitted)
 
   const availabilityRows: AvailabilityEntryTableRow[] = entries.map((entry) => {
     const cycle = getOne(entry.schedule_cycles)
@@ -422,27 +447,27 @@ export default async function AvailabilityPage({
       : null
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
-      <div className="border-b border-border bg-card px-6 pb-4 pt-5">
-        <div className="mb-3 flex items-start justify-between">
-          <div>
-            <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">
-              {canManageAvailability ? 'Availability And Staffing Inputs' : 'Future Availability'}
-            </h1>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {selectedCycle
-                ? `${selectedCycle.label} · ${selectedCycle.start_date} to ${selectedCycle.end_date}`
-                : 'No upcoming cycle selected'}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
+      <AvailabilityOverviewHeader
+        canManageAvailability={canManageAvailability}
+        title={canManageAvailability ? 'Availability And Staffing Inputs' : 'Future Availability'}
+        subtitle={
+          selectedCycle
+            ? `${selectedCycle.label} - ${selectedCycle.start_date} to ${selectedCycle.end_date}`
+            : 'No upcoming cycle selected'
+        }
+        totalRequests={totalRequests}
+        needOffRequests={needOffRequests}
+        availableToWorkRequests={availableToWorkRequests}
+        responseRatio={responseRatio}
+        actions={
+          <>
             <Button asChild size="sm" className="gap-1.5 text-xs">
               <a href={canManageAvailability ? '#staff-scheduling-inputs' : '#submit-entry'}>
                 <Plus className="h-3.5 w-3.5" />
-                {canManageAvailability ? 'Staff scheduling inputs' : 'Add availability'}
+                {canManageAvailability ? 'Plan staffing' : 'Add availability'}
               </a>
             </Button>
             <Button asChild variant="outline" size="sm" className="text-xs">
@@ -458,30 +483,9 @@ export default async function AvailabilityPage({
               </a>
               <PrintMenuItem />
             </MoreActionsMenu>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge variant="info">
-            <CalendarCheck2 className="h-3 w-3" />
-            {totalRequests} total requests
-          </StatusBadge>
-          <StatusBadge variant="error">
-            <UserX className="h-3 w-3" />
-            {needOffRequests} need off
-          </StatusBadge>
-          <StatusBadge variant="success">
-            <UserCheck className="h-3 w-3" />
-            {availableToWorkRequests} available to work
-          </StatusBadge>
-          {responseRatio && (
-            <StatusBadge variant="neutral">
-              <Users className="h-3 w-3" />
-              {responseRatio} responded
-            </StatusBadge>
-          )}
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {canManageAvailability ? (
         <>
@@ -493,6 +497,10 @@ export default async function AvailabilityPage({
             initialTherapistId={selectedPlannerTherapistId}
             saveManagerPlannerDatesAction={saveManagerPlannerDatesAction}
             deleteManagerPlannerDateAction={deleteManagerPlannerDateAction}
+          />
+          <AvailabilityStatusSummary
+            submittedRows={submittedAvailabilityRows}
+            missingRows={missingAvailabilityRows}
           />
           {entriesCard}
         </>

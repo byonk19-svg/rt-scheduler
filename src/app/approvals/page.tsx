@@ -1,11 +1,12 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { CalendarDays, CheckCircle2, Clock3, XCircle } from 'lucide-react'
+import { CalendarDays } from 'lucide-react'
 
 import {
   approvePreliminaryRequestAction,
   denyPreliminaryRequestAction,
 } from '@/app/approvals/actions'
+import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { can } from '@/lib/auth/can'
@@ -85,14 +86,15 @@ export default async function ApprovalsPage({
   if (requestsError) {
     return (
       <div className="space-y-4">
-        <div className="border-b border-border bg-card px-6 pb-4 pt-5">
-          <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">
-            Preliminary approvals
-          </h1>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Review live claims and schedule change requests before final publish.
-          </p>
-        </div>
+        <ManagerWorkspaceHeader
+          title="Preliminary approvals"
+          subtitle="Review live claims and schedule change requests before final publish."
+          summary={
+            <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 font-medium text-foreground">
+              Unable to load queue
+            </span>
+          }
+        />
         <div className="rounded-xl border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 py-3 text-sm font-medium text-[var(--error-text)]">
           Could not load preliminary approvals. Please refresh.
         </div>
@@ -156,43 +158,38 @@ export default async function ApprovalsPage({
   )
 
   return (
-    <div className="space-y-5">
-      <div className="border-b border-border bg-card px-6 pb-4 pt-5">
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div>
-            <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">
-              Preliminary approvals
-            </h1>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Review live claims and schedule change requests before final publish.
-            </p>
-          </div>
+    <div className="space-y-6">
+      <ManagerWorkspaceHeader
+        title="Preliminary approvals"
+        subtitle="Review live claims and schedule change requests before final publish."
+        summary={
+          <>
+            <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 font-medium text-foreground">
+              {queue.length} pending
+            </span>
+            {success === 'preliminary_request_approved' && (
+              <>
+                <span className="text-border/90">/</span>
+                <span className="text-[var(--success-text)]">Request approved</span>
+              </>
+            )}
+            {success === 'preliminary_request_denied' && (
+              <>
+                <span className="text-border/90">/</span>
+                <span className="text-[var(--warning-text)]">Request denied</span>
+              </>
+            )}
+          </>
+        }
+        actions={
           <Button asChild variant="outline" size="sm" className="text-xs">
             <Link href="/coverage?view=week">
               <CalendarDays className="h-3.5 w-3.5" />
               Back to schedule
             </Link>
           </Button>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge variant="warning">
-            <Clock3 className="h-3 w-3" />
-            {queue.length} pending
-          </StatusBadge>
-          {success === 'preliminary_request_approved' && (
-            <StatusBadge variant="success">
-              <CheckCircle2 className="h-3 w-3" />
-              Request approved
-            </StatusBadge>
-          )}
-          {success === 'preliminary_request_denied' && (
-            <StatusBadge variant="warning">
-              <XCircle className="h-3 w-3" />
-              Request denied
-            </StatusBadge>
-          )}
-        </div>
-      </div>
+        }
+      />
 
       {error === 'preliminary_review_failed' && (
         <div className="rounded-xl border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 py-3 text-sm font-medium text-[var(--error-text)]">
@@ -201,7 +198,7 @@ export default async function ApprovalsPage({
       )}
 
       {queue.length === 0 ? (
-        <div className="rounded-xl border border-border bg-card px-6 py-14 text-center shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+        <div className="rounded-xl border border-border/70 bg-background/70 px-6 py-14 text-center shadow-none">
           <p className="text-sm font-semibold text-foreground">No pending preliminary requests</p>
           <p className="mt-1 text-xs text-muted-foreground">
             Claims and change requests will appear here while the preliminary schedule is live.
@@ -212,7 +209,7 @@ export default async function ApprovalsPage({
           {queue.map((request) => (
             <div
               key={request.id}
-              className="rounded-xl border border-border bg-card px-4 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+              className="rounded-xl border border-border/70 bg-card/85 px-4 py-4 shadow-none"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -228,7 +225,7 @@ export default async function ApprovalsPage({
                     {formatShiftLabel(request.shiftDate, request.shiftType)}
                   </p>
                   {request.note && (
-                    <p className="mt-2 rounded-lg bg-muted px-3 py-2 text-sm text-foreground">
+                    <p className="mt-2 rounded-lg bg-muted/70 px-3 py-2 text-sm text-foreground">
                       {request.note}
                     </p>
                   )}

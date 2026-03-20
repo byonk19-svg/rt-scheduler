@@ -136,7 +136,7 @@ function TeamMemberCard({ profile, onClick }: { profile: TeamProfileRecord; onCl
       type="button"
       onClick={onClick}
       className={cn(
-        'group flex w-full items-start gap-4 rounded-xl border border-border bg-card p-5 text-left shadow-[0_1px_3px_rgba(15,23,42,0.05)] transition-all hover:border-primary/20 hover:shadow-md',
+        'group flex w-full items-start gap-4 rounded-xl border border-border/70 bg-card/85 p-5 text-left shadow-none transition-all hover:border-primary/20 hover:bg-card',
         !isActive && 'opacity-75'
       )}
     >
@@ -211,7 +211,7 @@ function TeamSection({
 
   return (
     <section className="mb-8 last:mb-0">
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
         {title}
       </h2>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -237,7 +237,7 @@ function ShiftGroup({
   if (leads.length === 0 && therapists.length === 0) return null
 
   return (
-    <section className="mb-8 rounded-2xl border border-border bg-muted/20 p-4 last:mb-0 sm:p-5">
+    <section className="mb-8 rounded-2xl border border-border/60 bg-muted/10 p-4 last:mb-0 sm:p-5">
       <h2 className="mb-4 text-sm font-semibold tracking-tight text-foreground">{title}</h2>
       <TeamSection title="Lead Therapists" profiles={leads} onOpen={onOpen} />
       <TeamSection title="Therapists" profiles={therapists} onOpen={onOpen} />

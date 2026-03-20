@@ -54,7 +54,7 @@ describe('ManagerSchedulingInputs', () => {
       })
     )
 
-    expect(html).toContain('Staff Scheduling Inputs')
+    expect(html).toContain('Plan staffing')
     expect(html).toContain('Schedule cycle')
     expect(html).toContain('Therapist')
     expect(html).toContain('Will work')

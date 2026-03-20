@@ -153,7 +153,7 @@ export function ManagerSchedulingInputs({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Staff Scheduling Inputs</CardTitle>
+          <CardTitle>Plan staffing</CardTitle>
           <CardDescription>
             Create a schedule cycle before planning hard staffing dates.
           </CardDescription>
@@ -166,7 +166,7 @@ export function ManagerSchedulingInputs({
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Staff Scheduling Inputs</CardTitle>
+          <CardTitle>Plan staffing</CardTitle>
           <CardDescription>No active therapists are available to plan right now.</CardDescription>
         </CardHeader>
       </Card>
@@ -174,11 +174,11 @@ export function ManagerSchedulingInputs({
   }
 
   return (
-    <Card id="staff-scheduling-inputs">
-      <CardHeader>
-        <CardTitle>Staff Scheduling Inputs</CardTitle>
+    <Card id="staff-scheduling-inputs" className="border-border/70 bg-card/85 shadow-none">
+      <CardHeader className="border-b border-border/60 bg-muted/15 pb-4">
+        <CardTitle>Plan staffing</CardTitle>
         <CardDescription>
-          Choose hard dates that auto-draft must honor. Use <strong>Will work</strong> for required
+          Set hard dates that auto-draft must honor. Use <strong>Will work</strong> for required
           days and <strong>Cannot work</strong> for blocked days.
         </CardDescription>
       </CardHeader>
@@ -217,7 +217,7 @@ export function ManagerSchedulingInputs({
         </div>
 
         {selectedTherapist && (
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2">
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-muted/10 px-3 py-2">
             <Badge variant="outline" className="capitalize">
               {selectedTherapist.shift_type} shift
             </Badge>
@@ -228,7 +228,7 @@ export function ManagerSchedulingInputs({
           </div>
         )}
 
-        <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-4">
+        <div className="space-y-3 rounded-xl border border-border/60 bg-muted/10 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
@@ -264,7 +264,7 @@ export function ManagerSchedulingInputs({
             </div>
           </div>
 
-          <div className="rounded-lg border border-border bg-card p-3">
+          <div className="rounded-xl border border-border/70 bg-background/90 p-3">
             <div className="mb-3 flex items-center justify-between">
               <Button
                 type="button"
@@ -381,7 +381,7 @@ export function ManagerSchedulingInputs({
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/45 p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-emerald-700">
               Will work
             </p>
@@ -398,7 +398,7 @@ export function ManagerSchedulingInputs({
             )}
           </div>
 
-          <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4">
+          <div className="rounded-xl border border-amber-200 bg-amber-50/45 p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-amber-700">
               Cannot work
             </p>
@@ -432,7 +432,7 @@ export function ManagerSchedulingInputs({
                 .map((row) => (
                   <div
                     key={row.id}
-                    className="flex flex-col gap-2 rounded-lg border border-border bg-background px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                    className="flex flex-col gap-2 rounded-xl border border-border/70 bg-background/80 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge

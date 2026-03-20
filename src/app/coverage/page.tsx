@@ -3,11 +3,11 @@
 import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { AlertTriangle, Printer, Send, Sparkles } from 'lucide-react'
+import { Printer, Send, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
 
+import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
 import { Button } from '@/components/ui/button'
-import { StatusBadge } from '@/components/ui/status-badge'
 import { cn } from '@/lib/utils'
 
 import {
@@ -697,98 +697,116 @@ function CoveragePageContent() {
         initial="hidden"
         animate="visible"
         custom={0}
-        className="no-print border-b border-border bg-card px-6 pb-4 pt-5"
+        className="no-print"
       >
-        <div className="mb-3 flex items-start justify-between">
-          <div className="min-w-0">
-            <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">
-              Coverage
-            </h1>
-            <p className="mt-0.5 text-xs text-muted-foreground">{cycleSummaryLabel}</p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-xs"
-              onClick={() => window.print()}
-            >
-              <Printer className="h-3.5 w-3.5" />
-              Print
-            </Button>
-            <form action={generateDraftScheduleAction}>
-              <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
-              <input type="hidden" name="view" value="week" />
-              <input type="hidden" name="show_unavailable" value="false" />
-              <input type="hidden" name="return_to" value="coverage" />
+        <ManagerWorkspaceHeader
+          title="Coverage"
+          subtitle={cycleSummaryLabel}
+          summary={
+            <>
+              <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 font-medium text-foreground">
+                {!loading && issueCount > 0
+                  ? `${issueCount} ${issueCount === 1 ? 'issue' : 'issues'}`
+                  : 'Coverage workspace'}
+              </span>
+              <span className="text-muted-foreground">
+                {activeCyclePublished ? 'Published to employees' : 'Draft cycle'}
+              </span>
+              {preliminaryLive && (
+                <>
+                  <span className="text-border/90">/</span>
+                  <span className="text-muted-foreground">
+                    Preliminary live{preliminarySentLabel ? ` (${preliminarySentLabel})` : ''}
+                  </span>
+                </>
+              )}
+            </>
+          }
+          actions={
+            <>
               <Button
-                type="submit"
+                type="button"
                 variant="outline"
                 size="sm"
                 className="gap-1.5 text-xs"
-                disabled={!activeCycleId || activeCyclePublished}
+                onClick={() => window.print()}
               >
-                <Sparkles className="h-3.5 w-3.5" />
-                Auto-draft
+                <Printer className="h-3.5 w-3.5" />
+                Print
               </Button>
-            </form>
-            <form action={resetDraftScheduleAction}>
-              <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
-              <input type="hidden" name="view" value="week" />
-              <input type="hidden" name="show_unavailable" value="false" />
-              <input type="hidden" name="return_to" value="coverage" />
-              <button
-                type="submit"
-                disabled={!activeCycleId || activeCyclePublished}
-                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 text-xs font-medium text-[var(--error-text)] transition-opacity hover:opacity-80 disabled:opacity-50"
-              >
-                Clear draft
-              </button>
-            </form>
-            <form action={sendPreliminaryScheduleAction}>
-              <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
-              <input type="hidden" name="view" value="week" />
-              <input type="hidden" name="show_unavailable" value="false" />
-              <input type="hidden" name="return_to" value="coverage" />
-              <Button
-                type="submit"
-                variant="outline"
-                size="sm"
-                className="gap-1.5 text-xs"
-                disabled={!activeCycleId || activeCyclePublished}
-              >
-                <Send className="h-3.5 w-3.5" />
-                {preliminaryLive ? 'Refresh preliminary' : 'Send preliminary'}
-              </Button>
-            </form>
-            <form action={toggleCyclePublishedAction}>
-              <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
-              <input type="hidden" name="view" value="week" />
-              <input type="hidden" name="show_unavailable" value="false" />
-              <input
-                type="hidden"
-                name="currently_published"
-                value={activeCyclePublished ? 'true' : 'false'}
-              />
-              <input type="hidden" name="override_weekly_rules" value="false" />
-              <input type="hidden" name="override_shift_rules" value="false" />
-              <input type="hidden" name="return_to" value="coverage" />
-              <Button
-                type="submit"
-                size="sm"
-                className="gap-1.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90"
-                disabled={!activeCycleId || activeCyclePublished}
-              >
-                <Send className="h-3.5 w-3.5" />
-                {activeCyclePublished ? 'Published' : 'Publish'}
-              </Button>
-            </form>
-          </div>
-        </div>
+              <form action={generateDraftScheduleAction}>
+                <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+                <input type="hidden" name="view" value="week" />
+                <input type="hidden" name="show_unavailable" value="false" />
+                <input type="hidden" name="return_to" value="coverage" />
+                <Button
+                  type="submit"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs"
+                  disabled={!activeCycleId || activeCyclePublished}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Auto-draft
+                </Button>
+              </form>
+              <form action={resetDraftScheduleAction}>
+                <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+                <input type="hidden" name="view" value="week" />
+                <input type="hidden" name="show_unavailable" value="false" />
+                <input type="hidden" name="return_to" value="coverage" />
+                <button
+                  type="submit"
+                  disabled={!activeCycleId || activeCyclePublished}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 text-xs font-medium text-[var(--error-text)] transition-opacity hover:opacity-80 disabled:opacity-50"
+                >
+                  Clear draft
+                </button>
+              </form>
+              <form action={sendPreliminaryScheduleAction}>
+                <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+                <input type="hidden" name="view" value="week" />
+                <input type="hidden" name="show_unavailable" value="false" />
+                <input type="hidden" name="return_to" value="coverage" />
+                <Button
+                  type="submit"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs"
+                  disabled={!activeCycleId || activeCyclePublished}
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  {preliminaryLive ? 'Refresh preliminary' : 'Send preliminary'}
+                </Button>
+              </form>
+              <form action={toggleCyclePublishedAction}>
+                <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+                <input type="hidden" name="view" value="week" />
+                <input type="hidden" name="show_unavailable" value="false" />
+                <input
+                  type="hidden"
+                  name="currently_published"
+                  value={activeCyclePublished ? 'true' : 'false'}
+                />
+                <input type="hidden" name="override_weekly_rules" value="false" />
+                <input type="hidden" name="override_shift_rules" value="false" />
+                <input type="hidden" name="return_to" value="coverage" />
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="gap-1.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90"
+                  disabled={!activeCycleId || activeCyclePublished}
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  {activeCyclePublished ? 'Published' : 'Publish'}
+                </Button>
+              </form>
+            </>
+          }
+        />
 
-        <div className="flex items-center gap-3">
+        <div className="px-6 pb-4 pt-4">
+          <div className="flex items-center gap-3">
           <div className="inline-flex overflow-hidden rounded-lg border border-border">
             {(['Day', 'Night'] as const).map((tab) => (
               <button
@@ -799,35 +817,15 @@ function CoveragePageContent() {
                 className={cn(
                   'px-3.5 py-1.5 text-xs font-medium transition-colors',
                   shiftTab === tab
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-card text-muted-foreground hover:text-foreground'
+                    ? 'bg-primary/90 text-primary-foreground'
+                    : 'bg-card text-muted-foreground hover:bg-muted/30 hover:text-foreground'
                 )}
               >
                 {tab} Shift
               </button>
             ))}
           </div>
-
-          {!loading && issueCount > 0 && (
-            <button
-              type="button"
-              className="flex items-center gap-1.5 rounded-lg border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2.5 py-1.5 text-xs font-medium text-[var(--warning-text)]"
-            >
-              <AlertTriangle className="h-3 w-3" />
-              {issueCount} {issueCount === 1 ? 'issue' : 'issues'}
-            </button>
-          )}
-
-          {activeCyclePublished && (
-            <StatusBadge variant="success" dot={false} className="text-[10px]">
-              Published
-            </StatusBadge>
-          )}
-          {preliminaryLive && (
-            <StatusBadge variant="warning" dot={false} className="text-[10px]">
-              Preliminary live
-            </StatusBadge>
-          )}
+          </div>
         </div>
       </motion.div>
 

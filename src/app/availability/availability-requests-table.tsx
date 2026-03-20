@@ -127,20 +127,25 @@ export function AvailabilityEntriesTable({
   }, [canManageAvailability, rows, filters, scope])
 
   const emptyColSpan = canManageAvailability ? 5 : 4
+  const managerAllStaffView = canManageAvailability && scope === 'all-staff'
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className={managerAllStaffView ? 'border-border/60 bg-background/70 shadow-none' : ''}>
+      <CardHeader
+        className={managerAllStaffView ? 'border-b border-border/60 bg-muted/10 pb-4' : ''}
+      >
         <CardTitle>
           {canManageAvailability
             ? scope === 'all-staff'
-              ? 'All Staff Availability Requests'
-              : 'My Saved Availability Requests'
+              ? 'Review requests'
+              : 'Review my requests'
             : 'My Saved Availability Requests'}
         </CardTitle>
         <CardDescription>
           {canManageAvailability
-            ? 'Requests used for schedule planning before publish. No approval workflow.'
+            ? scope === 'all-staff'
+              ? 'Scan submitted requests before the cycle is published.'
+              : 'Review the requests you entered yourself.'
             : 'Your saved requests for upcoming cycles.'}
         </CardDescription>
       </CardHeader>

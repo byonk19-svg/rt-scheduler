@@ -125,6 +125,15 @@ const SHELL_ROUTES = [
   '/therapist',
 ] as const
 
+export const APP_SHELL_SIDEBAR_CLASS =
+  'no-print hidden shrink-0 flex-col border-r border-sidebar-border/70 bg-sidebar text-sidebar-foreground shadow-none lg:flex'
+
+export const APP_SHELL_ACTIVE_NAV_CLASS =
+  'bg-sidebar-accent/60 text-sidebar-accent-foreground ring-1 ring-sidebar-border/60'
+
+export const APP_SHELL_PROFILE_CARD_CLASS =
+  'mt-2 rounded-xl border border-sidebar-border/70 bg-sidebar-accent/15 px-2.5 py-2'
+
 function Logo() {
   return (
     <div className="flex items-center gap-2.5">
@@ -181,9 +190,9 @@ function isNavItemActive(
 
 function navLinkClass(isActive: boolean): string {
   if (isActive) {
-    return 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
+    return APP_SHELL_ACTIVE_NAV_CLASS
   }
-  return 'text-sidebar-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground transition-colors duration-150'
+  return 'text-sidebar-foreground hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground transition-colors duration-150'
 }
 
 export function AppShell({ user, children }: AppShellProps) {
@@ -223,13 +232,8 @@ export function AppShell({ user, children }: AppShellProps) {
       </a>
 
       <div className="flex min-h-screen">
-        <aside
-          className={cn(
-            'no-print hidden shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:flex',
-            canAccessManagerUi ? 'w-60' : 'w-60'
-          )}
-        >
-          <div className="flex items-center justify-between gap-2 px-4 py-5">
+        <aside className={cn(APP_SHELL_SIDEBAR_CLASS, canAccessManagerUi ? 'w-60' : 'w-60')}>
+          <div className="flex items-center justify-between gap-2 px-4 py-4">
             <Link
               href={dashboardHref}
               className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
@@ -240,7 +244,7 @@ export function AppShell({ user, children }: AppShellProps) {
           </div>
 
           <nav className="flex-1 space-y-0.5 px-3 py-3" aria-label="Main navigation">
-            <p className="px-2 pb-2 pt-3 text-[11px] font-medium tracking-[0.08em] text-[color:var(--sidebar-muted)]">
+            <p className="px-2 pb-2 pt-3 text-[10px] font-medium tracking-[0.08em] text-[color:var(--sidebar-muted)]">
               {roleLabel}
             </p>
             {navItems.map((item) => {
@@ -251,7 +255,7 @@ export function AppShell({ user, children }: AppShellProps) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
+                    'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium',
                     navLinkClass(active)
                   )}
                   aria-current={active ? 'page' : undefined}
@@ -263,7 +267,7 @@ export function AppShell({ user, children }: AppShellProps) {
             })}
           </nav>
 
-          <div className="space-y-1 border-t border-sidebar-border px-3 py-3">
+          <div className="space-y-1 border-t border-sidebar-border/70 px-3 py-3">
             {bottomNavItems.map((item) => {
               const active = isNavItemActive(pathname, searchParams, item)
               const Icon = item.icon
@@ -272,7 +276,7 @@ export function AppShell({ user, children }: AppShellProps) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
+                    'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium',
                     navLinkClass(active)
                   )}
                   aria-current={active ? 'page' : undefined}
@@ -291,9 +295,9 @@ export function AppShell({ user, children }: AppShellProps) {
               {switchLabel}
             </Link>
 
-            <div className="mt-2 rounded-2xl border border-sidebar-border bg-sidebar px-2.5 py-2.5">
+            <div className={APP_SHELL_PROFILE_CARD_CLASS}>
               <div className="flex items-center gap-2.5">
-                <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-xs font-bold text-sidebar-accent-foreground">
+                <span className="inline-flex h-[1.625rem] w-[1.625rem] shrink-0 items-center justify-center rounded-full bg-sidebar-accent/75 text-[11px] font-bold text-sidebar-accent-foreground">
                   {initials(user?.fullName ?? 'Team member')}
                 </span>
                 <div className="min-w-0">
@@ -318,7 +322,7 @@ export function AppShell({ user, children }: AppShellProps) {
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="no-print sticky top-0 z-30 border-b border-sidebar-border bg-sidebar px-3 py-2 text-sidebar-foreground shadow-[0_1px_8px_rgba(0,0,0,0.12)] lg:hidden">
+          <header className="no-print sticky top-0 z-30 border-b border-sidebar-border/70 bg-sidebar px-3 py-2 text-sidebar-foreground shadow-[0_1px_8px_rgba(0,0,0,0.08)] lg:hidden">
             <div className="flex items-center justify-between gap-2">
               <Button
                 type="button"

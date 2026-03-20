@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 
 import { archiveTeamMemberAction, saveTeamQuickEditAction } from '@/app/team/actions'
 import { FeedbackToast } from '@/components/feedback-toast'
+import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
 import { TeamDirectory } from '@/components/team/TeamDirectory'
 import { can } from '@/lib/auth/can'
 import { MANAGED_TEAM_ROLE_VALUES, parseRole } from '@/lib/auth/roles'
@@ -121,19 +122,30 @@ export default async function TeamPage({
   const initialEditProfileId = getSearchParam(params?.edit_profile) ?? null
 
   return (
-    <div className="max-w-4xl px-8 py-6">
+    <div className="max-w-5xl space-y-7 py-6">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
-      <div className="mb-6">
-        <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">Team</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {allProfiles.length} team members · {managerCount} managers, {leadCount} lead therapists,{' '}
-          {therapistCount} therapists
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {inactiveCount} inactive · {onFmlaCount} on FMLA
-        </p>
-      </div>
+      <ManagerWorkspaceHeader
+        title="Team"
+        subtitle="Manage roles, staffing access, and inactive employees in one place."
+        className="px-0"
+        summary={
+          <>
+            <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 font-medium text-foreground">
+              {allProfiles.length} team members
+            </span>
+            <span className="text-muted-foreground">{managerCount} managers</span>
+            <span className="text-border/90">/</span>
+            <span className="text-muted-foreground">{leadCount} lead therapists</span>
+            <span className="text-border/90">/</span>
+            <span className="text-muted-foreground">{therapistCount} therapists</span>
+            <span className="text-border/90">/</span>
+            <span className="text-muted-foreground">{inactiveCount} inactive</span>
+            <span className="text-border/90">/</span>
+            <span className="text-muted-foreground">{onFmlaCount} on FMLA</span>
+          </>
+        }
+      />
 
       <TeamDirectory
         profiles={allProfiles}

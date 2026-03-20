@@ -1,6 +1,45 @@
 ﻿# Teamwise Scheduler
 
-Updated: 2026-03-19 (session 7)
+Updated: 2026-03-20 (session 8)
+
+## Latest Updates (2026-03-20)
+
+- **Manager-facing routes now share one quieter workspace header language**:
+  - New shared component:
+    - `src/components/manager/ManagerWorkspaceHeader.tsx`
+  - Manager pages now use the same top-level rhythm instead of ad hoc chip-heavy headers:
+    - `/availability`
+    - `/coverage`
+    - `/team`
+    - `/approvals`
+  - The pattern is:
+    - compact title + small supporting subtitle
+    - restrained summary text row
+    - actions grouped at the right
+  - This is the canonical manager page-header direction going forward.
+
+- **`/availability` was rebuilt into a cleaner manager workflow**:
+  - Manager sections now read in order:
+    - `Plan staffing`
+    - `Check responses`
+    - `Review requests`
+  - New manager-specific UI pieces:
+    - `src/components/availability/AvailabilityOverviewHeader.tsx`
+    - `src/components/availability/AvailabilityStatusSummary.tsx`
+  - `Check responses` is now triage-first:
+    - `Not submitted yet` appears first and stays expanded
+    - `Submitted` is summarized by default and expandable
+  - The old manager-only `Add therapist-reported availability` form was removed from `/availability`
+    - managers should use `Staff Scheduling Inputs`
+    - therapists still use their own self-service availability form
+
+- **Shell/sidebar visual weight was intentionally reduced**:
+  - `src/components/AppShell.tsx` now uses a calmer active-nav treatment, lighter hover states, and a less heavy profile block
+  - Goal: manager content should lead, not the nav chrome
+
+- **`/team` and `/approvals` now visually match the newer manager surfaces**:
+  - `/team` keeps the same roster/edit behavior, but card and section framing are lighter
+  - `/approvals` now reads more like a review queue than a standalone utility page
 
 ## What This App Is
 
@@ -337,7 +376,8 @@ All permission checks go through `can(role, permission)` in `src/lib/auth/can.ts
 ## Key Shared Components
 
 - `src/components/ui/page-header.tsx` â€” `<PageHeader>` is DEPRECATED for new pages; only remaining on legacy pages not yet migrated
-- **Compact header pattern** (Coverage, Availability, Directory, Publish, Profile, Shift Board): `<div className=”border-b border-border bg-card px-6 pb-4 pt-5”>` + `<StatusBadge>` chips for metadata; import from `@/components/ui/status-badge`
+- `src/components/manager/ManagerWorkspaceHeader.tsx` â€” canonical manager route header for `/availability`, `/coverage`, `/team`, and `/approvals`
+- `src/components/availability/AvailabilityOverviewHeader.tsx` â€” manager-specific availability wrapper around the shared manager workspace header
 - `src/components/ui/skeleton.tsx` â€” `<Skeleton>`, `<SkeletonLine>`, `<SkeletonCard>`, `<SkeletonListItem>` loading states
 - `src/components/NotificationBell.tsx` â€” real-time bell with Supabase subscription; variants: `default` | `staff`
 - `src/components/AppShell.tsx` â€” nav shell; add routes to `MANAGER_NAV` / `STAFF_NAV` arrays
@@ -414,6 +454,7 @@ Assignment status is informational only (does not affect coverage counts or publ
 `/coverage` (`src/app/coverage/page.tsx` + `src/components/coverage/`):
 
 - Full-width 7-column day calendar; centered shift editor dialog + inline status popovers
+- Uses the shared manager workspace header pattern at the top of the page
 - Clicking a day opens the editor dialog
 - Clicking an assigned therapist opens the status popover without opening the editor
 - Day/Night shift tabs; therapist assignment rows live in the dialog
@@ -430,18 +471,19 @@ Assignment status is informational only (does not affect coverage counts or publ
 - Clicking a team member card opens a quick-edit modal on the same page
 - Sections are grouped by:
   - managers
-  - leads
-  - therapists
+  - day shift (`Lead Therapists`, `Therapists`)
+  - night shift (`Lead Therapists`, `Therapists`)
   - inactive
 - Quick edit is meant for roster/access fields:
   - name
   - app role
   - shift type
   - employment type
-  - coverage lead eligibility
   - FMLA
   - FMLA return date
   - active/inactive
+- `Lead Therapist` is the visible manager-facing role label; the separate `Coverage lead` control was removed from `/team`
+- The page now shares the quieter manager workspace header pattern and lighter card framing used on `/availability` and `/approvals`
 - `/directory` should be treated as a compatibility redirect only, not a feature surface
 
 ## Schedule UX
@@ -532,6 +574,6 @@ Core tables:
 1. **Deploy to production** — run `vercel --prod` from project root. GitHub auto-deploy is NOT wired to Vercel; CLI deploy is the current method. All env vars and code are ready.
 2. **Verify end-to-end publish email flow in production** — publish a schedule from `/coverage`, check `/publish` for queue status, confirm recipient receives email from `noreply@mail.teamwise.work`.
 3. **Wire GitHub → Vercel auto-deploy** (optional) — connect `byonk19-svg/rt-scheduler` repo in Vercel dashboard under Git Integration so pushes trigger builds automatically.
-4. **Coverage visual shell rebuild** — interaction model is correct; next pass is a direct visual rebuild of the `/coverage` shell and day-card composition against the Lovable screenshot/reference. Do NOT do tiny font/spacing tweaks; do a full shell rebuild.
+4. **Production UAT for the newer manager workflows** — verify `/availability`, `/coverage`, `/team`, `/approvals`, `/preliminary`, and `/publish` together against a real cycle before broader visual/branding work.
 
-UI audit (2026-03-16) complete: all manager pages normalized to compact header pattern, dashboard grid responsive, Publish History added to nav, denial reason surfaced on Shift Board.
+UI audit (2026-03-16) complete: manager surfaces now follow the quieter workspace-header direction, dashboard grid is responsive, Publish History is in nav, and denial reason is surfaced on Shift Board.
