@@ -52,5 +52,6 @@ test-results/
 .claude/
 .superpowers/
 .planning/
+.worktrees/
 security_best_practices_report.md
 .tmp_lovable_import_*/
