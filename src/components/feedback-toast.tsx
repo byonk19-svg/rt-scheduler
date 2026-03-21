@@ -19,8 +19,8 @@ export function FeedbackToast({ message, variant }: FeedbackToastProps) {
 
   const variantClass =
     variant === 'error'
-      ? 'border-red-200 bg-red-50 text-red-800'
-      : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+      ? 'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]'
+      : 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
 
   return (
     <div

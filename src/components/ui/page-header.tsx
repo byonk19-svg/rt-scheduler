@@ -46,7 +46,7 @@ export function PageHeader({ title, subtitle, badge, actions, className }: PageH
 
       <div
         className="absolute inset-y-0 left-0 w-1 rounded-l-2xl"
-        style={{ background: 'linear-gradient(to bottom, #0667a9, #1d608e)' }}
+        style={{ background: 'var(--primary)' }}
         aria-hidden="true"
       />
 

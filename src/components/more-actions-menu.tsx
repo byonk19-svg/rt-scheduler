@@ -15,7 +15,10 @@ export function MoreActionsMenu({ children, label = 'More' }: MoreActionsMenuPro
           {label}
         </span>
       </summary>
-      <div className="absolute right-0 z-30 mt-2 w-52 rounded-md border border-border bg-card p-1 shadow-lg">
+      <div
+        role="menu"
+        className="absolute right-0 z-30 mt-2 w-52 rounded-md border border-border bg-card p-1 shadow-lg"
+      >
         {children}
       </div>
     </details>

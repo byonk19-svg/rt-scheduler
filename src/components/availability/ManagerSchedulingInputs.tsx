@@ -314,8 +314,12 @@ export function ManagerSchedulingInputs({
                         disabled={!isInCycle}
                         className={cn(
                           'h-9 rounded-md text-sm transition-colors',
-                          isSelected && mode === 'will_work' && 'bg-emerald-100 text-emerald-900',
-                          isSelected && mode === 'cannot_work' && 'bg-amber-100 text-amber-900',
+                          isSelected &&
+                            mode === 'will_work' &&
+                            'bg-[var(--success-subtle)] text-[var(--success-text)]',
+                          isSelected &&
+                            mode === 'cannot_work' &&
+                            'bg-[var(--warning-subtle)] text-[var(--warning-text)]',
                           !isSelected && isInCycle && 'hover:bg-secondary',
                           !isCurrentMonth && !isSelected && 'text-muted-foreground',
                           !isInCycle && 'cursor-not-allowed opacity-35'
@@ -381,16 +385,18 @@ export function ManagerSchedulingInputs({
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/45 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-emerald-700">
+          <div className="rounded-xl border border-[var(--success-border)] bg-[var(--success-subtle)]/45 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--success-text)]">
               Will work
             </p>
             {savedBuckets.willWork.length === 0 ? (
-              <p className="mt-2 text-sm text-emerald-800/80">No required work dates saved yet.</p>
+              <p className="mt-2 text-sm text-[var(--success-text)]/80">
+                No required work dates saved yet.
+              </p>
             ) : (
               <div className="mt-3 flex flex-wrap gap-2">
                 {savedBuckets.willWork.map((date) => (
-                  <Badge key={`will-work-${date}`} className="bg-emerald-600 text-white">
+                  <Badge key={`will-work-${date}`} className="bg-[var(--success-text)] text-white">
                     {formatEmployeeDate(date)}
                   </Badge>
                 ))}
@@ -398,16 +404,21 @@ export function ManagerSchedulingInputs({
             )}
           </div>
 
-          <div className="rounded-xl border border-amber-200 bg-amber-50/45 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-amber-700">
+          <div className="rounded-xl border border-[var(--warning-border)] bg-[var(--warning-subtle)]/45 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--warning-text)]">
               Cannot work
             </p>
             {savedBuckets.cannotWork.length === 0 ? (
-              <p className="mt-2 text-sm text-amber-900/80">No blocked dates saved yet.</p>
+              <p className="mt-2 text-sm text-[var(--warning-text)]/80">
+                No blocked dates saved yet.
+              </p>
             ) : (
               <div className="mt-3 flex flex-wrap gap-2">
                 {savedBuckets.cannotWork.map((date) => (
-                  <Badge key={`cannot-work-${date}`} className="bg-amber-600 text-white">
+                  <Badge
+                    key={`cannot-work-${date}`}
+                    className="bg-[var(--warning-text)] text-white"
+                  >
                     {formatEmployeeDate(date)}
                   </Badge>
                 ))}
@@ -439,8 +450,8 @@ export function ManagerSchedulingInputs({
                         variant="outline"
                         className={cn(
                           row.override_type === 'force_on'
-                            ? 'border-emerald-300 text-emerald-700'
-                            : 'border-amber-300 text-amber-700'
+                            ? 'border-[var(--success-border)] text-[var(--success-text)]'
+                            : 'border-[var(--warning-border)] text-[var(--warning-text)]'
                         )}
                       >
                         {row.override_type === 'force_on' ? 'Will work' : 'Cannot work'}

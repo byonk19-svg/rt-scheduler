@@ -51,7 +51,7 @@ export function AvailabilityStatusSummary({
               {missingRows.map((row) => (
                 <div
                   key={row.therapistId}
-                  className="rounded-md border border-white/70 bg-white/80 px-3 py-2 text-sm font-medium text-foreground"
+                  className="rounded-md border border-border/50 bg-card/90 px-3 py-2 text-sm font-medium text-foreground"
                 >
                   {row.therapistName}
                 </div>

@@ -63,7 +63,11 @@ export function TableToolbar({
           />
         </div>
 
+        <label htmlFor="toolbar-status-filter" className="sr-only">
+          Filter by status
+        </label>
         <select
+          id="toolbar-status-filter"
           className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm"
           value={filters.status}
           onChange={(event) => updateFilters({ status: event.target.value })}

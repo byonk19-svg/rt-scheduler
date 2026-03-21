@@ -190,10 +190,7 @@ export default function HomePage() {
             <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-sidebar-ring/25 bg-sidebar-ring/15">
               <CalendarDays className="h-4 w-4 text-sidebar-ring" />
             </div>
-            <span
-              className="text-[15px] font-bold tracking-tight text-sidebar-primary/90"
-              style={{ fontFamily: 'var(--font-plus-jakarta), DM Sans, sans-serif' }}
-            >
+            <span className="font-heading text-[15px] font-bold tracking-tight text-sidebar-primary/90">
               Teamwise
             </span>
           </div>
@@ -206,10 +203,9 @@ export default function HomePage() {
               Team Scheduling Hub
             </p>
             <h1
-              className="fade-up text-[1.55rem] font-bold leading-[1.2] tracking-tight text-sidebar-primary/80 xl:text-[1.7rem]"
+              className="fade-up font-heading text-[1.55rem] font-bold leading-[1.2] tracking-tight text-sidebar-primary/80 xl:text-[1.7rem]"
               style={{
                 animationDelay: '0.22s',
-                fontFamily: 'var(--font-plus-jakarta), DM Sans, sans-serif',
               }}
             >
               Scheduling, availability, and
@@ -395,10 +391,7 @@ export default function HomePage() {
                 Team Scheduling Hub
               </p>
 
-              <h2
-                className="text-[1.6rem] font-bold leading-snug tracking-tight text-foreground"
-                style={{ fontFamily: 'var(--font-plus-jakarta), DM Sans, sans-serif' }}
-              >
+              <h2 className="font-heading text-[1.6rem] font-bold leading-snug tracking-tight text-foreground">
                 {isForgot
                   ? 'Reset your password'
                   : isLogin

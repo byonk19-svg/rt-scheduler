@@ -165,8 +165,8 @@ function EmployeeRowBadges({ employee }: { employee: EmployeeDirectoryRecord }) 
         className={cn(
           'text-[10px] capitalize',
           employee.shift_type === 'day'
-            ? 'border-amber-300 bg-amber-50 text-amber-800'
-            : 'border-slate-300 bg-slate-100 text-slate-700'
+            ? 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+            : 'border-border bg-muted text-foreground'
         )}
       >
         {employee.shift_type === 'day' ? 'Day' : 'Night'}
@@ -192,7 +192,10 @@ function EmployeeRowBadges({ employee }: { employee: EmployeeDirectoryRecord }) 
         <Badge className={cn('text-[10px]', LEAD_ELIGIBLE_BADGE_CLASS)}>Lead</Badge>
       )}
       {!employee.is_active && (
-        <Badge variant="outline" className="border-red-300 bg-red-50 text-[10px] text-red-700">
+        <Badge
+          variant="outline"
+          className="border-[var(--error-border)] bg-[var(--error-subtle)] text-[10px] text-[var(--error-text)]"
+        >
           Inactive
         </Badge>
       )}
@@ -702,7 +705,7 @@ export function EmployeeDirectory({
                   className={cn(
                     'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
                     tab === value
-                      ? 'border-[#fde68a] bg-[#fffbeb] text-[#b45309]'
+                      ? 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
                       : 'border-transparent text-muted-foreground hover:bg-secondary'
                   )}
                 >
@@ -719,7 +722,7 @@ export function EmployeeDirectory({
                 className={cn(
                   'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
                   !includeInactive
-                    ? 'border-[#fde68a] bg-[#fffbeb] text-[#b45309]'
+                    ? 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
                     : 'border-transparent text-muted-foreground hover:bg-secondary'
                 )}
               >
@@ -731,7 +734,7 @@ export function EmployeeDirectory({
                 className={cn(
                   'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
                   includeInactive
-                    ? 'border-[#fde68a] bg-[#fffbeb] text-[#b45309]'
+                    ? 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
                     : 'border-transparent text-muted-foreground hover:bg-secondary'
                 )}
               >
@@ -749,7 +752,7 @@ export function EmployeeDirectory({
                   className={cn(
                     'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
                     employmentFilter === value
-                      ? 'border-[#fde68a] bg-[#fffbeb] text-[#b45309]'
+                      ? 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
                       : 'border-transparent text-muted-foreground hover:bg-secondary'
                   )}
                 >
@@ -1162,7 +1165,7 @@ export function EmployeeDirectory({
                     className={cn(
                       'flex-1 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors',
                       drawerTab === t.value
-                        ? 'border-[#d97706] text-[#b45309]'
+                        ? 'border-[var(--warning)] text-[var(--warning-text)]'
                         : 'border-transparent text-muted-foreground hover:text-foreground'
                     )}
                   >
@@ -1727,7 +1730,7 @@ export function EmployeeDirectory({
                                       className={cn(
                                         'h-8 rounded-md text-xs transition-colors',
                                         isSelected
-                                          ? 'bg-[#d97706] font-semibold text-white hover:bg-[#b45309]'
+                                          ? 'bg-[var(--warning)] font-semibold text-foreground hover:bg-[var(--warning-text)] hover:text-white'
                                           : 'bg-background',
                                         !isSelected && isInCycle && 'hover:bg-secondary',
                                         !isCurrentMonth && !isSelected && 'text-muted-foreground',
@@ -1763,7 +1766,7 @@ export function EmployeeDirectory({
                       {overrideFormState?.error && (
                         <p
                           role="alert"
-                          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 md:col-span-12"
+                          className="rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs font-medium text-[var(--error-text)] md:col-span-12"
                         >
                           {overrideFormState.error}
                         </p>
@@ -1783,7 +1786,7 @@ export function EmployeeDirectory({
                         deleteOverrideFormState.profileId === editEmployee.id && (
                           <p
                             role="alert"
-                            className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700"
+                            className="rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs font-medium text-[var(--error-text)]"
                           >
                             {deleteOverrideFormState.error}
                           </p>
@@ -1838,23 +1841,23 @@ export function EmployeeDirectory({
                     </div>
                   </div>
                   <div className="rounded-md border border-border bg-secondary/20 p-3">
-                    <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                    <p className="text-xs font-extrabold uppercase tracking-wide text-muted-foreground">
                       Copy shift pattern
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       Copy this employee&apos;s scheduled shifts from one cycle to another. Shifts
                       already in the target cycle are kept.
                     </p>
                     <form action={copyShiftsFormAction} className="mt-3 space-y-2">
                       <input type="hidden" name="employee_id" value={editEmployee.id} />
                       <div className="flex flex-col gap-2">
-                        <label className="text-xs font-semibold text-slate-600">
+                        <label className="text-xs font-semibold text-muted-foreground">
                           From cycle
                           <select
                             name="source_cycle_id"
                             value={copySourceCycleId}
                             onChange={(e) => setCopySourceCycleId(e.target.value)}
-                            className="mt-1 w-full rounded-md border border-slate-300 bg-card px-2 py-1.5 text-xs text-slate-700"
+                            className="mt-1 w-full rounded-md border border-border bg-card px-2 py-1.5 text-xs text-foreground"
                           >
                             {cycles.map((c) => (
                               <option key={c.id} value={c.id}>
@@ -1863,13 +1866,13 @@ export function EmployeeDirectory({
                             ))}
                           </select>
                         </label>
-                        <label className="text-xs font-semibold text-slate-600">
+                        <label className="text-xs font-semibold text-muted-foreground">
                           To cycle
                           <select
                             name="target_cycle_id"
                             value={copyTargetCycleId}
                             onChange={(e) => setCopyTargetCycleId(e.target.value)}
-                            className="mt-1 w-full rounded-md border border-slate-300 bg-card px-2 py-1.5 text-xs text-slate-700"
+                            className="mt-1 w-full rounded-md border border-border bg-card px-2 py-1.5 text-xs text-foreground"
                           >
                             {cycles.map((c) => (
                               <option key={c.id} value={c.id}>
@@ -1895,7 +1898,7 @@ export function EmployeeDirectory({
                         copyShiftsFormState.employeeId === editEmployee.id && (
                           <p
                             role="alert"
-                            className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700"
+                            className="rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs font-medium text-[var(--error-text)]"
                           >
                             {copyShiftsFormState.error}
                           </p>

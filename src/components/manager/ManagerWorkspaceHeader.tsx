@@ -24,7 +24,7 @@ export function ManagerWorkspaceHeader({
           <h1 className="font-heading text-[1.15rem] font-bold tracking-tight text-foreground">
             {title}
           </h1>
-          <p className="text-[11px] text-muted-foreground">{subtitle}</p>
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
         </div>
 
         {actions ? <div className="flex items-center gap-2.5">{actions}</div> : null}

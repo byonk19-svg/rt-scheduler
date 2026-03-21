@@ -83,7 +83,11 @@ export function PreliminaryShiftCard({
         <form action={card.canClaim ? claimAction : requestChangeAction} className="mt-3 space-y-2">
           <input type="hidden" name="snapshot_id" value={snapshotId} />
           <input type="hidden" name="shift_id" value={card.shiftId} />
+          <label htmlFor={`shift-note-${card.shiftId}`} className="sr-only">
+            Optional note
+          </label>
           <textarea
+            id={`shift-note-${card.shiftId}`}
             name="note"
             rows={2}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/30"

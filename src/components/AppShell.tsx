@@ -141,10 +141,7 @@ function Logo() {
         <CalendarDays className="h-4 w-4 text-sidebar-accent-foreground" />
       </div>
       <div className="leading-none">
-        <p
-          className="text-sm font-bold tracking-[-0.02em] text-sidebar-primary"
-          style={{ fontFamily: 'var(--font-plus-jakarta), sans-serif' }}
-        >
+        <p className="font-heading text-sm font-bold tracking-[-0.02em] text-sidebar-primary">
           Team<span className="text-accent">wise</span>
         </p>
         <p className="mt-0.5 text-[0.66rem] font-medium tracking-wide text-[color:var(--sidebar-muted)]">
@@ -260,7 +257,7 @@ export function AppShell({ user, children }: AppShellProps) {
                   )}
                   aria-current={active ? 'page' : undefined}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-4 w-4" aria-hidden="true" />
                   {item.label}
                 </Link>
               )
@@ -281,7 +278,7 @@ export function AppShell({ user, children }: AppShellProps) {
                   )}
                   aria-current={active ? 'page' : undefined}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-4 w-4" aria-hidden="true" />
                   {item.label}
                 </Link>
               )
@@ -305,7 +302,7 @@ export function AppShell({ user, children }: AppShellProps) {
                     {user?.fullName ?? 'Team member'}
                   </p>
                   <p className="mt-0.5 text-[10px] capitalize text-[color:var(--sidebar-muted)]">
-                    {canAccessManagerUi ? 'Lead Therapist' : 'Staff Therapist'}
+                    {user?.role === 'manager' ? 'Manager' : 'Staff Therapist'}
                   </p>
                 </div>
               </div>
@@ -376,7 +373,12 @@ export function AppShell({ user, children }: AppShellProps) {
       </div>
 
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden" aria-modal="true" role="dialog">
+        <div
+          className="fixed inset-0 z-40 lg:hidden"
+          aria-modal="true"
+          role="dialog"
+          aria-labelledby="mobile-nav-heading"
+        >
           <div
             className="absolute inset-0 bg-black/45"
             onClick={() => setMobileMenuOpen(false)}
@@ -386,6 +388,9 @@ export function AppShell({ user, children }: AppShellProps) {
             id="app-shell-mobile-nav"
             className="relative z-10 flex h-full w-[85vw] max-w-[20rem] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
           >
+            <h2 id="mobile-nav-heading" className="sr-only">
+              Navigation menu
+            </h2>
             <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-4">
               <Logo />
               <Button
@@ -418,7 +423,7 @@ export function AppShell({ user, children }: AppShellProps) {
                     aria-current={active ? 'page' : undefined}
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-4 w-4" aria-hidden="true" />
                     {item.label}
                   </Link>
                 )
@@ -448,7 +453,7 @@ export function AppShell({ user, children }: AppShellProps) {
                     aria-current={active ? 'page' : undefined}
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-4 w-4" aria-hidden="true" />
                     {item.label}
                   </Link>
                 )

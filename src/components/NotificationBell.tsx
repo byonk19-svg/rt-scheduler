@@ -225,14 +225,16 @@ export function NotificationBell({ variant = 'default' }: NotificationBellProps)
                 const href = getNotificationHref(item)
                 const isUnread = !item.read_at
                 return (
-                  <div
+                  <button
                     key={item.id}
+                    type="button"
                     onClick={() => {
                       void handleNotificationClick(item)
                     }}
-                    className={`flex gap-3 px-4 py-3 transition-colors ${
+                    aria-label={`${item.title}${isUnread ? ' (unread)' : ''}`}
+                    className={`flex w-full gap-3 px-4 py-3 text-left transition-colors ${
                       isUnread ? 'bg-muted/60' : 'bg-card'
-                    } ${href ? 'cursor-pointer hover:bg-muted/80' : ''}`}
+                    } ${href ? 'cursor-pointer hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50' : 'cursor-default'}`}
                   >
                     {/* Unread indicator */}
                     <div className="mt-1.5 flex w-2 shrink-0 items-start justify-center">
@@ -251,7 +253,7 @@ export function NotificationBell({ variant = 'default' }: NotificationBellProps)
                         {timeAgo(item.created_at)}
                       </p>
                     </div>
-                  </div>
+                  </button>
                 )
               })
             )}

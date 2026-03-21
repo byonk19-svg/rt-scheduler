@@ -51,7 +51,7 @@ export default async function PendingSetupPage({
   const requestReceived = getSearchParam(params?.success) === 'access_requested'
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#f4f8fb_0%,#e7eff4_100%)]">
+    <main className="relative min-h-screen overflow-hidden bg-background">
       <div className="pointer-events-none absolute left-0 top-4 h-64 w-64 rounded-full bg-[color:rgba(6,103,169,0.14)] blur-3xl" />
       <div className="pointer-events-none absolute bottom-0 right-0 h-72 w-72 rounded-full bg-[color:rgba(239,180,79,0.14)] blur-3xl" />
 

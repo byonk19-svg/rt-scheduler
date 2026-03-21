@@ -128,7 +128,7 @@
   }
 
   a:hover {
-    color: var(--tw-deep-blue);
+    color: var(--primary);
   }
 }
 

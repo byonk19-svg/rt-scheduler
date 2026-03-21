@@ -198,7 +198,7 @@ export function CalendarGrid({
                                 </span>
                               </AssignmentStatusPopover>
                               {shift.status === 'leave_early' && (
-                                <AlertTriangle className="h-4 w-4 text-[var(--warning-text)]" />
+                                <AlertTriangle className="h-4 w-4 text-[var(--warning-text)]" aria-hidden="true" />
                               )}
                             </div>
                           ))}
