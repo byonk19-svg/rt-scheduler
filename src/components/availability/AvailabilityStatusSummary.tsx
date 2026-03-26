@@ -1,3 +1,6 @@
+import Link from 'next/link'
+
+import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/status-badge'
 
 export type AvailabilityStatusSummaryRow = {
@@ -57,7 +60,11 @@ export function AvailabilityStatusSummary({
                 </div>
               ))}
             </div>
-          ) : null}
+          ) : (
+            <div className="rounded-md border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-2 text-sm text-[var(--success-text)]">
+              Everyone has responded. You can review details or move forward with scheduling.
+            </div>
+          )}
         </section>
 
         <section className="rounded-2xl border border-border/70 bg-muted/10 p-4">
@@ -94,7 +101,22 @@ export function AvailabilityStatusSummary({
                 ))}
               </div>
             </details>
-          ) : null}
+          ) : (
+            <div className="space-y-3 rounded-lg border border-border/70 bg-card/80 px-3 py-3">
+              <p className="text-sm text-muted-foreground">
+                No one has submitted yet. Confirm the cycle is open and remind staff to send their
+                dates.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild size="sm" variant="outline" className="text-xs">
+                  <Link href="/coverage?view=week">Open coverage workspace</Link>
+                </Button>
+                <Button asChild size="sm" variant="secondary" className="text-xs">
+                  <Link href="/shift-board">Review shift board</Link>
+                </Button>
+              </div>
+            </div>
+          )}
         </section>
       </div>
     </section>

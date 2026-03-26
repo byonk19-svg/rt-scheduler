@@ -470,10 +470,10 @@ export default async function AvailabilityPage({
                 {canManageAvailability ? 'Plan staffing' : 'Add availability'}
               </a>
             </Button>
-            <Button asChild variant="outline" size="sm" className="text-xs">
+            <Button asChild variant="secondary" size="sm" className="text-xs">
               <Link href="/shift-board">Shift board</Link>
             </Button>
-            <MoreActionsMenu>
+            <MoreActionsMenu label="Utilities">
               <a
                 href="/api/availability/export"
                 className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-secondary"

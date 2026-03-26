@@ -130,10 +130,8 @@ export function AvailabilityEntriesTable({
   const managerAllStaffView = canManageAvailability && scope === 'all-staff'
 
   return (
-    <Card className={managerAllStaffView ? 'border-border/60 bg-background/70 shadow-none' : ''}>
-      <CardHeader
-        className={managerAllStaffView ? 'border-b border-border/60 bg-muted/10 pb-4' : ''}
-      >
+    <Card className={managerAllStaffView ? 'border-border/60 bg-card shadow-none' : ''}>
+      <CardHeader className={managerAllStaffView ? 'border-b border-border/60 pb-4' : ''}>
         <CardTitle>
           {canManageAvailability
             ? scope === 'all-staff'

@@ -7,6 +7,7 @@ import { Printer, Send, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
+import { MoreActionsMenu } from '@/components/more-actions-menu'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -724,16 +725,6 @@ function CoveragePageContent() {
           }
           actions={
             <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-1.5 text-xs"
-                onClick={() => window.print()}
-              >
-                <Printer className="h-3.5 w-3.5" />
-                Print
-              </Button>
               <form action={generateDraftScheduleAction}>
                 <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
                 <input type="hidden" name="view" value="week" />
@@ -749,19 +740,6 @@ function CoveragePageContent() {
                   <Sparkles className="h-3.5 w-3.5" />
                   Auto-draft
                 </Button>
-              </form>
-              <form action={resetDraftScheduleAction}>
-                <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
-                <input type="hidden" name="view" value="week" />
-                <input type="hidden" name="show_unavailable" value="false" />
-                <input type="hidden" name="return_to" value="coverage" />
-                <button
-                  type="submit"
-                  disabled={!activeCycleId || activeCyclePublished}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 text-xs font-medium text-[var(--error-text)] transition-opacity hover:opacity-80 disabled:opacity-50"
-                >
-                  Clear draft
-                </button>
               </form>
               <form action={sendPreliminaryScheduleAction}>
                 <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
@@ -794,13 +772,36 @@ function CoveragePageContent() {
                 <Button
                   type="submit"
                   size="sm"
-                  className="gap-1.5 text-xs bg-primary text-primary-foreground hover:bg-primary/90"
+                  className="gap-1.5 text-xs"
                   disabled={!activeCycleId || activeCyclePublished}
                 >
                   <Send className="h-3.5 w-3.5" />
                   {activeCyclePublished ? 'Published' : 'Publish'}
                 </Button>
               </form>
+              <MoreActionsMenu>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  Print
+                </button>
+                <form action={resetDraftScheduleAction}>
+                  <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+                  <input type="hidden" name="view" value="week" />
+                  <input type="hidden" name="show_unavailable" value="false" />
+                  <input type="hidden" name="return_to" value="coverage" />
+                  <button
+                    type="submit"
+                    disabled={!activeCycleId || activeCyclePublished}
+                    className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm text-[var(--error-text)] hover:bg-secondary disabled:opacity-50"
+                  >
+                    Clear draft
+                  </button>
+                </form>
+              </MoreActionsMenu>
             </>
           }
         />

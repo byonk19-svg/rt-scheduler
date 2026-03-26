@@ -207,8 +207,8 @@ export function ManagerSchedulingInputs({
   }
 
   return (
-    <Card id="staff-scheduling-inputs" className="border-border/70 bg-card/85 shadow-none">
-      <CardHeader className="border-b border-border/60 bg-muted/15 pb-4">
+    <Card id="staff-scheduling-inputs" className="border-border/60 bg-card shadow-none">
+      <CardHeader className="border-b border-border/60 pb-4">
         <CardTitle>Plan staffing</CardTitle>
         <CardDescription>
           Set hard dates that auto-draft must honor. Use <strong>Will work</strong> for required
@@ -250,7 +250,7 @@ export function ManagerSchedulingInputs({
         </div>
 
         {selectedTherapist && (
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-muted/10 px-3 py-2">
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 px-3 py-2">
             <Badge variant="outline" className="capitalize">
               {selectedTherapist.shift_type} shift
             </Badge>

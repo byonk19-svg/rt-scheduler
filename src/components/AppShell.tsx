@@ -142,7 +142,7 @@ function Logo() {
       </div>
       <div className="leading-none">
         <p className="font-heading text-sm font-bold tracking-[-0.02em] text-sidebar-primary">
-          Team<span className="text-accent">wise</span>
+          Teamwise
         </p>
         <p className="mt-0.5 text-[0.66rem] font-medium tracking-wide text-[color:var(--sidebar-muted)]">
           Respiratory Therapy
@@ -233,6 +233,7 @@ export function AppShell({ user, children }: AppShellProps) {
           <div className="flex items-center justify-between gap-2 px-4 py-4">
             <Link
               href={dashboardHref}
+              aria-label="Teamwise Respiratory Therapy"
               className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
             >
               <Logo />
@@ -337,6 +338,7 @@ export function AppShell({ user, children }: AppShellProps) {
 
               <Link
                 href={dashboardHref}
+                aria-label="Teamwise Respiratory Therapy"
                 className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
               >
                 <Logo />

@@ -70,15 +70,17 @@ export function ManagerTriageDashboard({
   return (
     <div className="max-w-[1120px] px-5 py-5 xl:px-7">
       <div className="mb-4">
-        <h1 className="text-[1.8rem] font-semibold tracking-tight text-foreground">Dashboard</h1>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Your account details and role configuration.
+        <h1 className="text-[1.8rem] font-semibold tracking-tight text-foreground">
+          Manager inbox
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Triage approvals, cycle readiness, and review items in one place.
         </p>
       </div>
 
-      <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+      <div className="space-y-3">
         <div className="grid gap-3 lg:grid-cols-3">
-          <Card className="gap-0 rounded-2xl border-border/80 bg-background py-0 shadow-none">
+          <Card className="gap-0 rounded-2xl border-border/70 bg-card py-0 shadow-none">
             <CardHeader className="flex flex-row items-center justify-between border-b border-border/70 pb-2 pt-3.5">
               <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 Today&apos;s Coverage
@@ -99,7 +101,7 @@ export function ManagerTriageDashboard({
             </CardContent>
           </Card>
 
-          <Card className="gap-0 rounded-2xl border-border/80 bg-background py-0 shadow-none">
+          <Card className="gap-0 rounded-2xl border-border/70 bg-card py-0 shadow-none">
             <CardHeader className="flex flex-row items-center justify-between border-b border-border/70 pb-2 pt-3.5">
               <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 Upcoming Shifts
@@ -130,7 +132,7 @@ export function ManagerTriageDashboard({
             </CardContent>
           </Card>
 
-          <Card className="gap-0 rounded-2xl border-border/80 bg-background py-0 shadow-none">
+          <Card className="gap-0 rounded-2xl border-border/70 bg-card py-0 shadow-none">
             <CardHeader className="flex flex-row items-center justify-between border-b border-border/70 pb-2 pt-3.5">
               <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 Pending Requests
@@ -150,7 +152,7 @@ export function ManagerTriageDashboard({
         </div>
 
         <div className="mt-3 grid gap-3 xl:grid-cols-[2fr_1fr]">
-          <Card className="gap-0 rounded-2xl border-border/80 bg-background py-0 shadow-none">
+          <Card className="gap-0 rounded-2xl border-border/70 bg-card py-0 shadow-none">
             <CardHeader className="border-b border-border/70 pb-2.5 pt-3.5">
               <CardTitle className="text-sm font-medium text-foreground">
                 Schedule Overview
@@ -220,7 +222,7 @@ export function ManagerTriageDashboard({
           </Card>
 
           <div className="space-y-3">
-            <Card className="gap-0 rounded-2xl border-border/80 bg-background py-0 shadow-none">
+            <Card className="gap-0 rounded-2xl border-border/70 bg-card py-0 shadow-none">
               <CardHeader className="border-b border-border/70 pb-2.5 pt-3.5">
                 <CardTitle className="text-sm font-medium text-foreground">Manager Inbox</CardTitle>
               </CardHeader>
@@ -262,7 +264,7 @@ export function ManagerTriageDashboard({
               </CardContent>
             </Card>
 
-            <Card className="gap-0 rounded-2xl border-border/80 bg-background py-0 shadow-none">
+            <Card className="gap-0 rounded-2xl border-border/70 bg-card py-0 shadow-none">
               <CardHeader className="border-b border-border/70 pb-2.5 pt-3.5">
                 <CardTitle className="text-sm font-medium text-foreground">
                   Recent Activity

@@ -87,6 +87,7 @@ export function CalendarGrid({
                     const totalCount = flatten(day).length
                     const showMonthTag = shouldShowMonthTag(absoluteIndex, day.isoDate)
                     const missingLead = !day.leadShift
+                    const hasCoverageIssue = missingLead || day.constraintBlocked
 
                     return (
                       <article
@@ -95,6 +96,8 @@ export function CalendarGrid({
                         className={cn(
                           'relative min-h-[156px] rounded-[20px] border border-border/80 bg-card px-2.75 py-2.25 text-left shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-[border-color,box-shadow,transform] duration-200',
                           'hover:-translate-y-px hover:border-primary/35 hover:shadow-[0_18px_36px_-28px_rgba(15,23,42,0.42)]',
+                          hasCoverageIssue &&
+                            'border-[var(--warning-border)] bg-[var(--warning-subtle)]/35 shadow-[0_1px_0_rgba(15,23,42,0.02),0_0_0_1px_var(--warning-border)]',
                           selectedId === day.id &&
                             'border-primary/60 shadow-[0_0_0_1px_rgba(6,103,169,0.3),0_18px_36px_-30px_rgba(6,103,169,0.4)]'
                         )}
@@ -120,16 +123,23 @@ export function CalendarGrid({
                               </span>
                             )}
                           </div>
-                          <span
-                            className={cn(
-                              'rounded-full px-2 py-0.5 text-[0.64rem] font-bold leading-none',
-                              missingLead || day.constraintBlocked
-                                ? 'bg-[var(--error-subtle)] text-[var(--error-text)]'
-                                : 'bg-[var(--success-subtle)] text-[var(--success-text)]'
+                          <div className="flex flex-col items-end gap-1">
+                            <span
+                              className={cn(
+                                'rounded-full px-2 py-0.5 text-[0.62rem] font-bold leading-none',
+                                hasCoverageIssue
+                                  ? 'bg-[var(--error-subtle)] text-[var(--error-text)]'
+                                  : 'bg-[var(--success-subtle)] text-[var(--success-text)]'
+                              )}
+                            >
+                              {activeCount}/{totalCount}
+                            </span>
+                            {hasCoverageIssue && (
+                              <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[0.54rem] font-semibold uppercase tracking-[0.08em] text-[var(--warning-text)]">
+                                Needs attention
+                              </span>
                             )}
-                          >
-                            {activeCount}/{totalCount}
-                          </span>
+                          </div>
                         </div>
 
                         <div
@@ -165,7 +175,9 @@ export function CalendarGrid({
                               </span>
                             </AssignmentStatusPopover>
                           ) : (
-                            <p className="mt-0.5 text-[0.68rem] font-semibold leading-tight">No lead</p>
+                            <p className="mt-0.5 text-[0.68rem] font-semibold leading-tight">
+                              No lead assigned
+                            </p>
                           )}
                         </div>
 
@@ -175,7 +187,7 @@ export function CalendarGrid({
                           </div>
                         )}
 
-                        <div className="mt-1.75 space-y-0.75">
+                        <div className="mt-2 space-y-1">
                           {day.staffShifts.map((shift) => (
                             <div key={shift.id} className="flex items-center gap-1 text-[0.66rem]">
                               <AssignmentStatusPopover
@@ -188,7 +200,7 @@ export function CalendarGrid({
                               >
                                 <span
                                   className={cn(
-                                    'inline-flex items-center gap-1 text-[0.66rem] text-muted-foreground',
+                                    'inline-flex items-center gap-1 text-[0.66rem] text-muted-foreground/90',
                                     isUnavailableStatus(shift.status) &&
                                       'line-through decoration-[var(--error-text)]/50'
                                   )}
