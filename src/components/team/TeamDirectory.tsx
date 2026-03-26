@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Shield, User } from 'lucide-react'
 
 import { FormSubmitButton } from '@/components/form-submit-button'
@@ -297,9 +297,12 @@ export function TeamDirectory({
   archiveTeamMemberAction,
   saveTeamQuickEditAction,
 }: TeamDirectoryProps) {
-  const [editProfileId, setEditProfileId] = useState<string | null>(initialEditProfileId)
-  const [draftRole, setDraftRole] = useState<EditableRole>('therapist')
-  const [onFmla, setOnFmla] = useState(false)
+  const initialEditProfile = profiles.find((profile) => profile.id === initialEditProfileId) ?? null
+  const [editProfileId, setEditProfileId] = useState<string | null>(initialEditProfile?.id ?? null)
+  const [draftRole, setDraftRole] = useState<EditableRole>(
+    (initialEditProfile?.role as EditableRole | null) ?? 'therapist'
+  )
+  const [onFmla, setOnFmla] = useState(initialEditProfile?.on_fmla === true)
 
   const sections = useMemo(() => partitionTeamProfiles(profiles), [profiles])
   const editProfile = useMemo(
@@ -308,28 +311,30 @@ export function TeamDirectory({
   )
   const editProfileIsActive = editProfile ? teamMemberHasAppAccess(editProfile) : false
 
-  useEffect(() => {
-    if (!editProfile) return
-    setDraftRole((editProfile.role as EditableRole | null) ?? 'therapist')
-    setOnFmla(editProfile.on_fmla === true)
-  }, [editProfile])
+  function openEditor(profileId: string) {
+    const profile = profiles.find((item) => item.id === profileId)
+    if (!profile) return
+    setEditProfileId(profileId)
+    setDraftRole((profile.role as EditableRole | null) ?? 'therapist')
+    setOnFmla(profile.on_fmla === true)
+  }
 
   return (
     <>
-      <TeamSection title="Managers" profiles={sections.managers} onOpen={setEditProfileId} />
+      <TeamSection title="Managers" profiles={sections.managers} onOpen={openEditor} />
       <ShiftGroup
         title="Day Shift"
         leads={sections.dayLeads}
         therapists={sections.dayTherapists}
-        onOpen={setEditProfileId}
+        onOpen={openEditor}
       />
       <ShiftGroup
         title="Night Shift"
         leads={sections.nightLeads}
         therapists={sections.nightTherapists}
-        onOpen={setEditProfileId}
+        onOpen={openEditor}
       />
-      <TeamSection title="Inactive" profiles={sections.inactive} onOpen={setEditProfileId} />
+      <TeamSection title="Inactive" profiles={sections.inactive} onOpen={openEditor} />
 
       {profiles.length === 0 && (
         <div className="rounded-xl border border-border bg-card px-6 py-12 text-center">

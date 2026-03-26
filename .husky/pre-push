@@ -1,0 +1,6 @@
+if [ "$SKIP_LOCAL_CI" = "1" ]; then
+  echo "SKIP_LOCAL_CI=1 set; skipping local CI fallback checks."
+  exit 0
+fi
+
+npm run ci:local:quick

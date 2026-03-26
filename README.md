@@ -135,11 +135,37 @@ Workflow: `.github/workflows/ci.yml`
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
   - optional: `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`
 
+## Local CI Fallback (when GitHub Actions is unavailable)
+
+Run the same quality checks locally:
+
+```bash
+npm run ci:local
+```
+
+Quick pre-push profile:
+
+```bash
+npm run ci:local:quick
+```
+
+Full checks with e2e:
+
+```bash
+npm run ci:local:e2e
+```
+
+Notes:
+
+- A Husky `pre-push` hook runs `ci:local:quick` automatically.
+- To bypass once (for emergencies): `SKIP_LOCAL_CI=1 git push`
+
 ## Useful Commands
 
 ```bash
 npm run lint
 npm run build
+npm run ci:local
 npm run seed:users
 npm run test:e2e
 ```

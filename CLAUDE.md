@@ -1,6 +1,28 @@
 ﻿# Teamwise Scheduler
 
-Updated: 2026-03-20 (session 9)
+Updated: 2026-03-26 (session 10)
+
+## Latest Updates (2026-03-26)
+
+- **Local CI fallback added for billing/outage resilience**:
+  - New script: `scripts/local-ci-fallback.mjs`
+  - New npm scripts:
+    - `npm run ci:local` (full local gate: format/lint/typecheck/build/security regressions)
+    - `npm run ci:local:quick` (format/lint/build)
+    - `npm run ci:local:e2e` (full local gate + Playwright)
+  - New pre-push safeguard:
+    - `.husky/pre-push` now runs `npm run ci:local:quick` before push
+    - emergency bypass: `SKIP_LOCAL_CI=1 git push`
+  - Purpose:
+    - when GitHub Actions or Vercel checks are blocked (for example billing/spending limits), local quality gates still prevent low-quality pushes.
+
+- **Lint/stability cleanup for manager workflows**:
+  - Removed synchronous `setState` effects that tripped `react-hooks/set-state-in-effect`:
+    - `src/components/availability/ManagerSchedulingInputs.tsx`
+    - `src/components/team/TeamDirectory.tsx`
+  - Minor cleanup:
+    - `src/app/coverage/page.tsx` callback dependency trim
+    - `src/app/schedule/actions.ts` unused type removal
 
 ## Latest Updates (2026-03-20)
 

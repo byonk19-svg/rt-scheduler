@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { FormSubmitButton } from '@/components/form-submit-button'
@@ -69,6 +69,17 @@ function getModeCopy(mode: PlannerMode) {
   return 'Cannot work dates are hard blocks that auto-draft must never assign.'
 }
 
+function getSavedBucketsForSelection(
+  overrides: PlannerOverrideRecord[],
+  cycleId: string,
+  therapistId: string
+) {
+  return splitPlannerDatesByMode(
+    overrides.filter((row) => row.cycle_id === cycleId && row.therapist_id === therapistId),
+    { source: 'manager' }
+  )
+}
+
 export function ManagerSchedulingInputs({
   cycles,
   therapists,
@@ -78,14 +89,22 @@ export function ManagerSchedulingInputs({
   saveManagerPlannerDatesAction,
   deleteManagerPlannerDateAction,
 }: Props) {
-  const [selectedCycleId, setSelectedCycleId] = useState(initialCycleId || cycles[0]?.id || '')
-  const [selectedTherapistId, setSelectedTherapistId] = useState(
-    initialTherapistId || therapists[0]?.id || ''
-  )
+  const initialSelectedCycleId = initialCycleId || cycles[0]?.id || ''
+  const initialSelectedTherapistId = initialTherapistId || therapists[0]?.id || ''
+
+  const [selectedCycleId, setSelectedCycleId] = useState(initialSelectedCycleId)
+  const [selectedTherapistId, setSelectedTherapistId] = useState(initialSelectedTherapistId)
   const [mode, setMode] = useState<PlannerMode>('will_work')
-  const [selectedDates, setSelectedDates] = useState<string[]>([])
+  const [selectedDates, setSelectedDates] = useState<string[]>(() => {
+    const initialBuckets = getSavedBucketsForSelection(
+      overrides,
+      initialSelectedCycleId,
+      initialSelectedTherapistId
+    )
+    return initialBuckets.willWork
+  })
   const [monthStart, setMonthStart] = useState(() => {
-    const cycle = cycles.find((item) => item.id === (initialCycleId || cycles[0]?.id))
+    const cycle = cycles.find((item) => item.id === initialSelectedCycleId)
     return toMonthStartKey(cycle?.start_date ?? toIsoDate(new Date()))
   })
 
@@ -110,16 +129,6 @@ export function ManagerSchedulingInputs({
     () => splitPlannerDatesByMode(savedOverrides, { source: 'manager' }),
     [savedOverrides]
   )
-
-  useEffect(() => {
-    setSelectedDates(mode === 'will_work' ? savedBuckets.willWork : savedBuckets.cannotWork)
-  }, [mode, savedBuckets.cannotWork, savedBuckets.willWork])
-
-  useEffect(() => {
-    if (selectedCycle) {
-      setMonthStart(toMonthStartKey(selectedCycle.start_date))
-    }
-  }, [selectedCycle])
 
   const monthKey = monthStart.slice(0, 7)
   const calendarWeeks = useMemo(
@@ -147,6 +156,30 @@ export function ManagerSchedulingInputs({
         ? current.filter((value) => value !== date)
         : [...current, date].sort((a, b) => a.localeCompare(b))
     )
+  }
+
+  function syncSelection(nextMode: PlannerMode, cycleId: string, therapistId: string) {
+    const nextBuckets = getSavedBucketsForSelection(overrides, cycleId, therapistId)
+    setSelectedDates(nextMode === 'will_work' ? nextBuckets.willWork : nextBuckets.cannotWork)
+  }
+
+  function handleCycleChange(nextCycleId: string) {
+    setSelectedCycleId(nextCycleId)
+    const nextCycle = cycles.find((cycle) => cycle.id === nextCycleId)
+    if (nextCycle) {
+      setMonthStart(toMonthStartKey(nextCycle.start_date))
+    }
+    syncSelection(mode, nextCycleId, selectedTherapistId)
+  }
+
+  function handleTherapistChange(nextTherapistId: string) {
+    setSelectedTherapistId(nextTherapistId)
+    syncSelection(mode, selectedCycleId, nextTherapistId)
+  }
+
+  function handleModeChange(nextMode: PlannerMode) {
+    setMode(nextMode)
+    syncSelection(nextMode, selectedCycleId, selectedTherapistId)
   }
 
   if (cycles.length === 0) {
@@ -190,7 +223,7 @@ export function ManagerSchedulingInputs({
               id="planner_cycle_id"
               className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
               value={selectedCycleId}
-              onChange={(event) => setSelectedCycleId(event.target.value)}
+              onChange={(event) => handleCycleChange(event.target.value)}
             >
               {cycles.map((cycle) => (
                 <option key={cycle.id} value={cycle.id}>
@@ -205,7 +238,7 @@ export function ManagerSchedulingInputs({
               id="planner_therapist_id"
               className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm"
               value={selectedTherapistId}
-              onChange={(event) => setSelectedTherapistId(event.target.value)}
+              onChange={(event) => handleTherapistChange(event.target.value)}
             >
               {therapists.map((therapist) => (
                 <option key={therapist.id} value={therapist.id}>
@@ -245,7 +278,7 @@ export function ManagerSchedulingInputs({
                     ? 'bg-[var(--success-subtle)] text-[var(--success-text)]'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
-                onClick={() => setMode('will_work')}
+                onClick={() => handleModeChange('will_work')}
               >
                 Will work
               </button>
@@ -257,7 +290,7 @@ export function ManagerSchedulingInputs({
                     ? 'bg-[var(--warning-subtle)] text-[var(--warning-text)]'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
-                onClick={() => setMode('cannot_work')}
+                onClick={() => handleModeChange('cannot_work')}
               >
                 Cannot work
               </button>

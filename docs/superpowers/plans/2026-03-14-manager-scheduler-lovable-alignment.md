@@ -50,6 +50,7 @@
 ### Task 1: Add a dedicated coverage status UI helper
 
 **Files:**
+
 - Create: `src/lib/coverage/status-ui.ts`
 - Test: `src/lib/coverage/status-ui.test.ts`
 
@@ -122,6 +123,7 @@ git commit -m "feat: add coverage status ui helpers"
 ### Task 2: Move selectors and optimistic status updates onto the new status helper
 
 **Files:**
+
 - Modify: `src/lib/coverage/selectors.ts`
 - Modify: `src/lib/coverage/selectors.test.ts`
 - Modify: `src/lib/coverage/updateAssignmentStatus.ts`
@@ -187,6 +189,7 @@ git commit -m "feat: preserve call-in status in coverage ui"
 ### Task 3: Build the Lovable-style shift editor dialog
 
 **Files:**
+
 - Create: `src/components/coverage/ShiftEditorDialog.tsx`
 - Modify: `src/app/coverage/page.tsx`
 - Test: `e2e/coverage-overlay.spec.ts`
@@ -225,7 +228,9 @@ export function ShiftEditorDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{selectedDay.label} · {selectedDay.shiftType} Shift</DialogTitle>
+          <DialogTitle>
+            {selectedDay.label} · {selectedDay.shiftType} Shift
+          </DialogTitle>
         </DialogHeader>
         {/* lead section */}
         {/* staff section */}
@@ -250,6 +255,7 @@ git commit -m "feat: replace coverage drawer with shift editor dialog"
 ### Task 4: Build the Lovable-style inline assignment status popover
 
 **Files:**
+
 - Create: `src/components/coverage/AssignmentStatusPopover.tsx`
 - Modify: `src/components/coverage/CalendarGrid.tsx`
 - Modify: `src/app/coverage/page.tsx`
@@ -260,7 +266,9 @@ git commit -m "feat: replace coverage drawer with shift editor dialog"
 ```ts
 test('clicking an assigned therapist opens the status popover only', async ({ page }) => {
   await openCoveragePage(page, ctx!)
-  await page.getByTestId(`coverage-assignment-trigger-${ctx!.targetDate}-${ctx!.therapist1.id}`).click()
+  await page
+    .getByTestId(`coverage-assignment-trigger-${ctx!.targetDate}-${ctx!.therapist1.id}`)
+    .click()
 
   await expect(page.getByTestId('coverage-status-popover')).toBeVisible()
   await expect(page.getByRole('dialog', { name: /Day Shift|Night Shift/ })).toHaveCount(0)
@@ -304,6 +312,7 @@ git commit -m "feat: add inline coverage status popovers"
 ### Task 5: Reshape the top shell and calendar cards to Lovable fidelity
 
 **Files:**
+
 - Modify: `src/app/coverage/page.tsx`
 - Modify: `src/components/coverage/CalendarGrid.tsx`
 - Test: `e2e/coverage-overlay.spec.ts`
@@ -352,6 +361,7 @@ git commit -m "feat: align coverage shell with lovable scheduler"
 ### Task 6: Remove the drawer render path and finish regression coverage
 
 **Files:**
+
 - Modify: `src/app/coverage/page.tsx`
 - Delete: `src/components/coverage/ShiftDrawer.tsx`
 - Modify: `e2e/coverage-overlay.spec.ts`

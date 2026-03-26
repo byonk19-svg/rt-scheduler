@@ -551,7 +551,7 @@ function CoveragePageContent() {
 
       setAssigning(false)
     },
-    [activeCycleId, allTherapists, selectedDay, setDays, supabase]
+    [activeCycleId, allTherapists, selectedDay, setDays]
   )
 
   const handleChangeStatus = useCallback(

@@ -85,10 +85,6 @@ type PublishRecipientRow = {
   full_name: string | null
 }
 
-type PreliminarySnapshotLookupRow = {
-  id: string
-}
-
 type PreliminaryShiftLookupRow = {
   id: string
   cycle_id: string | null
