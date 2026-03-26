@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   ArrowRight,
@@ -78,7 +78,6 @@ export default function HomePage() {
   const [phone, setPhone] = useState('')
   const [role, setRole] = useState<'manager' | 'therapist'>('therapist')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
   const baseUrl =
@@ -86,17 +85,13 @@ export default function HomePage() {
     (typeof window !== 'undefined' ? window.location.origin : undefined)
   const authCallbackUrl = baseUrl ? `${baseUrl}/auth/callback` : undefined
   const resetPasswordUrl = baseUrl ? `${baseUrl}/reset-password` : undefined
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const queryError = toFriendlyQueryError(
-      new URLSearchParams(window.location.search).get('error')
-    )
-    if (queryError) {
-      setError(queryError)
-      setMessage(null)
-    }
-  }, [])
+  const authFieldTransitionClass =
+    'transition-[border-color,box-shadow,background-color,color] duration-150'
+  const initialQueryError =
+    typeof window === 'undefined'
+      ? null
+      : toFriendlyQueryError(new URLSearchParams(window.location.search).get('error'))
+  const [error, setError] = useState<string | null>(initialQueryError)
 
   async function handleForgotPassword(e: React.FormEvent) {
     e.preventDefault()
@@ -285,7 +280,7 @@ export default function HomePage() {
                             {cell.d}
                           </span>
                           <div
-                            className={`flex h-11 flex-col items-center justify-center gap-1 rounded-lg border transition-all ${
+                            className={`flex h-11 flex-col items-center justify-center gap-1 rounded-lg border transition-colors duration-150 ${
                               cell.status === 'today'
                                 ? 'border-sidebar-ring/40 bg-sidebar-ring/20 ring-1 ring-sidebar-ring/25 shadow-sm shadow-sidebar-ring/10'
                                 : cell.status === 'warning'
@@ -407,12 +402,18 @@ export default function HomePage() {
               </p>
 
               {message && (
-                <p className="mb-3 rounded-md border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-2 text-sm text-[var(--success-text)]">
+                <p
+                  aria-live="polite"
+                  className="mb-3 rounded-md border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-2 text-sm text-[var(--success-text)]"
+                >
                   {message}
                 </p>
               )}
               {error && (
-                <p className="mb-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]">
+                <p
+                  aria-live="polite"
+                  className="mb-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]"
+                >
                   {error}
                 </p>
               )}
@@ -425,22 +426,27 @@ export default function HomePage() {
                     </Label>
                     <Input
                       id="email"
+                      name="email"
                       type="email"
                       placeholder="you@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       autoComplete="email"
+                      spellCheck={false}
                       required
-                      className="h-11 rounded-lg border-border/70 bg-background/80 text-sm placeholder:text-muted-foreground/40 shadow-sm focus:ring-2 focus:ring-primary/15 focus:border-primary/30 transition-all"
+                      className={`h-11 rounded-lg border-border/70 bg-background/80 text-sm placeholder:text-muted-foreground/40 shadow-sm focus:border-primary/30 focus:ring-2 focus:ring-primary/15 ${authFieldTransitionClass}`}
                     />
                   </div>
                   <Button
                     type="submit"
-                    className="w-full h-11 rounded-lg text-sm font-semibold gap-2 shadow-md hover:shadow-lg hover:brightness-110 transition-all mt-1"
+                    className="mt-1 h-11 w-full gap-2 rounded-lg text-sm font-semibold shadow-md transition-[box-shadow,filter] duration-150 hover:brightness-110 hover:shadow-lg"
                     disabled={loading}
                   >
                     {loading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                        Sending reset link
+                      </>
                     ) : (
                       <>
                         Send reset link
@@ -463,12 +469,13 @@ export default function HomePage() {
                           </Label>
                           <Input
                             id="first_name"
+                            name="firstName"
                             placeholder="Jane"
                             value={firstName}
                             onChange={(e) => setFirstName(e.target.value)}
                             autoComplete="given-name"
                             required
-                            className="h-11 rounded-lg border-border/70 bg-background/80 text-sm placeholder:text-muted-foreground/40 shadow-sm focus:ring-2 focus:ring-primary/15 focus:border-primary/30 transition-all"
+                            className={`h-11 rounded-lg border-border/70 bg-background/80 text-sm placeholder:text-muted-foreground/40 shadow-sm focus:border-primary/30 focus:ring-2 focus:ring-primary/15 ${authFieldTransitionClass}`}
                           />
                         </div>
                         <div className="space-y-1.5">
@@ -480,12 +487,13 @@ export default function HomePage() {
                           </Label>
                           <Input
                             id="last_name"
+                            name="lastName"
                             placeholder="Smith"
                             value={lastName}
                             onChange={(e) => setLastName(e.target.value)}
                             autoComplete="family-name"
                             required
-                            className="h-11 rounded-lg border-border/70 bg-background/80 text-sm placeholder:text-muted-foreground/40 shadow-sm focus:ring-2 focus:ring-primary/15 focus:border-primary/30 transition-all"
+                            className={`h-11 rounded-lg border-border/70 bg-background/80 text-sm placeholder:text-muted-foreground/40 shadow-sm focus:border-primary/30 focus:ring-2 focus:ring-primary/15 ${authFieldTransitionClass}`}
                           />
                         </div>
                       </div>
@@ -499,12 +507,13 @@ export default function HomePage() {
                         </Label>
                         <Input
                           id="phone"
+                          name="phone"
                           type="tel"
                           placeholder="(555) 123-4567"
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
                           autoComplete="tel"
-                          className="h-11 rounded-lg border-border/70 bg-background/80 text-sm placeholder:text-muted-foreground/40 shadow-sm focus:ring-2 focus:ring-primary/15 focus:border-primary/30 transition-all"
+                          className={`h-11 rounded-lg border-border/70 bg-background/80 text-sm placeholder:text-muted-foreground/40 shadow-sm focus:border-primary/30 focus:ring-2 focus:ring-primary/15 ${authFieldTransitionClass}`}
                         />
                       </div>
 
@@ -517,9 +526,10 @@ export default function HomePage() {
                         </Label>
                         <select
                           id="role"
+                          name="role"
                           value={role}
                           onChange={(e) => setRole(e.target.value as 'manager' | 'therapist')}
-                          className="h-11 w-full rounded-lg border border-border/70 bg-background/80 px-3 text-sm shadow-sm outline-none transition-all focus:border-primary/30 focus:ring-2 focus:ring-primary/15"
+                          className={`h-11 w-full rounded-lg border border-border/70 bg-background/80 px-3 text-sm shadow-sm outline-none focus:border-primary/30 focus:ring-2 focus:ring-primary/15 ${authFieldTransitionClass}`}
                         >
                           <option value="therapist">Therapist / Staff</option>
                           <option value="manager">Manager</option>
@@ -537,13 +547,15 @@ export default function HomePage() {
                     </Label>
                     <Input
                       id="email_main"
+                      name="email"
                       type="email"
                       placeholder="you@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       autoComplete="email"
+                      spellCheck={false}
                       required
-                      className="h-11 rounded-lg border-border/70 bg-background/80 text-sm placeholder:text-muted-foreground/40 shadow-sm focus:ring-2 focus:ring-primary/15 focus:border-primary/30 transition-all"
+                      className={`h-11 rounded-lg border-border/70 bg-background/80 text-sm placeholder:text-muted-foreground/40 shadow-sm focus:border-primary/30 focus:ring-2 focus:ring-primary/15 ${authFieldTransitionClass}`}
                     />
                   </div>
 
@@ -571,6 +583,7 @@ export default function HomePage() {
                     </div>
                     <Input
                       id="password_main"
+                      name="password"
                       type="password"
                       placeholder="********"
                       value={password}
@@ -578,17 +591,20 @@ export default function HomePage() {
                       autoComplete={isLogin ? 'current-password' : 'new-password'}
                       required
                       minLength={6}
-                      className="h-11 rounded-lg border-border/70 bg-background/80 text-sm placeholder:text-muted-foreground/40 shadow-sm focus:ring-2 focus:ring-primary/15 focus:border-primary/30 transition-all"
+                      className={`h-11 rounded-lg border-border/70 bg-background/80 text-sm placeholder:text-muted-foreground/40 shadow-sm focus:border-primary/30 focus:ring-2 focus:ring-primary/15 ${authFieldTransitionClass}`}
                     />
                   </div>
 
                   <Button
                     type="submit"
-                    className="w-full h-11 rounded-lg text-sm font-semibold gap-2 shadow-md hover:shadow-lg hover:brightness-110 transition-all mt-1"
+                    className="mt-1 h-11 w-full gap-2 rounded-lg text-sm font-semibold shadow-md transition-[box-shadow,filter] duration-150 hover:brightness-110 hover:shadow-lg"
                     disabled={loading}
                   >
                     {loading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                        {isLogin ? 'Signing in' : 'Creating account'}
+                      </>
                     ) : (
                       <>
                         {isLogin ? 'Sign in' : 'Create account'}

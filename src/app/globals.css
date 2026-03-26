@@ -128,7 +128,8 @@
   }
 
   a:hover {
-    color: var(--primary);
+    color: color-mix(in srgb, var(--primary) 82%, black);
+    text-decoration: underline;
   }
 }
 

@@ -379,14 +379,15 @@ export function AppShell({ user, children }: AppShellProps) {
           role="dialog"
           aria-labelledby="mobile-nav-heading"
         >
-          <div
+          <button
+            type="button"
             className="absolute inset-0 bg-black/45"
             onClick={() => setMobileMenuOpen(false)}
-            aria-hidden="true"
+            aria-label="Close navigation menu"
           />
           <aside
             id="app-shell-mobile-nav"
-            className="relative z-10 flex h-full w-[85vw] max-w-[20rem] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
+            className="relative z-10 flex h-full w-[85vw] max-w-[20rem] flex-col overscroll-contain border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
           >
             <h2 id="mobile-nav-heading" className="sr-only">
               Navigation menu
