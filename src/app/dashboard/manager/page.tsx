@@ -12,6 +12,9 @@ import { getNextCyclePlanningWindow } from '@/lib/manager-inbox'
 import { createClient } from '@/lib/supabase/client'
 import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 
+const LOADING_LABEL = 'Loading...'
+const COVERED_SHIFT_STATUSES = new Set(['scheduled', 'on_call'])
+
 type DashboardData = {
   pendingApprovals: number
   activeCycle: Cycle | null
@@ -19,6 +22,12 @@ type DashboardData = {
   unreadReviewCount: number
   latestUnreadTitle: string | null
   latestUnreadHref: string
+  todayCoverageCovered: number
+  todayCoverageTotal: number
+  upcomingShiftCount: number
+  upcomingShiftDays: Array<{ label: string; count: number }>
+  todayActiveShifts: Array<{ label: string; detail: string }>
+  recentActivity: Array<{ title: string; timeLabel: string; href: string }>
 }
 
 type ManagerProfileRow = {
@@ -27,8 +36,27 @@ type ManagerProfileRow = {
 
 type NotificationRow = {
   event_type: string
-  title: string
+  title: string | null
   target_type: 'schedule_cycle' | 'shift' | 'shift_post' | 'system' | null
+  created_at?: string | null
+}
+
+type ShiftStatusRow = {
+  id: string
+  status: string | null
+}
+
+type ShiftDateRow = {
+  id: string
+  date: string
+}
+
+type ShiftAssignmentRow = {
+  id: string
+  shift_type: 'day' | 'night' | null
+  role: 'lead' | 'staff' | null
+  status: string | null
+  profiles: { full_name: string } | { full_name: string }[] | null
 }
 
 const INITIAL_DATA: DashboardData = {
@@ -38,12 +66,53 @@ const INITIAL_DATA: DashboardData = {
   unreadReviewCount: 0,
   latestUnreadTitle: null,
   latestUnreadHref: '/coverage?view=week',
+  todayCoverageCovered: 0,
+  todayCoverageTotal: 0,
+  upcomingShiftCount: 0,
+  upcomingShiftDays: [],
+  todayActiveShifts: [],
+  recentActivity: [],
+}
+
+function getOne<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null
+  return value ?? null
+}
+
+function toIsoDate(value: Date): string {
+  return value.toISOString().slice(0, 10)
+}
+
+function addDays(value: Date, days: number): Date {
+  const next = new Date(value)
+  next.setDate(next.getDate() + days)
+  return next
 }
 
 function formatCycleDate(value: string): string {
   const parsed = new Date(`${value}T00:00:00`)
   if (Number.isNaN(parsed.getTime())) return value
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function formatDayLabel(value: string): string {
+  return new Date(`${value}T00:00:00`).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
+function toRelativeTime(value: string | null | undefined): string {
+  if (!value) return 'Just now'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return 'Just now'
+  const deltaMs = Date.now() - parsed.getTime()
+  const deltaMinutes = Math.max(1, Math.round(deltaMs / (1000 * 60)))
+  if (deltaMinutes < 60) return `${deltaMinutes} minute${deltaMinutes === 1 ? '' : 's'} ago`
+  const deltaHours = Math.round(deltaMinutes / 60)
+  if (deltaHours < 24) return `${deltaHours} hour${deltaHours === 1 ? '' : 's'} ago`
+  const deltaDays = Math.round(deltaHours / 24)
+  return `${deltaDays} day${deltaDays === 1 ? '' : 's'} ago`
 }
 
 function getNotificationHref(item: NotificationRow): string {
@@ -54,6 +123,26 @@ function getNotificationHref(item: NotificationRow): string {
   if (item.target_type === 'schedule_cycle') return '/coverage?view=week'
   if (item.event_type.includes('request')) return '/requests'
   return '/coverage?view=week'
+}
+
+function formatShiftLine(row: ShiftAssignmentRow): { label: string; detail: string } {
+  const fullName = getOne(row.profiles)?.full_name ?? 'Unassigned therapist'
+  const shiftLabel =
+    row.shift_type === 'night' ? 'Night shift' : row.shift_type === 'day' ? 'Day shift' : 'Shift'
+  const roleLabel = row.role === 'lead' ? 'Lead' : 'Staff'
+  return {
+    label: fullName,
+    detail: `${shiftLabel} | ${roleLabel}`,
+  }
+}
+
+function getActivityTitle(row: NotificationRow): string {
+  const title = row.title?.trim()
+  if (title) return title
+  if (row.event_type === 'preliminary_request_submitted') return 'New preliminary request submitted'
+  if (row.event_type.includes('publish')) return 'Schedule publish activity'
+  if (row.event_type.includes('request')) return 'Request activity updated'
+  return 'Dashboard activity update'
 }
 
 export default function ManagerDashboardPage() {
@@ -75,7 +164,8 @@ export default function ManagerDashboardPage() {
           return
         }
 
-        const todayKey = new Date().toISOString().slice(0, 10)
+        const today = new Date()
+        const todayKey = toIsoDate(today)
 
         const [
           profileResult,
@@ -83,6 +173,7 @@ export default function ManagerDashboardPage() {
           pendingApprovalsResult,
           unreadReviewCountResult,
           latestUnreadResult,
+          recentActivityResult,
         ] = await Promise.all([
           supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
           supabase
@@ -107,13 +198,19 @@ export default function ManagerDashboardPage() {
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle(),
+          supabase
+            .from('notifications')
+            .select('event_type, title, target_type, created_at')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(5),
         ])
 
         if (profileResult.error) {
           console.error('Failed to load manager profile for dashboard:', profileResult.error)
         }
         if (cyclesResult.error) {
-          console.error('Failed to load cycles for manager inbox:', cyclesResult.error)
+          console.error('Failed to load cycles for manager dashboard:', cyclesResult.error)
         }
         if (pendingApprovalsResult.error) {
           console.error(
@@ -126,6 +223,9 @@ export default function ManagerDashboardPage() {
         }
         if (latestUnreadResult.error) {
           console.error('Failed to load latest unread review item:', latestUnreadResult.error)
+        }
+        if (recentActivityResult.error) {
+          console.error('Failed to load recent manager activity:', recentActivityResult.error)
         }
 
         const profile = (profileResult.data ?? null) as ManagerProfileRow | null
@@ -143,6 +243,70 @@ export default function ManagerDashboardPage() {
           : (cycles.find((cycle) => cycle.start_date > todayKey) ?? null)
         const latestUnread = (latestUnreadResult.data ?? null) as NotificationRow | null
 
+        let todayCoverageQuery = supabase.from('shifts').select('id, status').eq('date', todayKey)
+        let upcomingShiftsQuery = supabase
+          .from('shifts')
+          .select('id, date')
+          .gte('date', todayKey)
+          .lte('date', toIsoDate(addDays(today, 14)))
+          .in('status', ['scheduled', 'on_call'])
+        let todayActiveShiftsQuery = supabase
+          .from('shifts')
+          .select('id, shift_type, role, status, profiles:profiles!shifts_user_id_fkey(full_name)')
+          .eq('date', todayKey)
+          .in('status', ['scheduled', 'on_call'])
+          .order('shift_type', { ascending: true })
+          .order('role', { ascending: true })
+          .limit(6)
+
+        if (activeCycle) {
+          todayCoverageQuery = todayCoverageQuery.eq('cycle_id', activeCycle.id)
+          upcomingShiftsQuery = upcomingShiftsQuery.eq('cycle_id', activeCycle.id)
+          todayActiveShiftsQuery = todayActiveShiftsQuery.eq('cycle_id', activeCycle.id)
+        }
+
+        const [todayCoverageResult, upcomingShiftsResult, todayActiveShiftsResult] =
+          await Promise.all([todayCoverageQuery, upcomingShiftsQuery, todayActiveShiftsQuery])
+
+        if (todayCoverageResult.error) {
+          console.error('Failed to load today coverage metric:', todayCoverageResult.error)
+        }
+        if (upcomingShiftsResult.error) {
+          console.error('Failed to load upcoming shifts metric:', upcomingShiftsResult.error)
+        }
+        if (todayActiveShiftsResult.error) {
+          console.error('Failed to load active shifts list:', todayActiveShiftsResult.error)
+        }
+
+        const todayRows = (todayCoverageResult.data ?? []) as ShiftStatusRow[]
+        const todayCoverageTotal = todayRows.length
+        const todayCoverageCovered = todayRows.filter((row) =>
+          COVERED_SHIFT_STATUSES.has(row.status ?? '')
+        ).length
+
+        const upcomingRows = (upcomingShiftsResult.data ?? []) as ShiftDateRow[]
+        const upcomingByDayMap = new Map<string, number>()
+        for (const row of upcomingRows) {
+          upcomingByDayMap.set(row.date, (upcomingByDayMap.get(row.date) ?? 0) + 1)
+        }
+        const upcomingShiftDays = Array.from(upcomingByDayMap.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .slice(0, 3)
+          .map(([date, count]) => ({
+            label: formatDayLabel(date),
+            count,
+          }))
+
+        const todayShiftRows = (todayActiveShiftsResult.data ?? []) as ShiftAssignmentRow[]
+        const todayActiveShifts = todayShiftRows.map(formatShiftLine)
+
+        const activityRows = (recentActivityResult.data ?? []) as NotificationRow[]
+        const recentActivity = activityRows.map((row) => ({
+          title: getActivityTitle(row),
+          timeLabel: toRelativeTime(row.created_at),
+          href: getNotificationHref(row),
+        }))
+
         if (!isMounted) return
 
         setData({
@@ -154,6 +318,12 @@ export default function ManagerDashboardPage() {
           latestUnreadHref: latestUnread
             ? getNotificationHref(latestUnread)
             : '/coverage?view=week',
+          todayCoverageCovered,
+          todayCoverageTotal,
+          upcomingShiftCount: upcomingRows.length,
+          upcomingShiftDays,
+          todayActiveShifts,
+          recentActivity,
         })
       } catch (error) {
         console.error('Failed to load manager dashboard data:', error)
@@ -172,7 +342,7 @@ export default function ManagerDashboardPage() {
   const nextCyclePlanning = getNextCyclePlanningWindow(data.nextCycle?.start_date ?? null)
 
   const currentCycleStatus = loading
-    ? 'Loading'
+    ? LOADING_LABEL
     : data.activeCycle
       ? data.activeCycle.published
         ? 'Published'
@@ -180,31 +350,38 @@ export default function ManagerDashboardPage() {
       : 'No active cycle'
 
   const currentCycleDetail = loading
-    ? 'Loading'
+    ? LOADING_LABEL
     : data.activeCycle
       ? `Publish by ${formatCycleDate(data.activeCycle.end_date)}`
       : 'No current cycle is scheduled.'
 
   const nextCycleLabel = loading
-    ? 'Loading'
+    ? LOADING_LABEL
     : nextCyclePlanning.collectAvailabilityOn
       ? `Collect availability ${formatCycleDate(nextCyclePlanning.collectAvailabilityOn)}`
       : 'No next cycle'
 
   const nextCycleDetail = loading
-    ? 'Loading'
+    ? LOADING_LABEL
     : nextCyclePlanning.publishBy
       ? `Publish by ${formatCycleDate(nextCyclePlanning.publishBy)}`
       : 'Create the next 6-week cycle to plan ahead.'
 
   const needsReviewDetail = loading
-    ? 'Loading'
+    ? LOADING_LABEL
     : data.unreadReviewCount > 0
       ? (data.latestUnreadTitle ?? 'Unread review items are waiting.')
       : 'You are caught up.'
 
   return (
     <ManagerTriageDashboard
+      todayCoverageCovered={loading ? '--' : data.todayCoverageCovered}
+      todayCoverageTotal={loading ? '--' : data.todayCoverageTotal}
+      upcomingShiftCount={loading ? '--' : data.upcomingShiftCount}
+      upcomingShiftDays={loading ? [] : data.upcomingShiftDays}
+      todayActiveShifts={loading ? [] : data.todayActiveShifts}
+      recentActivity={loading ? [] : data.recentActivity}
+      pendingRequests={loading ? '--' : data.pendingApprovals}
       approvalsWaiting={loading ? '--' : data.pendingApprovals}
       currentCycleStatus={currentCycleStatus}
       currentCycleDetail={currentCycleDetail}
@@ -215,7 +392,6 @@ export default function ManagerDashboardPage() {
       approvalsHref={MANAGER_WORKFLOW_LINKS.approvals}
       scheduleHref={scheduleHref}
       reviewHref={data.latestUnreadHref}
-      onNavigate={(href) => router.push(href)}
     />
   )
 }

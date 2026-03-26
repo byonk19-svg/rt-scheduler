@@ -13,6 +13,9 @@
     "seed:demo": "node --env-file=.env.local scripts/seed-demo.mjs",
     "seed:users": "node --env-file=.env.local scripts/seed-users.mjs",
     "verify:publish": "node --env-file=.env.local scripts/verify-publish-readiness.mjs",
+    "auth:save": "node scripts/site-shots.mjs --save-auth true --headful true",
+    "shots:sitemap": "node scripts/site-shots.mjs --mode sitemap",
+    "shots:links": "node scripts/site-shots.mjs --mode links",
     "test:e2e": "playwright test",
     "test:unit": "vitest run"
   },
@@ -41,6 +44,7 @@
     "eslint-config-next": "16.1.6",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
+    "playwright": "^1.58.2",
     "prettier": "^3.8.1",
     "shadcn": "^3.8.5",
     "tailwindcss": "^4",

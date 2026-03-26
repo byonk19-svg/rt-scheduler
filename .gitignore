@@ -47,6 +47,8 @@ supabase/.temp/
 # playwright
 playwright-report/
 test-results/
+shots/
+.auth/
 
 # local agent/tooling state
 .claude/
