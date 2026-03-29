@@ -129,7 +129,6 @@ export function AvailabilityEntriesTable({
   }, [canManageAvailability, rows, filters, scope])
 
   const emptyColSpan = canManageAvailability ? 5 : 4
-  const managerAllStaffView = canManageAvailability && scope === 'all-staff'
 
   return (
     <Card className="overflow-hidden rounded-[1.75rem] border border-slate-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.08)]">
