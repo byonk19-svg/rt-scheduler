@@ -11,4 +11,11 @@ describe('therapist availability route', () => {
     expect(source).not.toContain("export { default } from '../../availability/page'")
     expect(source).toContain('TherapistAvailabilityWorkspace')
   })
+
+  it('uses the therapist relationship when reading availability overrides', () => {
+    const filePath = resolve(process.cwd(), 'src/app/therapist/availability/page.tsx')
+    const source = readFileSync(filePath, 'utf8')
+
+    expect(source).toContain('profiles!availability_overrides_therapist_id_fkey(full_name)')
+  })
 })

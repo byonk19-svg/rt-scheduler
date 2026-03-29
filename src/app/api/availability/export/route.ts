@@ -56,7 +56,7 @@ export async function GET() {
   let query = supabase
     .from('availability_overrides')
     .select(
-      'date, override_type, shift_type, note, source, created_at, therapist_id, profiles(full_name), schedule_cycles(label, start_date, end_date)'
+      'date, override_type, shift_type, note, source, created_at, therapist_id, profiles!availability_overrides_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
     )
     .order('date', { ascending: true })
     .order('created_at', { ascending: true })

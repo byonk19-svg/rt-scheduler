@@ -165,7 +165,7 @@ export default async function TherapistAvailabilityPage({
   let entriesQuery = supabase
     .from('availability_overrides')
     .select(
-      'id, date, shift_type, override_type, note, created_at, therapist_id, cycle_id, profiles(full_name), schedule_cycles(label, start_date, end_date)'
+      'id, date, shift_type, override_type, note, created_at, therapist_id, cycle_id, profiles!availability_overrides_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
     )
     .eq('therapist_id', user.id)
     .order('date', { ascending: true })
