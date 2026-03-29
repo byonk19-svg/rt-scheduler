@@ -13,17 +13,13 @@ import {
   submitAvailabilityEntryAction,
 } from '@/app/availability/actions'
 import { AvailabilityOverviewHeader } from '@/components/availability/AvailabilityOverviewHeader'
-import { AvailabilityStatusSummary } from '@/components/availability/AvailabilityStatusSummary'
 import { ManagerSchedulingInputs } from '@/components/availability/ManagerSchedulingInputs'
 import type { TableToolbarFilters } from '@/components/TableToolbar'
 import { FeedbackToast } from '@/components/feedback-toast'
-import { FormSubmitButton } from '@/components/form-submit-button'
 import { MoreActionsMenu } from '@/components/more-actions-menu'
 import { PrintMenuItem } from '@/components/print-menu-item'
+import { TherapistAvailabilityWorkspace } from '@/components/availability/TherapistAvailabilityWorkspace'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { can } from '@/lib/auth/can'
 import { buildMissingAvailabilityRows } from '@/lib/employee-directory'
 import { toUiRole } from '@/lib/auth/roles'
@@ -250,7 +246,6 @@ export default async function AvailabilityPage({
 
   const { data: entriesData } = await entriesQuery
   const entries = (entriesData ?? []) as AvailabilityRow[]
-  const hasCycles = cycles.length > 0
   const plannerTherapistsResult = canManageAvailability
     ? await supabase
         .from('profiles')
@@ -330,110 +325,13 @@ export default async function AvailabilityPage({
     />
   )
 
-  const submitEntryCard = (
-    <Card id="submit-entry">
-      <CardHeader>
-        <CardTitle>Submit availability for an upcoming cycle</CardTitle>
-        <CardDescription>
-          Use this before publish. First choose a date and cycle, then choose Need off or Available
-          to work.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form action={submitAvailabilityEntryAction} className="space-y-5">
-          <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-              Step 1: Pick cycle and date
-            </p>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="date">Date</Label>
-                <Input id="date" name="date" type="date" required />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="cycle_id">Schedule Cycle</Label>
-                <select
-                  id="cycle_id"
-                  name="cycle_id"
-                  className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  defaultValue={selectedCycleId}
-                  required
-                >
-                  <option value="" disabled>
-                    Select cycle
-                  </option>
-                  {cycles.map((cycle) => (
-                    <option key={cycle.id} value={cycle.id}>
-                      {cycle.label} ({cycle.start_date} to {cycle.end_date})
-                      {cycle.published ? '' : ' [draft]'}
-                    </option>
-                  ))}
-                </select>
-                {!hasCycles && (
-                  <p className="text-xs text-muted-foreground">
-                    No upcoming schedule cycles found.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-              Step 2: Choose request details
-            </p>
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="override_type">Request type</Label>
-                <select
-                  id="override_type"
-                  name="override_type"
-                  className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  defaultValue="force_off"
-                >
-                  <option value="force_off">Need off</option>
-                  <option value="force_on">Available to work</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="shift_type">Shift</Label>
-                <select
-                  id="shift_type"
-                  name="shift_type"
-                  className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  defaultValue="both"
-                >
-                  <option value="both">Both</option>
-                  <option value="day">Day</option>
-                  <option value="night">Night</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="note">Note (optional)</Label>
-                <Input id="note" name="note" placeholder="Vacation, appointment, childcare, etc." />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-muted-foreground">
-              Need off means you cannot work. Available to work means you are open for shifts.
-            </p>
-            <FormSubmitButton type="submit" pendingText="Saving...">
-              Save request
-            </FormSubmitButton>
-          </div>
-        </form>
-        {feedback?.variant === 'error' && (
-          <p className="mt-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]">
-            {feedback.message}
-          </p>
-        )}
-      </CardContent>
-    </Card>
+  const therapistWorkspace = (
+    <TherapistAvailabilityWorkspace
+      cycles={cycles}
+      availabilityRows={availabilityRows}
+      initialCycleId={selectedCycleId}
+      submitAvailabilityEntryAction={submitAvailabilityEntryAction}
+    />
   )
   const totalRequests = availabilityRows.length
   const needOffRequests = availabilityRows.filter((row) => row.entryType === 'force_off').length
@@ -452,7 +350,9 @@ export default async function AvailabilityPage({
 
       <AvailabilityOverviewHeader
         canManageAvailability={canManageAvailability}
-        title={canManageAvailability ? 'Availability And Staffing Inputs' : 'Future Availability'}
+        title={
+          canManageAvailability ? 'Optimized Staffing & Availability Hub' : 'Future Availability'
+        }
         subtitle={
           selectedCycle
             ? `${selectedCycle.label} - ${selectedCycle.start_date} to ${selectedCycle.end_date}`
@@ -464,13 +364,28 @@ export default async function AvailabilityPage({
         responseRatio={responseRatio}
         actions={
           <>
-            <Button asChild size="sm" className="gap-1.5 text-xs">
-              <a href={canManageAvailability ? '#staff-scheduling-inputs' : '#submit-entry'}>
+            <Button
+              asChild
+              size="sm"
+              className="gap-1.5 bg-[#2d5a5a] text-xs text-white hover:bg-[#244a4a]"
+            >
+              <a
+                href={
+                  canManageAvailability
+                    ? '#staff-scheduling-inputs'
+                    : '#therapist-availability-workspace'
+                }
+              >
                 <Plus className="h-3.5 w-3.5" />
                 {canManageAvailability ? 'Plan staffing' : 'Add availability'}
               </a>
             </Button>
-            <Button asChild variant="secondary" size="sm" className="text-xs">
+            <Button
+              asChild
+              variant="secondary"
+              size="sm"
+              className="border border-slate-200 bg-white text-xs text-slate-700 hover:bg-slate-100"
+            >
               <Link href="/shift-board">Shift board</Link>
             </Button>
             <MoreActionsMenu label="Utilities">
@@ -495,18 +410,16 @@ export default async function AvailabilityPage({
             overrides={plannerOverrides}
             initialCycleId={selectedCycleId}
             initialTherapistId={selectedPlannerTherapistId}
-            saveManagerPlannerDatesAction={saveManagerPlannerDatesAction}
-            deleteManagerPlannerDateAction={deleteManagerPlannerDateAction}
-          />
-          <AvailabilityStatusSummary
             submittedRows={submittedAvailabilityRows}
             missingRows={missingAvailabilityRows}
+            saveManagerPlannerDatesAction={saveManagerPlannerDatesAction}
+            deleteManagerPlannerDateAction={deleteManagerPlannerDateAction}
           />
           {entriesCard}
         </>
       ) : (
         <>
-          {submitEntryCard}
+          {therapistWorkspace}
           {entriesCard}
         </>
       )}

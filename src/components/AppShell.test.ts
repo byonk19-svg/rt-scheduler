@@ -38,4 +38,10 @@ describe('AppShell sidebar styling', () => {
   it('contains overscroll within the mobile drawer', () => {
     expect(appShellSource).toContain('overscroll-contain')
   })
+
+  it('routes staff future availability navigation to the therapist availability page', () => {
+    expect(appShellSource).toContain(
+      "href: '/therapist/availability', label: 'Future Availability'"
+    )
+  })
 })

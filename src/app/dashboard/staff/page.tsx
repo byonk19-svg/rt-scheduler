@@ -197,7 +197,7 @@ export default async function StaffDashboardPage({
           </div>
           <div className="flex flex-wrap gap-2">
             <Button asChild size="sm">
-              <Link href="/availability">
+              <Link href="/therapist/availability">
                 <Send className="mr-1.5 h-3.5 w-3.5" />
                 Submit availability
               </Link>
@@ -272,7 +272,7 @@ export default async function StaffDashboardPage({
             Use Future Availability to submit upcoming cycle requests.
           </p>
           <Button asChild size="sm" variant="outline" className="mt-3">
-            <Link href="/availability">Open future availability</Link>
+            <Link href="/therapist/availability">Open future availability</Link>
           </Button>
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
@@ -372,7 +372,7 @@ export default async function StaffDashboardPage({
                 : 'Not submitted for this upcoming cycle yet.'
               : 'Submit days you cannot work in upcoming cycles before publish.'
           }
-          href="/availability"
+          href="/therapist/availability"
           cta="Open future availability"
         />
         <NavCard

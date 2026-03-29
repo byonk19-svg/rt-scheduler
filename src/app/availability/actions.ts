@@ -14,7 +14,14 @@ import { createClient } from '@/lib/supabase/server'
 type AvailabilityOverrideType = 'force_off' | 'force_on'
 type AvailabilityShiftType = 'day' | 'night' | 'both'
 
-function buildAvailabilityUrl(params?: Record<string, string | undefined>) {
+function getReturnPath(value: string | null): '/availability' | '/therapist/availability' {
+  return value === '/therapist/availability' ? '/therapist/availability' : '/availability'
+}
+
+function buildAvailabilityUrl(
+  params?: Record<string, string | undefined>,
+  returnPath: '/availability' | '/therapist/availability' = '/availability'
+) {
   const search = new URLSearchParams()
   for (const [key, value] of Object.entries(params ?? {})) {
     if (value) {
@@ -22,7 +29,7 @@ function buildAvailabilityUrl(params?: Record<string, string | undefined>) {
     }
   }
   const query = search.toString()
-  return query.length > 0 ? `/availability?${query}` : '/availability'
+  return query.length > 0 ? `${returnPath}?${query}` : returnPath
 }
 
 async function getAuthenticatedUserWithRole() {
@@ -50,6 +57,7 @@ async function getAuthenticatedUserWithRole() {
 
 export async function submitAvailabilityEntryAction(formData: FormData) {
   const { supabase, user } = await getAuthenticatedUserWithRole()
+  const returnPath = getReturnPath(String(formData.get('return_to') ?? '').trim() || null)
 
   const date = String(formData.get('date') ?? '').trim()
   const cycleId = String(formData.get('cycle_id') ?? '').trim()
@@ -65,7 +73,7 @@ export async function submitAvailabilityEntryAction(formData: FormData) {
     (shiftType !== 'day' && shiftType !== 'night' && shiftType !== 'both') ||
     (overrideType !== 'force_off' && overrideType !== 'force_on')
   ) {
-    redirect(buildAvailabilityUrl({ error: 'submit_failed' }))
+    redirect(buildAvailabilityUrl({ error: 'submit_failed' }, returnPath))
   }
 
   const { error } = await supabase.from('availability_overrides').upsert(
@@ -84,20 +92,22 @@ export async function submitAvailabilityEntryAction(formData: FormData) {
 
   if (error) {
     console.error('Failed to save availability override:', error)
-    redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }))
+    redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
   }
 
   revalidatePath('/availability')
-  redirect(buildAvailabilityUrl({ success: 'entry_submitted', cycle: cycleId }))
+  revalidatePath('/therapist/availability')
+  redirect(buildAvailabilityUrl({ success: 'entry_submitted', cycle: cycleId }, returnPath))
 }
 
 export async function deleteAvailabilityEntryAction(formData: FormData) {
   const { supabase, user } = await getAuthenticatedUserWithRole()
+  const returnPath = getReturnPath(String(formData.get('return_to') ?? '').trim() || null)
 
   const entryId = String(formData.get('entry_id') ?? '').trim()
   const cycleId = String(formData.get('cycle_id') ?? '').trim()
   if (!entryId) {
-    redirect('/availability')
+    redirect(returnPath)
   }
 
   const { error } = await supabase
@@ -108,11 +118,16 @@ export async function deleteAvailabilityEntryAction(formData: FormData) {
 
   if (error) {
     console.error('Failed to delete availability override:', error)
-    redirect(buildAvailabilityUrl({ error: 'delete_failed', cycle: cycleId || undefined }))
+    redirect(
+      buildAvailabilityUrl({ error: 'delete_failed', cycle: cycleId || undefined }, returnPath)
+    )
   }
 
   revalidatePath('/availability')
-  redirect(buildAvailabilityUrl({ success: 'entry_deleted', cycle: cycleId || undefined }))
+  revalidatePath('/therapist/availability')
+  redirect(
+    buildAvailabilityUrl({ success: 'entry_deleted', cycle: cycleId || undefined }, returnPath)
+  )
 }
 
 export async function saveManagerPlannerDatesAction(formData: FormData) {

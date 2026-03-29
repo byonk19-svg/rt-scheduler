@@ -1,7 +1,8 @@
-import Link from 'next/link'
+'use client'
 
-import { Button } from '@/components/ui/button'
-import { StatusBadge } from '@/components/ui/status-badge'
+import { useState } from 'react'
+
+import { cn } from '@/lib/utils'
 
 export type AvailabilityStatusSummaryRow = {
   therapistId: string
@@ -18,106 +19,141 @@ function pluralizeTherapists(count: number): string {
   return `${count} therapist${count === 1 ? '' : 's'}`
 }
 
+function TherapistRow({
+  name,
+  subtitle,
+  tone,
+}: {
+  name: string
+  subtitle: string
+  tone: 'warning' | 'success'
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-[11px] font-bold uppercase text-slate-600">
+        {name
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 2)
+          .map((part) => part[0])
+          .join('')}
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-slate-800">{name}</p>
+        <div className="mt-1 flex items-center gap-1.5">
+          <span
+            className={cn(
+              'h-2 w-2 rounded-full',
+              tone === 'warning' ? 'bg-orange-400' : 'bg-emerald-500'
+            )}
+          />
+          <span className="text-[11px] font-medium text-slate-500">{subtitle}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function AvailabilityStatusSummary({
   submittedRows,
   missingRows,
 }: AvailabilityStatusSummaryProps) {
+  const [activeTab, setActiveTab] = useState<'missing' | 'submitted'>('missing')
+
   return (
-    <section className="space-y-3" aria-labelledby="availability-response-heading">
-      <div className="space-y-1">
+    <section className="flex h-full flex-col" aria-labelledby="availability-response-heading">
+      <div className="border-b border-slate-200/80 px-5 py-4">
         <h2
           id="availability-response-heading"
-          className="text-lg font-medium leading-none text-foreground"
+          className="text-sm font-bold tracking-[-0.01em] text-slate-700"
         >
-          Check responses
+          Response roster
         </h2>
-        <p className="text-sm text-muted-foreground">
-          Focus on missing responses first, then expand the submitted roster only if you need it.
-        </p>
       </div>
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-        <section className="rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-subtle)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-[var(--warning-text)]">Not submitted yet</p>
-              <p className="text-sm text-[var(--warning-text)]/85">
-                {missingRows.length > 0
-                  ? `${pluralizeTherapists(missingRows.length)} still need to respond`
-                  : 'Everyone has submitted availability for this cycle.'}
-              </p>
-            </div>
-            <StatusBadge variant="warning">{missingRows.length}</StatusBadge>
-          </div>
+
+      <div className="grid grid-cols-2 border-b border-slate-200/80 bg-slate-50/70">
+        <button
+          type="button"
+          className={cn(
+            'border-b-2 px-4 py-3 text-left text-xs font-bold transition-colors',
+            activeTab === 'missing'
+              ? 'border-orange-400 text-slate-900'
+              : 'border-transparent text-slate-400 hover:text-slate-700'
+          )}
+          onClick={() => setActiveTab('missing')}
+        >
+          Not submitted yet{' '}
+          <span className="ml-1 rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] text-orange-700">
+            {missingRows.length}
+          </span>
+        </button>
+        <button
+          type="button"
+          className={cn(
+            'border-b-2 px-4 py-3 text-left text-xs font-bold transition-colors',
+            activeTab === 'submitted'
+              ? 'border-emerald-400 text-slate-900'
+              : 'border-transparent text-slate-400 hover:text-slate-700'
+          )}
+          onClick={() => setActiveTab('submitted')}
+        >
+          Submitted{' '}
+          <span className="ml-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700">
+            {submittedRows.length}
+          </span>
+        </button>
+      </div>
+
+      <div className="min-h-[25rem] flex-1 overflow-y-auto p-4">
+        <div className={cn('space-y-3', activeTab !== 'missing' && 'hidden')}>
+          <p className="px-1 text-[11px] font-medium text-slate-500">
+            {missingRows.length > 0
+              ? `${pluralizeTherapists(missingRows.length)} still need to respond`
+              : 'Everyone has submitted availability for this cycle.'}
+          </p>
 
           {missingRows.length > 0 ? (
-            <div className="space-y-2">
-              {missingRows.map((row) => (
-                <div
-                  key={row.therapistId}
-                  className="rounded-md border border-border/50 bg-card/90 px-3 py-2 text-sm font-medium text-foreground"
-                >
-                  {row.therapistName}
-                </div>
-              ))}
-            </div>
+            missingRows.map((row) => (
+              <TherapistRow
+                key={row.therapistId}
+                name={row.therapistName}
+                subtitle="Not yet"
+                tone="warning"
+              />
+            ))
           ) : (
-            <div className="rounded-md border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-2 text-sm text-[var(--success-text)]">
-              Everyone has responded. You can review details or move forward with scheduling.
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-700">
+              Everyone has responded. You can move forward with schedule planning.
             </div>
           )}
-        </section>
+        </div>
 
-        <section className="rounded-2xl border border-border/70 bg-muted/10 p-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-foreground">Submitted</p>
-              <p className="text-sm text-muted-foreground">
-                {submittedRows.length > 0
-                  ? `${pluralizeTherapists(submittedRows.length)} have already submitted`
-                  : 'No one has submitted availability for this cycle yet.'}
-              </p>
-            </div>
-            <StatusBadge variant="success">{submittedRows.length}</StatusBadge>
-          </div>
+        <div className={cn('space-y-3', activeTab !== 'submitted' && 'hidden')}>
+          <p className="px-1 text-[11px] font-medium text-slate-500">
+            {submittedRows.length > 0
+              ? `${pluralizeTherapists(submittedRows.length)} have already submitted`
+              : 'No submissions yet for this cycle.'}
+          </p>
 
           {submittedRows.length > 0 ? (
-            <details className="group rounded-lg border border-border/70 bg-card/80 px-3 py-2">
-              <summary className="cursor-pointer list-none text-sm font-medium text-foreground marker:content-none">
-                Show all {submittedRows.length} submitted therapists
-              </summary>
-              <div className="mt-3 space-y-2 border-t border-border/70 pt-3">
-                {submittedRows.map((row) => (
-                  <div
-                    key={row.therapistId}
-                    className="flex items-center justify-between gap-3 rounded-md border border-border/70 bg-background px-3 py-2"
-                  >
-                    <span className="text-sm font-medium text-foreground">{row.therapistName}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {(row.overridesCount ?? 0) > 0
-                        ? `${row.overridesCount} date${row.overridesCount === 1 ? '' : 's'}`
-                        : 'No dates yet'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </details>
+            submittedRows.map((row) => (
+              <TherapistRow
+                key={row.therapistId}
+                name={row.therapistName}
+                subtitle={
+                  (row.overridesCount ?? 0) > 0
+                    ? `${row.overridesCount} saved date${row.overridesCount === 1 ? '' : 's'}`
+                    : 'Submitted'
+                }
+                tone="success"
+              />
+            ))
           ) : (
-            <div className="space-y-3 rounded-lg border border-border/70 bg-card/80 px-3 py-3">
-              <p className="text-sm text-muted-foreground">
-                No one has submitted yet. Confirm the cycle is open and remind staff to send their
-                dates.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button asChild size="sm" variant="outline" className="text-xs">
-                  <Link href="/coverage?view=week">Open coverage workspace</Link>
-                </Button>
-                <Button asChild size="sm" variant="secondary" className="text-xs">
-                  <Link href="/shift-board">Review shift board</Link>
-                </Button>
-              </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">
+              No one has submitted availability for this cycle yet.
             </div>
           )}
-        </section>
+        </div>
       </div>
     </section>
   )

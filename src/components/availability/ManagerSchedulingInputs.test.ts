@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { ManagerSchedulingInputs } from '@/components/availability/ManagerSchedulingInputs'
 
 describe('ManagerSchedulingInputs', () => {
-  it('renders cycle and therapist controls with saved will-work and cannot-work dates', () => {
+  it('renders the manager workspace with planner controls, calendar, and roster content', () => {
     const html = renderToStaticMarkup(
       createElement(ManagerSchedulingInputs, {
         cycles: [
@@ -49,20 +49,27 @@ describe('ManagerSchedulingInputs', () => {
         ],
         initialCycleId: 'cycle-1',
         initialTherapistId: 'therapist-1',
+        submittedRows: [{ therapistId: 'submitted-1', therapistName: 'Kim S.', overridesCount: 3 }],
+        missingRows: [{ therapistId: 'missing-1', therapistName: 'Layne P.' }],
         saveManagerPlannerDatesAction: async () => {},
         deleteManagerPlannerDateAction: async () => {},
       })
     )
 
+    expect(html).toContain('data-slot="availability-workspace-primary"')
+    expect(html).toContain('Staffing Inputs &amp; Calendar')
     expect(html).toContain('Plan staffing')
     expect(html).toContain('Schedule cycle')
     expect(html).toContain('Therapist')
     expect(html).toContain('Will work')
     expect(html).toContain('Cannot work')
+    expect(html).toContain('March 2026')
+    expect(html).toContain('Response roster')
+    expect(html).toContain('Not submitted yet')
+    expect(html).toContain('Layne P.')
     expect(html).toContain('Barbara C.')
     expect(html).toContain('Mar 24, 2026')
     expect(html).toContain('Mar 26, 2026')
-    expect(html).toContain('Remove saved dates')
   })
 
   it('renders a setup message when no cycles exist', () => {
@@ -73,6 +80,8 @@ describe('ManagerSchedulingInputs', () => {
         overrides: [],
         initialCycleId: '',
         initialTherapistId: '',
+        submittedRows: [],
+        missingRows: [],
         saveManagerPlannerDatesAction: async () => {},
         deleteManagerPlannerDateAction: async () => {},
       })

@@ -45,6 +45,7 @@ type AvailabilityEntriesTableProps = {
   rows: AvailabilityEntryTableRow[]
   deleteAvailabilityEntryAction: (formData: FormData) => void | Promise<void>
   initialFilters?: Partial<TableToolbarFilters>
+  returnToPath?: '/availability' | '/therapist/availability'
 }
 
 const STATUS_OPTIONS: TableStatusOption[] = [
@@ -74,6 +75,7 @@ export function AvailabilityEntriesTable({
   rows,
   deleteAvailabilityEntryAction,
   initialFilters,
+  returnToPath = '/availability',
 }: AvailabilityEntriesTableProps) {
   const canManageAvailability = can(role, 'access_manager_ui')
   const [scope, setScope] = useState<'all-staff' | 'my-entries'>(
@@ -130,8 +132,8 @@ export function AvailabilityEntriesTable({
   const managerAllStaffView = canManageAvailability && scope === 'all-staff'
 
   return (
-    <Card className={managerAllStaffView ? 'border-border/60 bg-card shadow-none' : ''}>
-      <CardHeader className={managerAllStaffView ? 'border-b border-border/60 pb-4' : ''}>
+    <Card className="overflow-hidden rounded-[1.75rem] border border-slate-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.08)]">
+      <CardHeader className="border-b border-slate-200/80 pb-4">
         <CardTitle>
           {canManageAvailability
             ? scope === 'all-staff'
@@ -147,13 +149,18 @@ export function AvailabilityEntriesTable({
             : 'Your saved requests for upcoming cycles.'}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 px-5 py-5">
         {canManageAvailability && (
           <div className="flex items-center gap-2">
             <Button
               type="button"
               size="sm"
               variant={scope === 'all-staff' ? 'default' : 'outline'}
+              className={
+                scope === 'all-staff'
+                  ? 'bg-[#2d5a5a] text-white hover:bg-[#244a4a]'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+              }
               onClick={() => setScope('all-staff')}
             >
               All staff
@@ -162,6 +169,11 @@ export function AvailabilityEntriesTable({
               type="button"
               size="sm"
               variant={scope === 'my-entries' ? 'default' : 'outline'}
+              className={
+                scope === 'my-entries'
+                  ? 'bg-[#2d5a5a] text-white hover:bg-[#244a4a]'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+              }
               onClick={() => setScope('my-entries')}
             >
               My entries
@@ -183,23 +195,30 @@ export function AvailabilityEntriesTable({
 
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
+            <TableRow className="border-slate-200 bg-slate-50/60">
+              <TableHead className="font-bold uppercase tracking-[0.06em] text-slate-500">
+                Date
+              </TableHead>
               {canManageAvailability && (
-                <TableHead className="hidden md:table-cell">Therapist</TableHead>
+                <TableHead className="hidden font-bold uppercase tracking-[0.06em] text-slate-500 md:table-cell">
+                  Therapist
+                </TableHead>
               )}
-              <TableHead>Request type</TableHead>
-              <TableHead className="hidden md:table-cell">Shift</TableHead>
-              <TableHead>Note</TableHead>
+              <TableHead className="font-bold uppercase tracking-[0.06em] text-slate-500">
+                Request type
+              </TableHead>
+              <TableHead className="hidden font-bold uppercase tracking-[0.06em] text-slate-500 md:table-cell">
+                Shift
+              </TableHead>
+              <TableHead className="font-bold uppercase tracking-[0.06em] text-slate-500">
+                Note
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredRows.length === 0 && (
               <TableRow>
-                <TableCell
-                  colSpan={emptyColSpan}
-                  className="py-6 text-center text-muted-foreground"
-                >
+                <TableCell colSpan={emptyColSpan} className="py-8 text-center text-slate-500">
                   No availability requests match your filters.
                 </TableCell>
               </TableRow>
@@ -212,7 +231,7 @@ export function AvailabilityEntriesTable({
               return (
                 <Fragment key={row.id}>
                   <TableRow
-                    className="cursor-pointer"
+                    className="cursor-pointer border-slate-200/80"
                     onClick={() => toggleDetails(row.id)}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter' || event.key === ' ') {
@@ -223,9 +242,13 @@ export function AvailabilityEntriesTable({
                     tabIndex={0}
                     aria-expanded={isExpanded}
                   >
-                    <TableCell>{formatDate(row.date)}</TableCell>
+                    <TableCell className="font-medium text-slate-700">
+                      {formatDate(row.date)}
+                    </TableCell>
                     {canManageAvailability && (
-                      <TableCell className="hidden md:table-cell">{row.requestedBy}</TableCell>
+                      <TableCell className="hidden text-slate-700 md:table-cell">
+                        {row.requestedBy}
+                      </TableCell>
                     )}
                     <TableCell>
                       <Badge variant={row.entryType === 'force_off' ? 'destructive' : 'outline'}>
@@ -251,7 +274,7 @@ export function AvailabilityEntriesTable({
 
                   {isExpanded && (
                     <TableRow>
-                      <TableCell colSpan={emptyColSpan} className="bg-muted/40">
+                      <TableCell colSpan={emptyColSpan} className="bg-slate-50/70">
                         <div className="grid grid-cols-1 gap-3 py-2 md:grid-cols-3">
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -297,6 +320,7 @@ export function AvailabilityEntriesTable({
                               >
                                 <input type="hidden" name="entry_id" value={row.id} />
                                 <input type="hidden" name="cycle_id" value={row.cycleId} />
+                                <input type="hidden" name="return_to" value={returnToPath} />
                                 <FormSubmitButton
                                   type="submit"
                                   variant="outline"

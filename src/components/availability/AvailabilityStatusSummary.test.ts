@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { AvailabilityStatusSummary } from '@/components/availability/AvailabilityStatusSummary'
 
 describe('AvailabilityStatusSummary', () => {
-  it('emphasizes missing responses first and collapses the submitted roster by default', () => {
+  it('renders a response roster with not-submitted rows first and a submitted tab', () => {
     const html = renderToStaticMarkup(
       createElement(AvailabilityStatusSummary, {
         submittedRows: [
@@ -21,10 +21,11 @@ describe('AvailabilityStatusSummary', () => {
       })
     )
 
+    expect(html).toContain('Response roster')
     expect(html.indexOf('Not submitted yet')).toBeLessThan(html.indexOf('Submitted'))
     expect(html).toContain('2 therapists still need to respond')
-    expect(html).toContain('Show all 4 submitted therapists')
-    expect(html).not.toContain('<details open')
+    expect(html).toContain('Adrienne S.')
+    expect(html).toContain('Barbara C.')
     expect(html).not.toContain('data-slot="card"')
   })
 })
