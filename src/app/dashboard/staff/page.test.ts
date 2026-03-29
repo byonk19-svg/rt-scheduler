@@ -13,4 +13,9 @@ describe('staff dashboard future availability links', () => {
     expect(staffDashboardSource).toContain('/therapist/availability')
     expect(staffDashboardSource).not.toContain('href="/availability"')
   })
+
+  it('uses the admin client to resolve coworker names for the published schedule preview', () => {
+    expect(staffDashboardSource).toContain('createAdminClient')
+    expect(staffDashboardSource).toContain(".in('id', rosterUserIds)")
+  })
 })

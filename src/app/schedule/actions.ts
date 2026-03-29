@@ -725,6 +725,8 @@ export async function toggleCyclePublishedAction(formData: FormData) {
               violations: String(violations),
               under: String(underCount),
               over: String(overCount),
+              override_weekly_rules: overrideWeeklyRules ? 'true' : undefined,
+              override_shift_rules: overrideShiftRules ? 'true' : undefined,
             })
           )
         }
@@ -771,6 +773,8 @@ export async function toggleCyclePublishedAction(formData: FormData) {
             lead_missing: String(slotValidation.missingLead),
             lead_multiple: String(slotValidation.multipleLeads),
             lead_ineligible: String(slotValidation.ineligibleLead),
+            override_weekly_rules: overrideWeeklyRules ? 'true' : undefined,
+            override_shift_rules: overrideShiftRules ? 'true' : undefined,
           })
         )
       }

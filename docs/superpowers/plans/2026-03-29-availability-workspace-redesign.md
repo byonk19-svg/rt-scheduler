@@ -9,13 +9,17 @@ Implemented outcomes:
 - rebuilt the availability UI around a shared workspace shell and shared calendar surface
 - delivered a manager availability hub with a combined staffing/calendar panel, response roster, and aligned request review table
 - replaced the therapist route re-export with a dedicated therapist availability page and personal workspace
+- replaced the broken therapist schedule redirect loop with a real single-page published schedule view that shows the full team schedule while highlighting the signed-in therapist's own shifts
 - rerouted staff navigation and dashboard CTAs to `/therapist/availability`
+- fixed staff dashboard coworker-name resolution for the published schedule preview
+- fixed the manager publish workflow so weekly and shift override actions can be applied sequentially without losing override state between redirects
 - added route-level and component-level regression coverage for the split manager/therapist workflows
 - tightened the visual system against the `teamwise-staffing-hub.zip` reference without exposing manager controls on therapist screens
 
 Verification run:
 
 - `npm run test:unit -- src/components/availability/availability-workspace-shell.test.ts src/components/availability/availability-calendar-panel.test.ts src/components/availability/ManagerSchedulingInputs.test.ts src/components/availability/AvailabilityStatusSummary.test.ts src/components/availability/TherapistAvailabilityWorkspace.test.ts src/app/therapist/availability/page.test.ts src/app/availability/availability-requests-table.test.ts src/components/AppShell.test.ts src/app/dashboard/staff/page.test.ts src/app/availability/page.test.ts`
+- `npm run test:unit -- src/app/dashboard/staff/page.test.ts src/app/therapist/schedule/page.test.ts src/app/coverage/page.test.ts`
 - `npm run build`
 
 Live checks completed:
@@ -23,7 +27,9 @@ Live checks completed:
 - therapist sidebar and staff dashboard now route to `/therapist/availability`
 - therapist availability page renders without manager-only controls
 - therapist empty-state flow was verified live
-- manager browser login was not available from local credentials, so manager fidelity was verified through passing component tests and production build output
+- manager publish flow was verified live through the override path from `/coverage`
+- therapist published schedule was verified live with full-team visibility and highlighted personal assignments
+- staff dashboard preview was verified live with coworker names rendered correctly
 
 Notes:
 

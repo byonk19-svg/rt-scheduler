@@ -6,6 +6,7 @@ import { FeedbackToast } from '@/components/feedback-toast'
 import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
 
@@ -137,7 +138,8 @@ export default async function StaffDashboardPage({
   ]
   const rosterNameById = new Map<string, string>()
   if (rosterUserIds.length > 0) {
-    const { data: rosterProfiles } = await supabase
+    const adminSupabase = createAdminClient()
+    const { data: rosterProfiles } = await adminSupabase
       .from('profiles')
       .select('id, full_name')
       .in('id', rosterUserIds)

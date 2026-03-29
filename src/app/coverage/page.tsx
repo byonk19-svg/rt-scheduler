@@ -102,6 +102,8 @@ function CoveragePageContent() {
   const errorParam = search.get('error')
   const autoParam = search.get('auto')
   const draftParam = search.get('draft')
+  const overrideWeeklyRulesParam = search.get('override_weekly_rules')
+  const overrideShiftRulesParam = search.get('override_shift_rules')
   const supabase = useMemo(() => createClient(), [])
   const [shiftTab, setShiftTab] = useState<ShiftTab>('Day')
   const [dayDays, setDayDays] = useState<DayItem[]>([])
@@ -159,6 +161,27 @@ function CoveragePageContent() {
     if (!autoParam && !draftParam) return null
     return getScheduleFeedback(scheduleFeedbackParams)
   }, [autoParam, draftParam, scheduleFeedbackParams])
+  const publishOverrideConfig = useMemo(() => {
+    if (errorParam === 'publish_weekly_rule_violation') {
+      return {
+        weekly: 'true',
+        shift: overrideShiftRulesParam === 'true' ? 'true' : 'false',
+        label: 'Publish with weekly override',
+        description: 'Bypass weekly workload validation for this publish only.',
+      }
+    }
+
+    if (errorParam === 'publish_shift_rule_violation') {
+      return {
+        weekly: overrideWeeklyRulesParam === 'true' ? 'true' : 'false',
+        shift: 'true',
+        label: 'Publish with shift override',
+        description: 'Bypass shift coverage and lead validation for this publish only.',
+      }
+    }
+
+    return null
+  }, [errorParam, overrideShiftRulesParam, overrideWeeklyRulesParam])
   const issueCount = useMemo(
     () => days.filter((d) => d.dayStatus === 'missing_lead').length,
     [days]
@@ -902,6 +925,43 @@ function CoveragePageContent() {
           <p className="mb-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs font-semibold text-[var(--error-text)]">
             {publishErrorMessage}
           </p>
+        )}
+        {publishOverrideConfig && !activeCyclePublished && (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-4 py-3">
+            <div>
+              <p className="text-xs font-semibold text-[var(--warning-text)]">
+                Override publish block
+              </p>
+              <p className="mt-1 text-xs text-[var(--warning-text)]/85">
+                {publishOverrideConfig.description}
+              </p>
+            </div>
+            <form action={toggleCyclePublishedAction}>
+              <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+              <input type="hidden" name="view" value="week" />
+              <input type="hidden" name="show_unavailable" value="false" />
+              <input
+                type="hidden"
+                name="currently_published"
+                value={activeCyclePublished ? 'true' : 'false'}
+              />
+              <input
+                type="hidden"
+                name="override_weekly_rules"
+                value={publishOverrideConfig.weekly}
+              />
+              <input
+                type="hidden"
+                name="override_shift_rules"
+                value={publishOverrideConfig.shift}
+              />
+              <input type="hidden" name="return_to" value="coverage" />
+              <Button type="submit" size="sm" className="gap-1.5 text-xs">
+                <Send className="h-3.5 w-3.5" />
+                {publishOverrideConfig.label}
+              </Button>
+            </form>
+          </div>
         )}
         {errorParam === 'preliminary_cycle_published' && (
           <p className="mb-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs font-semibold text-[var(--error-text)]">
