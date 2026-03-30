@@ -12,7 +12,7 @@ export type WorkloadCount = {
 }
 
 function countsTowardWorkload(status: WorkloadShift['status']): boolean {
-  return status === 'scheduled' || status === 'on_call'
+  return status === 'scheduled'
 }
 
 export function getWeekBoundsForDate(value: string): { weekStart: string; weekEnd: string } | null {

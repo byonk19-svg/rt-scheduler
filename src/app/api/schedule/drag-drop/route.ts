@@ -26,6 +26,7 @@ import {
 import { formatEligibilityReason, resolveEligibility } from '@/lib/coverage/resolve-availability'
 import { normalizeWorkPattern } from '@/lib/coverage/work-patterns'
 import type { AvailabilityOverrideRow as CycleAvailabilityOverrideRow } from '@/lib/coverage/types'
+import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import type { ShiftStatus, ShiftRole, EmploymentType } from '@/app/schedule/types'
 type RemovableShift = {
   id: string
@@ -112,9 +113,12 @@ async function getCoverageCountForSlot(
   const { data, error } = await query
   if (error) return { count: 0, error: error.message }
 
-  const count = (data ?? []).filter((shift) =>
-    countsTowardWeeklyLimit(shift.status as ShiftStatus)
-  ).length
+  const slotRows = (data ?? []) as Array<{ id: string }>
+  const activeOperationalCodesByShiftId = await fetchActiveOperationalCodeMap(
+    supabase,
+    slotRows.map((shift) => shift.id)
+  )
+  const count = slotRows.filter((shift) => !activeOperationalCodesByShiftId.has(shift.id)).length
   return { count }
 }
 

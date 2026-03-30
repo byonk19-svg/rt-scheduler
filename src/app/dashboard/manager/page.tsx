@@ -9,11 +9,11 @@ import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { buildCycleRoute } from '@/lib/cycle-route'
 import { getNextCyclePlanningWindow } from '@/lib/manager-inbox'
+import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import { createClient } from '@/lib/supabase/client'
 import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 
 const LOADING_LABEL = 'Loading...'
-const COVERED_SHIFT_STATUSES = new Set(['scheduled', 'on_call'])
 
 type DashboardData = {
   pendingApprovals: number
@@ -43,7 +43,6 @@ type NotificationRow = {
 
 type ShiftStatusRow = {
   id: string
-  status: string | null
 }
 
 type ShiftDateRow = {
@@ -55,7 +54,6 @@ type ShiftAssignmentRow = {
   id: string
   shift_type: 'day' | 'night' | null
   role: 'lead' | 'staff' | null
-  status: string | null
   profiles: { full_name: string } | { full_name: string }[] | null
 }
 
@@ -243,21 +241,18 @@ export default function ManagerDashboardPage() {
           : (cycles.find((cycle) => cycle.start_date > todayKey) ?? null)
         const latestUnread = (latestUnreadResult.data ?? null) as NotificationRow | null
 
-        let todayCoverageQuery = supabase.from('shifts').select('id, status').eq('date', todayKey)
+        let todayCoverageQuery = supabase.from('shifts').select('id').eq('date', todayKey)
         let upcomingShiftsQuery = supabase
           .from('shifts')
           .select('id, date')
           .gte('date', todayKey)
           .lte('date', toIsoDate(addDays(today, 14)))
-          .in('status', ['scheduled', 'on_call'])
         let todayActiveShiftsQuery = supabase
           .from('shifts')
-          .select('id, shift_type, role, status, profiles:profiles!shifts_user_id_fkey(full_name)')
+          .select('id, shift_type, role, profiles:profiles!shifts_user_id_fkey(full_name)')
           .eq('date', todayKey)
-          .in('status', ['scheduled', 'on_call'])
           .order('shift_type', { ascending: true })
           .order('role', { ascending: true })
-          .limit(6)
 
         if (activeCycle) {
           todayCoverageQuery = todayCoverageQuery.eq('cycle_id', activeCycle.id)
@@ -279,14 +274,25 @@ export default function ManagerDashboardPage() {
         }
 
         const todayRows = (todayCoverageResult.data ?? []) as ShiftStatusRow[]
-        const todayCoverageTotal = todayRows.length
-        const todayCoverageCovered = todayRows.filter((row) =>
-          COVERED_SHIFT_STATUSES.has(row.status ?? '')
-        ).length
-
         const upcomingRows = (upcomingShiftsResult.data ?? []) as ShiftDateRow[]
+        const todayShiftRows = (todayActiveShiftsResult.data ?? []) as ShiftAssignmentRow[]
+
+        const activeOperationalCodesByShiftId = await fetchActiveOperationalCodeMap(supabase, [
+          ...new Set([
+            ...todayRows.map((row) => row.id),
+            ...upcomingRows.map((row) => row.id),
+            ...todayShiftRows.map((row) => row.id),
+          ]),
+        ])
+        const isWorkingScheduled = (shiftId: string) =>
+          !activeOperationalCodesByShiftId.has(shiftId)
+
+        const todayCoverageTotal = todayRows.length
+        const todayCoverageCovered = todayRows.filter((row) => isWorkingScheduled(row.id)).length
+
         const upcomingByDayMap = new Map<string, number>()
         for (const row of upcomingRows) {
+          if (!isWorkingScheduled(row.id)) continue
           upcomingByDayMap.set(row.date, (upcomingByDayMap.get(row.date) ?? 0) + 1)
         }
         const upcomingShiftDays = Array.from(upcomingByDayMap.entries())
@@ -297,8 +303,10 @@ export default function ManagerDashboardPage() {
             count,
           }))
 
-        const todayShiftRows = (todayActiveShiftsResult.data ?? []) as ShiftAssignmentRow[]
-        const todayActiveShifts = todayShiftRows.map(formatShiftLine)
+        const todayActiveShifts = todayShiftRows
+          .filter((row) => isWorkingScheduled(row.id))
+          .slice(0, 6)
+          .map(formatShiftLine)
 
         const activityRows = (recentActivityResult.data ?? []) as NotificationRow[]
         const recentActivity = activityRows.map((row) => ({
@@ -320,7 +328,10 @@ export default function ManagerDashboardPage() {
             : '/coverage?view=week',
           todayCoverageCovered,
           todayCoverageTotal,
-          upcomingShiftCount: upcomingRows.length,
+          upcomingShiftCount: Array.from(upcomingByDayMap.values()).reduce(
+            (sum, count) => sum + count,
+            0
+          ),
           upcomingShiftDays,
           todayActiveShifts,
           recentActivity,

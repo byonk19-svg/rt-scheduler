@@ -10,18 +10,21 @@ import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/ui/page-header'
 import { SkeletonCard, SkeletonListItem } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 
 type RequestType = 'swap' | 'pickup'
 type PersistedRequestStatus = 'pending' | 'approved' | 'denied' | 'expired'
 type RequestStatus = PersistedRequestStatus | 'expired'
 type ShiftType = 'day' | 'night'
 type ShiftRole = 'lead' | 'staff'
+type ShiftStatus = 'scheduled' | 'on_call' | 'sick' | 'called_off'
 
 type ShiftRow = {
   id: string
   date: string
   shift_type: ShiftType
   role: ShiftRole
+  status: ShiftStatus
 }
 
 type ShiftPostRow = {
@@ -134,12 +137,14 @@ function formatRelativeTime(value: string): string {
   return rtf.format(Math.round(seconds / 86400), 'day')
 }
 
-function toUiStatus(
-  status: PersistedRequestStatus,
-  shiftDate: string | null,
-  todayKey: string
-): RequestStatus {
-  if (status === 'pending' && shiftDate !== null && shiftDate < todayKey) {
+function isOlderThanHours(value: string, hours: number): boolean {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return false
+  return Date.now() - parsed.getTime() >= hours * 60 * 60 * 1000
+}
+
+function toUiStatus(status: PersistedRequestStatus, createdAt: string): RequestStatus {
+  if (status === 'pending' && isOlderThanHours(createdAt, 48)) {
     return 'expired'
   }
   return status
@@ -221,9 +226,10 @@ function SwapRequestPageContent() {
         const [myShiftsResult, myRequestsResult] = await Promise.all([
           supabase
             .from('shifts')
-            .select('id, date, shift_type, role')
+            .select('id, date, shift_type, role, status')
             .eq('user_id', user.id)
             .gte('date', todayKey)
+            .eq('status', 'scheduled')
             .order('date', { ascending: true }),
           supabase
             .from('shift_posts')
@@ -234,22 +240,29 @@ function SwapRequestPageContent() {
 
         if (!active) return
 
-        const mappedMyShifts = ((myShiftsResult.data ?? []) as ShiftRow[]).map((shift) => {
-          const parsed = new Date(`${shift.date}T00:00:00`)
-          const dow = Number.isNaN(parsed.getTime())
-            ? shift.date
-            : parsed.toLocaleDateString('en-US', { weekday: 'long' })
+        const myShiftRows = (myShiftsResult.data ?? []) as ShiftRow[]
+        const activeOperationalCodes = await fetchActiveOperationalCodeMap(
+          supabase,
+          myShiftRows.map((shift) => shift.id)
+        )
+        const mappedMyShifts = myShiftRows
+          .filter((shift) => !activeOperationalCodes.has(shift.id))
+          .map((shift) => {
+            const parsed = new Date(`${shift.date}T00:00:00`)
+            const dow = Number.isNaN(parsed.getTime())
+              ? shift.date
+              : parsed.toLocaleDateString('en-US', { weekday: 'long' })
 
-          return {
-            id: shift.id,
-            isoDate: shift.date,
-            date: formatShortDate(shift.date),
-            dow,
-            type: shift.shift_type === 'day' ? 'Day' : 'Night',
-            shiftType: shift.shift_type,
-            isLead: shift.role === 'lead',
-          } satisfies MyShift
-        })
+            return {
+              id: shift.id,
+              isoDate: shift.date,
+              date: formatShortDate(shift.date),
+              dow,
+              type: shift.shift_type === 'day' ? 'Day' : 'Night',
+              shiftType: shift.shift_type,
+              isLead: shift.role === 'lead',
+            } satisfies MyShift
+          })
 
         const uniqueDates = Array.from(new Set(mappedMyShifts.map((shift) => shift.isoDate)))
         let leadCounts: Record<string, number> = {}
@@ -318,7 +331,7 @@ function SwapRequestPageContent() {
 
         const mappedOpenRequests = requestRows.map((row) => {
           const shift = row.shift_id ? (shiftById.get(row.shift_id) ?? null) : null
-          const status = toUiStatus(row.status, shift?.date ?? null, todayKey)
+          const status = toUiStatus(row.status, row.created_at)
 
           return {
             id: row.id,

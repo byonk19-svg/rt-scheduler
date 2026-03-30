@@ -49,6 +49,7 @@ export function NotificationBell({ variant = 'default' }: NotificationBellProps)
   const supabase = useMemo(() => createClient(), [])
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const [open, setOpen] = useState(false)
+  const [dropdownSide, setDropdownSide] = useState<'left' | 'right'>('right')
   const [loading, setLoading] = useState(true)
   const [unreadCount, setUnreadCount] = useState(0)
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
@@ -121,6 +122,53 @@ export function NotificationBell({ variant = 'default' }: NotificationBellProps)
     }
   }, [])
 
+  const resolveDropdownSide = useCallback(() => {
+    if (typeof window === 'undefined') return
+    const anchor = wrapperRef.current
+    if (!anchor) return
+
+    const rect = anchor.getBoundingClientRect()
+    const viewportWidth = window.innerWidth
+    const edgePadding = 8
+    const panelWidth = Math.min(320, viewportWidth - 16)
+
+    const leftAnchoredRightEdge = rect.left + panelWidth
+    const rightAnchoredLeftEdge = rect.right - panelWidth
+    const leftFits = leftAnchoredRightEdge <= viewportWidth - edgePadding
+    const rightFits = rightAnchoredLeftEdge >= edgePadding
+
+    if (leftFits && !rightFits) {
+      setDropdownSide('left')
+      return
+    }
+    if (rightFits && !leftFits) {
+      setDropdownSide('right')
+      return
+    }
+    if (leftFits && rightFits) {
+      setDropdownSide(rect.left < viewportWidth / 2 ? 'left' : 'right')
+      return
+    }
+
+    const leftOverflow = Math.max(0, leftAnchoredRightEdge - (viewportWidth - edgePadding))
+    const rightOverflow = Math.max(0, edgePadding - rightAnchoredLeftEdge)
+    setDropdownSide(leftOverflow <= rightOverflow ? 'left' : 'right')
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+
+    const frame = window.requestAnimationFrame(() => {
+      resolveDropdownSide()
+    })
+    const handleResize = () => resolveDropdownSide()
+    window.addEventListener('resize', handleResize)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [open, resolveDropdownSide])
+
   async function markAllAsRead() {
     if (unreadCount === 0) return
     const response = await fetch('/api/notifications/mark-read', { method: 'POST' })
@@ -147,15 +195,22 @@ export function NotificationBell({ variant = 'default' }: NotificationBellProps)
 
   const isStaffVariant = variant === 'staff'
   const isShellVariant = variant === 'shell'
+  const dropdownPositionClass = dropdownSide === 'left' ? 'left-0 right-auto' : 'right-0 left-auto'
 
   return (
     <div ref={wrapperRef} className="bell-wrapper relative">
       <button
         type="button"
         onClick={() => {
-          setOpen((current) => !current)
-          if (!open) {
+          const nextOpen = !open
+          setOpen(nextOpen)
+          if (nextOpen) {
             void loadNotifications()
+            if (typeof window !== 'undefined') {
+              window.requestAnimationFrame(() => {
+                resolveDropdownSide()
+              })
+            }
           }
         }}
         className={`relative inline-flex h-9 w-9 items-center justify-center rounded-md border ${
@@ -178,7 +233,9 @@ export function NotificationBell({ variant = 'default' }: NotificationBellProps)
       </button>
 
       {open && (
-        <div className="absolute right-0 z-40 mt-2 w-80 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+        <div
+          className={`absolute z-40 mt-2 w-80 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-border bg-card shadow-lg ${dropdownPositionClass}`}
+        >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
             <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -244,11 +301,13 @@ export function NotificationBell({ variant = 'default' }: NotificationBellProps)
                       <p
                         className={`text-sm leading-snug text-foreground ${
                           isUnread ? 'font-semibold' : 'font-medium'
-                        }`}
+                        } break-words`}
                       >
                         {item.title}
                       </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{item.message}</p>
+                      <p className="mt-0.5 break-words text-xs text-muted-foreground">
+                        {item.message}
+                      </p>
                       <p className="mt-1 text-[11px] text-muted-foreground">
                         {timeAgo(item.created_at)}
                       </p>

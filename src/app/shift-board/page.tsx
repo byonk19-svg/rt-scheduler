@@ -20,6 +20,7 @@ import { dateKeyFromDate, buildDateRange } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 
 type Role = UiRole
 type RequestType = 'swap' | 'pickup'
@@ -61,6 +62,7 @@ type CycleRow = {
 }
 
 type ShiftCoverageRow = {
+  id: string
   date: string
   shift_type: ShiftType
   status: ShiftStatus
@@ -176,15 +178,17 @@ function formatRelativeTime(value: string): string {
 }
 
 function countsTowardCoverage(status: ShiftStatus): boolean {
-  return status === 'scheduled' || status === 'on_call'
+  return status === 'scheduled'
 }
 
-function toUiStatus(
-  status: PersistedRequestStatus,
-  shiftDate: string | null,
-  todayKey: string
-): RequestStatus {
-  if (status === 'pending' && shiftDate !== null && shiftDate < todayKey) {
+function isOlderThanHours(value: string, hours: number): boolean {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return false
+  return Date.now() - parsed.getTime() >= hours * 60 * 60 * 1000
+}
+
+function toUiStatus(status: PersistedRequestStatus, createdAt: string): RequestStatus {
+  if (status === 'pending' && isOlderThanHours(createdAt, 48)) {
     return 'expired'
   }
   return status
@@ -290,7 +294,7 @@ export default function ShiftBoardPage() {
         if (activeCycle) {
           const { data: coverageData, error: coverageError } = await supabase
             .from('shifts')
-            .select('date, shift_type, status, role, user_id')
+            .select('id, date, shift_type, status, role, user_id')
             .eq('cycle_id', activeCycle.id)
             .gte('date', activeCycle.start_date)
             .lte('date', activeCycle.end_date)
@@ -303,13 +307,26 @@ export default function ShiftBoardPage() {
           } else {
             const bySlot = new Map<string, ShiftCoverageRow[]>()
             const dateMap = new Map<string, Map<string, ShiftType>>()
-            for (const row of (coverageData ?? []) as ShiftCoverageRow[]) {
+            const coverageRows = (coverageData ?? []) as ShiftCoverageRow[]
+            const activeOperationalCodes = await fetchActiveOperationalCodeMap(
+              supabase,
+              coverageRows.map((row) => row.id)
+            )
+            const hasActiveOperationalCode = (shiftId: string): boolean =>
+              activeOperationalCodes.has(shiftId)
+            for (const row of coverageRows) {
               const key = `${row.date}:${row.shift_type}`
               const bucket = bySlot.get(key) ?? []
               bucket.push(row)
               bySlot.set(key, bucket)
               // Build per-date scheduled user map for swap picker
               if (row.user_id) {
+                if (row.status !== 'scheduled') {
+                  continue
+                }
+                if (hasActiveOperationalCode(row.id)) {
+                  continue
+                }
                 let userMap = dateMap.get(row.date)
                 if (!userMap) {
                   userMap = new Map()
@@ -325,7 +342,9 @@ export default function ShiftBoardPage() {
             for (const date of buildDateRange(activeCycle.start_date, activeCycle.end_date)) {
               for (const shiftType of ['day', 'night'] as const) {
                 const slotRows = bySlot.get(`${date}:${shiftType}`) ?? []
-                const activeRows = slotRows.filter((row) => countsTowardCoverage(row.status))
+                const activeRows = slotRows.filter(
+                  (row) => countsTowardCoverage(row.status) && !hasActiveOperationalCode(row.id)
+                )
                 const assignedCount = activeRows.length
                 const leadCount = activeRows.filter((row) => row.role === 'lead').length
 
@@ -393,7 +412,7 @@ export default function ShiftBoardPage() {
             shift: shiftLabel,
             shiftDate: shift?.date ?? null,
             message: row.message,
-            status: toUiStatus(row.status, shift?.date ?? null, todayKey),
+            status: toUiStatus(row.status, row.created_at),
             posted: formatRelativeTime(row.created_at),
             postedAt: row.created_at,
             swapWithName: row.claimed_by ? (namesById.get(row.claimed_by) ?? null) : null,
@@ -551,11 +570,17 @@ export default function ShiftBoardPage() {
           ? 'Cannot approve: this swap request has no partner assigned. Select a swap partner first.'
           : updateError.message.includes('shifts_unique_cycle_user_date')
             ? 'Cannot approve: the selected swap partner is already scheduled on this date.'
-            : updateError.message.includes('Lead coverage gap')
-              ? 'override:Lead coverage gap - approving this request would leave a shift without a lead. You can force-approve below.'
-              : updateError.message.includes('Double booking')
-                ? 'Cannot approve: double booking. This therapist is already assigned to this shift.'
-                : `Could not save: ${updateError.message}`
+            : updateError.message.includes('partner shift type mismatch')
+              ? 'Cannot approve: swap partners must be scheduled on the same shift type.'
+              : updateError.message.includes('operational code')
+                ? 'Cannot approve: shifts with active operational codes are locked from swaps.'
+                : updateError.message.includes('is not working')
+                  ? 'Cannot approve: both swap partners must have working scheduled shifts.'
+                  : updateError.message.includes('Lead coverage gap')
+                    ? 'override:Lead coverage gap - approving this request would leave a shift without a lead. You can force-approve below.'
+                    : updateError.message.includes('Double booking')
+                      ? 'Cannot approve: double booking. This therapist is already assigned to this shift.'
+                      : `Could not save: ${updateError.message}`
         setRequestErrors((prev) => ({ ...prev, [id]: msg }))
         setSavingState((current) => ({ ...current, [id]: false }))
         return
@@ -916,9 +941,14 @@ function RequestCard({
   const isPending = req.status === 'pending'
   const needsPartner = req.type === 'swap' && !req.swapWithId && isPending && canReview
   const needsLeadPartner = shiftRole === 'lead'
-  // Filter to therapists scheduled on the same date; fall back to full list if coverage not loaded
+  // Filter to therapists working the same date and shift type; fall back to full list if coverage not loaded.
   const eligibleTherapists =
-    scheduledOnDate.size > 0 ? therapists.filter((t) => scheduledOnDate.has(t.id)) : therapists
+    scheduledOnDate.size > 0
+      ? therapists.filter((t) => {
+          if (!req.shiftType) return scheduledOnDate.has(t.id)
+          return scheduledOnDate.get(t.id) === req.shiftType
+        })
+      : therapists
   const isOverrideableError = error?.startsWith('override:')
   const overrideMessage = isOverrideableError ? error!.slice('override:'.length).trim() : null
   const displayError = isOverrideableError ? null : error

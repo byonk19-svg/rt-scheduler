@@ -42,6 +42,10 @@ import { getOne, getScheduleFeedback, getWeekBoundsForDate } from '@/lib/schedul
 import { createClient } from '@/lib/supabase/client'
 import type { AssignmentStatus, ShiftRole, ShiftStatus } from '@/lib/shift-types'
 import type { ScheduleSearchParams } from '@/app/schedule/types'
+import {
+  fetchActiveOperationalCodeMap,
+  toLegacyShiftStatusFromOperationalCode,
+} from '@/lib/operational-codes'
 
 type DayStatus = DayItem['dayStatus']
 
@@ -67,7 +71,6 @@ type ShiftRow = {
   shift_type: 'day' | 'night'
   status: ShiftStatus
   unfilled_reason: string | null
-  assignment_status: AssignmentStatus | null
   role: ShiftRole
   profiles:
     | { full_name: string; employment_type: 'full_time' | 'part_time' | 'prn' | null }
@@ -286,7 +289,7 @@ function CoveragePageContent() {
         let shiftsQuery = supabase
           .from('shifts')
           .select(
-            'id,user_id,date,shift_type,status,unfilled_reason,assignment_status,role,profiles:profiles!shifts_user_id_fkey(full_name,employment_type)'
+            'id,user_id,date,shift_type,status,unfilled_reason,role,profiles:profiles!shifts_user_id_fkey(full_name,employment_type)'
           )
           .gte('date', cycleStartDate)
           .lte('date', cycleEndDate)
@@ -327,6 +330,11 @@ function CoveragePageContent() {
         for (const key of assignedSlotKeys) {
           constraintBlockedSlotKeys.delete(key)
         }
+        const activeOperationalCodesByShiftId = await fetchActiveOperationalCodeMap(
+          supabase,
+          assignmentRows.map((row) => row.id)
+        )
+
         const therapistTallies = new Map<
           string,
           {
@@ -358,7 +366,10 @@ function CoveragePageContent() {
             current.employment_type = profile.employment_type
           }
           therapistTallies.set(row.user_id, current)
-          nextShiftByUserDate[`${row.user_id}:${row.date}`] = row.status
+          nextShiftByUserDate[`${row.user_id}:${row.date}`] = toLegacyShiftStatusFromOperationalCode(
+            activeOperationalCodesByShiftId.get(row.id) ?? null,
+            row.status
+          )
         }
 
         const nextPrintUsers: PrintTherapist[] = Array.from(therapistTallies.values())
@@ -387,7 +398,9 @@ function CoveragePageContent() {
           shift_type: row.shift_type,
           role: row.role,
           status: row.status,
-          assignment_status: row.assignment_status,
+          assignment_status: (activeOperationalCodesByShiftId.get(row.id) ?? null) as
+            | AssignmentStatus
+            | null,
           name: getOne(row.profiles)?.full_name ?? 'Unknown',
         }))
 

@@ -12,9 +12,19 @@ Focused view of the active schema used by scheduling, coverage, publish, and req
 - `shifts`
   - Assignment rows by cycle/date/shift/user.
   - Key fields: `status`, `role`, `assignment_status`, override metadata, `unfilled_reason`, `site_id`.
+  - `status`/`assignment_status` are retained for compatibility and historical reads; active operational state is externalized (see below).
   - Unique constraints/indexes:
     - one shift per `(cycle_id, user_id, date)`
     - one lead per slot `(cycle_id, date, shift_type)` where `role = 'lead'`
+
+## Operational Status Tables
+
+- `shift_operational_entries`
+  - One active operational code per shift row (`active = true` unique per `shift_id`).
+  - Stores operational code (`on_call`, `call_in`, `cancelled`, `left_early`), note metadata, and actor metadata.
+  - Used as the source of truth for active operational state in coverage/headcount logic.
+- `shift_operational_entry_audit`
+  - Append-only audit log for `add`/`replace`/`remove` operational transitions.
 
 ## Availability and Pattern Tables
 

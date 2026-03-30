@@ -90,16 +90,16 @@ describe('countBy', () => {
 })
 
 describe('countActive', () => {
-  it('excludes cancelled shifts', () => {
+  it('counts only active shifts', () => {
     const lead = makeShift({ status: 'active' })
     const staff1 = makeShift({ status: 'cancelled' })
     const staff2 = makeShift({ status: 'oncall' })
     const day = makeDay({ leadShift: lead, staffShifts: [staff1, staff2] })
 
-    expect(countActive(day)).toBe(2)
+    expect(countActive(day)).toBe(1)
   })
 
-  it('includes all non-cancelled statuses', () => {
+  it('excludes oncall and leave_early from active count', () => {
     const day = makeDay({
       leadShift: makeShift({ status: 'active' }),
       staffShifts: [
@@ -108,7 +108,7 @@ describe('countActive', () => {
         makeShift({ status: 'active' }),
       ],
     })
-    expect(countActive(day)).toBe(4)
+    expect(countActive(day)).toBe(2)
   })
 
   it('returns 0 when all shifts are cancelled', () => {

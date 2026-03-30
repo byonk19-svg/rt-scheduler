@@ -138,15 +138,30 @@ export async function unassignCoverageShiftViaApi(params: {
 }
 
 export async function persistCoverageShiftStatus(
-  supabase: SupabaseLike,
+  _supabase: SupabaseLike,
   shiftId: string,
   payload: CoverageAssignmentPayload
 ): Promise<{ error: CoverageMutationError }> {
-  return await supabase
-    .from('shifts')
-    .update({
-      assignment_status: payload.assignment_status,
-      status: payload.status,
-    })
-    .eq('id', shiftId)
+  const response = await fetch('/api/schedule/assignment-status', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      assignmentId: shiftId,
+      status: payload.assignment_status,
+    }),
+  })
+
+  if (response.ok) {
+    return { error: null }
+  }
+
+  const payloadBody = (await response.json().catch(() => null)) as CoverageApiErrorResponse | null
+  return {
+    error: {
+      code: payloadBody?.code,
+      message: payloadBody?.error ?? 'Could not save assignment status.',
+    },
+  }
 }

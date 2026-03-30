@@ -1,6 +1,20 @@
-﻿# Teamwise Scheduler
+# Teamwise Scheduler
 
-Updated: 2026-03-26 (session 10)
+Updated: 2026-03-26 (session 11)
+
+## Latest Updates (2026-03-26, session 11)
+
+- **Manager workflow hierarchy + triage surfaces (shipped)**:
+  - Landed on `main` as `8d40fe8` (`refine manager workflow hierarchy and triage surfaces`); pushed to `byonk19-svg/rt-scheduler`.
+  - Highlights: `/coverage` action hierarchy (`Print` / `Clear draft` in `MoreActionsMenu`, primary `Publish`); `/approvals` empty state + preliminary snapshot awareness; `/availability` secondary `Shift board`, `Utilities` menu label; lighter manager cards (`ManagerSchedulingInputs`, availability tables); exception-first coverage day cards (`CalendarGrid` — needs-attention pill, badge stacking, lead/staff tone); quieter `ManagerWorkspaceHeader` + dashboard inbox framing (`ManagerTriageDashboard`); `AppShell` visible brand + logo `aria-label`.
+  - Pre-push: `ci:local:quick` (husky) ran clean before push.
+
+- **Google Stitch MCP (local Cursor only)**:
+  - Config lives in **`.cursor/mcp.json`**: remote MCP URL `https://stitch.googleapis.com/mcp`, auth header **`X-Goog-Api-Key`** (user-supplied key; never commit).
+  - **`.cursor/mcp.json` is in `.gitignore`** so secrets stay local.
+  - **Restart Cursor** after editing MCP config so the `stitch` server registers. Confirm it under MCP settings (enabled, no connection errors).
+  - **Agent caveat:** automated assistant sessions only see MCP servers Cursor exposes to the tool bridge (often `plugin-*` + `cursor-ide-browser`). If `stitch` does not appear in a given chat, use Composer/Agent with Stitch connected in the UI, or verify registration after reload.
+  - **Key smoke test (run locally, do not paste keys into chat):** POST JSON-RPC `tools/list` to `https://stitch.googleapis.com/mcp` with the same header; expect a tools payload if the key and endpoint are valid.
 
 ## Latest Updates (2026-03-26)
 

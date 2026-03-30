@@ -12,6 +12,13 @@ Web app for respiratory therapy scheduling with role-based workflows:
 - Next.js App Router + TypeScript + Tailwind + shadcn/ui
 - Supabase (Postgres + Auth + RLS)
 
+## Operational Status Model
+
+- `shifts` stores planned assignments for cycle/date/role.
+- Real-time operational status (for example `on_call`, `call_in`, `cancelled`, `left_early`) is stored in `shift_operational_entries`.
+- Coverage/headcount metrics use "working scheduled" semantics: planned assignments minus active operational entries.
+- Assignment status updates are written through `update_assignment_status` RPC and audited.
+
 ## Local Setup
 
 1. Install dependencies:

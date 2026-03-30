@@ -17,7 +17,7 @@ type CalendarCellSummary = {
 }
 
 function countsTowardCoverage(status: ShiftStatus): boolean {
-  return status === 'scheduled' || status === 'on_call'
+  return status === 'scheduled'
 }
 
 export function summarizeCalendarCell(

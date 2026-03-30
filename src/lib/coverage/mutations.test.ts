@@ -165,7 +165,12 @@ describe('unassignCoverageShiftViaApi', () => {
 
 describe('persistCoverageShiftStatus', () => {
   it('returns no error on success', async () => {
-    const supabase = makeSupabase({ updateResult: { error: null } })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ assignment: { id: 'shift-1' } }), { status: 200 }))
+    )
+
+    const supabase = makeSupabase()
     const result = await persistCoverageShiftStatus(supabase, 'shift-1', {
       assignment_status: 'on_call',
       status: 'on_call',
@@ -174,27 +179,43 @@ describe('persistCoverageShiftStatus', () => {
   })
 
   it('returns the error on failure', async () => {
-    const dbError: CoverageMutationError = { message: 'update failed' }
-    const supabase = makeSupabase({ updateResult: { error: dbError } })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(JSON.stringify({ error: 'Could not update assignment status.' }), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        })
+      )
+    )
+
+    const supabase = makeSupabase()
     const result = await persistCoverageShiftStatus(supabase, 'shift-1', {
       assignment_status: 'cancelled',
       status: 'scheduled',
     })
-    expect(result.error).toEqual(dbError)
+    expect(result.error).toEqual({ code: undefined, message: 'Could not update assignment status.' })
   })
 
-  it('calls update with correct assignment_status and status fields', async () => {
+  it('calls assignment-status API with correct assignment_status', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ assignment: { id: 'shift-99' } }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
     const supabase = makeSupabase()
-    const fromMock = supabase.from('shifts')
 
     await persistCoverageShiftStatus(supabase, 'shift-99', {
       assignment_status: 'left_early',
       status: 'scheduled',
     })
 
-    expect(fromMock.update).toHaveBeenCalledWith({
-      assignment_status: 'left_early',
-      status: 'scheduled',
+    expect(fetchMock).toHaveBeenCalledWith('/api/schedule/assignment-status', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        assignmentId: 'shift-99',
+        status: 'left_early',
+      }),
     })
   })
 })

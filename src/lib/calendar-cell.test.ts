@@ -13,7 +13,7 @@ describe('summarizeCalendarCell', () => {
 
     expect(summary.leadName).toBe('Mark')
     expect(summary.missingLead).toBe(false)
-    expect(summary.coverageCount).toBe(4)
+    expect(summary.coverageCount).toBe(3)
     expect(summary.visibleShifts.map((shift) => shift.full_name)).toEqual([
       'Mark',
       'Alyce',

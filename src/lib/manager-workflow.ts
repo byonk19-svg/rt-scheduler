@@ -1,6 +1,10 @@
 import { buildDateRange, dateKeyFromDate } from '@/lib/schedule-helpers'
 import { MAX_SHIFT_COVERAGE_PER_DAY, MIN_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
 import { summarizeShiftSlotViolations } from '@/lib/schedule-rule-validation'
+import {
+  fetchActiveOperationalCodeMap,
+  toLegacyShiftStatusFromOperationalCode,
+} from '@/lib/operational-codes'
 import { createClient } from '@/lib/supabase/server'
 import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 
@@ -15,9 +19,9 @@ type CycleRow = {
 }
 
 type ShiftCoverageRow = {
+  id: string
   date: string
   shift_type: 'day' | 'night'
-  status: 'scheduled' | 'on_call' | 'sick' | 'called_off'
   role: 'lead' | 'staff'
   user_id: string
   profiles: { is_lead_eligible: boolean } | { is_lead_eligible: boolean }[] | null
@@ -118,7 +122,7 @@ export async function getManagerAttentionSnapshot(
       ? supabase
           .from('shifts')
           .select(
-            'date, shift_type, status, role, user_id, profiles:profiles!shifts_user_id_fkey(is_lead_eligible)'
+            'id, date, shift_type, role, user_id, profiles:profiles!shifts_user_id_fkey(is_lead_eligible)'
           )
           .eq('cycle_id', activeCycle.id)
           .gte('date', activeCycle.start_date)
@@ -158,13 +162,20 @@ export async function getManagerAttentionSnapshot(
   let missingLeadShifts = 0
 
   if (activeCycle) {
+    const cycleShiftRows = (cycleShiftsResult.data ?? []) as ShiftCoverageRow[]
+    const activeOperationalCodesByShiftId = await fetchActiveOperationalCodeMap(
+      supabase,
+      cycleShiftRows.map((shift) => shift.id)
+    )
     const cycleDates = buildDateRange(activeCycle.start_date, activeCycle.end_date)
     const validation = summarizeShiftSlotViolations({
       cycleDates,
-      assignments: ((cycleShiftsResult.data ?? []) as ShiftCoverageRow[]).map((shift) => ({
+      assignments: cycleShiftRows.map((shift) => ({
         date: shift.date,
         shiftType: shift.shift_type,
-        status: shift.status,
+        status: toLegacyShiftStatusFromOperationalCode(
+          activeOperationalCodesByShiftId.get(shift.id) ?? null
+        ),
         role: shift.role,
         therapistId: shift.user_id,
         therapistName: shift.user_id,

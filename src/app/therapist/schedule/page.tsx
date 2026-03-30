@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { formatDateLabel } from '@/lib/calendar-utils'
+import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
@@ -27,7 +28,6 @@ type ShiftRow = {
   user_id: string | null
   date: string
   shift_type: 'day' | 'night'
-  status: string
   role: 'lead' | 'staff'
 }
 
@@ -245,12 +245,16 @@ export default async function TherapistSchedulePage() {
 
   const { data: shiftsData } = await supabase
     .from('shifts')
-    .select('id, user_id, date, shift_type, status, role')
+    .select('id, user_id, date, shift_type, role')
     .eq('cycle_id', activeCycle.id)
-    .in('status', ['scheduled', 'on_call'])
     .order('date', { ascending: true })
 
-  const shifts = (shiftsData ?? []) as ShiftRow[]
+  const allShifts = (shiftsData ?? []) as ShiftRow[]
+  const activeOperationalCodesByShiftId = await fetchActiveOperationalCodeMap(
+    supabase,
+    allShifts.map((shift) => shift.id)
+  )
+  const shifts = allShifts.filter((shift) => !activeOperationalCodesByShiftId.has(shift.id))
   const shiftUserIds = Array.from(
     new Set(shifts.map((shift) => shift.user_id).filter((value): value is string => Boolean(value)))
   )

@@ -165,7 +165,7 @@ export function summarizeShiftSlotViolations({
       const slotKey = coverageSlotKey(date, shiftType)
       const slotAssignments = assignmentsBySlot.get(slotKey) ?? []
       const activeAssignments = slotAssignments.filter(
-        (assignment) => assignment.status === 'scheduled' || assignment.status === 'on_call'
+        (assignment) => assignment.status === 'scheduled'
       )
       const activeCoverage = activeAssignments.length
       const leadAssignments = slotAssignments.filter((assignment) => assignment.role === 'lead')

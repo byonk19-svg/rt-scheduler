@@ -197,6 +197,26 @@ function makeSupabaseMock(scenario: Scenario) {
         return { data: single ? null : [], error: null }
       }
 
+      if (table === 'shift_operational_entries') {
+        const shiftIdFilter = Array.isArray(state.filters['in:shift_id'])
+          ? (state.filters['in:shift_id'] as string[])
+          : []
+        const activeFilter = state.filters.active === true
+        if (!activeFilter || shiftIdFilter.length === 0) {
+          return { data: [], error: null }
+        }
+
+        const rows = scenario.coverageStatuses
+          .map((status, idx) => ({
+            shift_id: `coverage-${idx}`,
+            code: status === 'scheduled' ? null : status,
+          }))
+          .filter((row) => row.code !== null && shiftIdFilter.includes(row.shift_id))
+          .map((row) => ({ shift_id: row.shift_id, code: row.code }))
+
+        return { data: rows, error: null }
+      }
+
       return { data: single ? null : [], error: null }
     }
 
@@ -208,6 +228,7 @@ function makeSupabaseMock(scenario: Scenario) {
       neq: (column: string, value: unknown) => typeof builder
       gte: (column: string, value: unknown) => typeof builder
       lte: (column: string, value: unknown) => typeof builder
+      in: (column: string, values: unknown[]) => typeof builder
       maybeSingle: () => Promise<{
         data: unknown
         error: { code?: string; message?: string } | null
@@ -246,6 +267,10 @@ function makeSupabaseMock(scenario: Scenario) {
       },
       lte: (column, value) => {
         state.filters[`lte:${column}`] = value
+        return builder
+      },
+      in: (column, values) => {
+        state.filters[`in:${column}`] = values
         return builder
       },
       maybeSingle: async () => resolveSelect(true),

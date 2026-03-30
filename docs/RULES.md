@@ -6,7 +6,8 @@ This file captures the scheduling rules currently enforced by code and schema.
 
 - Coverage target per slot is `4` during auto-generate.
 - Hard slot bounds are `3` minimum and `5` maximum (`day` and `night` separately).
-- Coverage counts only shifts with status `scheduled` or `on_call`.
+- Coverage/headcount counts only working scheduled assignments.
+- Working scheduled = planned shifts minus active rows in `shift_operational_entries` (for example `on_call`, `call_in`, `cancelled`, `left_early` are excluded).
 - A slot can have at most one designated lead (`shifts.role = 'lead'` unique per cycle/date/shift).
 
 ## Eligibility Resolution Order
@@ -53,10 +54,12 @@ Eligibility is resolved in this order (`resolveEligibility`):
 - Allowed assignment statuses: `scheduled`, `call_in`, `cancelled`, `on_call`, `left_early`.
 - Only manager/lead or lead-eligible therapist/staff may update assignment status.
 - Updates are site-scoped in RPC (`profiles.site_id` must match assignment `shifts.site_id`).
-- Status changes are audited in `shift_status_changes`.
+- Active operational status is written to `shift_operational_entries` and transition-audited in `shift_operational_entry_audit`.
+- Compatibility status transitions are also recorded in `shift_status_changes`.
 
 ## Shift Board Approval Rules
 
 - `shift_posts` transitions to `approved` apply assignment changes via DB trigger.
-- Approval checks enforce lead coverage safety for swaps/pickups.
-- Pending swap posts are auto-expired by cron after shift date passes.
+- Approval checks enforce lead coverage safety for swaps/pickups and block when either side has active operational codes.
+- Swap approvals require same date + same shift type + both sides in working-scheduled state.
+- Pending swap posts expire after 48 hours.

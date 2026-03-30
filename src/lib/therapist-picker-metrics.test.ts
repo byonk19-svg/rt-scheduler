@@ -13,7 +13,7 @@ describe('therapist picker workload metrics', () => {
 
     const shifts: WorkloadShift[] = [
       { userId: 'a', date: '2026-03-08', status: 'scheduled' },
-      { userId: 'a', date: '2026-03-09', status: 'on_call' },
+      { userId: 'a', date: '2026-03-09', status: 'on_call' }, // excluded from workload count
       { userId: 'a', date: '2026-03-09', status: 'scheduled' }, // same day should count once
       { userId: 'a', date: '2026-03-01', status: 'scheduled' },
       { userId: 'a', date: '2026-03-12', status: 'called_off' }, // excluded

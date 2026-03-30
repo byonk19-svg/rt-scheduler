@@ -84,7 +84,12 @@ export function buildDayItems(
         log: [],
       }))
 
-    const hasOverride = slot.some((row) => row.status === 'called_off')
+    const hasOverride = slot.some(
+      (row) =>
+        row.assignment_status === 'cancelled' ||
+        row.assignment_status === 'call_in' ||
+        row.status === 'called_off'
+    )
     const hasDraft = slot.some((row) => row.status === 'sick')
     const dayStatus: DayStatus = !leadShift
       ? 'missing_lead'
@@ -126,7 +131,7 @@ export function countBy(day: DayItem, status: UiStatus): number {
 }
 
 export function countActive(day: DayItem): number {
-  return flatten(day).filter((row) => row.status !== 'cancelled' && row.status !== 'call_in').length
+  return flatten(day).filter((row) => row.status === 'active').length
 }
 
 export function shouldShowMonthTag(index: number, isoDate: string): boolean {

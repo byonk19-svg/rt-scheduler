@@ -252,4 +252,34 @@ describe('schedule rule validation', () => {
     expect(result.multipleLeads).toBe(1)
     expect(result.issues.some((issue) => issue.reasons.includes('multiple_leads'))).toBe(true)
   })
+
+  it('treats on_call assignments as not covered for slot headcount', () => {
+    const result = summarizeShiftSlotViolations({
+      cycleDates: ['2026-03-01'],
+      assignments: [
+        {
+          date: '2026-03-01',
+          shiftType: 'day',
+          status: 'on_call',
+          role: 'lead',
+          therapistId: 't1',
+          therapistName: 'Lead One',
+          isLeadEligible: true,
+        },
+        {
+          date: '2026-03-01',
+          shiftType: 'day',
+          status: 'scheduled',
+          role: 'staff',
+          therapistId: 't2',
+          therapistName: 'Staff One',
+          isLeadEligible: true,
+        },
+      ],
+      minCoveragePerShift: 2,
+      maxCoveragePerShift: 5,
+    })
+
+    expect(result.underCoverage).toBe(2)
+  })
 })

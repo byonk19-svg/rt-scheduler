@@ -70,7 +70,7 @@ function countCoveredMembers(
   let count = 0
   for (const member of members) {
     const status = shiftByUserDate[`${member.id}:${date}`]
-    if (status === 'scheduled' || status === 'on_call') {
+    if (status === 'scheduled') {
       count += 1
     }
   }

@@ -23,3 +23,9 @@
 
 - Public board for posting requests
 - Swaps require manager approval to be official
+
+## Operational State Separation
+
+- Decision: keep `shifts` focused on planned schedule rows and store live operational status in dedicated operational-entry tables.
+- Why: prevents operational overrides from mutating planning intent, gives one-active-code enforcement, and provides auditable transition history.
+- Impact: coverage/headcount metrics now use "working scheduled" semantics (planned minus active operational entries).

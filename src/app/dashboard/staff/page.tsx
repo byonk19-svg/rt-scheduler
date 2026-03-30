@@ -6,6 +6,7 @@ import { FeedbackToast } from '@/components/feedback-toast'
 import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
+import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
@@ -73,15 +74,20 @@ export default async function StaffDashboardPage({
     (cycles ?? [])[0] ??
     null
 
+  type UpcomingShiftRow = {
+    id: string
+    date: string
+    shift_type: string | null
+    role: string | null
+  }
   const [upcomingShiftsResult, overrideCountResult, pendingPostCountResult] = await Promise.all([
     activeCycle
       ? supabase
           .from('shifts')
-          .select('id, date, shift_type, status, role')
+          .select('id, date, shift_type, role')
           .eq('user_id', user.id)
           .eq('cycle_id', activeCycle.id)
           .gte('date', today)
-          .in('status', ['scheduled', 'on_call'])
           .order('date', { ascending: true })
           .limit(10)
       : Promise.resolve({ data: [] }),
@@ -99,7 +105,14 @@ export default async function StaffDashboardPage({
       .eq('status', 'pending'),
   ])
 
-  const upcomingShifts = upcomingShiftsResult.data ?? []
+  const upcomingShiftRows = (upcomingShiftsResult.data ?? []) as UpcomingShiftRow[]
+  const upcomingActiveOperationalCodesByShiftId = await fetchActiveOperationalCodeMap(
+    supabase,
+    upcomingShiftRows.map((row) => row.id)
+  )
+  const upcomingShifts = upcomingShiftRows.filter(
+    (row) => !upcomingActiveOperationalCodesByShiftId.has(row.id)
+  )
   const upcomingCount = upcomingShifts.length
   const nextShift = upcomingShifts[0] ?? null
   const nextShiftLabel = nextShift
@@ -114,6 +127,7 @@ export default async function StaffDashboardPage({
 
   // Upcoming shift roster - who else is scheduled on the next 3 shifts --------
   type RosterShift = {
+    id: string
     user_id: string | null
     date: string
     shift_type: string | null
@@ -125,16 +139,22 @@ export default async function StaffDashboardPage({
       ? (((
           await supabase
             .from('shifts')
-            .select('user_id, date, shift_type, role')
+            .select('id, user_id, date, shift_type, role')
             .eq('cycle_id', activeCycle.id)
             .in('date', rosterDates)
-            .in('status', ['scheduled', 'on_call'])
             .neq('user_id', user.id)
         ).data as RosterShift[] | null) ?? [])
       : []
+  const rosterActiveOperationalCodesByShiftId = await fetchActiveOperationalCodeMap(
+    supabase,
+    rosterRawShifts.map((shift) => shift.id)
+  )
+  const rosterShifts = rosterRawShifts.filter(
+    (shift) => !rosterActiveOperationalCodesByShiftId.has(shift.id)
+  )
 
   const rosterUserIds = [
-    ...new Set(rosterRawShifts.map((s) => s.user_id).filter((id): id is string => Boolean(id))),
+    ...new Set(rosterShifts.map((s) => s.user_id).filter((id): id is string => Boolean(id))),
   ]
   const rosterNameById = new Map<string, string>()
   if (rosterUserIds.length > 0) {
@@ -157,7 +177,7 @@ export default async function StaffDashboardPage({
     colleagues: ShiftColleague[]
   }
   const upcomingRoster: UpcomingShiftRoster[] = upcomingShifts.slice(0, 3).map((myShift) => {
-    const colleagues = rosterRawShifts
+    const colleagues = rosterShifts
       .filter((s) => s.date === myShift.date && s.shift_type === myShift.shift_type)
       .map((s) => ({
         name: s.user_id ? (rosterNameById.get(s.user_id) ?? '?') : '?',
