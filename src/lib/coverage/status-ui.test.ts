@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   COVERAGE_STATUS_OPTIONS,
+  coverageStatusPillSurfaceClass,
   getCoverageStatusLabel,
   toCoverageAssignmentPayload,
   toCoverageUiStatus,
@@ -22,5 +23,10 @@ describe('coverage status ui', () => {
 
   it('maps assignment_status call_in to ui status call_in', () => {
     expect(toCoverageUiStatus('call_in', 'scheduled')).toBe('call_in')
+  })
+
+  it('exposes pill surface classes for non-active coverage states', () => {
+    expect(coverageStatusPillSurfaceClass('active')).toBe('')
+    expect(coverageStatusPillSurfaceClass('oncall')).toContain('info-border')
   })
 })

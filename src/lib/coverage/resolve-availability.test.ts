@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import { resolveAvailability } from '@/lib/coverage/resolve-availability'
 import type { AvailabilityOverrideRow } from '@/lib/coverage/types'
@@ -108,7 +108,7 @@ describe('resolveAvailability', () => {
 
     expect(resolution.allowed).toBe(true)
     expect(resolution.reason).toBe('override_force_on')
-    expect(resolution.forcedByManager).toBe(false)
+    expect(resolution.forcedByManager).toBe(true)
   })
 
   it('does not bypass inactive or FMLA with force_on', () => {

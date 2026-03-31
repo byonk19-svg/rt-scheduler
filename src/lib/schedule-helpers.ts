@@ -333,7 +333,7 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
           : ''
       const forcedText =
         forcedMisses > 0
-          ? `${forcedMisses} manager-selected Will work date${forcedMisses !== 1 ? 's could not' : ' could not'} be honored automatically.`
+          ? `${forcedMisses} required work date${forcedMisses !== 1 ? 's could not' : ' could not'} be honored automatically (manager Will work or therapist must work).`
           : ''
       return {
         message:

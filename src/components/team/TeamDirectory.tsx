@@ -154,7 +154,7 @@ function TeamMemberCard({ profile, onClick }: { profile: TeamProfileRecord; onCl
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="mb-1.5 flex flex-wrap items-center gap-2">
+        <div className="mb-2.5 flex flex-wrap items-center gap-2">
           <h3 className="font-heading text-sm font-semibold text-foreground">
             {profile.full_name ?? 'Unknown'}
           </h3>
@@ -182,7 +182,7 @@ function TeamMemberCard({ profile, onClick }: { profile: TeamProfileRecord; onCl
             </span>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-muted-foreground">
           <span>{shiftLabel(profile.shift_type)}</span>
           <span className="h-1 w-1 rounded-full bg-border" />
           <span>{employmentLabel(profile.employment_type)}</span>
@@ -211,9 +211,14 @@ function TeamSection({
 
   return (
     <section className="mb-8 last:mb-0">
-      <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-        {title}
-      </h2>
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          {title}
+        </h2>
+        <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+          {profiles.length}
+        </span>
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {profiles.map((profile) => (
           <TeamMemberCard key={profile.id} profile={profile} onClick={() => onOpen(profile.id)} />
@@ -238,7 +243,14 @@ function ShiftGroup({
 
   return (
     <section className="mb-8 rounded-2xl border border-border/60 bg-muted/10 p-4 last:mb-0 sm:p-5">
-      <h2 className="mb-4 text-sm font-semibold tracking-tight text-foreground">{title}</h2>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          {title}
+        </h2>
+        <span className="rounded-full border border-border/70 bg-card px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+          {leads.length + therapists.length} total
+        </span>
+      </div>
       <TeamSection title="Lead Therapists" profiles={leads} onOpen={onOpen} />
       <TeamSection title="Therapists" profiles={therapists} onOpen={onOpen} />
     </section>
@@ -321,7 +333,9 @@ export function TeamDirectory({
 
   return (
     <>
-      <TeamSection title="Managers" profiles={sections.managers} onOpen={openEditor} />
+      <div className="rounded-2xl border border-border/60 bg-card/50 p-4 sm:p-5">
+        <TeamSection title="Managers" profiles={sections.managers} onOpen={openEditor} />
+      </div>
       <ShiftGroup
         title="Day Shift"
         leads={sections.dayLeads}
@@ -334,7 +348,9 @@ export function TeamDirectory({
         therapists={sections.nightTherapists}
         onOpen={openEditor}
       />
-      <TeamSection title="Inactive" profiles={sections.inactive} onOpen={openEditor} />
+      <div className="rounded-2xl border border-border/60 bg-card/50 p-4 sm:p-5">
+        <TeamSection title="Inactive" profiles={sections.inactive} onOpen={openEditor} />
+      </div>
 
       {profiles.length === 0 && (
         <div className="rounded-xl border border-border bg-card px-6 py-12 text-center">

@@ -45,7 +45,12 @@ type NavItem = {
 
 const STAFF_NAV_ITEMS: readonly NavItem[] = [
   { href: '/dashboard/staff', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/therapist/schedule', label: 'My Schedule', icon: CalendarDays },
+  {
+    href: '/coverage?view=week',
+    label: 'My Schedule',
+    icon: CalendarDays,
+    isActive: (pathname) => pathname === '/coverage',
+  },
   {
     href: '/preliminary',
     label: 'Preliminary',
@@ -199,12 +204,17 @@ export function AppShell({ user, children }: AppShellProps) {
   const canAccessManagerUi = can(user?.role, 'access_manager_ui')
 
   const shouldRenderShell = useMemo(() => Boolean(user) && usesAppShell(pathname), [pathname, user])
-  const navItems = canAccessManagerUi ? MANAGER_NAV_ITEMS : STAFF_NAV_ITEMS
+  const navItems = useMemo(() => {
+    if (canAccessManagerUi) return MANAGER_NAV_ITEMS
+    return STAFF_NAV_ITEMS
+  }, [canAccessManagerUi])
   const bottomNavItems = canAccessManagerUi ? MANAGER_BOTTOM_NAV_ITEMS : STAFF_BOTTOM_NAV_ITEMS
   const dashboardHref = canAccessManagerUi ? MANAGER_WORKFLOW_LINKS.dashboard : '/dashboard/staff'
   const roleLabel = canAccessManagerUi ? 'OPERATIONS' : 'MY SHIFTS'
-  const switchHref = canAccessManagerUi ? '/therapist' : '/dashboard/manager'
-  const switchLabel = canAccessManagerUi ? 'Switch to Therapist view' : 'Switch to Manager view'
+  const staffSwitchLink = useMemo(() => {
+    if (canAccessManagerUi) return { href: '/therapist', label: 'Switch to Therapist view' }
+    return null
+  }, [canAccessManagerUi])
   const isCoveragePage = pathname === '/coverage'
 
   useEffect(() => {
@@ -250,7 +260,7 @@ export function AppShell({ user, children }: AppShellProps) {
               const Icon = item.icon
               return (
                 <Link
-                  key={item.href}
+                  key={`${item.href}-${item.label}`}
                   href={item.href}
                   className={cn(
                     'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium',
@@ -285,13 +295,15 @@ export function AppShell({ user, children }: AppShellProps) {
               )
             })}
 
-            <Link
-              href={switchHref}
-              className="flex min-h-[36px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-[11px] font-medium text-[color:var(--sidebar-muted)] transition-colors hover:text-sidebar-foreground"
-            >
-              <ArrowLeftRight className="h-3.5 w-3.5" />
-              {switchLabel}
-            </Link>
+            {staffSwitchLink ? (
+              <Link
+                href={staffSwitchLink.href}
+                className="flex min-h-[36px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-[11px] font-medium text-[color:var(--sidebar-muted)] transition-colors hover:text-sidebar-foreground"
+              >
+                <ArrowLeftRight className="h-3.5 w-3.5" />
+                {staffSwitchLink.label}
+              </Link>
+            ) : null}
 
             <div className={APP_SHELL_PROFILE_CARD_CLASS}>
               <div className="flex items-center gap-2.5">
@@ -303,7 +315,11 @@ export function AppShell({ user, children }: AppShellProps) {
                     {user?.fullName ?? 'Team member'}
                   </p>
                   <p className="mt-0.5 text-[10px] capitalize text-[color:var(--sidebar-muted)]">
-                    {user?.role === 'manager' ? 'Manager' : 'Staff Therapist'}
+                    {user?.role === 'manager'
+                      ? 'Manager'
+                      : user?.role === 'lead'
+                        ? 'Lead'
+                        : 'Staff Therapist'}
                   </p>
                 </div>
               </div>
@@ -417,7 +433,7 @@ export function AppShell({ user, children }: AppShellProps) {
                 const Icon = item.icon
                 return (
                   <Link
-                    key={item.href}
+                    key={`${item.href}-${item.label}`}
                     href={item.href}
                     className={cn(
                       'flex min-h-[42px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
@@ -431,14 +447,16 @@ export function AppShell({ user, children }: AppShellProps) {
                   </Link>
                 )
               })}
-              <Link
-                href={switchHref}
-                className="flex min-h-[38px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-[color:var(--sidebar-muted)] transition-colors hover:text-sidebar-foreground"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <ArrowLeftRight className="h-4 w-4" />
-                {switchLabel}
-              </Link>
+              {staffSwitchLink ? (
+                <Link
+                  href={staffSwitchLink.href}
+                  className="flex min-h-[38px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-[color:var(--sidebar-muted)] transition-colors hover:text-sidebar-foreground"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <ArrowLeftRight className="h-4 w-4" />
+                  {staffSwitchLink.label}
+                </Link>
+              ) : null}
             </nav>
 
             <div className="space-y-1 border-t border-sidebar-border px-3 py-3">

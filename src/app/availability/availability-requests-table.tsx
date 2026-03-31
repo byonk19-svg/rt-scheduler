@@ -177,6 +177,9 @@ export function AvailabilityEntriesTable({
             >
               My entries
             </Button>
+            <span className="ml-auto rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">
+              {filteredRows.length} shown
+            </span>
           </div>
         )}
 
@@ -191,6 +194,13 @@ export function AvailabilityEntriesTable({
           statusOptions={STATUS_OPTIONS}
           showDateRange={canManageAvailability}
         />
+        {!canManageAvailability && (
+          <div className="flex justify-end">
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-500">
+              {filteredRows.length} shown
+            </span>
+          </div>
+        )}
 
         <Table>
           <TableHeader>

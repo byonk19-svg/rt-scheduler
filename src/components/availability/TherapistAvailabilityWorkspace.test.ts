@@ -32,17 +32,18 @@ describe('TherapistAvailabilityWorkspace', () => {
           },
         ],
         initialCycleId: 'cycle-1',
-        submitAvailabilityEntryAction: async () => {},
+        submitTherapistAvailabilityGridAction: async () => {},
       })
     )
 
-    expect(html).toContain('data-slot="availability-workspace-primary"')
-    expect(html).toContain('Availability Inputs &amp; Calendar')
+    expect(html).toContain('My Availability')
     expect(html).toContain('id="therapist-availability-workspace"')
-    expect(html).toContain('Save request')
-    expect(html).toContain('Need off')
-    expect(html).toContain('March 2026')
-    expect(html).toContain('Saved for this cycle')
+    expect(html).toContain('Tap a day to cycle through statuses')
+    expect(html).toContain('Must work')
+    expect(html).toContain('Unavailable')
+    expect(html).toContain('no preference')
+    expect(html).toContain('Week 1')
+    expect(html).toContain('Submit')
     expect(html).not.toContain('Therapist')
     expect(html).not.toContain('Not submitted yet')
   })

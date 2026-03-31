@@ -1737,8 +1737,9 @@ export async function generateDraftScheduleAction(formData: FormData) {
   }
 
   const finalAssignedShifts = [...existingShifts, ...draftShiftsToInsert]
-  const forcedManagerMisses = allAvailabilityOverrides.filter((override) => {
-    if (override.override_type !== 'force_on' || override.source !== 'manager') return false
+  const forcedMustWorkMisses = allAvailabilityOverrides.filter((override) => {
+    if (override.override_type !== 'force_on') return false
+    if (override.source !== 'manager' && override.source !== 'therapist') return false
 
     return !finalAssignedShifts.some((shift) => {
       if (shift.user_id !== override.therapist_id || shift.date !== override.date) return false
@@ -1757,7 +1758,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
       unfilled: String(unfilledSlots),
       constraints_unfilled: String(constraintsUnfilledSlots),
       lead_missing: String(missingLeadSlots),
-      forced_misses: forcedManagerMisses > 0 ? String(forcedManagerMisses) : undefined,
+      forced_misses: forcedMustWorkMisses > 0 ? String(forcedMustWorkMisses) : undefined,
     })
   )
 }

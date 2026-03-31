@@ -47,3 +47,17 @@ export function toCoverageUiStatus(
   if (status === 'sick') return 'cancelled'
   return 'active'
 }
+
+/** Tailwind surface tokens for compact status chips (shared with coverage + schedule views). */
+const STATUS_PILL_SURFACE: Record<CoverageUiStatus, string> = {
+  active: '',
+  leave_early:
+    'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]',
+  cancelled: 'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]',
+  call_in: 'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]',
+  oncall: 'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)]',
+}
+
+export function coverageStatusPillSurfaceClass(status: CoverageUiStatus): string {
+  return STATUS_PILL_SURFACE[status]
+}

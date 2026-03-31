@@ -10,7 +10,7 @@ import {
   deleteAvailabilityEntryAction,
   deleteManagerPlannerDateAction,
   saveManagerPlannerDatesAction,
-  submitAvailabilityEntryAction,
+  submitTherapistAvailabilityGridAction,
 } from '@/app/availability/actions'
 import { AvailabilityOverviewHeader } from '@/components/availability/AvailabilityOverviewHeader'
 import { ManagerSchedulingInputs } from '@/components/availability/ManagerSchedulingInputs'
@@ -330,7 +330,7 @@ export default async function AvailabilityPage({
       cycles={cycles}
       availabilityRows={availabilityRows}
       initialCycleId={selectedCycleId}
-      submitAvailabilityEntryAction={submitAvailabilityEntryAction}
+      submitTherapistAvailabilityGridAction={submitTherapistAvailabilityGridAction}
     />
   )
   const totalRequests = availabilityRows.length

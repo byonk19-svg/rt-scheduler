@@ -54,7 +54,7 @@ export function StaffShiftPostComposer({
             description="Ask your manager to assign shifts, or view your schedule."
             actions={
               <Button asChild variant="outline" size="sm">
-                <a href="/therapist/schedule">View my schedule</a>
+                <a href="/coverage?view=week">View my schedule</a>
               </Button>
             }
           />

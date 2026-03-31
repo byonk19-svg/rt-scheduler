@@ -27,6 +27,8 @@ type ShiftEditorDialogProps = {
   selectedDay: SelectedDay | null
   therapists: TherapistOption[]
   canEdit: boolean
+  /** When set, non-managers see guidance instead of the empty-cycle message. */
+  coverageCycleId: string | null
   isPastDate: boolean
   hasOperationalEntries: boolean
   assigning: boolean
@@ -170,6 +172,7 @@ export function ShiftEditorDialog({
   selectedDay,
   therapists,
   canEdit,
+  coverageCycleId,
   isPastDate,
   hasOperationalEntries,
   assigning,
@@ -241,7 +244,9 @@ export function ShiftEditorDialog({
                   'border border-[var(--warning-border)] bg-[var(--warning-subtle)] font-medium text-[var(--warning-text)]'
                 )}
               >
-                This view has no active schedule cycle, so assignments are read-only.
+                {!coverageCycleId
+                  ? 'This view has no active schedule cycle, so assignments are read-only.'
+                  : 'Staffing rows are manager-only. Leads can still set on-call, call-in, cancelled, and leave-early from therapist names on the calendar grid.'}
               </div>
               )}
 

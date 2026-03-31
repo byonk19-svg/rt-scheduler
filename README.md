@@ -5,6 +5,8 @@ Web app for respiratory therapy scheduling with role-based workflows:
 - Auth + role-aware dashboard
 - Availability requests
 - 6-week schedule cycle management
+- **Canonical staff schedule:** [`/coverage`](./src/app/coverage/page.tsx) (`view=week`); compatibility routes (`/schedule`, `/therapist/schedule`) redirect there
+- **Therapist availability:** 6-week grid on `/therapist/availability` — No preference (default), Unavailable, Must work (autodraft constraint); see [`CLAUDE.md`](./CLAUDE.md) for override semantics
 - Shift board (swap/pickup posts with manager approval)
 
 Current architecture and quality snapshot: [`docs/REPO_HEALTH.md`](docs/REPO_HEALTH.md)

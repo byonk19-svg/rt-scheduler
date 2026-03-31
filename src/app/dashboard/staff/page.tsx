@@ -202,13 +202,13 @@ export default async function StaffDashboardPage({
     <div className="space-y-4">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
-      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_10px_rgba(15,23,42,0.05)]">
+      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_12px_rgba(15,23,42,0.06)]">
         <div className="flex flex-col gap-3 border-b border-border px-4 py-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Staff Home
             </p>
-            <h1 className="mt-1 text-xl font-bold tracking-tight text-foreground">
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
               Welcome, {fullName}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -216,11 +216,14 @@ export default async function StaffDashboardPage({
                 ? `${activeCycle.label} | ${activeCycle.start_date} to ${activeCycle.end_date}`
                 : 'No active cycle selected'}
             </p>
-            <p className="mt-1.5 text-sm text-muted-foreground">
-              {upcomingCount > 0
-                ? `${String(upcomingCount)} upcoming shift${upcomingCount === 1 ? '' : 's'} this cycle`
-                : 'No upcoming shifts scheduled yet'}
-            </p>
+            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5">
+                {upcomingCount} upcoming
+              </span>
+              <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5">
+                {pendingPostCount} pending posts
+              </span>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button asChild size="sm">
@@ -304,7 +307,7 @@ export default async function StaffDashboardPage({
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded-xl border border-border bg-muted/30 px-3 py-2.5">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>Next shift</span>

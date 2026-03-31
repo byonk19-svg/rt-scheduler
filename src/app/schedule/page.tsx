@@ -1,7 +1,5 @@
-﻿import { redirect } from 'next/navigation'
+import { redirect } from 'next/navigation'
 
-import { can } from '@/lib/auth/can'
-import { parseRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 
 type ScheduleSearchParams = Record<string, string | string[] | undefined>
@@ -27,15 +25,6 @@ export default async function SchedulePage({
     redirect('/login')
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  const isManager = can(parseRole(profile?.role), 'access_manager_ui')
-  const targetPath = isManager ? '/coverage' : '/therapist/schedule'
-
   const passthrough = new URLSearchParams()
   for (const [key, rawValue] of Object.entries(params ?? {})) {
     const value = firstValue(rawValue)
@@ -43,6 +32,10 @@ export default async function SchedulePage({
     passthrough.set(key, value)
   }
 
+  if (!passthrough.has('view')) {
+    passthrough.set('view', 'week')
+  }
+
   const query = passthrough.toString()
-  redirect(query ? `${targetPath}?${query}` : targetPath)
+  redirect(query ? `/coverage?${query}` : '/coverage?view=week')
 }

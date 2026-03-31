@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import type { AvailabilityOverrideRow, Therapist } from '@/app/schedule/types'
 import { getScheduleFeedback, pickTherapistForDate } from '@/lib/schedule-helpers'
@@ -69,7 +69,7 @@ describe('schedule feedback messaging', () => {
     expect(feedback?.message).toContain('2 slots were left unfilled due to constraints.')
   })
 
-  it('includes forced manager-date misses after auto-generate', () => {
+  it('includes forced must-work date misses after auto-generate', () => {
     const feedback = getScheduleFeedback({
       auto: 'generated',
       added: '6',
@@ -81,7 +81,7 @@ describe('schedule feedback messaging', () => {
 
     expect(feedback?.variant).toBe('error')
     expect(feedback?.message).toContain(
-      '2 manager-selected Will work dates could not be honored automatically.'
+      '2 required work dates could not be honored automatically (manager Will work or therapist must work).'
     )
   })
 })

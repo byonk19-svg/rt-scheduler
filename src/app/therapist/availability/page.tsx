@@ -6,7 +6,7 @@ import {
 } from '@/app/availability/availability-requests-table'
 import {
   deleteAvailabilityEntryAction,
-  submitAvailabilityEntryAction,
+  submitTherapistAvailabilityGridAction,
 } from '@/app/availability/actions'
 import { AvailabilityOverviewHeader } from '@/components/availability/AvailabilityOverviewHeader'
 import { TherapistAvailabilityWorkspace } from '@/components/availability/TherapistAvailabilityWorkspace'
@@ -225,7 +225,7 @@ export default async function TherapistAvailabilityPage({
         cycles={cycles}
         availabilityRows={availabilityRows}
         initialCycleId={selectedCycleId}
-        submitAvailabilityEntryAction={submitAvailabilityEntryAction}
+        submitTherapistAvailabilityGridAction={submitTherapistAvailabilityGridAction}
         returnToPath="/therapist/availability"
       />
 

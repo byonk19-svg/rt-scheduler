@@ -100,6 +100,110 @@ export async function submitAvailabilityEntryAction(formData: FormData) {
   redirect(buildAvailabilityUrl({ success: 'entry_submitted', cycle: cycleId }, returnPath))
 }
 
+export async function submitTherapistAvailabilityGridAction(formData: FormData) {
+  const { supabase, user } = await getAuthenticatedUserWithRole()
+  const returnPath = getReturnPath(String(formData.get('return_to') ?? '').trim() || null)
+
+  const cycleId = String(formData.get('cycle_id') ?? '').trim()
+  const canWorkDates = formData
+    .getAll('can_work_dates')
+    .map((value) => String(value).trim())
+    .filter((value) => value.length > 0)
+  const cannotWorkDates = formData
+    .getAll('cannot_work_dates')
+    .map((value) => String(value).trim())
+    .filter((value) => value.length > 0)
+
+  if (!cycleId) {
+    redirect(buildAvailabilityUrl({ error: 'submit_failed' }, returnPath))
+  }
+
+  const { data: cycle } = await supabase
+    .from('schedule_cycles')
+    .select('start_date, end_date')
+    .eq('id', cycleId)
+    .maybeSingle()
+
+  if (!cycle) {
+    redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
+  }
+
+  const isValidCycleDate = (date: string) => date >= cycle.start_date && date <= cycle.end_date
+
+  const uniqueCanWorkDates = Array.from(new Set(canWorkDates.filter(isValidCycleDate)))
+  const uniqueCannotWorkDates = Array.from(new Set(cannotWorkDates.filter(isValidCycleDate)))
+  const cannotWorkSet = new Set(uniqueCannotWorkDates)
+  const resolvedCanWorkDates = uniqueCanWorkDates.filter((date) => !cannotWorkSet.has(date))
+
+  const { data: existingRows, error: existingRowsError } = await supabase
+    .from('availability_overrides')
+    .select('id, date')
+    .eq('cycle_id', cycleId)
+    .eq('therapist_id', user.id)
+    .eq('shift_type', 'both')
+    .eq('source', 'therapist')
+
+  if (existingRowsError) {
+    console.error('Failed to load existing therapist availability overrides:', existingRowsError)
+    redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
+  }
+
+  const desiredDates = new Set([...resolvedCanWorkDates, ...uniqueCannotWorkDates])
+  const rowsToDelete = (existingRows ?? [])
+    .filter((row) => !desiredDates.has(String(row.date)))
+    .map((row) => String(row.id))
+
+  if (rowsToDelete.length > 0) {
+    const { error: deleteError } = await supabase
+      .from('availability_overrides')
+      .delete()
+      .in('id', rowsToDelete)
+
+    if (deleteError) {
+      console.error('Failed to remove therapist availability overrides:', deleteError)
+      redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
+    }
+  }
+
+  const payload = [
+    ...resolvedCanWorkDates.map((date) => ({
+      therapist_id: user.id,
+      cycle_id: cycleId,
+      date,
+      shift_type: 'both' as const,
+      override_type: 'force_on' as const,
+      note: null,
+      created_by: user.id,
+      source: 'therapist' as const,
+    })),
+    ...uniqueCannotWorkDates.map((date) => ({
+      therapist_id: user.id,
+      cycle_id: cycleId,
+      date,
+      shift_type: 'both' as const,
+      override_type: 'force_off' as const,
+      note: null,
+      created_by: user.id,
+      source: 'therapist' as const,
+    })),
+  ]
+
+  if (payload.length > 0) {
+    const { error: upsertError } = await supabase
+      .from('availability_overrides')
+      .upsert(payload, { onConflict: 'cycle_id,therapist_id,date,shift_type' })
+
+    if (upsertError) {
+      console.error('Failed to save therapist availability grid:', upsertError)
+      redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
+    }
+  }
+
+  revalidatePath('/availability')
+  revalidatePath('/therapist/availability')
+  redirect(buildAvailabilityUrl({ success: 'entry_submitted', cycle: cycleId }, returnPath))
+}
+
 export async function deleteAvailabilityEntryAction(formData: FormData) {
   const { supabase, user } = await getAuthenticatedUserWithRole()
   const returnPath = getReturnPath(String(formData.get('return_to') ?? '').trim() || null)

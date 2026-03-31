@@ -1,6 +1,30 @@
 # Teamwise Scheduler
 
-Updated: 2026-03-31 (session 14)
+Updated: 2026-03-31 (session 16)
+
+## Latest Updates (2026-03-31, session 16)
+
+- **Therapist availability grid + autodraft semantics**:
+  - `src/components/availability/TherapistAvailabilityWorkspace.tsx` is a 6-week, cycle-scoped grid: tap cycles **No preference** → **Unavailable** → **Must work** → No preference.
+  - **No preference**: no `availability_overrides` row for that date; autodraft uses pattern/eligibility only (not a scheduling commitment).
+  - **Unavailable**: therapist `force_off` (`shift_type='both'`, `source='therapist'`).
+  - **Must work**: therapist `force_on` — same autodraft prioritization as manager “Will work” (`forcedByManager` in `resolveEligibility` is true for manager **or** therapist `force_on`); auto-generate **forced misses** count both sources (`src/app/schedule/actions.ts`). User-facing copy: `src/lib/schedule-helpers.ts` (`getScheduleFeedback` for `forced_misses`).
+  - Bulk save: `submitTherapistAvailabilityGridAction` in `src/app/availability/actions.ts`; therapist page wires it from `src/app/therapist/availability/page.tsx`.
+  - **Note:** Session 14 bullets below that describe a standalone Lovable-style month calendar on `/therapist/schedule` are **superseded** — that route now redirects to `/coverage?view=week`.
+
+## Latest Updates (2026-03-31, session 15)
+
+- **Unified schedule surface for all roles (working tree)**:
+  - `/coverage?view=week` is now the canonical schedule UI for managers, leads, and therapists.
+  - Compatibility routes now converge to coverage:
+    - `src/app/schedule/page.tsx` redirects authenticated users to `/coverage?view=week` (preserving existing query params).
+    - `src/app/therapist/schedule/page.tsx` redirects to `/coverage?view=week`.
+    - `src/app/staff/schedule/page.tsx` redirects to `/coverage?view=week`.
+  - `src/components/AppShell.tsx` now points staff **My Schedule** to `/coverage?view=week`; lead-only duplicate coverage nav item removed to keep one schedule destination.
+  - `src/app/coverage/page.tsx` now resolves cycle visibility by role:
+    - therapists default to published cycles only
+    - managers/leads continue to use full cycle visibility
+  - `src/components/coverage/CalendarGrid.tsx` now supports view-only status chips when role lacks assignment-status permissions; leads/managers still retain popover status edits where permitted.
 
 ## Latest Updates (2026-03-31, session 14)
 
@@ -379,10 +403,10 @@ Core domains: coverage planning, cycles, availability requests, shift board, app
   - Next pass should be a direct visual rebuild of the `/coverage` shell and day-card composition against the Lovable screenshot/reference.
 
 - Lovable UI is now the baseline visual direction across manager-facing scheduling routes.
-- `/coverage` is the canonical manager scheduling workspace and was restyled to match the new design.
+- `/coverage` is the canonical schedule workspace for all roles and was restyled to match the new design.
 - `/schedule` now acts as a compatibility redirect:
   - managers -> `/coverage`
-  - staff -> `/therapist/schedule`
+  - staff -> `/coverage`
 - Legacy schedule shell components were retired to prevent old UI from rendering:
   - `src/components/AttentionBar.tsx`
   - `src/components/ScheduleHeader.tsx`
@@ -459,7 +483,7 @@ E2E specs:
 - `/dashboard/manager`, `/dashboard/staff`
   - `/dashboard/manager` is now conceptually a manager inbox, not a traditional analytics dashboard
 - `/coverage` dedicated coverage UI (client page, full-width calendar + dialog/popover editing model)
-- `/schedule` role-aware redirect entrypoint (manager -> `/coverage`, staff -> `/therapist/schedule`)
+- `/schedule` compatibility redirect entrypoint -> `/coverage` (all roles)
 - `/approvals`
 - `/availability`
 - `/shift-board`
@@ -540,7 +564,9 @@ Typography classes:
   - inactive/FMLA blocks first
   - manager `force_off` blocks date in that cycle
   - manager `force_on` forces eligibility and is prioritized by auto-draft when legal
-  - therapist `force_off` / `force_on` still affect date eligibility, but manager planner is the strongest operational signal
+  - therapist **No preference** means no row for that date (pattern-only for that day in autodraft)
+  - therapist **Unavailable** → `force_off` (block); therapist **Must work** → `force_on` (autodraft prioritization, same class as manager `force_on` for slot picking and forced-miss reporting)
+  - manager planner is still the strongest operational signal for roster planning
   - fallback to recurring pattern if no override
 - PRN strict policy:
   - eligible only when cycle override `force_on` exists
@@ -596,8 +622,8 @@ Assignment status is informational only (does not affect coverage counts or publ
 
 ## Schedule UX
 
-`/coverage` is the manager editing workspace.
-`/schedule` is retained as a compatibility route and redirects by role.
+`/coverage` is the shared schedule workspace for all roles; actions and edits are permission-gated.
+`/schedule` is retained as a compatibility route and redirects into `/coverage`.
 
 ## Navbar / Branding
 

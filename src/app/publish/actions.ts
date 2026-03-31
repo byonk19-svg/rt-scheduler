@@ -134,7 +134,6 @@ export async function restartPublishedCycleAction(formData: FormData) {
   revalidatePath('/schedule')
   revalidatePath('/preliminary')
   revalidatePath('/approvals')
-  revalidatePath('/therapist/schedule')
 
   redirect('/publish?success=cycle_restarted')
 }

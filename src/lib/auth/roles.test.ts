@@ -47,7 +47,7 @@ describe('toUiRole', () => {
 
   it('returns "therapist" for all non-manager roles', () => {
     expect(toUiRole('therapist')).toBe('therapist')
-    expect(toUiRole('lead')).toBe('therapist')
+    expect(toUiRole('lead')).toBe('lead')
   })
 
   it('returns "therapist" for invalid or unknown values', () => {

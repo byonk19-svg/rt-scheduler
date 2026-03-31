@@ -38,6 +38,7 @@ export type EligibilityResolution = {
   overrideNote?: string | null
   offeredByOverride: boolean
   prnNotOffered: boolean
+  /** True when a `force_on` override should drive auto-draft prioritization (manager or therapist "must work"). */
   forcedByManager: boolean
 }
 
@@ -140,7 +141,8 @@ export function resolveEligibility(params: ResolveEligibilityParams): Eligibilit
     const resolution = buildResolution('override_force_on', {
       overrideNote: override.note ?? null,
     })
-    resolution.forcedByManager = override.source === 'manager'
+    resolution.forcedByManager =
+      override.source === 'manager' || override.source === 'therapist'
     return resolution
   }
 

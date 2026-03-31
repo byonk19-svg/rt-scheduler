@@ -37,6 +37,8 @@ import {
   type UiStatus,
 } from '@/lib/coverage/selectors'
 import { getCoverageStatusLabel } from '@/lib/coverage/status-ui'
+import { can } from '@/lib/auth/can'
+import { parseRole, type Role } from '@/lib/auth/roles'
 import { addDays, dateRange, formatDateLabel, toIsoDate } from '@/lib/calendar-utils'
 import { getOne, getScheduleFeedback, getWeekBoundsForDate } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/client'
@@ -70,6 +72,7 @@ type ShiftRow = {
   date: string
   shift_type: 'day' | 'night'
   status: ShiftStatus
+  assignment_status: AssignmentStatus
   unfilled_reason: string | null
   role: ShiftRole
   profiles:
@@ -129,6 +132,9 @@ function CoveragePageContent() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [error, setError] = useState<string>('')
   const [assignError, setAssignError] = useState<string>('')
+  const [canManageCoverage, setCanManageCoverage] = useState(false)
+  const [canUpdateAssignmentStatus, setCanUpdateAssignmentStatus] = useState(false)
+  const [actorRole, setActorRole] = useState<Role | null>(null)
   const days = shiftTab === 'Day' ? dayDays : nightDays
   const setDays = shiftTab === 'Day' ? setDayDays : setNightDays
   const scheduleFeedbackParams = useMemo<ScheduleSearchParams>(
@@ -205,12 +211,19 @@ function CoveragePageContent() {
     })
   }, [activePreliminarySnapshot])
   const cycleSummaryLabel = useMemo(() => {
-    if (!printCycle) return 'Current 6-week window - Click a day to edit'
+    const editHint = canManageCoverage
+      ? 'Click a day to edit staffing'
+      : canUpdateAssignmentStatus
+        ? 'Click a therapist name to update assignment status'
+        : 'View staffing and assignment status'
+    if (!printCycle) return `Current 6-week window — ${editHint}`
     const totalWeeks = Math.max(1, Math.round((printCycleDates.length || 42) / 7))
-    return `${formatDateLabel(printCycle.start_date)} - ${formatDateLabel(printCycle.end_date)} · ${totalWeeks} weeks · Click a day to edit`
-  }, [printCycle, printCycleDates.length])
+    return `${formatDateLabel(printCycle.start_date)} - ${formatDateLabel(printCycle.end_date)} · ${totalWeeks} weeks — ${editHint}`
+  }, [printCycle, printCycleDates.length, canManageCoverage, canUpdateAssignmentStatus])
 
   const publishedCoverageBanner = useMemo(() => getPublishedCoverageBannerContent(), [])
+
+  const showFullPrintRoster = canManageCoverage || actorRole === 'lead'
 
   useEffect(() => {
     let active = true
@@ -219,6 +232,30 @@ function CoveragePageContent() {
       setError('')
 
       try {
+        const { data: auth } = await supabase.auth.getUser()
+        const uid = auth.user?.id
+        if (!uid) {
+          if (active) setLoading(false)
+          return
+        }
+
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('role, is_active, archived_at')
+          .eq('id', uid)
+          .maybeSingle()
+
+        if (!active) return
+
+        const role = parseRole(prof?.role)
+        const permContext = {
+          isActive: prof?.is_active !== false,
+          archivedAt: prof?.archived_at ?? null,
+        }
+        setActorRole(role)
+        setCanManageCoverage(can(role, 'manage_coverage', permContext))
+        setCanUpdateAssignmentStatus(can(role, 'update_assignment_status', permContext))
+
         const today = new Date()
         const fallbackStartDate = toIsoDate(today)
         const fallbackEndDate = toIsoDate(addDays(today, 42))
@@ -238,10 +275,12 @@ function CoveragePageContent() {
         } else {
           const cycles = (cyclesData ?? []) as CycleRow[]
           const todayKey = toIsoDate(today)
+          const pool = role === 'therapist' ? cycles.filter((row) => row.published) : cycles
+          const fromUrl = cycleFromUrl ? pool.find((row) => row.id === cycleFromUrl) : null
           const cycle =
-            cycles.find((row) => row.id === cycleFromUrl) ??
-            cycles.find((row) => row.start_date <= todayKey && row.end_date >= todayKey) ??
-            cycles[0] ??
+            fromUrl ??
+            pool.find((row) => row.start_date <= todayKey && row.end_date >= todayKey) ??
+            pool[0] ??
             null
           if (cycle) {
             selectedCycle = cycle
@@ -290,7 +329,7 @@ function CoveragePageContent() {
         let shiftsQuery = supabase
           .from('shifts')
           .select(
-            'id,user_id,date,shift_type,status,unfilled_reason,role,profiles:profiles!shifts_user_id_fkey(full_name,employment_type)'
+            'id,user_id,date,shift_type,status,assignment_status,unfilled_reason,role,profiles:profiles!shifts_user_id_fkey(full_name,employment_type)'
           )
           .gte('date', cycleStartDate)
           .lte('date', cycleEndDate)
@@ -400,9 +439,8 @@ function CoveragePageContent() {
           shift_type: row.shift_type,
           role: row.role,
           status: row.status,
-          assignment_status: (activeOperationalCodesByShiftId.get(row.id) ?? null) as
-            | AssignmentStatus
-            | null,
+          assignment_status:
+            activeOperationalCodesByShiftId.get(row.id) ?? row.assignment_status ?? null,
           name: getOne(row.profiles)?.full_name ?? 'Unknown',
         }))
 
@@ -429,9 +467,13 @@ function CoveragePageContent() {
     }
   }, [cycleFromUrl, supabase])
 
-  // Fetch full therapist list once per shift type — not per day click.
+  // Fetch full therapist list once per shift type — not per day click (managers only).
   useEffect(() => {
     let active = true
+    if (!canManageCoverage) {
+      setAllTherapists([])
+      return
+    }
     const shiftType = shiftTab === 'Day' ? 'day' : 'night'
 
     void (async () => {
@@ -474,7 +516,7 @@ function CoveragePageContent() {
     return () => {
       active = false
     }
-  }, [shiftTab, supabase])
+  }, [shiftTab, supabase, canManageCoverage])
 
   const selectedDayBase = useMemo(
     () => days.find((row) => row.id === selectedId) ?? null,
@@ -604,6 +646,7 @@ function CoveragePageContent() {
 
   const handleChangeStatus = useCallback(
     async (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => {
+      if (!canUpdateAssignmentStatus) return
       // Keep callback aligned with the active shift tab setter.
       void shiftTab
       const targetDay = days.find((day) => day.id === dayId)
@@ -696,7 +739,7 @@ function CoveragePageContent() {
         },
       })
     },
-    [days, setDays, shiftTab, supabase]
+    [canUpdateAssignmentStatus, days, setDays, shiftTab, supabase]
   )
 
   const handleUnassign = useCallback(
@@ -749,14 +792,14 @@ function CoveragePageContent() {
         className="no-print"
       >
         <ManagerWorkspaceHeader
-          title="Coverage"
+          title="Schedule"
           subtitle={cycleSummaryLabel}
           summary={
             <>
               <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 font-medium text-foreground">
                 {!loading && issueCount > 0
                   ? `${issueCount} ${issueCount === 1 ? 'issue' : 'issues'}`
-                  : 'Coverage workspace'}
+                  : 'Schedule workspace'}
               </span>
               <span className="text-muted-foreground">
                 {activeCyclePublished ? 'Published to employees' : 'Draft cycle'}
@@ -772,85 +815,98 @@ function CoveragePageContent() {
             </>
           }
           actions={
-            <>
-              <form action={generateDraftScheduleAction}>
-                <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
-                <input type="hidden" name="view" value="week" />
-                <input type="hidden" name="show_unavailable" value="false" />
-                <input type="hidden" name="return_to" value="coverage" />
-                <Button
-                  type="submit"
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 text-xs"
-                  disabled={!activeCycleId || activeCyclePublished}
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Auto-draft
-                </Button>
-              </form>
-              <form action={sendPreliminaryScheduleAction}>
-                <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
-                <input type="hidden" name="view" value="week" />
-                <input type="hidden" name="show_unavailable" value="false" />
-                <input type="hidden" name="return_to" value="coverage" />
-                <Button
-                  type="submit"
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 text-xs"
-                  disabled={!activeCycleId || activeCyclePublished}
-                >
-                  <Send className="h-3.5 w-3.5" />
-                  {preliminaryLive ? 'Refresh preliminary' : 'Send preliminary'}
-                </Button>
-              </form>
-              <form action={toggleCyclePublishedAction}>
-                <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
-                <input type="hidden" name="view" value="week" />
-                <input type="hidden" name="show_unavailable" value="false" />
-                <input
-                  type="hidden"
-                  name="currently_published"
-                  value={activeCyclePublished ? 'true' : 'false'}
-                />
-                <input type="hidden" name="override_weekly_rules" value="false" />
-                <input type="hidden" name="override_shift_rules" value="false" />
-                <input type="hidden" name="return_to" value="coverage" />
-                <Button
-                  type="submit"
-                  size="sm"
-                  className="gap-1.5 text-xs"
-                  disabled={!activeCycleId || activeCyclePublished}
-                >
-                  <Send className="h-3.5 w-3.5" />
-                  {activeCyclePublished ? 'Published' : 'Publish'}
-                </Button>
-              </form>
-              <MoreActionsMenu>
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
-                >
-                  <Printer className="h-3.5 w-3.5" />
-                  Print
-                </button>
-                <form action={resetDraftScheduleAction}>
+            canManageCoverage ? (
+              <>
+                <form action={generateDraftScheduleAction}>
                   <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
                   <input type="hidden" name="view" value="week" />
                   <input type="hidden" name="show_unavailable" value="false" />
                   <input type="hidden" name="return_to" value="coverage" />
-                  <button
+                  <Button
                     type="submit"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs"
                     disabled={!activeCycleId || activeCyclePublished}
-                    className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm text-[var(--error-text)] hover:bg-secondary disabled:opacity-50"
                   >
-                    Clear draft
-                  </button>
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Auto-draft
+                  </Button>
                 </form>
-              </MoreActionsMenu>
-            </>
+                <form action={sendPreliminaryScheduleAction}>
+                  <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+                  <input type="hidden" name="view" value="week" />
+                  <input type="hidden" name="show_unavailable" value="false" />
+                  <input type="hidden" name="return_to" value="coverage" />
+                  <Button
+                    type="submit"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs"
+                    disabled={!activeCycleId || activeCyclePublished}
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    {preliminaryLive ? 'Refresh preliminary' : 'Send preliminary'}
+                  </Button>
+                </form>
+                <form action={toggleCyclePublishedAction}>
+                  <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+                  <input type="hidden" name="view" value="week" />
+                  <input type="hidden" name="show_unavailable" value="false" />
+                  <input
+                    type="hidden"
+                    name="currently_published"
+                    value={activeCyclePublished ? 'true' : 'false'}
+                  />
+                  <input type="hidden" name="override_weekly_rules" value="false" />
+                  <input type="hidden" name="override_shift_rules" value="false" />
+                  <input type="hidden" name="return_to" value="coverage" />
+                  <Button
+                    type="submit"
+                    size="sm"
+                    className="gap-1.5 text-xs"
+                    disabled={!activeCycleId || activeCyclePublished}
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    {activeCyclePublished ? 'Published' : 'Publish'}
+                  </Button>
+                </form>
+                <MoreActionsMenu>
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
+                  >
+                    <Printer className="h-3.5 w-3.5" />
+                    Print
+                  </button>
+                  <form action={resetDraftScheduleAction}>
+                    <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+                    <input type="hidden" name="view" value="week" />
+                    <input type="hidden" name="show_unavailable" value="false" />
+                    <input type="hidden" name="return_to" value="coverage" />
+                    <button
+                      type="submit"
+                      disabled={!activeCycleId || activeCyclePublished}
+                      className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm text-[var(--error-text)] hover:bg-secondary disabled:opacity-50"
+                    >
+                      Clear draft
+                    </button>
+                  </form>
+                </MoreActionsMenu>
+              </>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs"
+                onClick={() => window.print()}
+              >
+                <Printer className="h-3.5 w-3.5" />
+                Print
+              </Button>
+            )
           }
         />
 
@@ -951,7 +1007,7 @@ function CoveragePageContent() {
             {publishErrorMessage}
           </p>
         )}
-        {publishOverrideConfig && !activeCyclePublished && (
+        {canManageCoverage && publishOverrideConfig && !activeCyclePublished && (
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-4 py-3">
             <div>
               <p className="text-xs font-semibold text-[var(--warning-text)]">
@@ -1017,6 +1073,8 @@ function CoveragePageContent() {
           days={days}
           loading={loading}
           selectedId={selectedId}
+          schedulingViewOnly={!canManageCoverage}
+          allowAssignmentStatusEdits={canUpdateAssignmentStatus}
           onSelect={handleSelect}
           onChangeStatus={handleChangeStatus}
         />
@@ -1026,7 +1084,8 @@ function CoveragePageContent() {
         open={Boolean(selectedDay)}
         selectedDay={selectedDay}
         therapists={allTherapists}
-        canEdit={Boolean(activeCycleId)}
+        canEdit={Boolean(canManageCoverage && activeCycleId)}
+        coverageCycleId={activeCycleId}
         isPastDate={isPastDate}
         hasOperationalEntries={hasOperationalEntries}
         assigning={assigning}
@@ -1046,7 +1105,7 @@ function CoveragePageContent() {
         nightTeam={printNightTeam}
         printUsers={printUsers}
         shiftByUserDate={printShiftByUserDate}
-        isManager
+        isManager={showFullPrintRoster}
       />
     </div>
   )

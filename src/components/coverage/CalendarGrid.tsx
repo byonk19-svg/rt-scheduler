@@ -16,6 +16,10 @@ type CalendarGridProps = {
   days: DayItem[]
   loading: boolean
   selectedId: string | null
+  /** When false, day cell uses a "view" aria label (no staffing edits). */
+  schedulingViewOnly?: boolean
+  /** When false, assignment status chips are display-only (no status popover). */
+  allowAssignmentStatusEdits?: boolean
   onSelect: (id: string) => void
   onChangeStatus: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
 }
@@ -46,6 +50,8 @@ export function CalendarGrid({
   days,
   loading,
   selectedId,
+  schedulingViewOnly = false,
+  allowAssignmentStatusEdits = true,
   onSelect,
   onChangeStatus,
 }: CalendarGridProps) {
@@ -107,7 +113,7 @@ export function CalendarGrid({
                           type="button"
                           tabIndex={0}
                           data-testid={`coverage-day-cell-button-${day.id}`}
-                          aria-label={`Edit ${day.label}`}
+                          aria-label={`${schedulingViewOnly ? 'View' : 'Edit'} ${day.label}`}
                           className="absolute inset-0 rounded-[20px]"
                           onClick={() => onSelect(day.id)}
                         />
@@ -155,18 +161,31 @@ export function CalendarGrid({
                             LEAD
                           </p>
                           {day.leadShift ? (
-                            <AssignmentStatusPopover
-                              therapistName={day.leadShift.name}
-                              currentStatus={day.leadShift.status}
-                              isLead
-                              triggerTestId={`coverage-assignment-trigger-${day.id}-${day.leadShift.userId}`}
-                              onChangeStatus={(nextStatus) =>
-                                onChangeStatus(day.id, day.leadShift!.id, true, nextStatus)
-                              }
-                            >
+                            allowAssignmentStatusEdits ? (
+                              <AssignmentStatusPopover
+                                therapistName={day.leadShift.name}
+                                currentStatus={day.leadShift.status}
+                                isLead
+                                triggerTestId={`coverage-assignment-trigger-${day.id}-${day.leadShift.userId}`}
+                                onChangeStatus={(nextStatus) =>
+                                  onChangeStatus(day.id, day.leadShift!.id, true, nextStatus)
+                                }
+                              >
+                                <span
+                                  className={cn(
+                                    'mt-0.5 inline-flex items-center gap-1.25 text-[0.68rem] font-semibold leading-tight',
+                                    isUnavailableStatus(day.leadShift.status) &&
+                                      'line-through decoration-[var(--error-text)]/50'
+                                  )}
+                                >
+                                  <span>{compactName(day.leadShift.name)}</span>
+                                  <StatusPill status={day.leadShift.status} />
+                                </span>
+                              </AssignmentStatusPopover>
+                            ) : (
                               <span
                                 className={cn(
-                                  'mt-0.5 inline-flex items-center gap-1.25 text-[0.68rem] font-semibold leading-tight',
+                                  'pointer-events-auto mt-0.5 inline-flex items-center gap-1.25 text-[0.68rem] font-semibold leading-tight',
                                   isUnavailableStatus(day.leadShift.status) &&
                                     'line-through decoration-[var(--error-text)]/50'
                                 )}
@@ -174,7 +193,7 @@ export function CalendarGrid({
                                 <span>{compactName(day.leadShift.name)}</span>
                                 <StatusPill status={day.leadShift.status} />
                               </span>
-                            </AssignmentStatusPopover>
+                            )
                           ) : (
                             <p className="mt-0.5 text-[0.68rem] font-semibold leading-tight">
                               No lead assigned
@@ -191,17 +210,30 @@ export function CalendarGrid({
                         <div className="mt-2 space-y-1">
                           {day.staffShifts.map((shift) => (
                             <div key={shift.id} className="flex items-center gap-1 text-[0.66rem]">
-                              <AssignmentStatusPopover
-                                therapistName={shift.name}
-                                currentStatus={shift.status}
-                                triggerTestId={`coverage-assignment-trigger-${day.id}-${shift.userId}`}
-                                onChangeStatus={(nextStatus) =>
-                                  onChangeStatus(day.id, shift.id, false, nextStatus)
-                                }
-                              >
+                              {allowAssignmentStatusEdits ? (
+                                <AssignmentStatusPopover
+                                  therapistName={shift.name}
+                                  currentStatus={shift.status}
+                                  triggerTestId={`coverage-assignment-trigger-${day.id}-${shift.userId}`}
+                                  onChangeStatus={(nextStatus) =>
+                                    onChangeStatus(day.id, shift.id, false, nextStatus)
+                                  }
+                                >
+                                  <span
+                                    className={cn(
+                                      'inline-flex items-center gap-1 text-[0.66rem] text-muted-foreground/90',
+                                      isUnavailableStatus(shift.status) &&
+                                        'line-through decoration-[var(--error-text)]/50'
+                                    )}
+                                  >
+                                    <span>{compactName(shift.name)}</span>
+                                    <StatusPill status={shift.status} />
+                                  </span>
+                                </AssignmentStatusPopover>
+                              ) : (
                                 <span
                                   className={cn(
-                                    'inline-flex items-center gap-1 text-[0.66rem] text-muted-foreground/90',
+                                    'pointer-events-auto inline-flex items-center gap-1 text-[0.66rem] text-muted-foreground/90',
                                     isUnavailableStatus(shift.status) &&
                                       'line-through decoration-[var(--error-text)]/50'
                                   )}
@@ -209,7 +241,7 @@ export function CalendarGrid({
                                   <span>{compactName(shift.name)}</span>
                                   <StatusPill status={shift.status} />
                                 </span>
-                              </AssignmentStatusPopover>
+                              )}
                               {shift.status === 'leave_early' && (
                                 <AlertTriangle className="h-4 w-4 text-[var(--warning-text)]" aria-hidden="true" />
                               )}

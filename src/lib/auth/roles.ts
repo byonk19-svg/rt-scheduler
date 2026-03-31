@@ -3,7 +3,7 @@ export const TEAM_MEMBER_ROLE_VALUES = ['therapist', 'lead'] as const
 export const MANAGED_TEAM_ROLE_VALUES = ['manager', 'therapist', 'lead'] as const
 
 export type Role = (typeof ROLE_VALUES)[number]
-export type UiRole = 'manager' | 'therapist'
+export type UiRole = 'manager' | 'therapist' | 'lead'
 
 export function isRole(value: unknown): value is Role {
   return typeof value === 'string' && ROLE_VALUES.includes(value as Role)
@@ -15,5 +15,8 @@ export function parseRole(value: unknown): Role | null {
 }
 
 export function toUiRole(value: unknown): UiRole {
-  return parseRole(value) === 'manager' ? 'manager' : 'therapist'
+  const role = parseRole(value)
+  if (role === 'manager') return 'manager'
+  if (role === 'lead') return 'lead'
+  return 'therapist'
 }

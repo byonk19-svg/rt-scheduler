@@ -648,11 +648,11 @@ export default function ShiftBoardPage() {
   )
 
   return (
-    <div className="space-y-6">
-      <div className="border-b border-border bg-card px-6 pb-4 pt-5">
+    <div className="space-y-5">
+      <div className="rounded-2xl border border-border/70 bg-card px-6 pb-4 pt-5 shadow-[0_1px_10px_rgba(15,23,42,0.05)]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">
+            <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
               Shift Board
             </h1>
             <p className="mt-0.5 text-xs text-muted-foreground">
@@ -660,6 +660,19 @@ export default function ShiftBoardPage() {
                 ? 'Review and approve swap and pickup requests in the live schedule.'
                 : 'Post swaps or pickups for the published schedule only.'}
             </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+              <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5 text-muted-foreground">
+                {loading ? '--' : openPostCount} open
+              </span>
+              <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5 text-muted-foreground">
+                {loading ? '--' : pending} pending
+              </span>
+              {canReview ? (
+                <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[var(--warning-text)]">
+                  {loading ? '--' : metrics.unfilled + metrics.missingLead} needs attention
+                </span>
+              ) : null}
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -776,7 +789,7 @@ export default function ShiftBoardPage() {
             type="button"
             onClick={() => setActiveTab(tab.id)}
             className={cn(
-              'rounded-lg border px-4 py-2 text-sm font-semibold transition-colors',
+              'h-9 rounded-lg border px-4 text-sm font-semibold transition-colors',
               activeTab === tab.id
                 ? 'border-primary bg-primary/5 text-primary'
                 : 'border-border bg-card text-muted-foreground hover:bg-secondary'
@@ -992,7 +1005,7 @@ function FilterPill({
       type="button"
       onClick={onClick}
       className={cn(
-        'rounded-md border px-3 py-1 text-xs font-semibold transition-colors',
+        'h-9 rounded-md border px-3 text-xs font-semibold transition-colors',
         active
           ? 'border-primary bg-primary/10 text-primary shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--primary)_35%,transparent)]'
           : 'border-border bg-card text-muted-foreground hover:bg-secondary'
