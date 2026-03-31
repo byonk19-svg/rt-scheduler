@@ -21,13 +21,13 @@ Last verified on branch `codex/prd-v5-1-gap-fixes`:
 - `npm run lint` passed
 - `npx tsc --noEmit` passed
 - `npm run test:unit` passed (`340` tests)
-- `npm run test:e2e` passed for active suites (`19` passed, `13` skipped)
+- `npm run test:e2e` passed for active suites (`23` passed, `1` skipped)
 
 ## Known Exceptions / Gaps
 
-- `e2e/directory-date-override.spec.ts` is intentionally skipped.
-- Reason: current `/directory` route now renders the team-management UI surface, so the legacy directory override interaction path covered by that suite is no longer executable as written.
-- If date-override UX is reintroduced, this suite should be rebuilt against the current UI contracts before unskipping.
+- `e2e/directory-date-override.spec.ts` was removed.
+- Reason: current `/directory` route renders the team-management UI surface, so the legacy directory override interaction path covered by that suite is no longer executable as written.
+- If date-override UX is reintroduced, rebuild E2E coverage against current route ownership and UI contracts.
 
 ## Risk Notes
 
