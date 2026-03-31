@@ -13,15 +13,16 @@
 - Scheduling mutation APIs enforce role checks and trusted-request origin checks.
 - Manager workflow logic is centralized in `src/lib/manager-workflow.ts`.
 - Coverage assignment behavior is centralized in `src/lib/coverage/*` with server mutation endpoints in `src/app/api/schedule/*`.
+- Designated-lead role guards in app code and SQL mutation eligibility now both accept `therapist` and `lead` roles (with `is_lead_eligible=true` still required).
 
 ## Quality Status
 
-Last verified on branch `codex/prd-v5-1-gap-fixes`:
+Last verified on branch `main`:
 
 - `npm run lint` passed
 - `npx tsc --noEmit` passed
-- `npm run test:unit` passed (`340` tests)
-- `npm run test:e2e` passed for active suites (`23` passed, `1` skipped)
+- `npm run test:unit` passed (`341` tests)
+- `npx playwright test --workers=1` passed for active suites (`23` passed, `1` skipped)
 
 ## Known Exceptions / Gaps
 
@@ -32,10 +33,11 @@ Last verified on branch `codex/prd-v5-1-gap-fixes`:
 ## Risk Notes
 
 - E2E tests use a live app server and Supabase-seeded data; timing and environment isolation are the primary reliability risk.
+- Parallel Playwright workers can intermittently trigger seeded-user FK race conditions in manager planner E2E setup; serial execution (`--workers=1`) is currently the stable verification lane.
 - Mutation trust boundaries depend on origin/referer checks; local loopback alias handling (`localhost`, `127.0.0.1`, `[::1]`) is now normalized and should remain covered by tests.
 
 ## Suggested Next Maintenance Steps
 
 1. Decide whether date-override belongs in `/directory`, `/team`, or another dedicated manager surface.
-2. Replace skipped legacy e2e coverage with updated route-accurate tests.
+2. Keep route-level manager/staff scoping behavior covered in live `/shift-board` tests as the page evolves.
 3. Keep PRD/workflow docs in `docs/superpowers/plans/` aligned with actual route ownership as UI surfaces evolve.

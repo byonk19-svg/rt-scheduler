@@ -1,6 +1,37 @@
 # Teamwise Scheduler
 
-Updated: 2026-03-26 (session 11)
+Updated: 2026-03-31 (session 12)
+
+## Latest Updates (2026-03-31, session 13)
+
+- **Review-follow-up fixes shipped on `main` (`6cac461`)**:
+  - Closed designated-lead role mismatch across app + SQL layers:
+    - App guards already accepted `role in ('therapist','lead')` with `is_lead_eligible=true`
+    - SQL function now matches that contract via new migration:
+      - `supabase/migrations/20260331130500_allow_lead_role_in_set_designated_shift_lead.sql`
+      - `set_designated_shift_lead` now checks `p.role in ('therapist','lead')`
+  - Removed the false-positive route-test boundary for designated lead:
+    - `src/app/api/schedule/drag-drop/route.test.ts` no longer mocks `setDesignatedLeadMutation`
+    - conflict behavior is now exercised through mocked RPC error responses (`23505`) instead of mocking away the mutation contract
+  - Applied staff `mine/all` scope behavior in the **live** shift-board surface:
+    - `src/app/shift-board/page.tsx` now tracks current user id and filters staff scope by own/claimed posts
+    - adds explicit `My Requests` / `All Posts` controls for staff users in the active page UI
+
+## Latest Updates (2026-03-31, session 12)
+
+- **Role-model consistency fix for designated lead flows (shipped)**:
+  - Landed on `main` as `2a884c8` (`Allow lead role in designated-lead workflows and align shift board staff scoping`); pushed to `byonk19-svg/rt-scheduler`.
+  - `lead` app-role users are now accepted in designated-lead assignment guards (still requires `is_lead_eligible=true`) in:
+    - `src/app/api/schedule/drag-drop/route.ts`
+    - `src/app/schedule/actions.ts`
+  - Shift Board staff scoping no longer uses therapist-only checks; it now uses capability-based staff detection so non-manager staff get consistent `mine/all` behavior:
+    - `src/app/shift-board/shift-posts-table.tsx`
+  - Regression coverage added for lead-role designated-lead assignment:
+    - `src/app/api/schedule/drag-drop/route.test.ts`
+  - Verification in-session:
+    - `npm run test:unit -- src/app/api/schedule/drag-drop/route.test.ts` passed
+    - `npm run ci:local:quick` passed
+    - `npm run test:unit` passed (**341 tests**)
 
 ## Latest Updates (2026-03-26, session 11)
 
