@@ -8,6 +8,6 @@ test('login page renders', async ({ page }) => {
 
 test('signup page renders', async ({ page }) => {
   await page.goto('/signup')
-  await expect(page.getByText('Join Teamwise to manage schedules and coverage.')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Request Access' })).toBeVisible()
+  await expect(page.getByText('Create your employee account')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Create account' })).toBeVisible()
 })

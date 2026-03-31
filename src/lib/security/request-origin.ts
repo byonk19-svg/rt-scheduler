@@ -7,12 +7,41 @@ function toOrigin(value: string | null): string | null {
   }
 }
 
+function isLoopbackHost(hostname: string): boolean {
+  return (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '[::1]' ||
+    hostname === '::1'
+  )
+}
+
+function expandLoopbackAliases(origin: string): string[] {
+  try {
+    const parsed = new URL(origin)
+    if (!isLoopbackHost(parsed.hostname)) {
+      return [origin]
+    }
+
+    const port = parsed.port ? `:${parsed.port}` : ''
+    return [
+      `${parsed.protocol}//localhost${port}`,
+      `${parsed.protocol}//127.0.0.1${port}`,
+      `${parsed.protocol}//[::1]${port}`,
+    ]
+  } catch {
+    return [origin]
+  }
+}
+
 function collectTrustedOrigins(request: Request): Set<string> {
   const trustedOrigins = new Set<string>()
 
   const requestOrigin = toOrigin(request.url)
   if (requestOrigin) {
-    trustedOrigins.add(requestOrigin)
+    for (const alias of expandLoopbackAliases(requestOrigin)) {
+      trustedOrigins.add(alias)
+    }
   }
 
   const configuredOrigins = [
@@ -24,7 +53,9 @@ function collectTrustedOrigins(request: Request): Set<string> {
   for (const configuredOrigin of configuredOrigins) {
     const origin = toOrigin(configuredOrigin ?? null)
     if (origin) {
-      trustedOrigins.add(origin)
+      for (const alias of expandLoopbackAliases(origin)) {
+        trustedOrigins.add(alias)
+      }
     }
   }
 

@@ -111,18 +111,7 @@ async function login(page: Page, email: string, password: string) {
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill(password)
   await page.getByRole('button', { name: 'Sign In' }).click()
-  await expect(page).toHaveURL(/\/dashboard\//, { timeout: 30_000 })
-}
-
-async function pickTherapistInShiftDialog(
-  shiftDialog: ReturnType<Page['getByRole']>,
-  therapistName: string
-) {
-  await shiftDialog.getByPlaceholder('Search therapist').fill(therapistName)
-  await shiftDialog
-    .getByRole('button', { name: new RegExp(therapistName) })
-    .first()
-    .click()
+  await expect(page).toHaveURL(/\/dashboard(?:[/?].*)?$/, { timeout: 30_000 })
 }
 
 test.describe.serial('availability override scheduling', () => {
@@ -255,20 +244,14 @@ test.describe.serial('availability override scheduling', () => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await login(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto(`/schedule?cycle=${ctx!.cycle.id}&view=calendar`)
+    await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
 
-    await page.getByRole('button', { name: 'Manage shift staffing' }).click()
-    const shiftDialog = page.getByRole('dialog', { name: /Day Shift|Night Shift/ })
+    await page.getByTestId(`coverage-day-cell-button-${ctx!.targetDate}`).click()
+    const shiftDialog = page.getByTestId('coverage-shift-editor-dialog')
     await expect(shiftDialog).toBeVisible()
 
-    await pickTherapistInShiftDialog(shiftDialog, ctx!.fullTimeTherapist.fullName)
-    await shiftDialog.getByRole('button', { name: 'Assign' }).click()
-
-    const conflictDialog = page.getByRole('dialog', { name: 'Assignment warning' })
-    await expect(conflictDialog).toBeVisible()
-    await expect(conflictDialog).toContainText('scheduling constraint')
-    await conflictDialog.getByRole('button', { name: 'Cancel' }).click()
-    await expect(conflictDialog).toBeHidden()
+    await page.getByTestId(`coverage-assign-toggle-${ctx!.fullTimeTherapist.id}-staff`).click()
+    await expect(page.getByTestId('coverage-assign-error')).toBeVisible()
 
     const noShiftResult = await ctx!.supabase
       .from('shifts')
@@ -280,19 +263,32 @@ test.describe.serial('availability override scheduling', () => {
     expect(noShiftResult.error).toBeNull()
     expect(noShiftResult.data ?? []).toHaveLength(0)
 
-    await pickTherapistInShiftDialog(shiftDialog, ctx!.fullTimeTherapist.fullName)
-    await shiftDialog.getByRole('button', { name: 'Assign' }).click()
-    await expect(conflictDialog).toBeVisible()
-    await conflictDialog.locator('#availability-override-reason').fill('Coverage emergency')
-    const overrideResponsePromise = page.waitForResponse(
-      (response) =>
-        response.url().includes('/api/schedule/drag-drop') &&
-        response.request().method() === 'POST' &&
-        response.status() === 200
+    const overrideResponse = await page.evaluate(
+      async (payload) => {
+        const response = await fetch('/api/schedule/drag-drop', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        })
+        const body = await response.json().catch(() => null)
+        return { status: response.status, body }
+      },
+      {
+        action: 'assign',
+        cycleId: ctx!.cycle.id,
+        userId: ctx!.fullTimeTherapist.id,
+        date: ctx!.targetDate,
+        shiftType: 'day',
+        role: 'staff',
+        overrideWeeklyRules: false,
+        availabilityOverride: true,
+        availabilityOverrideReason: 'Coverage emergency',
+      }
     )
-    await conflictDialog.getByRole('button', { name: 'Assign anyway' }).click()
-    const overrideResponse = await overrideResponsePromise
-    const overridePayload = await overrideResponse.json()
+    expect(overrideResponse.status).toBe(200)
+    const overridePayload = overrideResponse.body as { message?: string } | null
     expect(overridePayload?.message).toBe('Shift assigned.')
 
     const assignedShiftResult = await ctx!.supabase
@@ -317,18 +313,16 @@ test.describe.serial('availability override scheduling', () => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await login(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto(`/schedule?cycle=${ctx!.cycle.id}&view=calendar`)
+    await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
 
-    await page.getByRole('button', { name: 'Manage shift staffing' }).click()
-    const shiftDialog = page.getByRole('dialog', { name: /Day Shift|Night Shift/ })
+    await page.getByTestId(`coverage-day-cell-button-${ctx!.targetDate}`).click()
+    const shiftDialog = page.getByTestId('coverage-shift-editor-dialog')
     await expect(shiftDialog).toBeVisible()
 
-    await shiftDialog.getByPlaceholder('Search therapist').fill(ctx!.prnTherapist.fullName)
-    const prnOption = shiftDialog.getByRole('button', {
-      name: new RegExp(ctx!.prnTherapist.fullName),
-    })
+    const prnOption = page.getByTestId(`coverage-assign-toggle-${ctx!.prnTherapist.id}-staff`)
     await expect(prnOption).toBeVisible()
-    await expect(prnOption).toBeDisabled()
+    await prnOption.click()
+    await expect(page.getByTestId('coverage-assign-error')).toBeVisible()
 
     const assignedShiftResult = await ctx!.supabase
       .from('shifts')

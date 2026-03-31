@@ -341,11 +341,46 @@ test.describe.serial('coverage manager dialog interactions', () => {
     await waitForCalendar(page, ctx!.assignDate)
     await openShiftEditor(page, ctx!.assignDate)
 
-    await expect(dayCell(page, ctx!.assignDate)).toContainText('0/0')
-    await page.getByTestId(`coverage-assign-toggle-${ctx!.therapist3.id}-staff`).click()
-    await expect(dayCell(page, ctx!.assignDate)).toContainText('1/1')
+    await expect(
+      page.getByTestId(`coverage-assign-toggle-${ctx!.therapist2.id}-staff`)
+    ).toBeVisible()
+    await page.getByTestId(`coverage-assign-toggle-${ctx!.therapist2.id}-staff`).click()
+    const unassignButton = page.getByRole('button', {
+      name: `Unassign ${ctx!.therapist2.fullName}`,
+    })
+    await expect(unassignButton).toBeVisible()
 
-    await page.getByRole('button', { name: `Unassign ${ctx!.therapist3.fullName}` }).click()
-    await expect(dayCell(page, ctx!.assignDate)).toContainText('0/0')
+    await expect
+      .poll(async () => {
+        const result = await ctx!.supabase
+          .from('shifts')
+          .select('id')
+          .eq('cycle_id', ctx!.cycle.id)
+          .eq('user_id', ctx!.therapist2.id)
+          .eq('date', ctx!.assignDate)
+          .eq('shift_type', 'day')
+        if (result.error) throw new Error(result.error.message)
+        return result.data?.length ?? 0
+      })
+      .toBe(1)
+
+    await unassignButton.click()
+    await expect(
+      page.getByTestId(`coverage-assign-toggle-${ctx!.therapist2.id}-staff`)
+    ).toBeVisible()
+
+    await expect
+      .poll(async () => {
+        const result = await ctx!.supabase
+          .from('shifts')
+          .select('id')
+          .eq('cycle_id', ctx!.cycle.id)
+          .eq('user_id', ctx!.therapist2.id)
+          .eq('date', ctx!.assignDate)
+          .eq('shift_type', 'day')
+        if (result.error) throw new Error(result.error.message)
+        return result.data?.length ?? 0
+      })
+      .toBe(0)
   })
 })

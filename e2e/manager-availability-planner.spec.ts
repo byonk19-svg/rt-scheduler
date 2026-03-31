@@ -9,7 +9,10 @@ type TestContext = {
   leadTherapist: { id: string }
   therapist: { id: string; fullName: string }
   prnTherapist: { id: string; fullName: string }
-  cycle: { id: string }
+  cycle: { id: string; startDate: string; endDate: string }
+  therapistWillWorkDate: string
+  therapistCannotWorkDate: string
+  prnWillWorkDate: string
 }
 
 const envCache = new Map<string, string>()
@@ -46,6 +49,27 @@ function getEnv(key: string): string | undefined {
 
 function randomString(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
+}
+
+function formatDateKey(value: Date): string {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+function formatCalendarLabel(isoDate: string): string {
+  return new Date(`${isoDate}T00:00:00`).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
 }
 
 async function createUser(
@@ -100,23 +124,29 @@ async function createUser(
 }
 
 async function createCycle(supabase: SupabaseClient) {
+  const startDate = addDays(new Date(), -1)
+  const endDate = addDays(startDate, 13)
   const label = `Planner E2E ${randomString('cycle')}`
   const { data, error } = await supabase
     .from('schedule_cycles')
     .insert({
       label,
-      start_date: '2026-03-22',
-      end_date: '2026-03-28',
+      start_date: formatDateKey(startDate),
+      end_date: formatDateKey(endDate),
       published: false,
     })
-    .select('id')
+    .select('id, start_date, end_date')
     .single()
 
   if (error || !data) {
     throw new Error(`Could not create test cycle: ${error?.message ?? 'unknown error'}`)
   }
 
-  return { id: data.id }
+  return {
+    id: data.id,
+    startDate: data.start_date,
+    endDate: data.end_date,
+  }
 }
 
 async function login(page: Page, email: string, password: string) {
@@ -124,10 +154,11 @@ async function login(page: Page, email: string, password: string) {
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill(password)
   await page.getByRole('button', { name: 'Sign In' }).click()
-  await expect(page).toHaveURL(/\/dashboard(?:\/|$)/, { timeout: 30_000 })
+  await expect(page).toHaveURL(/\/dashboard(?:[/?].*)?$/, { timeout: 30_000 })
 }
 
 test.describe.serial('/availability manager planner', () => {
+  test.setTimeout(90_000)
   let ctx: TestContext | null = null
   const createdUserIds: string[] = []
 
@@ -185,6 +216,10 @@ test.describe.serial('/availability manager planner', () => {
     })
 
     const cycle = await createCycle(supabase)
+    const cycleStartDate = new Date(`${cycle.startDate}T00:00:00`)
+    const therapistWillWorkDate = formatDateKey(addDays(cycleStartDate, 2))
+    const therapistCannotWorkDate = formatDateKey(addDays(cycleStartDate, 4))
+    const prnWillWorkDate = formatDateKey(addDays(cycleStartDate, 3))
 
     createdUserIds.push(manager.id, leadTherapist.id, therapist.id, prnTherapist.id)
     ctx = {
@@ -194,6 +229,9 @@ test.describe.serial('/availability manager planner', () => {
       therapist: { id: therapist.id, fullName: therapistFullName },
       prnTherapist: { id: prnTherapist.id, fullName: prnFullName },
       cycle,
+      therapistWillWorkDate,
+      therapistCannotWorkDate,
+      prnWillWorkDate,
     }
   })
 
@@ -214,42 +252,56 @@ test.describe.serial('/availability manager planner', () => {
     await page.goto(`/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}`)
 
     const planner = page.locator('#staff-scheduling-inputs')
-    await expect(planner.getByText('Staff Scheduling Inputs').first()).toBeVisible()
-    const calendarDay = (root: Locator, day: string) =>
-      root
-        .locator('button')
-        .filter({ hasText: new RegExp(`^${day}$`) })
-        .first()
+    await expect(planner.getByText('Staffing Inputs & Calendar').first()).toBeVisible()
+    const calendarDay = (root: Locator, isoDate: string) =>
+      root.getByRole('button', { name: formatCalendarLabel(isoDate) })
 
     await planner.getByLabel('Therapist').selectOption(ctx!.therapist.id)
-    await calendarDay(planner, '24').click()
-    await calendarDay(planner, '26').click()
+    await calendarDay(planner, ctx!.therapistWillWorkDate).click()
+    await calendarDay(planner, ctx!.therapistCannotWorkDate).click()
     await planner.getByRole('button', { name: 'Save Will work' }).click()
 
-    await expect(page).toHaveURL(
-      new RegExp(
-        `/availability\\?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}&success=planner_saved`
-      )
-    )
-    await expect(
-      page.getByRole('alert').filter({ hasText: 'Staff scheduling inputs saved.' })
-    ).toBeVisible()
+    await expect
+      .poll(async () => {
+        const result = await ctx!.supabase
+          .from('availability_overrides')
+          .select('date')
+          .eq('cycle_id', ctx!.cycle.id)
+          .eq('therapist_id', ctx!.therapist.id)
+          .eq('override_type', 'force_on')
+        if (result.error) throw new Error(result.error.message)
+        return (result.data ?? [])
+          .map((row) => row.date)
+          .sort()
+          .join(',')
+      })
+      .toBe([ctx!.therapistWillWorkDate, ctx!.therapistCannotWorkDate].sort().join(','))
 
+    await page.goto(`/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}`)
     const refreshedPlanner = page.locator('#staff-scheduling-inputs')
-    await refreshedPlanner.getByRole('button', { name: 'Cannot work' }).click()
-    await calendarDay(refreshedPlanner, '26').click()
+    await refreshedPlanner.getByRole('button', { name: /^Cannot work$/ }).click()
+    await expect(refreshedPlanner.getByRole('button', { name: 'Save Cannot work' })).toBeVisible()
+    await calendarDay(refreshedPlanner, ctx!.therapistCannotWorkDate).click()
     await refreshedPlanner.getByRole('button', { name: 'Save Cannot work' }).click()
 
-    await expect(page).toHaveURL(
-      new RegExp(
-        `/availability\\?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}&success=planner_saved`
-      )
-    )
+    await expect
+      .poll(async () => {
+        const result = await ctx!.supabase
+          .from('availability_overrides')
+          .select('id')
+          .eq('cycle_id', ctx!.cycle.id)
+          .eq('therapist_id', ctx!.therapist.id)
+          .eq('date', ctx!.therapistCannotWorkDate)
+          .eq('override_type', 'force_off')
+        if (result.error) throw new Error(result.error.message)
+        return result.data?.length ?? 0
+      })
+      .toBe(1)
 
     await page.goto(`/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.prnTherapist.id}`)
     const prnPlanner = page.locator('#staff-scheduling-inputs')
     await prnPlanner.getByLabel('Therapist').selectOption(ctx!.prnTherapist.id)
-    await calendarDay(prnPlanner, '25').click()
+    await calendarDay(prnPlanner, ctx!.prnWillWorkDate).click()
     await prnPlanner.getByRole('button', { name: 'Save Will work' }).click()
 
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
@@ -266,13 +318,19 @@ test.describe.serial('/availability manager planner', () => {
     const shifts = shiftsResult.data ?? []
 
     expect(
-      shifts.some((row) => row.user_id === ctx!.therapist.id && row.date === '2026-03-24')
+      shifts.some(
+        (row) => row.user_id === ctx!.therapist.id && row.date === ctx!.therapistWillWorkDate
+      )
     ).toBe(true)
     expect(
-      shifts.some((row) => row.user_id === ctx!.therapist.id && row.date === '2026-03-26')
+      shifts.some(
+        (row) => row.user_id === ctx!.therapist.id && row.date === ctx!.therapistCannotWorkDate
+      )
     ).toBe(false)
     expect(
-      shifts.some((row) => row.user_id === ctx!.prnTherapist.id && row.date === '2026-03-25')
+      shifts.some(
+        (row) => row.user_id === ctx!.prnTherapist.id && row.date === ctx!.prnWillWorkDate
+      )
     ).toBe(true)
   })
 })

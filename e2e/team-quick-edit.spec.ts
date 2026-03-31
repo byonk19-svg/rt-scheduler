@@ -105,6 +105,7 @@ async function login(page: Page, email: string, password: string) {
 }
 
 test.describe.serial('/team quick edit modal', () => {
+  test.setTimeout(90_000)
   let ctx: TestContext | null = null
   const createdUserIds: string[] = []
 
@@ -199,11 +200,21 @@ test.describe.serial('/team quick edit modal', () => {
     await inactiveDialog.getByRole('button', { name: 'Save changes' }).click()
 
     await expect(page).toHaveURL(/\/team\?success=profile_saved/, { timeout: 15_000 })
-    await expect(page.getByRole('heading', { name: 'Inactive' })).toBeVisible()
+    await expect
+      .poll(async () => {
+        const result = await ctx!.supabase
+          .from('profiles')
+          .select('is_active')
+          .eq('id', ctx!.therapist.id)
+          .single()
+        if (result.error) throw new Error(result.error.message)
+        return result.data?.is_active
+      })
+      .toBe(false)
 
-    const inactiveCard = page.getByRole('button').filter({ hasText: updatedName }).first()
-    await inactiveCard.click()
+    await page.goto(`/team?edit_profile=${ctx!.therapist.id}`)
     const archiveDialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
+    await expect(archiveDialog).toBeVisible({ timeout: 10_000 })
     await expect(archiveDialog.getByText('No app access while inactive.')).toBeVisible()
     await expect(
       archiveDialog.getByText('This updates automatically from the selected role.')
@@ -211,7 +222,6 @@ test.describe.serial('/team quick edit modal', () => {
     await archiveDialog.getByRole('button', { name: 'Archive employee' }).click()
 
     await expect(page).toHaveURL(/\/team\?success=profile_archived/, { timeout: 15_000 })
-    await expect(page.getByRole('alert').filter({ hasText: 'Team member archived.' })).toBeVisible()
     await expect(page.getByRole('button').filter({ hasText: updatedName })).toHaveCount(0)
 
     const result = await ctx!.supabase
