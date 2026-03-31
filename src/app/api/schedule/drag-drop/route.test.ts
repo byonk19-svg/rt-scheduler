@@ -27,7 +27,7 @@ type Scenario = {
   weeklyShifts: Array<{ date: string; status: 'scheduled' | 'on_call' | 'sick' | 'called_off' }>
   cyclePublished?: boolean
   leadTherapistEligible?: boolean
-  leadTherapistRole?: 'therapist' | 'manager'
+  leadTherapistRole?: 'therapist' | 'lead' | 'manager'
   existingShiftForLead?: {
     id: string
     status: 'scheduled' | 'on_call' | 'sick' | 'called_off'
@@ -544,6 +544,44 @@ describe('drag-drop API behavior', () => {
       makeSupabaseMock({
         coverageStatuses: ['scheduled', 'scheduled'],
         weeklyShifts: [],
+        leadTherapistEligible: true,
+        existingShiftForLead: { id: 'shift-existing', status: 'scheduled' },
+      }) as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          action: 'set_lead',
+          cycleId: 'cycle-1',
+          therapistId: 'therapist-lead',
+          shiftType: 'day',
+          date: '2026-03-10',
+          overrideWeeklyRules: false,
+        }),
+      })
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      message: 'Designated lead updated.',
+    })
+    expect(setDesignatedLeadMutation).toHaveBeenCalledWith(expect.anything(), {
+      cycleId: 'cycle-1',
+      therapistId: 'therapist-lead',
+      date: '2026-03-10',
+      shiftType: 'day',
+    })
+  })
+
+  it('sets designated lead when lead role is eligible', async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      makeSupabaseMock({
+        coverageStatuses: ['scheduled', 'scheduled'],
+        weeklyShifts: [],
+        leadTherapistRole: 'lead',
         leadTherapistEligible: true,
         existingShiftForLead: { id: 'shift-existing', status: 'scheduled' },
       }) as unknown as Awaited<ReturnType<typeof createClient>>

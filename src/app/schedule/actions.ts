@@ -1965,7 +1965,7 @@ export async function setDesignatedLeadAction(formData: FormData) {
   if (
     therapistError ||
     !therapist ||
-    therapist.role !== 'therapist' ||
+    (therapist.role !== 'therapist' && therapist.role !== 'lead') ||
     !therapist.is_lead_eligible
   ) {
     redirect(

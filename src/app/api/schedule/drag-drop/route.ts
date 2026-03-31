@@ -855,7 +855,7 @@ export async function POST(request: Request) {
     if (
       therapistError ||
       !therapist ||
-      therapist.role !== 'therapist' ||
+      (therapist.role !== 'therapist' && therapist.role !== 'lead') ||
       !therapist.is_lead_eligible
     ) {
       return NextResponse.json(

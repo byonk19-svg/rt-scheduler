@@ -74,7 +74,8 @@ export function ShiftPostsTable({
   updateShiftPostStatusAction,
 }: ShiftPostsTableProps) {
   const canReviewShiftPosts = can(role, 'review_shift_posts')
-  const [scope, setScope] = useState<'mine' | 'all'>(role === 'therapist' ? 'mine' : 'all')
+  const isStaffRole = !canReviewShiftPosts
+  const [scope, setScope] = useState<'mine' | 'all'>(isStaffRole ? 'mine' : 'all')
   const [expandedPostIds, setExpandedPostIds] = useState<Set<string>>(new Set())
   const [filters, setFilters] = useState<TableToolbarFilters>({
     ...DEFAULT_TABLE_FILTERS,
@@ -95,7 +96,7 @@ export function ShiftPostsTable({
 
   const visibleRows = useMemo(() => {
     const scopedRows =
-      role === 'therapist' && scope === 'mine'
+      isStaffRole && scope === 'mine'
         ? rows.filter((row) => row.isOwnPost || row.isClaimedByMe)
         : rows
 
@@ -107,7 +108,7 @@ export function ShiftPostsTable({
     }))
 
     return filterAndSortRows(mappedRows, filters)
-  }, [filters, role, rows, scope])
+  }, [filters, isStaffRole, rows, scope])
 
   const defaultFiltersForRole: TableToolbarFilters = {
     ...DEFAULT_TABLE_FILTERS,
@@ -208,7 +209,7 @@ export function ShiftPostsTable({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {role === 'therapist' && (
+        {isStaffRole && (
           <div className="flex items-center gap-2">
             <Button
               type="button"
