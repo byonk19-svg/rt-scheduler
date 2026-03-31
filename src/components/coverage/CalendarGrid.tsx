@@ -7,7 +7,7 @@ import {
   StatusPill,
 } from '@/components/coverage/AssignmentStatusPopover'
 import type { DayItem, UiStatus } from '@/lib/coverage/selectors'
-import { countActive, flatten, shouldShowMonthTag } from '@/lib/coverage/selectors'
+import { countActive, flatten, headcountThreshold, shouldShowMonthTag } from '@/lib/coverage/selectors'
 import { cn } from '@/lib/utils'
 
 const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
@@ -84,6 +84,7 @@ export function CalendarGrid({
                   {week.map((day, dayOffset) => {
                     const absoluteIndex = weekIndex * 7 + dayOffset
                     const activeCount = countActive(day)
+                    const threshold = headcountThreshold(activeCount)
                     const totalCount = flatten(day).length
                     const showMonthTag = shouldShowMonthTag(absoluteIndex, day.isoDate)
                     const missingLead = !day.leadShift
@@ -127,9 +128,9 @@ export function CalendarGrid({
                             <span
                               className={cn(
                                 'rounded-full px-2 py-0.5 text-[0.62rem] font-bold leading-none',
-                                hasCoverageIssue
-                                  ? 'bg-[var(--error-subtle)] text-[var(--error-text)]'
-                                  : 'bg-[var(--success-subtle)] text-[var(--success-text)]'
+                                threshold === 'red'    && 'bg-[var(--error-subtle)] text-[var(--error-text)]',
+                                threshold === 'yellow' && 'bg-[var(--warning-subtle)] text-[var(--warning-text)]',
+                                threshold === 'green'  && 'bg-[var(--success-subtle)] text-[var(--success-text)]'
                               )}
                             >
                               {activeCount}/{totalCount}

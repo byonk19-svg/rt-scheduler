@@ -80,6 +80,9 @@ function createSupabaseMock(context: TestContext) {
         order() {
           return builder
         },
+        limit() {
+          return builder
+        },
         async maybeSingle() {
           if (table === 'profiles' && selected === 'role' && filters.get('id') === context.userId) {
             return { data: { role: context.role }, error: null }

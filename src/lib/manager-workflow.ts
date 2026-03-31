@@ -68,32 +68,28 @@ function getOne<T>(value: T | T[] | null | undefined): T | null {
   return value ?? null
 }
 
-export function getManagerAttentionLinks(activeCycleId: string | null): DashboardLinks {
-  if (!activeCycleId) {
-    return {
-      approvals: MANAGER_WORKFLOW_LINKS.approvals,
-      approvalsPending: '/approvals?status=pending',
-      coverage: MANAGER_WORKFLOW_LINKS.coverage,
-      fixCoverage: '/coverage?view=week&filter=missing_lead&focus=first',
-      coverageMissingLead: '/coverage?view=week&filter=missing_lead&focus=first',
-      coverageUnderCoverage: '/coverage?view=week&filter=under_coverage&focus=first',
-      coverageUnfilled: '/coverage?view=week&filter=unfilled&focus=first',
-      coverageNeedsAttention: '/coverage?view=week&filter=needs_attention&focus=first',
-      publish: MANAGER_WORKFLOW_LINKS.publish,
-    }
-  }
+function buildCoverageBaseLink(activeCycleId: string | null): string {
+  if (!activeCycleId) return '/coverage?view=week'
+  return `/coverage?cycle=${activeCycleId}&view=week`
+}
 
-  const cycleParam = `cycle=${activeCycleId}`
+function buildCoverageFilterLink(activeCycleId: string | null, filter: string): string {
+  return `${buildCoverageBaseLink(activeCycleId)}&filter=${filter}&focus=first`
+}
+
+export function getManagerAttentionLinks(activeCycleId: string | null): DashboardLinks {
+  const coverage = buildCoverageBaseLink(activeCycleId)
+  const coverageMissingLead = buildCoverageFilterLink(activeCycleId, 'missing_lead')
   return {
     approvals: MANAGER_WORKFLOW_LINKS.approvals,
     approvalsPending: `/approvals?status=pending`,
-    coverage: `/coverage?${cycleParam}&view=week`,
-    fixCoverage: `/coverage?${cycleParam}&view=week&filter=missing_lead&focus=first`,
-    coverageMissingLead: `/coverage?${cycleParam}&view=week&filter=missing_lead&focus=first`,
-    coverageUnderCoverage: `/coverage?${cycleParam}&view=week&filter=under_coverage&focus=first`,
-    coverageUnfilled: `/coverage?${cycleParam}&view=week&filter=unfilled&focus=first`,
-    coverageNeedsAttention: `/coverage?${cycleParam}&view=week&filter=needs_attention&focus=first`,
-    publish: `/coverage?${cycleParam}&view=week`,
+    coverage,
+    fixCoverage: coverageMissingLead,
+    coverageMissingLead,
+    coverageUnderCoverage: buildCoverageFilterLink(activeCycleId, 'under_coverage'),
+    coverageUnfilled: buildCoverageFilterLink(activeCycleId, 'unfilled'),
+    coverageNeedsAttention: buildCoverageFilterLink(activeCycleId, 'needs_attention'),
+    publish: coverage,
   }
 }
 

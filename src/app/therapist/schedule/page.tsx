@@ -10,6 +10,7 @@ import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
+import { operationalCodeLabel } from './schedule-helpers'
 
 type PublishedCycleRow = {
   id: string
@@ -44,6 +45,7 @@ type ShiftAssignment = {
   role: 'lead' | 'staff'
   shiftType: 'day' | 'night'
   isCurrentUser: boolean
+  operationalCode: string | null
 }
 
 function formatShortDate(value: string) {
@@ -61,7 +63,8 @@ function formatCycleRange(startDate: string, endDate: string) {
 function buildDaySchedules(
   rows: ShiftRow[],
   currentUserId: string,
-  nameByUserId: Map<string, string>
+  nameByUserId: Map<string, string>,
+  operationalCodesByShiftId: Map<string, string>
 ): DaySchedule[] {
   const byDate = new Map<string, DaySchedule>()
 
@@ -79,6 +82,7 @@ function buildDaySchedules(
       role: row.role,
       shiftType: row.shift_type,
       isCurrentUser: row.user_id === currentUserId,
+      operationalCode: operationalCodeLabel(operationalCodesByShiftId.get(row.id) ?? ''),
     }
 
     if (row.shift_type === 'night') bucket.night.push(assignment)
@@ -148,21 +152,27 @@ function ShiftGroup({
           </span>
         ) : (
           assignments.map((assignment) => (
-            <span
-              key={assignment.id}
-              className={cn(
-                'rounded-full border px-2.5 py-1 text-[11px] font-semibold',
-                assignment.isCurrentUser
-                  ? 'border-primary/40 bg-primary/10 text-primary'
-                  : 'border-border bg-card text-foreground',
-                assignment.role === 'lead' && !assignment.isCurrentUser
-                  ? 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
-                  : null
+            <span key={assignment.id} className="inline-flex items-center gap-1">
+              <span
+                className={cn(
+                  'rounded-full border px-2.5 py-1 text-[11px] font-semibold',
+                  assignment.isCurrentUser
+                    ? 'border-primary/40 bg-primary/10 text-primary'
+                    : 'border-border bg-card text-foreground',
+                  assignment.role === 'lead' && !assignment.isCurrentUser
+                    ? 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+                    : null
+                )}
+              >
+                {assignment.role === 'lead' ? 'Lead: ' : ''}
+                {assignment.name}
+                {assignment.isCurrentUser ? ' (You)' : ''}
+              </span>
+              {assignment.operationalCode && (
+                <span className="rounded border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--warning-text)]">
+                  {assignment.operationalCode}
+                </span>
               )}
-            >
-              {assignment.role === 'lead' ? 'Lead: ' : ''}
-              {assignment.name}
-              {assignment.isCurrentUser ? ' (You)' : ''}
             </span>
           ))
         )}
@@ -254,9 +264,10 @@ export default async function TherapistSchedulePage() {
     supabase,
     allShifts.map((shift) => shift.id)
   )
-  const shifts = allShifts.filter((shift) => !activeOperationalCodesByShiftId.has(shift.id))
   const shiftUserIds = Array.from(
-    new Set(shifts.map((shift) => shift.user_id).filter((value): value is string => Boolean(value)))
+    new Set(
+      allShifts.map((shift) => shift.user_id).filter((value): value is string => Boolean(value))
+    )
   )
   const adminSupabase = createAdminClient()
   const { data: shiftProfilesData } =
@@ -270,7 +281,7 @@ export default async function TherapistSchedulePage() {
       row.full_name ?? 'Unknown therapist',
     ])
   )
-  const days = buildDaySchedules(shifts, user.id, nameByUserId)
+  const days = buildDaySchedules(allShifts, user.id, nameByUserId, activeOperationalCodesByShiftId)
   const myAssignmentCount = countMyAssignments(days)
   const nextShift = getNextShift(days)
   const visibleCoworkerCount = new Set(

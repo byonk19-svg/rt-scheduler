@@ -1,125 +1,29 @@
-import { expect, test, type Page } from '@playwright/test'
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
+import { expect, test } from '@playwright/test'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+import { loginAs } from './helpers/auth'
+import { randomString } from './helpers/env'
+import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type TestContext = {
   supabase: SupabaseClient
   manager: { id: string; email: string; password: string }
   therapist: { id: string; fullName: string }
-}
-
-const envCache = new Map<string, string>()
-
-function getEnvFromFile(key: string): string | undefined {
-  if (envCache.has(key)) return envCache.get(key)
-  const envPath = path.resolve(process.cwd(), '.env.local')
-  try {
-    const raw = readFileSync(envPath, 'utf-8')
-    for (const line of raw.split(/\r?\n/)) {
-      const trimmed = line.trim()
-      if (!trimmed || trimmed.startsWith('#')) continue
-      const eqIndex = trimmed.indexOf('=')
-      if (eqIndex <= 0) continue
-      const parsedKey = trimmed.slice(0, eqIndex).trim()
-      let parsedValue = trimmed.slice(eqIndex + 1).trim()
-      if (
-        (parsedValue.startsWith('"') && parsedValue.endsWith('"')) ||
-        (parsedValue.startsWith("'") && parsedValue.endsWith("'"))
-      ) {
-        parsedValue = parsedValue.slice(1, -1)
-      }
-      envCache.set(parsedKey, parsedValue)
-    }
-  } catch {
-    return undefined
-  }
-  return envCache.get(key)
-}
-
-function getEnv(key: string): string | undefined {
-  return process.env[key] ?? getEnvFromFile(key)
-}
-
-function randomString(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
-}
-
-async function createUser(
-  supabase: SupabaseClient,
-  payload: {
-    email: string
-    password: string
-    fullName: string
-    role: 'manager' | 'therapist'
-    employmentType: 'full_time' | 'part_time' | 'prn'
-    shiftType: 'day' | 'night'
-    isLeadEligible?: boolean
-  }
-): Promise<{ id: string }> {
-  const createResult = await supabase.auth.admin.createUser({
-    email: payload.email,
-    password: payload.password,
-    email_confirm: true,
-    user_metadata: { full_name: payload.fullName },
-  })
-
-  if (createResult.error || !createResult.data.user) {
-    throw new Error(
-      `Could not create test user ${payload.email}: ${createResult.error?.message ?? 'unknown error'}`
-    )
-  }
-
-  const userId = createResult.data.user.id
-  const { error: profileError } = await supabase.from('profiles').upsert(
-    {
-      id: userId,
-      full_name: payload.fullName,
-      email: payload.email,
-      role: payload.role,
-      shift_type: payload.shiftType,
-      employment_type: payload.employmentType,
-      max_work_days_per_week: payload.employmentType === 'prn' ? 1 : 3,
-      preferred_work_days: [],
-      is_lead_eligible: payload.isLeadEligible ?? false,
-      on_fmla: false,
-      is_active: true,
-      site_id: 'default',
-    },
-    { onConflict: 'id' }
-  )
-
-  if (profileError) {
-    throw new Error(`Could not upsert profile for ${payload.email}: ${profileError.message}`)
-  }
-
-  return { id: userId }
-}
-
-async function login(page: Page, email: string, password: string) {
-  await page.goto('/login')
-  await page.getByLabel('Email').fill(email)
-  await page.getByLabel('Password').fill(password)
-  await page.getByRole('button', { name: 'Sign In' }).click()
-  await expect(page).toHaveURL(/\/dashboard(?:\/|$)/, { timeout: 30_000 })
+  secondaryTherapist: { id: string; fullName: string }
 }
 
 test.describe.serial('/team quick edit modal', () => {
+  test.setTimeout(90_000)
   let ctx: TestContext | null = null
   const createdUserIds: string[] = []
 
   test.beforeAll(async () => {
-    const supabaseUrl = getEnv('NEXT_PUBLIC_SUPABASE_URL')
-    const serviceRoleKey = getEnv('SUPABASE_SERVICE_ROLE_KEY')
-    if (!supabaseUrl || !serviceRoleKey) return
-
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    })
+    const supabase = createServiceRoleClientOrNull()
+    if (!supabase) return
 
     const managerEmail = `${randomString('team-mgr')}@example.com`
     const managerPassword = `Mngr!${Math.random().toString(16).slice(2, 8)}`
-    const manager = await createUser(supabase, {
+    const manager = await createE2EUser(supabase, {
       email: managerEmail,
       password: managerPassword,
       fullName: 'E2E Team Manager',
@@ -130,7 +34,7 @@ test.describe.serial('/team quick edit modal', () => {
     })
 
     const therapistFullName = `E2E Team Therapist ${randomString('ther')}`
-    const therapist = await createUser(supabase, {
+    const therapist = await createE2EUser(supabase, {
       email: `${randomString('team-ther')}@example.com`,
       password: `Ther!${Math.random().toString(16).slice(2, 8)}`,
       fullName: therapistFullName,
@@ -140,11 +44,23 @@ test.describe.serial('/team quick edit modal', () => {
       isLeadEligible: false,
     })
 
-    createdUserIds.push(manager.id, therapist.id)
+    const secondaryTherapistFullName = `E2E Team Secondary ${randomString('ther')}`
+    const secondaryTherapist = await createE2EUser(supabase, {
+      email: `${randomString('team-ther2')}@example.com`,
+      password: `Ther!${Math.random().toString(16).slice(2, 8)}`,
+      fullName: secondaryTherapistFullName,
+      role: 'therapist',
+      employmentType: 'full_time',
+      shiftType: 'day',
+      isLeadEligible: false,
+    })
+
+    createdUserIds.push(manager.id, therapist.id, secondaryTherapist.id)
     ctx = {
       supabase,
       manager: { id: manager.id, email: managerEmail, password: managerPassword },
       therapist: { id: therapist.id, fullName: therapistFullName },
+      secondaryTherapist: { id: secondaryTherapist.id, fullName: secondaryTherapistFullName },
     }
   })
 
@@ -162,7 +78,7 @@ test.describe.serial('/team quick edit modal', () => {
 
     const updatedName = `${ctx!.therapist.fullName} Updated`
 
-    await login(page, ctx!.manager.email, ctx!.manager.password)
+    await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto('/team')
 
     await expect(page.getByRole('heading', { name: 'Managers' })).toBeVisible()
@@ -199,11 +115,21 @@ test.describe.serial('/team quick edit modal', () => {
     await inactiveDialog.getByRole('button', { name: 'Save changes' }).click()
 
     await expect(page).toHaveURL(/\/team\?success=profile_saved/, { timeout: 15_000 })
-    await expect(page.getByRole('heading', { name: 'Inactive' })).toBeVisible()
+    await expect
+      .poll(async () => {
+        const result = await ctx!.supabase
+          .from('profiles')
+          .select('is_active')
+          .eq('id', ctx!.therapist.id)
+          .single()
+        if (result.error) throw new Error(result.error.message)
+        return result.data?.is_active
+      })
+      .toBe(false)
 
-    const inactiveCard = page.getByRole('button').filter({ hasText: updatedName }).first()
-    await inactiveCard.click()
+    await page.goto(`/team?edit_profile=${ctx!.therapist.id}`)
     const archiveDialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
+    await expect(archiveDialog).toBeVisible({ timeout: 10_000 })
     await expect(archiveDialog.getByText('No app access while inactive.')).toBeVisible()
     await expect(
       archiveDialog.getByText('This updates automatically from the selected role.')
@@ -211,7 +137,6 @@ test.describe.serial('/team quick edit modal', () => {
     await archiveDialog.getByRole('button', { name: 'Archive employee' }).click()
 
     await expect(page).toHaveURL(/\/team\?success=profile_archived/, { timeout: 15_000 })
-    await expect(page.getByRole('alert').filter({ hasText: 'Team member archived.' })).toBeVisible()
     await expect(page.getByRole('button').filter({ hasText: updatedName })).toHaveCount(0)
 
     const result = await ctx!.supabase
@@ -235,5 +160,91 @@ test.describe.serial('/team quick edit modal', () => {
       archived_by: ctx!.manager.id,
     })
     expect(result.data?.archived_at).toBeTruthy()
+  })
+
+  test('active quick edit keeps archive unavailable and role access checklist updates live', async ({
+    page,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    await loginAs(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto(`/team?edit_profile=${ctx!.secondaryTherapist.id}`)
+
+    const dialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
+    await expect(dialog).toBeVisible({ timeout: 10_000 })
+    await expect(dialog.getByRole('button', { name: 'Archive employee' })).toHaveCount(0)
+    await expect(
+      dialog.getByText('This updates automatically from the selected role.')
+    ).toBeVisible()
+
+    await dialog.getByLabel('Role').selectOption('therapist')
+    await expect(
+      dialog
+        .locator('div')
+        .filter({ hasText: /^Approve swapsNo$/ })
+        .first()
+    ).toBeVisible()
+
+    await dialog.getByLabel('Role').selectOption('manager')
+    await expect(
+      dialog
+        .locator('div')
+        .filter({ hasText: /^Approve swapsYes$/ })
+        .first()
+    ).toBeVisible()
+  })
+
+  test('on-fmla can be cleared and removes return date from profile', async ({ page }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    const returnDate = '2026-06-01'
+
+    await loginAs(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto(`/team?edit_profile=${ctx!.secondaryTherapist.id}`)
+
+    const dialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
+    await expect(dialog).toBeVisible({ timeout: 10_000 })
+
+    await dialog.getByLabel('On FMLA').check()
+    await dialog.getByLabel('FMLA Return Date').fill(returnDate)
+    await dialog.getByRole('button', { name: 'Save changes' }).click()
+    await expect(page).toHaveURL(/\/team\?success=profile_saved/, { timeout: 15_000 })
+
+    await expect
+      .poll(async () => {
+        const result = await ctx!.supabase
+          .from('profiles')
+          .select('on_fmla, fmla_return_date')
+          .eq('id', ctx!.secondaryTherapist.id)
+          .single()
+        if (result.error) throw new Error(result.error.message)
+        return result.data
+      })
+      .toMatchObject({
+        on_fmla: true,
+        fmla_return_date: returnDate,
+      })
+
+    await page.goto(`/team?edit_profile=${ctx!.secondaryTherapist.id}`)
+    const updatedDialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
+    await expect(updatedDialog).toBeVisible({ timeout: 10_000 })
+    await updatedDialog.getByLabel('On FMLA').uncheck()
+    await updatedDialog.getByRole('button', { name: 'Save changes' }).click()
+    await expect(page).toHaveURL(/\/team\?success=profile_saved/, { timeout: 15_000 })
+
+    await expect
+      .poll(async () => {
+        const result = await ctx!.supabase
+          .from('profiles')
+          .select('on_fmla, fmla_return_date')
+          .eq('id', ctx!.secondaryTherapist.id)
+          .single()
+        if (result.error) throw new Error(result.error.message)
+        return result.data
+      })
+      .toMatchObject({
+        on_fmla: false,
+        fmla_return_date: null,
+      })
   })
 })

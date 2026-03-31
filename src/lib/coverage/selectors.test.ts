@@ -5,6 +5,7 @@ import {
   countActive,
   countBy,
   flatten,
+  headcountThreshold,
   shouldShowMonthTag,
   toUiStatus,
 } from '@/lib/coverage/selectors'
@@ -289,5 +290,35 @@ describe('buildDayItems', () => {
     const lead = makeRow({ id: 'l', user_id: 'uid-abc', role: 'lead', date: START })
     const [item] = buildDayItems('day', [lead], START, START, new Set())
     expect(item.leadShift?.userId).toBe('uid-abc')
+  })
+})
+
+describe('headcountThreshold', () => {
+  it('returns "red" for activeCount 0', () => {
+    expect(headcountThreshold(0)).toBe('red')
+  })
+
+  it('returns "red" for activeCount 1', () => {
+    expect(headcountThreshold(1)).toBe('red')
+  })
+
+  it('returns "red" for activeCount 2', () => {
+    expect(headcountThreshold(2)).toBe('red')
+  })
+
+  it('returns "yellow" for activeCount 3', () => {
+    expect(headcountThreshold(3)).toBe('yellow')
+  })
+
+  it('returns "green" for activeCount 4', () => {
+    expect(headcountThreshold(4)).toBe('green')
+  })
+
+  it('returns "green" for activeCount 5', () => {
+    expect(headcountThreshold(5)).toBe('green')
+  })
+
+  it('returns "green" for activeCount above 5', () => {
+    expect(headcountThreshold(10)).toBe('green')
   })
 })

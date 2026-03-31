@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { createHmac } from 'node:crypto'
 
 const envCache = new Map<string, string>()
 
@@ -35,6 +36,23 @@ function getEnv(key: string): string | undefined {
   return process.env[key] ?? getEnvFromFile(key)
 }
 
+function buildSignedWorkerHeaders(
+  method: 'POST',
+  pathname: '/api/publish/process',
+  workerKey: string,
+  signingKey: string
+) {
+  const timestamp = String(Math.floor(Date.now() / 1000))
+  const payload = [method, pathname, timestamp].join('\n')
+  const signature = createHmac('sha256', signingKey).update(payload).digest('hex')
+
+  return {
+    'x-publish-worker-key': workerKey,
+    'x-publish-worker-timestamp': timestamp,
+    'x-publish-worker-signature': signature,
+  }
+}
+
 test.describe.serial('/api/publish/process auth and idempotency', () => {
   test('rejects unauthenticated requests without worker key', async ({ request }) => {
     const response = await request.post('/api/publish/process', {
@@ -55,10 +73,19 @@ test.describe.serial('/api/publish/process auth and idempotency', () => {
     request,
   }) => {
     const workerKey = getEnv('PUBLISH_WORKER_KEY')
-    test.skip(!workerKey, 'Set PUBLISH_WORKER_KEY to run worker-key auth test.')
+    const signingKey = getEnv('PUBLISH_WORKER_SIGNING_KEY')
+    test.skip(
+      !workerKey || !signingKey,
+      'Set PUBLISH_WORKER_KEY and PUBLISH_WORKER_SIGNING_KEY to run worker-key auth test.'
+    )
 
     const missingEventId = randomUUID()
-    const headers = { 'x-publish-worker-key': workerKey! }
+    const headers = buildSignedWorkerHeaders(
+      'POST',
+      '/api/publish/process',
+      workerKey!,
+      signingKey!
+    )
 
     const firstResponse = await request.post('/api/publish/process', {
       headers,

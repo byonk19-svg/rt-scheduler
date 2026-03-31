@@ -7,6 +7,8 @@ Web app for respiratory therapy scheduling with role-based workflows:
 - 6-week schedule cycle management
 - Shift board (swap/pickup posts with manager approval)
 
+Current architecture and quality snapshot: [`docs/REPO_HEALTH.md`](docs/REPO_HEALTH.md)
+
 ## Tech Stack
 
 - Next.js App Router + TypeScript + Tailwind + shadcn/ui

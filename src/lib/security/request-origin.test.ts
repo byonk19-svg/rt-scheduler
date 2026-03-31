@@ -68,4 +68,15 @@ describe('isTrustedMutationRequest', () => {
 
     expect(isTrustedMutationRequest(request)).toBe(true)
   })
+
+  it('treats localhost and loopback aliases as the same trusted origin', () => {
+    const request = new Request('http://localhost:3000/api/notifications/mark-read', {
+      method: 'POST',
+      headers: {
+        origin: 'http://127.0.0.1:3000',
+      },
+    })
+
+    expect(isTrustedMutationRequest(request)).toBe(true)
+  })
 })

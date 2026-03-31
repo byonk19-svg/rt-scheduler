@@ -138,3 +138,15 @@ export function shouldShowMonthTag(index: number, isoDate: string): boolean {
   const parsed = new Date(`${isoDate}T00:00:00`)
   return index === 0 || (!Number.isNaN(parsed.getTime()) && parsed.getDate() === 1)
 }
+
+export type HeadcountThreshold = 'red' | 'yellow' | 'green'
+
+/**
+ * PRD §9.3: Red < 3, Yellow = 3, Green >= 4.
+ * Pass countActive(day) as the argument.
+ */
+export function headcountThreshold(activeCount: number): HeadcountThreshold {
+  if (activeCount < 3) return 'red'
+  if (activeCount === 3) return 'yellow'
+  return 'green'
+}
