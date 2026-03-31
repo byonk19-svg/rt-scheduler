@@ -9,8 +9,10 @@ describe('therapist schedule route', () => {
     const source = readFileSync(filePath, 'utf8')
 
     expect(source).not.toContain("export { default } from '../../staff/schedule/page'")
-    expect(source).toContain('Published Schedule')
-    expect(source).toContain('Entire published schedule')
+    expect(source).toContain('My Schedule')
+    expect(source).toContain('buildCalendarWeeks')
+    expect(source).toContain('shift?: string | string[]')
+    expect(source).toContain('No scheduled therapists')
     expect(source).toContain(".from('shifts')")
     expect(source).toContain(".in('id', shiftUserIds)")
     expect(source).toContain('createAdminClient')

@@ -1,6 +1,24 @@
 # Teamwise Scheduler
 
-Updated: 2026-03-31 (session 12)
+Updated: 2026-03-31 (session 14)
+
+## Latest Updates (2026-03-31, session 14)
+
+- **Staff-facing schedule/dashboard declutter + Lovable schedule alignment (working tree, ready to ship)**:
+  - `src/app/dashboard/staff/page.tsx` was simplified to remove repeated information blocks:
+    - upcoming shifts list is now the primary content block
+    - duplicate explainer and nav-card sections were removed
+    - compact status strip retained (`Next shift`, `Availability`, `Pending posts`)
+    - spacing/typography density tuned for a calmer surface
+  - `src/app/therapist/schedule/page.tsx` was rebuilt to match the requested Lovable-style therapist schedule direction:
+    - month-grid calendar layout with weekday headers and month navigation
+    - query-param controlled month + shift filtering (`month=YYYY-MM-01`, `shift=day|night`)
+    - separate Day/Night view toggles (not mixed in one cell)
+    - each date cell now shows all scheduled therapist names for the selected shift view, with lead labels surfaced
+    - manager users continue to redirect to manager scheduling (`/coverage?view=week`), while therapist/lead remain view-focused here
+  - `src/app/therapist/schedule/page.test.ts` expectations were updated to assert the new therapist schedule structure/content.
+  - Verification in-session:
+    - `npm run test:unit -- src/app/therapist/schedule/page.test.ts` passed
 
 ## Latest Updates (2026-03-31, session 13)
 

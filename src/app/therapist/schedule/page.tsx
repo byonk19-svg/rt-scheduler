@@ -1,16 +1,21 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowLeftRight, CalendarDays, Clock3, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Moon, Sun } from 'lucide-react'
 
-import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
-import { formatDateLabel } from '@/lib/calendar-utils'
-import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
+import {
+  buildCalendarWeeks,
+  formatDateLabel,
+  formatMonthLabel,
+  shiftMonthKey,
+  toIsoDate,
+  toMonthEndKey,
+  toMonthStartKey,
+} from '@/lib/calendar-utils'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
-import { operationalCodeLabel } from './schedule-helpers'
 
 type PublishedCycleRow = {
   id: string
@@ -32,157 +37,28 @@ type ShiftRow = {
   role: 'lead' | 'staff'
 }
 
-type DaySchedule = {
-  date: string
-  day: ShiftAssignment[]
-  night: ShiftAssignment[]
-}
-
 type ShiftAssignment = {
-  id: string
   userId: string | null
   name: string
   role: 'lead' | 'staff'
-  shiftType: 'day' | 'night'
-  isCurrentUser: boolean
-  operationalCode: string | null
-}
-
-function formatShortDate(value: string) {
-  return new Date(`${value}T00:00:00`).toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  })
 }
 
 function formatCycleRange(startDate: string, endDate: string) {
   return `${formatDateLabel(startDate)} - ${formatDateLabel(endDate)}`
 }
 
-function buildDaySchedules(
-  rows: ShiftRow[],
-  currentUserId: string,
-  nameByUserId: Map<string, string>,
-  operationalCodesByShiftId: Map<string, string>
-): DaySchedule[] {
-  const byDate = new Map<string, DaySchedule>()
-
-  for (const row of rows) {
-    const bucket = byDate.get(row.date) ?? {
-      date: row.date,
-      day: [],
-      night: [],
-    }
-
-    const assignment: ShiftAssignment = {
-      id: row.id,
-      userId: row.user_id,
-      name: row.user_id ? (nameByUserId.get(row.user_id) ?? 'Unknown therapist') : 'Open slot',
-      role: row.role,
-      shiftType: row.shift_type,
-      isCurrentUser: row.user_id === currentUserId,
-      operationalCode: operationalCodeLabel(operationalCodesByShiftId.get(row.id) ?? ''),
-    }
-
-    if (row.shift_type === 'night') bucket.night.push(assignment)
-    else bucket.day.push(assignment)
-    byDate.set(row.date, bucket)
-  }
-
-  const sortAssignments = (assignments: ShiftAssignment[]) =>
-    assignments.sort((left, right) => {
-      if (left.role !== right.role) return left.role === 'lead' ? -1 : 1
-      if (left.isCurrentUser !== right.isCurrentUser) return left.isCurrentUser ? -1 : 1
-      return left.name.localeCompare(right.name)
-    })
-
-  return Array.from(byDate.values())
-    .sort((left, right) => left.date.localeCompare(right.date))
-    .map((day) => ({
-      ...day,
-      day: sortAssignments(day.day),
-      night: sortAssignments(day.night),
-    }))
+function parseShiftFilter(raw: string | string[] | undefined): 'day' | 'night' {
+  const value = Array.isArray(raw) ? raw[0] : raw
+  return value === 'night' ? 'night' : 'day'
 }
 
-function countMyAssignments(days: DaySchedule[]) {
-  return days.reduce(
-    (count, day) =>
-      count +
-      day.day.filter((assignment) => assignment.isCurrentUser).length +
-      day.night.filter((assignment) => assignment.isCurrentUser).length,
-    0
-  )
-}
-
-function getNextShift(days: DaySchedule[]) {
-  const upcoming = days
-    .flatMap((day) =>
-      [...day.day, ...day.night].map((assignment) => ({ ...assignment, date: day.date }))
-    )
-    .filter((assignment) => assignment.isCurrentUser)
-    .sort((left, right) => {
-      if (left.date !== right.date) return left.date.localeCompare(right.date)
-      return left.shiftType.localeCompare(right.shiftType)
-    })
-
-  return upcoming[0] ?? null
-}
-
-function ShiftGroup({
-  label,
-  assignments,
+export default async function TherapistSchedulePage({
+  searchParams,
 }: {
-  label: 'Day' | 'Night'
-  assignments: ShiftAssignment[]
+  searchParams?: Promise<{ month?: string | string[]; shift?: string | string[] }>
 }) {
-  return (
-    <div className="rounded-xl border border-border bg-muted/25 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          {label} Shift
-        </p>
-        <p className="text-[11px] text-muted-foreground">{assignments.length} assigned</p>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {assignments.length === 0 ? (
-          <span className="rounded-full border border-dashed border-border px-2.5 py-1 text-[11px] text-muted-foreground">
-            No one assigned
-          </span>
-        ) : (
-          assignments.map((assignment) => (
-            <span key={assignment.id} className="inline-flex items-center gap-1">
-              <span
-                className={cn(
-                  'rounded-full border px-2.5 py-1 text-[11px] font-semibold',
-                  assignment.isCurrentUser
-                    ? 'border-primary/40 bg-primary/10 text-primary'
-                    : 'border-border bg-card text-foreground',
-                  assignment.role === 'lead' && !assignment.isCurrentUser
-                    ? 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
-                    : null
-                )}
-              >
-                {assignment.role === 'lead' ? 'Lead: ' : ''}
-                {assignment.name}
-                {assignment.isCurrentUser ? ' (You)' : ''}
-              </span>
-              {assignment.operationalCode && (
-                <span className="rounded border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--warning-text)]">
-                  {assignment.operationalCode}
-                </span>
-              )}
-            </span>
-          ))
-        )}
-      </div>
-    </div>
-  )
-}
-
-export default async function TherapistSchedulePage() {
   const supabase = await createClient()
+  const params = searchParams ? await searchParams : undefined
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -239,14 +115,6 @@ export default async function TherapistSchedulePage() {
             <p className="text-sm text-muted-foreground">
               When managers publish a cycle, the full team schedule will show up here.
             </p>
-            <div className="flex flex-wrap gap-2">
-              <Button asChild size="sm">
-                <Link href="/preliminary">Open preliminary</Link>
-              </Button>
-              <Button asChild size="sm" variant="outline">
-                <Link href="/therapist/availability">Future availability</Link>
-              </Button>
-            </div>
           </div>
         </section>
       </div>
@@ -260,10 +128,6 @@ export default async function TherapistSchedulePage() {
     .order('date', { ascending: true })
 
   const allShifts = (shiftsData ?? []) as ShiftRow[]
-  const activeOperationalCodesByShiftId = await fetchActiveOperationalCodeMap(
-    supabase,
-    allShifts.map((shift) => shift.id)
-  )
   const shiftUserIds = Array.from(
     new Set(
       allShifts.map((shift) => shift.user_id).filter((value): value is string => Boolean(value))
@@ -281,153 +145,238 @@ export default async function TherapistSchedulePage() {
       row.full_name ?? 'Unknown therapist',
     ])
   )
-  const days = buildDaySchedules(allShifts, user.id, nameByUserId, activeOperationalCodesByShiftId)
-  const myAssignmentCount = countMyAssignments(days)
-  const nextShift = getNextShift(days)
-  const visibleCoworkerCount = new Set(
-    days.flatMap((day) =>
-      [...day.day, ...day.night]
-        .filter((assignment) => assignment.userId && !assignment.isCurrentUser)
-        .map((assignment) => assignment.userId as string)
+
+  const shiftFilter = parseShiftFilter(params?.shift)
+  const requestedMonth = Array.isArray(params?.month) ? params?.month[0] : params?.month
+  const cycleStartMonth = toMonthStartKey(activeCycle.start_date)
+  const cycleEndMonth = toMonthStartKey(activeCycle.end_date)
+  const inferredMonth =
+    requestedMonth && /^\d{4}-\d{2}-01$/.test(requestedMonth)
+      ? requestedMonth
+      : toMonthStartKey(activeCycle.start_date)
+  const monthKey =
+    inferredMonth < cycleStartMonth
+      ? cycleStartMonth
+      : inferredMonth > cycleEndMonth
+        ? cycleEndMonth
+        : inferredMonth
+  const monthEndKey = toMonthEndKey(monthKey)
+  const monthLabel = formatMonthLabel(monthKey)
+  const prevMonth = shiftMonthKey(monthKey, -1)
+  const nextMonth = shiftMonthKey(monthKey, 1)
+  const canGoPrev = prevMonth >= cycleStartMonth
+  const canGoNext = nextMonth <= cycleEndMonth
+
+  const monthAssignments = allShifts
+    .filter((shift) => shift.date >= monthKey && shift.date <= monthEndKey)
+    .map(
+      (
+        shift
+      ): ShiftAssignment & {
+        date: string
+        shiftType: 'day' | 'night'
+        isCurrentUser: boolean
+      } => ({
+        userId: shift.user_id,
+        name: shift.user_id
+          ? (nameByUserId.get(shift.user_id) ?? 'Unknown therapist')
+          : 'Open slot',
+        role: shift.role,
+        date: shift.date,
+        shiftType: shift.shift_type,
+        isCurrentUser: shift.user_id === user.id,
+      })
     )
-  ).size
+
+  const myTotal = monthAssignments.filter((entry) => entry.isCurrentUser).length
+  const myDay = monthAssignments.filter(
+    (entry) => entry.isCurrentUser && entry.shiftType === 'day'
+  ).length
+  const myNight = monthAssignments.filter(
+    (entry) => entry.isCurrentUser && entry.shiftType === 'night'
+  ).length
+
+  const assignmentsByDate = new Map<string, ShiftAssignment[]>()
+  for (const assignment of monthAssignments) {
+    if (assignment.shiftType !== shiftFilter) continue
+    const list = assignmentsByDate.get(assignment.date) ?? []
+    list.push({
+      userId: assignment.userId,
+      name: assignment.name,
+      role: assignment.role,
+    })
+    assignmentsByDate.set(assignment.date, list)
+  }
+  for (const [date, entries] of assignmentsByDate.entries()) {
+    entries.sort((left, right) => {
+      if (left.role !== right.role) return left.role === 'lead' ? -1 : 1
+      return left.name.localeCompare(right.name)
+    })
+    assignmentsByDate.set(date, entries)
+  }
+  const weeks = buildCalendarWeeks(monthKey, monthEndKey)
+  const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
   return (
-    <div className="space-y-6">
-      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_2px_18px_rgba(15,23,42,0.06)]">
-        <div className="flex flex-col gap-4 border-b border-border px-5 py-5 lg:flex-row lg:items-start lg:justify-between">
+    <div className="space-y-5">
+      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_12px_rgba(15,23,42,0.05)]">
+        <div className="px-5 py-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              My Schedule
+            <h1 className="text-[2rem] font-bold tracking-tight text-foreground">My Schedule</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {formatCycleRange(activeCycle.start_date, activeCycle.end_date)} | {activeCycle.label}
             </p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
-              Published Schedule
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {activeCycle.label} | {formatCycleRange(activeCycle.start_date, activeCycle.end_date)}
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Full team view for the published cycle. Your own shifts are highlighted.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild size="sm" variant="outline">
-              <Link href="/preliminary">Preliminary</Link>
-            </Button>
-            <Button asChild size="sm" variant="outline">
-              <Link href="/therapist/availability">Future availability</Link>
-            </Button>
-            <Button asChild size="sm">
-              <Link href="/shift-board">Shift swaps</Link>
-            </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 px-5 py-4 sm:grid-cols-3">
-          <div className="rounded-xl border border-border bg-muted/30 px-3.5 py-3">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>My published shifts</span>
-              <CalendarDays className="h-3.5 w-3.5" />
-            </div>
-            <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">
-              {myAssignmentCount}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">Across this published cycle</p>
-          </div>
-          <div className="rounded-xl border border-border bg-muted/30 px-3.5 py-3">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Next shift</span>
-              <Clock3 className="h-3.5 w-3.5" />
-            </div>
-            <p className="mt-2 text-xl font-bold tracking-tight text-foreground">
-              {nextShift ? `${formatShortDate(nextShift.date)} · ${nextShift.shiftType}` : '--'}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {nextShift?.role === 'lead' ? 'Lead assignment' : 'Next published assignment'}
-            </p>
-          </div>
-          <div className="rounded-xl border border-border bg-muted/30 px-3.5 py-3">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Visible coworkers</span>
-              <Users className="h-3.5 w-3.5" />
-            </div>
-            <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">
-              {visibleCoworkerCount}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">People shown across the cycle</p>
+        <div className="border-t border-border px-5 py-3.5">
+          <div className="flex items-center justify-between">
+            {canGoPrev ? (
+              <Link
+                href={`/therapist/schedule?month=${prevMonth}&shift=${shiftFilter}`}
+                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Previous month"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Link>
+            ) : (
+              <span className="h-7 w-7" />
+            )}
+            <p className="text-[2rem] font-semibold tracking-tight text-foreground">{monthLabel}</p>
+            {canGoNext ? (
+              <Link
+                href={`/therapist/schedule?month=${nextMonth}&shift=${shiftFilter}`}
+                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                aria-label="Next month"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </Link>
+            ) : (
+              <span className="h-7 w-7" />
+            )}
           </div>
         </div>
-      </section>
 
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
-        <div className="flex flex-col gap-2 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Cycle View
+        <div className="grid grid-cols-1 gap-3 border-t border-border px-5 py-4 sm:grid-cols-3">
+          <div className="rounded-xl border border-border bg-card px-3.5 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+            <div className="flex items-center justify-center gap-1 text-muted-foreground">
+              <Sun className="h-3.5 w-3.5" />
+            </div>
+            <p className="mt-1 text-center text-[2rem] font-bold leading-none tracking-tight text-foreground">
+              {myTotal}
             </p>
-            <h2 className="mt-1 text-lg font-bold tracking-tight text-foreground">
-              Entire published schedule
-            </h2>
+            <p className="mt-1 text-center text-xs text-muted-foreground">Total Shifts</p>
           </div>
-          <p className="text-sm text-muted-foreground">Browse every day, even when you are off.</p>
+          <div className="rounded-xl border border-border bg-card px-3.5 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+            <div className="flex items-center justify-center gap-1 text-muted-foreground">
+              <Sun className="h-3.5 w-3.5" />
+            </div>
+            <p className="mt-1 text-center text-[2rem] font-bold leading-none tracking-tight text-foreground">
+              {myDay}
+            </p>
+            <p className="mt-1 text-center text-xs text-muted-foreground">Day Shifts</p>
+          </div>
+          <div className="rounded-xl border border-border bg-card px-3.5 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+            <div className="flex items-center justify-center gap-1 text-muted-foreground">
+              <Moon className="h-3.5 w-3.5" />
+            </div>
+            <p className="mt-1 text-center text-[2rem] font-bold leading-none tracking-tight text-foreground">
+              {myNight}
+            </p>
+            <p className="mt-1 text-center text-xs text-muted-foreground">Night Shifts</p>
+          </div>
         </div>
 
-        <div className="mt-4 space-y-3">
-          {days.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border px-5 py-10 text-center">
-              <p className="text-sm font-semibold text-foreground">
-                No published shifts are available for this cycle yet.
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                If the cycle was just published, refresh in a moment and try again.
-              </p>
-            </div>
-          ) : (
-            days.map((day) => {
-              const amWorking = [...day.day, ...day.night].some(
-                (assignment) => assignment.isCurrentUser
-              )
+        <div className="border-t border-border px-5 py-2.5">
+          <div className="inline-flex rounded-lg border border-border bg-muted/30 p-1">
+            <Link
+              href={`/therapist/schedule?month=${monthKey}&shift=day`}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold',
+                shiftFilter === 'day'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Sun className="h-3.5 w-3.5" />
+              Day
+            </Link>
+            <Link
+              href={`/therapist/schedule?month=${monthKey}&shift=night`}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold',
+                shiftFilter === 'night'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Moon className="h-3.5 w-3.5" />
+              Night
+            </Link>
+          </div>
+        </div>
 
-              return (
-                <article
-                  key={day.date}
-                  className={cn(
-                    'rounded-2xl border px-4 py-4',
-                    amWorking ? 'border-primary/35 bg-primary/5' : 'border-border bg-card'
-                  )}
-                >
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">
-                        {formatShortDate(day.date)}
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {amWorking ? 'You are scheduled on this date.' : 'You are off this date.'}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {amWorking && (
-                        <span className="rounded-full border border-primary/35 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
-                          Your shift day
-                        </span>
-                      )}
-                      <Button asChild size="sm" variant="outline" className="h-8">
-                        <Link href="/shift-board">
-                          <ArrowLeftRight className="mr-1.5 h-3.5 w-3.5" />
-                          Shift board
-                        </Link>
-                      </Button>
-                    </div>
+        <div className="overflow-hidden border-t border-border">
+          <div className="grid grid-cols-7 border-b border-border bg-muted/15">
+            {weekDays.map((weekday) => (
+              <div
+                key={weekday}
+                className="border-r border-border px-2 py-2 text-center text-[0.72rem] font-semibold uppercase tracking-wide text-muted-foreground last:border-r-0"
+              >
+                {weekday}
+              </div>
+            ))}
+          </div>
+          {weeks.map((week, weekIndex) => (
+            <div
+              key={week[0] ? toIsoDate(week[0]) : `week-${String(weekIndex)}`}
+              className="grid grid-cols-7"
+            >
+              {week.map((day) => {
+                const dateKey = toIsoDate(day)
+                const inMonth = dateKey >= monthKey && dateKey <= monthEndKey
+                const inCycle = dateKey >= activeCycle.start_date && dateKey <= activeCycle.end_date
+                const assignments = assignmentsByDate.get(dateKey) ?? []
+                return (
+                  <div
+                    key={dateKey}
+                    className={cn(
+                      'min-h-32 border-r border-b border-border px-2 py-2 align-top last:border-r-0',
+                      !inMonth ? 'bg-muted/10 text-muted-foreground/70' : 'bg-card'
+                    )}
+                  >
+                    <p className="text-right text-xs font-semibold text-foreground/90">
+                      {day.getDate()}
+                    </p>
+                    {inMonth && inCycle ? (
+                      <div className="mt-2 space-y-1">
+                        {assignments.length === 0 ? (
+                          <p className="text-[11px] text-muted-foreground">
+                            No scheduled therapists
+                          </p>
+                        ) : (
+                          assignments.map((assignment, index) => (
+                            <p
+                              key={`${dateKey}-${assignment.name}-${String(index)}`}
+                              className={cn(
+                                'truncate text-[11px] font-medium',
+                                assignment.role === 'lead'
+                                  ? 'text-[var(--warning-text)]'
+                                  : 'text-foreground'
+                              )}
+                            >
+                              {assignment.role === 'lead' ? 'Lead: ' : ''}
+                              {assignment.name}
+                            </p>
+                          ))
+                        )}
+                      </div>
+                    ) : null}
                   </div>
-
-                  <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                    <ShiftGroup label="Day" assignments={day.day} />
-                    <ShiftGroup label="Night" assignments={day.night} />
-                  </div>
-                </article>
-              )
-            })
-          )}
+                )
+              })}
+            </div>
+          ))}
         </div>
       </section>
     </div>
