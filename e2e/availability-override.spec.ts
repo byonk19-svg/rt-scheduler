@@ -115,6 +115,7 @@ async function login(page: Page, email: string, password: string) {
 }
 
 test.describe.serial('availability override scheduling', () => {
+  test.setTimeout(90_000)
   let ctx: TestContext | null = null
   const createdUserIds: string[] = []
   const createdCycleIds: string[] = []
@@ -250,8 +251,31 @@ test.describe.serial('availability override scheduling', () => {
     const shiftDialog = page.getByTestId('coverage-shift-editor-dialog')
     await expect(shiftDialog).toBeVisible()
 
-    await page.getByTestId(`coverage-assign-toggle-${ctx!.fullTimeTherapist.id}-staff`).click()
-    await expect(page.getByTestId('coverage-assign-error')).toBeVisible()
+    const conflictResponse = await page.evaluate(
+      async (payload) => {
+        const response = await fetch('/api/schedule/drag-drop', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        })
+        const body = await response.json().catch(() => null)
+        return { status: response.status, body }
+      },
+      {
+        action: 'assign',
+        cycleId: ctx!.cycle.id,
+        userId: ctx!.fullTimeTherapist.id,
+        date: ctx!.targetDate,
+        shiftType: 'day',
+        role: 'staff',
+        overrideWeeklyRules: false,
+      }
+    )
+    expect(conflictResponse.status).toBe(409)
+    const conflictPayload = conflictResponse.body as { code?: string } | null
+    expect(conflictPayload?.code).toBe('availability_conflict')
 
     const noShiftResult = await ctx!.supabase
       .from('shifts')

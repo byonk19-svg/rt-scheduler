@@ -7,6 +7,7 @@ type TestContext = {
   supabase: SupabaseClient
   manager: { id: string; email: string; password: string }
   therapist: { id: string; fullName: string }
+  secondaryTherapist: { id: string; fullName: string }
 }
 
 const envCache = new Map<string, string>()
@@ -141,11 +142,23 @@ test.describe.serial('/team quick edit modal', () => {
       isLeadEligible: false,
     })
 
-    createdUserIds.push(manager.id, therapist.id)
+    const secondaryTherapistFullName = `E2E Team Secondary ${randomString('ther')}`
+    const secondaryTherapist = await createUser(supabase, {
+      email: `${randomString('team-ther2')}@example.com`,
+      password: `Ther!${Math.random().toString(16).slice(2, 8)}`,
+      fullName: secondaryTherapistFullName,
+      role: 'therapist',
+      employmentType: 'full_time',
+      shiftType: 'day',
+      isLeadEligible: false,
+    })
+
+    createdUserIds.push(manager.id, therapist.id, secondaryTherapist.id)
     ctx = {
       supabase,
       manager: { id: manager.id, email: managerEmail, password: managerPassword },
       therapist: { id: therapist.id, fullName: therapistFullName },
+      secondaryTherapist: { id: secondaryTherapist.id, fullName: secondaryTherapistFullName },
     }
   })
 
@@ -245,5 +258,91 @@ test.describe.serial('/team quick edit modal', () => {
       archived_by: ctx!.manager.id,
     })
     expect(result.data?.archived_at).toBeTruthy()
+  })
+
+  test('active quick edit keeps archive unavailable and role access checklist updates live', async ({
+    page,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    await login(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto(`/team?edit_profile=${ctx!.secondaryTherapist.id}`)
+
+    const dialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
+    await expect(dialog).toBeVisible({ timeout: 10_000 })
+    await expect(dialog.getByRole('button', { name: 'Archive employee' })).toHaveCount(0)
+    await expect(
+      dialog.getByText('This updates automatically from the selected role.')
+    ).toBeVisible()
+
+    await dialog.getByLabel('Role').selectOption('therapist')
+    await expect(
+      dialog
+        .locator('div')
+        .filter({ hasText: /^Approve swapsNo$/ })
+        .first()
+    ).toBeVisible()
+
+    await dialog.getByLabel('Role').selectOption('manager')
+    await expect(
+      dialog
+        .locator('div')
+        .filter({ hasText: /^Approve swapsYes$/ })
+        .first()
+    ).toBeVisible()
+  })
+
+  test('on-fmla can be cleared and removes return date from profile', async ({ page }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    const returnDate = '2026-06-01'
+
+    await login(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto(`/team?edit_profile=${ctx!.secondaryTherapist.id}`)
+
+    const dialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
+    await expect(dialog).toBeVisible({ timeout: 10_000 })
+
+    await dialog.getByLabel('On FMLA').check()
+    await dialog.getByLabel('FMLA Return Date').fill(returnDate)
+    await dialog.getByRole('button', { name: 'Save changes' }).click()
+    await expect(page).toHaveURL(/\/team\?success=profile_saved/, { timeout: 15_000 })
+
+    await expect
+      .poll(async () => {
+        const result = await ctx!.supabase
+          .from('profiles')
+          .select('on_fmla, fmla_return_date')
+          .eq('id', ctx!.secondaryTherapist.id)
+          .single()
+        if (result.error) throw new Error(result.error.message)
+        return result.data
+      })
+      .toMatchObject({
+        on_fmla: true,
+        fmla_return_date: returnDate,
+      })
+
+    await page.goto(`/team?edit_profile=${ctx!.secondaryTherapist.id}`)
+    const updatedDialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
+    await expect(updatedDialog).toBeVisible({ timeout: 10_000 })
+    await updatedDialog.getByLabel('On FMLA').uncheck()
+    await updatedDialog.getByRole('button', { name: 'Save changes' }).click()
+    await expect(page).toHaveURL(/\/team\?success=profile_saved/, { timeout: 15_000 })
+
+    await expect
+      .poll(async () => {
+        const result = await ctx!.supabase
+          .from('profiles')
+          .select('on_fmla, fmla_return_date')
+          .eq('id', ctx!.secondaryTherapist.id)
+          .single()
+        if (result.error) throw new Error(result.error.message)
+        return result.data
+      })
+      .toMatchObject({
+        on_fmla: false,
+        fmla_return_date: null,
+      })
   })
 })
