@@ -21,6 +21,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
+import { groupPickupsBySlot } from './prn-interest-helpers'
 
 type Role = UiRole
 type RequestType = 'swap' | 'pickup'
@@ -53,6 +54,7 @@ type ProfileLookupRow = {
   full_name: string | null
   role?: string | null
   is_lead_eligible?: boolean | null
+  employment_type?: string | null
 }
 
 type CycleRow = {
@@ -77,6 +79,7 @@ type ShiftBoardRequest = {
   avatar: string
   shift: string
   shiftDate: string | null
+  shiftId: string | null
   message: string
   status: RequestStatus
   posted: string
@@ -214,6 +217,7 @@ export default function ShiftBoardPage() {
   const [savingState, setSavingState] = useState<Record<string, boolean>>({})
   const [requestErrors, setRequestErrors] = useState<Record<string, string>>({})
   const [therapists, setTherapists] = useState<ProfileLookupRow[]>([])
+  const [employmentType, setEmploymentType] = useState<string | null>(null)
   const [swapPartners, setSwapPartners] = useState<Record<string, string>>({})
   const [overrideReasons, setOverrideReasons] = useState<Record<string, string>>({})
   const [scheduledByDate, setScheduledByDate] = useState<Map<string, Map<string, ShiftType>>>(
@@ -264,7 +268,11 @@ export default function ShiftBoardPage() {
         }
 
         const [profileResult, cyclesResult, pendingPostsResult, postsResult] = await Promise.all([
-          supabase.from('profiles').select('id, full_name, role').eq('id', user.id).maybeSingle(),
+          supabase
+            .from('profiles')
+            .select('id, full_name, role, employment_type')
+            .eq('id', user.id)
+            .maybeSingle(),
           supabase
             .from('schedule_cycles')
             .select('id, start_date, end_date')
@@ -280,6 +288,7 @@ export default function ShiftBoardPage() {
         const profile = (profileResult.data ?? null) as ProfileLookupRow | null
         const nextRole: Role = toUiRole(profile?.role)
         setRole(nextRole)
+        setEmploymentType(profile?.employment_type ?? null)
         setPendingCount(pendingPostsResult.count ?? 0)
 
         const cycles = (cyclesResult.data ?? []) as CycleRow[]
@@ -411,6 +420,7 @@ export default function ShiftBoardPage() {
             avatar: initials(posterName),
             shift: shiftLabel,
             shiftDate: shift?.date ?? null,
+            shiftId: row.shift_id ?? null,
             message: row.message,
             status: toUiStatus(row.status, row.created_at),
             posted: formatRelativeTime(row.created_at),
@@ -441,6 +451,11 @@ export default function ShiftBoardPage() {
 
   const pending = pendingCount
   const canReview = can(role, 'review_shift_posts')
+  const pickupGroups = useMemo(() => groupPickupsBySlot(requests), [requests])
+  const multiCandidateSlots = useMemo(
+    () => pickupGroups.filter((group) => group.candidates.length >= 2),
+    [pickupGroups]
+  )
   const openPostCount = requests.filter((request) => request.status === 'pending').length
   const approvedCount = requests.filter((request) => request.status === 'approved').length
   const deniedCount = requests.filter((request) => request.status === 'denied').length
@@ -633,7 +648,7 @@ export default function ShiftBoardPage() {
               onClick={() => router.push('/requests/new')}
             >
               <ArrowRightLeft className="h-3.5 w-3.5" />
-              Post request
+              {!canReview && employmentType === 'prn' ? 'Express interest' : 'Post request'}
             </Button>
             <Button asChild size="sm" variant="outline" className="text-xs">
               <Link href="/availability">Future availability</Link>
@@ -790,6 +805,57 @@ export default function ShiftBoardPage() {
 
       {/* Cards */}
       <div className="fade-up flex flex-col gap-3" style={{ animationDelay: '0.15s' }}>
+        {canReview && multiCandidateSlots.length > 0 && (
+          <section className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              PRN Interest - Multiple Candidates
+            </p>
+            {multiCandidateSlots.map((group) => (
+              <div key={group.shiftId} className="rounded-xl border border-border bg-card p-4">
+                <p className="mb-3 text-sm font-semibold text-foreground">
+                  {group.shiftLabel}
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    {group.candidates.length} interested
+                  </span>
+                </p>
+                <div className="space-y-2">
+                  {group.candidates.map((candidate, index) => (
+                    <div
+                      key={candidate.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                          #{index + 1}
+                        </span>
+                        <span className="text-sm font-medium text-foreground">
+                          {candidate.poster}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(candidate.postedAt).toLocaleString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={savingState[candidate.id]}
+                        onClick={() => void handleAction(candidate.id, 'approve')}
+                        className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
+                      >
+                        {savingState[candidate.id] ? 'Selecting...' : 'Select'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
+
         {!loading && filtered.length === 0 ? (
           <EmptyState
             statusFilter={statusFilter}

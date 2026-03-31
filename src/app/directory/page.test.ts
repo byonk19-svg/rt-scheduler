@@ -14,8 +14,6 @@ import DirectoryPage from '@/app/directory/page'
 
 describe('directory redirect behavior', () => {
   it('redirects to team', async () => {
-    await expect(DirectoryPage({ searchParams: Promise.resolve({}) })).rejects.toThrow(
-      'REDIRECT:/team'
-    )
+    await expect(DirectoryPage()).rejects.toThrow('REDIRECT:/team')
   })
 })

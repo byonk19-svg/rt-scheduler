@@ -25,6 +25,7 @@ export type AssignCoverageShiftParams = {
   isoDate: string
   shiftType: 'day' | 'night'
   role?: 'lead' | 'staff'
+  isPostPublishModification?: boolean
 }
 
 export type AssignedCoverageShiftRow = {
@@ -88,6 +89,7 @@ export async function assignCoverageShiftViaApi(
       shiftType: params.shiftType,
       role: params.role ?? 'staff',
       overrideWeeklyRules: false,
+      isPostPublishModification: params.isPostPublishModification,
     }),
   })
 
@@ -111,6 +113,7 @@ export async function assignCoverageShiftViaApi(
 export async function unassignCoverageShiftViaApi(params: {
   cycleId: string
   shiftId: string
+  isPostPublishModification?: boolean
 }): Promise<{ error: CoverageMutationError }> {
   const response = await fetch('/api/schedule/drag-drop', {
     method: 'POST',
@@ -121,6 +124,7 @@ export async function unassignCoverageShiftViaApi(params: {
       action: 'remove',
       cycleId: params.cycleId,
       shiftId: params.shiftId,
+      isPostPublishModification: params.isPostPublishModification,
     }),
   })
 

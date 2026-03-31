@@ -122,6 +122,7 @@ function CoveragePageContent() {
   const [printUsers, setPrintUsers] = useState<PrintTherapist[]>([])
   const [printShiftByUserDate, setPrintShiftByUserDate] = useState<Record<string, ShiftStatus>>({})
   const [allTherapists, setAllTherapists] = useState<TherapistOption[]>([])
+  const [activeOpCodes, setActiveOpCodes] = useState<Map<string, string>>(new Map())
   const [assigning, setAssigning] = useState(false)
   const [unassigningShiftId, setUnassigningShiftId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -334,6 +335,7 @@ function CoveragePageContent() {
           supabase,
           assignmentRows.map((row) => row.id)
         )
+        setActiveOpCodes(new Map(activeOperationalCodesByShiftId))
 
         const therapistTallies = new Map<
           string,
@@ -482,6 +484,14 @@ function CoveragePageContent() {
     () => (selectedDayBase ? { ...selectedDayBase, shiftType: shiftTab } : null),
     [selectedDayBase, shiftTab]
   )
+  const today = toIsoDate(new Date())
+  const isPastDate = selectedDay !== null && selectedDay.isoDate < today
+  const selectedDayShiftIds = [
+    ...(selectedDay?.leadShift ? [selectedDay.leadShift.id] : []),
+    ...(selectedDay?.staffShifts.map((shift) => shift.id) ?? []),
+  ]
+  const hasOperationalEntries = selectedDayShiftIds.some((id) => activeOpCodes.has(id))
+  const isPostPublishModification = isPastDate || hasOperationalEntries
 
   // Compute how many shifts each therapist is working in the week that contains the selected day.
   // Used in the assign dropdown so managers can avoid overscheduling within a single week.
@@ -536,6 +546,7 @@ function CoveragePageContent() {
         isoDate: selectedDay.isoDate,
         shiftType,
         role,
+        isPostPublishModification,
       })
 
       if (insertError || !inserted) {
@@ -588,7 +599,7 @@ function CoveragePageContent() {
 
       setAssigning(false)
     },
-    [activeCycleId, allTherapists, selectedDay, setDays]
+    [activeCycleId, allTherapists, isPostPublishModification, selectedDay, setDays]
   )
 
   const handleChangeStatus = useCallback(
@@ -712,6 +723,7 @@ function CoveragePageContent() {
       const { error: deleteError } = await unassignCoverageShiftViaApi({
         cycleId: activeCycleId ?? '',
         shiftId,
+        isPostPublishModification,
       })
 
       if (!deleteError) {
@@ -724,7 +736,7 @@ function CoveragePageContent() {
       setError('Could not unassign therapist. Changes were rolled back.')
       setUnassigningShiftId(null)
     },
-    [activeCycleId, days, setDays, unassigningShiftId]
+    [activeCycleId, days, isPostPublishModification, setDays, unassigningShiftId]
   )
 
   return (
@@ -1015,6 +1027,8 @@ function CoveragePageContent() {
         selectedDay={selectedDay}
         therapists={allTherapists}
         canEdit={Boolean(activeCycleId)}
+        isPastDate={isPastDate}
+        hasOperationalEntries={hasOperationalEntries}
         assigning={assigning}
         unassigningShiftId={unassigningShiftId}
         weeklyTherapistCounts={weeklyTherapistCounts}

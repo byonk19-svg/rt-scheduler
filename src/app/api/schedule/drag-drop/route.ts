@@ -58,6 +58,7 @@ type DragAction =
       overrideWeeklyRules: boolean
       availabilityOverride?: boolean
       availabilityOverrideReason?: string
+      isPostPublishModification?: boolean
     }
   | {
       action: 'move'
@@ -68,11 +69,13 @@ type DragAction =
       overrideWeeklyRules: boolean
       availabilityOverride?: boolean
       availabilityOverrideReason?: string
+      isPostPublishModification?: boolean
     }
   | {
       action: 'remove'
       cycleId: string
       shiftId: string
+      isPostPublishModification?: boolean
     }
   | {
       action: 'remove'
@@ -80,6 +83,7 @@ type DragAction =
       userId: string
       date: string
       shiftType: 'day' | 'night'
+      isPostPublishModification?: boolean
     }
   | {
       action: 'set_lead'
@@ -90,6 +94,7 @@ type DragAction =
       overrideWeeklyRules: boolean
       availabilityOverride?: boolean
       availabilityOverrideReason?: string
+      isPostPublishModification?: boolean
     }
 
 async function getCoverageCountForSlot(
@@ -295,6 +300,10 @@ function parseActionBody(raw: unknown): DragAction | null {
           typeof r.availabilityOverrideReason === 'string'
             ? r.availabilityOverrideReason
             : undefined,
+        isPostPublishModification:
+          typeof r.isPostPublishModification === 'boolean'
+            ? r.isPostPublishModification
+            : undefined,
       }
     case 'move':
       if (typeof r.shiftId !== 'string') return null
@@ -313,10 +322,22 @@ function parseActionBody(raw: unknown): DragAction | null {
           typeof r.availabilityOverrideReason === 'string'
             ? r.availabilityOverrideReason
             : undefined,
+        isPostPublishModification:
+          typeof r.isPostPublishModification === 'boolean'
+            ? r.isPostPublishModification
+            : undefined,
       }
     case 'remove':
       if (typeof r.shiftId === 'string') {
-        return { action: 'remove', cycleId: r.cycleId, shiftId: r.shiftId }
+        return {
+          action: 'remove',
+          cycleId: r.cycleId,
+          shiftId: r.shiftId,
+          isPostPublishModification:
+            typeof r.isPostPublishModification === 'boolean'
+              ? r.isPostPublishModification
+              : undefined,
+        }
       }
       if (
         typeof r.userId === 'string' &&
@@ -329,6 +350,10 @@ function parseActionBody(raw: unknown): DragAction | null {
           userId: r.userId,
           date: r.date,
           shiftType: r.shiftType,
+          isPostPublishModification:
+            typeof r.isPostPublishModification === 'boolean'
+              ? r.isPostPublishModification
+              : undefined,
         }
       }
       return null
@@ -348,6 +373,10 @@ function parseActionBody(raw: unknown): DragAction | null {
         availabilityOverrideReason:
           typeof r.availabilityOverrideReason === 'string'
             ? r.availabilityOverrideReason
+            : undefined,
+        isPostPublishModification:
+          typeof r.isPostPublishModification === 'boolean'
+            ? r.isPostPublishModification
             : undefined,
       }
     default:
@@ -523,6 +552,15 @@ export async function POST(request: Request) {
       await writeAuditLog(supabase, {
         userId: user.id,
         action: 'shift_added',
+        targetType: 'shift',
+        targetId: insertedShift.id,
+      })
+    }
+
+    if (payload.isPostPublishModification && insertedShift?.id) {
+      await writeAuditLog(supabase, {
+        userId: user.id,
+        action: 'post_publish_modification',
         targetType: 'shift',
         targetId: insertedShift.id,
       })
@@ -717,6 +755,15 @@ export async function POST(request: Request) {
       overrideWeeklyRules: true,
     }
 
+    if (payload.isPostPublishModification) {
+      await writeAuditLog(supabase, {
+        userId: user.id,
+        action: 'post_publish_modification',
+        targetType: 'shift',
+        targetId: payload.shiftId,
+      })
+    }
+
     return NextResponse.json({ message: 'Shift moved.', undoAction })
   }
 
@@ -776,6 +823,16 @@ export async function POST(request: Request) {
       shiftType: shift.shift_type as 'day' | 'night',
       date: shift.date as string,
       overrideWeeklyRules: true,
+    }
+
+    if (payload.isPostPublishModification) {
+      const targetId = 'shiftId' in payload ? payload.shiftId : `${payload.userId}:${payload.date}`
+      await writeAuditLog(supabase, {
+        userId: user.id,
+        action: 'post_publish_modification',
+        targetType: 'shift',
+        targetId,
+      })
     }
 
     return NextResponse.json({ message: 'Shift removed from schedule.', undoAction })
@@ -967,6 +1024,29 @@ export async function POST(request: Request) {
         date: payload.date,
         shiftType: payload.shiftType,
         targetId: `${payload.cycleId}:${payload.therapistId}:${payload.date}:${payload.shiftType}`,
+      })
+    }
+
+    const leadShiftId =
+      existingShift?.id ??
+      (
+        await supabase
+          .from('shifts')
+          .select('id')
+          .eq('cycle_id', payload.cycleId)
+          .eq('user_id', payload.therapistId)
+          .eq('date', payload.date)
+          .eq('shift_type', payload.shiftType)
+          .maybeSingle()
+      ).data?.id ??
+      `${payload.cycleId}:${payload.therapistId}:${payload.date}:${payload.shiftType}`
+
+    if (payload.isPostPublishModification) {
+      await writeAuditLog(supabase, {
+        userId: user.id,
+        action: 'post_publish_modification',
+        targetType: 'shift',
+        targetId: leadShiftId,
       })
     }
 

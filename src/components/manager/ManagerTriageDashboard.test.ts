@@ -36,7 +36,7 @@ describe('ManagerTriageDashboard', () => {
       })
     )
 
-    expect(html).toContain('Dashboard')
+    expect(html).toContain('Manager inbox')
     expect(html).toContain('Today&#x27;s Coverage')
     expect(html).toContain('15 of 17 shifts')
     expect(html).toContain('Upcoming Shifts')

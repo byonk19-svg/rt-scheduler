@@ -27,6 +27,8 @@ type ShiftEditorDialogProps = {
   selectedDay: SelectedDay | null
   therapists: TherapistOption[]
   canEdit: boolean
+  isPastDate: boolean
+  hasOperationalEntries: boolean
   assigning: boolean
   unassigningShiftId: string | null
   weeklyTherapistCounts: Map<string, number>
@@ -168,6 +170,8 @@ export function ShiftEditorDialog({
   selectedDay,
   therapists,
   canEdit,
+  isPastDate,
+  hasOperationalEntries,
   assigning,
   unassigningShiftId,
   weeklyTherapistCounts,
@@ -239,6 +243,21 @@ export function ShiftEditorDialog({
               >
                 This view has no active schedule cycle, so assignments are read-only.
               </div>
+              )}
+
+              {(isPastDate || hasOperationalEntries) && canEdit && (
+                <div
+                  role="alert"
+                  data-testid="coverage-guardrail-banner"
+                  className={cn(
+                    shiftEditorDialogLayout.alert,
+                    'border border-[var(--warning-border)] bg-[var(--warning-subtle)] font-medium text-[var(--warning-text)]'
+                  )}
+                >
+                  {isPastDate
+                    ? 'This date is in the past. Changes will be logged as a post-publish modification.'
+                    : 'This date has active operational entries. Changes will be logged as a post-publish modification.'}
+                </div>
               )}
 
               <section className={shiftEditorDialogLayout.section}>
