@@ -2,16 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { POST } from '@/app/api/schedule/drag-drop/route'
 import { createClient } from '@/lib/supabase/server'
-import { setDesignatedLeadMutation } from '@/lib/set-designated-lead'
 import { notifyUsers } from '@/lib/notifications'
 import { writeAuditLog } from '@/lib/audit-log'
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
-}))
-
-vi.mock('@/lib/set-designated-lead', () => ({
-  setDesignatedLeadMutation: vi.fn(),
 }))
 
 vi.mock('@/lib/notifications', () => ({
@@ -59,6 +54,7 @@ type Scenario = {
     }
   >
   insertError?: { code?: string; message?: string } | null
+  designatedLeadRpcError?: { code?: string; message?: string } | null
 }
 
 function makeSupabaseMock(scenario: Scenario) {
@@ -74,6 +70,7 @@ function makeSupabaseMock(scenario: Scenario) {
   const auth = {
     getUser: async () => ({ data: { user: { id: 'manager-1' } } }),
   }
+  const rpc = vi.fn(async () => ({ error: scenario.designatedLeadRpcError ?? null }))
 
   const profileById = (id: string) => {
     if (id === 'manager-1') {
@@ -301,13 +298,12 @@ function makeSupabaseMock(scenario: Scenario) {
     return builder
   }
 
-  return { auth, from, insertedShiftPayloads }
+  return { auth, from, rpc, insertedShiftPayloads }
 }
 
 describe('drag-drop API behavior', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-    vi.mocked(setDesignatedLeadMutation).mockResolvedValue({ ok: true })
   })
 
   it('rejects cross-origin mutation requests', async () => {
@@ -568,12 +564,6 @@ describe('drag-drop API behavior', () => {
     await expect(response.json()).resolves.toMatchObject({
       message: 'Designated lead updated.',
     })
-    expect(setDesignatedLeadMutation).toHaveBeenCalledWith(expect.anything(), {
-      cycleId: 'cycle-1',
-      therapistId: 'therapist-lead',
-      date: '2026-03-10',
-      shiftType: 'day',
-    })
   })
 
   it('sets designated lead when lead role is eligible', async () => {
@@ -606,12 +596,6 @@ describe('drag-drop API behavior', () => {
     await expect(response.json()).resolves.toMatchObject({
       message: 'Designated lead updated.',
     })
-    expect(setDesignatedLeadMutation).toHaveBeenCalledWith(expect.anything(), {
-      cycleId: 'cycle-1',
-      therapistId: 'therapist-lead',
-      date: '2026-03-10',
-      shiftType: 'day',
-    })
   })
 
   it('blocks designated lead when therapist is not eligible', async () => {
@@ -642,20 +626,19 @@ describe('drag-drop API behavior', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: 'Only lead-eligible therapists can be designated as lead.',
     })
-    expect(setDesignatedLeadMutation).not.toHaveBeenCalled()
   })
 
   it('surfaces designated lead conflict from mutation', async () => {
-    vi.mocked(setDesignatedLeadMutation).mockResolvedValue({
-      ok: false,
-      reason: 'multiple_leads_prevented',
-    })
     vi.mocked(createClient).mockResolvedValue(
       makeSupabaseMock({
         coverageStatuses: ['scheduled'],
         weeklyShifts: [],
         leadTherapistEligible: true,
         existingShiftForLead: { id: 'shift-existing', status: 'scheduled' },
+        designatedLeadRpcError: {
+          code: '23505',
+          message: 'duplicate key value violates unique constraint',
+        },
       }) as unknown as Awaited<ReturnType<typeof createClient>>
     )
 

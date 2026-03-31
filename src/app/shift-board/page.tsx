@@ -76,6 +76,7 @@ type ShiftBoardRequest = {
   id: string
   type: RequestType
   poster: string
+  postedById: string | null
   avatar: string
   shift: string
   shiftDate: string | null
@@ -86,6 +87,7 @@ type ShiftBoardRequest = {
   postedAt: string
   swapWithName: string | null
   swapWithId: string | null
+  claimedById: string | null
   shiftType: ShiftType | null
   shiftRole: ShiftRole | null
   overrideReason: string | null
@@ -207,11 +209,13 @@ export default function ShiftBoardPage() {
   const [requests, setRequests] = useState<ShiftBoardRequest[]>([])
   const [metrics, setMetrics] = useState<MetricState>({ unfilled: 0, missingLead: 0 })
   const [pendingCount, setPendingCount] = useState(0)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'denied'>(
     'pending'
   )
   const [typeFilter, setTypeFilter] = useState<'all' | RequestType>('all')
+  const [scope, setScope] = useState<'mine' | 'all'>('mine')
   const [search, setSearch] = useState('')
   const [activeTab, setActiveTab] = useState<'open' | 'history'>('open')
   const [savingState, setSavingState] = useState<Record<string, boolean>>({})
@@ -252,6 +256,7 @@ export default function ShiftBoardPage() {
           router.replace('/login')
           return
         }
+        setCurrentUserId(user.id)
 
         const todayKey = dateKeyFromDate(new Date())
         let postsQuery = supabase
@@ -417,6 +422,7 @@ export default function ShiftBoardPage() {
             id: row.id,
             type: row.type,
             poster: posterName,
+            postedById: row.posted_by,
             avatar: initials(posterName),
             shift: shiftLabel,
             shiftDate: shift?.date ?? null,
@@ -427,6 +433,7 @@ export default function ShiftBoardPage() {
             postedAt: row.created_at,
             swapWithName: row.claimed_by ? (namesById.get(row.claimed_by) ?? null) : null,
             swapWithId: row.claimed_by ?? null,
+            claimedById: row.claimed_by ?? null,
             shiftType: shift?.shift_type ?? null,
             shiftRole: shift?.role ?? null,
             overrideReason: (row as { override_reason?: string | null }).override_reason ?? null,
@@ -451,6 +458,12 @@ export default function ShiftBoardPage() {
 
   const pending = pendingCount
   const canReview = can(role, 'review_shift_posts')
+  const isStaffRole = !canReview
+
+  useEffect(() => {
+    setScope(isStaffRole ? 'mine' : 'all')
+  }, [isStaffRole])
+
   const pickupGroups = useMemo(() => groupPickupsBySlot(requests), [requests])
   const multiCandidateSlots = useMemo(
     () => pickupGroups.filter((group) => group.candidates.length >= 2),
@@ -463,8 +476,15 @@ export default function ShiftBoardPage() {
 
   const filtered = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase()
+    const scopedRequests =
+      isStaffRole && scope === 'mine' && currentUserId
+        ? requests.filter(
+            (request) =>
+              request.postedById === currentUserId || request.claimedById === currentUserId
+          )
+        : requests
 
-    return requests.filter((request) => {
+    return scopedRequests.filter((request) => {
       if (activeTab === 'history' && !HISTORY_STATUSES.includes(request.status)) {
         return false
       }
@@ -490,7 +510,7 @@ export default function ShiftBoardPage() {
       const haystack = `${request.poster} ${request.message} ${request.shift}`.toLowerCase()
       return haystack.includes(normalizedSearch)
     })
-  }, [activeTab, requests, search, statusFilter, typeFilter])
+  }, [activeTab, currentUserId, isStaffRole, requests, scope, search, statusFilter, typeFilter])
 
   const handleAction = useCallback(
     async (id: string, action: 'approve' | 'deny', opts?: { override?: boolean }) => {
@@ -772,6 +792,20 @@ export default function ShiftBoardPage() {
         className="fade-up flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm"
         style={{ animationDelay: '0.1s' }}
       >
+        {isStaffRole && (
+          <div className="flex gap-1">
+            <FilterPill
+              label="My Requests"
+              active={scope === 'mine'}
+              onClick={() => setScope('mine')}
+            />
+            <FilterPill
+              label="All Posts"
+              active={scope === 'all'}
+              onClick={() => setScope('all')}
+            />
+          </div>
+        )}
         <div className="relative min-w-[200px] flex-1">
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <input
