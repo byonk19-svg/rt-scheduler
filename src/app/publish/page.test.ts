@@ -141,7 +141,7 @@ describe('PublishHistoryPage', () => {
       })
     )
 
-    const html = renderToStaticMarkup(await PublishHistoryPage())
+    const html = renderToStaticMarkup(await PublishHistoryPage({}))
 
     expect(html).toContain('Start over')
     expect(html).toContain('No longer live')

@@ -81,8 +81,8 @@ function StatusChip({ status }: { status: 'success' | 'failed' }) {
   )
 }
 
-export default async function PublishHistoryPage({ searchParams }: PublishHistoryPageProps) {
-  const resolvedSearchParams = (await searchParams) ?? {}
+export default async function PublishHistoryPage(props: PublishHistoryPageProps) {
+  const resolvedSearchParams = (await props.searchParams) ?? {}
   const supabase = await createClient()
   const {
     data: { user },
