@@ -211,10 +211,12 @@ function TeamSection({
 
   return (
     <section className="mb-8 last:mb-0">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      <div className="mb-3 flex items-center gap-2.5">
+        <div className="h-3.5 w-0.5 rounded-full bg-primary/40" />
+        <h2 className="text-[0.68rem] font-bold uppercase tracking-[0.1em] text-foreground/70">
           {title}
         </h2>
+        <div className="h-px flex-1 bg-border/60" />
         <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
           {profiles.length}
         </span>

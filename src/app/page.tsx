@@ -192,10 +192,10 @@ export default function HomePage() {
 
           <div className="mb-8 mt-12 max-w-[380px]">
             <p
-              className="fade-up mb-4 text-[10px] font-bold uppercase tracking-[0.25em] text-sidebar-ring/70"
+              className="fade-up mb-4 text-[11px] font-bold uppercase tracking-[0.18em] text-sidebar-ring/85"
               style={{ animationDelay: '0.15s' }}
             >
-              Team Scheduling Hub
+              Respiratory Therapy Scheduling
             </p>
             <h1
               className="fade-up font-heading text-[1.55rem] font-bold leading-[1.2] tracking-tight text-sidebar-primary/80 xl:text-[1.7rem]"
@@ -203,9 +203,9 @@ export default function HomePage() {
                 animationDelay: '0.22s',
               }}
             >
-              Scheduling, availability, and
+              Scheduling, availability,
               <br />
-              coverage - <span className="text-sidebar-ring">in sync.</span>
+              and coverage &mdash; <span className="text-sidebar-ring">in sync.</span>
             </h1>
             <p
               className="fade-up mt-3 text-[13px] leading-relaxed text-sidebar-primary/30"
@@ -377,13 +377,13 @@ export default function HomePage() {
               </div>
               <span className="text-xl font-bold tracking-tight text-foreground">Teamwise</span>
               <span className="mt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                Team Scheduling Hub
+                Respiratory Therapy Scheduling
               </span>
             </div>
 
             <div className="rounded-2xl border border-border/50 bg-card/60 p-7 pb-6 shadow-sm backdrop-blur-sm">
               <p className="mb-2.5 hidden text-[10px] font-bold uppercase tracking-[0.2em] text-primary/60 lg:block">
-                Team Scheduling Hub
+                Respiratory Therapy Scheduling
               </p>
 
               <h2 className="font-heading text-[1.6rem] font-bold leading-snug tracking-tight text-foreground">

@@ -241,11 +241,23 @@ export function ManagerSchedulingInputs({
                 value={selectedTherapistId}
                 onChange={(event) => handleTherapistChange(event.target.value)}
               >
-                {therapists.map((therapist) => (
-                  <option key={therapist.id} value={therapist.id}>
-                    {therapist.full_name}
-                  </option>
-                ))}
+                {(['day', 'night'] as const).map((shiftType) => {
+                  const group = therapists.filter((therapist) => therapist.shift_type === shiftType)
+                  if (group.length === 0) return null
+
+                  return (
+                    <optgroup
+                      key={shiftType}
+                      label={shiftType === 'day' ? 'Day Shift' : 'Night Shift'}
+                    >
+                      {group.map((therapist) => (
+                        <option key={therapist.id} value={therapist.id}>
+                          {therapist.full_name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )
+                })}
               </select>
             </div>
 

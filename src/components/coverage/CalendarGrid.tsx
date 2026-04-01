@@ -195,8 +195,8 @@ export function CalendarGrid({
                               </span>
                             )
                           ) : (
-                            <p className="mt-0.5 text-[0.68rem] font-semibold leading-tight">
-                              No lead assigned
+                            <p className="mt-0.5 text-[0.68rem] font-medium leading-tight text-[var(--warning-text)]/60">
+                              &mdash;
                             </p>
                           )}
                         </div>

@@ -78,4 +78,34 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('href="/approvals"')
     expect(html).toContain('href="/coverage?view=week"')
   })
+
+  it('shows actionable prompts when loaded metrics are empty', () => {
+    const html = renderToStaticMarkup(
+      createElement(ManagerTriageDashboard, {
+        todayCoverageCovered: 0,
+        todayCoverageTotal: 0,
+        upcomingShiftCount: 0,
+        upcomingShiftDays: [],
+        todayActiveShifts: [],
+        recentActivity: [],
+        pendingRequests: 0,
+        approvalsWaiting: 0,
+        currentCycleStatus: 'Draft cycle',
+        currentCycleDetail: 'Publish by Apr 27',
+        nextCycleLabel: 'Collect availability Mar 17',
+        nextCycleDetail: 'Publish by Apr 27',
+        needsReviewCount: 0,
+        needsReviewDetail: 'You are caught up.',
+        approvalsHref: '/approvals',
+        scheduleHref: '/coverage?view=week',
+        reviewHref: '/approvals',
+      })
+    )
+
+    expect(html).toContain('No coverage gaps - review the schedule to confirm.')
+    expect(html).toContain('Send a preliminary schedule to collect staff claims.')
+    expect(html).toContain('Auto-draft or manually assign shifts for this cycle.')
+    expect(html).toContain('Assign shifts and leads before publishing.')
+    expect(html).toContain('Go')
+  })
 })

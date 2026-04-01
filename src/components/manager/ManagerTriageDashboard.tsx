@@ -121,6 +121,7 @@ export function ManagerTriageDashboard({
           detail={riskCountLabel}
           href={scheduleHref}
           icon={<Shield className="h-4 w-4 text-[var(--error-text)]" />}
+          emptyPrompt="No coverage gaps - review the schedule to confirm."
         />
         <MetricCard
           title="Pending Approvals"
@@ -128,6 +129,7 @@ export function ManagerTriageDashboard({
           detail={pendingRequestLabel}
           href={approvalsHref}
           icon={<FileCheck className="h-4 w-4 text-[var(--warning-text)]" />}
+          emptyPrompt="Send a preliminary schedule to collect staff claims."
         />
         <MetricCard
           title="Upcoming Shifts"
@@ -135,6 +137,7 @@ export function ManagerTriageDashboard({
           detail={teamLoadLabel}
           href={scheduleHref}
           icon={<Users className="h-4 w-4 text-primary" />}
+          emptyPrompt="Auto-draft or manually assign shifts for this cycle."
         />
         <MetricCard
           title="Publish Readiness"
@@ -142,6 +145,7 @@ export function ManagerTriageDashboard({
           detail={coveragePercent === null ? LOADING_LABEL : `${coveragePercent}% ready`}
           href={reviewHref}
           icon={<CheckCircle2 className="h-4 w-4 text-[var(--warning-text)]" />}
+          emptyPrompt="Assign shifts and leads before publishing."
         />
       </div>
 
@@ -269,13 +273,17 @@ function MetricCard({
   detail,
   href,
   icon,
+  emptyPrompt,
 }: {
   title: string
   value: string
   detail: string
   href: string
   icon: ReactNode
+  emptyPrompt?: string
 }) {
+  const isActionableEmpty = value === '0' || value === '0%' || value === '--'
+
   return (
     <Card className="rounded-2xl border-border/70 bg-card shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
       <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4">
@@ -288,10 +296,12 @@ function MetricCard({
         <p className="text-2xl font-semibold leading-none tracking-tight text-foreground">
           {value}
         </p>
-        <p className="text-xs text-muted-foreground">{detail}</p>
+        <p className="text-xs text-muted-foreground">
+          {isActionableEmpty && emptyPrompt ? emptyPrompt : detail}
+        </p>
         <Button variant="ghost" size="sm" className="h-7 gap-1 px-0 text-xs" asChild>
           <Link href={href}>
-            Open
+            {isActionableEmpty && emptyPrompt ? 'Go' : 'Open'}
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </Button>

@@ -131,7 +131,7 @@ const SHELL_ROUTES = [
 ] as const
 
 export const APP_SHELL_SIDEBAR_CLASS =
-  'no-print hidden shrink-0 flex-col border-r border-sidebar-border/70 bg-sidebar text-sidebar-foreground shadow-none lg:flex'
+  'no-print hidden shrink-0 flex-col border-r border-sidebar-border/70 bg-sidebar text-sidebar-foreground shadow-none lg:flex lg:h-screen lg:max-h-screen lg:min-h-0 lg:self-start lg:sticky lg:top-0'
 
 export const APP_SHELL_ACTIVE_NAV_CLASS =
   'bg-sidebar-accent/60 text-sidebar-accent-foreground ring-1 ring-sidebar-border/60'
@@ -238,9 +238,9 @@ export function AppShell({ user, children }: AppShellProps) {
         Skip to main content
       </a>
 
-      <div className="flex min-h-screen">
-        <aside className={cn(APP_SHELL_SIDEBAR_CLASS, canAccessManagerUi ? 'w-60' : 'w-60')}>
-          <div className="flex items-center justify-between gap-2 px-4 py-4">
+      <div className="flex min-h-screen items-start">
+        <aside className={cn(APP_SHELL_SIDEBAR_CLASS, 'w-60')}>
+          <div className="flex shrink-0 items-center justify-between gap-2 px-4 py-4">
             <Link
               href={dashboardHref}
               aria-label="Teamwise Respiratory Therapy"
@@ -251,7 +251,10 @@ export function AppShell({ user, children }: AppShellProps) {
             <NotificationBell variant="shell" />
           </div>
 
-          <nav className="flex-1 space-y-0.5 px-3 py-3" aria-label="Main navigation">
+          <nav
+            className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-y-contain px-3 py-3"
+            aria-label="Main navigation"
+          >
             <p className="px-2 pb-2 pt-3 text-[10px] font-medium tracking-[0.08em] text-[color:var(--sidebar-muted)]">
               {roleLabel}
             </p>
@@ -275,7 +278,7 @@ export function AppShell({ user, children }: AppShellProps) {
             })}
           </nav>
 
-          <div className="space-y-1 border-t border-sidebar-border/70 px-3 py-3">
+          <div className="mt-auto shrink-0 space-y-1 border-t border-sidebar-border/70 bg-sidebar px-3 py-3">
             {bottomNavItems.map((item) => {
               const active = isNavItemActive(pathname, searchParams, item)
               const Icon = item.icon
@@ -335,7 +338,7 @@ export function AppShell({ user, children }: AppShellProps) {
           </div>
         </aside>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-h-screen min-w-0 flex-1">
           <header className="no-print sticky top-0 z-30 border-b border-sidebar-border/70 bg-sidebar px-3 py-2 text-sidebar-foreground shadow-[0_1px_8px_rgba(0,0,0,0.08)] lg:hidden">
             <div className="flex items-center justify-between gap-2">
               <Button
@@ -424,7 +427,10 @@ export function AppShell({ user, children }: AppShellProps) {
               </Button>
             </div>
 
-            <nav className="flex-1 space-y-0.5 px-3 py-3" aria-label="Mobile navigation">
+            <nav
+              className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-y-contain px-3 py-3"
+              aria-label="Mobile navigation"
+            >
               <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--sidebar-muted)]">
                 {roleLabel}
               </p>
@@ -459,7 +465,7 @@ export function AppShell({ user, children }: AppShellProps) {
               ) : null}
             </nav>
 
-            <div className="space-y-1 border-t border-sidebar-border px-3 py-3">
+            <div className="mt-auto shrink-0 space-y-1 border-t border-sidebar-border bg-sidebar px-3 py-3">
               {bottomNavItems.map((item) => {
                 const active = isNavItemActive(pathname, searchParams, item)
                 const Icon = item.icon

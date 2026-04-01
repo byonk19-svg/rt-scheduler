@@ -300,8 +300,16 @@ export default async function StaffDashboardPage({
               ))}
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
-              No upcoming shifts yet in this cycle.
+            <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-6 text-center">
+              <p className="text-sm text-muted-foreground">No upcoming shifts yet in this cycle.</p>
+              <div className="mt-3 flex justify-center gap-2">
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/therapist/availability">Submit availability</Link>
+                </Button>
+                <Button asChild size="sm" variant="ghost">
+                  <Link href="/shift-board">Browse open shifts</Link>
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -336,7 +344,16 @@ export default async function StaffDashboardPage({
           >
             {availabilitySubmitted ? 'Ready' : 'Pending'}
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">Future-cycle submission</p>
+          {availabilitySubmitted ? (
+            <p className="mt-1 text-xs text-muted-foreground">Future-cycle submission</p>
+          ) : (
+            <Link
+              href="/therapist/availability"
+              className="mt-1 block text-xs text-primary hover:underline"
+            >
+              Submit now &rarr;
+            </Link>
+          )}
         </div>
         <div className="rounded-xl border border-border bg-muted/30 px-3 py-2.5">
           <div className="flex items-center justify-between text-xs text-muted-foreground">

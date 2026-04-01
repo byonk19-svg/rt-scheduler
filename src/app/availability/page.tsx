@@ -350,9 +350,7 @@ export default async function AvailabilityPage({
 
       <AvailabilityOverviewHeader
         canManageAvailability={canManageAvailability}
-        title={
-          canManageAvailability ? 'Optimized Staffing & Availability Hub' : 'Future Availability'
-        }
+        title={canManageAvailability ? 'Availability' : 'Future Availability'}
         subtitle={
           selectedCycle
             ? `${selectedCycle.label} - ${selectedCycle.start_date} to ${selectedCycle.end_date}`
