@@ -1,12 +1,18 @@
 # Teamwise Scheduler
 
-Updated: 2026-03-31 (session 16)
+Updated: 2026-03-31 (session 17)
+
+## Latest Updates (2026-03-31, session 17)
+
+- **Therapist availability copy vs autodraft (docs alignment)**:
+  - **Available** (default) = neutral at the day level: no preference whether the therapist works that day or not; there is no override row, so autodraft only uses recurring pattern, eligibility, caps, and other global rules — not a hard “schedule me” constraint.
+  - **Must work** = hard autodraft constraint: therapist `force_on` is prioritized like manager “Will work” and participates in forced-miss reporting when the draft cannot honor it.
 
 ## Latest Updates (2026-03-31, session 16)
 
 - **Therapist availability grid + autodraft semantics**:
   - `src/components/availability/TherapistAvailabilityWorkspace.tsx` is a 6-week, cycle-scoped grid: tap cycles **Available** (default) → **Unavailable** → **Must work** → Available.
-  - **Available** (default): no `availability_overrides` row for that date; autodraft uses pattern/eligibility only (not a “must work” constraint).
+  - **Available** (default): no `availability_overrides` row for that date; autodraft uses pattern/eligibility/caps only — not a day-level “must work” constraint.
   - **Unavailable**: therapist `force_off` (`shift_type='both'`, `source='therapist'`).
   - **Must work**: therapist `force_on` — same autodraft prioritization as manager “Will work” (`forcedByManager` in `resolveEligibility` is true for manager **or** therapist `force_on`); auto-generate **forced misses** count both sources (`src/app/schedule/actions.ts`). User-facing copy: `src/lib/schedule-helpers.ts` (`getScheduleFeedback` for `forced_misses`).
   - Bulk save: `submitTherapistAvailabilityGridAction` in `src/app/availability/actions.ts`; therapist page wires it from `src/app/therapist/availability/page.tsx`.
@@ -564,8 +570,8 @@ Typography classes:
   - inactive/FMLA blocks first
   - manager `force_off` blocks date in that cycle
   - manager `force_on` forces eligibility and is prioritized by auto-draft when legal
-  - therapist **Available** (default) means no row for that date (pattern-only for that day in autodraft)
-  - therapist **Unavailable** → `force_off` (block); therapist **Must work** → `force_on` (autodraft prioritization, same class as manager `force_on` for slot picking and forced-miss reporting)
+  - therapist **Available** (default): no override row — neutral day (no forced on/off); autodraft may or may not assign that day based on pattern and constraints
+  - therapist **Unavailable** → `force_off` (block); therapist **Must work** → `force_on` (hard autodraft constraint: prioritization same class as manager `force_on` for slot picking and forced-miss reporting)
   - manager planner is still the strongest operational signal for roster planning
   - fallback to recurring pattern if no override
 - PRN strict policy:

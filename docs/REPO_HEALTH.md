@@ -5,7 +5,7 @@
 - Monorepo-style Next.js app (single app package) with App Router and TypeScript.
 - Supabase-backed auth + data model with manager/therapist role workflows.
 - Core manager surfaces: coverage, availability, team, approvals, publish, shift board.
-- Core therapist surfaces: schedule, availability, swaps.
+- Core therapist surfaces: schedule (`/coverage`), availability grid (`/therapist/availability`: Available / Unavailable / Must work), swaps.
 
 ## Architecture Highlights
 
