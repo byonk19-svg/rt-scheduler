@@ -50,6 +50,9 @@ test-results/
 shots/
 .auth/
 
+# local screen capture runs
+/artifacts/screen-capture/
+
 # local agent/tooling state
 .claude/
 .superpowers/

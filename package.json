@@ -11,6 +11,8 @@
     "format:check": "prettier --check .",
     "prepare": "husky",
     "seed:demo": "node --env-file=.env.local scripts/seed-demo.mjs",
+    "seed:functional": "node --env-file=.env.local scripts/seed-functional-demo.mjs",
+    "screens:all": "node --env-file=.env.local scripts/capture-all-screens.mjs",
     "seed:users": "node --env-file=.env.local scripts/seed-users.mjs",
     "verify:publish": "node --env-file=.env.local scripts/verify-publish-readiness.mjs",
     "ci:local": "node scripts/local-ci-fallback.mjs",
