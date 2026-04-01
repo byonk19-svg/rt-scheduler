@@ -1,6 +1,24 @@
 # Teamwise Scheduler
 
-Updated: 2026-03-31 (session 17)
+Updated: 2026-04-01 (session 18)
+
+## Latest Updates (2026-04-01, session 18)
+
+- **Design polish pass shipped (`1abd9c0`)** — visual audit + Codex implementation of 8 targeted UI fixes:
+  - **Coverage grid**: `src/components/coverage/CalendarGrid.tsx` — "No lead assigned" text replaced with `—` (en-dash); warning border/background kept as the color signal; "Needs attention" badge at top-right is the canonical indicator. Do not restore verbose placeholder text.
+  - **Manager dashboard metric cards**: `src/components/manager/ManagerTriageDashboard.tsx` — `MetricCard` now accepts optional `emptyPrompt?: string` prop; when `value` is `"0"`, `"0%"`, or `"--"`, renders the context-specific prompt instead of the generic detail label and changes the CTA button from "Open" to "Go". All four cards have tailored prompts.
+  - **Availability page title**: `src/app/availability/page.tsx` — manager title changed from `'Optimized Staffing & Availability Hub'` → `'Availability'` to match plain nav language used everywhere else.
+  - **Staff dashboard empty state**: `src/app/dashboard/staff/page.tsx` — empty shift box now includes "Submit availability" + "Browse open shifts" CTAs; availability stat card conditionally shows "Submit now →" link when not yet submitted, or "Future-cycle submission" subtext when ready.
+  - **Sidebar background**: `src/app/globals.css` line 77 — `--sidebar` lightened from `hsl(192 30% 20%)` to `hsl(192 24% 24%)`; applies to desktop nav, mobile sheet, and mobile header automatically via `bg-sidebar` usage in `AppShell.tsx`.
+  - **Therapist dropdown grouping**: `src/components/availability/ManagerSchedulingInputs.tsx` — therapist `<select>` now uses `<optgroup>` elements for Day Shift / Night Shift; `therapists` prop already carries `shift_type: 'day' | 'night'`, no type changes needed.
+  - **Team section headers**: `src/components/team/TeamDirectory.tsx` — `TeamSection` `<h2>` replaced with accent-bordered div (left color bar + rule) matching the `WEEK N` divider pattern used in `CalendarGrid.tsx`.
+  - **Landing copy**: `src/app/page.tsx` — kicker bumped to `text-[11px]` / `text-sidebar-ring/85` / updated to "Respiratory Therapy Scheduling"; headline hyphen `- in sync.` replaced with proper em-dash `— in sync.`; `and` moved to second line for better mobile rhythm.
+  - **Test coverage**: `src/components/manager/ManagerTriageDashboard.test.ts` — 30 new lines of tests added for `emptyPrompt` logic (verified passing in same commit).
+  - **Commit details**: 10 files changed, 108 insertions, 33 deletions. All CI gates passed: lint, tsc, test:unit, build.
+
+- **Design audit artifacts**: `artifacts/screen-capture/` — flat directory contains current-state screenshots of all key routes (manager + staff). Naming: `10-manager-dashboard.png`, `11-manager-coverage-week.png`, `12-manager-availability.png`, `30-staff-dashboard.png`, etc. Use for before/after comparison in future sessions.
+
+- **Design plan**: `docs/superpowers/plans/2026-04-01-design-polish.md` — full 9-task implementation plan with exact file paths, line references, and code blocks. Plan was reviewer-verified before execution. Keep as reference if design polish work resumes.
 
 ## Latest Updates (2026-03-31, session 17)
 
