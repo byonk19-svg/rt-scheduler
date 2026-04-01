@@ -21,7 +21,7 @@ Last verified on branch `main`:
 
 - `npm run lint` passed
 - `npx tsc --noEmit` passed
-- `npm run test:unit` passed (`341` tests)
+- `npm run test:unit` passed (`342` tests)
 - `npx playwright test --workers=1` passed for active suites (`23` passed, `1` skipped)
 
 ## Known Exceptions / Gaps

@@ -79,7 +79,7 @@ Updated: 2026-03-31 (session 17)
   - Verification in-session:
     - `npm run test:unit -- src/app/api/schedule/drag-drop/route.test.ts` passed
     - `npm run ci:local:quick` passed
-    - `npm run test:unit` passed (**341 tests**)
+    - `npm run test:unit` passed (**342 tests**)
 
 ## Latest Updates (2026-03-26, session 11)
 
@@ -466,7 +466,7 @@ All checks currently green:
 - `npm run lint` pass
 - `npm run format:check` pass (whole-repo Prettier; `.claude/**` excluded from ESLint)
 - `npm run build` pass
-- `npm run test:unit` pass (**212 tests** across 26 files)
+- `npm run test:unit` pass (**342 tests** across 63 files)
 - `npm run test:e2e` pass (39 passed, 1 skipped)
 
 CI gates: format check â†’ lint â†’ tsc â†’ build â†’ Playwright E2E
