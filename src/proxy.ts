@@ -5,7 +5,14 @@ import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { isValidPublishWorkerRequest } from '@/lib/security/worker-auth'
 
-const PUBLIC_ROUTES = ['/', '/login', '/signup', '/auth/callback', '/auth/signout'] as const
+const PUBLIC_ROUTES = [
+  '/',
+  '/login',
+  '/signup',
+  '/reset-password',
+  '/auth/callback',
+  '/auth/signout',
+] as const
 
 // Manager-only paths. Do not include shared staff surfaces (schedule, shift board, /requests alias)
 // or therapists/leads will be bounced by the guard below.
