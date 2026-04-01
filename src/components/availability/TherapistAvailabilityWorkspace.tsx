@@ -107,8 +107,8 @@ export function TherapistAvailabilityWorkspace({
     ? `${formatDateLabel(selectedCycle.start_date)} – ${formatDateLabel(selectedCycle.end_date)}`
     : ''
 
-  /** Days with no override — no preference for autodraft (pattern/eligibility only). */
-  const noPreferenceCount = useMemo(() => {
+  /** Days with no override — default "available" (no extra constraint; autodraft uses pattern/eligibility only). */
+  const availableCount = useMemo(() => {
     if (!selectedCycle) return 0
     return cycleDays.filter((date) => (draftStatusByDate[date] ?? 'none') === 'none').length
   }, [cycleDays, draftStatusByDate, selectedCycle])
@@ -240,8 +240,8 @@ export function TherapistAvailabilityWorkspace({
 
         <div className="border-b border-border/60 bg-muted/15 px-5 py-3 sm:px-6">
           <p className="text-right text-xs tabular-nums text-muted-foreground">
-            <span className="font-semibold text-foreground">{noPreferenceCount}</span> no preference
-            · <span className="font-semibold text-foreground">{cannotWorkDates.length}</span>{' '}
+            <span className="font-semibold text-foreground">{availableCount}</span> available ·{' '}
+            <span className="font-semibold text-foreground">{cannotWorkDates.length}</span>{' '}
             unavailable · <span className="font-semibold text-foreground">{mustWorkCount}</span>{' '}
             must work
           </p>
@@ -249,11 +249,12 @@ export function TherapistAvailabilityWorkspace({
 
         <div className="border-b border-[var(--info-border)] bg-[var(--info-subtle)] px-5 py-3 sm:px-6">
           <p className="text-xs font-medium leading-relaxed text-[var(--info-text)]">
-            Days default to <span className="font-semibold">no preference</span> (autodraft uses
-            your usual pattern only). Tap to <span className="font-semibold">unavailable</span>,
-            then <span className="font-semibold">must work</span> for a hard autodraft constraint
-            (we try to schedule you that day), then back to no preference. Add a note below for
-            unavailable days when needed.
+            Days default to <span className="font-semibold">available</span> (no extra constraint;
+            autodraft uses your usual pattern only). Tap to{' '}
+            <span className="font-semibold">unavailable</span>, then{' '}
+            <span className="font-semibold">must work</span> for a hard autodraft constraint (we try
+            to schedule you that day), then back to available. Add a note below for unavailable days
+            when needed.
           </p>
         </div>
 
@@ -308,7 +309,7 @@ export function TherapistAvailabilityWorkspace({
                       </span>
                       <span className="mt-1.5 block max-w-full px-0.5 text-[0.62rem] font-semibold leading-snug">
                         {status === 'none'
-                          ? 'No preference'
+                          ? 'Available'
                           : status === 'force_off'
                             ? 'Unavailable'
                             : 'Must work'}

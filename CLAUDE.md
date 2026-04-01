@@ -5,8 +5,8 @@ Updated: 2026-03-31 (session 16)
 ## Latest Updates (2026-03-31, session 16)
 
 - **Therapist availability grid + autodraft semantics**:
-  - `src/components/availability/TherapistAvailabilityWorkspace.tsx` is a 6-week, cycle-scoped grid: tap cycles **No preference** → **Unavailable** → **Must work** → No preference.
-  - **No preference**: no `availability_overrides` row for that date; autodraft uses pattern/eligibility only (not a scheduling commitment).
+  - `src/components/availability/TherapistAvailabilityWorkspace.tsx` is a 6-week, cycle-scoped grid: tap cycles **Available** (default) → **Unavailable** → **Must work** → Available.
+  - **Available** (default): no `availability_overrides` row for that date; autodraft uses pattern/eligibility only (not a “must work” constraint).
   - **Unavailable**: therapist `force_off` (`shift_type='both'`, `source='therapist'`).
   - **Must work**: therapist `force_on` — same autodraft prioritization as manager “Will work” (`forcedByManager` in `resolveEligibility` is true for manager **or** therapist `force_on`); auto-generate **forced misses** count both sources (`src/app/schedule/actions.ts`). User-facing copy: `src/lib/schedule-helpers.ts` (`getScheduleFeedback` for `forced_misses`).
   - Bulk save: `submitTherapistAvailabilityGridAction` in `src/app/availability/actions.ts`; therapist page wires it from `src/app/therapist/availability/page.tsx`.
@@ -564,7 +564,7 @@ Typography classes:
   - inactive/FMLA blocks first
   - manager `force_off` blocks date in that cycle
   - manager `force_on` forces eligibility and is prioritized by auto-draft when legal
-  - therapist **No preference** means no row for that date (pattern-only for that day in autodraft)
+  - therapist **Available** (default) means no row for that date (pattern-only for that day in autodraft)
   - therapist **Unavailable** → `force_off` (block); therapist **Must work** → `force_on` (autodraft prioritization, same class as manager `force_on` for slot picking and forced-miss reporting)
   - manager planner is still the strongest operational signal for roster planning
   - fallback to recurring pattern if no override

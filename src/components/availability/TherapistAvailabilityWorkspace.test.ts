@@ -41,7 +41,7 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('Tap a day to cycle through statuses')
     expect(html).toContain('Must work')
     expect(html).toContain('Unavailable')
-    expect(html).toContain('no preference')
+    expect(html).toContain('available ·')
     expect(html).toContain('Week 1')
     expect(html).toContain('Submit')
     expect(html).not.toContain('Therapist')

@@ -354,7 +354,7 @@ export default async function ProfilePage({
                 </FormSubmitButton>
                 <p className="text-xs font-medium text-muted-foreground">
                   Current:{' '}
-                  {preferredDayLabels.length > 0 ? preferredDayLabels.join(', ') : 'No preference'}
+                  {preferredDayLabels.length > 0 ? preferredDayLabels.join(', ') : 'None selected'}
                 </p>
               </div>
             </form>
