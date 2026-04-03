@@ -95,6 +95,7 @@ export function CalendarGrid({
                     const showMonthTag = shouldShowMonthTag(absoluteIndex, day.isoDate)
                     const missingLead = !day.leadShift
                     const hasCoverageIssue = missingLead || day.constraintBlocked
+                    const showAttentionBadge = day.constraintBlocked
 
                     return (
                       <article
@@ -141,7 +142,7 @@ export function CalendarGrid({
                             >
                               {activeCount}/{totalCount}
                             </span>
-                            {hasCoverageIssue && (
+                            {showAttentionBadge && (
                               <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[0.54rem] font-semibold uppercase tracking-[0.08em] text-[var(--warning-text)]">
                                 Needs attention
                               </span>

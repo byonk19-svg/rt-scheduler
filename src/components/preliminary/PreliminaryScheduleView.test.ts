@@ -64,6 +64,14 @@ describe('PreliminaryScheduleView', () => {
             state: 'pending_claim',
             reservedById: 'therapist-2',
           }),
+          makeCard({
+            shiftId: 'next-week-shift',
+            shiftDate: '2026-03-30',
+            assignedUserId: null,
+            assignedName: null,
+            state: 'open',
+            canClaim: true,
+          }),
         ],
         historyItems: [
           makeHistory(),
@@ -85,6 +93,8 @@ describe('PreliminaryScheduleView', () => {
     expect(html).toContain('Request change')
     expect(html).toContain('Claim shift')
     expect(html).toContain('Pending claim')
+    expect(html).toContain('Week of Mar 22')
+    expect(html).toContain('Week of Mar 29')
     expect(html).toContain('Request history')
     expect(html).toContain('Can cover this PRN shift')
   })

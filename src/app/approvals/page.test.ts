@@ -49,6 +49,20 @@ import {
 type TestContext = {
   userId?: string | null
   role?: string | null
+  pendingRequests?: Array<{
+    id: string
+    snapshot_id: string
+    shift_id: string
+    requester_id: string
+    type: string
+    status: string
+    note: string | null
+    decision_note: string | null
+    approved_by: string | null
+    approved_at: string | null
+    created_at: string
+  }>
+  hasActivePreliminary?: boolean
 }
 
 function createSupabaseMock(context: TestContext) {
@@ -94,7 +108,7 @@ function createSupabaseMock(context: TestContext) {
           if (table === 'preliminary_requests') {
             return Promise.resolve(
               resolve({
-                data: [
+                data: context.pendingRequests ?? [
                   {
                     id: 'request-1',
                     snapshot_id: 'snapshot-1',
@@ -138,6 +152,15 @@ function createSupabaseMock(context: TestContext) {
             return Promise.resolve(
               resolve({
                 data: [{ id: 'therapist-1', full_name: 'Barbara C.' }],
+                error: null,
+              })
+            )
+          }
+
+          if (table === 'preliminary_snapshots') {
+            return Promise.resolve(
+              resolve({
+                data: context.hasActivePreliminary ? [{ id: 'snapshot-1' }] : [],
                 error: null,
               })
             )
@@ -221,6 +244,23 @@ describe('approvals preliminary queue', () => {
     await expect(ApprovalsPage({ searchParams: Promise.resolve({}) })).rejects.toThrow(
       'REDIRECT:/dashboard'
     )
+  })
+
+  it('renders a compact empty state with a coverage CTA when the queue is clear', async () => {
+    createClientMock.mockResolvedValue(
+      createSupabaseMock({
+        userId: 'manager-1',
+        role: 'manager',
+        pendingRequests: [],
+        hasActivePreliminary: false,
+      })
+    )
+
+    const html = renderToStaticMarkup(await ApprovalsPage({ searchParams: Promise.resolve({}) }))
+
+    expect(html).toContain('No pending preliminary requests')
+    expect(html).toContain('Go to coverage to send preliminary')
+    expect(html).not.toContain('Approve')
   })
 
   it('approves and denies preliminary requests through server actions', async () => {

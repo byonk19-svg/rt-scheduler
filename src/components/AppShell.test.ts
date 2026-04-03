@@ -44,4 +44,9 @@ describe('AppShell sidebar styling', () => {
       "href: '/therapist/availability', label: 'Future Availability'"
     )
   })
+
+  it('uses Shift Board wording in shell navigation instead of Shift Swaps', () => {
+    expect(appShellSource).toContain("label: 'Shift Board'")
+    expect(appShellSource).not.toContain("label: 'Shift Swaps'")
+  })
 })

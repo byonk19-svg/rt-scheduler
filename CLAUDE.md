@@ -1,6 +1,30 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-01 (session 18)
+Updated: 2026-04-02 (session 19)
+
+## Latest Updates (2026-04-02, session 19)
+
+- **UI audit fix pass shipped (working tree)**:
+  - `src/components/preliminary/PreliminaryScheduleView.tsx` now groups preliminary shift cards by week with lightweight week dividers, so the page no longer reads as one flat list.
+  - `src/components/availability/AvailabilityStatusSummary.tsx` replaced hardcoded slate/orange/emerald classes with existing design tokens (`--warning-*`, `--success-*`, `border`, `muted`, `card`) to stay aligned with the app theme.
+  - `src/components/manager/ManagerTriageDashboard.tsx` now visually treats zero-value metric cards as intentional empty states instead of looking broken; empty cards switch to dashed/muted treatment while keeping the existing actionable prompts.
+  - `src/components/team/TeamDirectory.tsx` gives lead cards stronger distinction with a subtle primary-tinted card treatment, rather than relying only on the pill badge.
+  - `src/app/approvals/page.tsx` replaced the large dead-space empty state with a compact centered success-style state and direct coverage CTA.
+  - `src/components/coverage/CalendarGrid.tsx` now reserves the top-right `Needs attention` badge for constraint-blocked days, removing repeated alert noise on missing-lead-only cells while keeping the warning card treatment.
+  - `src/app/dashboard/staff/page.tsx` adds a second line of guidance to the empty upcoming-shifts state so the surface feels less sparse.
+  - `src/app/notifications/page.tsx` removes the subtitle duplication with the caught-up card; the header now uses a stable descriptive subtitle when unread count is zero.
+  - `src/components/AppShell.tsx` switches nav copy from **Shift Swaps** to **Shift Board** for both staff and manager shell navigation.
+  - New regression coverage added in:
+    - `src/components/preliminary/PreliminaryScheduleView.test.ts`
+    - `src/app/approvals/page.test.ts`
+    - `src/app/notifications/page.test.ts`
+    - `src/components/AppShell.test.ts`
+    - updated dashboard/team/preliminary tests remain green
+  - Verification in-session:
+    - `npm run lint` passed
+    - `npm run test:unit` passed (**346 tests**)
+    - `npm run build` passed
+    - `npx tsc --noEmit` passed after rerunning post-build because `.next/types` had been stale when `tsc` and `build` ran in parallel
 
 ## Latest Updates (2026-04-01, session 18)
 

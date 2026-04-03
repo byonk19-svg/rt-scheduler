@@ -302,6 +302,9 @@ export default async function StaffDashboardPage({
           ) : (
             <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-6 text-center">
               <p className="text-sm text-muted-foreground">No upcoming shifts yet in this cycle.</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Submit availability or browse the shift board while the next cycle is still filling.
+              </p>
               <div className="mt-3 flex justify-center gap-2">
                 <Button asChild size="sm" variant="outline">
                   <Link href="/therapist/availability">Submit availability</Link>

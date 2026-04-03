@@ -137,6 +137,8 @@ function TeamMemberCard({ profile, onClick }: { profile: TeamProfileRecord; onCl
       onClick={onClick}
       className={cn(
         'group flex w-full items-start gap-4 rounded-xl border border-border/70 bg-card/85 p-5 text-left shadow-none transition-all hover:border-primary/20 hover:bg-card',
+        profile.role === 'lead' &&
+          'border-primary/30 bg-primary/[0.04] hover:border-primary/45 hover:bg-primary/[0.06]',
         !isActive && 'opacity-75'
       )}
     >
@@ -161,7 +163,8 @@ function TeamMemberCard({ profile, onClick }: { profile: TeamProfileRecord; onCl
           <span
             className={cn(
               'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
-              roleBadgeClass(profile.role)
+              roleBadgeClass(profile.role),
+              profile.role === 'lead' && 'ring-1 ring-primary/10'
             )}
           >
             {profile.role === 'lead' ? (

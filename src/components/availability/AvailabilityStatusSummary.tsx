@@ -29,8 +29,8 @@ function TherapistRow({
   tone: 'warning' | 'success'
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-[11px] font-bold uppercase text-slate-600">
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-[11px] font-bold uppercase text-muted-foreground">
         {name
           .split(/\s+/)
           .filter(Boolean)
@@ -44,10 +44,10 @@ function TherapistRow({
           <span
             className={cn(
               'h-2 w-2 rounded-full',
-              tone === 'warning' ? 'bg-orange-400' : 'bg-emerald-500'
+              tone === 'warning' ? 'bg-[var(--warning-text)]' : 'bg-[var(--success-text)]'
             )}
           />
-          <span className="text-[11px] font-medium text-slate-500">{subtitle}</span>
+          <span className="text-[11px] font-medium text-muted-foreground">{subtitle}</span>
         </div>
       </div>
     </div>
@@ -62,28 +62,28 @@ export function AvailabilityStatusSummary({
 
   return (
     <section className="flex h-full flex-col" aria-labelledby="availability-response-heading">
-      <div className="border-b border-slate-200/80 px-5 py-4">
+      <div className="border-b border-border/80 px-5 py-4">
         <h2
           id="availability-response-heading"
-          className="text-sm font-bold tracking-[-0.01em] text-slate-700"
+          className="text-sm font-bold tracking-[-0.01em] text-foreground"
         >
           Response roster
         </h2>
       </div>
 
-      <div className="grid grid-cols-2 border-b border-slate-200/80 bg-slate-50/70">
+      <div className="grid grid-cols-2 border-b border-border/80 bg-muted/40">
         <button
           type="button"
           className={cn(
             'border-b-2 px-4 py-3 text-left text-xs font-bold transition-colors',
             activeTab === 'missing'
-              ? 'border-orange-400 text-slate-900'
-              : 'border-transparent text-slate-400 hover:text-slate-700'
+              ? 'border-[var(--warning-text)] text-foreground'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
           )}
           onClick={() => setActiveTab('missing')}
         >
           Not submitted yet{' '}
-          <span className="ml-1 rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] text-orange-700">
+          <span className="ml-1 rounded-full bg-[var(--warning-subtle)] px-1.5 py-0.5 text-[10px] text-[var(--warning-text)]">
             {missingRows.length}
           </span>
         </button>
@@ -92,13 +92,13 @@ export function AvailabilityStatusSummary({
           className={cn(
             'border-b-2 px-4 py-3 text-left text-xs font-bold transition-colors',
             activeTab === 'submitted'
-              ? 'border-emerald-400 text-slate-900'
-              : 'border-transparent text-slate-400 hover:text-slate-700'
+              ? 'border-[var(--success-text)] text-foreground'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
           )}
           onClick={() => setActiveTab('submitted')}
         >
           Submitted{' '}
-          <span className="ml-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] text-emerald-700">
+          <span className="ml-1 rounded-full bg-[var(--success-subtle)] px-1.5 py-0.5 text-[10px] text-[var(--success-text)]">
             {submittedRows.length}
           </span>
         </button>
@@ -106,7 +106,7 @@ export function AvailabilityStatusSummary({
 
       <div className="min-h-[25rem] flex-1 overflow-y-auto p-4">
         <div className={cn('space-y-3', activeTab !== 'missing' && 'hidden')}>
-          <p className="px-1 text-[11px] font-medium text-slate-500">
+          <p className="px-1 text-[11px] font-medium text-muted-foreground">
             {missingRows.length > 0
               ? `${pluralizeTherapists(missingRows.length)} still need to respond`
               : 'Everyone has submitted availability for this cycle.'}
@@ -122,14 +122,14 @@ export function AvailabilityStatusSummary({
               />
             ))
           ) : (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-700">
+            <div className="rounded-xl border border-[var(--success-border)] bg-[var(--success-subtle)] px-4 py-4 text-sm text-[var(--success-text)]">
               Everyone has responded. You can move forward with schedule planning.
             </div>
           )}
         </div>
 
         <div className={cn('space-y-3', activeTab !== 'submitted' && 'hidden')}>
-          <p className="px-1 text-[11px] font-medium text-slate-500">
+          <p className="px-1 text-[11px] font-medium text-muted-foreground">
             {submittedRows.length > 0
               ? `${pluralizeTherapists(submittedRows.length)} have already submitted`
               : 'No submissions yet for this cycle.'}
@@ -149,7 +149,7 @@ export function AvailabilityStatusSummary({
               />
             ))
           ) : (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">
+            <div className="rounded-xl border border-border bg-muted/30 px-4 py-4 text-sm text-muted-foreground">
               No one has submitted availability for this cycle yet.
             </div>
           )}

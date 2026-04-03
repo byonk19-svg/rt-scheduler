@@ -14,6 +14,7 @@ import {
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 const LOADING_LABEL = 'Loading...'
 
@@ -285,7 +286,12 @@ function MetricCard({
   const isActionableEmpty = value === '0' || value === '0%' || value === '--'
 
   return (
-    <Card className="rounded-2xl border-border/70 bg-card shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
+    <Card
+      className={cn(
+        'rounded-2xl border-border/70 bg-card shadow-[0_1px_8px_rgba(15,23,42,0.04)]',
+        isActionableEmpty && 'border-dashed bg-muted/20 shadow-none'
+      )}
+    >
       <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4">
         <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
           {title}
@@ -293,7 +299,14 @@ function MetricCard({
         {icon}
       </CardHeader>
       <CardContent className="space-y-1.5 pb-4">
-        <p className="text-2xl font-semibold leading-none tracking-tight text-foreground">
+        <p
+          className={cn(
+            'leading-none tracking-tight',
+            isActionableEmpty
+              ? 'text-lg font-semibold text-muted-foreground'
+              : 'text-2xl font-semibold text-foreground'
+          )}
+        >
           {value}
         </p>
         <p className="text-xs text-muted-foreground">

@@ -73,6 +73,7 @@ describe('ManagerTriageDashboard', () => {
     )
 
     expect(html).toContain('Loading...')
+    expect(html).toContain('border-dashed')
     expect(html).toContain('Review updates')
     expect(html).toContain('Open schedule')
     expect(html).toContain('href="/approvals"')
@@ -107,5 +108,6 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('Auto-draft or manually assign shifts for this cycle.')
     expect(html).toContain('Assign shifts and leads before publishing.')
     expect(html).toContain('Go')
+    expect(html).toContain('text-lg font-semibold text-muted-foreground')
   })
 })

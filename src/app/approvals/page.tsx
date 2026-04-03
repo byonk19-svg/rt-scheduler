@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { CalendarDays } from 'lucide-react'
+import { CalendarDays, CheckCircle2 } from 'lucide-react'
 
 import {
   approvePreliminaryRequestAction,
@@ -210,14 +210,21 @@ export default async function ApprovalsPage({
       )}
 
       {queue.length === 0 ? (
-        <div className="rounded-xl border border-border/70 bg-background/70 px-6 py-14 text-center shadow-none">
-          <p className="text-sm font-semibold text-foreground">No pending preliminary requests</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {hasActivePreliminary
-              ? 'Claims and change requests appear here while the preliminary schedule is live.'
-              : 'Send a preliminary schedule from Coverage to open this queue.'}
-          </p>
-          <div className="mt-4">
+        <div className="rounded-xl border border-border/70 bg-background/70 px-6 py-10 shadow-none">
+          <div className="mx-auto max-w-lg text-center">
+            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)]">
+              <CheckCircle2 className="h-5 w-5 text-[var(--success-text)]" />
+            </div>
+            <p className="mt-4 text-sm font-semibold text-foreground">
+              No pending preliminary requests
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {hasActivePreliminary
+                ? 'Claims and change requests appear here while the preliminary schedule is live.'
+                : 'Send a preliminary schedule from Coverage to open this queue.'}
+            </p>
+          </div>
+          <div className="mt-5 flex justify-center">
             <Button asChild size="sm" className="text-xs">
               <Link href="/coverage?view=week">
                 {hasActivePreliminary

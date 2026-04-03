@@ -175,7 +175,7 @@ export default async function NotificationsPage({
             <p className="mt-1 text-sm text-muted-foreground">
               {unreadCount > 0
                 ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}`
-                : "You're all caught up"}
+                : 'Schedule, request, and preliminary updates in one place.'}
             </p>
           </div>
           <div className="flex items-center gap-2">
