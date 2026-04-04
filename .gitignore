@@ -63,3 +63,4 @@ security_best_practices_report.md
 .cursor/mcp.json
 .codex-dev.log
 .omx/
+.codex/
