@@ -30,13 +30,18 @@ describe('ManagerTriageDashboard', () => {
         nextCycleDetail: 'Publish by Apr 27',
         needsReviewCount: 2,
         needsReviewDetail: 'Preliminary request waiting',
+        dayShiftsFilled: 18,
+        dayShiftsTotal: 21,
+        nightShiftsFilled: 15,
+        nightShiftsTotal: 21,
         approvalsHref: '/approvals',
         scheduleHref: '/coverage?view=week',
         reviewHref: '/approvals',
       })
     )
 
-    expect(html).toContain('Manager Dashboard')
+    expect(html).toContain('>Inbox</h1>')
+    expect(html).not.toContain('Manager Dashboard')
     expect(html).toContain('Coverage Issues')
     expect(html).toContain('Pending Approvals')
     expect(html).toContain('Upcoming Shifts')
@@ -66,6 +71,10 @@ describe('ManagerTriageDashboard', () => {
         nextCycleDetail: 'Loading',
         needsReviewCount: '--',
         needsReviewDetail: 'Loading',
+        dayShiftsFilled: '--',
+        dayShiftsTotal: '--',
+        nightShiftsFilled: '--',
+        nightShiftsTotal: '--',
         approvalsHref: '/approvals',
         scheduleHref: '/coverage?view=week',
         reviewHref: '/approvals',
@@ -97,6 +106,10 @@ describe('ManagerTriageDashboard', () => {
         nextCycleDetail: 'Publish by Apr 27',
         needsReviewCount: 0,
         needsReviewDetail: 'You are caught up.',
+        dayShiftsFilled: 0,
+        dayShiftsTotal: 0,
+        nightShiftsFilled: 0,
+        nightShiftsTotal: 0,
         approvalsHref: '/approvals',
         scheduleHref: '/coverage?view=week',
         reviewHref: '/approvals',

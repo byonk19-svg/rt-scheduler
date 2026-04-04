@@ -11,7 +11,9 @@ import {
   Shield,
   Users,
 } from 'lucide-react'
+import { motion } from 'framer-motion'
 
+import { ScheduleProgress } from '@/components/manager/ScheduleProgress'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -33,6 +35,10 @@ type ManagerTriageDashboardProps = {
   nextCycleDetail: string
   needsReviewCount: number | '--'
   needsReviewDetail: string
+  dayShiftsFilled: number | '--'
+  dayShiftsTotal: number | '--'
+  nightShiftsFilled: number | '--'
+  nightShiftsTotal: number | '--'
   approvalsHref: string
   scheduleHref: string
   reviewHref: string
@@ -53,6 +59,10 @@ export function ManagerTriageDashboard({
   nextCycleDetail,
   needsReviewCount,
   needsReviewDetail,
+  dayShiftsFilled,
+  dayShiftsTotal,
+  nightShiftsFilled,
+  nightShiftsTotal,
   approvalsHref,
   scheduleHref,
   reviewHref,
@@ -74,17 +84,57 @@ export function ManagerTriageDashboard({
     pendingRequests === '--' ? LOADING_LABEL : `${pendingRequests} pending`
   const teamLoadLabel =
     upcomingShiftCount === '--' ? LOADING_LABEL : `${upcomingShiftCount} upcoming shifts`
+  const fadeUp = {
+    hidden: { opacity: 0, y: 8 },
+    show: (index: number) => ({
+      opacity: 1,
+      y: 0,
+      transition: { delay: index * 0.06, duration: 0.3 },
+    }),
+  }
+  const metricCards = [
+    {
+      title: 'Coverage Issues',
+      value: riskCount === '--' ? '--' : String(riskCount),
+      detail: riskCountLabel,
+      href: scheduleHref,
+      icon: <Shield className="h-4 w-4 text-[var(--error-text)]" />,
+      emptyPrompt: 'No coverage gaps - review the schedule to confirm.',
+    },
+    {
+      title: 'Pending Approvals',
+      value: pendingRequests === '--' ? '--' : String(pendingRequests),
+      detail: pendingRequestLabel,
+      href: approvalsHref,
+      icon: <FileCheck className="h-4 w-4 text-[var(--warning-text)]" />,
+      emptyPrompt: 'Send a preliminary schedule to collect staff claims.',
+    },
+    {
+      title: 'Upcoming Shifts',
+      value: upcomingShiftCount === '--' ? '--' : String(upcomingShiftCount),
+      detail: teamLoadLabel,
+      href: scheduleHref,
+      icon: <Users className="h-4 w-4 text-primary" />,
+      emptyPrompt: 'Auto-draft or manually assign shifts for this cycle.',
+    },
+    {
+      title: 'Publish Readiness',
+      value: coveragePercent === null ? '--' : `${coveragePercent}%`,
+      detail: coveragePercent === null ? LOADING_LABEL : `${coveragePercent}% ready`,
+      href: reviewHref,
+      icon: <CheckCircle2 className="h-4 w-4 text-[var(--warning-text)]" />,
+      emptyPrompt: 'Assign shifts and leads before publishing.',
+    },
+  ]
 
   return (
     <div className="max-w-[1120px] space-y-4 px-5 py-5 xl:px-7">
       <div className="rounded-2xl border border-border/70 bg-card p-5 shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-[1.85rem] font-semibold tracking-tight text-foreground">
-              Manager Dashboard
-            </h1>
+            <h1 className="text-[1.85rem] font-semibold tracking-tight text-foreground">Inbox</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Current cycle status, staffing risk, and approval triage in one place.
+              Pending approvals, cycle status, and items needing your attention.
             </p>
             <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
               <span className="rounded-full border border-[var(--error-border)] bg-[var(--error-subtle)] px-2 py-0.5 text-[var(--error-text)]">
@@ -116,38 +166,17 @@ export function ManagerTriageDashboard({
       </div>
 
       <div className="grid gap-3 lg:grid-cols-4">
-        <MetricCard
-          title="Coverage Issues"
-          value={riskCount === '--' ? '--' : String(riskCount)}
-          detail={riskCountLabel}
-          href={scheduleHref}
-          icon={<Shield className="h-4 w-4 text-[var(--error-text)]" />}
-          emptyPrompt="No coverage gaps - review the schedule to confirm."
-        />
-        <MetricCard
-          title="Pending Approvals"
-          value={pendingRequests === '--' ? '--' : String(pendingRequests)}
-          detail={pendingRequestLabel}
-          href={approvalsHref}
-          icon={<FileCheck className="h-4 w-4 text-[var(--warning-text)]" />}
-          emptyPrompt="Send a preliminary schedule to collect staff claims."
-        />
-        <MetricCard
-          title="Upcoming Shifts"
-          value={upcomingShiftCount === '--' ? '--' : String(upcomingShiftCount)}
-          detail={teamLoadLabel}
-          href={scheduleHref}
-          icon={<Users className="h-4 w-4 text-primary" />}
-          emptyPrompt="Auto-draft or manually assign shifts for this cycle."
-        />
-        <MetricCard
-          title="Publish Readiness"
-          value={coveragePercent === null ? '--' : `${coveragePercent}%`}
-          detail={coveragePercent === null ? LOADING_LABEL : `${coveragePercent}% ready`}
-          href={reviewHref}
-          icon={<CheckCircle2 className="h-4 w-4 text-[var(--warning-text)]" />}
-          emptyPrompt="Assign shifts and leads before publishing."
-        />
+        {metricCards.map((card, index) => (
+          <motion.div
+            key={card.title}
+            custom={index}
+            variants={fadeUp}
+            initial="hidden"
+            animate="show"
+          >
+            <MetricCard {...card} />
+          </motion.div>
+        ))}
       </div>
 
       <div className="grid gap-3 xl:grid-cols-[2fr_1fr]">
@@ -264,6 +293,18 @@ export function ManagerTriageDashboard({
           )}
         </CardContent>
       </Card>
+
+      {dayShiftsFilled !== '--' &&
+        dayShiftsTotal !== '--' &&
+        nightShiftsFilled !== '--' &&
+        nightShiftsTotal !== '--' && (
+          <ScheduleProgress
+            dayFilled={dayShiftsFilled}
+            dayTotal={dayShiftsTotal}
+            nightFilled={nightShiftsFilled}
+            nightTotal={nightShiftsTotal}
+          />
+        )}
     </div>
   )
 }

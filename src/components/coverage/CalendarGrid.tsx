@@ -1,5 +1,6 @@
 'use client'
 
+import { useCallback, useMemo, useRef } from 'react'
 import { AlertTriangle } from 'lucide-react'
 
 import {
@@ -11,6 +12,23 @@ import { countActive, flatten, headcountThreshold, shouldShowMonthTag } from '@/
 import { cn } from '@/lib/utils'
 
 const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+
+export function nextIndex(current: number, key: string, total: number): number {
+  const cols = 7
+
+  switch (key) {
+    case 'ArrowRight':
+      return Math.min(current + 1, total - 1)
+    case 'ArrowLeft':
+      return Math.max(current - 1, 0)
+    case 'ArrowDown':
+      return Math.min(current + cols, total - 1)
+    case 'ArrowUp':
+      return Math.max(current - cols, 0)
+    default:
+      return current
+  }
+}
 
 type CalendarGridProps = {
   days: DayItem[]
@@ -56,9 +74,14 @@ export function CalendarGrid({
   onChangeStatus,
 }: CalendarGridProps) {
   const weeks = chunkWeeks(days)
+  const cellRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
+  const focusCell = useCallback((id: string) => {
+    cellRefs.current.get(id)?.focus()
+  }, [])
+  const flatDayIds = useMemo(() => days.map((day) => day.id), [days])
 
   return (
-    <div className="overflow-x-auto pb-2">
+    <div role="grid" aria-label="Coverage calendar" className="overflow-x-auto pb-2">
       <div className="min-w-[980px]">
         <div className="mb-2.5 grid grid-cols-7 gap-3 border-y border-border/80 py-2.25">
           {DOW.map((day) => (
@@ -86,20 +109,20 @@ export function CalendarGrid({
                   <div className="h-px flex-1 bg-border/90" />
                 </div>
 
-                <div className="grid grid-cols-7 gap-2.5">
+                <div role="row" className="grid grid-cols-7 gap-2.5">
                   {week.map((day, dayOffset) => {
                     const absoluteIndex = weekIndex * 7 + dayOffset
                     const activeCount = countActive(day)
                     const threshold = headcountThreshold(activeCount)
                     const totalCount = flatten(day).length
                     const showMonthTag = shouldShowMonthTag(absoluteIndex, day.isoDate)
-                    const missingLead = !day.leadShift
-                    const hasCoverageIssue = missingLead || day.constraintBlocked
+                    const hasCoverageIssue = day.constraintBlocked
                     const showAttentionBadge = day.constraintBlocked
 
                     return (
                       <article
                         key={day.id}
+                        role="gridcell"
                         data-testid={`coverage-day-panel-${day.id}`}
                         className={cn(
                           'relative min-h-[156px] rounded-[20px] border border-border/80 bg-card px-2.75 py-2.25 text-left shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-[border-color,box-shadow,transform] duration-200',
@@ -112,11 +135,30 @@ export function CalendarGrid({
                       >
                         <button
                           type="button"
-                          tabIndex={0}
+                          ref={(element) => {
+                            if (element) {
+                              cellRefs.current.set(day.id, element)
+                              return
+                            }
+                            cellRefs.current.delete(day.id)
+                          }}
+                          tabIndex={absoluteIndex === 0 ? 0 : -1}
                           data-testid={`coverage-day-cell-button-${day.id}`}
                           aria-label={`${schedulingViewOnly ? 'View' : 'Edit'} ${day.label}`}
                           className="absolute inset-0 rounded-[20px]"
                           onClick={() => onSelect(day.id)}
+                          onKeyDown={(event) => {
+                            if (
+                              !['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(
+                                event.key
+                              )
+                            ) {
+                              return
+                            }
+                            event.preventDefault()
+                            const next = nextIndex(absoluteIndex, event.key, flatDayIds.length)
+                            focusCell(flatDayIds[next])
+                          }}
                         />
 
                         <div className="pointer-events-none relative z-10">

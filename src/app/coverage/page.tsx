@@ -1,11 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Printer, Send, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
 
+import { AutoDraftConfirmDialog } from '@/components/coverage/AutoDraftConfirmDialog'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
 import { MoreActionsMenu } from '@/components/more-actions-menu'
 import { Button } from '@/components/ui/button'
@@ -130,11 +131,13 @@ function CoveragePageContent() {
   const [unassigningShiftId, setUnassigningShiftId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [autoDraftDialogOpen, setAutoDraftDialogOpen] = useState(false)
   const [error, setError] = useState<string>('')
   const [assignError, setAssignError] = useState<string>('')
   const [canManageCoverage, setCanManageCoverage] = useState(false)
   const [canUpdateAssignmentStatus, setCanUpdateAssignmentStatus] = useState(false)
   const [actorRole, setActorRole] = useState<Role | null>(null)
+  const autoDraftFormRef = useRef<HTMLFormElement>(null)
   const days = shiftTab === 'Day' ? dayDays : nightDays
   const setDays = shiftTab === 'Day' ? setDayDays : setNightDays
   const scheduleFeedbackParams = useMemo<ScheduleSearchParams>(
@@ -817,22 +820,28 @@ function CoveragePageContent() {
           actions={
             canManageCoverage ? (
               <>
-                <form action={generateDraftScheduleAction}>
+                <form
+                  ref={autoDraftFormRef}
+                  action={generateDraftScheduleAction}
+                  className="hidden"
+                  aria-hidden="true"
+                >
                   <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
                   <input type="hidden" name="view" value="week" />
                   <input type="hidden" name="show_unavailable" value="false" />
                   <input type="hidden" name="return_to" value="coverage" />
-                  <Button
-                    type="submit"
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5 text-xs"
-                    disabled={!activeCycleId || activeCyclePublished}
-                  >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    Auto-draft
-                  </Button>
                 </form>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-xs"
+                  disabled={!activeCycleId || activeCyclePublished}
+                  onClick={() => setAutoDraftDialogOpen(true)}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Auto-draft
+                </Button>
                 <form action={sendPreliminaryScheduleAction}>
                   <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
                   <input type="hidden" name="view" value="week" />
@@ -1097,6 +1106,11 @@ function CoveragePageContent() {
         onAssignTherapist={handleAssignTherapist}
         assignError={assignError}
         onUnassign={handleUnassign}
+      />
+      <AutoDraftConfirmDialog
+        open={autoDraftDialogOpen}
+        onOpenChange={setAutoDraftDialogOpen}
+        applyFormRef={autoDraftFormRef}
       />
       <PrintSchedule
         activeCycle={printCycle}

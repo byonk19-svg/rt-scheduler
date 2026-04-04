@@ -28,6 +28,10 @@ type DashboardData = {
   upcomingShiftDays: Array<{ label: string; count: number }>
   todayActiveShifts: Array<{ label: string; detail: string }>
   recentActivity: Array<{ title: string; timeLabel: string; href: string }>
+  dayShiftsFilled: number
+  dayShiftsTotal: number
+  nightShiftsFilled: number
+  nightShiftsTotal: number
 }
 
 type ManagerProfileRow = {
@@ -57,6 +61,11 @@ type ShiftAssignmentRow = {
   profiles: { full_name: string } | { full_name: string }[] | null
 }
 
+type ShiftCountRow = {
+  shift_type: 'day' | 'night'
+  user_id: string | null
+}
+
 const INITIAL_DATA: DashboardData = {
   pendingApprovals: 0,
   activeCycle: null,
@@ -70,6 +79,10 @@ const INITIAL_DATA: DashboardData = {
   upcomingShiftDays: [],
   todayActiveShifts: [],
   recentActivity: [],
+  dayShiftsFilled: 0,
+  dayShiftsTotal: 0,
+  nightShiftsFilled: 0,
+  nightShiftsTotal: 0,
 }
 
 function getOne<T>(value: T | T[] | null | undefined): T | null {
@@ -260,8 +273,25 @@ export default function ManagerDashboardPage() {
           todayActiveShiftsQuery = todayActiveShiftsQuery.eq('cycle_id', activeCycle.id)
         }
 
-        const [todayCoverageResult, upcomingShiftsResult, todayActiveShiftsResult] =
-          await Promise.all([todayCoverageQuery, upcomingShiftsQuery, todayActiveShiftsQuery])
+        const shiftCountQuery = activeCycle
+          ? supabase
+              .from('shifts')
+              .select('shift_type, user_id')
+              .eq('cycle_id', activeCycle.id)
+              .in('shift_type', ['day', 'night'])
+          : Promise.resolve({ data: [], error: null })
+
+        const [
+          todayCoverageResult,
+          upcomingShiftsResult,
+          todayActiveShiftsResult,
+          shiftCountResult,
+        ] = await Promise.all([
+          todayCoverageQuery,
+          upcomingShiftsQuery,
+          todayActiveShiftsQuery,
+          shiftCountQuery,
+        ])
 
         if (todayCoverageResult.error) {
           console.error('Failed to load today coverage metric:', todayCoverageResult.error)
@@ -272,10 +302,14 @@ export default function ManagerDashboardPage() {
         if (todayActiveShiftsResult.error) {
           console.error('Failed to load active shifts list:', todayActiveShiftsResult.error)
         }
+        if (shiftCountResult.error) {
+          console.error('Failed to load shift completion counts:', shiftCountResult.error)
+        }
 
         const todayRows = (todayCoverageResult.data ?? []) as ShiftStatusRow[]
         const upcomingRows = (upcomingShiftsResult.data ?? []) as ShiftDateRow[]
         const todayShiftRows = (todayActiveShiftsResult.data ?? []) as ShiftAssignmentRow[]
+        const shiftCountRows = (shiftCountResult.data ?? []) as ShiftCountRow[]
 
         const activeOperationalCodesByShiftId = await fetchActiveOperationalCodeMap(supabase, [
           ...new Set([
@@ -307,6 +341,8 @@ export default function ManagerDashboardPage() {
           .filter((row) => isWorkingScheduled(row.id))
           .slice(0, 6)
           .map(formatShiftLine)
+        const dayRows = shiftCountRows.filter((row) => row.shift_type === 'day')
+        const nightRows = shiftCountRows.filter((row) => row.shift_type === 'night')
 
         const activityRows = (recentActivityResult.data ?? []) as NotificationRow[]
         const recentActivity = activityRows.map((row) => ({
@@ -335,6 +371,10 @@ export default function ManagerDashboardPage() {
           upcomingShiftDays,
           todayActiveShifts,
           recentActivity,
+          dayShiftsFilled: dayRows.filter((row) => row.user_id !== null).length,
+          dayShiftsTotal: dayRows.length,
+          nightShiftsFilled: nightRows.filter((row) => row.user_id !== null).length,
+          nightShiftsTotal: nightRows.length,
         })
       } catch (error) {
         console.error('Failed to load manager dashboard data:', error)
@@ -400,6 +440,10 @@ export default function ManagerDashboardPage() {
       nextCycleDetail={nextCycleDetail}
       needsReviewCount={loading ? '--' : data.unreadReviewCount}
       needsReviewDetail={needsReviewDetail}
+      dayShiftsFilled={loading ? '--' : data.dayShiftsFilled}
+      dayShiftsTotal={loading ? '--' : data.dayShiftsTotal}
+      nightShiftsFilled={loading ? '--' : data.nightShiftsFilled}
+      nightShiftsTotal={loading ? '--' : data.nightShiftsTotal}
       approvalsHref={MANAGER_WORKFLOW_LINKS.approvals}
       scheduleHref={scheduleHref}
       reviewHref={data.latestUnreadHref}
