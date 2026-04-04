@@ -1,6 +1,17 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-02 (session 20)
+Updated: 2026-04-03 (session 21)
+
+## Latest Updates (2026-04-03, session 21)
+
+- **Ops-hub UI adoptions shipped** — 4 patterns adapted from the `teamwise-ops-hub` reference codebase:
+  - **CalendarGrid arrow-key nav**: `src/components/coverage/CalendarGrid.tsx` — `ArrowRight/Left/Up/Down` moves focus between day cells using a `Map<string, HTMLButtonElement>` ref + roving tabindex; `role="grid/row/gridcell"` ARIA attributes added. Helper `nextIndex()` exported for unit testing (8 tests in `CalendarGrid.test.ts`).
+  - **AutoDraftConfirmDialog**: `src/components/coverage/AutoDraftConfirmDialog.tsx` — confirm dialog before auto-draft to prevent accidental re-drafts; explains scheduling rules; "Apply Draft" programmatically submits the hidden real form via `ref.requestSubmit()`. Coverage page auto-draft form is now `className="hidden"` with a separate trigger button.
+  - **ScheduleProgress widget**: `src/components/manager/ScheduleProgress.tsx` — Day/Night shift completion progress bars (filled/total) with framer-motion slide-in; renders below the Recent Activity card on the manager inbox when shift data is available. Live counts fetched in `src/app/dashboard/manager/page.tsx` via a `shifts` query scoped to the active cycle.
+  - **Staggered metric card animations**: `src/components/manager/ManagerTriageDashboard.tsx` — metric cards array-driven with `motion.div` + `fadeUp` variant (60ms staggered delay). `ScheduleProgress` import and four new props (`dayShiftsFilled/Total`, `nightShiftsFilled/Total`) added to the dashboard.
+- **shadcn Progress primitive added**: `src/components/ui/progress.tsx` — installed via `npx shadcn@latest add progress`.
+- **Test count**: 364 passing (was 342), 0 TypeScript errors.
+- **Plan reference**: `docs/superpowers/plans/2026-04-02-ops-hub-ui-adoptions.md`
 
 ## Latest Updates (2026-04-02, session 20)
 
@@ -605,6 +616,10 @@ Typography classes:
 ## Tooling Gotchas
 
 - **framer-motion `ease`:** `ease: 'easeOut'` fails `tsc` — the `Easing` type requires specific literals. Omit `ease` entirely to use framer-motion's safe default.
+- **Auto-draft algorithm is not extracted:** The scheduling algorithm lives entirely inline inside `generateDraftScheduleAction` in `src/app/schedule/actions.ts` (~600 lines). There is no `generateSchedule()` lib function. Any dry-run or preview feature requires extracting it first.
+- **FK column names in schedule tables:** `work_patterns` and `availability_overrides` use `therapist_id` (not `user_id`) as the FK column — match what `generateDraftScheduleAction` uses when writing new queries against those tables.
+- **CalendarGrid has no React import:** `src/components/coverage/CalendarGrid.tsx` uses `'use client'` but has no `import ... from 'react'`. Add hooks as a fresh single import statement — don't look for an existing one to amend.
+- **`@/components/ui/progress` not installed by default:** Run `npx shadcn@latest add progress` before importing the Progress primitive. Not in the original shadcn set for this repo (added session 21).
 - **Preview MCP on Windows:** `preview_start` server tracking doesn't persist between tool calls. Use `tabs_context_mcp` + Chrome browser MCP tools (`computer screenshot`, `navigate`) for visual verification instead.
 - **Responsive stat grids:** Always `grid-cols-2 lg:grid-cols-4` — never bare `grid-cols-4` which clips on narrower viewports.
 - **Repo-local Next build lock on Windows:** if `npm run build` throws `EPERM` under `.next`, check for a running `next dev` process from this repo and stop it before rebuilding.
