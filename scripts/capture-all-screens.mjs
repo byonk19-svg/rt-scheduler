@@ -8,7 +8,7 @@
  *
  * Env:
  *   NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY (required for authenticated shots)
- *   PLAYWRIGHT_BASE_URL   (default http://127.0.0.1:3000)
+ *   PLAYWRIGHT_BASE_URL   (default http://127.0.0.1:3000 — if this points at production, shots won’t match local edits)
  *   SHOT_MANAGER_EMAIL    (default demo-manager@teamwise.test)
  *   SHOT_STAFF_EMAIL      (default demo-therapist01@teamwise.test)
  *   SHOT_PASSWORD         (default Teamwise123!)
@@ -20,6 +20,28 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 
 const baseURL = (process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '')
+
+/** Avoid CDN/browser serving a stale document or RSC payload during capture. */
+function cacheBustRelPath(relPath) {
+  const ts = Date.now()
+  const sep = relPath.includes('?') ? '&' : '?'
+  return `${relPath}${sep}_shot=${ts}`
+}
+
+function assertLikelyLocalDev() {
+  try {
+    const { hostname } = new URL(baseURL)
+    const local = hostname === 'localhost' || hostname === '127.0.0.1'
+    if (!local) {
+      console.warn(
+        `\n⚠️  PLAYWRIGHT_BASE_URL is ${baseURL} — screenshots show THAT server, not your unsaved local files.\n` +
+          '   For updated UI from this repo, use: npm run dev and http://127.0.0.1:3000 (default).\n'
+      )
+    }
+  } catch {
+    /* ignore */
+  }
+}
 
 const managerEmail =
   process.env.SHOT_MANAGER_EMAIL ?? process.env.E2E_USER_EMAIL ?? 'demo-manager@teamwise.test'
@@ -131,7 +153,8 @@ async function attachSession(context, email, pwd, outDir, label) {
   const jar = await buildAuthCookieJar(email, pwd)
   await context.addCookies(toPlaywrightCookies(jar))
   const page = await context.newPage()
-  await page.goto(`${baseURL}/dashboard`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  const dash = `${baseURL}${cacheBustRelPath('/dashboard')}`
+  await page.goto(dash, { waitUntil: 'domcontentloaded', timeout: 60_000 })
   if (/\/login/i.test(page.url())) {
     const snap = path.join(outDir, `_session-failed-${label}.png`)
     await page.screenshot({ path: snap, fullPage: true })
@@ -143,11 +166,13 @@ async function attachSession(context, email, pwd, outDir, label) {
 }
 
 async function capture(page, outDir, name, relPath) {
-  const url = `${baseURL}${relPath.startsWith('/') ? '' : '/'}${relPath}`
+  const pathPart = relPath.startsWith('/') ? relPath : `/${relPath}`
+  const url = `${baseURL}${cacheBustRelPath(pathPart)}`
   await page.goto(url, { waitUntil: 'networkidle', timeout: 90_000 }).catch(async () => {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90_000 })
   })
-  await page.waitForTimeout(600)
+  // Client-heavy App Router pages: give hydration a beat after network settles
+  await page.waitForTimeout(1200)
   const file = path.join(outDir, `${sanitizeFilename(name)}.png`)
   await page.screenshot({ path: file, fullPage: true })
   return file
@@ -155,7 +180,10 @@ async function capture(page, outDir, name, relPath) {
 
 async function tryPublishDetail(page, outDir) {
   try {
-    await page.goto(`${baseURL}/publish`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+    await page.goto(`${baseURL}${cacheBustRelPath('/publish')}`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    })
     await page.waitForTimeout(800)
     const link = page
       .locator('a[href^="/publish/"]')
@@ -163,8 +191,12 @@ async function tryPublishDetail(page, outDir) {
       .first()
     const href = await link.getAttribute('href')
     if (!href || href === '/publish') return null
-    await page.goto(`${baseURL}${href}`, { waitUntil: 'networkidle', timeout: 60_000 })
-    await page.waitForTimeout(600)
+    const detailPath = href.startsWith('/') ? href : `/${href}`
+    await page.goto(`${baseURL}${cacheBustRelPath(detailPath)}`, {
+      waitUntil: 'networkidle',
+      timeout: 60_000,
+    })
+    await page.waitForTimeout(1200)
     const file = path.join(outDir, '22-manager-publish-detail.png')
     await page.screenshot({ path: file, fullPage: true })
     return file
@@ -174,19 +206,26 @@ async function tryPublishDetail(page, outDir) {
 }
 
 async function main() {
+  assertLikelyLocalDev()
+
   const stamp = new Date().toISOString().replace(/[:.]/g, '-')
   const outDir = path.join(process.cwd(), 'artifacts', 'screen-capture', stamp)
   await fs.mkdir(outDir, { recursive: true })
 
   const browser = await chromium.launch({ headless: true })
-  const publicContext = await browser.newContext({
+  const contextOpts = {
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: 1,
-  })
+    serviceWorkers: 'block',
+  }
+  const publicContext = await browser.newContext(contextOpts)
   const publicPage = await publicContext.newPage()
 
   console.log(`Base URL: ${baseURL}`)
-  console.log(`Output: ${outDir}\n`)
+  console.log(`Output: ${outDir}`)
+  console.log(
+    'Using cache-busted navigations + blocked service workers so each shot reflects a fresh document load.\n'
+  )
 
   for (const shot of PUBLIC_SHOTS) {
     const file = await capture(publicPage, outDir, shot.name, shot.path)
@@ -196,10 +235,7 @@ async function main() {
   await publicContext.close()
 
   console.log('\n--- Manager session ---')
-  const managerContext = await browser.newContext({
-    viewport: { width: 1440, height: 900 },
-    deviceScaleFactor: 1,
-  })
+  const managerContext = await browser.newContext(contextOpts)
   const page = await attachSession(managerContext, managerEmail, password, outDir, 'manager')
   for (const shot of MANAGER_SHOTS) {
     const file = await capture(page, outDir, shot.name, shot.path)
@@ -211,10 +247,7 @@ async function main() {
 
   await managerContext.close()
 
-  const staffContext = await browser.newContext({
-    viewport: { width: 1440, height: 900 },
-    deviceScaleFactor: 1,
-  })
+  const staffContext = await browser.newContext(contextOpts)
 
   console.log('\n--- Staff session ---')
   const page2 = await attachSession(staffContext, staffEmail, password, outDir, 'staff')
@@ -226,7 +259,12 @@ async function main() {
   await staffContext.close()
   await browser.close()
 
-  console.log(`\nDone. Open folder: ${outDir}`)
+  const latestDir = path.join(process.cwd(), 'artifacts', 'screen-capture', 'latest')
+  await fs.rm(latestDir, { recursive: true, force: true })
+  await fs.cp(outDir, latestDir, { recursive: true })
+
+  console.log(`\nDone. This run: ${outDir}`)
+  console.log(`Mirror (always newest): ${latestDir}`)
 }
 
 main().catch((err) => {

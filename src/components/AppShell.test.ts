@@ -49,4 +49,13 @@ describe('AppShell sidebar styling', () => {
     expect(appShellSource).toContain("label: 'Shift Board'")
     expect(appShellSource).not.toContain("label: 'Shift Swaps'")
   })
+
+  it('uses Inbox wording in manager nav instead of Dashboard', () => {
+    expect(appShellSource).toContain(
+      "{ href: MANAGER_WORKFLOW_LINKS.dashboard, label: 'Inbox', icon: LayoutDashboard }"
+    )
+    expect(appShellSource).not.toContain(
+      "{ href: MANAGER_WORKFLOW_LINKS.dashboard, label: 'Dashboard', icon: LayoutDashboard }"
+    )
+  })
 })

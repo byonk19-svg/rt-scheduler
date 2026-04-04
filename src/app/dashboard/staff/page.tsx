@@ -329,7 +329,14 @@ export default async function StaffDashboardPage({
           </p>
           <p className="mt-1 text-xs text-muted-foreground">Earliest scheduled shift</p>
         </div>
-        <div className="rounded-xl border border-border bg-muted/30 px-3 py-2.5">
+        <div
+          className={cn(
+            'rounded-xl border px-3 py-2.5',
+            availabilitySubmitted
+              ? 'border-border bg-muted/30'
+              : 'border-[var(--warning-border)] bg-[var(--warning-subtle)]/40'
+          )}
+        >
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>Availability</span>
             <CheckCircle2

@@ -19,3 +19,11 @@ describe('staff dashboard future availability links', () => {
     expect(staffDashboardSource).toContain(".in('id', rosterUserIds)")
   })
 })
+
+describe('staff dashboard availability stat card', () => {
+  it('marks the availability card as pending when the source code has conditional warning treatment', () => {
+    expect(staffDashboardSource).toContain('availabilitySubmitted')
+    expect(staffDashboardSource).toContain('var(--warning-subtle)')
+    expect(staffDashboardSource).toContain('var(--warning-border)')
+  })
+})

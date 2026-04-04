@@ -1,10 +1,26 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-02 (session 19)
+Updated: 2026-04-02 (session 20)
+
+## Latest Updates (2026-04-02, session 20)
+
+- **Design audit fixes shipped (session 20)** — 5 targeted visual fixes from the session 20 audit:
+  - **Coverage calendar**: `src/components/coverage/CalendarGrid.tsx` — `hasCoverageIssue` now only fires on `day.constraintBlocked`, not `missingLead || constraintBlocked`. Missing-lead-only days already show their warning through the lead sub-section widget inside each card; the full yellow card background was causing the entire 6-week calendar to look permanently alarmed with demo data. Removed the now-unused `missingLead` variable entirely.
+  - **Preliminary week dividers**: `src/components/preliminary/PreliminaryScheduleView.tsx` — week group wrapper changed from `space-y-7` → `space-y-10`; week label div top padding changed from `pt-1` → `pt-3`. Week headers now visually chunk the page instead of disappearing into the scroll.
+  - **Availability workspace layout**: `src/components/availability/availability-workspace-shell.tsx` — removed the `xl:grid-cols-[minmax(0,1fr)_21rem]` side-by-side grid; response roster now stacks full-width below the planning card instead of being crammed into a 21rem aside. Also replaced all hardcoded `bg-white`, `border-slate-200`, `bg-slate-50/60` classes with design tokens (`bg-card`, `border-border`, `bg-muted/30`). Button in `src/app/availability/page.tsx` changed from hardcoded slate classes to `variant="outline"`.
+  - **Manager dashboard renamed to Inbox**: `src/components/manager/ManagerTriageDashboard.tsx` h1 changed from `Manager Dashboard` → `Inbox`; subtitle updated to "Pending approvals, cycle status, and items needing your attention." `src/components/AppShell.tsx` manager nav label changed from `Dashboard` → `Inbox`. Tests updated in `ManagerTriageDashboard.test.ts` and `AppShell.test.ts`.
+  - **Staff dashboard availability card**: `src/app/dashboard/staff/page.tsx` — Availability stat card now uses `border-[var(--warning-border)] bg-[var(--warning-subtle)]/40` when `!availabilitySubmitted`, making it visually distinct from the neutral adjacent cards.
+  - Also fixed: `src/components/availability/AvailabilityStatusSummary.tsx:42` — last remaining hardcoded `text-slate-800` → `text-foreground`.
+
+- **Screenshots re-captured after session 20 fixes**: `artifacts/screen-capture/latest/` is the current baseline. All 5 fixes verified via browser screenshot (Chrome MCP) and screenshot comparison.
+
+- **Audit plan reference**: `docs/superpowers/plans/2026-04-02-design-audit-fixes.md` — the plan written and executed this session.
+
+- **Next session start prompt**: Open a new chat and say: "Look at the screenshots in artifacts/screen-capture/latest/ and audit them for any remaining design issues — focus on the availability page response roster (sticky header opportunity) and any new issues."
 
 ## Latest Updates (2026-04-02, session 19)
 
-- **UI audit fix pass shipped (working tree)**:
+- **UI audit fix pass shipped via Codex**:
   - `src/components/preliminary/PreliminaryScheduleView.tsx` now groups preliminary shift cards by week with lightweight week dividers, so the page no longer reads as one flat list.
   - `src/components/availability/AvailabilityStatusSummary.tsx` replaced hardcoded slate/orange/emerald classes with existing design tokens (`--warning-*`, `--success-*`, `border`, `muted`, `card`) to stay aligned with the app theme.
   - `src/components/manager/ManagerTriageDashboard.tsx` now visually treats zero-value metric cards as intentional empty states instead of looking broken; empty cards switch to dashed/muted treatment while keeping the existing actionable prompts.
@@ -14,17 +30,13 @@ Updated: 2026-04-02 (session 19)
   - `src/app/dashboard/staff/page.tsx` adds a second line of guidance to the empty upcoming-shifts state so the surface feels less sparse.
   - `src/app/notifications/page.tsx` removes the subtitle duplication with the caught-up card; the header now uses a stable descriptive subtitle when unread count is zero.
   - `src/components/AppShell.tsx` switches nav copy from **Shift Swaps** to **Shift Board** for both staff and manager shell navigation.
-  - New regression coverage added in:
-    - `src/components/preliminary/PreliminaryScheduleView.test.ts`
-    - `src/app/approvals/page.test.ts`
-    - `src/app/notifications/page.test.ts`
-    - `src/components/AppShell.test.ts`
-    - updated dashboard/team/preliminary tests remain green
-  - Verification in-session:
-    - `npm run lint` passed
-    - `npm run test:unit` passed (**346 tests**)
-    - `npm run build` passed
-    - `npx tsc --noEmit` passed after rerunning post-build because `.next/types` had been stale when `tsc` and `build` ran in parallel
+  - Verification: `npm run lint` + `npm run test:unit` (346 tests) + `npm run build` + `npx tsc --noEmit` all passed.
+
+- **Screenshots re-captured after Codex changes**: `artifacts/screen-capture/` has been refreshed with post-fix screenshots (same filenames, same naming scheme as session 18). These are the **current state** of the app and should be used as the baseline for the next audit round.
+
+- **Audit plan reference**: `docs/superpowers/plans/2026-04-01-ui-audit-fixes.md` — the plan Codex executed. Keep as reference for what was targeted.
+
+- **Next session start prompt**: Open a new chat and say: "Look at the new screenshots in artifacts/screen-capture/ and audit them against the session 18 fixes — check whether each fix landed correctly and identify any new issues."
 
 ## Latest Updates (2026-04-01, session 18)
 
@@ -180,8 +192,8 @@ Updated: 2026-04-02 (session 19)
       - `publish by` = 1 day before the next cycle `start_date`
     - `Needs review` currently uses unread manager notifications as the lightweight inbox feed.
   - Product note:
-    - the nav label is still `Dashboard`, but the page concept is now much closer to `Inbox`.
-    - if the product keeps this direction, renaming the nav item from `Dashboard` to `Inbox` is likely the right follow-up.
+    - the nav label is now `Inbox` (renamed in session 20) and the page h1 is also `Inbox`.
+    - the rename is complete — no further follow-up needed on this.
 
 - **Manager-facing routes now share one quieter workspace header language**:
   - New shared component:
@@ -529,7 +541,7 @@ E2E specs:
 - `/pending-setup` post-signup onboarding gate
 - `/dashboard` role redirect
 - `/dashboard/manager`, `/dashboard/staff`
-  - `/dashboard/manager` is now conceptually a manager inbox, not a traditional analytics dashboard
+  - `/dashboard/manager` is the manager **Inbox** — h1 and nav label both read "Inbox" (renamed session 20)
 - `/coverage` dedicated coverage UI (client page, full-width calendar + dialog/popover editing model)
 - `/schedule` compatibility redirect entrypoint -> `/coverage` (all roles)
 - `/approvals`
@@ -645,6 +657,7 @@ Assignment status is informational only (does not affect coverage counts or publ
 - Coverage E2E now validates dialog/popover workflow instead of the removed drawer
 - Dialog density is controlled centrally in `src/components/coverage/shift-editor-dialog-layout.ts`
 - **Constraint warning gotcha:** `constraintBlockedSlotKeys` in `coverage/page.tsx` is built from unfilled shift rows (`user_id IS NULL`). After the loop, any slot key that also has an assigned therapist is deleted from the set — so "No eligible therapists (constraints)" only appears for truly empty slots; manually assigned therapists suppress it.
+- **Day-card warning treatment:** `hasCoverageIssue` in `CalendarGrid.tsx` is `day.constraintBlocked` only — **not** `missingLead || constraintBlocked`. Missing-lead-only days show their warning exclusively through the lead sub-section widget inside the card (which uses `day.leadShift` directly). Do not restore `missingLead` to `hasCoverageIssue` — it caused the entire 6-week calendar to look permanently alarmed in the demo data.
 
 ## Team UX
 
@@ -680,8 +693,7 @@ Assignment status is informational only (does not affect coverage counts or publ
 - User avatar: `var(--attention)` amber
 - Manager badge: `bg-[var(--warning-subtle)] text-[var(--warning-text)] border-[var(--warning-border)]`
 - App shell header `z-30`; coverage slide-over `z-50`
-- Manager nav order: Dashboard -> Schedule -> Availability -> Shift Swaps -> Team -> Publish History
-  - Note: `Dashboard` still appears in nav text, but the underlying page is now behaving like an inbox
+- Manager nav order: Inbox -> Schedule -> Availability -> Shift Board -> Team -> Approvals -> Publish History
 
 ## Assignment Status
 

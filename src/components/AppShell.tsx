@@ -63,7 +63,7 @@ const STAFF_NAV_ITEMS: readonly NavItem[] = [
 ]
 
 const MANAGER_NAV_ITEMS: readonly NavItem[] = [
-  { href: MANAGER_WORKFLOW_LINKS.dashboard, label: 'Dashboard', icon: LayoutDashboard },
+  { href: MANAGER_WORKFLOW_LINKS.dashboard, label: 'Inbox', icon: LayoutDashboard },
   {
     href: MANAGER_WORKFLOW_LINKS.coverage,
     label: 'Schedule',

@@ -39,7 +39,7 @@ function TherapistRow({
           .join('')}
       </div>
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-slate-800">{name}</p>
+        <p className="truncate text-sm font-semibold text-foreground">{name}</p>
         <div className="mt-1 flex items-center gap-1.5">
           <span
             className={cn(
