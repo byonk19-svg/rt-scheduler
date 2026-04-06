@@ -31,4 +31,15 @@ describe('coverage publish override affordance', () => {
     expect(source).toContain("override_weekly_rules: overrideWeeklyRules ? 'true' : undefined")
     expect(source).toContain("override_shift_rules: overrideShiftRules ? 'true' : undefined")
   })
+
+  it('surfaces cycle workflow controls in the coverage workspace', () => {
+    const filePath = resolve(process.cwd(), 'src/app/coverage/page.tsx')
+    const source = readFileSync(filePath, 'utf8')
+
+    expect(source).toContain('New 6-week block')
+    expect(source).toContain('ClearDraftConfirmDialog')
+    expect(source).toContain('CycleManagementDialog')
+    expect(source).toContain('Live schedule - edits stay enabled')
+    expect(source).toContain('Publish history')
+  })
 })

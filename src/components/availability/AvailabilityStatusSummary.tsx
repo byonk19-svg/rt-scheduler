@@ -104,7 +104,7 @@ export function AvailabilityStatusSummary({
         </button>
       </div>
 
-      <div className="min-h-[25rem] flex-1 overflow-y-auto p-4">
+      <div className="max-h-[560px] overflow-y-auto p-4">
         <div className={cn('space-y-3', activeTab !== 'missing' && 'hidden')}>
           <p className="px-1 text-[11px] font-medium text-muted-foreground">
             {missingRows.length > 0

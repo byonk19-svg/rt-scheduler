@@ -29,6 +29,8 @@ const WEEK_DAYS = [
   { d: 'S', n: 15, staff: 0, status: 'empty' as const },
 ]
 
+const AUTH_REQUEST_TIMEOUT_MS = 10000
+
 function toFriendlyLoginError(message: string): string {
   const normalized = message.toLowerCase()
   if (normalized.includes('invalid login credentials')) {
@@ -37,6 +39,23 @@ function toFriendlyLoginError(message: string): string {
   if (normalized.includes('email not confirmed')) {
     return 'Check your email for the confirmation link, then try signing in again.'
   }
+  return message
+}
+
+function toFriendlyAuthTransportError(message: string): string {
+  const normalized = message.toLowerCase()
+
+  if (
+    normalized.includes('timed out') ||
+    normalized.includes('timeout') ||
+    normalized.includes('failed to fetch') ||
+    normalized.includes('fetch failed') ||
+    normalized.includes('network') ||
+    normalized.includes('reach teamwise services')
+  ) {
+    return 'We could not reach Teamwise services. Check your internet or VPN and try again.'
+  }
+
   return message
 }
 
@@ -61,6 +80,23 @@ function toFriendlyQueryError(code: string | null): string | null {
   }
 
   return null
+}
+
+async function withAuthTimeout<T>(promise: Promise<T>, actionLabel: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error(`${actionLabel} timed out. Check your internet or VPN and try again.`))
+        }, AUTH_REQUEST_TIMEOUT_MS)
+      }),
+    ])
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
+  }
 }
 
 export default function HomePage() {
@@ -99,18 +135,28 @@ export default function HomePage() {
     setError(null)
     setMessage(null)
 
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: resetPasswordUrl,
-    })
+    try {
+      const { error: resetError } = await withAuthTimeout(
+        supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: resetPasswordUrl,
+        }),
+        'Password reset'
+      )
 
-    if (resetError) {
-      setError(resetError.message)
+      if (resetError) {
+        setError(toFriendlyAuthTransportError(resetError.message))
+        setLoading(false)
+        return
+      }
+
+      setMessage('Check your email. We sent a password reset link.')
       setLoading(false)
-      return
+    } catch (requestError) {
+      const message =
+        requestError instanceof Error ? requestError.message : 'Could not reset your password.'
+      setError(toFriendlyAuthTransportError(message))
+      setLoading(false)
     }
-
-    setMessage('Check your email. We sent a password reset link.')
-    setLoading(false)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -120,42 +166,64 @@ export default function HomePage() {
     setMessage(null)
 
     if (isLogin) {
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+      try {
+        const { error: signInError } = await withAuthTimeout(
+          supabase.auth.signInWithPassword({ email, password }),
+          'Sign-in'
+        )
 
-      if (signInError) {
-        setError(toFriendlyLoginError(signInError.message))
+        if (signInError) {
+          setError(toFriendlyLoginError(toFriendlyAuthTransportError(signInError.message)))
+          setLoading(false)
+          return
+        }
+
+        router.push('/dashboard?success=signed_in')
+        router.refresh()
+        return
+      } catch (requestError) {
+        const message =
+          requestError instanceof Error ? requestError.message : 'Could not sign in.'
+        setError(toFriendlyAuthTransportError(message))
+        setLoading(false)
+        return
+      }
+    }
+
+    const fullName = `${firstName} ${lastName}`.trim()
+    try {
+      const { error: signUpError } = await withAuthTimeout(
+        supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: authCallbackUrl,
+            data: {
+              full_name: fullName,
+              phone_number: phone,
+              role,
+              shift_type: 'day',
+            },
+          },
+        }),
+        'Sign-up'
+      )
+
+      if (signUpError) {
+        setError(toFriendlySignupError(toFriendlyAuthTransportError(signUpError.message)))
         setLoading(false)
         return
       }
 
-      router.push('/dashboard?success=signed_in')
+      router.push('/pending-setup?success=access_requested')
       router.refresh()
-      return
-    }
-
-    const fullName = `${firstName} ${lastName}`.trim()
-    const { error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: authCallbackUrl,
-        data: {
-          full_name: fullName,
-          phone_number: phone,
-          role,
-          shift_type: 'day',
-        },
-      },
-    })
-
-    if (signUpError) {
-      setError(toFriendlySignupError(signUpError.message))
+    } catch (requestError) {
+      const message =
+        requestError instanceof Error ? requestError.message : 'Could not create your account.'
+      setError(toFriendlyAuthTransportError(message))
       setLoading(false)
       return
     }
-
-    router.push('/pending-setup?success=access_requested')
-    router.refresh()
   }
 
   return (

@@ -94,45 +94,59 @@ export function ManagerTriageDashboard({
   }
   const metricCards = [
     {
+      eyebrow: 'Risk watch',
       title: 'Coverage Issues',
       value: riskCount === '--' ? '--' : String(riskCount),
       detail: riskCountLabel,
       href: scheduleHref,
       icon: <Shield className="h-4 w-4 text-[var(--error-text)]" />,
       emptyPrompt: 'No coverage gaps - review the schedule to confirm.',
+      tone: 'error' as const,
     },
     {
+      eyebrow: 'Queue',
       title: 'Pending Approvals',
       value: pendingRequests === '--' ? '--' : String(pendingRequests),
       detail: pendingRequestLabel,
       href: approvalsHref,
       icon: <FileCheck className="h-4 w-4 text-[var(--warning-text)]" />,
       emptyPrompt: 'Send a preliminary schedule to collect staff claims.',
+      tone: 'warning' as const,
     },
     {
+      eyebrow: 'Forecast',
       title: 'Upcoming Shifts',
       value: upcomingShiftCount === '--' ? '--' : String(upcomingShiftCount),
       detail: teamLoadLabel,
       href: scheduleHref,
       icon: <Users className="h-4 w-4 text-primary" />,
       emptyPrompt: 'Auto-draft or manually assign shifts for this cycle.',
+      tone: 'info' as const,
     },
     {
+      eyebrow: 'Release',
       title: 'Publish Readiness',
       value: coveragePercent === null ? '--' : `${coveragePercent}%`,
       detail: coveragePercent === null ? LOADING_LABEL : `${coveragePercent}% ready`,
       href: reviewHref,
       icon: <CheckCircle2 className="h-4 w-4 text-[var(--warning-text)]" />,
       emptyPrompt: 'Assign shifts and leads before publishing.',
+      tone: 'success' as const,
     },
   ]
 
   return (
     <div className="max-w-[1120px] space-y-4 px-5 py-5 xl:px-7">
-      <div className="rounded-2xl border border-border/70 bg-card p-5 shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="teamwise-aurora-bg relative overflow-hidden rounded-[26px] border border-border/70 bg-card p-5 shadow-[0_20px_40px_-34px_rgba(15,23,42,0.5)]">
+        <div className="teamwise-grid-bg-subtle absolute inset-0 opacity-70" />
+        <div className="relative flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-[1.85rem] font-semibold tracking-tight text-foreground">Inbox</h1>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Operations bulletin
+            </p>
+            <h1 className="font-heading text-[1.85rem] font-semibold tracking-[-0.04em] text-foreground">
+              Inbox
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Pending approvals, cycle status, and items needing your attention.
             </p>
@@ -148,7 +162,7 @@ export function ManagerTriageDashboard({
               </span>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="relative flex gap-2">
             <Button variant="outline" size="sm" className="h-9 px-4" asChild>
               <Link href={scheduleHref}>
                 <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
@@ -271,6 +285,18 @@ export function ManagerTriageDashboard({
         </div>
       </div>
 
+      {dayShiftsFilled !== '--' &&
+        dayShiftsTotal !== '--' &&
+        nightShiftsFilled !== '--' &&
+        nightShiftsTotal !== '--' && (
+          <ScheduleProgress
+            dayFilled={dayShiftsFilled}
+            dayTotal={dayShiftsTotal}
+            nightFilled={nightShiftsFilled}
+            nightTotal={nightShiftsTotal}
+          />
+        )}
+
       <Card className="rounded-2xl border-border/70 bg-card shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
         <CardHeader className="pb-2 pt-4">
           <CardTitle className="text-sm font-medium text-foreground">Recent Activity</CardTitle>
@@ -293,56 +319,72 @@ export function ManagerTriageDashboard({
           )}
         </CardContent>
       </Card>
-
-      {dayShiftsFilled !== '--' &&
-        dayShiftsTotal !== '--' &&
-        nightShiftsFilled !== '--' &&
-        nightShiftsTotal !== '--' && (
-          <ScheduleProgress
-            dayFilled={dayShiftsFilled}
-            dayTotal={dayShiftsTotal}
-            nightFilled={nightShiftsFilled}
-            nightTotal={nightShiftsTotal}
-          />
-        )}
     </div>
   )
 }
 
 function MetricCard({
+  eyebrow,
   title,
   value,
   detail,
   href,
   icon,
   emptyPrompt,
+  tone,
 }: {
+  eyebrow: string
   title: string
   value: string
   detail: string
   href: string
   icon: ReactNode
   emptyPrompt?: string
+  tone: 'error' | 'warning' | 'info' | 'success'
 }) {
   const isActionableEmpty = value === '0' || value === '0%' || value === '--'
+  const toneClasses = {
+    error: {
+      stripe: 'bg-[var(--error)]',
+      badge: 'bg-[var(--error-subtle)] text-[var(--error-text)]',
+    },
+    warning: {
+      stripe: 'bg-[var(--warning)]',
+      badge: 'bg-[var(--warning-subtle)] text-[var(--warning-text)]',
+    },
+    info: {
+      stripe: 'bg-primary',
+      badge: 'bg-[var(--info-subtle)] text-[var(--info-text)]',
+    },
+    success: {
+      stripe: 'bg-[var(--success)]',
+      badge: 'bg-[var(--success-subtle)] text-[var(--success-text)]',
+    },
+  }[tone]
 
   return (
     <Card
       className={cn(
-        'rounded-2xl border-border/70 bg-card shadow-[0_1px_8px_rgba(15,23,42,0.04)]',
+        'relative overflow-hidden rounded-[24px] border-border/70 bg-card/95 shadow-[0_16px_36px_-32px_rgba(15,23,42,0.5)] transition-transform duration-200 hover:-translate-y-0.5',
         isActionableEmpty && 'border-dashed bg-muted/20 shadow-none'
       )}
     >
+      <div className={cn('absolute inset-x-0 top-0 h-1', toneClasses.stripe)} />
       <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4">
-        <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-          {title}
-        </CardTitle>
-        {icon}
+        <div className="space-y-1">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            {eyebrow}
+          </p>
+          <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            {title}
+          </CardTitle>
+        </div>
+        <div className={cn('rounded-full p-2', toneClasses.badge)}>{icon}</div>
       </CardHeader>
       <CardContent className="space-y-1.5 pb-4">
         <p
           className={cn(
-            'leading-none tracking-tight',
+            'font-heading leading-none tracking-[-0.04em]',
             isActionableEmpty
               ? 'text-lg font-semibold text-muted-foreground'
               : 'text-2xl font-semibold text-foreground'

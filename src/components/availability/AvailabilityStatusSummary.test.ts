@@ -28,4 +28,20 @@ describe('AvailabilityStatusSummary', () => {
     expect(html).toContain('Barbara C.')
     expect(html).not.toContain('data-slot="card"')
   })
+
+  it('renders the list container with a max-height class so it scrolls internally', () => {
+    const html = renderToStaticMarkup(
+      createElement(AvailabilityStatusSummary, {
+        submittedRows: Array.from({ length: 30 }, (_, i) => ({
+          therapistId: `t-${i}`,
+          therapistName: `Therapist ${i}`,
+          overridesCount: 1,
+        })),
+        missingRows: [],
+      })
+    )
+
+    expect(html).toContain('max-h-[560px]')
+    expect(html).not.toMatch(/flex-1.*overflow-y-auto|overflow-y-auto.*flex-1/)
+  })
 })

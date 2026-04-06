@@ -8,7 +8,8 @@ Focused view of the active schema used by scheduling, coverage, publish, and req
   - User identity + staffing fields (`role`, `shift_type`, `employment_type`, `max_work_days_per_week`, `is_lead_eligible`, `on_fmla`, `is_active`, `site_id`).
   - `id` references `auth.users.id`.
 - `schedule_cycles`
-  - Scheduling windows (`label`, `start_date`, `end_date`, `published`).
+  - Scheduling windows (`label`, `start_date`, `end_date`, `published`, `archived_at`).
+  - `archived_at` hides non-live historical cycles from active scheduling surfaces without deleting related records.
 - `shifts`
   - Assignment rows by cycle/date/shift/user.
   - Key fields: `status`, `role`, `assignment_status`, override metadata, `unfilled_reason`, `site_id`.
@@ -47,6 +48,7 @@ Focused view of the active schema used by scheduling, coverage, publish, and req
 
 - `publish_events`
   - Publish audit per cycle: counts (`recipient_count`, `queued_count`, `sent_count`, `failed_count`) and status.
+  - Deleting a publish event does not delete the underlying schedule cycle.
 - `notification_outbox`
   - Async delivery queue for publish emails (`queued`/`sent`/`failed`, `attempt_count`, `last_error`).
 - `notifications`
@@ -65,6 +67,12 @@ Focused view of the active schema used by scheduling, coverage, publish, and req
 - `schedule_cycles (1) -> (many) availability_overrides`
 - `publish_events (1) -> (many) notification_outbox`
 - `shifts (1) -> (many) shift_posts`
+
+## Lifecycle Notes
+
+- The cycle itself lives in `schedule_cycles`.
+- Publish history lives in `publish_events`.
+- If an old cycle should disappear from Coverage and Availability, archive the `schedule_cycles` row; deleting `publish_events` alone is not enough.
 
 ## Legacy/Transitional Tables
 

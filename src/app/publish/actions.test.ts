@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { redirectMock, revalidatePathMock, createClientMock } = vi.hoisted(() => ({
+const { redirectMock, revalidatePathMock, createClientMock, createAdminClientMock } = vi.hoisted(() => ({
   redirectMock: vi.fn((url: string) => {
     throw new Error(`REDIRECT:${url}`)
   }),
   revalidatePathMock: vi.fn(),
   createClientMock: vi.fn(),
+  createAdminClientMock: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -21,16 +22,18 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 vi.mock('@/lib/supabase/admin', () => ({
-  createAdminClient: vi.fn(() => {
-    throw new Error('not used in restart test')
-  }),
+  createAdminClient: createAdminClientMock,
 }))
 
 vi.mock('@/lib/publish-events', () => ({
   refreshPublishEventCounts: vi.fn(),
 }))
 
-import { restartPublishedCycleAction } from '@/app/publish/actions'
+import {
+  archiveCycleAction,
+  deletePublishEventAction,
+  restartPublishedCycleAction,
+} from '@/app/publish/actions'
 
 type TestContext = {
   userId?: string | null
@@ -42,6 +45,7 @@ function createSupabaseMock(context: TestContext) {
     cyclePublished: true,
     deletedShiftIds: [] as string[],
     closedSnapshots: [] as string[],
+    publishEventPublished: false,
   }
 
   return {
@@ -77,6 +81,17 @@ function createSupabaseMock(context: TestContext) {
                 id: 'cycle-1',
                 label: 'April schedule',
                 published: state.cyclePublished,
+              },
+              error: null,
+            }
+          }
+
+          if (table === 'publish_events') {
+            return {
+              data: {
+                id: 'event-1',
+                cycle_id: 'cycle-1',
+                schedule_cycles: { published: state.publishEventPublished },
               },
               error: null,
             }
@@ -144,6 +159,12 @@ function makeFormData() {
   return formData
 }
 
+function makeDeleteFormData() {
+  const formData = new FormData()
+  formData.set('publish_event_id', 'event-1')
+  return formData
+}
+
 describe('restartPublishedCycleAction', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -175,5 +196,81 @@ describe('restartPublishedCycleAction', () => {
     )
 
     await expect(restartPublishedCycleAction(makeFormData())).rejects.toThrow('REDIRECT:/dashboard')
+  })
+})
+
+describe('deletePublishEventAction', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('deletes non-live publish history entries through the admin client', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+    })
+    const deleteMock = vi.fn().mockResolvedValue({ error: null })
+    createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue({
+      from: vi.fn(() => ({
+        delete: vi.fn(() => ({
+          eq: deleteMock,
+        })),
+      })),
+    })
+
+    await expect(deletePublishEventAction(makeDeleteFormData())).rejects.toThrow(
+      'REDIRECT:/publish?success=publish_event_deleted'
+    )
+
+    expect(deleteMock).toHaveBeenCalledWith('id', 'event-1')
+    expect(revalidatePathMock).toHaveBeenCalledWith('/publish')
+  })
+
+  it('blocks deletion for live publish history entries', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+    })
+    supabase.state.publishEventPublished = true
+    createClientMock.mockResolvedValue(supabase)
+
+    await expect(deletePublishEventAction(makeDeleteFormData())).rejects.toThrow(
+      'REDIRECT:/publish?error=delete_live_publish_event'
+    )
+  })
+})
+
+describe('archiveCycleAction', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('archives non-live cycles', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+    })
+    supabase.state.cyclePublished = false
+    createClientMock.mockResolvedValue(supabase)
+
+    await expect(archiveCycleAction(makeFormData())).rejects.toThrow(
+      'REDIRECT:/publish?success=cycle_archived'
+    )
+
+    expect(revalidatePathMock).toHaveBeenCalledWith('/coverage')
+  })
+
+  it('blocks archiving live cycles', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+    })
+    supabase.state.cyclePublished = true
+    createClientMock.mockResolvedValue(supabase)
+
+    await expect(archiveCycleAction(makeFormData())).rejects.toThrow(
+      'REDIRECT:/publish?error=archive_live_cycle'
+    )
   })
 })

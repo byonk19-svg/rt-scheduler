@@ -11,6 +11,16 @@ Web app for respiratory therapy scheduling with role-based workflows:
 
 Current architecture and quality snapshot: [`docs/REPO_HEALTH.md`](docs/REPO_HEALTH.md)
 
+## Cycle Workflow
+
+- Managers create and manage 6-week schedule blocks from [`/coverage`](./src/app/coverage/page.tsx).
+- `New 6-week block` creates a draft cycle and can optionally copy staffing from the latest published cycle.
+- `Clear draft` removes draft assignments only while the cycle is still unpublished.
+- Published cycles remain editable in Coverage; live edits are supported there.
+- [`/publish`](./src/app/publish/page.tsx) is publish-event history, not the source of truth for cycle existence.
+- `Delete history` removes a publish-event record only.
+- `Archive cycle` hides a non-live cycle from Coverage, Availability, and dashboard cycle pickers without deleting operational records.
+
 ## Tech Stack
 
 - Next.js App Router + TypeScript + Tailwind + shadcn/ui

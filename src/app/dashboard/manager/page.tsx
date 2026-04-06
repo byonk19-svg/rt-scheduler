@@ -189,7 +189,8 @@ export default function ManagerDashboardPage() {
           supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
           supabase
             .from('schedule_cycles')
-            .select('id, label, start_date, end_date, published')
+            .select('id, label, start_date, end_date, published, archived_at')
+            .is('archived_at', null)
             .gte('end_date', todayKey)
             .order('start_date', { ascending: true }),
           supabase

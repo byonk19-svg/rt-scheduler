@@ -30,4 +30,11 @@ describe('auth page guideline guardrails', () => {
     expect(pageSource).toContain('Sending reset link')
     expect(pageSource).toContain("isLogin ? 'Signing in' : 'Creating account'")
   })
+
+  it('fails fast with a transport timeout message for auth requests', () => {
+    expect(pageSource).toContain('AUTH_REQUEST_TIMEOUT_MS = 10000')
+    expect(pageSource).toContain('We could not reach Teamwise services. Check your internet or VPN and try again.')
+    expect(pageSource).toContain('timed out. Check your internet or VPN and try again.')
+    expect(pageSource).toContain("'Sign-in'")
+  })
 })

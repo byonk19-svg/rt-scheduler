@@ -123,4 +123,39 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('Go')
     expect(html).toContain('text-lg font-semibold text-muted-foreground')
   })
+
+  it('renders Schedule Completion before Recent Activity', () => {
+    const html = renderToStaticMarkup(
+      createElement(ManagerTriageDashboard, {
+        todayCoverageCovered: 15,
+        todayCoverageTotal: 17,
+        upcomingShiftCount: 12,
+        upcomingShiftDays: [],
+        todayActiveShifts: [],
+        recentActivity: [{ title: 'Some activity', timeLabel: '1 hour ago', href: '/coverage' }],
+        pendingRequests: 0,
+        approvalsWaiting: 0,
+        currentCycleStatus: 'Draft cycle',
+        currentCycleDetail: 'Publish by Apr 27',
+        nextCycleLabel: 'Collect availability Apr 1',
+        nextCycleDetail: 'Publish by Apr 27',
+        needsReviewCount: 0,
+        needsReviewDetail: 'You are caught up.',
+        dayShiftsFilled: 18,
+        dayShiftsTotal: 21,
+        nightShiftsFilled: 15,
+        nightShiftsTotal: 21,
+        approvalsHref: '/approvals',
+        scheduleHref: '/coverage?view=week',
+        reviewHref: '/approvals',
+      })
+    )
+
+    const scheduleProgressIndex = html.indexOf('Schedule Completion')
+    const recentActivityIndex = html.indexOf('Recent Activity')
+
+    expect(scheduleProgressIndex).toBeGreaterThan(-1)
+    expect(recentActivityIndex).toBeGreaterThan(-1)
+    expect(scheduleProgressIndex).toBeLessThan(recentActivityIndex)
+  })
 })

@@ -7,12 +7,16 @@ import { Printer, Send, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 import { AutoDraftConfirmDialog } from '@/components/coverage/AutoDraftConfirmDialog'
+import { ClearDraftConfirmDialog } from '@/components/coverage/ClearDraftConfirmDialog'
+import { CycleManagementDialog } from '@/components/coverage/CycleManagementDialog'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
 import { MoreActionsMenu } from '@/components/more-actions-menu'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 import {
+  createCycleAction,
+  deleteCycleAction,
   generateDraftScheduleAction,
   resetDraftScheduleAction,
   sendPreliminaryScheduleAction,
@@ -21,7 +25,6 @@ import {
 import { CalendarGrid } from '@/components/coverage/CalendarGrid'
 import { ShiftEditorDialog } from '@/components/coverage/ShiftEditorDialog'
 import { PrintSchedule } from '@/components/print-schedule'
-import { getPublishedCoverageBannerContent } from '@/lib/coverage/published-cycle-ui'
 import { updateCoverageAssignmentStatus } from '@/lib/coverage/updateAssignmentStatus'
 import {
   assignCoverageShiftViaApi,
@@ -52,7 +55,14 @@ import {
 
 type DayStatus = DayItem['dayStatus']
 
-type CycleRow = { id: string; label: string; start_date: string; end_date: string; published: boolean }
+type CycleRow = {
+  id: string
+  label: string
+  start_date: string
+  end_date: string
+  published: boolean
+  archived_at: string | null
+}
 type TherapistOption = {
   id: string
   full_name: string
@@ -119,6 +129,7 @@ function CoveragePageContent() {
   const [activeCyclePublished, setActiveCyclePublished] = useState(false)
   const [activePreliminarySnapshot, setActivePreliminarySnapshot] =
     useState<PreliminarySnapshotRow | null>(null)
+  const [availableCycles, setAvailableCycles] = useState<CycleRow[]>([])
   const [printCycle, setPrintCycle] = useState<{ label: string; start_date: string; end_date: string } | null>(null)
   const [printCycleDates, setPrintCycleDates] = useState<string[]>([])
   const [printDayTeam, setPrintDayTeam] = useState<PrintTherapist[]>([])
@@ -132,12 +143,15 @@ function CoveragePageContent() {
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [autoDraftDialogOpen, setAutoDraftDialogOpen] = useState(false)
+  const [clearDraftDialogOpen, setClearDraftDialogOpen] = useState(false)
+  const [cycleDialogOpen, setCycleDialogOpen] = useState(false)
   const [error, setError] = useState<string>('')
   const [assignError, setAssignError] = useState<string>('')
   const [canManageCoverage, setCanManageCoverage] = useState(false)
   const [canUpdateAssignmentStatus, setCanUpdateAssignmentStatus] = useState(false)
   const [actorRole, setActorRole] = useState<Role | null>(null)
   const autoDraftFormRef = useRef<HTMLFormElement>(null)
+  const clearDraftFormRef = useRef<HTMLFormElement>(null)
   const days = shiftTab === 'Day' ? dayDays : nightDays
   const setDays = shiftTab === 'Day' ? setDayDays : setNightDays
   const scheduleFeedbackParams = useMemo<ScheduleSearchParams>(
@@ -224,8 +238,6 @@ function CoveragePageContent() {
     return `${formatDateLabel(printCycle.start_date)} - ${formatDateLabel(printCycle.end_date)} · ${totalWeeks} weeks — ${editHint}`
   }, [printCycle, printCycleDates.length, canManageCoverage, canUpdateAssignmentStatus])
 
-  const publishedCoverageBanner = useMemo(() => getPublishedCoverageBannerContent(), [])
-
   const showFullPrintRoster = canManageCoverage || actorRole === 'lead'
 
   useEffect(() => {
@@ -266,17 +278,19 @@ function CoveragePageContent() {
         let cycleEndDate = fallbackEndDate
         let cycleId: string | null = null
         let selectedCycle: CycleRow | null = null
+        let cycles: CycleRow[] = []
 
         const { data: cyclesData, error: cyclesError } = await supabase
           .from('schedule_cycles')
-          .select('id, label, start_date, end_date, published')
+          .select('id, label, start_date, end_date, published, archived_at')
+          .is('archived_at', null)
           .order('start_date', { ascending: false })
 
         if (!active) return
         if (cyclesError) {
           console.error('Could not load cycles for coverage; falling back to a 6-week window:', cyclesError)
         } else {
-          const cycles = (cyclesData ?? []) as CycleRow[]
+          cycles = (cyclesData ?? []) as CycleRow[]
           const todayKey = toIsoDate(today)
           const pool = role === 'therapist' ? cycles.filter((row) => row.published) : cycles
           const fromUrl = cycleFromUrl ? pool.find((row) => row.id === cycleFromUrl) : null
@@ -293,6 +307,7 @@ function CoveragePageContent() {
           }
         }
         if (active) {
+          setAvailableCycles(cycles)
           setActiveCycleId(cycleId)
           setActiveCyclePublished(Boolean(selectedCycle?.published))
           setActivePreliminarySnapshot(null)
@@ -805,7 +820,7 @@ function CoveragePageContent() {
                   : 'Schedule workspace'}
               </span>
               <span className="text-muted-foreground">
-                {activeCyclePublished ? 'Published to employees' : 'Draft cycle'}
+                {activeCyclePublished ? 'Live schedule - edits stay enabled' : 'Draft cycle'}
               </span>
               {preliminaryLive && (
                 <>
@@ -823,6 +838,17 @@ function CoveragePageContent() {
                 <form
                   ref={autoDraftFormRef}
                   action={generateDraftScheduleAction}
+                  className="hidden"
+                  aria-hidden="true"
+                >
+                  <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+                  <input type="hidden" name="view" value="week" />
+                  <input type="hidden" name="show_unavailable" value="false" />
+                  <input type="hidden" name="return_to" value="coverage" />
+                </form>
+                <form
+                  ref={clearDraftFormRef}
+                  action={resetDraftScheduleAction}
                   className="hidden"
                   aria-hidden="true"
                 >
@@ -858,29 +884,54 @@ function CoveragePageContent() {
                     {preliminaryLive ? 'Refresh preliminary' : 'Send preliminary'}
                   </Button>
                 </form>
-                <form action={toggleCyclePublishedAction}>
-                  <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
-                  <input type="hidden" name="view" value="week" />
-                  <input type="hidden" name="show_unavailable" value="false" />
-                  <input
-                    type="hidden"
-                    name="currently_published"
-                    value={activeCyclePublished ? 'true' : 'false'}
-                  />
-                  <input type="hidden" name="override_weekly_rules" value="false" />
-                  <input type="hidden" name="override_shift_rules" value="false" />
-                  <input type="hidden" name="return_to" value="coverage" />
-                  <Button
-                    type="submit"
-                    size="sm"
-                    className="gap-1.5 text-xs"
-                    disabled={!activeCycleId || activeCyclePublished}
-                  >
-                    <Send className="h-3.5 w-3.5" />
-                    {activeCyclePublished ? 'Published' : 'Publish'}
-                  </Button>
-                </form>
+                {activeCyclePublished ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-1 text-xs font-medium text-[var(--success-text)]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--success-text)]" />
+                    Published
+                  </span>
+                ) : (
+                  <form action={toggleCyclePublishedAction}>
+                    <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+                    <input type="hidden" name="view" value="week" />
+                    <input type="hidden" name="show_unavailable" value="false" />
+                    <input type="hidden" name="currently_published" value="false" />
+                    <input type="hidden" name="override_weekly_rules" value="false" />
+                    <input type="hidden" name="override_shift_rules" value="false" />
+                    <input type="hidden" name="return_to" value="coverage" />
+                    <Button
+                      type="submit"
+                      size="sm"
+                      className="gap-1.5 text-xs"
+                      disabled={!activeCycleId}
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      Publish
+                    </Button>
+                  </form>
+                )}
                 <MoreActionsMenu>
+                  <button
+                    type="button"
+                    onClick={() => setCycleDialogOpen(true)}
+                    className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    New 6-week block
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!activeCycleId || activeCyclePublished}
+                    onClick={() => setClearDraftDialogOpen(true)}
+                    className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary disabled:pointer-events-none disabled:opacity-40"
+                  >
+                    Clear draft
+                  </button>
+                  <Link
+                    href="/publish"
+                    className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
+                  >
+                    Publish history
+                  </Link>
                   <button
                     type="button"
                     onClick={() => window.print()}
@@ -889,19 +940,6 @@ function CoveragePageContent() {
                     <Printer className="h-3.5 w-3.5" />
                     Print
                   </button>
-                  <form action={resetDraftScheduleAction}>
-                    <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
-                    <input type="hidden" name="view" value="week" />
-                    <input type="hidden" name="show_unavailable" value="false" />
-                    <input type="hidden" name="return_to" value="coverage" />
-                    <button
-                      type="submit"
-                      disabled={!activeCycleId || activeCyclePublished}
-                      className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm text-[var(--error-text)] hover:bg-secondary disabled:opacity-50"
-                    >
-                      Clear draft
-                    </button>
-                  </form>
                 </MoreActionsMenu>
               </>
             ) : (
@@ -920,25 +958,46 @@ function CoveragePageContent() {
         />
 
         <div className="px-6 pb-4 pt-4">
-          <div className="flex items-center gap-3">
-          <div className="inline-flex overflow-hidden rounded-lg border border-border">
-            {(['Day', 'Night'] as const).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => handleTabSwitch(tab)}
-                data-testid={`coverage-shift-tab-${tab.toLowerCase()}`}
-                className={cn(
-                  'px-3.5 py-1.5 text-xs font-medium transition-colors',
-                  shiftTab === tab
-                    ? 'bg-primary/90 text-primary-foreground'
-                    : 'bg-card text-muted-foreground hover:bg-muted/30 hover:text-foreground'
-                )}
-              >
-                {tab} Shift
-              </button>
-            ))}
-          </div>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {availableCycles.slice(0, 4).map((cycle) => {
+                const isActive = cycle.id === activeCycleId
+                return (
+                  <Link
+                    key={cycle.id}
+                    href={`/coverage?cycle=${cycle.id}&view=week`}
+                    className={cn(
+                      'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                      isActive
+                        ? 'border-primary/50 bg-primary/8 text-foreground'
+                        : 'border-border/80 bg-card text-muted-foreground hover:bg-muted/30 hover:text-foreground'
+                    )}
+                  >
+                    {cycle.label}
+                    {cycle.published ? ' • Live' : ''}
+                  </Link>
+                )
+              })}
+            </div>
+
+            <div className="inline-flex overflow-hidden rounded-lg border border-border">
+              {(['Day', 'Night'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => handleTabSwitch(tab)}
+                  data-testid={`coverage-shift-tab-${tab.toLowerCase()}`}
+                  className={cn(
+                    'px-3.5 py-1.5 text-xs font-medium transition-colors',
+                    shiftTab === tab
+                      ? 'bg-primary/90 text-primary-foreground'
+                      : 'bg-card text-muted-foreground hover:bg-muted/30 hover:text-foreground'
+                  )}
+                >
+                  {tab} Shift
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </motion.div>
@@ -951,28 +1010,16 @@ function CoveragePageContent() {
         className="no-print px-6 py-5"
       >
         {activeCyclePublished && (
-          <div className="mb-3 rounded-lg border border-[var(--success-border)] bg-[var(--success-subtle)] px-4 py-3">
-            <p className="text-xs font-semibold text-[var(--success-text)]">
-              {publishedCoverageBanner.title}
-            </p>
-            <p className="mt-1 text-xs text-[var(--success-text)]/85">
-              {publishedCoverageBanner.description}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <Link
-                href={weekRosterHref}
-                className="rounded-md border border-[var(--success-border)] bg-card px-3 py-1.5 text-xs font-medium text-[var(--success-text)] transition-colors hover:bg-[var(--success-subtle)]"
-              >
-                View published schedule
-              </Link>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="rounded-md border border-[var(--success-border)] bg-card px-3 py-1.5 text-xs font-medium text-[var(--success-text)] transition-colors hover:bg-[var(--success-subtle)]"
-              >
-                Print published schedule
-              </button>
-            </div>
+          <div className="mb-3 flex items-center gap-3 rounded-lg border border-[var(--success-border)] bg-[var(--success-subtle)] px-4 py-2.5">
+            <span className="text-xs text-[var(--success-text)]">
+              Live — staffing changes are visible to employees immediately.
+            </span>
+            <Link
+              href={weekRosterHref}
+              className="ml-auto shrink-0 text-xs font-medium text-[var(--success-text)] underline-offset-2 hover:underline"
+            >
+              View published schedule
+            </Link>
           </div>
         )}
         {successParam === 'cycle_published' && (
@@ -993,6 +1040,16 @@ function CoveragePageContent() {
         {successParam === 'cycle_unpublished' && (
           <p className="mb-3 rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-2 text-xs font-semibold text-[var(--warning-text)]">
             Cycle unpublished.
+          </p>
+        )}
+        {successParam === 'cycle_deleted' && (
+          <p className="mb-3 rounded-md border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-2 text-xs font-semibold text-[var(--success-text)]">
+            Cycle deleted.
+          </p>
+        )}
+        {errorParam === 'delete_cycle_published' && (
+          <p className="mb-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs font-semibold text-[var(--error-text)]">
+            Cannot delete a live cycle. Unpublish it first.
           </p>
         )}
         {successParam === 'shift_added' && (
@@ -1111,6 +1168,24 @@ function CoveragePageContent() {
         open={autoDraftDialogOpen}
         onOpenChange={setAutoDraftDialogOpen}
         applyFormRef={autoDraftFormRef}
+        cycleId={activeCycleId ?? ''}
+        isPublished={activeCyclePublished}
+      />
+      <ClearDraftConfirmDialog
+        open={clearDraftDialogOpen}
+        onOpenChange={setClearDraftDialogOpen}
+        applyFormRef={clearDraftFormRef}
+        cycleId={activeCycleId ?? ''}
+        cycleLabel={printCycle?.label ?? null}
+        isPublished={activeCyclePublished}
+      />
+      <CycleManagementDialog
+        key={`cycle-dialog-${cycleDialogOpen ? 'open' : 'closed'}-${availableCycles[0]?.end_date ?? 'none'}`}
+        cycles={availableCycles}
+        open={cycleDialogOpen}
+        onOpenChange={setCycleDialogOpen}
+        createCycleAction={createCycleAction}
+        deleteCycleAction={deleteCycleAction}
       />
       <PrintSchedule
         activeCycle={printCycle}

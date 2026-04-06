@@ -34,6 +34,7 @@ type Cycle = {
   start_date: string
   end_date: string
   published: boolean
+  archived_at?: string | null
 }
 
 type AvailabilityRow = {
@@ -149,7 +150,8 @@ export default async function TherapistAvailabilityPage({
 
   const { data: cyclesData } = await supabase
     .from('schedule_cycles')
-    .select('id, label, start_date, end_date, published')
+    .select('id, label, start_date, end_date, published, archived_at')
+    .is('archived_at', null)
     .gte('end_date', todayKey)
     .order('start_date', { ascending: true })
 

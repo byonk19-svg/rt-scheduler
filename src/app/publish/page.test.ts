@@ -18,6 +18,8 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/app/publish/actions', () => ({
   restartPublishedCycleAction: vi.fn(),
+  deletePublishEventAction: vi.fn(),
+  archiveCycleAction: vi.fn(),
 }))
 
 import PublishHistoryPage from '@/app/publish/page'
@@ -144,6 +146,9 @@ describe('PublishHistoryPage', () => {
     const html = renderToStaticMarkup(await PublishHistoryPage({}))
 
     expect(html).toContain('Start over')
+    expect(html).toContain('Archive cycle')
+    expect(html).toContain('Delete history')
+    expect(html).toContain('Open cycle')
     expect(html).toContain('No longer live')
     expect(html).toContain('Live cycle')
     expect(html).toContain('Old cycle')
@@ -165,5 +170,40 @@ describe('PublishHistoryPage', () => {
 
     expect(html).toContain('Cycle restarted')
     expect(html).toContain('draft schedule')
+  })
+
+  it('shows a success banner after deleting publish history', async () => {
+    createClientMock.mockResolvedValue(
+      createSupabaseMock({
+        userId: 'manager-1',
+        role: 'manager',
+      })
+    )
+
+    const html = renderToStaticMarkup(
+      await PublishHistoryPage({
+        searchParams: Promise.resolve({ success: 'publish_event_deleted' }),
+      })
+    )
+
+    expect(html).toContain('Publish history entry deleted')
+  })
+
+  it('shows a success banner after archiving a cycle', async () => {
+    createClientMock.mockResolvedValue(
+      createSupabaseMock({
+        userId: 'manager-1',
+        role: 'manager',
+      })
+    )
+
+    const html = renderToStaticMarkup(
+      await PublishHistoryPage({
+        searchParams: Promise.resolve({ success: 'cycle_archived' }),
+      })
+    )
+
+    expect(html).toContain('Cycle archived')
+    expect(html).toContain('will no longer appear in Coverage')
   })
 })

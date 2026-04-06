@@ -32,6 +32,11 @@ async function requireManagerUser() {
   return user
 }
 
+function getOne<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null
+  return value ?? null
+}
+
 export async function requeueFailedPublishEmailsAction(formData: FormData) {
   await requireManagerUser()
 
@@ -136,4 +141,99 @@ export async function restartPublishedCycleAction(formData: FormData) {
   revalidatePath('/approvals')
 
   redirect('/publish?success=cycle_restarted')
+}
+
+export async function deletePublishEventAction(formData: FormData) {
+  await requireManagerUser()
+
+  const publishEventId = String(formData.get('publish_event_id') ?? '').trim()
+  if (!publishEventId) {
+    redirect('/publish?error=missing_publish_event')
+  }
+
+  const supabase = await createClient()
+  const { data: publishEvent, error: publishEventError } = await supabase
+    .from('publish_events')
+    .select('id, cycle_id, schedule_cycles(published)')
+    .eq('id', publishEventId)
+    .maybeSingle()
+
+  if (publishEventError || !publishEvent) {
+    console.error('Failed to load publish event for deletion:', publishEventError)
+    redirect('/publish?error=delete_publish_event_failed')
+  }
+
+  if (getOne(publishEvent.schedule_cycles)?.published) {
+    redirect('/publish?error=delete_live_publish_event')
+  }
+
+  const admin = (() => {
+    try {
+      return createAdminClient()
+    } catch (error) {
+      console.error('Failed to initialize admin client for publish event delete:', error)
+      redirect('/publish?error=delete_publish_event_failed')
+    }
+  })()
+
+  const { error: deleteError } = await admin
+    .from('publish_events')
+    .delete()
+    .eq('id', publishEventId)
+
+  if (deleteError) {
+    console.error('Failed to delete publish event:', deleteError)
+    redirect('/publish?error=delete_publish_event_failed')
+  }
+
+  revalidatePath('/publish')
+  revalidatePath('/coverage')
+  revalidatePath('/schedule')
+
+  redirect('/publish?success=publish_event_deleted')
+}
+
+export async function archiveCycleAction(formData: FormData) {
+  await requireManagerUser()
+
+  const cycleId = String(formData.get('cycle_id') ?? '').trim()
+  if (!cycleId) {
+    redirect('/publish?error=missing_cycle')
+  }
+
+  const supabase = await createClient()
+  const { data: cycle, error: cycleError } = await supabase
+    .from('schedule_cycles')
+    .select('id, published, archived_at')
+    .eq('id', cycleId)
+    .maybeSingle()
+
+  if (cycleError || !cycle) {
+    console.error('Failed to load cycle for archival:', cycleError)
+    redirect('/publish?error=cycle_archive_failed')
+  }
+
+  if (cycle.published) {
+    redirect('/publish?error=archive_live_cycle')
+  }
+
+  const { error: archiveError } = await supabase
+    .from('schedule_cycles')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', cycleId)
+
+  if (archiveError) {
+    console.error('Failed to archive cycle:', archiveError)
+    redirect('/publish?error=cycle_archive_failed')
+  }
+
+  revalidatePath('/publish')
+  revalidatePath('/coverage')
+  revalidatePath('/schedule')
+  revalidatePath('/availability')
+  revalidatePath('/dashboard')
+  revalidatePath('/dashboard/manager')
+  revalidatePath('/dashboard/staff')
+
+  redirect('/publish?success=cycle_archived')
 }

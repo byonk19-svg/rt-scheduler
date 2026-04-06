@@ -1,8 +1,21 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowRight, CalendarDays, CheckCircle2, CircleX, Clock3, Send } from 'lucide-react'
+import {
+  Archive,
+  ArrowRight,
+  CalendarDays,
+  CheckCircle2,
+  CircleX,
+  Clock3,
+  Send,
+  Trash2,
+} from 'lucide-react'
 
-import { restartPublishedCycleAction } from '@/app/publish/actions'
+import {
+  archiveCycleAction,
+  deletePublishEventAction,
+  restartPublishedCycleAction,
+} from '@/app/publish/actions'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { Button } from '@/components/ui/button'
@@ -187,8 +200,39 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
         </div>
       )}
 
+      {resolvedSearchParams.success === 'publish_event_deleted' && (
+        <div
+          className="rounded-xl border px-4 py-3 text-sm font-medium"
+          style={{
+            borderColor: 'var(--success-border)',
+            backgroundColor: 'var(--success-subtle)',
+            color: 'var(--success-text)',
+          }}
+        >
+          Publish history entry deleted.
+        </div>
+      )}
+
+      {resolvedSearchParams.success === 'cycle_archived' && (
+        <div
+          className="rounded-xl border px-4 py-3 text-sm font-medium"
+          style={{
+            borderColor: 'var(--success-border)',
+            backgroundColor: 'var(--success-subtle)',
+            color: 'var(--success-text)',
+          }}
+        >
+          Cycle archived. It will no longer appear in Coverage or availability views.
+        </div>
+      )}
+
       {(resolvedSearchParams.error === 'missing_cycle' ||
-        resolvedSearchParams.error === 'cycle_restart_failed') && (
+        resolvedSearchParams.error === 'cycle_restart_failed' ||
+        resolvedSearchParams.error === 'delete_publish_event_failed' ||
+        resolvedSearchParams.error === 'delete_live_publish_event' ||
+        resolvedSearchParams.error === 'missing_publish_event' ||
+        resolvedSearchParams.error === 'archive_live_cycle' ||
+        resolvedSearchParams.error === 'cycle_archive_failed') && (
         <div
           className="rounded-xl border px-4 py-3 text-sm font-medium"
           style={{
@@ -199,7 +243,17 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
         >
           {resolvedSearchParams.error === 'missing_cycle'
             ? 'Could not restart that cycle because no cycle was selected.'
-            : 'Could not restart that published cycle. Please try again.'}
+            : resolvedSearchParams.error === 'delete_live_publish_event'
+              ? 'Live publish entries must be restarted from the schedule workspace before they can be removed from history.'
+              : resolvedSearchParams.error === 'missing_publish_event'
+                ? 'Could not delete that history entry because no publish event was selected.'
+            : resolvedSearchParams.error === 'delete_publish_event_failed'
+                ? 'Could not delete that publish history entry. Please try again.'
+                : resolvedSearchParams.error === 'archive_live_cycle'
+                  ? 'Live cycles must be restarted as drafts before they can be archived.'
+                  : resolvedSearchParams.error === 'cycle_archive_failed'
+                    ? 'Could not archive that cycle. Please try again.'
+                    : 'Could not restart that published cycle. Please try again.'}
         </div>
       )}
 
@@ -300,6 +354,36 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                             </button>
                           </form>
                         )}
+                        {!getOne(event.schedule_cycles)?.published && (
+                          <>
+                            <form action={archiveCycleAction}>
+                              <input type="hidden" name="cycle_id" value={event.cycle_id} />
+                              <button
+                                type="submit"
+                                className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80"
+                              >
+                                <Archive className="h-3.5 w-3.5" />
+                                Archive cycle
+                              </button>
+                            </form>
+                            <form action={deletePublishEventAction}>
+                              <input type="hidden" name="publish_event_id" value={event.id} />
+                              <button
+                                type="submit"
+                                className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 text-xs font-semibold text-[var(--error-text)] transition-opacity hover:opacity-80"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Delete history
+                              </button>
+                            </form>
+                          </>
+                        )}
+                        <Link
+                          href={`/coverage?cycle=${event.cycle_id}&view=week`}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                        >
+                          Open cycle
+                        </Link>
                         <Link
                           href={`/publish/${event.id}`}
                           className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"

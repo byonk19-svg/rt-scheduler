@@ -64,7 +64,8 @@ export default async function StaffDashboardPage({
 
   const { data: cycles } = await supabase
     .from('schedule_cycles')
-    .select('id, label, start_date, end_date')
+    .select('id, label, start_date, end_date, archived_at')
+    .is('archived_at', null)
     .gte('end_date', today)
     .order('start_date', { ascending: true })
     .limit(2)

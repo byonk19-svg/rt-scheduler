@@ -32,34 +32,73 @@ export function ScheduleProgress({
   const overallTotal = dayTotal + nightTotal
   const overall = computeProgress(overallFilled, overallTotal)
   const rows = [
-    { label: 'Day Shifts', ...day, filled: dayFilled, total: dayTotal },
-    { label: 'Night Shifts', ...night, filled: nightFilled, total: nightTotal },
+    {
+      label: 'Day Shifts',
+      caption: 'Core daytime staffing',
+      indicatorClassName: 'bg-primary',
+      badgeClassName: 'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)]',
+      ...day,
+      filled: dayFilled,
+      total: dayTotal,
+    },
+    {
+      label: 'Night Shifts',
+      caption: 'Overnight coverage load',
+      indicatorClassName: 'bg-[var(--warning)]',
+      badgeClassName:
+        'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]',
+      ...night,
+      filled: nightFilled,
+      total: nightTotal,
+    },
   ]
 
   return (
-    <div className="rounded-2xl border border-border/70 bg-card shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
-      <div className="flex items-center justify-between border-b border-border/70 px-5 py-4">
-        <h3 className="text-sm font-medium text-foreground">Schedule Completion</h3>
-        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-          Active cycle
-        </span>
+    <div className="relative overflow-hidden rounded-[26px] border border-border/70 bg-card shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
+      <div className="teamwise-grid-bg-subtle teamwise-aurora-bg absolute inset-x-0 top-0 h-28 opacity-80" />
+
+      <div className="relative flex items-start justify-between gap-3 border-b border-border/70 px-5 py-4">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            Coverage signal
+          </p>
+          <h3 className="font-heading text-[1.05rem] font-semibold tracking-[-0.03em] text-foreground">
+            Schedule Completion
+          </h3>
+        </div>
+        <div className="rounded-full border border-[var(--info-border)] bg-[var(--info-subtle)] px-3 py-1 text-right">
+          <p className="font-heading text-sm font-semibold leading-none text-[var(--info-text)]">
+            {overall.pct}%
+          </p>
+          <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--info-text)]/80">
+            Active cycle
+          </p>
+        </div>
       </div>
 
-      <div className="space-y-5 px-5 py-4">
+      <div className="relative space-y-4 px-5 py-4">
         {rows.map((row, index) => (
           <motion.div
             key={row.label}
+            className="rounded-[22px] border border-border/75 bg-card/95 px-4 py-3.5 shadow-[0_12px_28px_-28px_rgba(15,23,42,0.45)]"
             initial={{ opacity: 0, x: -16 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: index * 0.08, duration: 0.3 }}
           >
-            <div className="mb-1.5 flex items-baseline justify-between">
-              <span className="text-sm font-medium text-foreground">{row.label}</span>
-              <span className="tabular-nums text-xs font-medium text-muted-foreground">
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <div>
+                <span className="font-heading text-sm font-semibold tracking-[-0.02em] text-foreground">
+                  {row.label}
+                </span>
+                <p className="mt-1 text-[11px] text-muted-foreground">{row.caption}</p>
+              </div>
+              <span
+                className={`rounded-full border px-2.5 py-1 text-[11px] font-medium tabular-nums ${row.badgeClassName}`}
+              >
                 {row.filled}/{row.total}
               </span>
             </div>
-            <Progress value={row.pct} className="h-1.5" />
+            <Progress value={row.pct} className="h-2" indicatorClassName={row.indicatorClassName} />
             <div className="mt-1 flex justify-between">
               <span className="text-[11px] text-muted-foreground">{row.pct}%</span>
               <span className="text-[11px] text-muted-foreground">{row.gaps} remaining</span>
@@ -68,14 +107,16 @@ export function ScheduleProgress({
         ))}
       </div>
 
-      <div className="border-t border-border/70 px-5 py-4">
+      <div className="relative border-t border-border/70 bg-muted/10 px-5 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-foreground">Overall</p>
+            <p className="font-heading text-sm font-semibold text-foreground">Overall</p>
             <p className="text-[11px] text-muted-foreground">All shifts</p>
           </div>
           <div className="text-right">
-            <p className="text-xl font-bold text-foreground tabular-nums">{overall.pct}%</p>
+            <p className="font-heading text-xl font-bold text-foreground tabular-nums">
+              {overall.pct}%
+            </p>
             {overall.gaps > 0 && (
               <p className="text-[11px] text-muted-foreground">{overall.gaps} gaps</p>
             )}
