@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Shield, User } from 'lucide-react'
+import { ChevronRight, Shield, User } from 'lucide-react'
 
 import { FormSubmitButton } from '@/components/form-submit-button'
 import { Button } from '@/components/ui/button'
@@ -136,15 +136,15 @@ function TeamMemberCard({ profile, onClick }: { profile: TeamProfileRecord; onCl
       type="button"
       onClick={onClick}
       className={cn(
-        'group flex w-full items-start gap-4 rounded-xl border border-border/70 bg-card/85 p-5 text-left shadow-none transition-all hover:border-primary/20 hover:bg-card',
+        'group flex w-full cursor-pointer items-start gap-4 rounded-xl border border-border/70 bg-card/85 p-5 text-left shadow-sm transition-all hover:border-primary/30 hover:bg-card hover:shadow-md active:scale-[0.99] active:shadow-sm',
         profile.role === 'lead' &&
-          'border-primary/30 bg-primary/[0.04] hover:border-primary/45 hover:bg-primary/[0.06]',
+          'border-primary/30 bg-primary/[0.04] hover:border-primary/50 hover:bg-primary/[0.07]',
         !isActive && 'opacity-75'
       )}
     >
       <div
         className={cn(
-          'flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold',
+          'flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-transform group-hover:scale-105',
           profile.role === 'lead'
             ? 'border border-primary/20 bg-primary/10 text-primary'
             : profile.role === 'manager'
@@ -197,6 +197,8 @@ function TeamMemberCard({ profile, onClick }: { profile: TeamProfileRecord; onCl
           )}
         </div>
       </div>
+
+      <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/30 transition-all group-hover:translate-x-0.5 group-hover:text-primary/50" />
     </button>
   )
 }

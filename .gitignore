@@ -49,9 +49,10 @@ playwright-report/
 test-results/
 shots/
 .auth/
+.playwright-mcp/
 
-# local screen capture runs
-/artifacts/screen-capture/
+# local screen capture and generated artifact dumps
+/artifacts/
 
 # local agent/tooling state
 .claude/
