@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { redirectMock, revalidatePathMock, createClientMock, createAdminClientMock } = vi.hoisted(() => ({
-  redirectMock: vi.fn((url: string) => {
-    throw new Error(`REDIRECT:${url}`)
-  }),
-  revalidatePathMock: vi.fn(),
-  createClientMock: vi.fn(),
-  createAdminClientMock: vi.fn(),
-}))
+const { redirectMock, revalidatePathMock, createClientMock, createAdminClientMock } = vi.hoisted(
+  () => ({
+    redirectMock: vi.fn((url: string) => {
+      throw new Error(`REDIRECT:${url}`)
+    }),
+    revalidatePathMock: vi.fn(),
+    createClientMock: vi.fn(),
+    createAdminClientMock: vi.fn(),
+  })
+)
 
 vi.mock('next/navigation', () => ({
   redirect: redirectMock,
@@ -33,6 +35,7 @@ import {
   archiveCycleAction,
   deletePublishEventAction,
   restartPublishedCycleAction,
+  unpublishCycleKeepShiftsAction,
 } from '@/app/publish/actions'
 
 type TestContext = {
@@ -196,6 +199,42 @@ describe('restartPublishedCycleAction', () => {
     )
 
     await expect(restartPublishedCycleAction(makeFormData())).rejects.toThrow('REDIRECT:/dashboard')
+  })
+})
+
+describe('unpublishCycleKeepShiftsAction', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('sets published false, keeps shifts, and closes active preliminary', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+    })
+    createClientMock.mockResolvedValue(supabase)
+
+    await expect(unpublishCycleKeepShiftsAction(makeFormData())).rejects.toThrow(
+      'REDIRECT:/publish?success=unpublished_keep_shifts'
+    )
+
+    expect(supabase.state.cyclePublished).toBe(false)
+    expect(supabase.state.deletedShiftIds).toEqual([])
+    expect(supabase.state.closedSnapshots).toEqual(['cycle-1'])
+    expect(revalidatePathMock).toHaveBeenCalledWith('/coverage')
+  })
+
+  it('denies non-managers', async () => {
+    createClientMock.mockResolvedValue(
+      createSupabaseMock({
+        userId: 'therapist-1',
+        role: 'therapist',
+      })
+    )
+
+    await expect(unpublishCycleKeepShiftsAction(makeFormData())).rejects.toThrow(
+      'REDIRECT:/dashboard'
+    )
   })
 })
 

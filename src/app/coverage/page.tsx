@@ -110,6 +110,43 @@ function timestamp(): string {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
+function buildEmptyCoverageDays(
+  cycleStartDate: string,
+  cycleEndDate: string
+): DayItem[] {
+  return dateRange(cycleStartDate, cycleEndDate).map((isoDate) => {
+    const date = new Date(`${isoDate}T00:00:00`)
+    return {
+      id: isoDate,
+      isoDate,
+      date: date.getDate(),
+      label: date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      }),
+      dayStatus: 'draft',
+      constraintBlocked: false,
+      leadShift: null,
+      staffShifts: [],
+    } satisfies DayItem
+  })
+}
+
+async function fetchCoverageNamesByUserId(cycleId: string): Promise<Record<string, string>> {
+  const response = await fetch(`/api/schedule/coverage-names?cycle_id=${encodeURIComponent(cycleId)}`, {
+    method: 'GET',
+    cache: 'no-store',
+  })
+
+  if (!response.ok) {
+    throw new Error(`coverage names request failed with ${response.status}`)
+  }
+
+  const payload = (await response.json()) as { namesById?: Record<string, string> }
+  return payload.namesById ?? {}
+}
+
 function CoveragePageContent() {
   const search = useSearchParams()
   const cycleFromUrl = search.get('cycle')
@@ -140,6 +177,7 @@ function CoveragePageContent() {
   const [unassigningShiftId, setUnassigningShiftId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedCycleHasShiftRows, setSelectedCycleHasShiftRows] = useState(false)
   const [autoDraftDialogOpen, setAutoDraftDialogOpen] = useState(false)
   const [clearDraftDialogOpen, setClearDraftDialogOpen] = useState(false)
   const [cycleDialogOpen, setCycleDialogOpen] = useState(false)
@@ -237,8 +275,19 @@ function CoveragePageContent() {
         : 'No published schedule is available right now'
     }
     const totalWeeks = Math.max(1, Math.round((printCycleDates.length || 42) / 7))
+    if (!selectedCycleHasShiftRows) {
+      return `${formatDateLabel(printCycle.start_date)} - ${formatDateLabel(printCycle.end_date)} - ${totalWeeks} weeks - ${
+        canManageCoverage ? 'No staffing drafted yet' : 'No staffing published yet'
+      }`
+    }
     return `${formatDateLabel(printCycle.start_date)} - ${formatDateLabel(printCycle.end_date)} - ${totalWeeks} weeks - ${editHint}`
-  }, [printCycle, printCycleDates.length, canManageCoverage, canUpdateAssignmentStatus])
+  }, [
+    printCycle,
+    printCycleDates.length,
+    canManageCoverage,
+    canUpdateAssignmentStatus,
+    selectedCycleHasShiftRows,
+  ])
 
   const showFullPrintRoster = canManageCoverage || actorRole === 'lead'
   const clearLoadedScheduleState = useCallback(() => {
@@ -316,6 +365,7 @@ function CoveragePageContent() {
           setAvailableCycles(cycles)
           setActiveCycleId(cycleId)
           setActiveCyclePublished(Boolean(selectedCycle?.published))
+          setSelectedCycleHasShiftRows(false)
           setActivePreliminarySnapshot(null)
           setPrintCycle(
             selectedCycle
@@ -371,6 +421,21 @@ function CoveragePageContent() {
         }
 
         const rows = (shiftsData ?? []) as ShiftRow[]
+        setSelectedCycleHasShiftRows(rows.length > 0)
+        if (rows.length === 0) {
+          clearLoadedScheduleState()
+          setDayDays(buildEmptyCoverageDays(selectedCycle.start_date, selectedCycle.end_date))
+          setNightDays(buildEmptyCoverageDays(selectedCycle.start_date, selectedCycle.end_date))
+          return
+        }
+        let namesByUserId: Record<string, string> = {}
+        if (rows.some((row) => row.user_id && !getOne(row.profiles)?.full_name)) {
+          try {
+            namesByUserId = await fetchCoverageNamesByUserId(cycleId)
+          } catch (nameError) {
+            console.error('Could not load coverage display names:', nameError)
+          }
+        }
         const assignmentRows: AssignedShiftRow[] = []
         const constraintBlockedSlotKeys = new Set<string>()
         const assignedSlotKeys = new Set<string>()
@@ -407,7 +472,7 @@ function CoveragePageContent() {
 
         for (const row of assignmentRows) {
           const profile = getOne(row.profiles)
-          const fullName = profile?.full_name ?? 'Unknown'
+          const fullName = profile?.full_name ?? namesByUserId[row.user_id] ?? 'Unknown'
           const current = therapistTallies.get(row.user_id) ?? {
             id: row.user_id,
             full_name: fullName,
@@ -458,7 +523,7 @@ function CoveragePageContent() {
           status: row.status,
           assignment_status:
             activeOperationalCodesByShiftId.get(row.id) ?? row.assignment_status ?? null,
-          name: getOne(row.profiles)?.full_name ?? 'Unknown',
+          name: getOne(row.profiles)?.full_name ?? namesByUserId[row.user_id] ?? 'Unknown',
         }))
 
         setDayDays(
@@ -555,6 +620,7 @@ function CoveragePageContent() {
     [selectedDayBase, shiftTab]
   )
   const noCycleSelected = !loading && !activeCycleId
+  const showEmptyDraftState = !loading && Boolean(activeCycleId) && !selectedCycleHasShiftRows
   const today = toIsoDate(new Date())
   const isPastDate = selectedDay !== null && selectedDay.isoDate < today
   const selectedDayShiftIds = [
@@ -828,6 +894,8 @@ function CoveragePageContent() {
               <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 font-medium text-foreground">
                 {noCycleSelected
                   ? 'No active cycle'
+                  : showEmptyDraftState
+                    ? 'Draft not started'
                   : !loading && issueCount > 0
                   ? `${issueCount} ${issueCount === 1 ? 'issue' : 'issues'}`
                   : 'Schedule workspace'}
@@ -837,6 +905,10 @@ function CoveragePageContent() {
                   ? canManageCoverage
                     ? 'Create a new block to begin staffing'
                     : 'Waiting for the next published schedule'
+                  : showEmptyDraftState
+                    ? canManageCoverage
+                      ? 'Auto-draft or manually assign the first shifts for this block'
+                      : 'No staffing is available in this block yet'
                   : activeCyclePublished
                     ? 'Live schedule - edits stay enabled'
                     : 'Draft cycle'}
@@ -1203,6 +1275,33 @@ function CoveragePageContent() {
             )}
           </section>
         ) : (
+          <>
+            {showEmptyDraftState && (
+              <section className="mb-3 rounded-[1.75rem] border border-border/70 bg-card px-6 py-6 shadow-[0_1px_0_rgba(15,23,42,0.04)]">
+                <h2 className="text-lg font-semibold text-foreground">
+                  {canManageCoverage ? 'No staffing drafted yet' : 'No staffing published yet'}
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+                  {canManageCoverage
+                    ? 'This block exists, but it does not have any shift rows yet. Auto-draft it or click a day to start assigning the first shifts manually.'
+                    : 'This schedule block exists, but no staffing has been published into it yet. Check another cycle pill or come back after the schedule is drafted.'}
+                </p>
+                {canManageCoverage && (
+                  <div className="mt-4">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="gap-1.5 text-xs"
+                      disabled={!activeCycleId || activeCyclePublished}
+                      onClick={() => setAutoDraftDialogOpen(true)}
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Auto-draft
+                    </Button>
+                  </div>
+                )}
+              </section>
+            )}
           <CalendarGrid
             days={days}
             loading={loading}
@@ -1212,6 +1311,7 @@ function CoveragePageContent() {
             onSelect={handleSelect}
             onChangeStatus={handleChangeStatus}
           />
+          </>
         )}
       </motion.div>
 

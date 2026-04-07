@@ -143,6 +143,61 @@ export async function restartPublishedCycleAction(formData: FormData) {
   redirect('/publish?success=cycle_restarted')
 }
 
+/** Sets published=false without removing shifts (draft again, assignments preserved). */
+export async function unpublishCycleKeepShiftsAction(formData: FormData) {
+  await requireManagerUser()
+
+  const cycleId = String(formData.get('cycle_id') ?? '').trim()
+  if (!cycleId) {
+    redirect('/publish?error=missing_cycle')
+  }
+
+  const supabase = await createClient()
+  const { data: cycle, error: cycleError } = await supabase
+    .from('schedule_cycles')
+    .select('id, published')
+    .eq('id', cycleId)
+    .maybeSingle()
+
+  if (cycleError || !cycle) {
+    console.error('Failed to load cycle for unpublish:', cycleError)
+    redirect('/publish?error=unpublish_keep_shifts_failed')
+  }
+
+  if (!cycle.published) {
+    redirect('/publish?error=unpublish_not_live')
+  }
+
+  const { error: cycleUpdateError } = await supabase
+    .from('schedule_cycles')
+    .update({ published: false })
+    .eq('id', cycleId)
+
+  if (cycleUpdateError) {
+    console.error('Failed to unpublish cycle:', cycleUpdateError)
+    redirect('/publish?error=unpublish_keep_shifts_failed')
+  }
+
+  const { error: closeSnapshotError } = await supabase
+    .from('preliminary_snapshots')
+    .update({ status: 'closed' })
+    .eq('cycle_id', cycleId)
+    .eq('status', 'active')
+
+  if (closeSnapshotError) {
+    console.error('Failed to close preliminary snapshot during unpublish:', closeSnapshotError)
+    redirect('/publish?error=unpublish_keep_shifts_failed')
+  }
+
+  revalidatePath('/publish')
+  revalidatePath('/coverage')
+  revalidatePath('/schedule')
+  revalidatePath('/preliminary')
+  revalidatePath('/approvals')
+
+  redirect('/publish?success=unpublished_keep_shifts')
+}
+
 export async function deletePublishEventAction(formData: FormData) {
   await requireManagerUser()
 

@@ -195,6 +195,7 @@ test.describe.serial('/availability manager planner', () => {
 
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
     await page.getByRole('button', { name: 'Auto-draft' }).click()
+    await page.getByRole('button', { name: 'Apply Draft' }).click()
     await expect(page).toHaveURL(/auto=generated/, { timeout: 30_000 })
 
     const shiftsResult = await ctx!.supabase

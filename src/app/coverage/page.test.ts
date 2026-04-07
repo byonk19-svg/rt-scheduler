@@ -51,4 +51,14 @@ describe('coverage publish override affordance', () => {
     expect(source).toContain('Create the next 6-week block to start staffing this calendar.')
     expect(source).not.toContain('Current 6-week window')
   })
+
+  it('shows an explicit empty-draft state when a cycle exists but has no staffing rows yet', () => {
+    const filePath = resolve(process.cwd(), 'src/app/coverage/page.tsx')
+    const source = readFileSync(filePath, 'utf8')
+
+    expect(source).toContain('No staffing drafted yet')
+    expect(source).toContain(
+      'This block exists, but it does not have any shift rows yet. Auto-draft it or click a day to start assigning the first shifts manually.'
+    )
+  })
 })

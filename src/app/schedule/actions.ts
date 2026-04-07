@@ -17,6 +17,7 @@ import {
   summarizePublishWeeklyViolations,
   summarizeShiftSlotViolations,
 } from '@/lib/schedule-rule-validation'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { setDesignatedLeadMutation } from '@/lib/set-designated-lead'
 import { notifyUsers } from '@/lib/notifications'
@@ -434,10 +435,36 @@ export async function deleteCycleAction(formData: FormData) {
     )
   }
 
-  const { error } = await supabase.from('schedule_cycles').delete().eq('id', cycleId).single()
+  const admin = (() => {
+    try {
+      return createAdminClient()
+    } catch (error) {
+      console.error('Failed to initialize admin client for cycle delete:', error)
+      redirect(
+        returnToPublish
+          ? '/publish?error=delete_cycle_failed'
+          : '/coverage?view=week&error=delete_cycle_failed'
+      )
+    }
+  })()
+
+  const { data: deletedRows, error } = await admin
+    .from('schedule_cycles')
+    .delete()
+    .eq('id', cycleId)
+    .select('id')
 
   if (error) {
     console.error('Failed to delete cycle:', error)
+    redirect(
+      returnToPublish
+        ? '/publish?error=delete_cycle_failed'
+        : '/coverage?view=week&error=delete_cycle_failed'
+    )
+  }
+
+  if (!deletedRows?.length) {
+    console.error('Delete cycle affected 0 rows')
     redirect(
       returnToPublish
         ? '/publish?error=delete_cycle_failed'

@@ -49,6 +49,32 @@ describe('resolveCoverageCycle', () => {
     ).toMatchObject({ id: 'current-cycle' })
   })
 
+  it('prefers the earliest active cycle when windows overlap', () => {
+    expect(
+      resolveCoverageCycle({
+        cycles: [
+          {
+            id: 'later-active',
+            label: 'Later active',
+            start_date: '2026-03-30',
+            end_date: '2026-05-10',
+            published: true,
+          },
+          {
+            id: 'earlier-active',
+            label: 'Earlier active',
+            start_date: '2026-03-23',
+            end_date: '2026-05-03',
+            published: true,
+          },
+        ],
+        cycleIdFromUrl: null,
+        role: 'manager',
+        todayKey: '2026-04-07',
+      })
+    ).toMatchObject({ id: 'earlier-active' })
+  })
+
   it('selects the next upcoming cycle when nothing is active yet', () => {
     expect(
       resolveCoverageCycle({

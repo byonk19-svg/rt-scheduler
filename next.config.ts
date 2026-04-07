@@ -53,6 +53,7 @@ const contentSecurityPolicy = buildContentSecurityPolicy()
 const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
+  allowedDevOrigins: ['127.0.0.1', 'localhost'],
   distDir: process.env.NEXT_DIST_DIR ?? '.next',
   async headers() {
     return [

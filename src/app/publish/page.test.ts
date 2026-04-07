@@ -18,6 +18,7 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/app/publish/actions', () => ({
   restartPublishedCycleAction: vi.fn(),
+  unpublishCycleKeepShiftsAction: vi.fn(),
   deletePublishEventAction: vi.fn(),
   archiveCycleAction: vi.fn(),
 }))
@@ -158,6 +159,7 @@ describe('PublishHistoryPage', () => {
 
     expect(html).toContain('Schedule blocks')
     expect(html).toContain('Publish email log')
+    expect(html).toContain('Unpublish (keep shifts)')
     expect(html).toContain('Start over')
     expect(html).toContain('Archive cycle')
     expect(html).toContain('Delete history')
@@ -182,7 +184,7 @@ describe('PublishHistoryPage', () => {
     )
 
     expect(html).toContain('Cycle restarted')
-    expect(html).toContain('draft schedule')
+    expect(html).toContain('published shifts were cleared')
   })
 
   it('shows a success banner after deleting publish history', async () => {

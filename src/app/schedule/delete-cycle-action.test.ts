@@ -1,16 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { redirectMock, revalidatePathMock, createClientMock } = vi.hoisted(() => ({
-  redirectMock: vi.fn((url: string) => {
-    throw new Error(`REDIRECT:${url}`)
-  }),
-  revalidatePathMock: vi.fn(),
-  createClientMock: vi.fn(),
-}))
+const { redirectMock, revalidatePathMock, createClientMock, createAdminClientMock } = vi.hoisted(
+  () => ({
+    redirectMock: vi.fn((url: string) => {
+      throw new Error(`REDIRECT:${url}`)
+    }),
+    revalidatePathMock: vi.fn(),
+    createClientMock: vi.fn(),
+    createAdminClientMock: vi.fn(),
+  })
+)
 
 vi.mock('next/navigation', () => ({ redirect: redirectMock }))
 vi.mock('next/cache', () => ({ revalidatePath: revalidatePathMock }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: createClientMock }))
+vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: createAdminClientMock }))
 
 import { deleteCycleAction } from '@/app/schedule/actions'
 
@@ -40,9 +44,17 @@ function createSupabaseMock(context: TestContext) {
     },
     from(table: string) {
       const filters = new Map<string, unknown>()
+      let op: 'read' | 'delete' = 'read'
 
       const builder = {
         select() {
+          if (table === 'schedule_cycles' && op === 'delete') {
+            deletedCycleId = String(filters.get('id') ?? '')
+            if (context.deleteError) {
+              return Promise.resolve({ data: null, error: { message: 'delete failed' } })
+            }
+            return Promise.resolve({ data: [{ id: deletedCycleId }], error: null })
+          }
           return builder
         },
         eq(col: string, val: unknown) {
@@ -50,6 +62,7 @@ function createSupabaseMock(context: TestContext) {
           return builder
         },
         delete() {
+          op = 'delete'
           return builder
         },
         async maybeSingle() {
@@ -68,14 +81,6 @@ function createSupabaseMock(context: TestContext) {
               },
               error: null,
             }
-          }
-          return { data: null, error: null }
-        },
-        async single() {
-          if (table === 'schedule_cycles') {
-            deletedCycleId = String(filters.get('id') ?? '')
-            if (context.deleteError) return { data: null, error: { message: 'delete failed' } }
-            return { data: { id: deletedCycleId }, error: null }
           }
           return { data: null, error: null }
         },
@@ -144,6 +149,7 @@ describe('deleteCycleAction', () => {
       cycleExists: true,
     })
     createClientMock.mockResolvedValue(mock)
+    createAdminClientMock.mockReturnValue(mock)
 
     await expect(deleteCycleAction(makeFormData('cycle-1'))).rejects.toThrow(
       'REDIRECT:/coverage?view=week&success=cycle_deleted'
@@ -158,6 +164,7 @@ describe('deleteCycleAction', () => {
       cycleExists: true,
     })
     createClientMock.mockResolvedValue(mock)
+    createAdminClientMock.mockReturnValue(mock)
 
     await expect(deleteCycleAction(makeFormData('cycle-1', 'publish'))).rejects.toThrow(
       'REDIRECT:/publish?success=cycle_deleted'

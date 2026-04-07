@@ -15,6 +15,7 @@ import {
   archiveCycleAction,
   deletePublishEventAction,
   restartPublishedCycleAction,
+  unpublishCycleKeepShiftsAction,
 } from '@/app/publish/actions'
 import { deleteCycleAction } from '@/app/schedule/actions'
 import { can } from '@/lib/auth/can'
@@ -202,8 +203,22 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
             color: 'var(--warning-text)',
           }}
         >
-          Cycle restarted. The published version was taken offline and the cycle is back in draft
-          schedule mode.
+          Cycle restarted. The block is draft again, published shifts were cleared, and any active
+          preliminary snapshot was closed.
+        </div>
+      )}
+
+      {resolvedSearchParams.success === 'unpublished_keep_shifts' && (
+        <div
+          className="rounded-xl border px-4 py-3 text-sm font-medium"
+          style={{
+            borderColor: 'var(--success-border)',
+            backgroundColor: 'var(--success-subtle)',
+            color: 'var(--success-text)',
+          }}
+        >
+          Block unpublished. Assignments stay on the draft grid; staff no longer see it as a
+          published schedule until you publish again.
         </div>
       )}
 
@@ -248,6 +263,8 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
 
       {(resolvedSearchParams.error === 'missing_cycle' ||
         resolvedSearchParams.error === 'cycle_restart_failed' ||
+        resolvedSearchParams.error === 'unpublish_keep_shifts_failed' ||
+        resolvedSearchParams.error === 'unpublish_not_live' ||
         resolvedSearchParams.error === 'delete_publish_event_failed' ||
         resolvedSearchParams.error === 'delete_live_publish_event' ||
         resolvedSearchParams.error === 'missing_publish_event' ||
@@ -269,25 +286,29 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
             ? 'Could not restart that cycle because no cycle was selected.'
             : resolvedSearchParams.error === 'cycle_restart_failed'
               ? 'Could not restart that published cycle. Please try again.'
-              : resolvedSearchParams.error === 'delete_live_publish_event'
-                ? 'Live publish entries must be restarted from the schedule workspace before they can be removed from history.'
-                : resolvedSearchParams.error === 'missing_publish_event'
-                  ? 'Could not delete that history entry because no publish event was selected.'
-                  : resolvedSearchParams.error === 'delete_publish_event_failed'
-                    ? 'Could not delete that publish history entry. Please try again.'
-                    : resolvedSearchParams.error === 'archive_live_cycle'
-                      ? 'Live cycles must be restarted as drafts before they can be archived.'
-                      : resolvedSearchParams.error === 'cycle_archive_failed'
-                        ? 'Could not archive that cycle. Please try again.'
-                        : resolvedSearchParams.error === 'delete_cycle_unauthorized'
-                          ? 'You do not have permission to delete that schedule block.'
-                          : resolvedSearchParams.error === 'delete_cycle_not_found'
-                            ? 'That schedule block was not found.'
-                            : resolvedSearchParams.error === 'delete_cycle_published'
-                              ? 'Published blocks cannot be deleted. Use Start over to return to draft, then archive or delete.'
-                              : resolvedSearchParams.error === 'delete_cycle_failed'
-                                ? 'Could not delete that draft block. Please try again.'
-                                : 'Something went wrong.'}
+              : resolvedSearchParams.error === 'unpublish_keep_shifts_failed'
+                ? 'Could not unpublish that block while keeping shifts. Please try again.'
+                : resolvedSearchParams.error === 'unpublish_not_live'
+                  ? 'That block is already a draft.'
+                  : resolvedSearchParams.error === 'delete_live_publish_event'
+                    ? 'Live publish entries must be restarted from the schedule workspace before they can be removed from history.'
+                    : resolvedSearchParams.error === 'missing_publish_event'
+                      ? 'Could not delete that history entry because no publish event was selected.'
+                      : resolvedSearchParams.error === 'delete_publish_event_failed'
+                        ? 'Could not delete that publish history entry. Please try again.'
+                        : resolvedSearchParams.error === 'archive_live_cycle'
+                          ? 'Live blocks must be unpublished or cleared with Start over before they can be archived.'
+                          : resolvedSearchParams.error === 'cycle_archive_failed'
+                            ? 'Could not archive that cycle. Please try again.'
+                            : resolvedSearchParams.error === 'delete_cycle_unauthorized'
+                              ? 'You do not have permission to delete that schedule block.'
+                              : resolvedSearchParams.error === 'delete_cycle_not_found'
+                                ? 'That schedule block was not found.'
+                                : resolvedSearchParams.error === 'delete_cycle_published'
+                                  ? 'Published blocks cannot be deleted. Unpublish (keep shifts) or Start over, then archive or delete the draft.'
+                                  : resolvedSearchParams.error === 'delete_cycle_failed'
+                                    ? 'Could not delete that draft block. Please try again.'
+                                    : 'Something went wrong.'}
         </div>
       )}
 
@@ -295,9 +316,9 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
         <div className="px-0.5">
           <h2 className="text-sm font-bold tracking-tight text-foreground">Schedule blocks</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Every row is a 6-week block (draft or live). Archive hides it from Schedule and
-            Availability; delete removes a draft entirely. Email delivery is tracked in the next
-            section.
+            Live blocks: Unpublish (keep shifts) takes them offline but keeps assignments; Start
+            over clears the grid and returns to draft. Drafts: archive hides from Schedule, delete
+            removes the block. Email log is below.
           </p>
         </div>
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
@@ -355,15 +376,27 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                             Open in Schedule
                           </Link>
                           {cycle.published ? (
-                            <form action={restartPublishedCycleAction}>
-                              <input type="hidden" name="cycle_id" value={cycle.id} />
-                              <button
-                                type="submit"
-                                className="inline-flex h-8 items-center rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 text-xs font-semibold text-[var(--warning-text)] transition-opacity hover:opacity-80"
-                              >
-                                Start over
-                              </button>
-                            </form>
+                            <>
+                              <form action={unpublishCycleKeepShiftsAction}>
+                                <input type="hidden" name="cycle_id" value={cycle.id} />
+                                <button
+                                  type="submit"
+                                  className="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80"
+                                >
+                                  Unpublish (keep shifts)
+                                </button>
+                              </form>
+                              <form action={restartPublishedCycleAction}>
+                                <input type="hidden" name="cycle_id" value={cycle.id} />
+                                <button
+                                  type="submit"
+                                  title="Draft again and clear all assignments for this block"
+                                  className="inline-flex h-8 items-center rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 text-xs font-semibold text-[var(--warning-text)] transition-opacity hover:opacity-80"
+                                >
+                                  Start over
+                                </button>
+                              </form>
+                            </>
                           ) : (
                             <>
                               <form action={archiveCycleAction}>
@@ -495,15 +528,27 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-2">
                           {getOne(event.schedule_cycles)?.published && (
-                            <form action={restartPublishedCycleAction}>
-                              <input type="hidden" name="cycle_id" value={event.cycle_id} />
-                              <button
-                                type="submit"
-                                className="inline-flex h-8 items-center rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 text-xs font-semibold text-[var(--warning-text)] transition-opacity hover:opacity-80"
-                              >
-                                Start over
-                              </button>
-                            </form>
+                            <>
+                              <form action={unpublishCycleKeepShiftsAction}>
+                                <input type="hidden" name="cycle_id" value={event.cycle_id} />
+                                <button
+                                  type="submit"
+                                  className="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80"
+                                >
+                                  Unpublish (keep shifts)
+                                </button>
+                              </form>
+                              <form action={restartPublishedCycleAction}>
+                                <input type="hidden" name="cycle_id" value={event.cycle_id} />
+                                <button
+                                  type="submit"
+                                  title="Draft again and clear all assignments for this block"
+                                  className="inline-flex h-8 items-center rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 text-xs font-semibold text-[var(--warning-text)] transition-opacity hover:opacity-80"
+                                >
+                                  Start over
+                                </button>
+                              </form>
+                            </>
                           )}
                           {!getOne(event.schedule_cycles)?.published && (
                             <>

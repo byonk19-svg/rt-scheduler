@@ -21,6 +21,7 @@ export function resolveCoverageCycle<T extends CoverageCycleShape>({
   todayKey,
 }: ResolveCoverageCycleArgs<T>): T | null {
   const visibleCycles = role === 'therapist' ? cycles.filter((cycle) => cycle.published) : cycles
+  const orderedCycles = [...visibleCycles].sort((a, b) => a.start_date.localeCompare(b.start_date))
   const fromUrl = cycleIdFromUrl
     ? visibleCycles.find((cycle) => cycle.id === cycleIdFromUrl) ?? null
     : null
@@ -28,15 +29,13 @@ export function resolveCoverageCycle<T extends CoverageCycleShape>({
   if (fromUrl) return fromUrl
 
   const activeCycle =
-    visibleCycles.find((cycle) => cycle.start_date <= todayKey && cycle.end_date >= todayKey) ??
+    orderedCycles.find((cycle) => cycle.start_date <= todayKey && cycle.end_date >= todayKey) ??
     null
 
   if (activeCycle) return activeCycle
 
   const nextUpcomingCycle =
-    [...visibleCycles]
-      .sort((a, b) => a.start_date.localeCompare(b.start_date))
-      .find((cycle) => cycle.start_date > todayKey) ?? null
+    orderedCycles.find((cycle) => cycle.start_date > todayKey) ?? null
 
   return nextUpcomingCycle
 }
