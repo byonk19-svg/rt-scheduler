@@ -1,6 +1,16 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-07 (session 27)
+Updated: 2026-04-07 (session 28)
+
+## Latest Updates (2026-04-07, session 28)
+
+- **Therapist staff dashboard + Future Availability copy alignment (no layout redesign):**
+  - **`src/app/dashboard/staff/page.tsx`** — Option B header: **Welcome, [first name]** as main title; secondary **Cycle: …** via shared `formatHumanCycleRange`; redundant “Dashboard” kicker removed; section titles Title Case (**Availability for This Cycle**, **Requests Awaiting Action**, **Next Shift**, **Upcoming Shifts**); availability submission line uses `formatSubmittedDateTime`; inferred availability due date unchanged with a TODO for future per-cycle deadlines.
+  - **`src/lib/calendar-utils.ts`** — `formatHumanCycleRange`, `formatSubmittedDateTime` for shared therapist-facing cycle and “Submitted …” timestamps; unit tests in `calendar-utils.test.ts`.
+  - **`src/components/availability/TherapistAvailabilityWorkspace.tsx`** + **`src/app/therapist/availability/page.tsx`** — Terminology: **Available**, **Need Off**, **Request to Work**; **Submit Availability** section / **Submit availability** CTA; human cycle line; **Availability summary:** counts; submission state **Submitted** / **Not submitted** + timestamp from therapist `availability_overrides` activity; lower table **Submitted Availability**; no “draft not submitted” label without backend draft.
+  - **`src/app/availability/availability-requests-table.tsx`** — Therapist table filter labels aligned (**Need Off**, **Request to Work**).
+  - **Shell / shift board naming:** `AppShell` staff nav **Schedule preview** (was Preliminary), **Open shifts** (was Shift Board); manager nav for `/swaps` + `/shift-board`: **Open shifts**; `src/app/shift-board/page.tsx` page `<h1>` **Open shifts**.
+- **Verification:** `npx tsc --noEmit`, `npm run lint` (touched files), `npm run test:unit` (**405** passing).
 
 ## Latest Updates (2026-04-07, session 27)
 
@@ -623,7 +633,7 @@ All checks currently green:
 - `npm run lint` pass
 - `npm run format:check` pass (whole-repo Prettier; `.claude/**` excluded from ESLint)
 - `npm run build` pass
-- `npm run test:unit` pass (**394 tests**)
+- `npm run test:unit` pass (**405 tests**)
 - `npm run test:e2e` pass (39 passed, 1 skipped)
 
 CI gates: format check â†’ lint â†’ tsc â†’ build â†’ Playwright E2E
@@ -802,7 +812,7 @@ Assignment status is informational only (does not affect coverage counts or publ
 - User avatar: `var(--attention)` amber
 - Manager badge: `bg-[var(--warning-subtle)] text-[var(--warning-text)] border-[var(--warning-border)]`
 - App shell header `z-30`; coverage slide-over `z-50`
-- Manager nav order: Inbox -> Schedule -> Availability -> Shift Board -> Team -> Approvals -> Publish History
+- Manager nav order: Inbox -> Schedule -> Availability -> Open shifts -> Team -> Approvals -> Publish History
 
 ## Assignment Status
 

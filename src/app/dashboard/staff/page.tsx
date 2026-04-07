@@ -6,6 +6,14 @@ import { FeedbackToast } from '@/components/feedback-toast'
 import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
+import {
+  addDays,
+  dateFromKey,
+  formatDateLabel,
+  formatHumanCycleRange,
+  formatSubmittedDateTime,
+  toIsoDate,
+} from '@/lib/calendar-utils'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { cn } from '@/lib/utils'
@@ -28,6 +36,20 @@ function getStaffDashboardFeedback(
   if (success === 'access_requested')
     return { message: 'Access request submitted and signed in.', variant: 'success' }
   return null
+}
+
+/**
+ * Inferred preferred-by date (day before cycle start). Replace with explicit per-cycle
+ * deadlines when product supports configured submission close dates or role-specific cutoffs.
+ */
+function availabilityDueSupportLine(cycleStart: string, submitted: boolean): string | null {
+  if (submitted) return null
+  const preferredBy = toIsoDate(addDays(dateFromKey(cycleStart), -1))
+  const today = new Date().toISOString().slice(0, 10)
+  if (preferredBy < today) {
+    return 'Submit as soon as you can—your manager is still building this block.'
+  }
+  return `Due ${formatDateLabel(preferredBy)}`
 }
 
 export default async function StaffDashboardPage({
@@ -58,13 +80,13 @@ export default async function StaffDashboardPage({
   }
 
   const fullName = profile?.full_name ?? user.user_metadata?.full_name ?? 'Staff member'
+  const firstName = fullName.split(/\s+/)[0] ?? fullName
 
-  // Fetch live metrics --------------------------------------------------------
   const today = new Date().toISOString().split('T')[0]
 
   const { data: cycles } = await supabase
     .from('schedule_cycles')
-    .select('id, label, start_date, end_date, archived_at')
+    .select('id, label, start_date, end_date, archived_at, published')
     .is('archived_at', null)
     .gte('end_date', today)
     .order('start_date', { ascending: true })
@@ -81,30 +103,33 @@ export default async function StaffDashboardPage({
     shift_type: string | null
     role: string | null
   }
-  const [upcomingShiftsResult, overrideCountResult, pendingPostCountResult] = await Promise.all([
-    activeCycle
-      ? supabase
-          .from('shifts')
-          .select('id, date, shift_type, role')
-          .eq('user_id', user.id)
-          .eq('cycle_id', activeCycle.id)
-          .gte('date', today)
-          .order('date', { ascending: true })
-          .limit(10)
-      : Promise.resolve({ data: [] }),
-    activeCycle
-      ? supabase
-          .from('availability_overrides')
-          .select('id', { head: true, count: 'exact' })
-          .eq('therapist_id', user.id)
-          .eq('cycle_id', activeCycle.id)
-      : Promise.resolve({ count: 0 }),
-    supabase
-      .from('shift_posts')
-      .select('id', { head: true, count: 'exact' })
-      .eq('posted_by', user.id)
-      .eq('status', 'pending'),
-  ])
+
+  const [upcomingShiftsResult, therapistOverridesResult, pendingPostCountResult] =
+    await Promise.all([
+      activeCycle
+        ? supabase
+            .from('shifts')
+            .select('id, date, shift_type, role')
+            .eq('user_id', user.id)
+            .eq('cycle_id', activeCycle.id)
+            .gte('date', today)
+            .order('date', { ascending: true })
+            .limit(10)
+        : Promise.resolve({ data: [] }),
+      activeCycle
+        ? supabase
+            .from('availability_overrides')
+            .select('updated_at')
+            .eq('therapist_id', user.id)
+            .eq('cycle_id', activeCycle.id)
+            .eq('source', 'therapist')
+        : Promise.resolve({ data: [] }),
+      supabase
+        .from('shift_posts')
+        .select('id', { head: true, count: 'exact' })
+        .eq('posted_by', user.id)
+        .eq('status', 'pending'),
+    ])
 
   const upcomingShiftRows = (upcomingShiftsResult.data ?? []) as UpcomingShiftRow[]
   const upcomingActiveOperationalCodesByShiftId = await fetchActiveOperationalCodeMap(
@@ -123,10 +148,26 @@ export default async function StaffDashboardPage({
         day: 'numeric',
       })
     : null
-  const availabilitySubmitted = (overrideCountResult.count ?? 0) > 0
+
+  const therapistOverrideRows = (therapistOverridesResult.data ?? []) as { updated_at: string }[]
+  const availabilitySubmitted = therapistOverrideRows.length > 0
+  const lastAvailabilitySubmitAt = therapistOverrideRows.reduce<string | null>((latest, row) => {
+    if (!latest || row.updated_at > latest) return row.updated_at
+    return latest
+  }, null)
+
   const pendingPostCount = pendingPostCountResult.count ?? 0
 
-  // Upcoming shift roster - who else is scheduled on the next 3 shifts --------
+  const cycleRangeLabel =
+    activeCycle && !Number.isNaN(dateFromKey(activeCycle.start_date).getTime())
+      ? formatHumanCycleRange(activeCycle.start_date, activeCycle.end_date)
+      : null
+
+  const availabilityDueLine =
+    activeCycle && !availabilitySubmitted
+      ? availabilityDueSupportLine(activeCycle.start_date, availabilitySubmitted)
+      : null
+
   type RosterShift = {
     id: string
     user_id: string | null
@@ -197,7 +238,10 @@ export default async function StaffDashboardPage({
       colleagues,
     }
   })
-  // --------------------------------------------------------------------------
+
+  const nextShiftTypeLabel = nextShift?.shift_type
+    ? `${nextShift.shift_type.charAt(0).toUpperCase()}${nextShift.shift_type.slice(1)} shift`
+    : null
 
   return (
     <div className="space-y-4">
@@ -206,41 +250,68 @@ export default async function StaffDashboardPage({
       <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_12px_rgba(15,23,42,0.06)]">
         <div className="flex flex-col gap-3 border-b border-border px-4 py-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Staff Home
-            </p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
-              Welcome, {fullName}
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Welcome, {firstName}
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {activeCycle
-                ? `${activeCycle.label} | ${activeCycle.start_date} to ${activeCycle.end_date}`
-                : 'No active cycle selected'}
-            </p>
-            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+            {activeCycle && cycleRangeLabel ? (
+              <>
+                <p className="mt-2 text-sm font-medium text-foreground">Cycle: {cycleRangeLabel}</p>
+                {activeCycle.published ? (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Published {formatDateLabel(activeCycle.start_date)}
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">No active scheduling cycle yet.</p>
+            )}
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5">
-                {upcomingCount} upcoming
+                {upcomingCount} upcoming shifts
               </span>
               <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5">
-                {pendingPostCount} pending posts
+                {pendingPostCount} requests awaiting action
+              </span>
+              <span
+                className={cn(
+                  'rounded-full border px-2 py-0.5',
+                  availabilitySubmitted
+                    ? 'border-border/70 bg-muted/20'
+                    : 'border-[var(--warning-border)] bg-[var(--warning-subtle)]/50 text-[var(--warning-text)]'
+                )}
+              >
+                {availabilitySubmitted ? 'Availability: Submitted' : 'Availability: Not submitted'}
               </span>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button asChild size="sm">
-              <Link href="/therapist/availability">
-                <Send className="mr-1.5 h-3.5 w-3.5" />
-                Submit availability
-              </Link>
-            </Button>
-            <Button asChild size="sm" variant="outline">
-              <Link href="/shift-board">Open shift board</Link>
-            </Button>
+            {!availabilitySubmitted ? (
+              <>
+                <Button asChild size="sm">
+                  <Link href="/therapist/availability">
+                    <Send className="mr-1.5 h-3.5 w-3.5" />
+                    Submit availability
+                  </Link>
+                </Button>
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/shift-board">Browse open shifts</Link>
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button asChild size="sm">
+                  <Link href="/shift-board">Browse open shifts</Link>
+                </Button>
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/therapist/availability">Edit availability</Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
         <div className="px-4 py-3.5">
           <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            Upcoming shifts
+            Upcoming Shifts
           </p>
           {upcomingRoster.length > 0 ? (
             <div className="divide-y divide-border">
@@ -302,17 +373,27 @@ export default async function StaffDashboardPage({
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-6 text-center">
-              <p className="text-sm text-muted-foreground">No upcoming shifts yet in this cycle.</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Submit availability or browse the shift board while the next cycle is still filling.
+              <p className="text-sm font-medium text-foreground">
+                No shifts scheduled yet for this cycle
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Submit your availability or browse open shifts while the schedule is still being
+                filled.
               </p>
               <div className="mt-3 flex justify-center gap-2">
-                <Button asChild size="sm" variant="outline">
-                  <Link href="/therapist/availability">Submit availability</Link>
-                </Button>
-                <Button asChild size="sm" variant="ghost">
+                {!availabilitySubmitted ? (
+                  <Button asChild size="sm">
+                    <Link href="/therapist/availability">Submit availability</Link>
+                  </Button>
+                ) : null}
+                <Button asChild size="sm" variant={availabilitySubmitted ? 'default' : 'outline'}>
                   <Link href="/shift-board">Browse open shifts</Link>
                 </Button>
+                {!availabilitySubmitted ? null : (
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/therapist/availability">Edit availability</Link>
+                  </Button>
+                )}
               </div>
             </div>
           )}
@@ -322,13 +403,31 @@ export default async function StaffDashboardPage({
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded-xl border border-border bg-muted/30 px-3 py-2.5">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Next shift</span>
+            <span>Next Shift</span>
             <Clock className="h-3.5 w-3.5" />
           </div>
-          <p className="mt-1.5 text-lg font-semibold tracking-tight text-foreground">
-            {nextShiftLabel ?? '--'}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">Earliest scheduled shift</p>
+          {nextShift && nextShiftLabel ? (
+            <>
+              <p className="mt-1.5 text-lg font-semibold tracking-tight text-foreground">
+                {nextShiftLabel}
+              </p>
+              {nextShiftTypeLabel ? (
+                <p className="mt-0.5 text-sm font-medium capitalize text-foreground">
+                  {nextShiftTypeLabel}
+                </p>
+              ) : null}
+              <p className="mt-1 text-xs text-muted-foreground">
+                Your next shift in this published schedule
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="mt-1.5 text-sm font-medium text-foreground">No shift scheduled yet</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Your next scheduled shift will appear here once you are on the roster.
+              </p>
+            </>
+          )}
         </div>
         <div
           className={cn(
@@ -339,7 +438,7 @@ export default async function StaffDashboardPage({
           )}
         >
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Availability</span>
+            <span>Availability for This Cycle</span>
             <CheckCircle2
               className={cn(
                 'h-3.5 w-3.5',
@@ -353,29 +452,42 @@ export default async function StaffDashboardPage({
               availabilitySubmitted ? 'text-[var(--success-text)]' : 'text-[var(--warning-text)]'
             )}
           >
-            {availabilitySubmitted ? 'Ready' : 'Pending'}
+            {availabilitySubmitted ? 'Submitted' : 'Not submitted'}
           </p>
-          {availabilitySubmitted ? (
-            <p className="mt-1 text-xs text-muted-foreground">Future-cycle submission</p>
+          {availabilitySubmitted && lastAvailabilitySubmitAt ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Submitted {formatSubmittedDateTime(lastAvailabilitySubmitAt)}
+            </p>
+          ) : null}
+          {!availabilitySubmitted && availabilityDueLine ? (
+            <p className="mt-1 text-xs text-muted-foreground">{availabilityDueLine}</p>
+          ) : null}
+          {!availabilitySubmitted ? (
+            <Link
+              href="/therapist/availability"
+              className="mt-2 inline-block text-xs font-semibold text-primary hover:underline"
+            >
+              Submit availability &rarr;
+            </Link>
           ) : (
             <Link
               href="/therapist/availability"
-              className="mt-1 block text-xs text-primary hover:underline"
+              className="mt-2 inline-block text-xs font-semibold text-primary hover:underline"
             >
-              Submit now &rarr;
+              Edit availability &rarr;
             </Link>
           )}
         </div>
         <div className="rounded-xl border border-border bg-muted/30 px-3 py-2.5">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Pending posts</span>
+            <span>Requests Awaiting Action</span>
             <ArrowLeftRight className="h-3.5 w-3.5" />
           </div>
           <p className="mt-1.5 text-lg font-semibold tracking-tight text-foreground">
             {pendingPostCount}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Swap or pickup requests awaiting action
+            Swap or pickup requests that need your response
           </p>
         </div>
       </section>

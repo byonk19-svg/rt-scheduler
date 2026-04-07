@@ -6,7 +6,13 @@ import { useMemo, useState } from 'react'
 import type { AvailabilityEntryTableRow } from '@/app/availability/availability-requests-table'
 import { FormSubmitButton } from '@/components/form-submit-button'
 import { Label } from '@/components/ui/label'
-import { addDays, formatDateLabel, toIsoDate } from '@/lib/calendar-utils'
+import {
+  addDays,
+  formatDateLabel,
+  formatHumanCycleRange,
+  formatSubmittedDateTime,
+  toIsoDate,
+} from '@/lib/calendar-utils'
 import { cn } from '@/lib/utils'
 
 type Cycle = {
@@ -40,16 +46,6 @@ function monthRibbonLabel(isoDate: string, previousIsoDate: string | null): stri
     return d.toLocaleDateString('en-US', { month: 'short' })
   }
   return null
-}
-
-function formatSubmissionTimestamp(value: Date | null): string | null {
-  if (!value) return null
-  return value.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
 }
 
 export function TherapistAvailabilityWorkspace({
@@ -139,9 +135,6 @@ export function TherapistAvailabilityWorkspace({
     [draftStatusByDate]
   )
 
-  const cycleDateRangeLabel = selectedCycle
-    ? `${formatDateLabel(selectedCycle.start_date)} – ${formatDateLabel(selectedCycle.end_date)}`
-    : ''
   const noteDates = useMemo(
     () =>
       cycleDays.filter((date) => {
@@ -169,13 +162,18 @@ export function TherapistAvailabilityWorkspace({
 
   const requestToWorkCount = canWorkDates.length
   const totalDaysSelected = cycleDays.length
-  const latestSubmittedAt = useMemo(() => {
-    const timestamps = cycleRows
-      .map((row) => new Date(row.createdAt).getTime())
-      .filter((value) => Number.isFinite(value))
-    if (timestamps.length === 0) return null
-    return new Date(Math.max(...timestamps))
+
+  const serverHasOverrides = cycleRows.length > 0
+  const latestActivityIso = useMemo(() => {
+    const times = cycleRows
+      .flatMap((row) => [row.updatedAt, row.createdAt])
+      .filter(Boolean)
+      .map((t) => new Date(t as string).getTime())
+      .filter((n) => Number.isFinite(n))
+    if (times.length === 0) return null
+    return new Date(Math.max(...times)).toISOString()
   }, [cycleRows])
+
   const hasUnsavedChanges = useMemo(() => {
     const allDates = new Set([
       ...Object.keys(initialStatusByDate),
@@ -198,19 +196,19 @@ export function TherapistAvailabilityWorkspace({
     return false
   }, [draftNotesByDate, draftStatusByDate, initialNotesByDate, initialStatusByDate])
 
-  const submissionStatus = hasUnsavedChanges
-    ? 'Draft not submitted'
-    : latestSubmittedAt
+  const submissionPrimaryLabel = hasUnsavedChanges
+    ? 'Not submitted'
+    : serverHasOverrides
       ? 'Submitted'
-      : 'Draft not submitted'
-  const latestSubmittedLabel = formatSubmissionTimestamp(latestSubmittedAt)
-  const submissionStatusDetail = hasUnsavedChanges
-    ? latestSubmittedLabel
-      ? `Submitted on ${latestSubmittedLabel} · new edits not submitted`
-      : 'Your selections are still a draft until you submit availability.'
-    : latestSubmittedLabel
-      ? `Submitted on ${latestSubmittedLabel}`
-      : 'Choose your availability for this cycle, then submit when ready.'
+      : 'Not submitted'
+
+  const submissionDetailLabel = hasUnsavedChanges
+    ? 'You have changes that are not saved yet. Tap Submit availability to save them.'
+    : serverHasOverrides && latestActivityIso
+      ? formatSubmittedDateTime(latestActivityIso)
+      : serverHasOverrides
+        ? 'Your availability is on file for this cycle.'
+        : 'Choose your days for this cycle, then submit when ready.'
 
   function toggleDate(date: string) {
     if (!selectedCycle) return
@@ -278,18 +276,35 @@ export function TherapistAvailabilityWorkspace({
               {selectedCycle ? (
                 <>
                   <span className="font-medium text-foreground">Cycle:</span>{' '}
-                  <span>{cycleDateRangeLabel}</span>
+                  <span className="text-foreground">
+                    {formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)}
+                  </span>
+                  {selectedCycle.published ? (
+                    <>
+                      <br />
+                      <span className="text-xs text-muted-foreground">
+                        Published {formatDateLabel(selectedCycle.start_date)}
+                      </span>
+                    </>
+                  ) : null}
                 </>
               ) : (
                 'Select a cycle to enter availability.'
               )}
             </p>
             <div className="flex flex-wrap gap-2">
-              <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-1 text-[11px] font-semibold text-[var(--warning-text)]">
-                {submissionStatus}
+              <span
+                className={cn(
+                  'rounded-full border px-3 py-1 text-[11px] font-semibold',
+                  submissionPrimaryLabel === 'Submitted'
+                    ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
+                    : 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+                )}
+              >
+                {submissionPrimaryLabel}
               </span>
               <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 text-[11px] text-muted-foreground">
-                {submissionStatusDetail}
+                {submissionDetailLabel}
               </span>
             </div>
           </div>
@@ -318,11 +333,11 @@ export function TherapistAvailabilityWorkspace({
             <FormSubmitButton
               type="submit"
               size="sm"
-              pendingText="Saving..."
+              pendingText="Saving…"
               className="h-10 shrink-0 gap-2 px-5 font-semibold shadow-sm sm:self-end"
             >
               <Send className="h-3.5 w-3.5" aria-hidden />
-              Submit Availability
+              Submit availability
             </FormSubmitButton>
           </div>
         </div>
@@ -331,6 +346,7 @@ export function TherapistAvailabilityWorkspace({
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <p className="font-medium text-foreground">{totalDaysSelected} days selected</p>
             <p className="tabular-nums">
+              Availability summary:{' '}
               <span className="font-semibold text-foreground">{availableCount}</span> available ·{' '}
               <span className="font-semibold text-foreground">{cannotWorkDates.length}</span> need
               off · <span className="font-semibold text-foreground">{requestToWorkCount}</span>{' '}
@@ -339,11 +355,16 @@ export function TherapistAvailabilityWorkspace({
           </div>
         </div>
 
-        <div className="border-b border-[var(--info-border)] bg-[var(--info-subtle)] px-5 py-3 sm:px-6">
+        <div className="border-b border-[var(--info-border)] bg-[var(--info-subtle)] px-5 py-3 sm:px-6 space-y-2">
           <p className="text-xs font-medium leading-snug text-[var(--info-text)]">
             Tap a day to switch between Available, Need Off, and Request to Work. Add an optional
             note for more detail.
           </p>
+          <ul className="list-inside list-disc text-[11px] leading-snug text-[var(--info-text)]/95">
+            <li>Available = I can work this day</li>
+            <li>Need Off = I am requesting this day off</li>
+            <li>Request to Work = I would like to be considered (not guaranteed)</li>
+          </ul>
         </div>
 
         <div className="border-b border-border/70 bg-card px-5 py-4 sm:px-6">
@@ -455,7 +476,7 @@ export function TherapistAvailabilityWorkspace({
             <div>
               <h3 className="text-sm font-semibold text-foreground">Day Notes</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                Add optional details for Need Off or Request to Work days.
+                Optional context for Need Off or Request to Work days.
               </p>
             </div>
             {noteDates.length === 0 ? (

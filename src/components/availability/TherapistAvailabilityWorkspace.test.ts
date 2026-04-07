@@ -24,6 +24,7 @@ describe('TherapistAvailabilityWorkspace', () => {
             date: '2026-03-24',
             reason: 'Vacation',
             createdAt: '2026-03-02T08:00:00.000Z',
+            updatedAt: '2026-03-02T08:00:00.000Z',
             requestedBy: 'Barbara C.',
             cycleLabel: 'Apr 2026 (2026-03-22 to 2026-05-02)',
             entryType: 'force_off',
@@ -37,6 +38,7 @@ describe('TherapistAvailabilityWorkspace', () => {
     )
 
     expect(html).toContain('Submit Availability')
+    expect(html).toContain('Submit availability')
     expect(html).toContain('id="therapist-availability-workspace"')
     expect(html).toContain('Submitted')
     expect(html).toContain('Cycle:')
@@ -48,7 +50,6 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('Need Off')
     expect(html).toContain('request to work')
     expect(html).toContain('Week 1')
-    expect(html).toContain('Submit Availability')
     expect(html).not.toContain('Must work')
     expect(html).not.toContain('Unavailable')
   })

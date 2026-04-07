@@ -33,6 +33,8 @@ export type AvailabilityEntryTableRow = {
   date: string
   reason: string | null
   createdAt: string
+  /** Latest activity time for therapist entries (mirrors availability_overrides.updated_at). */
+  updatedAt?: string
   requestedBy: string
   cycleLabel: string
   entryType: 'force_off' | 'force_on'
@@ -53,8 +55,8 @@ type AvailabilityEntriesTableProps = {
 
 const STATUS_OPTIONS: TableStatusOption[] = [
   { value: 'all', label: 'All' },
-  { value: 'force_off', label: 'Need off' },
-  { value: 'force_on', label: 'Request to work' },
+  { value: 'force_off', label: 'Need Off' },
+  { value: 'force_on', label: 'Request to Work' },
 ]
 
 function formatDateTime(value: string): string {
@@ -64,7 +66,7 @@ function formatDateTime(value: string): string {
 }
 
 function formatEntryLabel(entryType: AvailabilityEntryTableRow['entryType']): string {
-  return entryType === 'force_on' ? 'Request to work' : 'Need off'
+  return entryType === 'force_on' ? 'Request to Work' : 'Need Off'
 }
 
 function formatShiftTypeLabel(shiftType: AvailabilityEntryTableRow['shiftType']): string {

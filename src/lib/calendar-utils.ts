@@ -70,6 +70,37 @@ export function formatMonthLabel(value: string): string {
   return parsed.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 }
 
+/**
+ * Human-readable cycle window, e.g. "Mar 23 – May 3, 2026".
+ * Shared by therapist dashboard and availability surfaces—keep wording aligned.
+ */
+export function formatHumanCycleRange(startDate: string, endDate: string): string {
+  const s = dateFromKey(startDate)
+  const e = dateFromKey(endDate)
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) {
+    return `${startDate} – ${endDate}`
+  }
+  if (s.getFullYear() === e.getFullYear()) {
+    const left = s.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const right = e.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    return `${left} – ${right}`
+  }
+  return `${formatDateLabel(startDate)} – ${formatDateLabel(endDate)}`
+}
+
+/** Timestamp for "Submitted …" lines on therapist-facing surfaces. */
+export function formatSubmittedDateTime(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
 /** Returns the ISO date of the first day of the month containing `dateValue`. */
 export function toMonthStartKey(dateValue: string): string {
   const parsed = new Date(`${dateValue}T00:00:00`)

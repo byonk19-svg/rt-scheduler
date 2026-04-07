@@ -53,12 +53,12 @@ const STAFF_NAV_ITEMS: readonly NavItem[] = [
   },
   {
     href: '/preliminary',
-    label: 'Preliminary',
+    label: 'Schedule preview',
     icon: CalendarRange,
     isActive: (pathname) => pathname === '/preliminary',
   },
   { href: '/therapist/availability', label: 'Future Availability', icon: CalendarRange },
-  { href: '/shift-board', label: 'Shift Board', icon: ArrowLeftRight },
+  { href: '/shift-board', label: 'Open shifts', icon: ArrowLeftRight },
   { href: '/notifications', label: 'Notifications', icon: Bell },
 ]
 
@@ -75,7 +75,7 @@ const MANAGER_NAV_ITEMS: readonly NavItem[] = [
   { href: '/availability', label: 'Availability', icon: CalendarRange },
   {
     href: '/swaps',
-    label: 'Shift Board',
+    label: 'Open shifts',
     icon: ArrowLeftRight,
     isActive: (pathname) => pathname === '/swaps' || pathname === '/shift-board',
   },

@@ -14,6 +14,7 @@ import type { TableToolbarFilters } from '@/components/TableToolbar'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { can } from '@/lib/auth/can'
 import { toUiRole } from '@/lib/auth/roles'
+import { formatDateLabel, formatHumanCycleRange } from '@/lib/calendar-utils'
 import { createClient } from '@/lib/supabase/server'
 
 type ToastVariant = 'success' | 'error'
@@ -37,32 +38,13 @@ type Cycle = {
   archived_at?: string | null
 }
 
-function formatTherapistCycleLabel(cycle: Cycle | null): string {
-  if (!cycle) return 'No cycle selected'
-  const start = new Date(`${cycle.start_date}T00:00:00`)
-  const end = new Date(`${cycle.end_date}T00:00:00`)
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return `Cycle: ${cycle.start_date} – ${cycle.end_date}`
+function therapistCycleSubtitle(cycle: Cycle | null): string {
+  if (!cycle) return 'No upcoming cycle selected'
+  const range = `Cycle: ${formatHumanCycleRange(cycle.start_date, cycle.end_date)}`
+  if (cycle.published) {
+    return `${range} · Published ${formatDateLabel(cycle.start_date)}`
   }
-
-  const sameYear = start.getFullYear() === end.getFullYear()
-  const startLabel = start.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  })
-  const endLabel = end.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-
-  return sameYear
-    ? `Cycle: ${startLabel} – ${endLabel}`
-    : `Cycle: ${start.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      })} – ${endLabel}`
+  return range
 }
 
 type AvailabilityRow = {
@@ -72,6 +54,7 @@ type AvailabilityRow = {
   override_type: 'force_off' | 'force_on'
   note: string | null
   created_at: string
+  updated_at: string
   therapist_id: string
   cycle_id: string
   profiles: { full_name: string } | { full_name: string }[] | null
@@ -195,7 +178,7 @@ export default async function TherapistAvailabilityPage({
   let entriesQuery = supabase
     .from('availability_overrides')
     .select(
-      'id, date, shift_type, override_type, note, created_at, therapist_id, cycle_id, profiles!availability_overrides_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
+      'id, date, shift_type, override_type, note, created_at, updated_at, therapist_id, cycle_id, profiles!availability_overrides_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
     )
     .eq('therapist_id', user.id)
     .order('date', { ascending: true })
@@ -217,6 +200,7 @@ export default async function TherapistAvailabilityPage({
       date: entry.date,
       reason: entry.note,
       createdAt: entry.created_at,
+      updatedAt: entry.updated_at,
       requestedBy: requester?.full_name ?? 'Unknown user',
       cycleLabel: cycle
         ? `${cycle.label} (${cycle.start_date} to ${cycle.end_date})`
@@ -248,9 +232,7 @@ export default async function TherapistAvailabilityPage({
       <AvailabilityOverviewHeader
         canManageAvailability={false}
         title="Availability for This Cycle"
-        subtitle={
-          selectedCycle ? formatTherapistCycleLabel(selectedCycle) : 'No upcoming cycle selected'
-        }
+        subtitle={therapistCycleSubtitle(selectedCycle)}
         totalRequests={totalRequests}
         needOffRequests={needOffRequests}
         availableToWorkRequests={requestToWorkRequests}
@@ -261,8 +243,8 @@ export default async function TherapistAvailabilityPage({
               {totalCycleDays} days selected
             </span>
             <span className="text-muted-foreground">
-              {availableDays} available · {needOffRequests} need off · {requestToWorkRequests}{' '}
-              request to work
+              Availability summary: {availableDays} available · {needOffRequests} need off ·{' '}
+              {requestToWorkRequests} request to work
             </span>
           </>
         }

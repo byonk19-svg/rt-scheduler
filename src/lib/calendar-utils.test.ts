@@ -5,6 +5,8 @@ import {
   toMonthEndKey,
   toMonthStartKey,
   formatMonthLabel,
+  formatHumanCycleRange,
+  formatSubmittedDateTime,
 } from '@/lib/calendar-utils'
 
 // ---------------------------------------------------------------------------
@@ -98,5 +100,31 @@ describe('formatMonthLabel', () => {
 
   it('returns the raw input for an invalid date string', () => {
     expect(formatMonthLabel('not-a-date')).toBe('not-a-date')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// formatHumanCycleRange / formatSubmittedDateTime (therapist-facing copy)
+// ---------------------------------------------------------------------------
+
+describe('formatHumanCycleRange', () => {
+  it('formats same-year ranges with en-US short months', () => {
+    expect(formatHumanCycleRange('2026-03-23', '2026-05-03')).toBe('Mar 23 – May 3, 2026')
+  })
+
+  it('shows both years when the cycle spans years', () => {
+    expect(formatHumanCycleRange('2025-12-01', '2026-01-15')).toBe('Dec 1, 2025 – Jan 15, 2026')
+  })
+})
+
+describe('formatSubmittedDateTime', () => {
+  it('returns a non-empty en-US timestamp for valid ISO input', () => {
+    const out = formatSubmittedDateTime('2026-03-02T08:00:00.000Z')
+    expect(out.length).toBeGreaterThan(0)
+    expect(out).toMatch(/2026/)
+  })
+
+  it('returns empty string for invalid input', () => {
+    expect(formatSubmittedDateTime('not-a-date')).toBe('')
   })
 })

@@ -27,3 +27,15 @@ describe('staff dashboard availability stat card', () => {
     expect(staffDashboardSource).toContain('var(--warning-border)')
   })
 })
+
+describe('staff dashboard therapist action-center copy', () => {
+  it('uses human cycle labeling and availability-for-cycle language', () => {
+    expect(staffDashboardSource).toContain('Cycle:')
+    expect(staffDashboardSource).toContain('Availability for This Cycle')
+    expect(staffDashboardSource).toContain('requests awaiting action')
+    expect(staffDashboardSource).toContain('Browse open shifts')
+    expect(staffDashboardSource).toContain("eq('source', 'therapist')")
+    expect(staffDashboardSource).toContain('Welcome,')
+    expect(staffDashboardSource).toContain('formatHumanCycleRange')
+  })
+})

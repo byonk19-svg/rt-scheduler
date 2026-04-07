@@ -45,8 +45,8 @@ describe('AppShell sidebar styling', () => {
     )
   })
 
-  it('uses Shift Board wording in shell navigation instead of Shift Swaps', () => {
-    expect(appShellSource).toContain("label: 'Shift Board'")
+  it('uses Open shifts wording in staff shell navigation', () => {
+    expect(appShellSource).toContain("label: 'Open shifts'")
     expect(appShellSource).not.toContain("label: 'Shift Swaps'")
   })
 
