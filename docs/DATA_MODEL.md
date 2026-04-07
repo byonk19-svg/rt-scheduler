@@ -36,6 +36,11 @@ Focused view of the active schema used by scheduling, coverage, publish, and req
   - Cycle-scoped date overrides (`force_off` or `force_on`) by date + shift.
   - Tracks source (`therapist` or `manager`) and creator metadata.
   - Unique constraint on `(cycle_id, therapist_id, date, shift_type)`.
+  - Therapist UI semantics:
+    - `force_off` = **Need Off**
+    - `force_on` = **Request to Work**
+    - no row = **Available** (neutral, scheduler can use or skip)
+  - Therapist day-level notes are stored on the same `availability_overrides.note` field.
 
 ## Shift Board and Request Tables
 

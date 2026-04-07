@@ -1,6 +1,49 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-07 (session 28)
+Updated: 2026-04-07 (session 30)
+
+## Latest Updates (2026-04-07, session 30)
+
+- **Therapist cycle availability model clarified in repo docs**:
+  - `docs/REPO_HEALTH.md` now describes therapist availability as a **full-cycle submission workflow** with:
+    - **Available** = neutral
+    - **Need Off** = therapist `force_off`
+    - **Request to Work** = therapist `force_on`
+  - `docs/DATA_MODEL.md` now records the same mapping at the `availability_overrides` layer and explicitly notes that therapist day-level notes are stored in `availability_overrides.note`.
+- **Operational meaning preserved**:
+  - `Request to Work` remains scheduler-prioritized in auto-draft / manager scheduling, but is still documented as a therapist request rather than a guaranteed assignment promise.
+- **Docs intent**:
+  - This session was documentation alignment only — no product logic change beyond the already-shipped therapist availability update from session 29.
+
+## Latest Updates (2026-04-07, session 29)
+
+- **Therapist Future Availability rewritten around a full-availability model**:
+  - `src/app/therapist/availability/page.tsx` now frames the page as **Availability for This Cycle** with a human cycle label like `Cycle: Mar 22 - May 2, 2026`.
+  - `src/components/availability/TherapistAvailabilityWorkspace.tsx` now uses therapist-facing statuses:
+    - **Available** = neutral / scheduler can use or skip
+    - **Need Off** = therapist `force_off`
+    - **Request to Work** = therapist `force_on`
+  - **Important semantics:** `Request to Work` means _consider me for a shift on this day_ and is intentionally scheduler-prioritized in auto-draft / manager scheduling, but it is **not** a guaranteed assignment promise in the UI copy.
+- **Submission clarity added**:
+  - Therapist workspace now shows an explicit state chip near the top:
+    - **Draft not submitted** when edits differ from saved cycle overrides
+    - **Submitted** when the current cycle selections match saved rows
+  - Timestamp text now clarifies whether the page reflects a submitted state or unsaved edits.
+- **Summary and legend clarified**:
+  - Therapist summary now reflects full-cycle availability instead of old request-count framing:
+    - `42 days selected`
+    - `40 available · 1 need off · 1 request to work`
+  - Helper copy and legend explain each status in scheduler-friendly language.
+- **Day-level therapist notes added**:
+  - Therapists can now add optional notes for **Need Off** and **Request to Work** days inside the cycle grid workflow.
+  - `src/app/availability/actions.ts` persists these notes through `submitTherapistAvailabilityGridAction` on the matching `availability_overrides` rows.
+- **Lower therapist section renamed / clarified**:
+  - `src/app/availability/availability-requests-table.tsx` supports therapist-specific title/description/empty-state overrides.
+  - Therapist page now uses **Submitted Availability** and **No availability submitted yet.**
+- **Verification**:
+  - `npm.cmd run lint -- src/app/therapist/availability/page.tsx src/components/availability/TherapistAvailabilityWorkspace.tsx src/components/availability/TherapistAvailabilityWorkspace.test.ts src/app/therapist/availability/page.test.ts src/app/availability/availability-requests-table.tsx src/components/availability/AvailabilityOverviewHeader.tsx src/components/availability/AvailabilityOverviewHeader.test.ts src/app/availability/actions.ts src/app/availability/actions.test.ts src/lib/coverage/resolve-availability.ts`
+  - `npm.cmd run test:unit -- src/components/availability/TherapistAvailabilityWorkspace.test.ts src/app/therapist/availability/page.test.ts src/components/availability/AvailabilityOverviewHeader.test.ts src/app/availability/availability-requests-table.test.ts src/app/availability/actions.test.ts src/lib/coverage/resolve-availability.test.ts`
+  - `npx.cmd tsc --noEmit`
 
 ## Latest Updates (2026-04-07, session 28)
 

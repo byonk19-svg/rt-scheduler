@@ -5,7 +5,7 @@
 - Monorepo-style Next.js app (single app package) with App Router and TypeScript.
 - Supabase-backed auth + data model with manager/therapist role workflows.
 - Core manager surfaces: coverage, availability, team, approvals, publish, shift board.
-- Core therapist surfaces: schedule (`/coverage`), availability grid (`/therapist/availability`: Available / Unavailable / Must work), swaps.
+- Core therapist surfaces: schedule (`/coverage`), availability grid (`/therapist/availability`: Available / Need Off / Request to Work), swaps.
 
 ## Architecture Highlights
 
@@ -15,6 +15,7 @@
 - Coverage assignment behavior is centralized in `src/lib/coverage/*` with server mutation endpoints in `src/app/api/schedule/*`.
 - Shared cycle-selection behavior is centralized in `src/lib/coverage/active-cycle.ts` and now drives Coverage, manager workflow, and shift board surfaces.
 - `src/lib/coverage/fetch-schedule-cycles.ts` loads cycles for Coverage (and related) with a fallback when `schedule_cycles.archived_at` is missing or PostgREST schema cache is stale.
+- Therapist availability is now explicitly a full-cycle submission workflow, not an exceptions-only workflow. `Request to Work` maps to therapist `force_on`, `Need Off` maps to therapist `force_off`, and `Available` is neutral.
 - **Publish History** (`/publish`) lists **schedule blocks** (all non-archived cycles) separately from the **publish email log** (`publish_events`); see `CLAUDE.md` workflow section.
 - Active scheduling surfaces no longer fall back to a synthetic or stale "latest cycle" window when no current/upcoming block exists.
 - Designated-lead role guards in app code and SQL mutation eligibility now both accept `therapist` and `lead` roles (with `is_lead_eligible=true` still required).
