@@ -21,8 +21,10 @@ Current architecture and quality snapshot: [`docs/REPO_HEALTH.md`](docs/REPO_HEA
 
 ## Tech Stack
 
-- Next.js App Router + TypeScript + Tailwind + shadcn/ui
+- Next.js (App Router; **16.1.x** patch line) + TypeScript + Tailwind + shadcn/ui
 - Supabase (Postgres + Auth + RLS)
+
+Local tooling noise (Playwright MCP dumps, generated `artifacts/`) is gitignored — see `.gitignore`.
 
 ## Operational Status Model
 

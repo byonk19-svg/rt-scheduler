@@ -1,4 +1,4 @@
-# Repository Health Snapshot (March 31, 2026)
+# Repository Health Snapshot (April 7, 2026)
 
 ## Current Shape
 
@@ -14,6 +14,8 @@
 - Manager workflow logic is centralized in `src/lib/manager-workflow.ts`.
 - Coverage assignment behavior is centralized in `src/lib/coverage/*` with server mutation endpoints in `src/app/api/schedule/*`.
 - Shared cycle-selection behavior is centralized in `src/lib/coverage/active-cycle.ts` and now drives Coverage, manager workflow, and shift board surfaces.
+- `src/lib/coverage/fetch-schedule-cycles.ts` loads cycles for Coverage (and related) with a fallback when `schedule_cycles.archived_at` is missing or PostgREST schema cache is stale.
+- **Publish History** (`/publish`) lists **schedule blocks** (all non-archived cycles) separately from the **publish email log** (`publish_events`); see `CLAUDE.md` workflow section.
 - Active scheduling surfaces no longer fall back to a synthetic or stale "latest cycle" window when no current/upcoming block exists.
 - Designated-lead role guards in app code and SQL mutation eligibility now both accept `therapist` and `lead` roles (with `is_lead_eligible=true` still required).
 
@@ -23,8 +25,8 @@ Last verified on branch `main`:
 
 - `npm run lint` passed
 - `npx tsc --noEmit` passed
-- `npm run test:unit` passed (`342` tests)
-- `npx playwright test --workers=1` passed for active suites (`23` passed, `1` skipped)
+- `npm run test:unit` passed (`394` tests)
+- `npx playwright test --workers=1` passed for active suites (`23` passed, `1` skipped) — re-verify after major route changes
 
 ## Known Exceptions / Gaps
 

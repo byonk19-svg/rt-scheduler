@@ -1,6 +1,13 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-07 (session 26)
+Updated: 2026-04-07 (session 27)
+
+## Latest Updates (2026-04-07, session 27)
+
+- **Dependencies:** Next.js **16.1.7** (patch bump with `eslint-config-next` aligned) — `package.json` / `package-lock.json`.
+- **Team roster affordance:** `src/components/team/TeamDirectory.tsx` — member cards use a trailing **chevron**, `cursor-pointer`, and hover/active shadow so clickable rows read as interactive.
+- **Gitignore:** `.playwright-mcp/` (local MCP/tooling); **`/artifacts/`** (entire tree — replaces ignoring only `artifacts/screen-capture/`).
+- **Verification:** `npx tsc --noEmit`, `npm run test:unit -- src/components/team/TeamDirectory.test.ts`, ESLint on `TeamDirectory.tsx`.
 
 ## Latest Updates (2026-04-07, session 26)
 
@@ -616,7 +623,7 @@ All checks currently green:
 - `npm run lint` pass
 - `npm run format:check` pass (whole-repo Prettier; `.claude/**` excluded from ESLint)
 - `npm run build` pass
-- `npm run test:unit` pass (**342 tests** across 63 files)
+- `npm run test:unit` pass (**394 tests**)
 - `npm run test:e2e` pass (39 passed, 1 skipped)
 
 CI gates: format check â†’ lint â†’ tsc â†’ build â†’ Playwright E2E
