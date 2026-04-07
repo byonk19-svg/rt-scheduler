@@ -25,6 +25,7 @@ import {
   deleteManagerPlannerDateAction,
   saveManagerPlannerDatesAction,
   submitAvailabilityEntryAction,
+  submitTherapistAvailabilityGridAction,
 } from '@/app/availability/actions'
 
 type TestContext = {
@@ -141,6 +142,21 @@ function makeManagerPlannerFormData() {
   return formData
 }
 
+function makeTherapistGridFormData() {
+  const formData = new FormData()
+  formData.set('cycle_id', 'cycle-1')
+  formData.append('can_work_dates', '2026-03-24')
+  formData.append('cannot_work_dates', '2026-03-26')
+  formData.set(
+    'notes_json',
+    JSON.stringify({
+      '2026-03-24': 'Please schedule if census is high',
+      '2026-03-26': 'Family appointment',
+    })
+  )
+  return formData
+}
+
 describe('availability actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -235,6 +251,38 @@ describe('availability actions', () => {
         note: null,
         created_by: 'manager-1',
         source: 'manager',
+      },
+    ])
+  })
+
+  it('lets a therapist save full-cycle availability with day-level notes', async () => {
+    const supabase = createSupabaseMock({ userId: 'therapist-1', role: 'therapist' })
+    createClientMock.mockResolvedValue(supabase)
+
+    await expect(
+      submitTherapistAvailabilityGridAction(makeTherapistGridFormData())
+    ).rejects.toThrow('REDIRECT:/availability?success=entry_submitted&cycle=cycle-1')
+
+    expect(supabase.state.upsertPayloads[0]).toEqual([
+      {
+        therapist_id: 'therapist-1',
+        cycle_id: 'cycle-1',
+        date: '2026-03-24',
+        shift_type: 'both',
+        override_type: 'force_on',
+        note: 'Please schedule if census is high',
+        created_by: 'therapist-1',
+        source: 'therapist',
+      },
+      {
+        therapist_id: 'therapist-1',
+        cycle_id: 'cycle-1',
+        date: '2026-03-26',
+        shift_type: 'both',
+        override_type: 'force_off',
+        note: 'Family appointment',
+        created_by: 'therapist-1',
+        source: 'therapist',
       },
     ])
   })

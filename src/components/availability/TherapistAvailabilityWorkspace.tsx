@@ -28,7 +28,6 @@ type Props = {
 const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const
 type DayStatus = 'none' | 'force_on' | 'force_off'
 
-/** Show month on the first cycle day and whenever the calendar crosses into a new month. */
 function monthRibbonLabel(isoDate: string, previousIsoDate: string | null): string | null {
   const d = new Date(`${isoDate}T12:00:00`)
   if (Number.isNaN(d.getTime())) return null
@@ -41,6 +40,16 @@ function monthRibbonLabel(isoDate: string, previousIsoDate: string | null): stri
     return d.toLocaleDateString('en-US', { month: 'short' })
   }
   return null
+}
+
+function formatSubmissionTimestamp(value: Date | null): string | null {
+  if (!value) return null
+  return value.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }
 
 export function TherapistAvailabilityWorkspace({
@@ -69,17 +78,29 @@ export function TherapistAvailabilityWorkspace({
     }
     return next
   }, [cycleRows])
+  const initialNotesByDate = useMemo(() => {
+    const next: Record<string, string> = {}
+    for (const row of cycleRows) {
+      if (row.reason?.trim()) next[row.date] = row.reason.trim()
+    }
+    return next
+  }, [cycleRows])
   const [draftStatusByDate, setDraftStatusByDate] =
     useState<Record<string, DayStatus>>(initialStatusByDate)
+  const [draftNotesByDate, setDraftNotesByDate] =
+    useState<Record<string, string>>(initialNotesByDate)
 
   function handleCycleChange(nextCycleId: string) {
     setSelectedCycleId(nextCycleId)
     const nextRows = availabilityRows.filter((row) => row.cycleId === nextCycleId)
     const nextStatusByDate: Record<string, DayStatus> = {}
+    const nextNotesByDate: Record<string, string> = {}
     for (const row of nextRows) {
       nextStatusByDate[row.date] = row.entryType === 'force_off' ? 'force_off' : 'force_on'
+      if (row.reason?.trim()) nextNotesByDate[row.date] = row.reason.trim()
     }
     setDraftStatusByDate(nextStatusByDate)
+    setDraftNotesByDate(nextNotesByDate)
   }
 
   const cycleDays = useMemo(() => {
@@ -121,29 +142,101 @@ export function TherapistAvailabilityWorkspace({
   const cycleDateRangeLabel = selectedCycle
     ? `${formatDateLabel(selectedCycle.start_date)} – ${formatDateLabel(selectedCycle.end_date)}`
     : ''
+  const noteDates = useMemo(
+    () =>
+      cycleDays.filter((date) => {
+        const status = draftStatusByDate[date] ?? 'none'
+        return status !== 'none'
+      }),
+    [cycleDays, draftStatusByDate]
+  )
+  const notesPayload = useMemo(
+    () =>
+      JSON.stringify(
+        Object.fromEntries(
+          Object.entries(draftNotesByDate)
+            .map(([date, note]) => [date, note.trim()])
+            .filter(([, note]) => note.length > 0)
+        )
+      ),
+    [draftNotesByDate]
+  )
 
-  /** Days with no override — default "available" (no extra constraint; autodraft uses pattern/eligibility only). */
   const availableCount = useMemo(() => {
     if (!selectedCycle) return 0
     return cycleDays.filter((date) => (draftStatusByDate[date] ?? 'none') === 'none').length
   }, [cycleDays, draftStatusByDate, selectedCycle])
 
-  const mustWorkCount = canWorkDates.length
+  const requestToWorkCount = canWorkDates.length
+  const totalDaysSelected = cycleDays.length
+  const latestSubmittedAt = useMemo(() => {
+    const timestamps = cycleRows
+      .map((row) => new Date(row.createdAt).getTime())
+      .filter((value) => Number.isFinite(value))
+    if (timestamps.length === 0) return null
+    return new Date(Math.max(...timestamps))
+  }, [cycleRows])
+  const hasUnsavedChanges = useMemo(() => {
+    const allDates = new Set([
+      ...Object.keys(initialStatusByDate),
+      ...Object.keys(draftStatusByDate),
+    ])
+    for (const date of allDates) {
+      if ((initialStatusByDate[date] ?? 'none') !== (draftStatusByDate[date] ?? 'none')) {
+        return true
+      }
+    }
+    const allNoteDates = new Set([
+      ...Object.keys(initialNotesByDate),
+      ...Object.keys(draftNotesByDate),
+    ])
+    for (const date of allNoteDates) {
+      if ((initialNotesByDate[date] ?? '').trim() !== (draftNotesByDate[date] ?? '').trim()) {
+        return true
+      }
+    }
+    return false
+  }, [draftNotesByDate, draftStatusByDate, initialNotesByDate, initialStatusByDate])
+
+  const submissionStatus = hasUnsavedChanges
+    ? 'Draft not submitted'
+    : latestSubmittedAt
+      ? 'Submitted'
+      : 'Draft not submitted'
+  const latestSubmittedLabel = formatSubmissionTimestamp(latestSubmittedAt)
+  const submissionStatusDetail = hasUnsavedChanges
+    ? latestSubmittedLabel
+      ? `Submitted on ${latestSubmittedLabel} · new edits not submitted`
+      : 'Your selections are still a draft until you submit availability.'
+    : latestSubmittedLabel
+      ? `Submitted on ${latestSubmittedLabel}`
+      : 'Choose your availability for this cycle, then submit when ready.'
 
   function toggleDate(date: string) {
     if (!selectedCycle) return
     setDraftStatusByDate((current) => {
       const status = current[date] ?? 'none'
-      // Default: available → unavailable → must work → available
       const next: DayStatus =
         status === 'none' ? 'force_off' : status === 'force_off' ? 'force_on' : 'none'
       const prev = { ...current }
       if (next === 'none') {
         delete prev[date]
+        setDraftNotesByDate((currentNotes) => {
+          const nextNotes = { ...currentNotes }
+          delete nextNotes[date]
+          return nextNotes
+        })
         return prev
       }
       return { ...prev, [date]: next }
     })
+  }
+
+  function updateDateNote(date: string, note: string) {
+    setDraftNotesByDate((current) => ({
+      ...current,
+      [date]: note,
+    }))
   }
 
   if (cycles.length === 0) {
@@ -152,7 +245,9 @@ export function TherapistAvailabilityWorkspace({
         id="therapist-availability-workspace"
         className="rounded-2xl border border-border bg-card px-6 py-5 shadow-[0_1px_0_rgba(15,23,42,0.04)]"
       >
-        <h2 className="text-lg font-semibold tracking-tight text-foreground">My availability</h2>
+        <h2 className="text-lg font-semibold tracking-tight text-foreground">
+          Submit Availability
+        </h2>
         <p className="mt-2 text-sm text-muted-foreground">
           No upcoming cycle is open for availability yet.
         </p>
@@ -168,6 +263,7 @@ export function TherapistAvailabilityWorkspace({
       >
         <input type="hidden" name="cycle_id" value={selectedCycleId} />
         <input type="hidden" name="return_to" value={returnToPath} />
+        <input type="hidden" name="notes_json" value={notesPayload} />
         {canWorkDates.map((date) => (
           <input key={`can-${date}`} type="hidden" name="can_work_dates" value={date} />
         ))}
@@ -177,43 +273,23 @@ export function TherapistAvailabilityWorkspace({
 
         <div className="flex flex-col gap-5 border-b border-border/80 px-5 py-5 sm:px-6 sm:py-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-3">
-            <h2 className="app-page-title text-foreground">My Availability</h2>
+            <h2 className="app-page-title text-foreground">Submit Availability</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
               {selectedCycle ? (
                 <>
-                  <span className="font-medium text-foreground">{selectedCycle.label}</span>
-                  {cycleDateRangeLabel ? (
-                    <>
-                      <span className="text-border"> · </span>
-                      {cycleDateRangeLabel}
-                    </>
-                  ) : null}
+                  <span className="font-medium text-foreground">Cycle:</span>{' '}
+                  <span>{cycleDateRangeLabel}</span>
                 </>
               ) : (
                 'Select a cycle to enter availability.'
               )}
             </p>
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[0.68rem] font-medium uppercase tracking-[0.07em] text-muted-foreground">
-              <span className="inline-flex items-center gap-2">
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full bg-muted ring-2 ring-border"
-                  aria-hidden
-                />
-                Available
+            <div className="flex flex-wrap gap-2">
+              <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-1 text-[11px] font-semibold text-[var(--warning-text)]">
+                {submissionStatus}
               </span>
-              <span className="inline-flex items-center gap-2">
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--error-subtle)] ring-2 ring-[var(--error-border)]/80"
-                  aria-hidden
-                />
-                Unavailable
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--success-subtle)] ring-2 ring-[var(--success-border)]/80"
-                  aria-hidden
-                />
-                Must work
+              <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 text-[11px] text-muted-foreground">
+                {submissionStatusDetail}
               </span>
             </div>
           </div>
@@ -242,29 +318,55 @@ export function TherapistAvailabilityWorkspace({
             <FormSubmitButton
               type="submit"
               size="sm"
-              pendingText="Saving…"
+              pendingText="Saving..."
               className="h-10 shrink-0 gap-2 px-5 font-semibold shadow-sm sm:self-end"
             >
               <Send className="h-3.5 w-3.5" aria-hidden />
-              Submit
+              Submit Availability
             </FormSubmitButton>
           </div>
         </div>
 
         <div className="border-b border-border/60 bg-muted/15 px-5 py-3 sm:px-6">
-          <p className="text-right text-xs tabular-nums text-muted-foreground">
-            <span className="font-semibold text-foreground">{availableCount}</span> available ·{' '}
-            <span className="font-semibold text-foreground">{cannotWorkDates.length}</span>{' '}
-            unavailable · <span className="font-semibold text-foreground">{mustWorkCount}</span>{' '}
-            must work
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">{totalDaysSelected} days selected</p>
+            <p className="tabular-nums">
+              <span className="font-semibold text-foreground">{availableCount}</span> available ·{' '}
+              <span className="font-semibold text-foreground">{cannotWorkDates.length}</span> need
+              off · <span className="font-semibold text-foreground">{requestToWorkCount}</span>{' '}
+              request to work
+            </p>
+          </div>
         </div>
 
         <div className="border-b border-[var(--info-border)] bg-[var(--info-subtle)] px-5 py-3 sm:px-6">
           <p className="text-xs font-medium leading-snug text-[var(--info-text)]">
-            <span className="font-semibold">Tap a day</span> to rotate: Available → Unavailable →
-            Must work → Available. Add an optional note below if a day needs more detail.
+            Tap a day to switch between Available, Need Off, and Request to Work. Add an optional
+            note for more detail.
           </p>
+        </div>
+
+        <div className="border-b border-border/70 bg-card px-5 py-4 sm:px-6">
+          <div className="grid gap-2 md:grid-cols-3">
+            <div className="rounded-2xl border border-border/80 bg-muted/10 px-3 py-3">
+              <p className="text-sm font-semibold text-foreground">Available</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                I can work this day.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[var(--error-border)] bg-[var(--error-subtle)]/50 px-3 py-3">
+              <p className="text-sm font-semibold text-[var(--error-text)]">Need Off</p>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--error-text)]/80">
+                I am requesting this day off.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[var(--info-border)] bg-[var(--info-subtle)]/60 px-3 py-3">
+              <p className="text-sm font-semibold text-[var(--info-text)]">Request to Work</p>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--info-text)]/80">
+                I would like to be considered for a shift on this day.
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="space-y-5 px-5 py-6 sm:px-6 sm:py-7">
@@ -303,17 +405,17 @@ export function TherapistAvailabilityWorkspace({
                         'hover:-translate-y-px focus-visible:border-ring focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
                         status === 'none' &&
                           'border-border/80 bg-card text-foreground hover:border-primary/25 hover:shadow-[0_14px_28px_-22px_rgba(15,23,42,0.35)]',
-                        status === 'force_on' &&
-                          'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)] shadow-[0_1px_0_rgba(15,23,42,0.02)]',
                         status === 'force_off' &&
-                          'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)] shadow-[0_1px_0_rgba(15,23,42,0.02)]'
+                          'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)] shadow-[0_1px_0_rgba(15,23,42,0.02)]',
+                        status === 'force_on' &&
+                          'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)] shadow-[0_1px_0_rgba(15,23,42,0.02)]'
                       )}
                       aria-label={`${formatDateLabel(date)}: ${
                         status === 'none'
                           ? 'Available'
                           : status === 'force_off'
-                            ? 'Unavailable'
-                            : 'Must work'
+                            ? 'Need Off'
+                            : 'Request to Work'
                       }`}
                     >
                       {monthRibbon ? (
@@ -321,7 +423,7 @@ export function TherapistAvailabilityWorkspace({
                           className={cn(
                             'mb-0.5 text-[0.58rem] font-semibold uppercase tracking-[0.12em]',
                             status === 'none' && 'text-muted-foreground',
-                            status === 'force_on' && 'text-[var(--success-text)]/90',
+                            status === 'force_on' && 'text-[var(--info-text)]/90',
                             status === 'force_off' && 'text-[var(--error-text)]/90'
                           )}
                         >
@@ -337,8 +439,8 @@ export function TherapistAvailabilityWorkspace({
                         {status === 'none'
                           ? 'Available'
                           : status === 'force_off'
-                            ? 'Unavailable'
-                            : 'Must work'}
+                            ? 'Need Off'
+                            : 'Request to Work'}
                       </span>
                     </button>
                   )
@@ -346,6 +448,65 @@ export function TherapistAvailabilityWorkspace({
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="border-t border-border/70 px-5 py-5 sm:px-6">
+          <div className="space-y-3">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Day Notes</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Add optional details for Need Off or Request to Work days.
+              </p>
+            </div>
+            {noteDates.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No day-specific notes yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {noteDates.map((date) => {
+                  const status = draftStatusByDate[date] ?? 'none'
+                  const statusLabel =
+                    status === 'force_off'
+                      ? 'Need Off'
+                      : status === 'force_on'
+                        ? 'Request to Work'
+                        : 'Available'
+                  return (
+                    <div
+                      key={`note-${date}`}
+                      className="rounded-2xl border border-border/80 bg-muted/10 px-4 py-3"
+                    >
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold text-foreground">
+                          {formatDateLabel(date)}
+                        </p>
+                        <span
+                          className={cn(
+                            'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]',
+                            status === 'force_off' &&
+                              'bg-[var(--error-subtle)] text-[var(--error-text)]',
+                            status === 'force_on' &&
+                              'bg-[var(--info-subtle)] text-[var(--info-text)]'
+                          )}
+                        >
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <textarea
+                        value={draftNotesByDate[date] ?? ''}
+                        onChange={(event) => updateDateNote(date, event.target.value)}
+                        placeholder={
+                          status === 'force_off'
+                            ? 'Optional: why you need this day off'
+                            : 'Optional: add context for your request to work'
+                        }
+                        className="min-h-[72px] w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </form>
     </section>

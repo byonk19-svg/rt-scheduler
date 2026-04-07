@@ -38,7 +38,7 @@ export type EligibilityResolution = {
   overrideNote?: string | null
   offeredByOverride: boolean
   prnNotOffered: boolean
-  /** True when a `force_on` override should drive auto-draft prioritization (manager or therapist "must work"). */
+  /** True when a `force_on` override should drive auto-draft prioritization (manager or therapist request-to-work). */
   forcedByManager: boolean
 }
 

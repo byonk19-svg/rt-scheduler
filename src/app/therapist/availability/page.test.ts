@@ -18,4 +18,14 @@ describe('therapist availability route', () => {
 
     expect(source).toContain('profiles!availability_overrides_therapist_id_fkey(full_name)')
   })
+
+  it('uses cycle-specific, human-readable therapist copy', () => {
+    const filePath = resolve(process.cwd(), 'src/app/therapist/availability/page.tsx')
+    const source = readFileSync(filePath, 'utf8')
+
+    expect(source).toContain('Availability for This Cycle')
+    expect(source).toContain('Submitted Availability')
+    expect(source).toContain('No availability submitted yet.')
+    expect(source).toContain('days selected')
+  })
 })

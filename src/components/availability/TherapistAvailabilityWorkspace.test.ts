@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { TherapistAvailabilityWorkspace } from '@/components/availability/TherapistAvailabilityWorkspace'
 
 describe('TherapistAvailabilityWorkspace', () => {
-  it('renders therapist-only controls, calendar, and personal status content', () => {
+  it('renders therapist-only controls, summary, and full-availability status copy', () => {
     const html = renderToStaticMarkup(
       createElement(TherapistAvailabilityWorkspace, {
         cycles: [
@@ -36,17 +36,20 @@ describe('TherapistAvailabilityWorkspace', () => {
       })
     )
 
-    expect(html).toContain('My Availability')
+    expect(html).toContain('Submit Availability')
     expect(html).toContain('id="therapist-availability-workspace"')
-    expect(html).toContain('Tap a day')
+    expect(html).toContain('Submitted')
+    expect(html).toContain('Cycle:')
+    expect(html).toContain('42 days selected')
+    expect(html).toContain('Tap a day to switch between Available, Need Off, and Request to Work.')
     expect(html).toContain('Mar')
     expect(html).toContain('Apr')
-    expect(html).toContain('Must work')
-    expect(html).toContain('Unavailable')
-    expect(html).toContain('available ·')
+    expect(html).toContain('Request to Work')
+    expect(html).toContain('Need Off')
+    expect(html).toContain('request to work')
     expect(html).toContain('Week 1')
-    expect(html).toContain('Submit')
-    expect(html).not.toContain('Therapist')
-    expect(html).not.toContain('Not submitted yet')
+    expect(html).toContain('Submit Availability')
+    expect(html).not.toContain('Must work')
+    expect(html).not.toContain('Unavailable')
   })
 })

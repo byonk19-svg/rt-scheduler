@@ -37,6 +37,34 @@ type Cycle = {
   archived_at?: string | null
 }
 
+function formatTherapistCycleLabel(cycle: Cycle | null): string {
+  if (!cycle) return 'No cycle selected'
+  const start = new Date(`${cycle.start_date}T00:00:00`)
+  const end = new Date(`${cycle.end_date}T00:00:00`)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return `Cycle: ${cycle.start_date} – ${cycle.end_date}`
+  }
+
+  const sameYear = start.getFullYear() === end.getFullYear()
+  const startLabel = start.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  })
+  const endLabel = end.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+
+  return sameYear
+    ? `Cycle: ${startLabel} – ${endLabel}`
+    : `Cycle: ${start.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })} – ${endLabel}`
+}
+
 type AvailabilityRow = {
   id: string
   date: string
@@ -201,9 +229,17 @@ export default async function TherapistAvailabilityPage({
 
   const totalRequests = availabilityRows.length
   const needOffRequests = availabilityRows.filter((row) => row.entryType === 'force_off').length
-  const availableToWorkRequests = availabilityRows.filter(
+  const requestToWorkRequests = availabilityRows.filter(
     (row) => row.entryType === 'force_on'
   ).length
+  const totalCycleDays = selectedCycle
+    ? Math.floor(
+        (new Date(`${selectedCycle.end_date}T00:00:00`).getTime() -
+          new Date(`${selectedCycle.start_date}T00:00:00`).getTime()) /
+          (24 * 60 * 60 * 1000)
+      ) + 1
+    : 0
+  const availableDays = Math.max(totalCycleDays - needOffRequests - requestToWorkRequests, 0)
 
   return (
     <div className="space-y-7">
@@ -211,16 +247,25 @@ export default async function TherapistAvailabilityPage({
 
       <AvailabilityOverviewHeader
         canManageAvailability={false}
-        title="Future Availability"
+        title="Availability for This Cycle"
         subtitle={
-          selectedCycle
-            ? `${selectedCycle.label} - ${selectedCycle.start_date} to ${selectedCycle.end_date}`
-            : 'No upcoming cycle selected'
+          selectedCycle ? formatTherapistCycleLabel(selectedCycle) : 'No upcoming cycle selected'
         }
         totalRequests={totalRequests}
         needOffRequests={needOffRequests}
-        availableToWorkRequests={availableToWorkRequests}
+        availableToWorkRequests={requestToWorkRequests}
         responseRatio={null}
+        summaryContent={
+          <>
+            <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 font-medium text-foreground">
+              {totalCycleDays} days selected
+            </span>
+            <span className="text-muted-foreground">
+              {availableDays} available · {needOffRequests} need off · {requestToWorkRequests}{' '}
+              request to work
+            </span>
+          </>
+        }
       />
 
       <TherapistAvailabilityWorkspace
@@ -237,6 +282,9 @@ export default async function TherapistAvailabilityPage({
         deleteAvailabilityEntryAction={deleteAvailabilityEntryAction}
         initialFilters={initialFilters}
         returnToPath="/therapist/availability"
+        titleOverride="Submitted Availability"
+        descriptionOverride="Availability entries you have submitted for this cycle."
+        emptyMessageOverride="No availability submitted yet."
       />
     </div>
   )

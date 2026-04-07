@@ -46,12 +46,15 @@ type AvailabilityEntriesTableProps = {
   deleteAvailabilityEntryAction: (formData: FormData) => void | Promise<void>
   initialFilters?: Partial<TableToolbarFilters>
   returnToPath?: '/availability' | '/therapist/availability'
+  titleOverride?: string
+  descriptionOverride?: string
+  emptyMessageOverride?: string
 }
 
 const STATUS_OPTIONS: TableStatusOption[] = [
   { value: 'all', label: 'All' },
   { value: 'force_off', label: 'Need off' },
-  { value: 'force_on', label: 'Available to work' },
+  { value: 'force_on', label: 'Request to work' },
 ]
 
 function formatDateTime(value: string): string {
@@ -61,7 +64,7 @@ function formatDateTime(value: string): string {
 }
 
 function formatEntryLabel(entryType: AvailabilityEntryTableRow['entryType']): string {
-  return entryType === 'force_on' ? 'Available to work' : 'Need off'
+  return entryType === 'force_on' ? 'Request to work' : 'Need off'
 }
 
 function formatShiftTypeLabel(shiftType: AvailabilityEntryTableRow['shiftType']): string {
@@ -76,6 +79,9 @@ export function AvailabilityEntriesTable({
   deleteAvailabilityEntryAction,
   initialFilters,
   returnToPath = '/availability',
+  titleOverride,
+  descriptionOverride,
+  emptyMessageOverride,
 }: AvailabilityEntriesTableProps) {
   const canManageAvailability = can(role, 'access_manager_ui')
   const [scope, setScope] = useState<'all-staff' | 'my-entries'>(
@@ -134,18 +140,20 @@ export function AvailabilityEntriesTable({
     <Card className="overflow-hidden rounded-[1.75rem] border border-slate-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.08)]">
       <CardHeader className="border-b border-slate-200/80 pb-4">
         <CardTitle>
-          {canManageAvailability
-            ? scope === 'all-staff'
-              ? 'Review requests'
-              : 'Review my requests'
-            : 'My Saved Availability Requests'}
+          {titleOverride ??
+            (canManageAvailability
+              ? scope === 'all-staff'
+                ? 'Review requests'
+                : 'Review my requests'
+              : 'My Saved Availability Requests')}
         </CardTitle>
         <CardDescription>
-          {canManageAvailability
-            ? scope === 'all-staff'
-              ? 'Scan submitted requests before the cycle is published.'
-              : 'Review the requests you entered yourself.'
-            : 'Your saved requests for upcoming cycles.'}
+          {descriptionOverride ??
+            (canManageAvailability
+              ? scope === 'all-staff'
+                ? 'Scan submitted requests before the cycle is published.'
+                : 'Review the requests you entered yourself.'
+              : 'Your saved requests for upcoming cycles.')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 px-5 py-5">
@@ -228,7 +236,7 @@ export function AvailabilityEntriesTable({
             {filteredRows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={emptyColSpan} className="py-8 text-center text-slate-500">
-                  No availability requests match your filters.
+                  {emptyMessageOverride ?? 'No availability requests match your filters.'}
                 </TableCell>
               </TableRow>
             )}

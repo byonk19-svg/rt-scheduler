@@ -21,7 +21,7 @@ describe('AvailabilityOverviewHeader', () => {
 
     expect(html).toContain('18 requests on file')
     expect(html).toContain('7 need off')
-    expect(html).toContain('11 available to work')
+    expect(html).toContain('11 request to work')
     expect(html).not.toContain('9/24 responded')
   })
 })

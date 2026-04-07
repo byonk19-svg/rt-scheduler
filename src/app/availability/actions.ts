@@ -113,6 +113,7 @@ export async function submitTherapistAvailabilityGridAction(formData: FormData) 
     .getAll('cannot_work_dates')
     .map((value) => String(value).trim())
     .filter((value) => value.length > 0)
+  const rawNotesJson = String(formData.get('notes_json') ?? '').trim()
 
   if (!cycleId) {
     redirect(buildAvailabilityUrl({ error: 'submit_failed' }, returnPath))
@@ -134,6 +135,20 @@ export async function submitTherapistAvailabilityGridAction(formData: FormData) 
   const uniqueCannotWorkDates = Array.from(new Set(cannotWorkDates.filter(isValidCycleDate)))
   const cannotWorkSet = new Set(uniqueCannotWorkDates)
   const resolvedCanWorkDates = uniqueCanWorkDates.filter((date) => !cannotWorkSet.has(date))
+  let notesByDate: Record<string, string> = {}
+  if (rawNotesJson) {
+    try {
+      const parsed = JSON.parse(rawNotesJson) as Record<string, unknown>
+      notesByDate = Object.fromEntries(
+        Object.entries(parsed)
+          .map(([date, note]) => [date, String(note ?? '').trim()])
+          .filter(([date, note]) => isValidCycleDate(date) && note.length > 0)
+      )
+    } catch (error) {
+      console.error('Failed to parse therapist availability notes payload:', error)
+      redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
+    }
+  }
 
   const { data: existingRows, error: existingRowsError } = await supabase
     .from('availability_overrides')
@@ -172,7 +187,7 @@ export async function submitTherapistAvailabilityGridAction(formData: FormData) 
       date,
       shift_type: 'both' as const,
       override_type: 'force_on' as const,
-      note: null,
+      note: notesByDate[date] ?? null,
       created_by: user.id,
       source: 'therapist' as const,
     })),
@@ -182,7 +197,7 @@ export async function submitTherapistAvailabilityGridAction(formData: FormData) 
       date,
       shift_type: 'both' as const,
       override_type: 'force_off' as const,
-      note: null,
+      note: notesByDate[date] ?? null,
       created_by: user.id,
       source: 'therapist' as const,
     })),
