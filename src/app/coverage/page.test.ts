@@ -42,4 +42,13 @@ describe('coverage publish override affordance', () => {
     expect(source).toContain('Live schedule - edits stay enabled')
     expect(source).toContain('Publish history')
   })
+
+  it('shows an explicit empty state instead of a synthetic 6-week window when no cycle exists', () => {
+    const filePath = resolve(process.cwd(), 'src/app/coverage/page.tsx')
+    const source = readFileSync(filePath, 'utf8')
+
+    expect(source).toContain('No open 6-week block')
+    expect(source).toContain('Create the next 6-week block to start staffing this calendar.')
+    expect(source).not.toContain('Current 6-week window')
+  })
 })

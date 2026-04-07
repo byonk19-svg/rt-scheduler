@@ -16,6 +16,7 @@ import {
 
 import { can } from '@/lib/auth/can'
 import { toUiRole, type UiRole } from '@/lib/auth/roles'
+import { resolveCoverageCycle } from '@/lib/coverage/active-cycle'
 import { dateKeyFromDate, buildDateRange } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -61,6 +62,7 @@ type CycleRow = {
   id: string
   start_date: string
   end_date: string
+  published: boolean
 }
 
 type ShiftCoverageRow = {
@@ -280,7 +282,7 @@ export default function ShiftBoardPage() {
             .maybeSingle(),
           supabase
             .from('schedule_cycles')
-            .select('id, start_date, end_date')
+            .select('id, start_date, end_date, published')
             .order('start_date', { ascending: false })
             .limit(24),
           supabase
@@ -297,10 +299,12 @@ export default function ShiftBoardPage() {
         setPendingCount(pendingPostsResult.count ?? 0)
 
         const cycles = (cyclesResult.data ?? []) as CycleRow[]
-        const activeCycle =
-          cycles.find((cycle) => cycle.start_date <= todayKey && cycle.end_date >= todayKey) ??
-          cycles[0] ??
-          null
+        const activeCycle = resolveCoverageCycle({
+          cycles,
+          cycleIdFromUrl: null,
+          role: 'manager',
+          todayKey,
+        })
 
         let unfilled = 0
         let missingLead = 0

@@ -1,6 +1,7 @@
 import { buildDateRange, dateKeyFromDate } from '@/lib/schedule-helpers'
 import { MAX_SHIFT_COVERAGE_PER_DAY, MIN_SHIFT_COVERAGE_PER_DAY } from '@/lib/scheduling-constants'
 import { summarizeShiftSlotViolations } from '@/lib/schedule-rule-validation'
+import { resolveCoverageCycle } from '@/lib/coverage/active-cycle'
 import {
   fetchActiveOperationalCodeMap,
   toLegacyShiftStatusFromOperationalCode,
@@ -107,10 +108,12 @@ export async function getManagerAttentionSnapshot(
     .limit(12)
 
   const cycles = (cyclesData ?? []) as CycleRow[]
-  const activeCycle =
-    cycles.find((cycle) => cycle.start_date <= todayKey && cycle.end_date >= todayKey) ??
-    cycles[0] ??
-    null
+  const activeCycle = resolveCoverageCycle({
+    cycles,
+    cycleIdFromUrl: null,
+    role: 'manager',
+    todayKey,
+  })
 
   const links = getManagerAttentionLinks(activeCycle?.id ?? null)
 
@@ -191,8 +194,9 @@ export async function getManagerAttentionSnapshot(
   const coverageIssues = missingLeadShifts + underCoverageSlots + overCoverageSlots
   const unfilledShiftSlots = underCoverageSlots
   const attentionItems = pendingApprovals + coverageIssues
-  const publishReady =
-    Boolean(activeCycle) && !activeCycle.published && pendingApprovals === 0 && coverageIssues === 0
+  const publishReady = activeCycle
+    ? !activeCycle.published && pendingApprovals === 0 && coverageIssues === 0
+    : false
 
   const resolveBlockersLink =
     coverageIssues > 0

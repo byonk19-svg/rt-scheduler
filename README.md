@@ -14,6 +14,8 @@ Current architecture and quality snapshot: [`docs/REPO_HEALTH.md`](docs/REPO_HEA
 ## Cycle Workflow
 
 - Managers create and manage 6-week schedule blocks from [`/coverage`](./src/app/coverage/page.tsx).
+- Coverage, shift board, and manager workflow surfaces now use the same cycle-selection rule: explicit cycle from URL if present, otherwise the current active cycle, otherwise the next upcoming cycle, otherwise no cycle.
+- When no active or upcoming cycle exists, Coverage shows an explicit empty state instead of rendering a synthetic 6-week window.
 - `New 6-week block` creates a draft cycle and can optionally copy staffing from the latest published cycle.
 - `Clear draft` removes draft assignments only while the cycle is still unpublished.
 - Published cycles remain editable in Coverage; live edits are supported there.

@@ -1,6 +1,73 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-03 (session 21)
+Updated: 2026-04-07 (session 25)
+
+## Latest Updates (2026-04-07, session 25)
+
+- **No-cycle schedule fallback removed**:
+  - `src/app/coverage/page.tsx` no longer invents a synthetic 6-week window when no schedule block exists.
+  - Coverage now renders an explicit empty state with `New 6-week block` instead of showing a fake editable grid.
+  - When no cycle is selected, manager actions collapse to cycle creation + publish history; print/day-night controls stay hidden.
+- **Shared cycle selection extracted**:
+  - New helper: `src/lib/coverage/active-cycle.ts`.
+  - Selection rule is now: explicit cycle from URL if visible, otherwise active current cycle, otherwise next upcoming cycle, otherwise none.
+  - This helper is now used by:
+    - `src/app/coverage/page.tsx`
+    - `src/lib/manager-workflow.ts`
+    - `src/app/shift-board/page.tsx`
+- **Resulting behavior change**:
+  - Manager-facing surfaces no longer silently treat the most recent past cycle as if it were current.
+  - Coverage, manager workflow links, and shift board now agree on when there is no open block.
+- **Verification**:
+  - `npm.cmd run test:unit -- src/app/coverage/page.test.ts src/lib/coverage/active-cycle.test.ts`
+  - `npm.cmd run test:unit -- src/lib/coverage/active-cycle.test.ts src/lib/manager-workflow.test.ts`
+  - `npm.cmd run lint -- src/app/coverage/page.tsx src/lib/coverage/active-cycle.ts src/lib/coverage/active-cycle.test.ts`
+  - `npm.cmd run lint -- src/lib/coverage/active-cycle.ts src/lib/manager-workflow.ts src/app/shift-board/page.tsx`
+  - `npx.cmd tsc --noEmit`
+
+## Latest Updates (2026-04-06, session 24)
+
+- **Cycle archival shipped**: non-live cycles can now be archived from `src/app/publish/page.tsx` via `archiveCycleAction` in `src/app/publish/actions.ts`.
+  - Archiving sets `schedule_cycles.archived_at`.
+  - Archived cycles are excluded from active scheduling surfaces:
+    - `src/app/coverage/page.tsx`
+    - `src/app/availability/page.tsx`
+    - `src/app/therapist/availability/page.tsx`
+    - `src/app/dashboard/staff/page.tsx`
+    - `src/app/dashboard/manager/page.tsx`
+    - `src/lib/manager-workflow.ts`
+  - New migration: `supabase/migrations/20260406110000_add_schedule_cycle_archival.sql`.
+- **Publish history vs cycle lifecycle clarified**:
+  - `Delete history` removes only the `publish_events` row.
+  - `Archive cycle` hides the actual `schedule_cycles` row from Coverage, Availability, and dashboard pickers.
+  - Deleting publish history alone will not remove cycle pills from Coverage.
+- **Coverage is now the cycle-management surface**:
+  - `New 6-week block` and `Clear draft` are first-class actions on `src/app/coverage/page.tsx`.
+  - Published cycles are intentionally treated as live-editable in Coverage.
+- **Auth fail-fast added on the landing/login page**:
+  - `src/app/page.tsx` now wraps Supabase auth calls in a 10s timeout.
+  - Unreachable Supabase now shows `We could not reach Teamwise services. Check your internet or VPN and try again.` instead of leaving the UI stuck on `Signing in`.
+- **Test count**: 384 passing, lint/build green, `tsc` clean after build regeneration of `.next/types`.
+
+## Latest Updates (2026-04-06, session 23)
+
+- **Coverage page header streamlined**: `src/app/coverage/page.tsx` — action bar reduced from 7 buttons to 3 visible (Auto-draft, Send preliminary, Publish) + More menu. New 6-week block, Clear draft, Publish history, and Print moved to `MoreActionsMenu`. Disabled "Published" button replaced with a `● Published` status badge. Published banner collapsed from a multi-line box to a single slim strip. Cycle pills capped at `availableCycles.slice(0, 4)`.
+- **Delete cycle feature added (TDD)**: `deleteCycleAction` in `src/app/schedule/actions.ts` — managers can delete unpublished draft cycles. Published cycles are blocked at the action layer. All related data cascades automatically via `ON DELETE CASCADE` FKs on `schedule_cycles`. UI lives in `CycleManagementDialog` — trash icon per cycle with two-click inline confirmation. 5 tests in `src/app/schedule/delete-cycle-action.test.ts`.
+- **Test count**: 381 passing (was 376), 0 TypeScript errors.
+
+## Data model gotcha — publish history ≠ schedule cycles
+
+- `publish_events` (shown at `/publish`) and `schedule_cycles` (shown as cycle pills on `/coverage`) are **separate tables**. Deleting a publish history record does NOT remove the cycle from the coverage selector.
+- Preferred lifecycle action: **archive** old non-live cycles from `/publish`. That sets `schedule_cycles.archived_at` and removes the cycle from Coverage, Availability, therapist availability, and dashboard cycle pickers without deleting operational records.
+- Unpublished draft cycles can still be hard-deleted through the delete-cycle flow when you explicitly want to remove the row and its dependents.
+- `schedule_cycles` `ON DELETE CASCADE` covers: `shifts`, `availability_overrides`, `availability_requests`, `publish_events`, `preliminary_snapshots`. One DB call cleans up everything when hard-delete is used.
+
+## Latest Updates (2026-04-04, session 22)
+
+- **Availability response roster height capped**: `src/components/availability/AvailabilityStatusSummary.tsx` — list container changed from `flex-1 min-h-[25rem]` → `max-h-[560px] overflow-y-auto` so the "Response roster" header and tabs stay visible without a bounded scroll height. Root cause: `flex-1` on a list inside a `flex-col` section with no parent height constraint causes infinite growth.
+- **ScheduleProgress moved before Recent Activity**: `src/components/manager/ManagerTriageDashboard.tsx` — widget was orphaned at the bottom of the Inbox page after Recent Activity; moved above it so the page reads: metric cards → operational details → schedule signal → activity log.
+- **Test count**: 376 passing (was 364), 0 TypeScript errors.
+- **Plan reference**: `docs/superpowers/plans/2026-04-03-inbox-availability-layout-fixes.md`
 
 ## Latest Updates (2026-04-03, session 21)
 
@@ -620,7 +687,9 @@ Typography classes:
 - **FK column names in schedule tables:** `work_patterns` and `availability_overrides` use `therapist_id` (not `user_id`) as the FK column — match what `generateDraftScheduleAction` uses when writing new queries against those tables.
 - **CalendarGrid has no React import:** `src/components/coverage/CalendarGrid.tsx` uses `'use client'` but has no `import ... from 'react'`. Add hooks as a fresh single import statement — don't look for an existing one to amend.
 - **`@/components/ui/progress` not installed by default:** Run `npx shadcn@latest add progress` before importing the Progress primitive. Not in the original shadcn set for this repo (added session 21).
-- **Preview MCP on Windows:** `preview_start` server tracking doesn't persist between tool calls. Use `tabs_context_mcp` + Chrome browser MCP tools (`computer screenshot`, `navigate`) for visual verification instead.
+- **Preview MCP on Windows:** `preview_start` server tracking doesn't persist between tool calls. Chrome MCP also returns "Permission denied" on localhost. For local visual verification, use saved screenshots in `artifacts/screen-capture/latest/`. To confirm server health use `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000`.
+- **Zombie dev server on Windows:** Stale `next dev` processes can hold port 3000 silently (visible as ~994MB node.exe in tasklist). Find the PID with `netstat -ano | grep ":3000" | grep LISTENING` then kill with `taskkill //PID <pid> //F`. Follow with `rm -rf .next` before rebuilding.
+- **"Supabase lookup failed" in build output is not an error:** During `npm run build`, Next.js tries to statically pre-render all routes; auth routes that call `cookies()` bail out and log this message. All routes correctly render as `ƒ` (dynamic). Safe to ignore.
 - **Responsive stat grids:** Always `grid-cols-2 lg:grid-cols-4` — never bare `grid-cols-4` which clips on narrower viewports.
 - **Repo-local Next build lock on Windows:** if `npm run build` throws `EPERM` under `.next`, check for a running `next dev` process from this repo and stop it before rebuilding.
 - **Session end workflow:** update CLAUDE.md with learnings → `git add CLAUDE.md && git commit && git push`

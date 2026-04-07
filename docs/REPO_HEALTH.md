@@ -13,6 +13,8 @@
 - Scheduling mutation APIs enforce role checks and trusted-request origin checks.
 - Manager workflow logic is centralized in `src/lib/manager-workflow.ts`.
 - Coverage assignment behavior is centralized in `src/lib/coverage/*` with server mutation endpoints in `src/app/api/schedule/*`.
+- Shared cycle-selection behavior is centralized in `src/lib/coverage/active-cycle.ts` and now drives Coverage, manager workflow, and shift board surfaces.
+- Active scheduling surfaces no longer fall back to a synthetic or stale "latest cycle" window when no current/upcoming block exists.
 - Designated-lead role guards in app code and SQL mutation eligibility now both accept `therapist` and `lead` roles (with `is_lead_eligible=true` still required).
 
 ## Quality Status
