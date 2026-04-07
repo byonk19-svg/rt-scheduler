@@ -41,6 +41,10 @@ import {
   type UiStatus,
 } from '@/lib/coverage/selectors'
 import { resolveCoverageCycle } from '@/lib/coverage/active-cycle'
+import {
+  fetchScheduleCyclesForCoverage,
+  type CoverageScheduleCycleRow,
+} from '@/lib/coverage/fetch-schedule-cycles'
 import { getCoverageStatusLabel } from '@/lib/coverage/status-ui'
 import { can } from '@/lib/auth/can'
 import { parseRole, type Role } from '@/lib/auth/roles'
@@ -56,14 +60,7 @@ import {
 
 type DayStatus = DayItem['dayStatus']
 
-type CycleRow = {
-  id: string
-  label: string
-  start_date: string
-  end_date: string
-  published: boolean
-  archived_at: string | null
-}
+type CycleRow = CoverageScheduleCycleRow
 type TherapistOption = {
   id: string
   full_name: string
@@ -244,6 +241,15 @@ function CoveragePageContent() {
   }, [printCycle, printCycleDates.length, canManageCoverage, canUpdateAssignmentStatus])
 
   const showFullPrintRoster = canManageCoverage || actorRole === 'lead'
+  const clearLoadedScheduleState = useCallback(() => {
+    setDayDays([])
+    setNightDays([])
+    setPrintUsers([])
+    setPrintDayTeam([])
+    setPrintNightTeam([])
+    setPrintShiftByUserDate({})
+    setActiveOpCodes(new Map())
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -281,18 +287,19 @@ function CoveragePageContent() {
         let selectedCycle: CycleRow | null = null
         let cycles: CycleRow[] = []
 
-        const { data: cyclesData, error: cyclesError } = await supabase
-          .from('schedule_cycles')
-          .select('id, label, start_date, end_date, published, archived_at')
-          .is('archived_at', null)
-          .order('start_date', { ascending: false })
+        const { data: cyclesData, error: cyclesError } =
+          await fetchScheduleCyclesForCoverage(supabase)
 
         if (!active) return
         if (cyclesError) {
-          console.error('Could not load cycles for coverage:', cyclesError)
+          console.error(
+            `Could not load cycles for coverage: ${cyclesError.message}${
+              cyclesError.code ? ` (code ${cyclesError.code})` : ''
+            }`
+          )
           setError('Could not load schedule blocks.')
         } else {
-          cycles = (cyclesData ?? []) as CycleRow[]
+          cycles = cyclesData ?? []
           const todayKey = toIsoDate(today)
           const cycle = resolveCoverageCycle({
             cycles,
@@ -325,13 +332,7 @@ function CoveragePageContent() {
         }
 
         if (!cycleId || !selectedCycle) {
-          setDayDays([])
-          setNightDays([])
-          setPrintUsers([])
-          setPrintDayTeam([])
-          setPrintNightTeam([])
-          setPrintShiftByUserDate({})
-          setActiveOpCodes(new Map())
+          clearLoadedScheduleState()
           return
         }
 
@@ -365,12 +366,7 @@ function CoveragePageContent() {
         if (!active) return
         if (shiftsError) {
           setError(shiftsError.message || 'Could not load shifts.')
-          setDayDays([])
-          setNightDays([])
-          setPrintUsers([])
-          setPrintDayTeam([])
-          setPrintNightTeam([])
-          setPrintShiftByUserDate({})
+          clearLoadedScheduleState()
           return
         }
 
@@ -486,12 +482,7 @@ function CoveragePageContent() {
       } catch (loadError) {
         console.error('Could not load coverage calendar data:', loadError)
         setError('Could not load coverage schedule.')
-        setDayDays([])
-        setNightDays([])
-        setPrintUsers([])
-        setPrintDayTeam([])
-        setPrintNightTeam([])
-        setPrintShiftByUserDate({})
+        clearLoadedScheduleState()
       } finally {
         if (active) {
           setLoading(false)
@@ -502,7 +493,7 @@ function CoveragePageContent() {
     return () => {
       active = false
     }
-  }, [cycleFromUrl, supabase])
+  }, [cycleFromUrl, supabase, clearLoadedScheduleState])
 
   // Fetch full therapist list once per shift type — not per day click (managers only).
   useEffect(() => {

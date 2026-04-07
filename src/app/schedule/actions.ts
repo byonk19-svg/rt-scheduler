@@ -389,6 +389,74 @@ export async function sendPreliminaryScheduleAction(formData: FormData) {
   )
 }
 
+export async function deleteCycleAction(formData: FormData) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const returnToPublish = String(formData.get('return_to') ?? '').trim() === 'publish'
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  const role = await getRoleForUser(user.id)
+  if (!can(role, 'manage_schedule')) {
+    redirect(
+      returnToPublish
+        ? '/publish?error=delete_cycle_unauthorized'
+        : '/coverage?view=week&error=delete_cycle_unauthorized'
+    )
+  }
+
+  const cycleId = String(formData.get('cycle_id') ?? '').trim()
+
+  const { data: cycle } = await supabase
+    .from('schedule_cycles')
+    .select('id, published')
+    .eq('id', cycleId)
+    .maybeSingle()
+
+  if (!cycle) {
+    redirect(
+      returnToPublish
+        ? '/publish?error=delete_cycle_not_found'
+        : '/coverage?view=week&error=delete_cycle_not_found'
+    )
+  }
+
+  if (cycle.published) {
+    redirect(
+      returnToPublish
+        ? '/publish?error=delete_cycle_published'
+        : '/coverage?view=week&error=delete_cycle_published'
+    )
+  }
+
+  const { error } = await supabase.from('schedule_cycles').delete().eq('id', cycleId).single()
+
+  if (error) {
+    console.error('Failed to delete cycle:', error)
+    redirect(
+      returnToPublish
+        ? '/publish?error=delete_cycle_failed'
+        : '/coverage?view=week&error=delete_cycle_failed'
+    )
+  }
+
+  revalidatePath('/publish')
+  revalidatePath('/coverage')
+  revalidatePath('/schedule')
+  revalidatePath('/availability')
+  revalidatePath('/dashboard')
+  revalidatePath('/dashboard/manager')
+  revalidatePath('/dashboard/staff')
+  redirect(
+    returnToPublish ? '/publish?success=cycle_deleted' : '/coverage?view=week&success=cycle_deleted'
+  )
+}
+
 export async function createCycleAction(formData: FormData) {
   const supabase = await createClient()
   const {

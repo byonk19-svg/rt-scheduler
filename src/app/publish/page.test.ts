@@ -22,6 +22,17 @@ vi.mock('@/app/publish/actions', () => ({
   archiveCycleAction: vi.fn(),
 }))
 
+vi.mock('@/app/schedule/actions', () => ({
+  deleteCycleAction: vi.fn(),
+}))
+
+vi.mock('@/lib/coverage/fetch-schedule-cycles', () => ({
+  fetchScheduleCyclesForCoverage: vi.fn(async () => ({
+    data: [],
+    error: null,
+  })),
+}))
+
 import PublishHistoryPage from '@/app/publish/page'
 
 type TestContext = {
@@ -145,6 +156,8 @@ describe('PublishHistoryPage', () => {
 
     const html = renderToStaticMarkup(await PublishHistoryPage({}))
 
+    expect(html).toContain('Schedule blocks')
+    expect(html).toContain('Publish email log')
     expect(html).toContain('Start over')
     expect(html).toContain('Archive cycle')
     expect(html).toContain('Delete history')

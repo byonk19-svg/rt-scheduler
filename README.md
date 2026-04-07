@@ -13,15 +13,11 @@ Current architecture and quality snapshot: [`docs/REPO_HEALTH.md`](docs/REPO_HEA
 
 ## Cycle Workflow
 
-- Managers create and manage 6-week schedule blocks from [`/coverage`](./src/app/coverage/page.tsx).
-- Coverage, shift board, and manager workflow surfaces now use the same cycle-selection rule: explicit cycle from URL if present, otherwise the current active cycle, otherwise the next upcoming cycle, otherwise no cycle.
-- When no active or upcoming cycle exists, Coverage shows an explicit empty state instead of rendering a synthetic 6-week window.
-- `New 6-week block` creates a draft cycle and can optionally copy staffing from the latest published cycle.
-- `Clear draft` removes draft assignments only while the cycle is still unpublished.
-- Published cycles remain editable in Coverage; live edits are supported there.
-- [`/publish`](./src/app/publish/page.tsx) is publish-event history, not the source of truth for cycle existence.
-- `Delete history` removes a publish-event record only.
-- `Archive cycle` hides a non-live cycle from Coverage, Availability, and dashboard cycle pickers without deleting operational records.
+- **Schedule** (nav label; route [`/coverage`](./src/app/coverage/page.tsx)) — create **New 6-week block**, staff the grid, auto-draft, preliminary, **Publish**. Same cycle-selection rule everywhere: URL cycle if valid, else active window, else next upcoming, else none (empty state, not a fake grid).
+- **Availability** — therapist requests and manager **Plan staffing** for the selected cycle.
+- **Publish History** ([`/publish`](./src/app/publish/page.tsx)) — two parts: (1) **Schedule blocks** — all non-archived cycles; archive drafts or delete drafts; **Start over** takes a live block offline; (2) **Publish email log** — delivery rows per publish; **Delete history** removes only that log row, not the block.
+- `New 6-week block` can optionally copy staffing from the latest published cycle. `Clear draft` clears draft assignments while unpublished.
+- Published cycles stay editable on Schedule; `Archive cycle` sets `archived_at` and hides the block from pickers (see [`CLAUDE.md`](./CLAUDE.md) for data model).
 
 ## Tech Stack
 

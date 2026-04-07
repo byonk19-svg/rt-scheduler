@@ -1,6 +1,24 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-07 (session 25)
+Updated: 2026-04-07 (session 26)
+
+## Latest Updates (2026-04-07, session 26)
+
+- **Coverage cycle load resilient to missing `archived_at`**:
+  - New helper: `src/lib/coverage/fetch-schedule-cycles.ts` — tries `schedule_cycles` with `archived_at` filter; on schema/cache errors about that column, falls back to a legacy select (pre-migration DBs).
+  - `src/app/coverage/page.tsx` uses it so creating a block does not strand the client on “Could not load schedule blocks.”
+- **Publish History is the cycle-management hub** (`src/app/publish/page.tsx`):
+  - **Schedule blocks** section lists all non-archived cycles (draft + live) with Open in Schedule, Start over (live), Archive / Delete draft (draft).
+  - **Publish email log** section is the existing `publish_events` delivery table; copy clarifies log delete vs block lifecycle.
+  - `deleteCycleAction` in `src/app/schedule/actions.ts` accepts `return_to=publish` to redirect back to `/publish` after draft delete; revalidates coverage/availability/dashboard paths.
+- **Canonical manager workflow** (see also “Primary Routes” / navbar: Schedule = `/coverage`):
+  1. **Schedule** — New 6-week block, staff grid, auto-draft, preliminary, publish.
+  2. **Availability** — therapist requests + manager “Plan staffing” for the selected cycle.
+  3. **Publish History** — archive or delete draft blocks; review email delivery per publish event.
+- **Verification**:
+  - `npm.cmd run test:unit -- src/lib/coverage/fetch-schedule-cycles.test.ts src/app/publish/page.test.ts src/app/schedule/delete-cycle-action.test.ts`
+  - `npm.cmd run lint -- src/app/publish/page.tsx src/app/coverage/page.tsx src/lib/coverage/fetch-schedule-cycles.ts src/app/schedule/actions.ts`
+  - `npx.cmd tsc --noEmit`
 
 ## Latest Updates (2026-04-07, session 25)
 
