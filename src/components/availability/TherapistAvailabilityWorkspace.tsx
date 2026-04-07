@@ -28,6 +28,21 @@ type Props = {
 const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const
 type DayStatus = 'none' | 'force_on' | 'force_off'
 
+/** Show month on the first cycle day and whenever the calendar crosses into a new month. */
+function monthRibbonLabel(isoDate: string, previousIsoDate: string | null): string | null {
+  const d = new Date(`${isoDate}T12:00:00`)
+  if (Number.isNaN(d.getTime())) return null
+  if (!previousIsoDate) {
+    return d.toLocaleDateString('en-US', { month: 'short' })
+  }
+  const p = new Date(`${previousIsoDate}T12:00:00`)
+  if (Number.isNaN(p.getTime())) return d.toLocaleDateString('en-US', { month: 'short' })
+  if (d.getFullYear() !== p.getFullYear() || d.getMonth() !== p.getMonth()) {
+    return d.toLocaleDateString('en-US', { month: 'short' })
+  }
+  return null
+}
+
 export function TherapistAvailabilityWorkspace({
   cycles,
   availabilityRows,
@@ -170,11 +185,9 @@ export function TherapistAvailabilityWorkspace({
                   {cycleDateRangeLabel ? (
                     <>
                       <span className="text-border"> · </span>
-                      Next cycle: {cycleDateRangeLabel}
+                      {cycleDateRangeLabel}
                     </>
                   ) : null}
-                  <span className="text-border"> · </span>
-                  Tap a day to cycle through statuses.
                 </>
               ) : (
                 'Select a cycle to enter availability.'
@@ -248,13 +261,9 @@ export function TherapistAvailabilityWorkspace({
         </div>
 
         <div className="border-b border-[var(--info-border)] bg-[var(--info-subtle)] px-5 py-3 sm:px-6">
-          <p className="text-xs font-medium leading-relaxed text-[var(--info-text)]">
-            Days default to <span className="font-semibold">available</span> (no extra constraint;
-            autodraft uses your usual pattern only). Tap to{' '}
-            <span className="font-semibold">unavailable</span>, then{' '}
-            <span className="font-semibold">must work</span> for a hard autodraft constraint (we try
-            to schedule you that day), then back to available. Add a note below for unavailable days
-            when needed.
+          <p className="text-xs font-medium leading-snug text-[var(--info-text)]">
+            <span className="font-semibold">Tap a day</span> to rotate: Available → Unavailable →
+            Must work → Available. Add an optional note below if a day needs more detail.
           </p>
         </div>
 
@@ -281,13 +290,16 @@ export function TherapistAvailabilityWorkspace({
               <div className="grid grid-cols-7 gap-2 sm:gap-2.5">
                 {week.map((date) => {
                   const status = draftStatusByDate[date] ?? 'none'
+                  const dayIndex = cycleDays.indexOf(date)
+                  const prevInCycle = dayIndex > 0 ? cycleDays[dayIndex - 1] : null
+                  const monthRibbon = monthRibbonLabel(date, prevInCycle)
                   return (
                     <button
                       key={date}
                       type="button"
                       onClick={() => toggleDate(date)}
                       className={cn(
-                        'flex min-h-[5.5rem] flex-col items-center justify-center rounded-[20px] border px-1 py-2 text-center shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-[border-color,box-shadow,transform,background-color] duration-200',
+                        'flex min-h-[5.75rem] flex-col items-center justify-center rounded-[20px] border px-1 py-2 text-center shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-[border-color,box-shadow,transform,background-color] duration-200',
                         'hover:-translate-y-px focus-visible:border-ring focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
                         status === 'none' &&
                           'border-border/80 bg-card text-foreground hover:border-primary/25 hover:shadow-[0_14px_28px_-22px_rgba(15,23,42,0.35)]',
@@ -304,6 +316,20 @@ export function TherapistAvailabilityWorkspace({
                             : 'Must work'
                       }`}
                     >
+                      {monthRibbon ? (
+                        <span
+                          className={cn(
+                            'mb-0.5 text-[0.58rem] font-semibold uppercase tracking-[0.12em]',
+                            status === 'none' && 'text-muted-foreground',
+                            status === 'force_on' && 'text-[var(--success-text)]/90',
+                            status === 'force_off' && 'text-[var(--error-text)]/90'
+                          )}
+                        >
+                          {monthRibbon}
+                        </span>
+                      ) : (
+                        <span className="mb-0.5 h-[0.58rem]" aria-hidden />
+                      )}
                       <span className="text-[1.2rem] font-bold leading-none tracking-[-0.03em]">
                         {new Date(`${date}T00:00:00`).getDate()}
                       </span>

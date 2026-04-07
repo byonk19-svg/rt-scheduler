@@ -38,7 +38,9 @@ describe('TherapistAvailabilityWorkspace', () => {
 
     expect(html).toContain('My Availability')
     expect(html).toContain('id="therapist-availability-workspace"')
-    expect(html).toContain('Tap a day to cycle through statuses')
+    expect(html).toContain('Tap a day')
+    expect(html).toContain('Mar')
+    expect(html).toContain('Apr')
     expect(html).toContain('Must work')
     expect(html).toContain('Unavailable')
     expect(html).toContain('available ·')
