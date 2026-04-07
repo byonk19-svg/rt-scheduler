@@ -18,4 +18,12 @@ describe('availability page role-specific actions', () => {
 
     expect(source).toContain('profiles!availability_overrides_therapist_id_fkey(full_name)')
   })
+
+  it('loads official therapist submissions for manager response roster metrics', () => {
+    const filePath = resolve(process.cwd(), 'src/app/availability/page.tsx')
+    const source = readFileSync(filePath, 'utf8')
+
+    expect(source).toContain('therapist_availability_submissions')
+    expect(source).toContain('officialSubmissionTherapistIds')
+  })
 })

@@ -6,13 +6,11 @@ import { useMemo, useState } from 'react'
 import type { AvailabilityEntryTableRow } from '@/app/availability/availability-requests-table'
 import { FormSubmitButton } from '@/components/form-submit-button'
 import { Label } from '@/components/ui/label'
+import { addDays, formatDateLabel, formatHumanCycleRange, toIsoDate } from '@/lib/calendar-utils'
 import {
-  addDays,
-  formatDateLabel,
-  formatHumanCycleRange,
-  formatSubmittedDateTime,
-  toIsoDate,
-} from '@/lib/calendar-utils'
+  buildTherapistSubmissionUiState,
+  resolveAvailabilityDueSupportLine,
+} from '@/lib/therapist-availability-submission'
 import { cn } from '@/lib/utils'
 
 type Cycle = {
@@ -21,12 +19,15 @@ type Cycle = {
   start_date: string
   end_date: string
   published: boolean
+  availability_due_at?: string | null
 }
 
 type Props = {
   cycles: Cycle[]
   availabilityRows: AvailabilityEntryTableRow[]
   initialCycleId: string
+  /** Official submission timestamps from therapist_availability_submissions (not inferred from overrides). */
+  submissionsByCycleId: Record<string, { submittedAt: string; lastEditedAt: string }>
   submitTherapistAvailabilityGridAction: (formData: FormData) => void | Promise<void>
   returnToPath?: '/availability' | '/therapist/availability'
 }
@@ -52,6 +53,7 @@ export function TherapistAvailabilityWorkspace({
   cycles,
   availabilityRows,
   initialCycleId,
+  submissionsByCycleId,
   submitTherapistAvailabilityGridAction,
   returnToPath = '/availability',
 }: Props) {
@@ -164,15 +166,31 @@ export function TherapistAvailabilityWorkspace({
   const totalDaysSelected = cycleDays.length
 
   const serverHasOverrides = cycleRows.length > 0
-  const latestActivityIso = useMemo(() => {
-    const times = cycleRows
-      .flatMap((row) => [row.updatedAt, row.createdAt])
-      .filter(Boolean)
-      .map((t) => new Date(t as string).getTime())
-      .filter((n) => Number.isFinite(n))
-    if (times.length === 0) return null
-    return new Date(Math.max(...times)).toISOString()
-  }, [cycleRows])
+  const serverSubmission = submissionsByCycleId[selectedCycleId]
+  const submissionUi = useMemo(
+    () =>
+      buildTherapistSubmissionUiState(
+        serverSubmission
+          ? {
+              schedule_cycle_id: selectedCycleId,
+              submitted_at: serverSubmission.submittedAt,
+              last_edited_at: serverSubmission.lastEditedAt,
+            }
+          : null
+      ),
+    [selectedCycleId, serverSubmission]
+  )
+
+  const dueLine = useMemo(() => {
+    if (!selectedCycle || submissionUi.isSubmitted) return null
+    return resolveAvailabilityDueSupportLine(
+      {
+        start_date: selectedCycle.start_date,
+        availability_due_at: selectedCycle.availability_due_at ?? null,
+      },
+      submissionUi.isSubmitted
+    )
+  }, [selectedCycle, submissionUi.isSubmitted])
 
   const hasUnsavedChanges = useMemo(() => {
     const allDates = new Set([
@@ -196,19 +214,37 @@ export function TherapistAvailabilityWorkspace({
     return false
   }, [draftNotesByDate, draftStatusByDate, initialNotesByDate, initialStatusByDate])
 
-  const submissionPrimaryLabel = hasUnsavedChanges
-    ? 'Not submitted'
-    : serverHasOverrides
-      ? 'Submitted'
-      : 'Not submitted'
+  const submissionPrimaryLabel = submissionUi.isSubmitted ? 'Submitted' : 'Not submitted'
 
-  const submissionDetailLabel = hasUnsavedChanges
-    ? 'You have changes that are not saved yet. Tap Submit availability to save them.'
-    : serverHasOverrides && latestActivityIso
-      ? formatSubmittedDateTime(latestActivityIso)
-      : serverHasOverrides
-        ? 'Your availability is on file for this cycle.'
-        : 'Choose your days for this cycle, then submit when ready.'
+  const submissionDetailLabel = (() => {
+    if (submissionUi.isSubmitted) {
+      const parts: string[] = []
+      if (submissionUi.submittedAtDisplay) {
+        parts.push(`Submitted ${submissionUi.submittedAtDisplay}`)
+      }
+      if (submissionUi.lastEditedDisplay) {
+        parts.push(`Last edited ${submissionUi.lastEditedDisplay}`)
+      }
+      if (hasUnsavedChanges) {
+        parts.push('You have unsaved changes — save to update your submitted availability.')
+      }
+      return parts.join(' · ') || 'Your availability is officially submitted for this cycle.'
+    }
+    if (hasUnsavedChanges) {
+      return 'You have unsaved changes. Use Save progress or Submit availability.'
+    }
+    if (serverHasOverrides) {
+      return [
+        'Selections saved — submit availability when you want it to count as official.',
+        dueLine,
+      ]
+        .filter(Boolean)
+        .join(' ')
+    }
+    return [dueLine, 'Choose your days for this cycle, then submit when ready.']
+      .filter(Boolean)
+      .join(' ')
+  })()
 
   function toggleDate(date: string) {
     if (!selectedCycle) return
@@ -296,7 +332,7 @@ export function TherapistAvailabilityWorkspace({
               <span
                 className={cn(
                   'rounded-full border px-3 py-1 text-[11px] font-semibold',
-                  submissionPrimaryLabel === 'Submitted'
+                  submissionUi.isSubmitted
                     ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
                     : 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
                 )}
@@ -330,15 +366,46 @@ export function TherapistAvailabilityWorkspace({
                 ))}
               </select>
             </div>
-            <FormSubmitButton
-              type="submit"
-              size="sm"
-              pendingText="Saving…"
-              className="h-10 shrink-0 gap-2 px-5 font-semibold shadow-sm sm:self-end"
-            >
-              <Send className="h-3.5 w-3.5" aria-hidden />
-              Submit availability
-            </FormSubmitButton>
+            <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-end sm:self-end">
+              {!submissionUi.isSubmitted ? (
+                <>
+                  <FormSubmitButton
+                    type="submit"
+                    name="workflow"
+                    value="draft"
+                    variant="outline"
+                    size="sm"
+                    pendingText="Saving…"
+                    className="h-10 shrink-0 px-4 font-semibold sm:min-w-[8.5rem]"
+                  >
+                    Save progress
+                  </FormSubmitButton>
+                  <FormSubmitButton
+                    type="submit"
+                    name="workflow"
+                    value="submit"
+                    size="sm"
+                    pendingText="Saving…"
+                    className="h-10 shrink-0 gap-2 px-5 font-semibold shadow-sm sm:min-w-[10.5rem]"
+                  >
+                    <Send className="h-3.5 w-3.5" aria-hidden />
+                    Submit availability
+                  </FormSubmitButton>
+                </>
+              ) : (
+                <FormSubmitButton
+                  type="submit"
+                  name="workflow"
+                  value="submit"
+                  size="sm"
+                  pendingText="Saving…"
+                  className="h-10 shrink-0 gap-2 px-5 font-semibold shadow-sm sm:self-end"
+                >
+                  <Send className="h-3.5 w-3.5" aria-hidden />
+                  Save changes
+                </FormSubmitButton>
+              )}
+            </div>
           </div>
         </div>
 

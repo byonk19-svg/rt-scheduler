@@ -34,7 +34,7 @@ describe('staff dashboard therapist action-center copy', () => {
     expect(staffDashboardSource).toContain('Availability for This Cycle')
     expect(staffDashboardSource).toContain('requests awaiting action')
     expect(staffDashboardSource).toContain('Browse open shifts')
-    expect(staffDashboardSource).toContain("eq('source', 'therapist')")
+    expect(staffDashboardSource).toContain("'therapist_availability_submissions'")
     expect(staffDashboardSource).toContain('Welcome,')
     expect(staffDashboardSource).toContain('formatHumanCycleRange')
   })

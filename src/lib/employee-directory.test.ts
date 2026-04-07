@@ -180,7 +180,58 @@ describe('employee directory helpers', () => {
     expect(canTherapistMutateOverride(therapistOverride, 'therapist-1')).toBe(true)
   })
 
-  it('identifies missing availability by cycle', () => {
+  it('identifies missing availability by cycle using official submission ids', () => {
+    const rows = buildMissingAvailabilityRows(
+      sampleEmployees,
+      [
+        {
+          id: 'ov-1',
+          therapist_id: '1',
+          cycle_id: 'cycle-a',
+          date: '2026-03-01',
+          shift_type: 'both',
+          override_type: 'force_off',
+          note: null,
+          created_at: '2026-02-27T12:00:00.000Z',
+          source: 'therapist',
+        },
+      ],
+      'cycle-a',
+      { officialSubmissionTherapistIds: new Set(['1']) }
+    )
+
+    const byId = new Map(rows.map((row) => [row.therapistId, row]))
+    expect(byId.get('1')?.submitted).toBe(true)
+    expect(byId.get('2')?.submitted).toBe(false)
+    expect(byId.get('2')?.overridesCount).toBe(0)
+  })
+
+  it('does not mark submitted when overrides exist but official submission is absent', () => {
+    const rows = buildMissingAvailabilityRows(
+      sampleEmployees,
+      [
+        {
+          id: 'ov-1',
+          therapist_id: '1',
+          cycle_id: 'cycle-a',
+          date: '2026-03-01',
+          shift_type: 'both',
+          override_type: 'force_off',
+          note: null,
+          created_at: '2026-02-27T12:00:00.000Z',
+          source: 'therapist',
+        },
+      ],
+      'cycle-a',
+      { officialSubmissionTherapistIds: new Set() }
+    )
+
+    const byId = new Map(rows.map((row) => [row.therapistId, row]))
+    expect(byId.get('1')?.submitted).toBe(false)
+    expect(byId.get('1')?.overridesCount).toBe(1)
+  })
+
+  it('falls back to override-based submitted when official set is not passed', () => {
     const rows = buildMissingAvailabilityRows(
       sampleEmployees,
       [
@@ -199,10 +250,7 @@ describe('employee directory helpers', () => {
       'cycle-a'
     )
 
-    const byId = new Map(rows.map((row) => [row.therapistId, row]))
-    expect(byId.get('1')?.submitted).toBe(true)
-    expect(byId.get('2')?.submitted).toBe(false)
-    expect(byId.get('2')?.overridesCount).toBe(0)
+    expect(new Map(rows.map((row) => [row.therapistId, row])).get('1')?.submitted).toBe(true)
   })
 })
 

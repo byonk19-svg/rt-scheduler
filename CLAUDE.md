@@ -1,6 +1,17 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-07 (session 30)
+Updated: 2026-04-07 (session 31)
+
+## Latest Updates (2026-04-07, session 31)
+
+- **Official therapist availability submission (per therapist, per cycle):**
+  - New table: `therapist_availability_submissions` (`submitted_at`, `last_edited_at`, unique `(therapist_id, schedule_cycle_id)`). Migration: `supabase/migrations/20260407140000_therapist_availability_submissions.sql`.
+  - `schedule_cycles.availability_due_at` optional — UI due line uses it when set, else day-before-start fallback (`src/lib/therapist-availability-submission.ts`).
+  - **Workflow A:** After first official submit, further grid saves and day deletes update `last_edited_at` only; `submitted_at` is immutable. **Save progress** (draft) saves overrides only and does not create a submission row.
+  - **All therapist submit paths** call the same submission upsert: `submitTherapistAvailabilityGridAction` (submit vs draft), `submitAvailabilityEntryAction` (single-row), and delete touches `last_edited_at` when a submission exists.
+- **Staff dashboard + therapist pages** read submission state from the new table (`src/app/dashboard/staff/page.tsx`, `TherapistAvailabilityWorkspace`, therapist + staff `/availability` flows).
+- **Manager `/availability` response roster:** `buildMissingAvailabilityRows` takes `officialSubmissionTherapistIds` so “submitted” matches therapist-facing truth (`src/lib/employee-directory.ts`, `src/app/availability/page.tsx`). Optional `officialSubmissionTherapistIds` on `EmployeeDirectory` for future wiring.
+- **Verification:** `npx tsc --noEmit`, `npm run lint` (touched files), `npm run test:unit` (**415** passing).
 
 ## Latest Updates (2026-04-07, session 30)
 
@@ -138,7 +149,7 @@ Updated: 2026-04-07 (session 30)
 - `publish_events` (shown at `/publish`) and `schedule_cycles` (shown as cycle pills on `/coverage`) are **separate tables**. Deleting a publish history record does NOT remove the cycle from the coverage selector.
 - Preferred lifecycle action: **archive** old non-live cycles from `/publish`. That sets `schedule_cycles.archived_at` and removes the cycle from Coverage, Availability, therapist availability, and dashboard cycle pickers without deleting operational records.
 - Unpublished draft cycles can still be hard-deleted through the delete-cycle flow when you explicitly want to remove the row and its dependents.
-- `schedule_cycles` `ON DELETE CASCADE` covers: `shifts`, `availability_overrides`, `availability_requests`, `publish_events`, `preliminary_snapshots`. One DB call cleans up everything when hard-delete is used.
+- `schedule_cycles` `ON DELETE CASCADE` covers: `shifts`, `availability_overrides`, `therapist_availability_submissions`, `availability_requests`, `publish_events`, `preliminary_snapshots`. One DB call cleans up everything when hard-delete is used.
 
 ## Latest Updates (2026-04-04, session 22)
 
@@ -676,7 +687,7 @@ All checks currently green:
 - `npm run lint` pass
 - `npm run format:check` pass (whole-repo Prettier; `.claude/**` excluded from ESLint)
 - `npm run build` pass
-- `npm run test:unit` pass (**405 tests**)
+- `npm run test:unit` pass (**415 tests**)
 - `npm run test:e2e` pass (39 passed, 1 skipped)
 
 CI gates: format check â†’ lint â†’ tsc â†’ build â†’ Playwright E2E
@@ -910,6 +921,7 @@ Core tables:
 - `shifts` â€” `cycle_id`, `user_id`, `date`, `shift_type`, `status`, `role`, `unfilled_reason`, assignment-status fields, `site_id`
 - `work_patterns` â€” `works_dow`, `offs_dow`, `weekend_rotation`, `weekend_anchor_date`, `works_dow_mode`
 - `availability_overrides` â€” active cycle-scoped override model (`force_off` / `force_on`, `source`)
+- `therapist_availability_submissions` â€” official per-therapist per-cycle submit state (`submitted_at`, `last_edited_at`)
 - `shift_posts`, `notifications`, `audit_log`
 - `publish_events`, `notification_outbox`
 - `availability_requests` (legacy), `availability_entries` (legacy transitional)
@@ -925,6 +937,7 @@ Core tables:
 - `20260225190000_add_publish_events_and_notification_outbox.sql`
 - `20260227143000_add_work_patterns_and_cycle_overrides.sql`
 - `20260227184500_add_source_to_availability_overrides.sql`
+- `20260407140000_therapist_availability_submissions.sql` (`therapist_availability_submissions`, `schedule_cycles.availability_due_at`)
 
 ## Next High-Value Priorities
 

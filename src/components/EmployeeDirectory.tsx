@@ -84,6 +84,8 @@ type EmployeeDirectoryProps = {
   initialEditEmployeeId?: string | null
   initialFocusAvailability?: boolean
   initialOverrideCycleId?: string | null
+  /** Therapist IDs with an official availability submission for the selected cycle; enables aligned manager metrics. */
+  officialSubmissionTherapistIds?: string[]
   saveEmployeeAction: (formData: FormData) => void | Promise<void>
   setEmployeeActiveAction: (formData: FormData) => void | Promise<void>
   saveEmployeeDateOverrideAction: (
@@ -313,6 +315,7 @@ export function EmployeeDirectory({
   initialEditEmployeeId = null,
   initialFocusAvailability = false,
   initialOverrideCycleId = null,
+  officialSubmissionTherapistIds,
   saveEmployeeAction,
   setEmployeeActiveAction,
   saveEmployeeDateOverrideAction,
@@ -546,8 +549,16 @@ export function EmployeeDirectory({
     return nextMonthStart <= selectedOverrideCycle.end_date
   }, [selectedOverrideCycle, overrideCalendarMonthStart])
   const missingAvailabilityRows = useMemo(
-    () => buildMissingAvailabilityRows(employees, dateOverrides, selectedAvailabilityCycleId),
-    [dateOverrides, employees, selectedAvailabilityCycleId]
+    () =>
+      buildMissingAvailabilityRows(
+        employees,
+        dateOverrides,
+        selectedAvailabilityCycleId,
+        officialSubmissionTherapistIds !== undefined
+          ? { officialSubmissionTherapistIds: new Set(officialSubmissionTherapistIds) }
+          : undefined
+      ),
+    [dateOverrides, employees, officialSubmissionTherapistIds, selectedAvailabilityCycleId]
   )
 
   useEffect(() => {

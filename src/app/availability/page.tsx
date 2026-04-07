@@ -35,6 +35,7 @@ type Cycle = {
   end_date: string
   published: boolean
   archived_at?: string | null
+  availability_due_at?: string | null
 }
 
 type AvailabilityRow = {
@@ -111,7 +112,15 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
   }
   if (success === 'entry_submitted') {
     return {
-      message: 'Availability request saved for this cycle.',
+      message: 'Availability saved and submitted for this cycle.',
+      variant: 'success',
+    }
+  }
+
+  if (success === 'draft_saved') {
+    return {
+      message:
+        'Progress saved. Submit availability when you are ready for it to count as official.',
       variant: 'success',
     }
   }
@@ -215,12 +224,31 @@ export default async function AvailabilityPage({
 
   const { data: cyclesData } = await supabase
     .from('schedule_cycles')
-    .select('id, label, start_date, end_date, published, archived_at')
+    .select('id, label, start_date, end_date, published, archived_at, availability_due_at')
     .is('archived_at', null)
     .gte('end_date', todayKey)
     .order('start_date', { ascending: true })
 
   const cycles = (cyclesData ?? []) as Cycle[]
+
+  const submissionsByCycleId: Record<string, { submittedAt: string; lastEditedAt: string }> = {}
+  if (!canManageAvailability && cycles.length > 0) {
+    const { data: submissionRowsData } = await supabase
+      .from('therapist_availability_submissions')
+      .select('schedule_cycle_id, submitted_at, last_edited_at')
+      .eq('therapist_id', user.id)
+      .in(
+        'schedule_cycle_id',
+        cycles.map((c) => c.id)
+      )
+    for (const row of submissionRowsData ?? []) {
+      const r = row as { schedule_cycle_id: string; submitted_at: string; last_edited_at: string }
+      submissionsByCycleId[r.schedule_cycle_id] = {
+        submittedAt: r.submitted_at,
+        lastEditedAt: r.last_edited_at,
+      }
+    }
+  }
   const selectedCycleIdFromParams = getSearchParam(params?.cycle)
   const selectedTherapistIdFromParams = getSearchParam(params?.therapist)
   const selectedCycle =
@@ -275,6 +303,19 @@ export default async function AvailabilityPage({
     plannerTherapists.find((therapist) => therapist.id === selectedTherapistIdFromParams)?.id ??
     plannerTherapists[0]?.id ??
     ''
+
+  const { data: officialSubmissionRows } =
+    canManageAvailability && selectedCycleId
+      ? await supabase
+          .from('therapist_availability_submissions')
+          .select('therapist_id')
+          .eq('schedule_cycle_id', selectedCycleId)
+      : { data: [] }
+
+  const officialSubmissionTherapistIds = new Set(
+    (officialSubmissionRows ?? []).map((row) => (row as { therapist_id: string }).therapist_id)
+  )
+
   const availabilityStatusRows = canManageAvailability
     ? buildMissingAvailabilityRows(
         plannerTherapists.map((therapist) => ({
@@ -293,7 +334,8 @@ export default async function AvailabilityPage({
           created_at: entry.created_at,
           source: 'therapist',
         })),
-        selectedCycleId
+        selectedCycleId,
+        { officialSubmissionTherapistIds }
       )
     : []
   const submittedAvailabilityRows = availabilityStatusRows.filter((row) => row.submitted)
@@ -332,6 +374,7 @@ export default async function AvailabilityPage({
       cycles={cycles}
       availabilityRows={availabilityRows}
       initialCycleId={selectedCycleId}
+      submissionsByCycleId={submissionsByCycleId}
       submitTherapistAvailabilityGridAction={submitTherapistAvailabilityGridAction}
     />
   )

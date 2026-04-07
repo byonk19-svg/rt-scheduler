@@ -36,6 +36,7 @@ type Cycle = {
   end_date: string
   published: boolean
   archived_at?: string | null
+  availability_due_at?: string | null
 }
 
 function therapistCycleSubtitle(cycle: Cycle | null): string {
@@ -97,7 +98,15 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
   }
   if (success === 'entry_submitted') {
     return {
-      message: 'Availability request saved for this cycle.',
+      message: 'Availability saved and submitted for this cycle.',
+      variant: 'success',
+    }
+  }
+
+  if (success === 'draft_saved') {
+    return {
+      message:
+        'Progress saved. Submit availability when you are ready for it to count as official.',
       variant: 'success',
     }
   }
@@ -161,7 +170,7 @@ export default async function TherapistAvailabilityPage({
 
   const { data: cyclesData } = await supabase
     .from('schedule_cycles')
-    .select('id, label, start_date, end_date, published, archived_at')
+    .select('id, label, start_date, end_date, published, archived_at, availability_due_at')
     .is('archived_at', null)
     .gte('end_date', todayKey)
     .order('start_date', { ascending: true })
@@ -174,6 +183,27 @@ export default async function TherapistAvailabilityPage({
     cycles[0] ??
     null
   const selectedCycleId = selectedCycle?.id ?? ''
+
+  const { data: submissionRowsData } =
+    cycles.length > 0
+      ? await supabase
+          .from('therapist_availability_submissions')
+          .select('schedule_cycle_id, submitted_at, last_edited_at')
+          .eq('therapist_id', user.id)
+          .in(
+            'schedule_cycle_id',
+            cycles.map((c) => c.id)
+          )
+      : { data: [] }
+
+  const submissionsByCycleId: Record<string, { submittedAt: string; lastEditedAt: string }> = {}
+  for (const row of submissionRowsData ?? []) {
+    const r = row as { schedule_cycle_id: string; submitted_at: string; last_edited_at: string }
+    submissionsByCycleId[r.schedule_cycle_id] = {
+      submittedAt: r.submitted_at,
+      lastEditedAt: r.last_edited_at,
+    }
+  }
 
   let entriesQuery = supabase
     .from('availability_overrides')
@@ -254,6 +284,7 @@ export default async function TherapistAvailabilityPage({
         cycles={cycles}
         availabilityRows={availabilityRows}
         initialCycleId={selectedCycleId}
+        submissionsByCycleId={submissionsByCycleId}
         submitTherapistAvailabilityGridAction={submitTherapistAvailabilityGridAction}
         returnToPath="/therapist/availability"
       />
@@ -265,8 +296,8 @@ export default async function TherapistAvailabilityPage({
         initialFilters={initialFilters}
         returnToPath="/therapist/availability"
         titleOverride="Submitted Availability"
-        descriptionOverride="Availability entries you have submitted for this cycle."
-        emptyMessageOverride="No availability submitted yet."
+        descriptionOverride="Day-level availability entries for the selected cycle."
+        emptyMessageOverride="No day-level entries yet for this cycle."
       />
     </div>
   )

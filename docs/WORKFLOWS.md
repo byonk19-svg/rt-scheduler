@@ -38,11 +38,12 @@ Operational workflows as implemented in the current codebase.
 
 ## 3) Therapist/Manager: Availability Input
 
-- Main table: `availability_overrides` (cycle-scoped).
-- Therapist on `/availability`:
-  - PRN can submit only `force_on` ("Available to work (PRN)").
-  - Non-PRN therapist can submit only `force_off` ("Need off").
-- Manager on `/directory` can enter `force_on` or `force_off` for any therapist (`source = manager`).
+- Day-level table: `availability_overrides` (cycle-scoped).
+- Official therapist submit state: `therapist_availability_submissions` (one row per therapist per cycle after **Submit availability**; **Save progress** stores overrides only and does not create this row).
+- Therapist grid (`/therapist/availability`, staff `/availability`): **Save progress** (draft) vs **Submit availability** / **Save changes** (updates submission timestamps per app rules).
+- Single-row therapist save (`submitAvailabilityEntryAction`) also upserts the submission row so it cannot drift from the grid path.
+- Manager planner entries use `source = manager` on `availability_overrides` (separate from therapist official submit).
+- Manager “who has submitted” for the cycle uses submission IDs, not “has any therapist override rows.”
 - No approval step for availability entries.
 
 ## 4) Assignment Status Updates

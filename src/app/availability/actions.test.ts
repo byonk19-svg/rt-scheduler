@@ -31,11 +31,18 @@ import {
 type TestContext = {
   userId?: string | null
   role?: string | null
+  therapistSubmissionExists?: boolean
 }
 
-function createSupabaseMock(context: TestContext) {
+function createSupabaseMock(context: TestContext = {}) {
   const state = {
     upsertPayloads: [] as Array<Record<string, unknown> | Array<Record<string, unknown>>>,
+    inserts: [] as Array<{ table: string; payload: Record<string, unknown> }>,
+    updates: [] as Array<{
+      table: string
+      payload: Record<string, unknown>
+      filters: Record<string, unknown>
+    }>,
     deletes: [] as Array<{ table: string; filters: Record<string, unknown> }>,
     selectRows: [] as Array<Record<string, unknown>>,
   }
@@ -88,6 +95,26 @@ function createSupabaseMock(context: TestContext) {
           state.upsertPayloads.push(payload)
           return Promise.resolve({ error: null })
         },
+        insert(payload: Record<string, unknown>) {
+          state.inserts.push({ table, payload })
+          return Promise.resolve({ error: null })
+        },
+        update(payload: Record<string, unknown>) {
+          return {
+            eq(column: string, value: unknown) {
+              return {
+                eq(column2: string, value2: unknown) {
+                  state.updates.push({
+                    table,
+                    payload,
+                    filters: { [column]: value, [column2]: value2 },
+                  })
+                  return Promise.resolve({ error: null })
+                },
+              }
+            },
+          }
+        },
         maybeSingle: async () => {
           if (table === 'profiles' && selected === 'role') {
             return { data: { role: context.role }, error: null }
@@ -98,6 +125,20 @@ function createSupabaseMock(context: TestContext) {
                 start_date: '2026-03-22',
                 end_date: '2026-05-02',
               },
+              error: null,
+            }
+          }
+          if (table === 'therapist_availability_submissions' && selected.includes('submitted_at')) {
+            return {
+              data: context.therapistSubmissionExists
+                ? { submitted_at: '2026-04-01T12:00:00.000Z' }
+                : null,
+              error: null,
+            }
+          }
+          if (table === 'therapist_availability_submissions' && selected.includes('id')) {
+            return {
+              data: context.therapistSubmissionExists ? { id: 'sub-1' } : null,
               error: null,
             }
           }
@@ -180,7 +221,12 @@ describe('availability actions', () => {
       created_by: 'therapist-1',
       source: 'therapist',
     })
+    expect(
+      supabase.state.inserts.some((row) => row.table === 'therapist_availability_submissions')
+    ).toBe(true)
     expect(revalidatePathMock).toHaveBeenCalledWith('/availability')
+    expect(revalidatePathMock).toHaveBeenCalledWith('/therapist/availability')
+    expect(revalidatePathMock).toHaveBeenCalledWith('/dashboard/staff')
   })
 
   it('only lets a therapist delete their own availability row', async () => {
@@ -283,6 +329,47 @@ describe('availability actions', () => {
         note: 'Family appointment',
         created_by: 'therapist-1',
         source: 'therapist',
+      },
+    ])
+    expect(supabase.state.inserts).toHaveLength(1)
+    expect(supabase.state.inserts[0].table).toBe('therapist_availability_submissions')
+    expect(supabase.state.inserts[0].payload.therapist_id).toBe('therapist-1')
+    expect(supabase.state.inserts[0].payload.schedule_cycle_id).toBe('cycle-1')
+    expect(revalidatePathMock).toHaveBeenCalledWith('/dashboard/staff')
+  })
+
+  it('saves grid draft without creating a submission record', async () => {
+    const supabase = createSupabaseMock({ userId: 'therapist-1', role: 'therapist' })
+    createClientMock.mockResolvedValue(supabase)
+    const formData = makeTherapistGridFormData()
+    formData.set('workflow', 'draft')
+
+    await expect(submitTherapistAvailabilityGridAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?success=draft_saved&cycle=cycle-1'
+    )
+
+    expect(supabase.state.inserts).toHaveLength(0)
+    expect(supabase.state.updates).toHaveLength(0)
+  })
+
+  it('updates last_edited_at when resubmitting an existing official submission', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'therapist-1',
+      role: 'therapist',
+      therapistSubmissionExists: true,
+    })
+    createClientMock.mockResolvedValue(supabase)
+
+    await expect(
+      submitTherapistAvailabilityGridAction(makeTherapistGridFormData())
+    ).rejects.toThrow('REDIRECT:/availability?success=entry_submitted&cycle=cycle-1')
+
+    expect(supabase.state.inserts).toHaveLength(0)
+    expect(supabase.state.updates).toEqual([
+      {
+        table: 'therapist_availability_submissions',
+        payload: expect.objectContaining({ last_edited_at: expect.any(String) }),
+        filters: { therapist_id: 'therapist-1', schedule_cycle_id: 'cycle-1' },
       },
     ])
   })

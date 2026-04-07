@@ -15,7 +15,7 @@
 - Coverage assignment behavior is centralized in `src/lib/coverage/*` with server mutation endpoints in `src/app/api/schedule/*`.
 - Shared cycle-selection behavior is centralized in `src/lib/coverage/active-cycle.ts` and now drives Coverage, manager workflow, and shift board surfaces.
 - `src/lib/coverage/fetch-schedule-cycles.ts` loads cycles for Coverage (and related) with a fallback when `schedule_cycles.archived_at` is missing or PostgREST schema cache is stale.
-- Therapist availability is now explicitly a full-cycle submission workflow, not an exceptions-only workflow. `Request to Work` maps to therapist `force_on`, `Need Off` maps to therapist `force_off`, and `Available` is neutral.
+- Therapist availability is a full-cycle workflow: day-level state lives in `availability_overrides`; **official** submitted/not-submitted for a cycle lives in `therapist_availability_submissions` (not inferred from overrides alone). `Request to Work` → therapist `force_on`, `Need Off` → therapist `force_off`, `Available` = neutral.
 - **Publish History** (`/publish`) lists **schedule blocks** (all non-archived cycles) separately from the **publish email log** (`publish_events`); see `CLAUDE.md` workflow section.
 - Active scheduling surfaces no longer fall back to a synthetic or stale "latest cycle" window when no current/upcoming block exists.
 - Designated-lead role guards in app code and SQL mutation eligibility now both accept `therapist` and `lead` roles (with `is_lead_eligible=true` still required).
@@ -26,7 +26,7 @@ Last verified on branch `main`:
 
 - `npm run lint` passed
 - `npx tsc --noEmit` passed
-- `npm run test:unit` passed (`394` tests)
+- `npm run test:unit` passed (`415` tests) — re-run after pulls; count drifts with new tests
 - `npx playwright test --workers=1` passed for active suites (`23` passed, `1` skipped) — re-verify after major route changes
 
 ## Known Exceptions / Gaps

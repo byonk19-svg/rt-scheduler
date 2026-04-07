@@ -9,6 +9,7 @@ Focused view of the active schema used by scheduling, coverage, publish, and req
   - `id` references `auth.users.id`.
 - `schedule_cycles`
   - Scheduling windows (`label`, `start_date`, `end_date`, `published`, `archived_at`).
+  - Optional `availability_due_at` (timestamptz): explicit therapist availability deadline; UI falls back to inferred “due” when null.
   - `archived_at` hides non-live historical cycles from active scheduling surfaces without deleting related records.
 - `shifts`
   - Assignment rows by cycle/date/shift/user.
@@ -41,6 +42,11 @@ Focused view of the active schema used by scheduling, coverage, publish, and req
     - `force_on` = **Request to Work**
     - no row = **Available** (neutral, scheduler can use or skip)
   - Therapist day-level notes are stored on the same `availability_overrides.note` field.
+- `therapist_availability_submissions`
+  - One row per therapist per cycle **after they officially submit** (workflow state).
+  - Fields: `submitted_at` (first official submit), `last_edited_at` (any later change while still submitted, including grid saves or day deletes).
+  - Day-level selections remain in `availability_overrides`; therapists can **save progress** (draft) without a row here until they **Submit availability**.
+  - Manager/therapist “submitted” counts for a cycle should use this table — not “has any therapist override rows.”
 
 ## Shift Board and Request Tables
 
@@ -70,6 +76,8 @@ Focused view of the active schema used by scheduling, coverage, publish, and req
 - `profiles (1) -> (1) work_patterns`
 - `profiles (1) -> (many) availability_overrides`
 - `schedule_cycles (1) -> (many) availability_overrides`
+- `profiles (1) -> (many) therapist_availability_submissions`
+- `schedule_cycles (1) -> (many) therapist_availability_submissions`
 - `publish_events (1) -> (many) notification_outbox`
 - `shifts (1) -> (many) shift_posts`
 
@@ -82,4 +90,4 @@ Focused view of the active schema used by scheduling, coverage, publish, and req
 ## Legacy/Transitional Tables
 
 - `availability_requests` and `availability_entries` exist historically.
-- Current app paths use `availability_overrides` + `work_patterns` for scheduling eligibility.
+- Current app paths use `availability_overrides` + `work_patterns` for scheduling eligibility, and `therapist_availability_submissions` for official per-cycle therapist submit state.

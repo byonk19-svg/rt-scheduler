@@ -25,9 +25,10 @@ describe('therapist availability route', () => {
 
     expect(source).toContain('Availability for This Cycle')
     expect(source).toContain('Submitted Availability')
-    expect(source).toContain('No availability submitted yet.')
+    expect(source).toContain('No day-level entries yet for this cycle.')
     expect(source).toContain('days selected')
     expect(source).toContain('formatHumanCycleRange')
     expect(source).toContain('Availability summary:')
+    expect(source).toContain('therapist_availability_submissions')
   })
 })

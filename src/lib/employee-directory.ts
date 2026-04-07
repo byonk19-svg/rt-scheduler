@@ -47,7 +47,13 @@ export type MissingAvailabilityRow = {
   therapistName: string
   overridesCount: number
   lastUpdatedAt: string | null
+  /** True when therapist has officially submitted for this cycle (therapist_availability_submissions), when that set is supplied. */
   submitted: boolean
+}
+
+/** When provided, `submitted` reflects official per-cycle submissions, not override rows alone. */
+export type BuildMissingAvailabilityOptions = {
+  officialSubmissionTherapistIds: ReadonlySet<string>
 }
 
 export function filterEmployeeDirectoryRecords(
@@ -99,7 +105,8 @@ export function canTherapistMutateOverride(
 export function buildMissingAvailabilityRows(
   therapists: Array<Pick<EmployeeDirectoryRecord, 'id' | 'full_name' | 'is_active'>>,
   overrides: EmployeeAvailabilityOverride[],
-  cycleId: string
+  cycleId: string,
+  options?: BuildMissingAvailabilityOptions | null
 ): MissingAvailabilityRow[] {
   const byTherapist = new Map<string, EmployeeAvailabilityOverride[]>()
 
@@ -110,6 +117,8 @@ export function buildMissingAvailabilityRows(
     byTherapist.set(row.therapist_id, current)
   }
 
+  const officialIds = options?.officialSubmissionTherapistIds
+
   return therapists
     .filter((therapist) => therapist.is_active)
     .map((therapist) => {
@@ -118,12 +127,13 @@ export function buildMissingAvailabilityRows(
         rows.length === 0
           ? null
           : (rows.map((row) => row.created_at).sort((a, b) => b.localeCompare(a))[0] ?? null)
+      const submitted = officialIds !== undefined ? officialIds.has(therapist.id) : rows.length > 0
       return {
         therapistId: therapist.id,
         therapistName: therapist.full_name,
         overridesCount: rows.length,
         lastUpdatedAt,
-        submitted: rows.length > 0,
+        submitted,
       }
     })
     .sort((a, b) => {

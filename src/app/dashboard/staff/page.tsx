@@ -6,14 +6,11 @@ import { FeedbackToast } from '@/components/feedback-toast'
 import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
+import { dateFromKey, formatDateLabel, formatHumanCycleRange } from '@/lib/calendar-utils'
 import {
-  addDays,
-  dateFromKey,
-  formatDateLabel,
-  formatHumanCycleRange,
-  formatSubmittedDateTime,
-  toIsoDate,
-} from '@/lib/calendar-utils'
+  buildTherapistSubmissionUiState,
+  resolveAvailabilityDueSupportLine,
+} from '@/lib/therapist-availability-submission'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { cn } from '@/lib/utils'
@@ -36,20 +33,6 @@ function getStaffDashboardFeedback(
   if (success === 'access_requested')
     return { message: 'Access request submitted and signed in.', variant: 'success' }
   return null
-}
-
-/**
- * Inferred preferred-by date (day before cycle start). Replace with explicit per-cycle
- * deadlines when product supports configured submission close dates or role-specific cutoffs.
- */
-function availabilityDueSupportLine(cycleStart: string, submitted: boolean): string | null {
-  if (submitted) return null
-  const preferredBy = toIsoDate(addDays(dateFromKey(cycleStart), -1))
-  const today = new Date().toISOString().slice(0, 10)
-  if (preferredBy < today) {
-    return 'Submit as soon as you can—your manager is still building this block.'
-  }
-  return `Due ${formatDateLabel(preferredBy)}`
 }
 
 export default async function StaffDashboardPage({
@@ -86,7 +69,7 @@ export default async function StaffDashboardPage({
 
   const { data: cycles } = await supabase
     .from('schedule_cycles')
-    .select('id, label, start_date, end_date, archived_at, published')
+    .select('id, label, start_date, end_date, archived_at, published, availability_due_at')
     .is('archived_at', null)
     .gte('end_date', today)
     .order('start_date', { ascending: true })
@@ -104,7 +87,7 @@ export default async function StaffDashboardPage({
     role: string | null
   }
 
-  const [upcomingShiftsResult, therapistOverridesResult, pendingPostCountResult] =
+  const [upcomingShiftsResult, therapistSubmissionResult, pendingPostCountResult] =
     await Promise.all([
       activeCycle
         ? supabase
@@ -118,12 +101,12 @@ export default async function StaffDashboardPage({
         : Promise.resolve({ data: [] }),
       activeCycle
         ? supabase
-            .from('availability_overrides')
-            .select('updated_at')
+            .from('therapist_availability_submissions')
+            .select('submitted_at, last_edited_at, schedule_cycle_id')
             .eq('therapist_id', user.id)
-            .eq('cycle_id', activeCycle.id)
-            .eq('source', 'therapist')
-        : Promise.resolve({ data: [] }),
+            .eq('schedule_cycle_id', activeCycle.id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
       supabase
         .from('shift_posts')
         .select('id', { head: true, count: 'exact' })
@@ -149,12 +132,21 @@ export default async function StaffDashboardPage({
       })
     : null
 
-  const therapistOverrideRows = (therapistOverridesResult.data ?? []) as { updated_at: string }[]
-  const availabilitySubmitted = therapistOverrideRows.length > 0
-  const lastAvailabilitySubmitAt = therapistOverrideRows.reduce<string | null>((latest, row) => {
-    if (!latest || row.updated_at > latest) return row.updated_at
-    return latest
-  }, null)
+  const submissionRow = therapistSubmissionResult.data as {
+    submitted_at: string
+    last_edited_at: string
+    schedule_cycle_id: string
+  } | null
+  const submissionUi = buildTherapistSubmissionUiState(
+    submissionRow
+      ? {
+          schedule_cycle_id: submissionRow.schedule_cycle_id,
+          submitted_at: submissionRow.submitted_at,
+          last_edited_at: submissionRow.last_edited_at,
+        }
+      : null
+  )
+  const availabilitySubmitted = submissionUi.isSubmitted
 
   const pendingPostCount = pendingPostCountResult.count ?? 0
 
@@ -165,7 +157,13 @@ export default async function StaffDashboardPage({
 
   const availabilityDueLine =
     activeCycle && !availabilitySubmitted
-      ? availabilityDueSupportLine(activeCycle.start_date, availabilitySubmitted)
+      ? resolveAvailabilityDueSupportLine(
+          {
+            start_date: activeCycle.start_date,
+            availability_due_at: activeCycle.availability_due_at ?? null,
+          },
+          availabilitySubmitted
+        )
       : null
 
   type RosterShift = {
@@ -454,9 +452,14 @@ export default async function StaffDashboardPage({
           >
             {availabilitySubmitted ? 'Submitted' : 'Not submitted'}
           </p>
-          {availabilitySubmitted && lastAvailabilitySubmitAt ? (
+          {availabilitySubmitted && submissionUi.submittedAtDisplay ? (
             <p className="mt-1 text-xs text-muted-foreground">
-              Submitted {formatSubmittedDateTime(lastAvailabilitySubmitAt)}
+              Submitted {submissionUi.submittedAtDisplay}
+            </p>
+          ) : null}
+          {availabilitySubmitted && submissionUi.lastEditedDisplay ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Last edited {submissionUi.lastEditedDisplay}
             </p>
           ) : null}
           {!availabilitySubmitted && availabilityDueLine ? (

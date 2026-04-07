@@ -33,6 +33,7 @@ describe('TherapistAvailabilityWorkspace', () => {
           },
         ],
         initialCycleId: 'cycle-1',
+        submissionsByCycleId: {},
         submitTherapistAvailabilityGridAction: async () => {},
       })
     )
@@ -40,7 +41,7 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('Submit Availability')
     expect(html).toContain('Submit availability')
     expect(html).toContain('id="therapist-availability-workspace"')
-    expect(html).toContain('Submitted')
+    expect(html).toContain('Not submitted')
     expect(html).toContain('Cycle:')
     expect(html).toContain('42 days selected')
     expect(html).toContain('Tap a day to switch between Available, Need Off, and Request to Work.')

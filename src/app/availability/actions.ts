@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
+import type { SupabaseClient } from '@supabase/supabase-js'
+
 import { can } from '@/lib/auth/can'
 import {
   buildPlannerSavePayload,
@@ -10,6 +12,81 @@ import {
   toOverrideType,
 } from '@/lib/availability-planner'
 import { createClient } from '@/lib/supabase/server'
+
+async function upsertTherapistSubmissionAfterOfficialSave(
+  supabase: SupabaseClient,
+  therapistId: string,
+  cycleId: string
+) {
+  const now = new Date().toISOString()
+  const { data: existing, error: loadError } = await supabase
+    .from('therapist_availability_submissions')
+    .select('submitted_at')
+    .eq('therapist_id', therapistId)
+    .eq('schedule_cycle_id', cycleId)
+    .maybeSingle()
+
+  if (loadError) {
+    console.error('Failed to load therapist availability submission:', loadError)
+    return
+  }
+
+  if (!existing) {
+    const { error } = await supabase.from('therapist_availability_submissions').insert({
+      therapist_id: therapistId,
+      schedule_cycle_id: cycleId,
+      submitted_at: now,
+      last_edited_at: now,
+    })
+    if (error) {
+      console.error('Failed to insert therapist availability submission:', error)
+    }
+    return
+  }
+
+  const { error } = await supabase
+    .from('therapist_availability_submissions')
+    .update({ last_edited_at: now })
+    .eq('therapist_id', therapistId)
+    .eq('schedule_cycle_id', cycleId)
+
+  if (error) {
+    console.error('Failed to update therapist availability submission:', error)
+  }
+}
+
+async function touchTherapistSubmissionLastEditedIfExists(
+  supabase: SupabaseClient,
+  therapistId: string,
+  cycleId: string
+) {
+  if (!cycleId) return
+  const now = new Date().toISOString()
+  const { data: existing } = await supabase
+    .from('therapist_availability_submissions')
+    .select('id')
+    .eq('therapist_id', therapistId)
+    .eq('schedule_cycle_id', cycleId)
+    .maybeSingle()
+
+  if (!existing) return
+
+  const { error } = await supabase
+    .from('therapist_availability_submissions')
+    .update({ last_edited_at: now })
+    .eq('therapist_id', therapistId)
+    .eq('schedule_cycle_id', cycleId)
+
+  if (error) {
+    console.error('Failed to touch therapist availability submission last_edited_at:', error)
+  }
+}
+
+function revalidateTherapistAvailabilitySurfaces() {
+  revalidatePath('/availability')
+  revalidatePath('/therapist/availability')
+  revalidatePath('/dashboard/staff')
+}
 
 type AvailabilityOverrideType = 'force_off' | 'force_on'
 type AvailabilityShiftType = 'day' | 'night' | 'both'
@@ -95,14 +172,20 @@ export async function submitAvailabilityEntryAction(formData: FormData) {
     redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
   }
 
-  revalidatePath('/availability')
-  revalidatePath('/therapist/availability')
+  await upsertTherapistSubmissionAfterOfficialSave(supabase, user.id, cycleId)
+
+  revalidateTherapistAvailabilitySurfaces()
   redirect(buildAvailabilityUrl({ success: 'entry_submitted', cycle: cycleId }, returnPath))
 }
 
 export async function submitTherapistAvailabilityGridAction(formData: FormData) {
   const { supabase, user } = await getAuthenticatedUserWithRole()
   const returnPath = getReturnPath(String(formData.get('return_to') ?? '').trim() || null)
+
+  const workflowRaw = String(formData.get('workflow') ?? 'submit')
+    .trim()
+    .toLowerCase()
+  const workflow: 'draft' | 'submit' = workflowRaw === 'draft' ? 'draft' : 'submit'
 
   const cycleId = String(formData.get('cycle_id') ?? '').trim()
   const canWorkDates = formData
@@ -214,9 +297,13 @@ export async function submitTherapistAvailabilityGridAction(formData: FormData) 
     }
   }
 
-  revalidatePath('/availability')
-  revalidatePath('/therapist/availability')
-  redirect(buildAvailabilityUrl({ success: 'entry_submitted', cycle: cycleId }, returnPath))
+  if (workflow === 'submit') {
+    await upsertTherapistSubmissionAfterOfficialSave(supabase, user.id, cycleId)
+  }
+
+  revalidateTherapistAvailabilitySurfaces()
+  const successParam = workflow === 'draft' ? 'draft_saved' : 'entry_submitted'
+  redirect(buildAvailabilityUrl({ success: successParam, cycle: cycleId }, returnPath))
 }
 
 export async function deleteAvailabilityEntryAction(formData: FormData) {
@@ -242,8 +329,11 @@ export async function deleteAvailabilityEntryAction(formData: FormData) {
     )
   }
 
-  revalidatePath('/availability')
-  revalidatePath('/therapist/availability')
+  if (cycleId) {
+    await touchTherapistSubmissionLastEditedIfExists(supabase, user.id, cycleId)
+  }
+
+  revalidateTherapistAvailabilitySurfaces()
   redirect(
     buildAvailabilityUrl({ success: 'entry_deleted', cycle: cycleId || undefined }, returnPath)
   )
