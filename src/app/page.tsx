@@ -182,8 +182,7 @@ export default function HomePage() {
         router.refresh()
         return
       } catch (requestError) {
-        const message =
-          requestError instanceof Error ? requestError.message : 'Could not sign in.'
+        const message = requestError instanceof Error ? requestError.message : 'Could not sign in.'
         setError(toFriendlyAuthTransportError(message))
         setLoading(false)
         return

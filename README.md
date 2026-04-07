@@ -50,6 +50,15 @@ npm run dev
 
 4. Open `http://localhost:3000`.
 
+For final workflow/UAT validation, prefer the production build instead of `next dev`:
+
+```bash
+npm run build
+npm run start:prod:local
+```
+
+Then validate against `http://127.0.0.1:3001`. Use `next dev` for iteration, not the final truth source for browser behavior.
+
 ## Seed Demo Data
 
 The demo seed script is idempotent and creates:
@@ -104,6 +113,11 @@ Run:
 ```bash
 npm run test:e2e
 ```
+
+Recommended lane:
+
+- `npm run test:e2e` against `next dev` for routine regression coverage
+- `npm run build` + `npm run start:prod:local` + screenshot/UAT checks against `http://127.0.0.1:3001` before trusting product-level workflow behavior
 
 Optional auth flow test uses:
 

@@ -17,6 +17,7 @@
 **File:** `src/components/availability/AvailabilityStatusSummary.tsx`
 
 The inner list div is:
+
 ```tsx
 <div className="min-h-[25rem] flex-1 overflow-y-auto p-4">
 ```
@@ -30,6 +31,7 @@ The inner list div is:
 **File:** `src/components/manager/ManagerTriageDashboard.tsx`
 
 Current render order at the bottom of the JSX (lines ~288–321):
+
 1. `<Card>` — Recent Activity (full-width)
 2. `{dayShiftsFilled !== '--' && ...}` — ScheduleProgress (full-width, conditional)
 
@@ -41,18 +43,19 @@ ScheduleProgress after Recent Activity looks orphaned, especially when Recent Ac
 
 ## Files changed
 
-| File | Action |
-|------|--------|
-| `src/components/availability/AvailabilityStatusSummary.tsx` | Modify: cap list height |
-| `src/components/availability/AvailabilityStatusSummary.test.ts` | Modify: add max-h assertion |
-| `src/components/manager/ManagerTriageDashboard.tsx` | Modify: move ScheduleProgress block |
-| `src/components/manager/ManagerTriageDashboard.test.ts` | Modify: add order assertion |
+| File                                                            | Action                              |
+| --------------------------------------------------------------- | ----------------------------------- |
+| `src/components/availability/AvailabilityStatusSummary.tsx`     | Modify: cap list height             |
+| `src/components/availability/AvailabilityStatusSummary.test.ts` | Modify: add max-h assertion         |
+| `src/components/manager/ManagerTriageDashboard.tsx`             | Modify: move ScheduleProgress block |
+| `src/components/manager/ManagerTriageDashboard.test.ts`         | Modify: add order assertion         |
 
 ---
 
 ## Task 1 — Cap the availability response roster list height
 
 **Files:**
+
 - Modify: `src/components/availability/AvailabilityStatusSummary.tsx` (line 107)
 - Test: `src/components/availability/AvailabilityStatusSummary.test.ts`
 
@@ -133,6 +136,7 @@ git commit -m "fix: cap availability response roster height so header stays visi
 ## Task 2 — Move ScheduleProgress before Recent Activity in manager Inbox
 
 **Files:**
+
 - Modify: `src/components/manager/ManagerTriageDashboard.tsx`
 - Test: `src/components/manager/ManagerTriageDashboard.test.ts`
 
@@ -149,9 +153,7 @@ it('renders Schedule Completion before Recent Activity', () => {
       upcomingShiftCount: 12,
       upcomingShiftDays: [],
       todayActiveShifts: [],
-      recentActivity: [
-        { title: 'Some activity', timeLabel: '1 hour ago', href: '/coverage' },
-      ],
+      recentActivity: [{ title: 'Some activity', timeLabel: '1 hour ago', href: '/coverage' }],
       pendingRequests: 0,
       approvalsWaiting: 0,
       currentCycleStatus: 'Draft cycle',
@@ -223,26 +225,26 @@ Find the block that starts around line 288 — the full-width Recent Activity `<
 **Move** the `ScheduleProgress` conditional block so it appears BEFORE the Recent Activity card. The result should be:
 
 ```tsx
-      {dayShiftsFilled !== '--' &&
-        dayShiftsTotal !== '--' &&
-        nightShiftsFilled !== '--' &&
-        nightShiftsTotal !== '--' && (
-          <ScheduleProgress
-            dayFilled={dayShiftsFilled}
-            dayTotal={dayShiftsTotal}
-            nightFilled={nightShiftsFilled}
-            nightTotal={nightShiftsTotal}
-          />
-        )}
+{
+  dayShiftsFilled !== '--' &&
+    dayShiftsTotal !== '--' &&
+    nightShiftsFilled !== '--' &&
+    nightShiftsTotal !== '--' && (
+      <ScheduleProgress
+        dayFilled={dayShiftsFilled}
+        dayTotal={dayShiftsTotal}
+        nightFilled={nightShiftsFilled}
+        nightTotal={nightShiftsTotal}
+      />
+    )
+}
 
-      <Card className="rounded-2xl border-border/70 bg-card shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
-        <CardHeader className="pb-2 pt-4">
-          <CardTitle className="text-sm font-medium text-foreground">Recent Activity</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2.5 pb-4">
-          ...
-        </CardContent>
-      </Card>
+;<Card className="rounded-2xl border-border/70 bg-card shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
+  <CardHeader className="pb-2 pt-4">
+    <CardTitle className="text-sm font-medium text-foreground">Recent Activity</CardTitle>
+  </CardHeader>
+  <CardContent className="space-y-2.5 pb-4">...</CardContent>
+</Card>
 ```
 
 No other changes — do not touch props, data queries, or any other sections.

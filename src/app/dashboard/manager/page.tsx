@@ -392,19 +392,28 @@ export default function ManagerDashboardPage() {
 
   const scheduleHref = buildCycleRoute('/coverage', data.activeCycle?.id ?? null)
   const nextCyclePlanning = getNextCyclePlanningWindow(data.nextCycle?.start_date ?? null)
+  const activeCycleHasNoShifts =
+    !loading &&
+    Boolean(data.activeCycle) &&
+    data.dayShiftsTotal === 0 &&
+    data.nightShiftsTotal === 0
 
   const currentCycleStatus = loading
     ? LOADING_LABEL
     : data.activeCycle
       ? data.activeCycle.published
         ? 'Published'
-        : 'Draft cycle'
+        : activeCycleHasNoShifts
+          ? 'Draft not started'
+          : 'Draft cycle'
       : 'No active cycle'
 
   const currentCycleDetail = loading
     ? LOADING_LABEL
     : data.activeCycle
-      ? `Publish by ${formatCycleDate(data.activeCycle.end_date)}`
+      ? activeCycleHasNoShifts
+        ? 'No staffing drafted yet. Auto-draft or add the first shifts.'
+        : `Publish by ${formatCycleDate(data.activeCycle.end_date)}`
       : 'No current cycle is scheduled.'
 
   const nextCycleLabel = loading
