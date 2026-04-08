@@ -1,6 +1,15 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-08 (session 36)
+Updated: 2026-04-08 (session 37)
+
+## Latest Updates (2026-04-08, session 37)
+
+- **Therapist Staff Dashboard (`/dashboard/staff`) — action hierarchy polish** (`src/app/dashboard/staff/page.tsx`):
+  - **Chips:** **Availability** status chip first, then upcoming shift count, then requests awaiting action (submission state surfaces first).
+  - **Hero / empty state:** Schedule-focused body copy (_The schedule is still being filled…_); **single CTA** — **Browse open shifts** only (no second hero button duplicating header actions).
+  - **Header:** Unchanged global actions — when availability not submitted, primary **Submit availability** + outline **Browse open shifts**; when submitted, **Browse open shifts** + **Edit availability**.
+  - **Availability for This Cycle card:** Deadline / due line slightly stronger (`font-medium text-foreground/90`, spacing); contextual **Submit availability →** / **Edit availability →** links use `font-medium` vs header primary button.
+- **Verification:** `npx tsc --noEmit`, `npm run lint` (touched file), `npx vitest run` (**424 tests** passing).
 
 ## Latest Updates (2026-04-08, session 36)
 

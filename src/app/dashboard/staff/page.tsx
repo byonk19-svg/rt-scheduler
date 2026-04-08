@@ -264,12 +264,6 @@ export default async function StaffDashboardPage({
               <p className="mt-2 text-sm text-muted-foreground">No active scheduling cycle yet.</p>
             )}
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5">
-                {upcomingCount} upcoming shifts
-              </span>
-              <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5">
-                {pendingPostCount} requests awaiting action
-              </span>
               <span
                 className={cn(
                   'rounded-full border px-2 py-0.5',
@@ -279,6 +273,12 @@ export default async function StaffDashboardPage({
                 )}
               >
                 {availabilitySubmitted ? 'Availability: Submitted' : 'Availability: Not submitted'}
+              </span>
+              <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5">
+                {upcomingCount} upcoming shifts
+              </span>
+              <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5">
+                {pendingPostCount} requests awaiting action
               </span>
             </div>
           </div>
@@ -375,23 +375,13 @@ export default async function StaffDashboardPage({
                 No shifts scheduled yet for this cycle
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Submit your availability or browse open shifts while the schedule is still being
-                filled.
+                The schedule is still being filled. You can browse open shifts now, and submit
+                availability if you have not done so yet.
               </p>
-              <div className="mt-3 flex justify-center gap-2">
-                {!availabilitySubmitted ? (
-                  <Button asChild size="sm">
-                    <Link href="/therapist/availability">Submit availability</Link>
-                  </Button>
-                ) : null}
-                <Button asChild size="sm" variant={availabilitySubmitted ? 'default' : 'outline'}>
+              <div className="mt-3 flex justify-center">
+                <Button asChild size="sm">
                   <Link href="/shift-board">Browse open shifts</Link>
                 </Button>
-                {!availabilitySubmitted ? null : (
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/therapist/availability">Edit availability</Link>
-                  </Button>
-                )}
               </div>
             </div>
           )}
@@ -463,19 +453,21 @@ export default async function StaffDashboardPage({
             </p>
           ) : null}
           {!availabilitySubmitted && availabilityDueLine ? (
-            <p className="mt-1 text-xs text-muted-foreground">{availabilityDueLine}</p>
+            <p className="mt-2 text-xs font-medium leading-snug text-foreground/90">
+              {availabilityDueLine}
+            </p>
           ) : null}
           {!availabilitySubmitted ? (
             <Link
               href="/therapist/availability"
-              className="mt-2 inline-block text-xs font-semibold text-primary hover:underline"
+              className="mt-2.5 inline-block text-xs font-medium text-primary hover:underline"
             >
               Submit availability &rarr;
             </Link>
           ) : (
             <Link
               href="/therapist/availability"
-              className="mt-2 inline-block text-xs font-semibold text-primary hover:underline"
+              className="mt-2.5 inline-block text-xs font-medium text-primary hover:underline"
             >
               Edit availability &rarr;
             </Link>
