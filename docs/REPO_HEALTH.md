@@ -1,11 +1,11 @@
-# Repository Health Snapshot (April 7, 2026)
+# Repository Health Snapshot (April 8, 2026)
 
 ## Current Shape
 
 - Monorepo-style Next.js app (single app package) with App Router and TypeScript.
 - Supabase-backed auth + data model with manager/therapist role workflows.
 - Core manager surfaces: coverage, availability, team, approvals, publish, shift board.
-- Core therapist surfaces: schedule (`/coverage`), availability grid (`/therapist/availability`: Available / Need Off / Request to Work), swaps.
+- Core therapist surfaces: schedule (`/coverage`), availability grid (`/therapist/availability`: full-cycle **Available / Need Off / Request to Work** grid, **Selected Day** inline editor under the active week row, **Day Notes** review list at bottom), swaps.
 
 ## Architecture Highlights
 
@@ -26,7 +26,7 @@ Last verified on branch `main`:
 
 - `npm run lint` passed
 - `npx tsc --noEmit` passed
-- `npm run test:unit` passed (`415` tests) — re-run after pulls; count drifts with new tests
+- `npm run test:unit` passed (`424` tests) — re-run after pulls; count drifts with new tests
 - `npx playwright test --workers=1` passed for active suites (`23` passed, `1` skipped) — re-verify after major route changes
 
 ## Known Exceptions / Gaps

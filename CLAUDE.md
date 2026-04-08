@@ -1,11 +1,20 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-08 (session 35)
+Updated: 2026-04-08 (session 36)
+
+## Latest Updates (2026-04-08, session 36)
+
+- **Therapist `/therapist/availability` — Selected Day editor, concrete deadlines, polish** (`TherapistAvailabilityWorkspace.tsx`, `therapist-availability-submission.ts`, tests):
+  - **Inline Selected Day:** Note entry and status sit directly under the calendar **week row** that contains the selected day (click still cycles **Available → Need Off → Request to Work** and selects). **Clear day** / **Clear note**; `notes_json` includes notes only for **Need Off** / **Request to Work** dates (Available draft text stays local until status changes).
+  - **Deadlines:** `resolveTherapistDeadlinePresentation()` / `resolveAvailabilityDueSupportLine`: **Due {date}**, **Due today** / **Due tomorrow**, **Past due — final deadline was {date}**; submitted state shows **Submitted {timestamp}** (plus last-edited when applicable) and **Final deadline was {date}**.
+  - **Day Notes:** Bottom **Day Notes** is **review-only** (date · status · quote); live editing is in Selected Day.
+  - **Visual polish:** Softer selected-tile ring vs. textarea; light default borders, stronger focus on `:focus-visible`; compact Selected Day card; ghost-style **Clear day**; shortened two-line helper under the cycle selector.
+- **Verification:** `npx tsc --noEmit`, `npm run lint` (touched files), `npx vitest run` (**424 tests** passing).
 
 ## Latest Updates (2026-04-08, session 35)
 
 - **Therapist `/therapist/availability` — deadline + hierarchy polish** (`TherapistAvailabilityWorkspace.tsx`, `therapist-availability-submission.ts`):
-  - **Deadlines:** `resolveTherapistDeadlinePresentation()` drives header copy: **Final day to submit: [date]**, **Due today** / **Due tomorrow**, **Past due** (only after the real deadline instant for `availability_due_at`, or after **end of local calendar day** for the inferred day-before-start fallback). Submitted state shows timestamp + **Final deadline was [date]**.
+  - **Deadlines:** `resolveTherapistDeadlinePresentation()` drives header copy (session 36 refines wording to **Due {date}** / **Past due — final deadline was {date}**; see session 36). **Due today** / **Due tomorrow** / past logic unchanged (real deadline instant for `availability_due_at`, or **end of local calendar day** for inferred day-before-start). Submitted state shows timestamp + **Final deadline was [date]**.
   - **Layout:** Single page title block (no duplicate `AvailabilityOverviewHeader` on therapist route); compact **Submitted Availability** empty state (`availability-requests-table.tsx`); **Save progress** / **Submit availability** / **Save changes** only at **bottom** of the form (no sticky top action bar).
   - **Nav/copy:** Staff sidebar **Future Availability** → **Availability** (`AppShell.tsx`); non-manager **`/availability`** page title **Availability**; tightened helper lines; cycle dropdown label **Cycle** (lighter).
   - **Calendar:** Default **Available** tiles visually quieter; **Need Off** / **Request to Work** stronger (ring/shadow).

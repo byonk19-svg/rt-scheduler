@@ -118,7 +118,10 @@ function resolveNotSubmittedHeadline(
   const isPast = now.getTime() > deadlineInstant.getTime()
 
   if (isPast) {
-    return { headline: 'Past due', emphasis: 'past' }
+    return {
+      headline: `Past due — final deadline was ${formatDateLabel(deadlineDateKey)}`,
+      emphasis: 'past',
+    }
   }
 
   const dayDiff = daysBetweenDateKeys(todayKey, deadlineDateKey)
@@ -129,7 +132,7 @@ function resolveNotSubmittedHeadline(
     return { headline: 'Due tomorrow', emphasis: 'urgent' }
   }
   return {
-    headline: `Final day to submit: ${formatDateLabel(deadlineDateKey)}`,
+    headline: `Due ${formatDateLabel(deadlineDateKey)}`,
     emphasis: 'neutral',
   }
 }
@@ -165,7 +168,9 @@ export function resolveTherapistDeadlinePresentation(
   }
 
   const primaryParts: string[] = []
-  if (submission.submittedAtDisplay) primaryParts.push(submission.submittedAtDisplay)
+  if (submission.submittedAtDisplay) {
+    primaryParts.push(`Submitted ${submission.submittedAtDisplay}`)
+  }
   if (submission.lastEditedDisplay) {
     primaryParts.push(`Last edited ${submission.lastEditedDisplay}`)
   }

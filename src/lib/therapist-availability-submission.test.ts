@@ -37,13 +37,13 @@ describe('therapist-availability-submission', () => {
     ).toBe(true)
   })
 
-  it('uses explicit availability_due_at in final-day wording when not imminent', () => {
+  it('uses explicit availability_due_at in due-date wording when not imminent', () => {
     const line = resolveAvailabilityDueSupportLine(
       { start_date: '2026-04-01', availability_due_at: '2026-04-10T23:59:59.000Z' },
       false,
       new Date(2026, 3, 7, 12, 0, 0)
     )
-    expect(line).toMatch(/^Final day to submit: /)
+    expect(line).toBe('Due Apr 10, 2026')
   })
 
   it('falls back to day-before-start when availability_due_at is absent', () => {
@@ -52,7 +52,7 @@ describe('therapist-availability-submission', () => {
       false,
       new Date(2026, 3, 7, 12, 0, 0)
     )
-    expect(line).toBe('Final day to submit: Apr 14, 2026')
+    expect(line).toBe('Due Apr 14, 2026')
   })
 
   it('returns null for due line when submitted', () => {
@@ -71,7 +71,7 @@ describe('therapist-availability-submission', () => {
       false,
       new Date(2026, 3, 7, 12, 0, 0)
     )
-    expect(line).toBe('Past due')
+    expect(line).toBe('Past due — final deadline was Feb 28, 2026')
   })
 
   it('returns Due tomorrow when the deadline is the next calendar day', () => {
@@ -103,8 +103,8 @@ describe('therapist-availability-submission', () => {
       false,
       new Date('2026-04-10T18:00:01.000Z')
     )
-    expect(before).not.toBe('Past due')
-    expect(after).toBe('Past due')
+    expect(before).not.toMatch(/^Past due/)
+    expect(after).toMatch(/^Past due — final deadline was /)
   })
 
   it('includes submitted lines and final deadline context when submitted', () => {
@@ -119,6 +119,7 @@ describe('therapist-availability-submission', () => {
       new Date(2026, 3, 12, 12, 0, 0)
     )
     expect(pres.deadlineHeadline).toBeNull()
+    expect(pres.submittedPrimaryLine).toMatch(/^Submitted /)
     expect(pres.submittedPrimaryLine).toMatch(/Apr/)
     expect(pres.submittedDeadlineContextLine).toMatch(/^Final deadline was /)
     expect(pres.emphasis).toBe('submitted')
