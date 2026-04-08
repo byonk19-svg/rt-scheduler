@@ -62,10 +62,11 @@ export function buildTherapistSubmissionUiState(
  */
 export function resolveAvailabilityDueSupportLine(
   cycle: TherapistAvailabilityCycleDeadlineInput,
-  submitted: boolean
+  submitted: boolean,
+  today?: string
 ): string | null {
   if (submitted) return null
-  const todayKey = new Date().toISOString().slice(0, 10)
+  const todayKey = today ?? new Date().toISOString().slice(0, 10)
 
   if (cycle.availability_due_at) {
     const raw = cycle.availability_due_at

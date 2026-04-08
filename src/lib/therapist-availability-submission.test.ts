@@ -39,13 +39,18 @@ describe('therapist-availability-submission', () => {
   it('uses explicit availability_due_at date for Due line when present', () => {
     const line = resolveAvailabilityDueSupportLine(
       { start_date: '2026-04-01', availability_due_at: '2026-04-10T23:59:59.000Z' },
-      false
+      false,
+      '2026-04-07'
     )
     expect(line).toMatch(/^Due /)
   })
 
   it('falls back to day-before-start when availability_due_at is absent', () => {
-    const line = resolveAvailabilityDueSupportLine({ start_date: '2026-04-15' }, false)
+    const line = resolveAvailabilityDueSupportLine(
+      { start_date: '2026-04-15' },
+      false,
+      '2026-04-07'
+    )
     expect(line).toBe('Due Apr 14, 2026')
   })
 
@@ -53,8 +58,18 @@ describe('therapist-availability-submission', () => {
     expect(
       resolveAvailabilityDueSupportLine(
         { start_date: '2026-04-01', availability_due_at: null },
-        true
+        true,
+        '2026-04-07'
       )
     ).toBeNull()
+  })
+
+  it('returns past-due message when due date is in the past', () => {
+    const line = resolveAvailabilityDueSupportLine(
+      { start_date: '2026-03-01' },
+      false,
+      '2026-04-07'
+    )
+    expect(line).toMatch(/Submit as soon as you can/)
   })
 })

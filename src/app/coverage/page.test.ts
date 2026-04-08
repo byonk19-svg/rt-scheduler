@@ -25,7 +25,7 @@ describe('coverage publish override affordance', () => {
   })
 
   it('keeps override flags in publish validation redirects', () => {
-    const filePath = resolve(process.cwd(), 'src/app/schedule/actions.ts')
+    const filePath = resolve(process.cwd(), 'src/app/schedule/actions/publish-actions.ts')
     const source = readFileSync(filePath, 'utf8')
 
     expect(source).toContain("override_weekly_rules: overrideWeeklyRules ? 'true' : undefined")
