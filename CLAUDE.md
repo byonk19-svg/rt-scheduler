@@ -1,6 +1,14 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-07 (session 31)
+Updated: 2026-04-07 (session 32)
+
+## Latest Updates (2026-04-07, session 32)
+
+- **Code quality refactor (commit f173665):**
+  - `resolveAvailabilityDueSupportLine` in `src/lib/therapist-availability-submission.ts` now accepts optional `today?: string` — tests pin the date so assertions never drift with the calendar. Added past-due branch test.
+  - **Auto-draft algorithm extracted:** `generateDraftForCycle` now lives in `src/lib/coverage/generate-draft.ts` as a pure, fully-tested function (`src/lib/coverage/generate-draft.test.ts`). `generateDraftScheduleAction` is now a thin DB loader + saver that calls it.
+  - **`actions.ts` split:** `src/app/schedule/actions.ts` is now a one-line barrel (`export * from './actions/index'`). Logic lives in `src/app/schedule/actions/helpers.ts`, `cycle-actions.ts`, `publish-actions.ts`, `shift-actions.ts`, `draft-actions.ts`, `preliminary-actions.ts`. All 4 external callers unchanged.
+- **Verification:** `npx tsc --noEmit`, `npm run lint`, `npx vitest run` (**420 tests** passing).
 
 ## Latest Updates (2026-04-07, session 31)
 
@@ -687,7 +695,7 @@ All checks currently green:
 - `npm run lint` pass
 - `npm run format:check` pass (whole-repo Prettier; `.claude/**` excluded from ESLint)
 - `npm run build` pass
-- `npm run test:unit` pass (**415 tests**)
+- `npm run test:unit` pass (**420 tests**)
 - `npm run test:e2e` pass (39 passed, 1 skipped)
 
 CI gates: format check â†’ lint â†’ tsc â†’ build â†’ Playwright E2E
@@ -772,7 +780,8 @@ Typography classes:
 ## Tooling Gotchas
 
 - **framer-motion `ease`:** `ease: 'easeOut'` fails `tsc` — the `Easing` type requires specific literals. Omit `ease` entirely to use framer-motion's safe default.
-- **Auto-draft algorithm is not extracted:** The scheduling algorithm lives entirely inline inside `generateDraftScheduleAction` in `src/app/schedule/actions.ts` (~600 lines). There is no `generateSchedule()` lib function. Any dry-run or preview feature requires extracting it first.
+- **Auto-draft algorithm lives in `src/lib/coverage/generate-draft.ts`:** `generateDraftForCycle(input: GenerateDraftInput): GenerateDraftResult` is a pure function. `generateDraftScheduleAction` in `src/app/schedule/actions/draft-actions.ts` is a thin wrapper that loads DB data, calls it, then saves results. Dry-run and preview features can call `generateDraftForCycle` directly without a server action.
+- **`src/app/schedule/actions.ts` is a barrel:** Real logic is in `src/app/schedule/actions/` sub-modules (`helpers.ts`, `cycle-actions.ts`, `publish-actions.ts`, `shift-actions.ts`, `draft-actions.ts`, `preliminary-actions.ts`). Each action file has `'use server'`; `helpers.ts` and `index.ts` do not.
 - **FK column names in schedule tables:** `work_patterns` and `availability_overrides` use `therapist_id` (not `user_id`) as the FK column — match what `generateDraftScheduleAction` uses when writing new queries against those tables.
 - **CalendarGrid has no React import:** `src/components/coverage/CalendarGrid.tsx` uses `'use client'` but has no `import ... from 'react'`. Add hooks as a fresh single import statement — don't look for an existing one to amend.
 - **`@/components/ui/progress` not installed by default:** Run `npx shadcn@latest add progress` before importing the Progress primitive. Not in the original shadcn set for this repo (added session 21).
