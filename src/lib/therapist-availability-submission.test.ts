@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildTherapistSubmissionUiState,
   resolveAvailabilityDueSupportLine,
+  resolveTherapistDeadlinePresentation,
   shouldShowLastEditedAfterSubmit,
 } from '@/lib/therapist-availability-submission'
 
@@ -36,22 +37,22 @@ describe('therapist-availability-submission', () => {
     ).toBe(true)
   })
 
-  it('uses explicit availability_due_at date for Due line when present', () => {
+  it('uses explicit availability_due_at in final-day wording when not imminent', () => {
     const line = resolveAvailabilityDueSupportLine(
       { start_date: '2026-04-01', availability_due_at: '2026-04-10T23:59:59.000Z' },
       false,
-      '2026-04-07'
+      new Date(2026, 3, 7, 12, 0, 0)
     )
-    expect(line).toMatch(/^Due /)
+    expect(line).toMatch(/^Final day to submit: /)
   })
 
   it('falls back to day-before-start when availability_due_at is absent', () => {
     const line = resolveAvailabilityDueSupportLine(
       { start_date: '2026-04-15' },
       false,
-      '2026-04-07'
+      new Date(2026, 3, 7, 12, 0, 0)
     )
-    expect(line).toBe('Due Apr 14, 2026')
+    expect(line).toBe('Final day to submit: Apr 14, 2026')
   })
 
   it('returns null for due line when submitted', () => {
@@ -59,17 +60,67 @@ describe('therapist-availability-submission', () => {
       resolveAvailabilityDueSupportLine(
         { start_date: '2026-04-01', availability_due_at: null },
         true,
-        '2026-04-07'
+        new Date(2026, 3, 7, 12, 0, 0)
       )
     ).toBeNull()
   })
 
-  it('returns past-due message when due date is in the past', () => {
+  it('returns Past due when the soft deadline day has ended', () => {
     const line = resolveAvailabilityDueSupportLine(
       { start_date: '2026-03-01' },
       false,
-      '2026-04-07'
+      new Date(2026, 3, 7, 12, 0, 0)
     )
-    expect(line).toMatch(/Submit as soon as you can/)
+    expect(line).toBe('Past due')
+  })
+
+  it('returns Due tomorrow when the deadline is the next calendar day', () => {
+    const line = resolveAvailabilityDueSupportLine(
+      { start_date: '2026-04-15', availability_due_at: '2026-04-10T23:59:59.000Z' },
+      false,
+      new Date(2026, 3, 9, 12, 0, 0)
+    )
+    expect(line).toBe('Due tomorrow')
+  })
+
+  it('returns Due today when the deadline is today', () => {
+    const line = resolveAvailabilityDueSupportLine(
+      { start_date: '2026-04-15', availability_due_at: '2026-04-10T23:59:59.000Z' },
+      false,
+      new Date(2026, 3, 10, 10, 0, 0)
+    )
+    expect(line).toBe('Due today')
+  })
+
+  it('treats explicit deadline as past only after the instant has passed', () => {
+    const before = resolveAvailabilityDueSupportLine(
+      { start_date: '2026-04-01', availability_due_at: '2026-04-10T18:00:00.000Z' },
+      false,
+      new Date('2026-04-10T17:59:59.000Z')
+    )
+    const after = resolveAvailabilityDueSupportLine(
+      { start_date: '2026-04-01', availability_due_at: '2026-04-10T18:00:00.000Z' },
+      false,
+      new Date('2026-04-10T18:00:01.000Z')
+    )
+    expect(before).not.toBe('Past due')
+    expect(after).toBe('Past due')
+  })
+
+  it('includes submitted lines and final deadline context when submitted', () => {
+    const ui = buildTherapistSubmissionUiState({
+      schedule_cycle_id: 'c1',
+      submitted_at: '2026-04-08T15:40:00.000Z',
+      last_edited_at: '2026-04-08T15:40:00.000Z',
+    })
+    const pres = resolveTherapistDeadlinePresentation(
+      { start_date: '2026-04-15', availability_due_at: '2026-04-10T12:00:00.000Z' },
+      ui,
+      new Date(2026, 3, 12, 12, 0, 0)
+    )
+    expect(pres.deadlineHeadline).toBeNull()
+    expect(pres.submittedPrimaryLine).toMatch(/Apr/)
+    expect(pres.submittedDeadlineContextLine).toMatch(/^Final deadline was /)
+    expect(pres.emphasis).toBe('submitted')
   })
 })

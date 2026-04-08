@@ -57,7 +57,7 @@ const STAFF_NAV_ITEMS: readonly NavItem[] = [
     icon: CalendarRange,
     isActive: (pathname) => pathname === '/preliminary',
   },
-  { href: '/therapist/availability', label: 'Future Availability', icon: CalendarRange },
+  { href: '/therapist/availability', label: 'Availability', icon: CalendarRange },
   { href: '/shift-board', label: 'Open shifts', icon: ArrowLeftRight },
   { href: '/notifications', label: 'Notifications', icon: Bell },
 ]

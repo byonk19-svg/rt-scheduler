@@ -8,13 +8,11 @@ import {
   deleteAvailabilityEntryAction,
   submitTherapistAvailabilityGridAction,
 } from '@/app/availability/actions'
-import { AvailabilityOverviewHeader } from '@/components/availability/AvailabilityOverviewHeader'
 import { TherapistAvailabilityWorkspace } from '@/components/availability/TherapistAvailabilityWorkspace'
 import type { TableToolbarFilters } from '@/components/TableToolbar'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { can } from '@/lib/auth/can'
 import { toUiRole } from '@/lib/auth/roles'
-import { formatDateLabel, formatHumanCycleRange } from '@/lib/calendar-utils'
 import { createClient } from '@/lib/supabase/server'
 
 type ToastVariant = 'success' | 'error'
@@ -37,15 +35,6 @@ type Cycle = {
   published: boolean
   archived_at?: string | null
   availability_due_at?: string | null
-}
-
-function therapistCycleSubtitle(cycle: Cycle | null): string {
-  if (!cycle) return 'No upcoming cycle selected'
-  const range = `Cycle: ${formatHumanCycleRange(cycle.start_date, cycle.end_date)}`
-  if (cycle.published) {
-    return `${range} · Published ${formatDateLabel(cycle.start_date)}`
-  }
-  return range
 }
 
 type AvailabilityRow = {
@@ -241,44 +230,9 @@ export default async function TherapistAvailabilityPage({
     }
   })
 
-  const totalRequests = availabilityRows.length
-  const needOffRequests = availabilityRows.filter((row) => row.entryType === 'force_off').length
-  const requestToWorkRequests = availabilityRows.filter(
-    (row) => row.entryType === 'force_on'
-  ).length
-  const totalCycleDays = selectedCycle
-    ? Math.floor(
-        (new Date(`${selectedCycle.end_date}T00:00:00`).getTime() -
-          new Date(`${selectedCycle.start_date}T00:00:00`).getTime()) /
-          (24 * 60 * 60 * 1000)
-      ) + 1
-    : 0
-  const availableDays = Math.max(totalCycleDays - needOffRequests - requestToWorkRequests, 0)
-
   return (
     <div className="space-y-7">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
-
-      <AvailabilityOverviewHeader
-        canManageAvailability={false}
-        title="Availability for This Cycle"
-        subtitle={therapistCycleSubtitle(selectedCycle)}
-        totalRequests={totalRequests}
-        needOffRequests={needOffRequests}
-        availableToWorkRequests={requestToWorkRequests}
-        responseRatio={null}
-        summaryContent={
-          <>
-            <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 font-medium text-foreground">
-              {totalCycleDays} days selected
-            </span>
-            <span className="text-muted-foreground">
-              Availability summary: {availableDays} available · {needOffRequests} need off ·{' '}
-              {requestToWorkRequests} request to work
-            </span>
-          </>
-        }
-      />
 
       <TherapistAvailabilityWorkspace
         cycles={cycles}

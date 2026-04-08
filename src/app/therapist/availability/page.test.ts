@@ -20,15 +20,18 @@ describe('therapist availability route', () => {
   })
 
   it('uses cycle-specific, human-readable therapist copy', () => {
-    const filePath = resolve(process.cwd(), 'src/app/therapist/availability/page.tsx')
-    const source = readFileSync(filePath, 'utf8')
+    const pagePath = resolve(process.cwd(), 'src/app/therapist/availability/page.tsx')
+    const workspacePath = resolve(
+      process.cwd(),
+      'src/components/availability/TherapistAvailabilityWorkspace.tsx'
+    )
+    const pageSource = readFileSync(pagePath, 'utf8')
+    const workspaceSource = readFileSync(workspacePath, 'utf8')
 
-    expect(source).toContain('Availability for This Cycle')
-    expect(source).toContain('Submitted Availability')
-    expect(source).toContain('No day-level entries yet for this cycle.')
-    expect(source).toContain('days selected')
-    expect(source).toContain('formatHumanCycleRange')
-    expect(source).toContain('Availability summary:')
-    expect(source).toContain('therapist_availability_submissions')
+    expect(workspaceSource).toContain('Availability for This Cycle')
+    expect(pageSource).toContain('Submitted Availability')
+    expect(pageSource).toContain('No day-level entries yet for this cycle.')
+    expect(pageSource).not.toContain('days selected')
+    expect(pageSource).toContain('therapist_availability_submissions')
   })
 })

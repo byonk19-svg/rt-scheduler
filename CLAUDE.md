@@ -1,6 +1,15 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-07 (session 34)
+Updated: 2026-04-08 (session 35)
+
+## Latest Updates (2026-04-08, session 35)
+
+- **Therapist `/therapist/availability` — deadline + hierarchy polish** (`TherapistAvailabilityWorkspace.tsx`, `therapist-availability-submission.ts`):
+  - **Deadlines:** `resolveTherapistDeadlinePresentation()` drives header copy: **Final day to submit: [date]**, **Due today** / **Due tomorrow**, **Past due** (only after the real deadline instant for `availability_due_at`, or after **end of local calendar day** for the inferred day-before-start fallback). Submitted state shows timestamp + **Final deadline was [date]**.
+  - **Layout:** Single page title block (no duplicate `AvailabilityOverviewHeader` on therapist route); compact **Submitted Availability** empty state (`availability-requests-table.tsx`); **Save progress** / **Submit availability** / **Save changes** only at **bottom** of the form (no sticky top action bar).
+  - **Nav/copy:** Staff sidebar **Future Availability** → **Availability** (`AppShell.tsx`); non-manager **`/availability`** page title **Availability**; tightened helper lines; cycle dropdown label **Cycle** (lighter).
+  - **Calendar:** Default **Available** tiles visually quieter; **Need Off** / **Request to Work** stronger (ring/shadow).
+- **Verification:** `npx tsc --noEmit`, `npm run lint` (touched files), `npx vitest run` (**424 tests** passing).
 
 ## Latest Updates (2026-04-07, session 34)
 
@@ -719,7 +728,7 @@ All checks currently green:
 - `npm run lint` pass
 - `npm run format:check` pass (whole-repo Prettier; `.claude/**` excluded from ESLint)
 - `npm run build` pass
-- `npm run test:unit` pass (**420 tests**)
+- `npm run test:unit` pass (**424 tests**)
 - `npm run test:e2e` pass (39 passed, 1 skipped)
 
 CI gates: format check â†’ lint â†’ tsc â†’ build â†’ Playwright E2E

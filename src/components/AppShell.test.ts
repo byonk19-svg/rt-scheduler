@@ -40,9 +40,7 @@ describe('AppShell sidebar styling', () => {
   })
 
   it('routes staff future availability navigation to the therapist availability page', () => {
-    expect(appShellSource).toContain(
-      "href: '/therapist/availability', label: 'Future Availability'"
-    )
+    expect(appShellSource).toContain("href: '/therapist/availability', label: 'Availability'")
   })
 
   it('uses Open shifts wording in staff shell navigation', () => {

@@ -138,6 +138,19 @@ export function AvailabilityEntriesTable({
 
   const emptyColSpan = canManageAvailability ? 5 : 4
 
+  if (!canManageAvailability && rows.length === 0) {
+    return (
+      <section className="rounded-2xl border border-border/80 bg-card px-5 py-4 shadow-[0_1px_0_rgba(15,23,42,0.04)]">
+        <h2 className="text-base font-semibold tracking-tight text-foreground">
+          {titleOverride ?? 'Submitted Availability'}
+        </h2>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          {emptyMessageOverride ?? 'No day-level entries yet for this cycle.'}
+        </p>
+      </section>
+    )
+  }
+
   return (
     <Card className="overflow-hidden rounded-[1.75rem] border border-slate-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.08)]">
       <CardHeader className="border-b border-slate-200/80 pb-4">

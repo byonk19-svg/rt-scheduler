@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { addDays, formatDateLabel, formatHumanCycleRange, toIsoDate } from '@/lib/calendar-utils'
 import {
   buildTherapistSubmissionUiState,
-  resolveAvailabilityDueSupportLine,
+  resolveTherapistDeadlinePresentation,
 } from '@/lib/therapist-availability-submission'
 import { cn } from '@/lib/utils'
 
@@ -163,9 +163,7 @@ export function TherapistAvailabilityWorkspace({
   }, [cycleDays, draftStatusByDate, selectedCycle])
 
   const requestToWorkCount = canWorkDates.length
-  const totalDaysSelected = cycleDays.length
 
-  const serverHasOverrides = cycleRows.length > 0
   const serverSubmission = submissionsByCycleId[selectedCycleId]
   const submissionUi = useMemo(
     () =>
@@ -181,16 +179,16 @@ export function TherapistAvailabilityWorkspace({
     [selectedCycleId, serverSubmission]
   )
 
-  const dueLine = useMemo(() => {
-    if (!selectedCycle || submissionUi.isSubmitted) return null
-    return resolveAvailabilityDueSupportLine(
+  const deadlinePresentation = useMemo(() => {
+    if (!selectedCycle) return null
+    return resolveTherapistDeadlinePresentation(
       {
         start_date: selectedCycle.start_date,
         availability_due_at: selectedCycle.availability_due_at ?? null,
       },
-      submissionUi.isSubmitted
+      submissionUi
     )
-  }, [selectedCycle, submissionUi.isSubmitted])
+  }, [selectedCycle, submissionUi])
 
   const hasUnsavedChanges = useMemo(() => {
     const allDates = new Set([
@@ -216,35 +214,57 @@ export function TherapistAvailabilityWorkspace({
 
   const submissionPrimaryLabel = submissionUi.isSubmitted ? 'Submitted' : 'Not submitted'
 
-  const submissionDetailLabel = (() => {
-    if (submissionUi.isSubmitted) {
-      const parts: string[] = []
-      if (submissionUi.submittedAtDisplay) {
-        parts.push(`Submitted ${submissionUi.submittedAtDisplay}`)
-      }
-      if (submissionUi.lastEditedDisplay) {
-        parts.push(`Last edited ${submissionUi.lastEditedDisplay}`)
-      }
-      if (hasUnsavedChanges) {
-        parts.push('You have unsaved changes — save to update your submitted availability.')
-      }
-      return parts.join(' · ') || 'Your availability is officially submitted for this cycle.'
+  const cyclePageSubtitle = useMemo(() => {
+    if (!selectedCycle) return 'Select a cycle to enter availability.'
+    const range = `Cycle: ${formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)}`
+    if (selectedCycle.published) {
+      return `${range} · Published ${formatDateLabel(selectedCycle.start_date)}`
     }
-    if (hasUnsavedChanges) {
-      return 'You have unsaved changes. Use Save progress or Submit availability.'
-    }
-    if (serverHasOverrides) {
-      return [
-        'Selections saved — submit availability when you want it to count as official.',
-        dueLine,
-      ]
-        .filter(Boolean)
-        .join(' ')
-    }
-    return [dueLine, 'Choose your days for this cycle, then submit when ready.']
-      .filter(Boolean)
-      .join(' ')
-  })()
+    return range
+  }, [selectedCycle])
+
+  const actionButtons = (
+    <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
+      {!submissionUi.isSubmitted ? (
+        <>
+          <FormSubmitButton
+            type="submit"
+            name="workflow"
+            value="draft"
+            variant="outline"
+            size="sm"
+            pendingText="Saving…"
+            className="h-10 shrink-0 px-4 font-semibold sm:min-w-[8.5rem]"
+          >
+            Save progress
+          </FormSubmitButton>
+          <FormSubmitButton
+            type="submit"
+            name="workflow"
+            value="submit"
+            size="sm"
+            pendingText="Saving…"
+            className="h-10 shrink-0 gap-2 px-5 font-semibold shadow-sm sm:min-w-[10.5rem]"
+          >
+            <Send className="h-3.5 w-3.5" aria-hidden />
+            Submit availability
+          </FormSubmitButton>
+        </>
+      ) : (
+        <FormSubmitButton
+          type="submit"
+          name="workflow"
+          value="submit"
+          size="sm"
+          pendingText="Saving…"
+          className="h-10 shrink-0 gap-2 px-5 font-semibold shadow-sm"
+        >
+          <Send className="h-3.5 w-3.5" aria-hidden />
+          Save changes
+        </FormSubmitButton>
+      )}
+    </div>
+  )
 
   function toggleDate(date: string) {
     if (!selectedCycle) return
@@ -275,22 +295,80 @@ export function TherapistAvailabilityWorkspace({
 
   if (cycles.length === 0) {
     return (
-      <section
-        id="therapist-availability-workspace"
-        className="rounded-2xl border border-border bg-card px-6 py-5 shadow-[0_1px_0_rgba(15,23,42,0.04)]"
-      >
-        <h2 className="text-lg font-semibold tracking-tight text-foreground">
-          Submit Availability
-        </h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          No upcoming cycle is open for availability yet.
-        </p>
+      <section id="therapist-availability-workspace" className="space-y-3">
+        <header className="border-b border-border/70 pb-4">
+          <h1 className="font-heading text-[1.4rem] font-semibold leading-tight tracking-tight text-foreground">
+            Availability for This Cycle
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            No upcoming cycle is open for availability yet.
+          </p>
+        </header>
       </section>
     )
   }
 
   return (
-    <section id="therapist-availability-workspace" className="space-y-4">
+    <section id="therapist-availability-workspace" className="space-y-5">
+      <header className="border-b border-border/70 pb-4">
+        <h1 className="font-heading text-[1.4rem] font-semibold leading-tight tracking-tight text-foreground">
+          Availability for This Cycle
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">{cyclePageSubtitle}</p>
+        {deadlinePresentation ? (
+          <div className="mt-3 space-y-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-2">
+              <span
+                className={cn(
+                  'w-fit shrink-0 rounded-full border px-3 py-1 text-[11px] font-semibold',
+                  submissionUi.isSubmitted
+                    ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
+                    : 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+                )}
+              >
+                {submissionPrimaryLabel}
+              </span>
+              {!submissionUi.isSubmitted && deadlinePresentation.deadlineHeadline ? (
+                <p
+                  className={cn(
+                    'min-w-0 text-base font-semibold leading-snug tracking-tight',
+                    deadlinePresentation.emphasis === 'past' && 'text-[var(--error-text)]',
+                    deadlinePresentation.emphasis === 'urgent' && 'text-[var(--warning-text)]',
+                    deadlinePresentation.emphasis === 'neutral' && 'text-foreground'
+                  )}
+                >
+                  {deadlinePresentation.deadlineHeadline}
+                </p>
+              ) : null}
+              {submissionUi.isSubmitted && deadlinePresentation.submittedPrimaryLine ? (
+                <p className="min-w-0 text-base font-semibold leading-snug text-foreground">
+                  {deadlinePresentation.submittedPrimaryLine}
+                </p>
+              ) : null}
+            </div>
+            {submissionUi.isSubmitted && deadlinePresentation.submittedDeadlineContextLine ? (
+              <p className="text-sm font-medium text-muted-foreground">
+                {deadlinePresentation.submittedDeadlineContextLine}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        {submissionUi.isSubmitted && hasUnsavedChanges ? (
+          <p className="mt-2 text-xs font-medium text-[var(--warning-text)]">
+            You have unsaved changes — save to update your submitted availability.
+          </p>
+        ) : null}
+        {!submissionUi.isSubmitted && hasUnsavedChanges ? (
+          <p className="mt-2 text-xs font-medium text-[var(--warning-text)]">
+            You have unsaved changes. Save progress or submit availability.
+          </p>
+        ) : null}
+        <p className="mt-2 text-xs tabular-nums text-muted-foreground">
+          Availability summary: {availableCount} available · {cannotWorkDates.length} need off ·{' '}
+          {requestToWorkCount} request to work
+        </p>
+      </header>
+
       <form
         action={submitTherapistAvailabilityGridAction}
         className="overflow-hidden rounded-[20px] border border-border/80 bg-card shadow-[0_1px_0_rgba(15,23,42,0.03)]"
@@ -305,164 +383,46 @@ export function TherapistAvailabilityWorkspace({
           <input key={`cannot-${date}`} type="hidden" name="cannot_work_dates" value={date} />
         ))}
 
-        <div className="flex flex-col gap-5 border-b border-border/80 px-5 py-5 sm:px-6 sm:py-6 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0 space-y-3">
-            <h2 className="app-page-title text-foreground">Submit Availability</h2>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              {selectedCycle ? (
-                <>
-                  <span className="font-medium text-foreground">Cycle:</span>{' '}
-                  <span className="text-foreground">
-                    {formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)}
-                  </span>
-                  {selectedCycle.published ? (
-                    <>
-                      <br />
-                      <span className="text-xs text-muted-foreground">
-                        Published {formatDateLabel(selectedCycle.start_date)}
-                      </span>
-                    </>
-                  ) : null}
-                </>
-              ) : (
-                'Select a cycle to enter availability.'
-              )}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <span
-                className={cn(
-                  'rounded-full border px-3 py-1 text-[11px] font-semibold',
-                  submissionUi.isSubmitted
-                    ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
-                    : 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
-                )}
-              >
-                {submissionPrimaryLabel}
-              </span>
-              <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 text-[11px] text-muted-foreground">
-                {submissionDetailLabel}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end lg:w-auto lg:shrink-0">
-            <div className="w-full max-w-[15rem] space-y-1.5 sm:max-w-[17.5rem]">
-              <Label
-                htmlFor="therapist_cycle_id"
-                className="text-[0.65rem] font-bold uppercase tracking-[0.1em] text-muted-foreground"
-              >
-                Schedule cycle
-              </Label>
-              <select
-                id="therapist_cycle_id"
-                title={
-                  selectedCycle
-                    ? `${selectedCycle.label} · ${formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)}`
-                    : undefined
-                }
-                className="h-10 w-full max-w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                value={selectedCycleId}
-                onChange={(event) => handleCycleChange(event.target.value)}
-              >
-                {cycles.map((cycle) => (
-                  <option key={cycle.id} value={cycle.id}>
-                    {formatHumanCycleRange(cycle.start_date, cycle.end_date)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end sm:self-end">
-              {!submissionUi.isSubmitted ? (
-                <>
-                  <FormSubmitButton
-                    type="submit"
-                    name="workflow"
-                    value="draft"
-                    variant="outline"
-                    size="sm"
-                    pendingText="Saving…"
-                    className="h-10 shrink-0 px-4 font-semibold sm:min-w-[8.5rem]"
-                  >
-                    Save progress
-                  </FormSubmitButton>
-                  <FormSubmitButton
-                    type="submit"
-                    name="workflow"
-                    value="submit"
-                    size="sm"
-                    pendingText="Saving…"
-                    className="h-10 shrink-0 gap-2 px-5 font-semibold shadow-sm sm:min-w-[10.5rem]"
-                  >
-                    <Send className="h-3.5 w-3.5" aria-hidden />
-                    Submit availability
-                  </FormSubmitButton>
-                </>
-              ) : (
-                <FormSubmitButton
-                  type="submit"
-                  name="workflow"
-                  value="submit"
-                  size="sm"
-                  pendingText="Saving…"
-                  className="h-10 shrink-0 gap-2 px-5 font-semibold shadow-sm sm:self-end"
-                >
-                  <Send className="h-3.5 w-3.5" aria-hidden />
-                  Save changes
-                </FormSubmitButton>
-              )}
-            </div>
+        <div className="flex flex-col gap-2 border-b border-border/80 px-5 py-3 sm:px-6">
+          <div className="w-full max-w-[15rem] space-y-1 sm:max-w-[17.5rem]">
+            <Label
+              htmlFor="therapist_cycle_id"
+              className="text-[0.6rem] font-medium uppercase tracking-[0.08em] text-muted-foreground/75"
+            >
+              Cycle
+            </Label>
+            <select
+              id="therapist_cycle_id"
+              title={
+                selectedCycle
+                  ? `${selectedCycle.label} · ${formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)}`
+                  : undefined
+              }
+              className="h-10 w-full max-w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              value={selectedCycleId}
+              onChange={(event) => handleCycleChange(event.target.value)}
+            >
+              {cycles.map((cycle) => (
+                <option key={cycle.id} value={cycle.id}>
+                  {formatHumanCycleRange(cycle.start_date, cycle.end_date)}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
-        <div className="border-b border-border/60 bg-muted/15 px-5 py-3 sm:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <p className="font-medium text-foreground">{totalDaysSelected} days selected</p>
-            <p className="tabular-nums">
-              Availability summary:{' '}
-              <span className="font-semibold text-foreground">{availableCount}</span> available ·{' '}
-              <span className="font-semibold text-foreground">{cannotWorkDates.length}</span> need
-              off · <span className="font-semibold text-foreground">{requestToWorkCount}</span>{' '}
-              request to work
-            </p>
-          </div>
-        </div>
-
-        <div className="border-b border-[var(--info-border)] bg-[var(--info-subtle)] px-5 py-3 sm:px-6 space-y-2">
+        <div className="border-b border-[var(--info-border)] bg-[var(--info-subtle)] px-5 py-2 sm:px-6">
           <p className="text-xs font-medium leading-snug text-[var(--info-text)]">
             Tap a day to switch between Available, Need Off, and Request to Work. Add an optional
-            note for more detail.
+            note if needed.
           </p>
-          <ul className="list-inside list-disc text-[11px] leading-snug text-[var(--info-text)]/95">
-            <li>Available = I can work this day</li>
-            <li>Need Off = I am requesting this day off</li>
-            <li>Request to Work = I would like to be considered (not guaranteed)</li>
-          </ul>
+          <p className="mt-1 text-[11px] leading-snug text-[var(--info-text)]/95">
+            Available = I can work · Need Off = I&apos;m requesting the day off · Request to Work =
+            Please consider me for a shift (not guaranteed)
+          </p>
         </div>
 
-        <div className="border-b border-border/70 bg-card px-5 py-4 sm:px-6">
-          <div className="grid gap-2 md:grid-cols-3">
-            <div className="rounded-2xl border border-border/80 bg-muted/10 px-3 py-3">
-              <p className="text-sm font-semibold text-foreground">Available</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                I can work this day.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-[var(--error-border)] bg-[var(--error-subtle)]/50 px-3 py-3">
-              <p className="text-sm font-semibold text-[var(--error-text)]">Need Off</p>
-              <p className="mt-1 text-xs leading-relaxed text-[var(--error-text)]/80">
-                I am requesting this day off.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-[var(--info-border)] bg-[var(--info-subtle)]/60 px-3 py-3">
-              <p className="text-sm font-semibold text-[var(--info-text)]">Request to Work</p>
-              <p className="mt-1 text-xs leading-relaxed text-[var(--info-text)]/80">
-                I would like to be considered for a shift on this day.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-5 px-5 py-6 sm:px-6 sm:py-7">
+        <div className="space-y-5 px-5 py-5 sm:px-6 sm:py-6">
           <div className="grid grid-cols-7 gap-3 border-y border-border/80 py-2.5">
             {DOW.map((dow) => (
               <p
@@ -497,11 +457,11 @@ export function TherapistAvailabilityWorkspace({
                         'flex min-h-[5.75rem] flex-col items-center justify-center rounded-[20px] border px-1 py-2 text-center shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-[border-color,box-shadow,transform,background-color] duration-200',
                         'hover:-translate-y-px focus-visible:border-ring focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
                         status === 'none' &&
-                          'border-border/80 bg-card text-foreground hover:border-primary/25 hover:shadow-[0_14px_28px_-22px_rgba(15,23,42,0.35)]',
+                          'border-border/25 bg-muted/10 text-muted-foreground/85 shadow-none hover:border-primary/15 hover:bg-muted/18',
                         status === 'force_off' &&
-                          'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)] shadow-[0_1px_0_rgba(15,23,42,0.02)]',
+                          'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)] shadow-[0_2px_8px_-4px_rgba(15,23,42,0.2)] ring-1 ring-[var(--error-border)]/35',
                         status === 'force_on' &&
-                          'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)] shadow-[0_1px_0_rgba(15,23,42,0.02)]'
+                          'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)] shadow-[0_2px_8px_-4px_rgba(15,23,42,0.18)] ring-1 ring-[var(--info-border)]/40'
                       )}
                       aria-label={`${formatDateLabel(date)}: ${
                         status === 'none'
@@ -515,7 +475,7 @@ export function TherapistAvailabilityWorkspace({
                         <span
                           className={cn(
                             'mb-0.5 text-[0.58rem] font-semibold uppercase tracking-[0.12em]',
-                            status === 'none' && 'text-muted-foreground',
+                            status === 'none' && 'text-muted-foreground/65',
                             status === 'force_on' && 'text-[var(--info-text)]/90',
                             status === 'force_off' && 'text-[var(--error-text)]/90'
                           )}
@@ -525,10 +485,24 @@ export function TherapistAvailabilityWorkspace({
                       ) : (
                         <span className="mb-0.5 h-[0.58rem]" aria-hidden />
                       )}
-                      <span className="text-[1.2rem] font-bold leading-none tracking-[-0.03em]">
+                      <span
+                        className={cn(
+                          'text-[1.2rem] leading-none tracking-[-0.03em]',
+                          status === 'none'
+                            ? 'font-medium text-muted-foreground/75'
+                            : 'font-bold text-foreground'
+                        )}
+                      >
                         {new Date(`${date}T00:00:00`).getDate()}
                       </span>
-                      <span className="mt-1.5 block max-w-full px-0.5 text-[0.62rem] font-semibold leading-snug">
+                      <span
+                        className={cn(
+                          'mt-1.5 block max-w-full px-0.5 text-[0.62rem] leading-snug',
+                          status === 'none' && 'font-medium text-muted-foreground/75',
+                          status === 'force_off' && 'font-semibold',
+                          status === 'force_on' && 'font-semibold'
+                        )}
+                      >
                         {status === 'none'
                           ? 'Available'
                           : status === 'force_off'
@@ -541,6 +515,10 @@ export function TherapistAvailabilityWorkspace({
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-border/70 bg-muted/10 px-5 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6">
+          {actionButtons}
         </div>
 
         <div className="border-t border-border/70 px-5 py-5 sm:px-6">

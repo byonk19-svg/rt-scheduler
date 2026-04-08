@@ -56,30 +56,138 @@ export function buildTherapistSubmissionUiState(
   }
 }
 
+function localDateKey(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function daysBetweenDateKeys(fromKey: string, toKey: string): number {
+  const from = dateFromKey(fromKey)
+  const to = dateFromKey(toKey)
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return 0
+  return Math.round((to.getTime() - from.getTime()) / 86400000)
+}
+
+function endOfLocalDay(dateKey: string): Date {
+  const d = dateFromKey(dateKey)
+  d.setHours(23, 59, 59, 999)
+  return d
+}
+
+export type TherapistDeadlineEmphasis = 'neutral' | 'urgent' | 'past' | 'submitted'
+
+export type TherapistDeadlinePresentation = {
+  /** Not submitted: prominent deadline message. Submitted: null. */
+  deadlineHeadline: string | null
+  /** Submitted: primary status line with timestamp(s). */
+  submittedPrimaryLine: string | null
+  /** Submitted: optional context about the cycle deadline date. */
+  submittedDeadlineContextLine: string | null
+  emphasis: TherapistDeadlineEmphasis
+}
+
+function resolveNotSubmittedHeadline(
+  cycle: TherapistAvailabilityCycleDeadlineInput,
+  now: Date
+): { headline: string; emphasis: TherapistDeadlineEmphasis } {
+  const todayKey = localDateKey(now)
+
+  let deadlineDateKey: string
+  let deadlineInstant: Date
+
+  if (cycle.availability_due_at) {
+    const raw = cycle.availability_due_at
+    const parsed = new Date(raw)
+    if (!Number.isNaN(parsed.getTime())) {
+      deadlineInstant = parsed
+      deadlineDateKey = localDateKey(parsed)
+    } else {
+      const fallbackKey =
+        raw.length >= 10 ? raw.slice(0, 10) : toIsoDate(addDays(dateFromKey(cycle.start_date), -1))
+      deadlineDateKey =
+        fallbackKey.length === 10 ? fallbackKey : toIsoDate(dateFromKey(cycle.start_date))
+      deadlineInstant = endOfLocalDay(deadlineDateKey)
+    }
+  } else {
+    deadlineDateKey = toIsoDate(addDays(dateFromKey(cycle.start_date), -1))
+    deadlineInstant = endOfLocalDay(deadlineDateKey)
+  }
+
+  const isPast = now.getTime() > deadlineInstant.getTime()
+
+  if (isPast) {
+    return { headline: 'Past due', emphasis: 'past' }
+  }
+
+  const dayDiff = daysBetweenDateKeys(todayKey, deadlineDateKey)
+  if (dayDiff === 0) {
+    return { headline: 'Due today', emphasis: 'urgent' }
+  }
+  if (dayDiff === 1) {
+    return { headline: 'Due tomorrow', emphasis: 'urgent' }
+  }
+  return {
+    headline: `Final day to submit: ${formatDateLabel(deadlineDateKey)}`,
+    emphasis: 'neutral',
+  }
+}
+
 /**
- * Due line for staff dashboard + availability header when availability is not officially submitted.
- * Uses explicit cycle.availability_due_at when set; otherwise day-before-cycle-start (legacy).
+ * Therapist availability page: deadline + submission lines with correct instant-based past logic.
+ */
+export function resolveTherapistDeadlinePresentation(
+  cycle: TherapistAvailabilityCycleDeadlineInput,
+  submission: TherapistSubmissionUiState,
+  now?: Date
+): TherapistDeadlinePresentation {
+  const clock = now ?? new Date()
+
+  let deadlineDateKeyForContext: string
+  if (cycle.availability_due_at) {
+    const parsed = new Date(cycle.availability_due_at)
+    deadlineDateKeyForContext = Number.isNaN(parsed.getTime())
+      ? toIsoDate(addDays(dateFromKey(cycle.start_date), -1))
+      : localDateKey(parsed)
+  } else {
+    deadlineDateKeyForContext = toIsoDate(addDays(dateFromKey(cycle.start_date), -1))
+  }
+
+  if (!submission.isSubmitted) {
+    const { headline, emphasis } = resolveNotSubmittedHeadline(cycle, clock)
+    return {
+      deadlineHeadline: headline,
+      submittedPrimaryLine: null,
+      submittedDeadlineContextLine: null,
+      emphasis,
+    }
+  }
+
+  const primaryParts: string[] = []
+  if (submission.submittedAtDisplay) primaryParts.push(submission.submittedAtDisplay)
+  if (submission.lastEditedDisplay) {
+    primaryParts.push(`Last edited ${submission.lastEditedDisplay}`)
+  }
+
+  return {
+    deadlineHeadline: null,
+    submittedPrimaryLine: primaryParts.length > 0 ? primaryParts.join(' · ') : null,
+    submittedDeadlineContextLine: `Final deadline was ${formatDateLabel(deadlineDateKeyForContext)}`,
+    emphasis: 'submitted',
+  }
+}
+
+/**
+ * Short due line for staff dashboard when availability is not officially submitted.
+ * Uses the same deadline rules as the therapist availability page.
  */
 export function resolveAvailabilityDueSupportLine(
   cycle: TherapistAvailabilityCycleDeadlineInput,
   submitted: boolean,
-  today?: string
+  now?: Date
 ): string | null {
   if (submitted) return null
-  const todayKey = today ?? new Date().toISOString().slice(0, 10)
-
-  if (cycle.availability_due_at) {
-    const raw = cycle.availability_due_at
-    const dueDateKey = raw.length >= 10 ? raw.slice(0, 10) : raw
-    if (dueDateKey.length === 10 && dueDateKey < todayKey) {
-      return 'Submit as soon as you can—your manager is still building this block.'
-    }
-    return `Due ${formatDateLabel(dueDateKey)}`
-  }
-
-  const preferredBy = toIsoDate(addDays(dateFromKey(cycle.start_date), -1))
-  if (preferredBy < todayKey) {
-    return 'Submit as soon as you can—your manager is still building this block.'
-  }
-  return `Due ${formatDateLabel(preferredBy)}`
+  const clock = now ?? new Date()
+  return resolveNotSubmittedHeadline(cycle, clock).headline
 }
