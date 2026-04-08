@@ -47,7 +47,7 @@ const STAFF_NAV_ITEMS: readonly NavItem[] = [
   { href: '/dashboard/staff', label: 'Dashboard', icon: LayoutDashboard },
   {
     href: '/coverage?view=week',
-    label: 'My Schedule',
+    label: 'Schedule',
     icon: CalendarDays,
     isActive: (pathname) => pathname === '/coverage',
   },

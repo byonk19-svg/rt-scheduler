@@ -345,8 +345,8 @@ export function TherapistAvailabilityWorkspace({
             </div>
           </div>
 
-          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-end lg:w-auto lg:min-w-[280px] lg:max-w-sm">
-            <div className="w-full flex-1 space-y-1.5">
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end lg:w-auto lg:shrink-0">
+            <div className="w-full max-w-[15rem] space-y-1.5 sm:max-w-[17.5rem]">
               <Label
                 htmlFor="therapist_cycle_id"
                 className="text-[0.65rem] font-bold uppercase tracking-[0.1em] text-muted-foreground"
@@ -355,18 +355,23 @@ export function TherapistAvailabilityWorkspace({
               </Label>
               <select
                 id="therapist_cycle_id"
-                className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                title={
+                  selectedCycle
+                    ? `${selectedCycle.label} · ${formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)}`
+                    : undefined
+                }
+                className="h-10 w-full max-w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 value={selectedCycleId}
                 onChange={(event) => handleCycleChange(event.target.value)}
               >
                 {cycles.map((cycle) => (
                   <option key={cycle.id} value={cycle.id}>
-                    {cycle.label} ({cycle.start_date} to {cycle.end_date})
+                    {formatHumanCycleRange(cycle.start_date, cycle.end_date)}
                   </option>
                 ))}
               </select>
             </div>
-            <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-end sm:self-end">
+            <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end sm:self-end">
               {!submissionUi.isSubmitted ? (
                 <>
                   <FormSubmitButton

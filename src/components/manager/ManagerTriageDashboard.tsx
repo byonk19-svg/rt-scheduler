@@ -42,6 +42,8 @@ type ManagerTriageDashboardProps = {
   approvalsHref: string
   scheduleHref: string
   reviewHref: string
+  currentCycleCtaHref?: string
+  nextCycleCtaHref?: string
 }
 
 export function ManagerTriageDashboard({
@@ -66,6 +68,8 @@ export function ManagerTriageDashboard({
   approvalsHref,
   scheduleHref,
   reviewHref,
+  currentCycleCtaHref,
+  nextCycleCtaHref,
 }: ManagerTriageDashboardProps) {
   const isLoading =
     todayCoverageCovered === '--' ||
@@ -241,8 +245,16 @@ export function ManagerTriageDashboard({
                 label="Current cycle"
                 value={currentCycleStatus}
                 detail={currentCycleDetail}
+                ctaHref={currentCycleCtaHref}
+                ctaLabel="New 6-week block"
               />
-              <InboxRow label="Next 6-week cycle" value={nextCycleLabel} detail={nextCycleDetail} />
+              <InboxRow
+                label="Next 6-week cycle"
+                value={nextCycleLabel}
+                detail={nextCycleDetail}
+                ctaHref={nextCycleCtaHref}
+                ctaLabel="Plan next cycle"
+              />
               <InboxRow
                 label="Needs review"
                 value={needsReviewCount === '--' ? '--' : String(needsReviewCount)}
@@ -406,7 +418,19 @@ function MetricCard({
   )
 }
 
-function InboxRow({ label, value, detail }: { label: string; value: string; detail: string }) {
+function InboxRow({
+  label,
+  value,
+  detail,
+  ctaHref,
+  ctaLabel,
+}: {
+  label: string
+  value: string
+  detail: string
+  ctaHref?: string
+  ctaLabel?: string
+}) {
   return (
     <div>
       <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
@@ -414,6 +438,19 @@ function InboxRow({ label, value, detail }: { label: string; value: string; deta
       </p>
       <p className="mt-1 text-sm font-semibold text-foreground">{value}</p>
       <p className="text-[11px] text-muted-foreground">{detail}</p>
+      {ctaHref && ctaLabel && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mt-1 h-6 gap-1 px-0 text-xs text-primary"
+          asChild
+        >
+          <Link href={ctaHref}>
+            {ctaLabel}
+            <ArrowRight className="h-3 w-3" />
+          </Link>
+        </Button>
+      )}
     </div>
   )
 }

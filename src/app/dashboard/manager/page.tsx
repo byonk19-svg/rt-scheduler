@@ -457,6 +457,8 @@ export default function ManagerDashboardPage() {
       approvalsHref={MANAGER_WORKFLOW_LINKS.approvals}
       scheduleHref={scheduleHref}
       reviewHref={data.latestUnreadHref}
+      currentCycleCtaHref={!loading && !data.activeCycle ? '/coverage' : undefined}
+      nextCycleCtaHref={!loading && !data.nextCycle ? '/coverage' : undefined}
     />
   )
 }

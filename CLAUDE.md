@@ -1,6 +1,17 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-07 (session 32)
+Updated: 2026-04-07 (session 34)
+
+## Latest Updates (2026-04-07, session 34)
+
+- **Therapist Future Availability — Schedule cycle control** (`src/components/availability/TherapistAvailabilityWorkspace.tsx`):
+  - Layout: button group `sm:w-auto` (not full-width beside the `<select>`), controls column `lg:shrink-0` so the header row does not crush the dropdown.
+  - Width capped (`max-w-[15rem]` / `sm:max-w-[17.5rem]`); option labels use **`formatHumanCycleRange`** only for a short gist; **`title`** on the `<select>` exposes the full DB cycle label + range on hover.
+- **UX audit + targeted fixes (see UX Fixes section below):**
+  - Staff nav "My Schedule" → "Schedule" (`src/components/AppShell.tsx`)
+  - Manager Inbox: "New 6-week block" / "Plan next cycle" CTAs when no cycle exists (`src/components/manager/ManagerTriageDashboard.tsx`, `src/app/dashboard/manager/page.tsx`)
+  - Publish History: info callout + "Open to publish" label for draft cycles (`src/app/publish/page.tsx`)
+- **Verification:** `npx tsc --noEmit`, `npx vitest run` (**420 tests** passing).
 
 ## Latest Updates (2026-04-07, session 32)
 
@@ -667,6 +678,19 @@ Core domains: coverage planning, cycles, availability requests, shift board, app
 - Tailwind + shadcn/ui patterns
 - Vitest (unit) + Playwright (e2e)
 
+## UX Fixes (session 34 — items #1–#3 shipped)
+
+From audit: workflow/usability issues being addressed one at a time.
+
+- [x] **#1** Rename staff nav "My Schedule" → "Schedule" (`AppShell.tsx`)
+- [x] **#2** Manager Inbox: add "New 6-week block" CTA when no active cycle (`ManagerTriageDashboard`, `dashboard/manager/page.tsx`)
+- [x] **#3** Publish History: info callout + "Open to publish" label for draft cycles (`publish/page.tsx`)
+- [ ] **#4** After preliminary claim submit, add link to see pending request status
+- [ ] **#5** Auto-draft result: surface summary (shifts assigned, unfilled, forced-date misses)
+- [ ] **#6** Approvals: sort by age, add urgency signal
+- [ ] **#7** Availability deadline: countdown chip on therapist dashboard
+- [ ] **#8** Coverage empty state: guided first-time manager flow
+
 ## Resume Checklist
 
 ```bash
@@ -779,6 +803,7 @@ Typography classes:
 
 ## Tooling Gotchas
 
+- **Browser verification on auth routes:** All app routes require login. Chrome DevTools MCP always redirects to `/login` — browser verification via screenshot is not possible without credentials. Confirm changes via `tsc`, `vitest`, and code review only.
 - **framer-motion `ease`:** `ease: 'easeOut'` fails `tsc` — the `Easing` type requires specific literals. Omit `ease` entirely to use framer-motion's safe default.
 - **Auto-draft algorithm lives in `src/lib/coverage/generate-draft.ts`:** `generateDraftForCycle(input: GenerateDraftInput): GenerateDraftResult` is a pure function. `generateDraftScheduleAction` in `src/app/schedule/actions/draft-actions.ts` is a thin wrapper that loads DB data, calls it, then saves results. Dry-run and preview features can call `generateDraftForCycle` directly without a server action.
 - **`src/app/schedule/actions.ts` is a barrel:** Real logic is in `src/app/schedule/actions/` sub-modules (`helpers.ts`, `cycle-actions.ts`, `publish-actions.ts`, `shift-actions.ts`, `draft-actions.ts`, `preliminary-actions.ts`). Each action file has `'use server'`; `helpers.ts` and `index.ts` do not.

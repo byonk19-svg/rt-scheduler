@@ -157,6 +157,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
   const successCount = events.filter((event) => event.status === 'success').length
   const failedCount = events.filter((event) => event.status === 'failed').length
   const queuedCount = events.reduce((total, event) => total + Math.max(event.queued_count, 0), 0)
+  const hasDraftCycles = !cyclesLoadError && (activeCycles ?? []).some((cycle) => !cycle.published)
 
   return (
     <div className="space-y-5">
@@ -312,6 +313,23 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
         </div>
       )}
 
+      {hasDraftCycles && (
+        <div
+          className="rounded-xl border px-4 py-3"
+          style={{
+            borderColor: 'var(--info-border)',
+            backgroundColor: 'var(--info-subtle)',
+            color: 'var(--info-text)',
+          }}
+        >
+          <p className="text-xs font-semibold">Ready to publish a draft?</p>
+          <p className="mt-0.5 text-xs">
+            Open the cycle in Schedule using the link below, then click <strong>Publish</strong> in
+            the action bar. This page only shows delivery history after publishing.
+          </p>
+        </div>
+      )}
+
       <div className="space-y-2">
         <div className="px-0.5">
           <h2 className="text-sm font-bold tracking-tight text-foreground">Schedule blocks</h2>
@@ -373,7 +391,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                             href={`/coverage?cycle=${cycle.id}&view=week`}
                             className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
                           >
-                            Open in Schedule
+                            {cycle.published ? 'Open in Schedule' : 'Open to publish'}
                           </Link>
                           {cycle.published ? (
                             <>
