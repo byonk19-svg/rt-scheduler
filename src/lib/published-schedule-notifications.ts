@@ -27,6 +27,12 @@ type PublishedShiftMovedParams = PublishedShiftBase & {
   toShiftType: 'day' | 'night'
 }
 
+type PublishedShiftStatusChangedParams = PublishedShiftBase & {
+  date: string
+  shiftType: 'day' | 'night'
+  nextStatus: 'scheduled' | 'on_call' | 'cancelled' | 'call_in' | 'left_early'
+}
+
 function formatShortDate(date: string) {
   return new Date(`${date}T12:00:00`).toLocaleDateString('en-US', {
     month: 'short',
@@ -77,5 +83,37 @@ export async function notifyPublishedShiftMoved(
   await notifyPublishedShiftChange(supabase, {
     ...params,
     message: `Your published schedule changed: your shift moved from ${formatShortDate(params.fromDate)} ${params.fromShiftType} to ${formatShortDate(params.toDate)} ${params.toShiftType}.`,
+  })
+}
+
+function getStatusChangeMessage(params: PublishedShiftStatusChangedParams): string {
+  const shiftLabel = `${params.shiftType} shift on ${formatShortDate(params.date)}`
+
+  if (params.nextStatus === 'on_call') {
+    return `Your published schedule changed: your ${shiftLabel} is now on call.`
+  }
+
+  if (params.nextStatus === 'cancelled') {
+    return `Your published schedule changed: your ${shiftLabel} was cancelled.`
+  }
+
+  if (params.nextStatus === 'call_in') {
+    return `Your published schedule changed: your ${shiftLabel} is marked call in.`
+  }
+
+  if (params.nextStatus === 'left_early') {
+    return `Your published schedule changed: your ${shiftLabel} was marked left early.`
+  }
+
+  return `Your published schedule changed: your ${shiftLabel} is active.`
+}
+
+export async function notifyPublishedShiftStatusChanged(
+  supabase: ServerSupabaseClient,
+  params: PublishedShiftStatusChangedParams
+) {
+  await notifyPublishedShiftChange(supabase, {
+    ...params,
+    message: getStatusChangeMessage(params),
   })
 }

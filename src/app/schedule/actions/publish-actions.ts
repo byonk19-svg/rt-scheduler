@@ -6,7 +6,8 @@ import { redirect } from 'next/navigation'
 import { can } from '@/lib/auth/can'
 import { notifyUsers } from '@/lib/notifications'
 import { writeAuditLog } from '@/lib/audit-log'
-import { getPublishEmailConfig } from '@/lib/publish-events'
+import { getPublishEmailConfig, processQueuedPublishEmails } from '@/lib/publish-events'
+import { createAdminClient } from '@/lib/supabase/admin'
 import {
   buildDateRange,
   buildScheduleUrl,
@@ -267,7 +268,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
     let publishedAt: string | null = null
     let recipientCount = 0
     let queuedCount = 0
-    const sentCount = 0
+    let sentCount = 0
     let failedCount = 0
     let emailQueueError: string | null = null
 
@@ -406,6 +407,29 @@ export async function toggleCyclePublishedAction(formData: FormData) {
       targetType: 'schedule_cycle',
       targetId: cycleId,
     })
+
+    if (publishEventId && queuedCount > 0) {
+      try {
+        const admin = createAdminClient()
+        const processResult = await processQueuedPublishEmails(admin, {
+          publishEventId,
+          batchSize: queuedCount,
+        })
+
+        if (processResult.publishEventCounts) {
+          queuedCount = processResult.publishEventCounts.queuedCount
+          sentCount = processResult.publishEventCounts.sentCount
+          failedCount = processResult.publishEventCounts.failedCount
+        }
+
+        if (!processResult.emailConfigured) {
+          emailQueueError = emailQueueError ?? 'email_not_configured'
+        }
+      } catch (processError) {
+        console.error('Failed to process publish emails immediately:', processError)
+        emailQueueError = emailQueueError ?? 'immediate_publish_process_failed'
+      }
+    }
 
     revalidatePath('/publish')
     if (publishEventId) {

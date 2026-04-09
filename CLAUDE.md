@@ -1,10 +1,22 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-09 (session 40)
+Updated: 2026-04-09 (session 41)
 
 ## Session History
 
 Sessions 11–38 archived to `docs/SESSION_HISTORY.md`.
+
+## Latest Updates (2026-04-09, session 41)
+
+- **Publish flow â€” immediate email processing, no deploy-blocking Vercel cron requirement** (`src/app/schedule/actions/publish-actions.ts`, `src/lib/publish-events.ts`, `src/app/api/publish/process/route.ts`, tests):
+  - Publishing a cycle still writes `publish_events` and queues `notification_outbox` rows, but now the publish action immediately processes the queued emails in the same flow.
+  - `/api/publish/process` now reuses the same shared processor as the publish action for retry/manual processing instead of owning a separate Resend loop.
+  - `vercel.json` cron config was removed, so Hobby-plan production deploys are no longer blocked by the old every-minute cron expression.
+- **Published schedule operations â€” clearer live status visibility** (`CoverageClientPage.tsx`, assignment-status route, published-schedule notifications, tests):
+  - Shared `/coverage` live-schedule UI now explicitly calls out operational status badges on the published schedule: **On Call**, **Leave Early**, **Cancelled**, **Call In**.
+  - Published assignment-status changes now trigger `published_schedule_changed` notifications for the affected therapist.
+  - Staff still need to refresh or reopen the schedule to see a managerâ€™s latest status change; realtime cross-client syncing is intentionally not implemented yet.
+- **Verification:** `npm run lint`, `npx vitest run` (**453 tests** passing), `npm run build`.
 
 ## Latest Updates (2026-04-08, session 40)
 
@@ -94,7 +106,7 @@ All checks currently green:
 - `npm run lint` pass
 - `npm run format:check` pass (whole-repo Prettier; `.claude/**` excluded from ESLint)
 - `npm run build` pass
-- `npm run test:unit` pass (**444 tests**)
+- `npm run test:unit` pass (**453 tests**)
 - `npm run test:e2e` pass (39 passed, 1 skipped)
 
 CI gates: format check → lint → tsc → build → Playwright E2E
@@ -193,6 +205,7 @@ Typography classes:
 - **Session end workflow:** update CLAUDE.md with learnings → `git add CLAUDE.md && git commit && git push`
 - **`availability_overrides` are cycle-scoped:** Manager-entered overrides (`force_on`/`force_off`) do NOT carry forward between cycles. Use `copyAvailabilityFromPreviousCycleAction` (or the "Copy from last block" UI) to shift them into the next cycle. Rotating-schedule workers should submit availability each block or use the copy feature.
 - **Supabase mock builder must include all chained methods used by the action under test:** `neq`, `order`, `limit` are no-ops on most mocks — add them as chainable builders that return `this`. Forgetting them causes `TypeError: builder.neq is not a function` even when the test assertions look correct. Also extend `then()` to handle every select column shape the action calls (keyed by the column string).
+- **Publish email flow no longer depends on a Vercel cron deployment hook:** production publish now processes queued emails immediately in `toggleCyclePublishedAction`. Keep `/api/publish/process` as the shared retry/manual path, but do not reintroduce `vercel.json` cron config unless the deployment plan changes.
 
 ## Scheduling Rules
 
@@ -285,8 +298,8 @@ Write path: `POST /api/schedule/assignment-status` with optimistic local update 
 
 ## Publish Flow
 
-- Manager publishes from `/coverage` -> triggers email queue via `notification_outbox`
-- `POST /api/publish/process` processes queued rows (batch_size param)
+- Manager publishes from `/coverage` -> triggers email queue via `notification_outbox` and immediately processes the queued emails in the publish action
+- `POST /api/publish/process` is still available for retries/manual processing (batch_size param)
 - History at `/publish`; detail + retry at `/publish/[id]`
 - Key files: `src/app/publish/`, `src/lib/publish-events.ts`, `src/app/publish/actions.ts`
 
@@ -299,12 +312,15 @@ SUPABASE_SERVICE_ROLE_KEY
 NEXT_PUBLIC_APP_URL              # must be https://www.teamwise.work in production (not localhost)
 RESEND_API_KEY
 PUBLISH_EMAIL_FROM               # must match verified Resend domain: Teamwise <noreply@mail.teamwise.work>
-PUBLISH_WORKER_KEY               # worker key id sent in x-publish-worker-key header
-PUBLISH_WORKER_SIGNING_KEY       # HMAC-SHA256 signing secret for cron → process requests
-CRON_SECRET                      # Vercel cron auth secret (Authorization: Bearer <CRON_SECRET>)
 ```
 
-All 9 vars above are confirmed set in Vercel production environment (2026-03-16).
+Optional/manual processing only:
+
+```
+PUBLISH_WORKER_KEY
+PUBLISH_WORKER_SIGNING_KEY
+CRON_SECRET
+```
 
 Supabase Auth (production):
 

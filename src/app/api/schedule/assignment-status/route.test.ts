@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+const { notifyPublishedShiftStatusChangedMock } = vi.hoisted(() => ({
+  notifyPublishedShiftStatusChangedMock: vi.fn(async () => undefined),
+}))
+
 import { POST } from '@/app/api/schedule/assignment-status/route'
 import { createClient } from '@/lib/supabase/server'
 
@@ -7,11 +11,21 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
 }))
 
+vi.mock('@/lib/published-schedule-notifications', () => ({
+  notifyPublishedShiftStatusChanged: notifyPublishedShiftStatusChangedMock,
+}))
+
 type Scenario = {
   userId?: string | null
   role?: string
   isActive?: boolean | null
   archivedAt?: string | null
+  shiftLookup?: {
+    date: string
+    shift_type: 'day' | 'night'
+    user_id: string | null
+    published: boolean
+  } | null
   rpcError?: { code?: string; message: string } | null
   rpcData?: Array<Record<string, unknown>>
 }
@@ -52,22 +66,39 @@ function makeSupabaseMock(scenario: Scenario) {
         return builder
       },
       maybeSingle: async () => {
-        if (table !== 'profiles') {
-          return { data: null, error: null }
+        if (table === 'profiles') {
+          if (!state.id || scenario.userId === null) {
+            return { data: null, error: null }
+          }
+
+          return {
+            data: {
+              role: scenario.role ?? 'therapist',
+              is_active: scenario.isActive ?? true,
+              archived_at: scenario.archivedAt ?? null,
+            },
+            error: null,
+          }
         }
 
-        if (!state.id || scenario.userId === null) {
-          return { data: null, error: null }
+        if (table === 'shifts') {
+          if (!scenario.shiftLookup) {
+            return { data: null, error: null }
+          }
+
+          return {
+            data: {
+              id: state.id ?? 'shift-1',
+              date: scenario.shiftLookup.date,
+              shift_type: scenario.shiftLookup.shift_type,
+              user_id: scenario.shiftLookup.user_id,
+              schedule_cycles: { published: scenario.shiftLookup.published },
+            },
+            error: null,
+          }
         }
 
-        return {
-          data: {
-            role: scenario.role ?? 'therapist',
-            is_active: scenario.isActive ?? true,
-            archived_at: scenario.archivedAt ?? null,
-          },
-          error: null,
-        }
+        return { data: null, error: null }
       },
     }
 
@@ -130,6 +161,7 @@ describe('assignment status API', () => {
       p_note: 'Traffic delay',
       p_left_early_time: null,
     })
+    expect(notifyPublishedShiftStatusChangedMock).not.toHaveBeenCalled()
   })
 
   it('denies staff from updating status', async () => {
@@ -185,6 +217,12 @@ describe('assignment status API', () => {
     const supabase = makeSupabaseMock({
       role: 'manager',
       userId: 'manager-1',
+      shiftLookup: {
+        date: '2026-02-23',
+        shift_type: 'day',
+        user_id: 'therapist-1',
+        published: true,
+      },
     })
     vi.mocked(createClient).mockResolvedValue(
       supabase as unknown as Awaited<ReturnType<typeof createClient>>
@@ -203,6 +241,17 @@ describe('assignment status API', () => {
 
     expect(response.status).toBe(200)
     expect(supabase.rpc).toHaveBeenCalledOnce()
+    expect(notifyPublishedShiftStatusChangedMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        cyclePublished: true,
+        userId: 'therapist-1',
+        date: '2026-02-23',
+        shiftType: 'day',
+        nextStatus: 'call_in',
+        targetId: 'shift-1',
+      })
+    )
   })
 
   it('enforces site scope via RPC errors', async () => {

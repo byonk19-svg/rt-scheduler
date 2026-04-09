@@ -49,7 +49,7 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).not.toContain('days selected')
     expect(html).toContain('Availability summary:')
     expect(html).toContain('Tap a day to switch between Available, Need Off, and Request to Work.')
-    expect(html).toContain('Notes appear below')
+    expect(html).toContain('appear below the selected week')
     expect(html).toContain('Day Notes')
     expect(html).toContain('Mar')
     expect(html).toContain('Apr')

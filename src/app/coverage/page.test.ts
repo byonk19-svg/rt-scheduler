@@ -79,4 +79,14 @@ describe('coverage publish override affordance', () => {
       'This block exists, but it does not have any shift rows yet. Auto-draft it or click a day to start assigning the first shifts manually.'
     )
   })
+
+  it('calls out live operational status badges on the published schedule', () => {
+    const filePath = resolve(process.cwd(), 'src/app/coverage/CoverageClientPage.tsx')
+    const source = readFileSync(filePath, 'utf8')
+
+    expect(source).toContain('Operational updates visible to everyone:')
+    expect(source).toContain('<StatusPill status="oncall" />')
+    expect(source).toContain('<StatusPill status="cancelled" />')
+    expect(source).toContain('<StatusPill status="call_in" />')
+  })
 })

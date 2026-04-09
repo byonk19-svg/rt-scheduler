@@ -19,6 +19,7 @@ Operational workflows as implemented in the current codebase.
    - validates weekly and slot rules
    - writes `publish_events`
    - queues email rows in `notification_outbox`
+   - processes publish emails immediately in the publish action
    - sends in-app notifications
 
 ## 1.1) Manager: Work on a Published Cycle
@@ -26,6 +27,7 @@ Operational workflows as implemented in the current codebase.
 - Published cycles stay editable in `/coverage`.
 - Coverage presents the active published cycle as a live schedule rather than a locked artifact.
 - Manual assignment changes, removals, and lead changes remain available and are treated as post-publish modifications.
+- Published assignment status changes (`on call`, `cancelled`, `call in`, `left early`) are shown on the shared schedule UI and included in therapist published-schedule change notifications.
 - `Start over` on a currently live cycle unpublishes it, clears shifts, and closes any active preliminary snapshot.
 
 ## 2) Manager: Coverage Edits (Drag/Drop and Picker)
@@ -58,6 +60,7 @@ Operational workflows as implemented in the current codebase.
 - Persists via RPC `update_assignment_status`.
 - Updates status metadata on `shifts` and writes `shift_status_changes` audit rows.
 - Used by manager month/week calendar and coverage status flows.
+- If the cycle is already published, the affected therapist also receives a `published_schedule_changed` in-app notification describing the new status.
 
 ## 5) Shift Board Requests
 

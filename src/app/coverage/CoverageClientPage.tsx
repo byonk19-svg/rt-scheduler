@@ -22,6 +22,7 @@ import {
   sendPreliminaryScheduleAction,
   toggleCyclePublishedAction,
 } from '@/app/schedule/actions'
+import { StatusPill } from '@/components/coverage/AssignmentStatusPopover'
 import { CalendarGrid } from '@/components/coverage/CalendarGrid'
 import { ShiftEditorDialog } from '@/components/coverage/ShiftEditorDialog'
 import { PrintSchedule } from '@/components/print-schedule'
@@ -1227,6 +1228,7 @@ export function CoverageClientPage({
       >
         {/* Future: quick exception filters (understaffed, open slots, missing lead, conflicts). */}
         {activeCyclePublished && (
+          <>
           <div className="mb-3 flex items-center gap-3 rounded-lg border border-[var(--success-border)]/85 bg-[var(--success-subtle)]/80 px-3 py-2">
             <span className="text-xs leading-snug text-[var(--success-text)]">
               Live schedule — staff see updates as you save.
@@ -1239,6 +1241,16 @@ export function CoverageClientPage({
               <ChevronRight className="h-3.5 w-3.5 opacity-90" aria-hidden />
             </Link>
           </div>
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border/80 bg-card px-3 py-2 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">
+              Operational updates visible to everyone:
+            </span>
+            <StatusPill status="oncall" />
+            <StatusPill status="leave_early" />
+            <StatusPill status="cancelled" />
+            <StatusPill status="call_in" />
+          </div>
+          </>
         )}
         {successParam === 'cycle_published' && (
           <p className="mb-3 rounded-md border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-2 text-xs font-semibold text-[var(--success-text)]">
@@ -1469,4 +1481,3 @@ export function CoverageClientPage({
     </div>
   )
 }
-

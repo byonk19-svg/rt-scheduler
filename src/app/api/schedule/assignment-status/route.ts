@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
+import { notifyPublishedShiftStatusChanged } from '@/lib/published-schedule-notifications'
 import { isTrustedMutationRequest } from '@/lib/security/request-origin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -36,6 +37,19 @@ type RpcAssignmentStatusRow = {
   status_updated_at: string | null
   status_updated_by: string | null
   status_updated_by_name: string | null
+}
+
+type ShiftNotificationLookupRow = {
+  id: string
+  date: string
+  shift_type: 'day' | 'night'
+  user_id: string | null
+  schedule_cycles: { published: boolean } | { published: boolean }[] | null
+}
+
+function getOne<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null
+  return value ?? null
 }
 
 function isAllowedAssignmentStatus(value: string): value is AssignmentStatus {
@@ -117,6 +131,26 @@ export async function POST(request: Request) {
   const row = Array.isArray(data) ? ((data[0] ?? null) as RpcAssignmentStatusRow | null) : null
   if (!row) {
     return NextResponse.json({ error: 'Assignment status response was empty.' }, { status: 500 })
+  }
+
+  const { data: shiftLookup } = await supabase
+    .from('shifts')
+    .select('id, date, shift_type, user_id, schedule_cycles(published)')
+    .eq('id', row.id)
+    .maybeSingle()
+
+  const shift = (shiftLookup ?? null) as ShiftNotificationLookupRow | null
+  const cycle = getOne(shift?.schedule_cycles)
+
+  if (shift?.user_id && cycle?.published) {
+    await notifyPublishedShiftStatusChanged(supabase, {
+      cyclePublished: true,
+      userId: shift.user_id,
+      date: shift.date,
+      shiftType: shift.shift_type,
+      nextStatus: row.assignment_status,
+      targetId: shift.id,
+    })
   }
 
   return NextResponse.json({ assignment: row })

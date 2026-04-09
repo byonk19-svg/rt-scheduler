@@ -12,6 +12,7 @@ import {
   notifyPublishedShiftAdded,
   notifyPublishedShiftMoved,
   notifyPublishedShiftRemoved,
+  notifyPublishedShiftStatusChanged,
 } from '@/lib/published-schedule-notifications'
 
 describe('published schedule change notifications', () => {
@@ -83,6 +84,41 @@ describe('published schedule change notifications', () => {
       expect.objectContaining({
         message:
           'Your published schedule changed: your shift moved from Mar 24 day to Mar 25 night.',
+      })
+    )
+  })
+
+  it('formats published status-change notifications for operational updates', async () => {
+    await notifyPublishedShiftStatusChanged({} as never, {
+      cyclePublished: true,
+      userId: 'therapist-3',
+      date: '2026-03-26',
+      shiftType: 'day',
+      nextStatus: 'on_call',
+      targetId: 'shift-4',
+    })
+
+    await notifyPublishedShiftStatusChanged({} as never, {
+      cyclePublished: true,
+      userId: 'therapist-4',
+      date: '2026-03-27',
+      shiftType: 'night',
+      nextStatus: 'cancelled',
+      targetId: 'shift-5',
+    })
+
+    expect(notifyUsersMock).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      expect.objectContaining({
+        message: 'Your published schedule changed: your day shift on Mar 26 is now on call.',
+      })
+    )
+    expect(notifyUsersMock).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.objectContaining({
+        message: 'Your published schedule changed: your night shift on Mar 27 was cancelled.',
       })
     )
   })
