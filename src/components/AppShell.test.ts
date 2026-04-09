@@ -16,19 +16,19 @@ const appShellSource = fs.readFileSync(
 
 describe('AppShell sidebar styling', () => {
   it('keeps the sidebar present but less dominant than the content area', () => {
-    expect(APP_SHELL_SIDEBAR_CLASS).toContain('border-sidebar-border/70')
+    expect(APP_SHELL_SIDEBAR_CLASS).toContain('border-precision-grid-line')
     expect(APP_SHELL_SIDEBAR_CLASS).toContain('shadow-none')
   })
 
-  it('uses a calmer active nav state without the old heavy shadow treatment', () => {
-    expect(APP_SHELL_ACTIVE_NAV_CLASS).toContain('bg-sidebar-accent/60')
-    expect(APP_SHELL_ACTIVE_NAV_CLASS).toContain('ring-1')
+  it('uses Precision Light active nav (emerald rail + slate fill)', () => {
+    expect(APP_SHELL_ACTIVE_NAV_CLASS).toContain('border-precision-emerald')
+    expect(APP_SHELL_ACTIVE_NAV_CLASS).toContain('bg-precision-slate-base')
     expect(APP_SHELL_ACTIVE_NAV_CLASS).not.toContain('shadow-sm')
   })
 
   it('tones down the profile block at the bottom of the sidebar', () => {
-    expect(APP_SHELL_PROFILE_CARD_CLASS).toContain('bg-sidebar-accent/15')
-    expect(APP_SHELL_PROFILE_CARD_CLASS).toContain('border-sidebar-border/70')
+    expect(APP_SHELL_PROFILE_CARD_CLASS).toContain('bg-precision-slate-base')
+    expect(APP_SHELL_PROFILE_CARD_CLASS).toContain('border-precision-grid-line')
   })
 
   it('uses a real button for the mobile backdrop dismiss target', () => {

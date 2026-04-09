@@ -32,6 +32,7 @@ type DashboardData = {
   dayShiftsTotal: number
   nightShiftsFilled: number
   nightShiftsTotal: number
+  activeCycleDateRange: string | null
 }
 
 type ManagerProfileRow = {
@@ -83,6 +84,7 @@ const INITIAL_DATA: DashboardData = {
   dayShiftsTotal: 0,
   nightShiftsFilled: 0,
   nightShiftsTotal: 0,
+  activeCycleDateRange: null,
 }
 
 function getOne<T>(value: T | T[] | null | undefined): T | null {
@@ -253,6 +255,9 @@ export default function ManagerDashboardPage() {
         const nextCycle = activeCycle
           ? (cycles.find((cycle) => cycle.start_date > activeCycle.end_date) ?? null)
           : (cycles.find((cycle) => cycle.start_date > todayKey) ?? null)
+        const activeCycleDateRange = activeCycle
+          ? `${formatCycleDate(activeCycle.start_date)} – ${formatCycleDate(activeCycle.end_date)}`
+          : null
         const latestUnread = (latestUnreadResult.data ?? null) as NotificationRow | null
 
         let todayCoverageQuery = supabase.from('shifts').select('id').eq('date', todayKey)
@@ -376,6 +381,7 @@ export default function ManagerDashboardPage() {
           dayShiftsTotal: dayRows.length,
           nightShiftsFilled: nightRows.filter((row) => row.user_id !== null).length,
           nightShiftsTotal: nightRows.length,
+          activeCycleDateRange,
         })
       } catch (error) {
         console.error('Failed to load manager dashboard data:', error)
@@ -457,6 +463,7 @@ export default function ManagerDashboardPage() {
       approvalsHref={MANAGER_WORKFLOW_LINKS.approvals}
       scheduleHref={scheduleHref}
       reviewHref={data.latestUnreadHref}
+      activeCycleDateRange={loading ? undefined : (data.activeCycleDateRange ?? undefined)}
       currentCycleCtaHref={!loading && !data.activeCycle ? '/coverage' : undefined}
       nextCycleCtaHref={!loading && !data.nextCycle ? '/coverage' : undefined}
     />

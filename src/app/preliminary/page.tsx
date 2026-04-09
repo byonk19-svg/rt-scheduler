@@ -16,6 +16,7 @@ import type {
   PreliminaryShiftStateRow,
   PreliminarySnapshotRow,
 } from '@/lib/preliminary-schedule/types'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 type PreliminarySearchParams = Record<string, string | string[] | undefined>
@@ -160,23 +161,30 @@ export default async function PreliminaryPage({
   const shiftStates = (shiftStatesData ?? []) as PreliminaryShiftStateRow[]
   const shiftIds = Array.from(new Set(shiftStates.map((state) => state.shift_id)))
 
-  const { data: shiftsData } = shiftIds.length
-    ? await supabase
-        .from('shifts')
-        .select(
-          'id, cycle_id, user_id, date, shift_type, status, role, profiles:profiles!shifts_user_id_fkey(full_name)'
-        )
-        .in('id', shiftIds)
-    : { data: [] }
+  let shiftsData: Array<
+    PreliminaryShiftRow & {
+      profiles: { full_name: string | null } | { full_name: string | null }[] | null
+    }
+  > | null = []
 
-  const shiftsById = new Map(
-    (
-      (shiftsData ?? []) as Array<
+  if (shiftIds.length) {
+    const admin = createAdminClient()
+    const { data } = await admin
+      .from('shifts')
+      .select(
+        'id, cycle_id, user_id, date, shift_type, status, role, profiles:profiles!shifts_user_id_fkey(full_name)'
+      )
+      .in('id', shiftIds)
+    shiftsData =
+      (data as Array<
         PreliminaryShiftRow & {
           profiles: { full_name: string | null } | { full_name: string | null }[] | null
         }
-      >
-    ).map((shift) => [
+      > | null) ?? []
+  }
+
+  const shiftsById = new Map(
+    (shiftsData ?? []).map((shift) => [
       shift.id,
       {
         id: shift.id,

@@ -43,7 +43,7 @@ export function TeamwiseLogo({
       {showWordmark && (
         <span
           className={`${textSize} font-extrabold leading-none tracking-tight`}
-          style={{ fontFamily: 'var(--font-plus-jakarta), sans-serif', letterSpacing: '-0.03em' }}
+          style={{ fontFamily: 'var(--font-space-grotesk), sans-serif', letterSpacing: '-0.03em' }}
         >
           <span style={{ color: '#1c1917' }}>Team</span>
           <span style={{ color: '#d97706' }}>wise</span>

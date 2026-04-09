@@ -305,7 +305,7 @@ async function getShift(
 function buildRequest(
   params: SubmitPreliminaryRequestParams,
   type: PreliminaryRequestRow['type']
-): PreliminaryRequestRow {
+): Omit<PreliminaryRequestRow, 'requester_name'> {
   return {
     id: newId(),
     snapshot_id: params.snapshotId,
@@ -318,7 +318,6 @@ function buildRequest(
     approved_by: null,
     approved_at: null,
     created_at: nowIso(),
-    requester_name: null,
   }
 }
 
@@ -380,7 +379,7 @@ export async function submitPreliminaryClaimRequest(
     }
   }
 
-  return { data: request, error: null }
+  return { data: { ...request, requester_name: null }, error: null }
 }
 
 export async function submitPreliminaryChangeRequest(
@@ -447,7 +446,7 @@ export async function submitPreliminaryChangeRequest(
     }
   }
 
-  return { data: request, error: null }
+  return { data: { ...request, requester_name: null }, error: null }
 }
 
 async function getRequest(

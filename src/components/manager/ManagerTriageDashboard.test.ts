@@ -37,6 +37,7 @@ describe('ManagerTriageDashboard', () => {
         approvalsHref: '/approvals',
         scheduleHref: '/coverage?view=week',
         reviewHref: '/approvals',
+        activeCycleDateRange: 'Mar 17 – Apr 13',
       })
     )
 
@@ -78,6 +79,7 @@ describe('ManagerTriageDashboard', () => {
         approvalsHref: '/approvals',
         scheduleHref: '/coverage?view=week',
         reviewHref: '/approvals',
+        activeCycleDateRange: undefined,
       })
     )
 
@@ -113,14 +115,11 @@ describe('ManagerTriageDashboard', () => {
         approvalsHref: '/approvals',
         scheduleHref: '/coverage?view=week',
         reviewHref: '/approvals',
+        activeCycleDateRange: 'Mar 17 – Apr 13',
       })
     )
 
-    expect(html).toContain('No coverage gaps - review the schedule to confirm.')
-    expect(html).toContain('Send a preliminary schedule to collect staff claims.')
-    expect(html).toContain('Auto-draft or manually assign shifts for this cycle.')
-    expect(html).toContain('Assign shifts and leads before publishing.')
-    expect(html).toContain('Go')
+    expect(html).not.toContain('Publish Readiness')
     expect(html).toContain('text-lg font-semibold text-muted-foreground')
   })
 
@@ -148,6 +147,7 @@ describe('ManagerTriageDashboard', () => {
         approvalsHref: '/approvals',
         scheduleHref: '/coverage?view=week',
         reviewHref: '/approvals',
+        activeCycleDateRange: 'Mar 17 – Apr 13',
       })
     )
 
@@ -157,5 +157,36 @@ describe('ManagerTriageDashboard', () => {
     expect(scheduleProgressIndex).toBeGreaterThan(-1)
     expect(recentActivityIndex).toBeGreaterThan(-1)
     expect(scheduleProgressIndex).toBeLessThan(recentActivityIndex)
+  })
+
+  it('renders cycle date range pill when provided', () => {
+    const html = renderToStaticMarkup(
+      createElement(ManagerTriageDashboard, {
+        todayCoverageCovered: 15,
+        todayCoverageTotal: 17,
+        upcomingShiftCount: 12,
+        upcomingShiftDays: [],
+        todayActiveShifts: [],
+        recentActivity: [],
+        pendingRequests: 0,
+        approvalsWaiting: 0,
+        currentCycleStatus: 'Published',
+        currentCycleDetail: 'Live',
+        nextCycleLabel: 'Collect availability Apr 1',
+        nextCycleDetail: 'Publish by May 11',
+        needsReviewCount: 0,
+        needsReviewDetail: 'You are caught up.',
+        dayShiftsFilled: 18,
+        dayShiftsTotal: 21,
+        nightShiftsFilled: 15,
+        nightShiftsTotal: 21,
+        approvalsHref: '/approvals',
+        scheduleHref: '/coverage',
+        reviewHref: '/approvals',
+        activeCycleDateRange: 'Mar 17 – Apr 13',
+      })
+    )
+
+    expect(html).toContain('Mar 17 – Apr 13')
   })
 })

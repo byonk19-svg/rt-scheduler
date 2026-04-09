@@ -4,6 +4,7 @@ import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { notifyPublishedShiftStatusChanged } from '@/lib/published-schedule-notifications'
 import { isTrustedMutationRequest } from '@/lib/security/request-origin'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 const ASSIGNMENT_STATUS_VALUES = [
@@ -143,7 +144,8 @@ export async function POST(request: Request) {
   const cycle = getOne(shift?.schedule_cycles)
 
   if (shift?.user_id && cycle?.published) {
-    await notifyPublishedShiftStatusChanged(supabase, {
+    const admin = createAdminClient()
+    await notifyPublishedShiftStatusChanged(admin as never, {
       cyclePublished: true,
       userId: shift.user_id,
       date: shift.date,

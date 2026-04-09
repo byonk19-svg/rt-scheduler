@@ -19,4 +19,10 @@ describe('public homepage copy and ctas', () => {
     expect(signInMatches.length).toBeGreaterThanOrEqual(2)
     expect(createAccountMatches.length).toBeGreaterThanOrEqual(2)
   })
+
+  it('shows an approval note for new staff', () => {
+    expect(pageSource).toContain(
+      'Your manager will need to approve your account before your first sign-in.'
+    )
+  })
 })

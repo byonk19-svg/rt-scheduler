@@ -30,8 +30,8 @@ export default async function PendingSetupPage({
                   Your account is waiting for approval
                 </h1>
                 <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-foreground/80">
-                  Thanks for signing up. You’ll be able to use the app once your account is
-                  approved.
+                  No action needed on your end. Sit tight while your manager reviews your account —
+                  you’ll be able to log in once you&apos;re approved.
                 </p>
               </div>
             </div>

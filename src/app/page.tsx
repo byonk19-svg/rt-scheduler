@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { CalendarDays } from 'lucide-react'
 
@@ -46,6 +47,20 @@ export default function HomePage() {
           <Button asChild variant="outline" className="min-w-[140px]">
             <Link href="/signup">Create account</Link>
           </Button>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Your manager will need to approve your account before your first sign-in.
+        </p>
+        <div className="relative h-[360px] w-full overflow-hidden rounded-2xl border border-border/60 shadow-sm">
+          <Image
+            src="/images/app-preview.png"
+            alt="Teamwise schedule view"
+            fill
+            className="object-cover object-top"
+            priority
+            unoptimized
+          />
+          <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-b from-transparent to-[var(--background)]" />
         </div>
       </section>
     </main>

@@ -4,8 +4,6 @@ import {
   AlertTriangle,
   ArrowRight,
   CalendarDays,
-  CheckCircle2,
-  Clock,
   FileCheck,
   Send,
   Shield,
@@ -42,6 +40,7 @@ type ManagerTriageDashboardProps = {
   approvalsHref: string
   scheduleHref: string
   reviewHref: string
+  activeCycleDateRange?: string
   currentCycleCtaHref?: string
   nextCycleCtaHref?: string
 }
@@ -68,6 +67,7 @@ export function ManagerTriageDashboard({
   approvalsHref,
   scheduleHref,
   reviewHref,
+  activeCycleDateRange,
   currentCycleCtaHref,
   nextCycleCtaHref,
 }: ManagerTriageDashboardProps) {
@@ -77,7 +77,6 @@ export function ManagerTriageDashboard({
     upcomingShiftCount === '--' ||
     pendingRequests === '--' ||
     needsReviewCount === '--'
-  const coveragePercent = getCoveragePercent(todayCoverageCovered, todayCoverageTotal)
   const riskCount =
     todayCoverageCovered === '--' || todayCoverageTotal === '--'
       ? '--'
@@ -98,44 +97,28 @@ export function ManagerTriageDashboard({
   }
   const metricCards = [
     {
-      eyebrow: 'Risk watch',
       title: 'Coverage Issues',
       value: riskCount === '--' ? '--' : String(riskCount),
       detail: riskCountLabel,
       href: scheduleHref,
       icon: <Shield className="h-4 w-4 text-[var(--error-text)]" />,
-      emptyPrompt: 'No coverage gaps - review the schedule to confirm.',
       tone: 'error' as const,
     },
     {
-      eyebrow: 'Queue',
       title: 'Pending Approvals',
       value: pendingRequests === '--' ? '--' : String(pendingRequests),
       detail: pendingRequestLabel,
       href: approvalsHref,
       icon: <FileCheck className="h-4 w-4 text-[var(--warning-text)]" />,
-      emptyPrompt: 'Send a preliminary schedule to collect staff claims.',
       tone: 'warning' as const,
     },
     {
-      eyebrow: 'Forecast',
       title: 'Upcoming Shifts',
       value: upcomingShiftCount === '--' ? '--' : String(upcomingShiftCount),
       detail: teamLoadLabel,
       href: scheduleHref,
       icon: <Users className="h-4 w-4 text-primary" />,
-      emptyPrompt: 'Auto-draft or manually assign shifts for this cycle.',
       tone: 'info' as const,
-    },
-    {
-      eyebrow: 'Release',
-      title: 'Publish Readiness',
-      value: coveragePercent === null ? '--' : `${coveragePercent}%`,
-      detail: coveragePercent === null ? LOADING_LABEL : `${coveragePercent}% ready`,
-      href: reviewHref,
-      icon: <CheckCircle2 className="h-4 w-4 text-[var(--warning-text)]" />,
-      emptyPrompt: 'Assign shifts and leads before publishing.',
-      tone: 'success' as const,
     },
   ]
 
@@ -145,25 +128,15 @@ export function ManagerTriageDashboard({
         <div className="teamwise-grid-bg-subtle absolute inset-0 opacity-70" />
         <div className="relative flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Operations bulletin
-            </p>
-            <h1 className="font-heading text-[1.85rem] font-semibold tracking-[-0.04em] text-foreground">
-              Inbox
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Pending approvals, cycle status, and items needing your attention.
-            </p>
-            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="rounded-full border border-[var(--error-border)] bg-[var(--error-subtle)] px-2 py-0.5 text-[var(--error-text)]">
-                {riskCountLabel}
-              </span>
-              <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5">
-                {pendingRequestLabel}
-              </span>
-              <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5">
-                {teamLoadLabel}
-              </span>
+            <div className="flex items-center gap-3">
+              <h1 className="font-heading text-[1.85rem] font-semibold tracking-[-0.04em] text-foreground">
+                Inbox
+              </h1>
+              {activeCycleDateRange && (
+                <span className="rounded-full border border-border/70 bg-muted/20 px-3 py-1 text-xs text-muted-foreground">
+                  {activeCycleDateRange}
+                </span>
+              )}
             </div>
           </div>
           <div className="relative flex gap-2">
@@ -183,59 +156,98 @@ export function ManagerTriageDashboard({
         </div>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-4">
-        {metricCards.map((card, index) => (
-          <motion.div
-            key={card.title}
-            custom={index}
-            variants={fadeUp}
-            initial="hidden"
-            animate="show"
-          >
-            <MetricCard {...card} />
-          </motion.div>
-        ))}
-      </div>
+      <div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {metricCards.map((card, index) => (
+              <motion.div
+                key={card.title}
+                custom={index}
+                variants={fadeUp}
+                initial="hidden"
+                animate="show"
+              >
+                <MetricCard {...card} />
+              </motion.div>
+            ))}
+          </div>
 
-      <div className="grid gap-3 xl:grid-cols-[2fr_1fr]">
-        <Card className="rounded-2xl border-border/70 bg-card shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-sm font-medium text-foreground">Coverage Risks</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 pb-4">
-            {todayActiveShifts.length > 0 ? (
-              todayActiveShifts.map((shift, index) => (
-                <div
-                  key={`${shift.label}-${shift.detail}-${index}`}
-                  className="flex items-center justify-between rounded-lg border border-border/70 bg-card px-3 py-2.5"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <AlertTriangle className="h-4 w-4 text-[var(--warning-text)]" />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{shift.label}</p>
-                      <p className="text-xs text-muted-foreground">{shift.detail}</p>
-                    </div>
-                  </div>
-                  <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--warning-text)]">
-                    Review
-                  </span>
-                </div>
-              ))
-            ) : (
-              <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
-                {isLoading ? LOADING_LABEL : 'No active shift risks right now.'}
-              </p>
+          {dayShiftsFilled !== '--' &&
+            dayShiftsTotal !== '--' &&
+            nightShiftsFilled !== '--' &&
+            nightShiftsTotal !== '--' && (
+              <ScheduleProgress
+                dayFilled={dayShiftsFilled}
+                dayTotal={dayShiftsTotal}
+                nightFilled={nightShiftsFilled}
+                nightTotal={nightShiftsTotal}
+              />
             )}
-            <Button variant="ghost" size="sm" className="h-7 gap-1 px-0 text-xs" asChild>
-              <Link href={scheduleHref}>
-                Fix coverage
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
 
-        <div className="space-y-3">
+          <Card className="rounded-2xl border-border/70 bg-card shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
+            <CardHeader className="pb-2 pt-4">
+              <CardTitle className="text-sm font-medium text-foreground">Coverage Risks</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 pb-4">
+              {todayActiveShifts.length > 0 ? (
+                todayActiveShifts.map((shift, index) => (
+                  <div
+                    key={`${shift.label}-${shift.detail}-${index}`}
+                    className="flex items-center justify-between rounded-lg border border-border/70 bg-card px-3 py-2.5"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <AlertTriangle className="h-4 w-4 text-[var(--warning-text)]" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{shift.label}</p>
+                        <p className="text-xs text-muted-foreground">{shift.detail}</p>
+                      </div>
+                    </div>
+                    <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--warning-text)]">
+                      Review
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+                  {isLoading ? LOADING_LABEL : 'No active shift risks right now.'}
+                </p>
+              )}
+              {todayActiveShifts.length > 0 && (
+                <Button variant="ghost" size="sm" className="h-7 gap-1 px-0 text-xs" asChild>
+                  <Link href={scheduleHref}>
+                    Fix coverage
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl border-border/70 bg-card shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
+            <CardHeader className="pb-2 pt-4">
+              <CardTitle className="text-sm font-medium text-foreground">Recent Activity</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2.5 pb-4">
+              {recentActivity.length > 0 ? (
+                recentActivity.map((item, index) => (
+                  <div
+                    key={`${item.title}-${index}`}
+                    className="flex items-center justify-between gap-3"
+                  >
+                    <p className="text-sm text-foreground">{item.title}</p>
+                    <p className="text-xs text-muted-foreground">{item.timeLabel}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {isLoading ? LOADING_LABEL : 'No recent activity.'}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-4 xl:sticky xl:top-4 xl:self-start">
           <Card className="rounded-2xl border-border/70 bg-card shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
             <CardHeader className="pb-2 pt-4">
               <CardTitle className="text-sm font-medium text-foreground">Manager Inbox</CardTitle>
@@ -289,72 +301,30 @@ export function ManagerTriageDashboard({
                   {isLoading ? LOADING_LABEL : 'No upcoming shift clusters right now.'}
                 </p>
               )}
-              <div className="pt-1">
-                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-              </div>
             </CardContent>
           </Card>
         </div>
       </div>
-
-      {dayShiftsFilled !== '--' &&
-        dayShiftsTotal !== '--' &&
-        nightShiftsFilled !== '--' &&
-        nightShiftsTotal !== '--' && (
-          <ScheduleProgress
-            dayFilled={dayShiftsFilled}
-            dayTotal={dayShiftsTotal}
-            nightFilled={nightShiftsFilled}
-            nightTotal={nightShiftsTotal}
-          />
-        )}
-
-      <Card className="rounded-2xl border-border/70 bg-card shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
-        <CardHeader className="pb-2 pt-4">
-          <CardTitle className="text-sm font-medium text-foreground">Recent Activity</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2.5 pb-4">
-          {recentActivity.length > 0 ? (
-            recentActivity.map((item, index) => (
-              <div
-                key={`${item.title}-${index}`}
-                className="flex items-center justify-between gap-3"
-              >
-                <p className="text-sm text-foreground">{item.title}</p>
-                <p className="text-xs text-muted-foreground">{item.timeLabel}</p>
-              </div>
-            ))
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              {isLoading ? LOADING_LABEL : 'No recent activity.'}
-            </p>
-          )}
-        </CardContent>
-      </Card>
     </div>
   )
 }
 
 function MetricCard({
-  eyebrow,
   title,
   value,
   detail,
   href,
   icon,
-  emptyPrompt,
   tone,
 }: {
-  eyebrow: string
   title: string
   value: string
   detail: string
   href: string
   icon: ReactNode
-  emptyPrompt?: string
-  tone: 'error' | 'warning' | 'info' | 'success'
+  tone: 'error' | 'warning' | 'info'
 }) {
-  const isActionableEmpty = value === '0' || value === '0%' || value === '--'
+  const isEmpty = value === '0' || value === '0%' || value === '--'
   const toneClasses = {
     error: {
       stripe: 'bg-[var(--error)]',
@@ -368,53 +338,36 @@ function MetricCard({
       stripe: 'bg-primary',
       badge: 'bg-[var(--info-subtle)] text-[var(--info-text)]',
     },
-    success: {
-      stripe: 'bg-[var(--success)]',
-      badge: 'bg-[var(--success-subtle)] text-[var(--success-text)]',
-    },
   }[tone]
 
   return (
-    <Card
-      className={cn(
-        'relative overflow-hidden rounded-[24px] border-border/70 bg-card/95 shadow-[0_16px_36px_-32px_rgba(15,23,42,0.5)] transition-transform duration-200 hover:-translate-y-0.5',
-        isActionableEmpty && 'border-dashed bg-muted/20 shadow-none'
-      )}
-    >
-      <div className={cn('absolute inset-x-0 top-0 h-1', toneClasses.stripe)} />
-      <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4">
-        <div className="space-y-1">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            {eyebrow}
+    <Link href={href} className="block">
+      <Card
+        className={cn(
+          'relative overflow-hidden rounded-[24px] border-border/70 bg-card/95 shadow-[0_16px_36px_-32px_rgba(15,23,42,0.5)] transition-transform duration-200 hover:-translate-y-0.5',
+          isEmpty && 'border-dashed bg-muted/20 shadow-none'
+        )}
+      >
+        <div className={cn('absolute inset-x-0 top-0 h-1', toneClasses.stripe)} />
+        <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4">
+          <CardTitle className="text-sm font-medium text-foreground">{title}</CardTitle>
+          <div className={cn('rounded-full p-2', toneClasses.badge)}>{icon}</div>
+        </CardHeader>
+        <CardContent className="space-y-1 pb-4">
+          <p
+            className={cn(
+              'font-heading leading-none tracking-[-0.04em]',
+              isEmpty
+                ? 'text-lg font-semibold text-muted-foreground'
+                : 'text-2xl font-semibold text-foreground'
+            )}
+          >
+            {value}
           </p>
-          <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-            {title}
-          </CardTitle>
-        </div>
-        <div className={cn('rounded-full p-2', toneClasses.badge)}>{icon}</div>
-      </CardHeader>
-      <CardContent className="space-y-1.5 pb-4">
-        <p
-          className={cn(
-            'font-heading leading-none tracking-[-0.04em]',
-            isActionableEmpty
-              ? 'text-lg font-semibold text-muted-foreground'
-              : 'text-2xl font-semibold text-foreground'
-          )}
-        >
-          {value}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {isActionableEmpty && emptyPrompt ? emptyPrompt : detail}
-        </p>
-        <Button variant="ghost" size="sm" className="h-7 gap-1 px-0 text-xs" asChild>
-          <Link href={href}>
-            {isActionableEmpty && emptyPrompt ? 'Go' : 'Open'}
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </Button>
-      </CardContent>
-    </Card>
+          <p className="text-xs text-muted-foreground">{detail}</p>
+        </CardContent>
+      </Card>
+    </Link>
   )
 }
 
@@ -453,10 +406,4 @@ function InboxRow({
       )}
     </div>
   )
-}
-
-function getCoveragePercent(covered: number | '--', total: number | '--') {
-  if (covered === '--' || total === '--') return null
-  if (total <= 0) return 0
-  return Math.max(0, Math.min(100, Math.round((covered / total) * 100)))
 }

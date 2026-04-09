@@ -88,6 +88,14 @@ export async function restartPublishedCycleAction(formData: FormData) {
   }
 
   const supabase = await createClient()
+  const admin = (() => {
+    try {
+      return createAdminClient()
+    } catch (error) {
+      console.error('Failed to initialize admin client for cycle restart:', error)
+      redirect('/publish?error=cycle_restart_failed')
+    }
+  })()
 
   const { data: cycle, error: cycleError } = await supabase
     .from('schedule_cycles')
@@ -121,7 +129,7 @@ export async function restartPublishedCycleAction(formData: FormData) {
     redirect('/publish?error=cycle_restart_failed')
   }
 
-  const { error: closeSnapshotError } = await supabase
+  const { error: closeSnapshotError } = await admin
     .from('preliminary_snapshots')
     .update({ status: 'closed' })
     .eq('cycle_id', cycleId)
@@ -153,6 +161,14 @@ export async function unpublishCycleKeepShiftsAction(formData: FormData) {
   }
 
   const supabase = await createClient()
+  const admin = (() => {
+    try {
+      return createAdminClient()
+    } catch (error) {
+      console.error('Failed to initialize admin client for cycle unpublish:', error)
+      redirect('/publish?error=unpublish_keep_shifts_failed')
+    }
+  })()
   const { data: cycle, error: cycleError } = await supabase
     .from('schedule_cycles')
     .select('id, published')
@@ -178,7 +194,7 @@ export async function unpublishCycleKeepShiftsAction(formData: FormData) {
     redirect('/publish?error=unpublish_keep_shifts_failed')
   }
 
-  const { error: closeSnapshotError } = await supabase
+  const { error: closeSnapshotError } = await admin
     .from('preliminary_snapshots')
     .update({ status: 'closed' })
     .eq('cycle_id', cycleId)

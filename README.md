@@ -129,6 +129,15 @@ Recommended lane:
 - `npm run test:e2e` against `next dev` for routine regression coverage
 - `npm run build` + `npm run start:prod:local` + screenshot/UAT checks against `http://127.0.0.1:3001` before trusting product-level workflow behavior
 
+Focused workflow suites:
+
+- `e2e/coverage-publish-flow.spec.ts` - direct Coverage publish and override flow
+- `e2e/coverage-cycle-controls.spec.ts` - cycle create/delete plus auto-draft / clear-draft controls
+- `e2e/manager-specialized-controls.spec.ts` - swap partner approval and draft-cycle archive lifecycle
+- `e2e/publish-history-lifecycle.spec.ts` - publish details, delete history, and start-over lifecycle
+
+These focused specs complement the broader role/workflow coverage already in the repo and are useful when debugging a single manager-facing surface.
+
 Optional auth flow test uses:
 
 - `E2E_USER_EMAIL`

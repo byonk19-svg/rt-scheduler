@@ -9,6 +9,7 @@ import {
   submitPreliminaryChangeRequest,
   submitPreliminaryClaimRequest,
 } from '@/lib/preliminary-schedule/mutations'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 async function getCurrentActiveUser() {
@@ -73,11 +74,12 @@ async function redirectWithResult(success?: string, error?: string) {
 
 export async function claimPreliminaryShiftAction(formData: FormData) {
   const { supabase, userId } = await getCurrentActiveUser()
+  const admin = createAdminClient()
   const snapshotId = String(formData.get('snapshot_id') ?? '').trim()
   const shiftId = String(formData.get('shift_id') ?? '').trim()
   const note = String(formData.get('note') ?? '').trim()
 
-  const result = await submitPreliminaryClaimRequest(supabase as never, {
+  const result = await submitPreliminaryClaimRequest(admin as never, {
     snapshotId,
     shiftId,
     requesterId: userId,
@@ -98,11 +100,12 @@ export async function claimPreliminaryShiftAction(formData: FormData) {
 
 export async function requestPreliminaryChangeAction(formData: FormData) {
   const { supabase, userId } = await getCurrentActiveUser()
+  const admin = createAdminClient()
   const snapshotId = String(formData.get('snapshot_id') ?? '').trim()
   const shiftId = String(formData.get('shift_id') ?? '').trim()
   const note = String(formData.get('note') ?? '').trim()
 
-  const result = await submitPreliminaryChangeRequest(supabase as never, {
+  const result = await submitPreliminaryChangeRequest(admin as never, {
     snapshotId,
     shiftId,
     requesterId: userId,
@@ -122,10 +125,11 @@ export async function requestPreliminaryChangeAction(formData: FormData) {
 }
 
 export async function cancelPreliminaryRequestAction(formData: FormData) {
-  const { supabase, userId } = await getCurrentActiveUser()
+  const { userId } = await getCurrentActiveUser()
+  const admin = createAdminClient()
   const requestId = String(formData.get('request_id') ?? '').trim()
 
-  const result = await cancelPreliminaryRequest(supabase as never, {
+  const result = await cancelPreliminaryRequest(admin as never, {
     requestId,
     requesterId: userId,
   })
