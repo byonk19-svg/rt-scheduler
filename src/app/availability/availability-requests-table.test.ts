@@ -22,6 +22,33 @@ const MANAGER_ROWS: AvailabilityEntryTableRow[] = [
   },
 ]
 
+const THERAPIST_REVIEW_ROWS: AvailabilityEntryTableRow[] = [
+  {
+    id: 'a',
+    cycleId: 'cycle-1',
+    date: '2026-03-24',
+    reason: null,
+    createdAt: '2026-03-01T10:00:00.000Z',
+    requestedBy: 'Jamie T.',
+    cycleLabel: 'Mar 22-May 2',
+    entryType: 'force_off',
+    shiftType: 'both',
+    canDelete: true,
+  },
+  {
+    id: 'b',
+    cycleId: 'cycle-1',
+    date: '2026-03-25',
+    reason: 'Prefer this day',
+    createdAt: '2026-03-01T11:00:00.000Z',
+    requestedBy: 'Jamie T.',
+    cycleLabel: 'Mar 22-May 2',
+    entryType: 'force_on',
+    shiftType: 'both',
+    canDelete: true,
+  },
+]
+
 describe('AvailabilityEntriesTable', () => {
   it('frames manager review as request review work', () => {
     const html = renderToStaticMarkup(
@@ -35,5 +62,56 @@ describe('AvailabilityEntriesTable', () => {
 
     expect(html).toContain('Review requests')
     expect(html).toContain('Scan submitted requests before the cycle is published.')
+  })
+
+  it('uses a quiet empty note and a clear View affordance for therapist review', () => {
+    const html = renderToStaticMarkup(
+      createElement(AvailabilityEntriesTable, {
+        role: 'therapist',
+        rows: THERAPIST_REVIEW_ROWS,
+        deleteAvailabilityEntryAction: async () => {},
+        titleOverride: 'Submitted Availability',
+        initialFilters: {},
+      })
+    )
+
+    expect(html).not.toContain('No reason provided')
+    expect(html).toContain('—')
+    expect(html).toContain('>View</button>')
+    expect(html).not.toContain('Details</span>')
+    expect(html).toMatch(/>2<\/span>\s*entries/)
+    expect(html).toContain('>Action</th>')
+    expect(html).toContain('1 Need Off')
+    expect(html).toContain('1 Request to Work')
+    expect(html).not.toContain('>Shift</th>')
+  })
+
+  it('keeps a Shift column when any row differentiates shift scope', () => {
+    const rows: AvailabilityEntryTableRow[] = [
+      ...THERAPIST_REVIEW_ROWS,
+      {
+        id: 'c',
+        cycleId: 'cycle-1',
+        date: '2026-03-26',
+        reason: null,
+        createdAt: '2026-03-02T10:00:00.000Z',
+        requestedBy: 'Jamie T.',
+        cycleLabel: 'Mar 22-May 2',
+        entryType: 'force_off',
+        shiftType: 'day',
+        canDelete: true,
+      },
+    ]
+    const html = renderToStaticMarkup(
+      createElement(AvailabilityEntriesTable, {
+        role: 'therapist',
+        rows,
+        deleteAvailabilityEntryAction: async () => {},
+        initialFilters: {},
+      })
+    )
+
+    expect(html).toContain('>Shift</th>')
+    expect(html).toContain('Day shift')
   })
 })

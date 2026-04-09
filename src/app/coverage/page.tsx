@@ -48,7 +48,7 @@ import {
 import { getCoverageStatusLabel } from '@/lib/coverage/status-ui'
 import { can } from '@/lib/auth/can'
 import { parseRole, type Role } from '@/lib/auth/roles'
-import { dateRange, formatDateLabel, toIsoDate } from '@/lib/calendar-utils'
+import { dateRange, formatHumanCycleRange, toIsoDate } from '@/lib/calendar-utils'
 import { getOne, getScheduleFeedback, getWeekBoundsForDate } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/client'
 import type { AssignmentStatus, ShiftRole, ShiftStatus } from '@/lib/shift-types'
@@ -263,30 +263,51 @@ function CoveragePageContent() {
       minute: '2-digit',
     })
   }, [activePreliminarySnapshot])
-  const cycleSummaryLabel = useMemo(() => {
+  const scheduleSubtitle = useMemo(() => {
     const editHint = canManageCoverage
-      ? 'Click a day to edit staffing'
+      ? 'Click a day to edit staffing.'
       : canUpdateAssignmentStatus
-        ? 'Click a therapist name to update assignment status'
-        : 'View staffing and assignment status'
+        ? 'Click a therapist name to update assignment status.'
+        : 'View staffing and assignment status.'
     if (!printCycle) {
       return canManageCoverage
-        ? 'No open 6-week block - create a new draft block to start staffing'
-        : 'No published schedule is available right now'
+        ? 'No open 6-week block — create a new draft block to start staffing.'
+        : 'No published schedule is available right now.'
     }
-    const totalWeeks = Math.max(1, Math.round((printCycleDates.length || 42) / 7))
+    const range = formatHumanCycleRange(printCycle.start_date, printCycle.end_date)
+    const statusChip = activeCyclePublished ? (
+      <span className="font-medium text-[var(--success-text)]"> · Live</span>
+    ) : (
+      <span className="font-medium text-muted-foreground"> · Draft</span>
+    )
     if (!selectedCycleHasShiftRows) {
-      return `${formatDateLabel(printCycle.start_date)} - ${formatDateLabel(printCycle.end_date)} - ${totalWeeks} weeks - ${
-        canManageCoverage ? 'No staffing drafted yet' : 'No staffing published yet'
-      }`
+      return (
+        <>
+          <span className="block text-sm font-medium text-foreground/90">
+            {range}
+            {statusChip}
+          </span>
+          <span className="mt-1 block text-xs text-muted-foreground">
+            {canManageCoverage ? 'No staffing drafted yet.' : 'No staffing published yet.'}
+          </span>
+        </>
+      )
     }
-    return `${formatDateLabel(printCycle.start_date)} - ${formatDateLabel(printCycle.end_date)} - ${totalWeeks} weeks - ${editHint}`
+    return (
+      <>
+        <span className="block text-sm font-medium text-foreground/90">
+          {range}
+          {statusChip}
+        </span>
+        <span className="mt-1 block text-xs text-muted-foreground">{editHint}</span>
+      </>
+    )
   }, [
     printCycle,
-    printCycleDates.length,
     canManageCoverage,
     canUpdateAssignmentStatus,
     selectedCycleHasShiftRows,
+    activeCyclePublished,
   ])
 
   const showFullPrintRoster = canManageCoverage || actorRole === 'lead'
@@ -888,37 +909,49 @@ function CoveragePageContent() {
       >
         <ManagerWorkspaceHeader
           title="Schedule"
-          subtitle={cycleSummaryLabel}
+          subtitle={scheduleSubtitle}
           summary={
             <>
-              <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 font-medium text-foreground">
-                {noCycleSelected
-                  ? 'No active cycle'
-                  : showEmptyDraftState
-                    ? 'Draft not started'
-                  : !loading && issueCount > 0
-                  ? `${issueCount} ${issueCount === 1 ? 'issue' : 'issues'}`
-                  : 'Schedule workspace'}
-              </span>
-              <span className="text-muted-foreground">
-                {noCycleSelected
-                  ? canManageCoverage
-                    ? 'Create a new block to begin staffing'
-                    : 'Waiting for the next published schedule'
-                  : showEmptyDraftState
-                    ? canManageCoverage
-                      ? 'Auto-draft or manually assign the first shifts for this block'
-                      : 'No staffing is available in this block yet'
-                  : activeCyclePublished
-                    ? 'Live schedule - edits stay enabled'
-                    : 'Draft cycle'}
-              </span>
-              {preliminaryLive && (
+              {noCycleSelected ? (
                 <>
-                  <span className="text-border/90">/</span>
-                  <span className="text-muted-foreground">
-                    Preliminary live{preliminarySentLabel ? ` (${preliminarySentLabel})` : ''}
+                  <span className="rounded-md border border-border/60 bg-muted/25 px-2 py-0.5 text-[11px] font-medium text-foreground/85">
+                    No active cycle
                   </span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {canManageCoverage
+                      ? 'Create a block to begin staffing.'
+                      : 'Waiting for the next published schedule.'}
+                  </span>
+                </>
+              ) : showEmptyDraftState ? (
+                <span className="text-[11px] text-muted-foreground">
+                  {canManageCoverage
+                    ? 'Auto-draft or open a day to assign the first shifts.'
+                    : 'No staffing rows in this block yet.'}
+                </span>
+              ) : (
+                <>
+                  {issueCount > 0 && (
+                    <span className="rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)]/45 px-2 py-0.5 text-[11px] font-medium text-[var(--warning-text)]">
+                      {issueCount} {issueCount === 1 ? 'day' : 'days'} missing a lead
+                    </span>
+                  )}
+                  {preliminaryLive && (
+                    <span className="text-[11px] text-muted-foreground/90">
+                      Preliminary active
+                      {preliminarySentLabel ? ` · ${preliminarySentLabel}` : ''}
+                    </span>
+                  )}
+                  {issueCount === 0 && !preliminaryLive && activeCyclePublished && (
+                    <span className="text-[11px] text-muted-foreground/75">
+                      Updates publish to staff as you save.
+                    </span>
+                  )}
+                  {issueCount === 0 && !preliminaryLive && !activeCyclePublished && (
+                    <span className="text-[11px] text-muted-foreground/75">
+                      Draft — not visible to staff until published.
+                    </span>
+                  )}
                 </>
               )}
             </>
@@ -1046,7 +1079,7 @@ function CoveragePageContent() {
                       <button
                         type="button"
                         onClick={() => window.print()}
-                        className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
+                        className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
                       >
                         <Printer className="h-3.5 w-3.5" />
                         Print
@@ -1061,7 +1094,7 @@ function CoveragePageContent() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="gap-1.5 text-xs"
+                  className="gap-1.5 text-xs font-normal text-muted-foreground hover:text-foreground"
                   onClick={() => window.print()}
                 >
                   <Printer className="h-3.5 w-3.5" />
@@ -1072,31 +1105,37 @@ function CoveragePageContent() {
           }
         />
 
-        <div className="px-6 pb-4 pt-4">
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center gap-2">
+        <div className="px-6 pb-2 pt-2">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-4">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
               {availableCycles.slice(0, 4).map((cycle) => {
                 const isActive = cycle.id === activeCycleId
+                const rangeLabel = formatHumanCycleRange(cycle.start_date, cycle.end_date)
                 return (
                   <Link
                     key={cycle.id}
                     href={`/coverage?cycle=${cycle.id}&view=week`}
+                    title={cycle.label}
                     className={cn(
-                      'rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                      'rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
                       isActive
-                        ? 'border-primary/50 bg-primary/8 text-foreground'
-                        : 'border-border/80 bg-card text-muted-foreground hover:bg-muted/30 hover:text-foreground'
+                        ? 'border-primary/55 bg-primary/10 text-foreground shadow-sm'
+                        : 'border-border/70 bg-card text-muted-foreground hover:bg-muted/35 hover:text-foreground'
                     )}
                   >
-                    {cycle.label}
-                    {cycle.published ? ' • Live' : ''}
+                    <span>{rangeLabel}</span>
+                    {cycle.published && !isActive ? (
+                      <span className="ml-1 text-[0.65rem] font-normal text-muted-foreground">
+                        · Live
+                      </span>
+                    ) : null}
                   </Link>
                 )
               })}
             </div>
 
             {!noCycleSelected && (
-              <div className="inline-flex overflow-hidden rounded-lg border border-border">
+              <div className="inline-flex shrink-0 overflow-hidden rounded-lg border border-border">
                 {(['Day', 'Night'] as const).map((tab) => (
                   <button
                     key={tab}
@@ -1104,7 +1143,7 @@ function CoveragePageContent() {
                     onClick={() => handleTabSwitch(tab)}
                     data-testid={`coverage-shift-tab-${tab.toLowerCase()}`}
                     className={cn(
-                      'px-3.5 py-1.5 text-xs font-medium transition-colors',
+                      'px-3 py-1.5 text-xs font-medium transition-colors',
                       shiftTab === tab
                         ? 'bg-primary/90 text-primary-foreground'
                         : 'bg-card text-muted-foreground hover:bg-muted/30 hover:text-foreground'
@@ -1124,12 +1163,13 @@ function CoveragePageContent() {
         initial="hidden"
         animate="visible"
         custom={1}
-        className="no-print px-6 py-5"
+        className="no-print px-6 py-4"
       >
+        {/* Future: quick exception filters (understaffed, open slots, missing lead, conflicts). */}
         {activeCyclePublished && (
-          <div className="mb-3 flex items-center gap-3 rounded-lg border border-[var(--success-border)] bg-[var(--success-subtle)] px-4 py-2.5">
-            <span className="text-xs text-[var(--success-text)]">
-              Live — staffing changes are visible to employees immediately.
+          <div className="mb-3 flex items-center gap-3 rounded-lg border border-[var(--success-border)]/85 bg-[var(--success-subtle)]/80 px-3 py-2">
+            <span className="text-xs leading-snug text-[var(--success-text)]">
+              Live schedule — staff see updates as you save.
             </span>
             <Link
               href={weekRosterHref}

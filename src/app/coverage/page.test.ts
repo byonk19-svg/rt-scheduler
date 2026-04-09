@@ -39,7 +39,8 @@ describe('coverage publish override affordance', () => {
     expect(source).toContain('New 6-week block')
     expect(source).toContain('ClearDraftConfirmDialog')
     expect(source).toContain('CycleManagementDialog')
-    expect(source).toContain('Live schedule - edits stay enabled')
+    expect(source).toContain('formatHumanCycleRange')
+    expect(source).toContain('Updates publish to staff as you save.')
     expect(source).toContain('Publish history')
   })
 

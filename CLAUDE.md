@@ -1,6 +1,16 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-08 (session 37)
+Updated: 2026-04-08 (session 38)
+
+## Latest Updates (2026-04-08, session 38)
+
+- **Submitted Availability review table** (`availability-requests-table.tsx`, `TableToolbar.tsx`, tests):
+  - Empty notes: muted **—** (no “No reason provided”); **Request to Work** uses info-tinted pill; **Action** column + **View**/**Hide** button; **Shift** column hidden when all rows are `both`; compact toolbar (sort inline when no date range); entry summary line; `TableToolbar` optional **`compact`** prop.
+- **Schedule / Coverage (`/coverage`) — scan + header polish** (`page.tsx`, `CalendarGrid.tsx`, `ManagerWorkspaceHeader.tsx`, tests):
+  - Subtitle: **`formatHumanCycleRange`** + **· Live** / **· Draft** with secondary hint line; lighter summary (issues / preliminary / short draft-live copy); cycle pills show human date range, **`title`** = DB label, **· Live** only on non-active published cycles; pills + Day/Night toggle one row from `md` up; slimmer live banner; Print de-emphasized; comment hook for future exception filters.
+  - Grid: **staffingCardTone** tints day tiles (constraint / missing lead / under / partial / full); stronger count pill; **No lead** chip when applicable; softer lead block; roster divider + lighter name text; stronger DOW header row.
+- **ManagerWorkspaceHeader:** `subtitle` accepts **ReactNode**; slightly tighter vertical padding (all manager surfaces using it).
+- **Verification:** `npx tsc --noEmit`, `npm run lint` (touched files), `npx vitest run` (**426 tests** passing).
 
 ## Latest Updates (2026-04-08, session 37)
 
@@ -746,7 +756,7 @@ All checks currently green:
 - `npm run lint` pass
 - `npm run format:check` pass (whole-repo Prettier; `.claude/**` excluded from ESLint)
 - `npm run build` pass
-- `npm run test:unit` pass (**424 tests**)
+- `npm run test:unit` pass (**426 tests**)
 - `npm run test:e2e` pass (39 passed, 1 skipped)
 
 CI gates: format check â†’ lint â†’ tsc â†’ build â†’ Playwright E2E
