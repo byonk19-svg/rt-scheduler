@@ -19,6 +19,24 @@ import { formatEmployeeDate } from '@/lib/employee-directory'
 import { getTeamRolePermissions } from '@/lib/team-role-permissions'
 import { cn } from '@/lib/utils'
 
+export type WorkPatternRecord = {
+  works_dow: number[]
+  offs_dow: number[]
+  works_dow_mode: 'hard' | 'soft'
+  weekend_rotation: 'none' | 'every_other'
+  weekend_anchor_date: string | null
+}
+
+const DOW_OPTIONS = [
+  { label: 'Su', value: 0 },
+  { label: 'Mo', value: 1 },
+  { label: 'Tu', value: 2 },
+  { label: 'We', value: 3 },
+  { label: 'Th', value: 4 },
+  { label: 'Fr', value: 5 },
+  { label: 'Sa', value: 6 },
+]
+
 export type TeamProfileRecord = {
   id: string
   full_name: string | null
@@ -33,6 +51,7 @@ export type TeamProfileRecord = {
 
 type TeamDirectoryProps = {
   profiles: TeamProfileRecord[]
+  workPatterns?: Record<string, WorkPatternRecord>
   initialEditProfileId?: string | null
   archiveTeamMemberAction: (formData: FormData) => void | Promise<void>
   saveTeamQuickEditAction: (formData: FormData) => void | Promise<void>
@@ -312,16 +331,32 @@ function InactiveAccessNotice() {
 
 export function TeamDirectory({
   profiles,
+  workPatterns = {},
   initialEditProfileId = null,
   archiveTeamMemberAction,
   saveTeamQuickEditAction,
 }: TeamDirectoryProps) {
   const initialEditProfile = profiles.find((profile) => profile.id === initialEditProfileId) ?? null
+  const initialPattern = initialEditProfile ? (workPatterns[initialEditProfile.id] ?? null) : null
+
   const [editProfileId, setEditProfileId] = useState<string | null>(initialEditProfile?.id ?? null)
   const [draftRole, setDraftRole] = useState<EditableRole>(
     (initialEditProfile?.role as EditableRole | null) ?? 'therapist'
   )
   const [onFmla, setOnFmla] = useState(initialEditProfile?.on_fmla === true)
+
+  // Work pattern state
+  const [hasPattern, setHasPattern] = useState(
+    initialPattern !== null && initialPattern.works_dow.length > 0
+  )
+  const [selectedDays, setSelectedDays] = useState<number[]>(initialPattern?.works_dow ?? [])
+  const [neverDays, setNeverDays] = useState<number[]>(initialPattern?.offs_dow ?? [])
+  const [worksDowMode, setWorksDowMode] = useState<'hard' | 'soft'>(
+    initialPattern?.works_dow_mode ?? 'hard'
+  )
+  const [weekendRotation, setWeekendRotation] = useState<'none' | 'every_other'>(
+    initialPattern?.weekend_rotation ?? 'none'
+  )
 
   const sections = useMemo(() => partitionTeamProfiles(profiles), [profiles])
   const editProfile = useMemo(
@@ -333,9 +368,27 @@ export function TeamDirectory({
   function openEditor(profileId: string) {
     const profile = profiles.find((item) => item.id === profileId)
     if (!profile) return
+    const pattern = workPatterns[profileId] ?? null
     setEditProfileId(profileId)
     setDraftRole((profile.role as EditableRole | null) ?? 'therapist')
     setOnFmla(profile.on_fmla === true)
+    setHasPattern(pattern !== null && (pattern.works_dow ?? []).length > 0)
+    setSelectedDays(pattern?.works_dow ?? [])
+    setNeverDays(pattern?.offs_dow ?? [])
+    setWorksDowMode(pattern?.works_dow_mode ?? 'hard')
+    setWeekendRotation(pattern?.weekend_rotation ?? 'none')
+  }
+
+  function toggleDay(value: number) {
+    setSelectedDays((current) =>
+      current.includes(value) ? current.filter((d) => d !== value) : [...current, value]
+    )
+  }
+
+  function toggleNeverDay(value: number) {
+    setNeverDays((current) =>
+      current.includes(value) ? current.filter((d) => d !== value) : [...current, value]
+    )
   }
 
   return (
@@ -487,6 +540,180 @@ export function TeamDirectory({
               ) : (
                 <InactiveAccessNotice />
               )}
+
+              {/* ── Scheduling Constraints ── */}
+              <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-3">
+                <p className="text-sm font-semibold text-foreground">Scheduling Constraints</p>
+
+                {/* ── Days they never work (offs_dow) — always shown ── */}
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-foreground">Days they never work</p>
+                  <p className="text-xs text-muted-foreground">
+                    Auto-draft will never assign them on these days, regardless of anything else.
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DOW_OPTIONS.map((day) => (
+                      <button
+                        key={day.value}
+                        type="button"
+                        onClick={() => toggleNeverDay(day.value)}
+                        className={cn(
+                          'h-9 w-10 rounded-lg border text-xs font-semibold transition-colors',
+                          neverDays.includes(day.value)
+                            ? 'border-destructive bg-destructive/10 text-destructive'
+                            : 'border-border bg-card text-muted-foreground hover:border-destructive/40 hover:text-foreground'
+                        )}
+                      >
+                        {day.label}
+                      </button>
+                    ))}
+                  </div>
+                  {neverDays.map((d) => (
+                    <input key={d} type="hidden" name="offs_dow" value={String(d)} />
+                  ))}
+                </div>
+
+                <div className="h-px bg-border/60" />
+
+                {/* ── Recurring weekly pattern (works_dow) — toggled ── */}
+                <div className="space-y-3">
+                  <label className="flex cursor-pointer items-center gap-2.5">
+                    <input
+                      type="checkbox"
+                      name="has_recurring_schedule"
+                      className="h-4 w-4"
+                      checked={hasPattern}
+                      onChange={(e) => setHasPattern(e.target.checked)}
+                    />
+                    <span className="text-xs font-medium text-foreground">
+                      Has a fixed weekly pattern
+                      <span className="ml-1 font-normal text-muted-foreground">
+                        — works the same days every week
+                      </span>
+                    </span>
+                  </label>
+
+                  {hasPattern && (
+                    <div className="space-y-3 pl-1">
+                      {/* Work days */}
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-medium text-foreground">Days they work</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {DOW_OPTIONS.map((day) => (
+                            <button
+                              key={day.value}
+                              type="button"
+                              onClick={() => toggleDay(day.value)}
+                              className={cn(
+                                'h-9 w-10 rounded-lg border text-xs font-semibold transition-colors',
+                                selectedDays.includes(day.value)
+                                  ? 'border-primary bg-primary text-primary-foreground'
+                                  : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                              )}
+                            >
+                              {day.label}
+                            </button>
+                          ))}
+                        </div>
+                        {selectedDays.map((d) => (
+                          <input key={d} type="hidden" name="works_dow" value={String(d)} />
+                        ))}
+                      </div>
+
+                      {/* Strictness */}
+                      {selectedDays.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-foreground">How strict?</p>
+                          <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border bg-card px-3 py-2 text-sm has-[:checked]:border-primary/40 has-[:checked]:bg-primary/5">
+                            <input
+                              type="radio"
+                              name="works_dow_mode"
+                              value="hard"
+                              className="mt-0.5 h-4 w-4 shrink-0"
+                              checked={worksDowMode === 'hard'}
+                              onChange={() => setWorksDowMode('hard')}
+                            />
+                            <span>
+                              <span className="font-medium text-foreground">Only these days</span>
+                              <span className="ml-1 text-muted-foreground">
+                                — will not be scheduled on other days
+                              </span>
+                            </span>
+                          </label>
+                          <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border bg-card px-3 py-2 text-sm has-[:checked]:border-primary/40 has-[:checked]:bg-primary/5">
+                            <input
+                              type="radio"
+                              name="works_dow_mode"
+                              value="soft"
+                              className="mt-0.5 h-4 w-4 shrink-0"
+                              checked={worksDowMode === 'soft'}
+                              onChange={() => setWorksDowMode('soft')}
+                            />
+                            <span>
+                              <span className="font-medium text-foreground">
+                                Usually these days
+                              </span>
+                              <span className="ml-1 text-muted-foreground">
+                                — preferred but can flex when needed
+                              </span>
+                            </span>
+                          </label>
+                        </div>
+                      )}
+
+                      {/* Weekend rotation */}
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-medium text-foreground">Weekend rotation</p>
+                        <div className="space-y-1">
+                          <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2 text-sm has-[:checked]:border-primary/40 has-[:checked]:bg-primary/5">
+                            <input
+                              type="radio"
+                              name="weekend_rotation"
+                              value="none"
+                              className="h-4 w-4 shrink-0"
+                              checked={weekendRotation === 'none'}
+                              onChange={() => setWeekendRotation('none')}
+                            />
+                            <span className="font-medium text-foreground">Works every weekend</span>
+                          </label>
+                          <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2 text-sm has-[:checked]:border-primary/40 has-[:checked]:bg-primary/5">
+                            <input
+                              type="radio"
+                              name="weekend_rotation"
+                              value="every_other"
+                              className="h-4 w-4 shrink-0"
+                              checked={weekendRotation === 'every_other'}
+                              onChange={() => setWeekendRotation('every_other')}
+                            />
+                            <span className="font-medium text-foreground">Every other weekend</span>
+                          </label>
+                        </div>
+
+                        {weekendRotation === 'every_other' && (
+                          <div className="mt-2 space-y-1">
+                            <label
+                              htmlFor="weekend_anchor_date"
+                              className="text-xs font-medium text-foreground"
+                            >
+                              Pick a Saturday for their next on-weekend block
+                            </label>
+                            <Input
+                              id="weekend_anchor_date"
+                              name="weekend_anchor_date"
+                              type="date"
+                              defaultValue={workPatterns[editProfile.id]?.weekend_anchor_date ?? ''}
+                              required
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Auto-draft alternates weekends from this date.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
 
               <DialogFooter className="gap-2 sm:justify-between">
                 {!editProfileIsActive ? (

@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { archiveTeamMemberAction, saveTeamQuickEditAction } from '@/app/team/actions'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
-import { TeamDirectory } from '@/components/team/TeamDirectory'
+import { TeamDirectory, type WorkPatternRecord } from '@/components/team/TeamDirectory'
 import { can } from '@/lib/auth/can'
 import { MANAGED_TEAM_ROLE_VALUES, parseRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
@@ -18,6 +18,14 @@ type ProfileRow = {
   is_active: boolean | null
   on_fmla: boolean | null
   fmla_return_date: string | null
+}
+
+type WorkPatternRow = {
+  therapist_id: string
+  works_dow: number[]
+  works_dow_mode: string
+  weekend_rotation: string
+  weekend_anchor_date: string | null
 }
 
 type TeamSearchParams = {
@@ -112,6 +120,23 @@ export default async function TeamPage({
     .order('full_name', { ascending: true })
 
   const allProfiles = (profiles ?? []) as ProfileRow[]
+
+  const { data: patternRows } = await supabase
+    .from('work_patterns')
+    .select(
+      'therapist_id, works_dow, offs_dow, works_dow_mode, weekend_rotation, weekend_anchor_date'
+    )
+
+  const workPatterns: Record<string, WorkPatternRecord> = {}
+  for (const row of (patternRows ?? []) as WorkPatternRow[]) {
+    workPatterns[row.therapist_id] = {
+      works_dow: row.works_dow,
+      offs_dow: (row as { offs_dow?: number[] }).offs_dow ?? [],
+      works_dow_mode: row.works_dow_mode === 'soft' ? 'soft' : 'hard',
+      weekend_rotation: row.weekend_rotation === 'every_other' ? 'every_other' : 'none',
+      weekend_anchor_date: row.weekend_anchor_date ?? null,
+    }
+  }
   const activeProfiles = allProfiles.filter((profile) => profile.is_active !== false)
   const managerCount = activeProfiles.filter((profile) => profile.role === 'manager').length
   const leadCount = activeProfiles.filter((profile) => profile.role === 'lead').length
@@ -149,6 +174,7 @@ export default async function TeamPage({
 
       <TeamDirectory
         profiles={allProfiles}
+        workPatterns={workPatterns}
         initialEditProfileId={initialEditProfileId}
         archiveTeamMemberAction={archiveTeamMemberAction}
         saveTeamQuickEditAction={saveTeamQuickEditAction}

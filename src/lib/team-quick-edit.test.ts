@@ -45,6 +45,14 @@ describe('parseTeamQuickEditFormData', () => {
         onFmla: true,
         fmlaReturnDate: '2026-05-12',
         isActive: true,
+        workPattern: {
+          hasPattern: false,
+          worksDow: [],
+          offsDow: [],
+          worksDowMode: 'hard',
+          weekendRotation: 'none',
+          weekendAnchorDate: null,
+        },
       },
     })
   })

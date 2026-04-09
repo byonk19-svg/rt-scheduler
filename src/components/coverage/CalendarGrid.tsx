@@ -200,13 +200,13 @@ export function CalendarGrid({
                           <div className="flex flex-col items-end gap-1">
                             <span
                               className={cn(
-                                'min-w-[2.75rem] rounded-full px-2.5 py-1 text-center text-[0.68rem] font-bold leading-none tabular-nums',
+                                'min-w-[2.85rem] rounded-full px-2.5 py-1.5 text-center text-[0.7rem] font-extrabold leading-none tabular-nums shadow-[0_1px_2px_rgba(15,23,42,0.06)]',
                                 threshold === 'red' &&
-                                  'bg-[var(--error-subtle)] text-[var(--error-text)] ring-1 ring-[var(--error-border)]/35',
+                                  'bg-[var(--error-subtle)] text-[var(--error-text)] ring-2 ring-[var(--error-border)]/50',
                                 threshold === 'yellow' &&
-                                  'bg-[var(--warning-subtle)] text-[var(--warning-text)] ring-1 ring-[var(--warning-border)]/40',
+                                  'bg-[var(--warning-subtle)] text-[var(--warning-text)] ring-2 ring-[var(--warning-border)]/55',
                                 threshold === 'green' &&
-                                  'bg-[var(--success-subtle)] text-[var(--success-text)] ring-1 ring-[var(--success-border)]/35'
+                                  'bg-[var(--success-subtle)]/95 text-[var(--success-text)] ring-2 ring-[var(--success-border)]/50'
                               )}
                             >
                               {activeCount}/{totalCount}
@@ -226,13 +226,13 @@ export function CalendarGrid({
 
                         <div
                           className={cn(
-                            'mt-1.5 rounded-[14px] border px-2 py-1',
+                            'mt-1.5 rounded-xl border px-1.75 py-1',
                             day.leadShift
-                              ? 'border-[var(--info-border)]/65 bg-[var(--info-subtle)]/40 text-[var(--info-text)]'
-                              : 'border-[var(--warning-border)]/75 bg-[var(--warning-subtle)]/25 text-[var(--warning-text)]'
+                              ? 'border-[var(--info-border)]/40 bg-[var(--info-subtle)]/22 text-[var(--info-text)]'
+                              : 'border-[var(--warning-border)]/55 bg-[var(--warning-subtle)]/18 text-[var(--warning-text)]'
                           )}
                         >
-                          <p className="text-[0.5rem] font-semibold uppercase tracking-[0.2em] text-muted-foreground/90">
+                          <p className="text-[0.5rem] font-semibold uppercase tracking-[0.2em] text-muted-foreground/75">
                             LEAD
                           </p>
                           {day.leadShift ? (

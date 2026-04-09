@@ -140,6 +140,27 @@ export async function saveTeamQuickEditAction(formData: FormData) {
     await realignFutureDraftShiftsForEmployee(supabase, input.profileId)
   }
 
+  // Upsert or clear the recurring work pattern
+  if (input.workPattern.hasPattern) {
+    const { error: patternError } = await supabase.from('work_patterns').upsert(
+      {
+        therapist_id: input.profileId,
+        works_dow: input.workPattern.worksDow,
+        offs_dow: input.workPattern.offsDow,
+        works_dow_mode: input.workPattern.worksDowMode,
+        weekend_rotation: input.workPattern.weekendRotation,
+        weekend_anchor_date: input.workPattern.weekendAnchorDate,
+        shift_preference: 'either',
+      },
+      { onConflict: 'therapist_id' }
+    )
+    if (patternError) {
+      console.error('Failed to save work pattern:', patternError)
+    }
+  } else {
+    await supabase.from('work_patterns').delete().eq('therapist_id', input.profileId)
+  }
+
   revalidatePath('/team')
   revalidatePath('/schedule')
   revalidatePath('/coverage')

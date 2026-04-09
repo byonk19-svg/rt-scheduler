@@ -40,8 +40,21 @@ describe('coverage publish override affordance', () => {
     expect(source).toContain('ClearDraftConfirmDialog')
     expect(source).toContain('CycleManagementDialog')
     expect(source).toContain('formatHumanCycleRange')
-    expect(source).toContain('Updates publish to staff as you save.')
+    expect(source).toContain('Schedule cycle')
     expect(source).toContain('Publish history')
+  })
+
+  it('defaults schedule shift tab from profile shift_type and honors ?shift= query', () => {
+    const filePath = resolve(process.cwd(), 'src/app/coverage/page.tsx')
+    const source = readFileSync(filePath, 'utf8')
+
+    expect(source).toContain('shift_type')
+    expect(source).toContain('parseCoverageShiftSearchParam')
+    expect(source).toContain('COVERAGE_SHIFT_QUERY_KEY')
+    expect(source).toContain('normalizeActorShiftType')
+    expect(source).toContain('defaultCoverageShiftTabFromProfileShift')
+    expect(source).toContain('router.replace')
+    expect(source).toContain('handleTabSwitch')
   })
 
   it('shows an explicit empty state instead of a synthetic 6-week window when no cycle exists', () => {

@@ -1,6 +1,18 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-08 (session 38)
+Updated: 2026-04-09 (session 39)
+
+## Latest Updates (2026-04-09, session 39)
+
+- **Schedule / Coverage (`/coverage`) — default shift tab + URL sync** (`page.tsx`, `coverage-shift-tab.ts`, tests):
+  - Default **Day Shift** / **Night Shift** tab from signed-in `profiles.shift_type` when `?shift=` is absent; **`?shift=day|night`** overrides (case-insensitive).
+  - **Toggle** calls **`router.replace`** so the query string stays aligned; **cycle pills** and **View published schedule** preserve the active shift.
+  - Helpers live in **`src/lib/coverage/coverage-shift-tab.ts`** (parse, profile default, query value); **`/schedule`** redirect already passes query through to `/coverage`.
+- **Schedule screen polish (prior pass, same files)** (`CalendarGrid.tsx`, `page.tsx`): **Schedule cycle** label above pills; stronger **coverage** count pill; softer **lead** block; trimmed duplicate live copy near title; **View published schedule** link with chevron + focus/hover.
+- **Team (`/team`) — recurring pattern in quick edit** (`TeamDirectory.tsx`, `team-quick-edit.ts`, `team/actions.ts`, `page.tsx`, tests, plan `docs/superpowers/plans/2026-04-08-copy-cycle-availability.md`):
+  - Quick-edit modal can capture **work pattern** fields (works/offs DOW, mode, weekend rotation/anchor) for therapist/lead rows.
+- **Lib — copy availability between cycles (pure)** (`copy-cycle-availability.ts`, tests): **`shiftOverridesToCycle`** maps override dates from a source cycle into a target window (gap from cycle starts); supports future copy-availability UX.
+- **Verification:** `npx tsc --noEmit`, ESLint on touched files, `npx vitest run` (**439 tests** passing, including **`copy-cycle-availability.test.ts`**).
 
 ## Latest Updates (2026-04-08, session 38)
 
@@ -756,7 +768,7 @@ All checks currently green:
 - `npm run lint` pass
 - `npm run format:check` pass (whole-repo Prettier; `.claude/**` excluded from ESLint)
 - `npm run build` pass
-- `npm run test:unit` pass (**426 tests**)
+- `npm run test:unit` pass (**439 tests**)
 - `npm run test:e2e` pass (39 passed, 1 skipped)
 
 CI gates: format check â†’ lint â†’ tsc â†’ build â†’ Playwright E2E
@@ -896,6 +908,7 @@ Assignment status is informational only (does not affect coverage counts or publ
 - Clicking a day opens the editor dialog
 - Clicking an assigned therapist opens the status popover without opening the editor
 - Day/Night shift tabs; therapist assignment rows live in the dialog
+- **Default shift tab:** without `?shift=`, the selected tab follows signed-in `profiles.shift_type` (night → Night, else Day). **`?shift=day|night`** overrides; toggling updates the URL (`shift` query) while preserving other params. Helpers: `src/lib/coverage/coverage-shift-tab.ts`
 - Optimistic status updates with rollback on save failure
 - Lead/staff assignment actions still use current Teamwise mutations and rules
 - Coverage E2E now validates dialog/popover workflow instead of the removed drawer
@@ -921,6 +934,7 @@ Assignment status is informational only (does not affect coverage counts or publ
   - FMLA
   - FMLA return date
   - active/inactive
+  - recurring **work pattern** (works/offs DOW, hard/soft works mode, weekend rotation + anchor) for therapist/lead rows
 - `Lead Therapist` is the visible manager-facing role label; the separate `Coverage lead` control was removed from `/team`
 - The page now shares the quieter manager workspace header pattern and lighter card framing used on `/availability` and `/approvals`
 - `/directory` should be treated as a compatibility redirect only, not a feature surface

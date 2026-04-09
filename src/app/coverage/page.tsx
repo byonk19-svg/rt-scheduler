@@ -2,8 +2,8 @@
 
 import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { Printer, Send, Sparkles } from 'lucide-react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { ChevronRight, Printer, Send, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 import { AutoDraftConfirmDialog } from '@/components/coverage/AutoDraftConfirmDialog'
@@ -57,6 +57,13 @@ import {
   fetchActiveOperationalCodeMap,
   toLegacyShiftStatusFromOperationalCode,
 } from '@/lib/operational-codes'
+import {
+  COVERAGE_SHIFT_QUERY_KEY,
+  defaultCoverageShiftTabFromProfileShift,
+  normalizeActorShiftType,
+  parseCoverageShiftSearchParam,
+  shiftTabToQueryValue,
+} from '@/lib/coverage/coverage-shift-tab'
 
 type DayStatus = DayItem['dayStatus']
 
@@ -149,6 +156,8 @@ async function fetchCoverageNamesByUserId(cycleId: string): Promise<Record<strin
 
 function CoveragePageContent() {
   const search = useSearchParams()
+  const pathname = usePathname()
+  const router = useRouter()
   const cycleFromUrl = search.get('cycle')
   const successParam = search.get('success')
   const errorParam = search.get('error')
@@ -157,7 +166,18 @@ function CoveragePageContent() {
   const overrideWeeklyRulesParam = search.get('override_weekly_rules')
   const overrideShiftRulesParam = search.get('override_shift_rules')
   const supabase = useMemo(() => createClient(), [])
-  const [shiftTab, setShiftTab] = useState<ShiftTab>('Day')
+  const urlShiftTab = useMemo(
+    () => parseCoverageShiftSearchParam(search.get(COVERAGE_SHIFT_QUERY_KEY)),
+    [search]
+  )
+  const [shiftTab, setShiftTab] = useState<ShiftTab>(() =>
+    parseCoverageShiftSearchParam(search.get(COVERAGE_SHIFT_QUERY_KEY)) ?? 'Day'
+  )
+  const [actorScheduleShift, setActorScheduleShift] = useState<{
+    resolved: boolean
+    type: 'day' | 'night' | null
+  }>({ resolved: false, type: null })
+  const profileDefaultAppliedRef = useRef(false)
   const [dayDays, setDayDays] = useState<DayItem[]>([])
   const [nightDays, setNightDays] = useState<DayItem[]>([])
   const [activeCycleId, setActiveCycleId] = useState<string | null>(cycleFromUrl)
@@ -250,9 +270,28 @@ function CoveragePageContent() {
     [days]
   )
 
-  const weekRosterHref = activeCycleId
-    ? `/coverage?cycle=${activeCycleId}&view=week`
-    : '/coverage?view=week'
+  useEffect(() => {
+    if (urlShiftTab != null) {
+      setShiftTab(urlShiftTab)
+      profileDefaultAppliedRef.current = true
+    }
+  }, [urlShiftTab])
+
+  useEffect(() => {
+    if (urlShiftTab != null) return
+    if (!actorScheduleShift.resolved) return
+    if (profileDefaultAppliedRef.current) return
+    setShiftTab(defaultCoverageShiftTabFromProfileShift(actorScheduleShift.type))
+    profileDefaultAppliedRef.current = true
+  }, [urlShiftTab, actorScheduleShift])
+
+  const weekRosterHref = useMemo(() => {
+    const params = new URLSearchParams()
+    if (activeCycleId) params.set('cycle', activeCycleId)
+    params.set('view', 'week')
+    params.set(COVERAGE_SHIFT_QUERY_KEY, shiftTabToQueryValue(shiftTab))
+    return `/coverage?${params.toString()}`
+  }, [activeCycleId, shiftTab])
   const preliminaryLive = Boolean(activePreliminarySnapshot)
   const preliminarySentLabel = useMemo(() => {
     if (!activePreliminarySnapshot) return null
@@ -265,9 +304,9 @@ function CoveragePageContent() {
   }, [activePreliminarySnapshot])
   const scheduleSubtitle = useMemo(() => {
     const editHint = canManageCoverage
-      ? 'Click a day to edit staffing.'
+      ? 'View staffing and assignment status — click a day to edit.'
       : canUpdateAssignmentStatus
-        ? 'Click a therapist name to update assignment status.'
+        ? 'View staffing and assignment status — click a therapist name to update status.'
         : 'View staffing and assignment status.'
     if (!printCycle) {
       return canManageCoverage
@@ -331,17 +370,26 @@ function CoveragePageContent() {
         const { data: auth } = await supabase.auth.getUser()
         const uid = auth.user?.id
         if (!uid) {
-          if (active) setLoading(false)
+          if (active) {
+            setActorScheduleShift({ resolved: true, type: null })
+          }
           return
         }
 
         const { data: prof } = await supabase
           .from('profiles')
-          .select('role, is_active, archived_at')
+          .select('role, is_active, archived_at, shift_type')
           .eq('id', uid)
           .maybeSingle()
 
         if (!active) return
+
+        if (active) {
+          setActorScheduleShift({
+            resolved: true,
+            type: normalizeActorShiftType(prof?.shift_type),
+          })
+        }
 
         const role = parseRole(prof?.role)
         const permContext = {
@@ -572,6 +620,9 @@ function CoveragePageContent() {
       } finally {
         if (active) {
           setLoading(false)
+          setActorScheduleShift((prev) =>
+            prev.resolved ? prev : { resolved: true, type: null }
+          )
         }
       }
     }
@@ -672,8 +723,12 @@ function CoveragePageContent() {
 
   const handleTabSwitch = (tab: ShiftTab) => {
     setShiftTab(tab)
+    profileDefaultAppliedRef.current = true
     setSelectedId(null)
     setAssignError('')
+    const params = new URLSearchParams(search.toString())
+    params.set(COVERAGE_SHIFT_QUERY_KEY, shiftTabToQueryValue(tab))
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
   const handleSelect = (id: string) => {
@@ -942,11 +997,6 @@ function CoveragePageContent() {
                       {preliminarySentLabel ? ` · ${preliminarySentLabel}` : ''}
                     </span>
                   )}
-                  {issueCount === 0 && !preliminaryLive && activeCyclePublished && (
-                    <span className="text-[11px] text-muted-foreground/75">
-                      Updates publish to staff as you save.
-                    </span>
-                  )}
                   {issueCount === 0 && !preliminaryLive && !activeCyclePublished && (
                     <span className="text-[11px] text-muted-foreground/75">
                       Draft — not visible to staff until published.
@@ -1107,31 +1157,37 @@ function CoveragePageContent() {
 
         <div className="px-6 pb-2 pt-2">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-4">
-            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-              {availableCycles.slice(0, 4).map((cycle) => {
-                const isActive = cycle.id === activeCycleId
-                const rangeLabel = formatHumanCycleRange(cycle.start_date, cycle.end_date)
-                return (
-                  <Link
-                    key={cycle.id}
-                    href={`/coverage?cycle=${cycle.id}&view=week`}
-                    title={cycle.label}
-                    className={cn(
-                      'rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
-                      isActive
-                        ? 'border-primary/55 bg-primary/10 text-foreground shadow-sm'
-                        : 'border-border/70 bg-card text-muted-foreground hover:bg-muted/35 hover:text-foreground'
-                    )}
-                  >
-                    <span>{rangeLabel}</span>
-                    {cycle.published && !isActive ? (
-                      <span className="ml-1 text-[0.65rem] font-normal text-muted-foreground">
-                        · Live
-                      </span>
-                    ) : null}
-                  </Link>
-                )
-              })}
+            <div className="min-w-0 space-y-1">
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground/90">
+                Schedule cycle
+              </p>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {availableCycles.slice(0, 4).map((cycle) => {
+                  const isActive = cycle.id === activeCycleId
+                  const rangeLabel = formatHumanCycleRange(cycle.start_date, cycle.end_date)
+                  return (
+                    <Link
+                      key={cycle.id}
+                      href={`/coverage?cycle=${cycle.id}&view=week&${COVERAGE_SHIFT_QUERY_KEY}=${shiftTabToQueryValue(shiftTab)}`}
+                      title={cycle.label}
+                      aria-current={isActive ? 'page' : undefined}
+                      className={cn(
+                        'rounded-full border px-2.5 py-1 text-xs transition-colors',
+                        isActive
+                          ? 'border-primary bg-primary/14 font-semibold text-foreground shadow-sm ring-1 ring-primary/25'
+                          : 'border-border/70 bg-card font-medium text-muted-foreground hover:bg-muted/35 hover:text-foreground'
+                      )}
+                    >
+                      <span>{rangeLabel}</span>
+                      {cycle.published && !isActive ? (
+                        <span className="ml-1 text-[0.65rem] font-normal text-muted-foreground">
+                          · Live
+                        </span>
+                      ) : null}
+                    </Link>
+                  )
+                })}
+              </div>
             </div>
 
             {!noCycleSelected && (
@@ -1173,9 +1229,10 @@ function CoveragePageContent() {
             </span>
             <Link
               href={weekRosterHref}
-              className="ml-auto shrink-0 text-xs font-medium text-[var(--success-text)] underline-offset-2 hover:underline"
+              className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold text-[var(--success-text)] underline-offset-2 ring-offset-background transition-colors hover:bg-[var(--success-subtle)]/90 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--success-border)]/60 focus-visible:ring-offset-2"
             >
               View published schedule
+              <ChevronRight className="h-3.5 w-3.5 opacity-90" aria-hidden />
             </Link>
           </div>
         )}

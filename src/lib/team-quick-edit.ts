@@ -12,6 +12,15 @@ export type TeamQuickEditError =
   | 'invalid_shift'
   | 'invalid_employment'
 
+export type WorkPatternInput = {
+  hasPattern: boolean
+  worksDow: number[]
+  worksDowMode: 'hard' | 'soft'
+  offsDow: number[]
+  weekendRotation: 'none' | 'every_other'
+  weekendAnchorDate: string | null
+}
+
 export type TeamQuickEditInput = {
   profileId: string
   fullName: string
@@ -22,6 +31,7 @@ export type TeamQuickEditInput = {
   onFmla: boolean
   fmlaReturnDate: string | null
   isActive: boolean
+  workPattern: WorkPatternInput
 }
 
 type TeamQuickEditResult =
@@ -72,6 +82,24 @@ export function parseTeamQuickEditFormData(formData: FormData): TeamQuickEditRes
 
   const onFmla = formData.get('on_fmla') === 'on'
 
+  const hasPattern = formData.get('has_recurring_schedule') === 'on'
+  const worksDow = formData
+    .getAll('works_dow')
+    .map((v) => parseInt(String(v), 10))
+    .filter((n) => !isNaN(n) && n >= 0 && n <= 6)
+  const offsDow = formData
+    .getAll('offs_dow')
+    .map((v) => parseInt(String(v), 10))
+    .filter((n) => !isNaN(n) && n >= 0 && n <= 6)
+  const worksDowModeRaw = String(formData.get('works_dow_mode') ?? 'hard')
+  const worksDowMode: 'hard' | 'soft' = worksDowModeRaw === 'soft' ? 'soft' : 'hard'
+  const weekendRotationRaw = String(formData.get('weekend_rotation') ?? 'none')
+  const weekendRotation: 'none' | 'every_other' =
+    weekendRotationRaw === 'every_other' ? 'every_other' : 'none'
+  const weekendAnchorDateRaw = String(formData.get('weekend_anchor_date') ?? '').trim()
+  const weekendAnchorDate =
+    weekendRotation === 'every_other' && weekendAnchorDateRaw ? weekendAnchorDateRaw : null
+
   return {
     ok: true,
     value: {
@@ -87,6 +115,14 @@ export function parseTeamQuickEditFormData(formData: FormData): TeamQuickEditRes
         onFmla
       ),
       isActive: formData.get('is_active') === 'on',
+      workPattern: {
+        hasPattern,
+        worksDow,
+        worksDowMode,
+        offsDow,
+        weekendRotation,
+        weekendAnchorDate,
+      },
     },
   }
 }
