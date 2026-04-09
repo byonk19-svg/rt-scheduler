@@ -26,4 +26,11 @@ describe('availability page role-specific actions', () => {
     expect(source).toContain('therapist_availability_submissions')
     expect(source).toContain('officialSubmissionTherapistIds')
   })
+
+  it('loads override source and updated_at for roster metrics and review table', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/app/availability/page.tsx'), 'utf8')
+    expect(source).toContain('updated_at')
+    expect(source).toContain('source')
+    expect(source).toContain("entry.source === 'manager' ? 'manager' : 'therapist'")
+  })
 })

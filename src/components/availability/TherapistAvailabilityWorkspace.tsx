@@ -147,9 +147,15 @@ export function TherapistAvailabilityWorkspace({
     [draftStatusByDate]
   )
 
+  /** Persisted notes only exist for Need Off / Request to Work; omit Available-only drafts. */
   const daysWithNoteText = useMemo(
-    () => cycleDays.filter((date) => (draftNotesByDate[date] ?? '').trim().length > 0),
-    [cycleDays, draftNotesByDate]
+    () =>
+      cycleDays.filter((date) => {
+        const status = draftStatusByDate[date] ?? 'none'
+        if (status !== 'force_off' && status !== 'force_on') return false
+        return (draftNotesByDate[date] ?? '').trim().length > 0
+      }),
+    [cycleDays, draftNotesByDate, draftStatusByDate]
   )
   const notesPayload = useMemo(
     () =>
@@ -467,8 +473,8 @@ export function TherapistAvailabilityWorkspace({
 
         <div className="border-b border-[var(--info-border)] bg-[var(--info-subtle)] px-5 py-2 sm:px-6">
           <p className="text-xs font-medium leading-snug text-[var(--info-text)]">
-            Tap a day to switch between Available, Need Off, and Request to Work. Notes appear below
-            the selected week when needed.
+            Tap a day to switch between Available, Need Off, and Request to Work. Notes (Need Off /
+            Request to Work only) appear below the selected week when needed.
           </p>
           <p className="mt-1 text-[11px] leading-snug text-[var(--info-text)]/95">
             Available = I can work · Need Off = I&apos;m requesting the day off · Request to Work =
@@ -589,21 +595,9 @@ export function TherapistAvailabilityWorkspace({
                   </div>
 
                   {(draftStatusByDate[selectedDate] ?? 'none') === 'none' ? (
-                    <div className="mt-1.5 space-y-0.5">
-                      <Label
-                        htmlFor={`therapist-day-note-${selectedDate}`}
-                        className="text-[11px] font-medium text-muted-foreground"
-                      >
-                        Optional note
-                      </Label>
-                      <textarea
-                        id={`therapist-day-note-${selectedDate}`}
-                        value={draftNotesByDate[selectedDate] ?? ''}
-                        onChange={(event) => updateDateNote(selectedDate, event.target.value)}
-                        placeholder="Optional note"
-                        className="min-h-[44px] w-full rounded-lg border border-border/15 bg-muted/5 px-2.5 py-1.5 text-[13px] leading-snug text-foreground shadow-none outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground/40 focus-visible:border-ring focus-visible:shadow-sm focus-visible:ring-2 focus-visible:ring-ring/50"
-                      />
-                    </div>
+                    <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                      Notes are only saved for Need Off or Request to Work days.
+                    </p>
                   ) : (
                     <div className="mt-1.5 space-y-0.5">
                       <Label

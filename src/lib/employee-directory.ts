@@ -123,15 +123,17 @@ export function buildMissingAvailabilityRows(
     .filter((therapist) => therapist.is_active)
     .map((therapist) => {
       const rows = byTherapist.get(therapist.id) ?? []
+      const metricsRows =
+        officialIds !== undefined ? rows.filter((row) => row.source === 'therapist') : rows
       const lastUpdatedAt =
-        rows.length === 0
+        metricsRows.length === 0
           ? null
-          : (rows.map((row) => row.created_at).sort((a, b) => b.localeCompare(a))[0] ?? null)
+          : (metricsRows.map((row) => row.created_at).sort((a, b) => b.localeCompare(a))[0] ?? null)
       const submitted = officialIds !== undefined ? officialIds.has(therapist.id) : rows.length > 0
       return {
         therapistId: therapist.id,
         therapistName: therapist.full_name,
-        overridesCount: rows.length,
+        overridesCount: metricsRows.length,
         lastUpdatedAt,
         submitted,
       }

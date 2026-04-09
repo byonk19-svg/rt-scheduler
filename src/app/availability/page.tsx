@@ -46,6 +46,8 @@ type AvailabilityRow = {
   override_type: AvailabilityOverrideType
   note: string | null
   created_at: string
+  updated_at?: string | null
+  source?: 'therapist' | 'manager' | null
   therapist_id: string
   cycle_id: string
   profiles: { full_name: string } | { full_name: string }[] | null
@@ -294,7 +296,7 @@ export default async function AvailabilityPage({
   let entriesQuery = supabase
     .from('availability_overrides')
     .select(
-      'id, date, shift_type, override_type, note, created_at, therapist_id, cycle_id, profiles!availability_overrides_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
+      'id, date, shift_type, override_type, note, created_at, updated_at, source, therapist_id, cycle_id, profiles!availability_overrides_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
     )
     .order('date', { ascending: true })
     .order('created_at', { ascending: false })
@@ -365,7 +367,7 @@ export default async function AvailabilityPage({
           override_type: entry.override_type,
           note: entry.note,
           created_at: entry.created_at,
-          source: 'therapist',
+          source: entry.source === 'manager' ? 'manager' : 'therapist',
         })),
         selectedCycleId,
         { officialSubmissionTherapistIds }
@@ -383,6 +385,7 @@ export default async function AvailabilityPage({
       date: entry.date,
       reason: entry.note,
       createdAt: entry.created_at,
+      updatedAt: entry.updated_at ?? undefined,
       requestedBy: requester?.full_name ?? 'Unknown user',
       cycleLabel: cycle
         ? `${cycle.label} (${cycle.start_date} to ${cycle.end_date})`

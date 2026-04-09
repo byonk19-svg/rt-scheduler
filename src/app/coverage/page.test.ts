@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 describe('coverage publish override affordance', () => {
   it('renders a weekly-rule override publish action when weekly validation blocks publish', () => {
-    const filePath = resolve(process.cwd(), 'src/app/coverage/page.tsx')
+    const filePath = resolve(process.cwd(), 'src/app/coverage/CoverageClientPage.tsx')
     const source = readFileSync(filePath, 'utf8')
 
     expect(source).toContain("errorParam === 'publish_weekly_rule_violation'")
@@ -15,7 +15,7 @@ describe('coverage publish override affordance', () => {
   })
 
   it('preserves a weekly override when shift validation fails afterward', () => {
-    const filePath = resolve(process.cwd(), 'src/app/coverage/page.tsx')
+    const filePath = resolve(process.cwd(), 'src/app/coverage/CoverageClientPage.tsx')
     const source = readFileSync(filePath, 'utf8')
 
     expect(source).toContain("const overrideWeeklyRulesParam = search.get('override_weekly_rules')")
@@ -33,7 +33,7 @@ describe('coverage publish override affordance', () => {
   })
 
   it('surfaces cycle workflow controls in the coverage workspace', () => {
-    const filePath = resolve(process.cwd(), 'src/app/coverage/page.tsx')
+    const filePath = resolve(process.cwd(), 'src/app/coverage/CoverageClientPage.tsx')
     const source = readFileSync(filePath, 'utf8')
 
     expect(source).toContain('New 6-week block')
@@ -45,20 +45,24 @@ describe('coverage publish override affordance', () => {
   })
 
   it('defaults schedule shift tab from profile shift_type and honors ?shift= query', () => {
-    const filePath = resolve(process.cwd(), 'src/app/coverage/page.tsx')
-    const source = readFileSync(filePath, 'utf8')
+    const clientPath = resolve(process.cwd(), 'src/app/coverage/CoverageClientPage.tsx')
+    const client = readFileSync(clientPath, 'utf8')
+    const serverPath = resolve(process.cwd(), 'src/app/coverage/page.tsx')
+    const server = readFileSync(serverPath, 'utf8')
 
-    expect(source).toContain('shift_type')
-    expect(source).toContain('parseCoverageShiftSearchParam')
-    expect(source).toContain('COVERAGE_SHIFT_QUERY_KEY')
-    expect(source).toContain('normalizeActorShiftType')
-    expect(source).toContain('defaultCoverageShiftTabFromProfileShift')
-    expect(source).toContain('router.replace')
-    expect(source).toContain('handleTabSwitch')
+    expect(server).toContain('parseCoverageShiftSearchParam')
+    expect(server).toContain('normalizeActorShiftType')
+    expect(server).toContain('defaultCoverageShiftTabFromProfileShift')
+    expect(server).toContain('CoverageClientPage')
+    expect(server).toContain('shiftTabLockedFromUrl')
+    expect(client).toContain('initialShiftTab')
+    expect(client).toContain('COVERAGE_SHIFT_QUERY_KEY')
+    expect(client).toContain('router.replace')
+    expect(client).toContain('handleTabSwitch')
   })
 
   it('shows an explicit empty state instead of a synthetic 6-week window when no cycle exists', () => {
-    const filePath = resolve(process.cwd(), 'src/app/coverage/page.tsx')
+    const filePath = resolve(process.cwd(), 'src/app/coverage/CoverageClientPage.tsx')
     const source = readFileSync(filePath, 'utf8')
 
     expect(source).toContain('No open 6-week block')
@@ -67,7 +71,7 @@ describe('coverage publish override affordance', () => {
   })
 
   it('shows an explicit empty-draft state when a cycle exists but has no staffing rows yet', () => {
-    const filePath = resolve(process.cwd(), 'src/app/coverage/page.tsx')
+    const filePath = resolve(process.cwd(), 'src/app/coverage/CoverageClientPage.tsx')
     const source = readFileSync(filePath, 'utf8')
 
     expect(source).toContain('No staffing drafted yet')

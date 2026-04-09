@@ -5,7 +5,7 @@ Web app for respiratory therapy scheduling with role-based workflows:
 - Auth + role-aware dashboard
 - Availability requests
 - 6-week schedule cycle management
-- **Canonical staff schedule:** [`/coverage`](./src/app/coverage/page.tsx) (`view=week`); compatibility routes (`/schedule`, `/therapist/schedule`) redirect there
+- **Canonical staff schedule:** [`/coverage`](./src/app/coverage/page.tsx) (`view=week`); server entry is `page.tsx` and interactive client logic lives in [`CoverageClientPage.tsx`](./src/app/coverage/CoverageClientPage.tsx). Compatibility routes (`/schedule`, `/therapist/schedule`) redirect there
 - **Therapist availability:** 6-week grid on `/therapist/availability` — **Available** (default: neutral day, no forced on/off), **Unavailable**, **Must work** (hard autodraft `force_on`); see [`CLAUDE.md`](./CLAUDE.md)
 - Shift board (swap/pickup posts with manager approval)
 
@@ -13,7 +13,7 @@ Current architecture and quality snapshot: [`docs/REPO_HEALTH.md`](docs/REPO_HEA
 
 ## Cycle Workflow
 
-- **Schedule** (nav label; route [`/coverage`](./src/app/coverage/page.tsx)) — create **New 6-week block**, staff the grid, auto-draft, preliminary, **Publish**. Same cycle-selection rule everywhere: URL cycle if valid, else active window, else next upcoming, else none (empty state, not a fake grid).
+- **Schedule** (nav label; route [`/coverage`](./src/app/coverage/page.tsx), rendered via [`CoverageClientPage.tsx`](./src/app/coverage/CoverageClientPage.tsx)) — create **New 6-week block**, staff the grid, auto-draft, preliminary, **Publish**. Same cycle-selection rule everywhere: URL cycle if valid, else active window, else next upcoming, else none (empty state, not a fake grid).
 - **Availability** — therapist requests and manager **Plan staffing** for the selected cycle.
 - **Publish History** ([`/publish`](./src/app/publish/page.tsx)) — two parts: (1) **Schedule blocks** — all non-archived cycles; archive drafts or delete drafts; **Start over** takes a live block offline; (2) **Publish email log** — delivery rows per publish; **Delete history** removes only that log row, not the block.
 - `New 6-week block` can optionally copy staffing from the latest published cycle. `Clear draft` clears draft assignments while unpublished.
