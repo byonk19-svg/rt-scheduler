@@ -27,6 +27,7 @@ import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 export type AppShellUser = {
   fullName: string
   role: UiRole
+  pendingAccessRequests?: number
 }
 
 type AppShellProps = {
@@ -74,10 +75,17 @@ const MANAGER_NAV_ITEMS: readonly NavItem[] = [
   },
   { href: '/availability', label: 'Availability', icon: CalendarRange },
   {
-    href: '/swaps',
-    label: 'Open shifts',
+    href: '/requests',
+    label: 'Requests',
     icon: ArrowLeftRight,
-    isActive: (pathname) => pathname === '/swaps' || pathname === '/shift-board',
+    isActive: (pathname) =>
+      pathname === '/requests' || pathname.startsWith('/requests/') || pathname === '/shift-board',
+  },
+  {
+    href: '/requests/user-access',
+    label: 'User Access Requests',
+    icon: Users,
+    isActive: (pathname) => pathname === '/requests/user-access',
   },
   {
     href: '/team',
@@ -197,6 +205,12 @@ function navLinkClass(isActive: boolean): string {
   return 'text-sidebar-foreground hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground transition-colors duration-150'
 }
 
+function shouldShowPendingBadge(user: AppShellUser | null, href: string): boolean {
+  if (!user || user.role !== 'manager') return false
+  if (!user.pendingAccessRequests || user.pendingAccessRequests <= 0) return false
+  return href === '/requests' || href === '/requests/user-access'
+}
+
 export function AppShell({ user, children }: AppShellProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -272,7 +286,12 @@ export function AppShell({ user, children }: AppShellProps) {
                   aria-current={active ? 'page' : undefined}
                 >
                   <Icon className="h-4 w-4" aria-hidden="true" />
-                  {item.label}
+                  <span>{item.label}</span>
+                  {shouldShowPendingBadge(user, item.href) && (
+                    <span className="ml-auto rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--warning-text)]">
+                      {user?.pendingAccessRequests}
+                    </span>
+                  )}
                 </Link>
               )
             })}
@@ -449,7 +468,12 @@ export function AppShell({ user, children }: AppShellProps) {
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <Icon className="h-4 w-4" aria-hidden="true" />
-                    {item.label}
+                    <span>{item.label}</span>
+                    {shouldShowPendingBadge(user, item.href) && (
+                      <span className="ml-auto rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--warning-text)]">
+                        {user?.pendingAccessRequests}
+                      </span>
+                    )}
                   </Link>
                 )
               })}

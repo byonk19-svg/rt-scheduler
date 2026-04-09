@@ -22,6 +22,7 @@ const MANAGER_ROUTES = [
   '/team',
   '/approvals',
   '/publish',
+  '/requests/user-access',
 ] as const
 
 const STAFF_ROUTES = ['/staff', '/dashboard/staff', '/requests/new'] as const
@@ -164,6 +165,10 @@ export async function proxy(request: NextRequest) {
     MANAGER_ROUTES.some((route) => matchesRoute(pathname, route))
   ) {
     return NextResponse.redirect(new URL('/dashboard/staff', request.url))
+  }
+
+  if (!can(role, 'access_manager_ui') && pathname === '/requests') {
+    return NextResponse.redirect(new URL('/requests/new', request.url))
   }
 
   if (

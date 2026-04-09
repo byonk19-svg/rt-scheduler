@@ -68,6 +68,8 @@ const MANAGER_SHOTS = [
   { name: '19-manager-settings', path: '/settings' },
   { name: '20-manager-profile', path: '/profile' },
   { name: '21-manager-requests-new', path: '/requests/new' },
+  { name: '22-manager-requests', path: '/requests' },
+  { name: '23-manager-user-access-requests', path: '/requests/user-access' },
 ]
 
 const STAFF_SHOTS = [

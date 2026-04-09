@@ -43,10 +43,20 @@ export default async function RootLayout({
         .eq('id', user.id)
         .maybeSingle()
 
+      let pendingAccessRequests = 0
+      if (profile?.role === 'manager') {
+        const { count } = await supabase
+          .from('profiles')
+          .select('id', { count: 'exact', head: true })
+          .is('role', null)
+        pendingAccessRequests = count ?? 0
+      }
+
       appShellUser = {
         fullName:
           profile?.full_name ?? user.user_metadata?.full_name ?? user.email ?? 'Team member',
         role: toUiRole(profile?.role),
+        pendingAccessRequests,
       }
     }
   } catch (error) {
