@@ -1,18 +1,21 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-08 (session 40)
+Updated: 2026-04-09 (session 40)
 
 ## Latest Updates (2026-04-08, session 40)
 
-- **Availability (`/availability`) - copy manager overrides from the last block** (`src/app/availability/actions.ts`, `page.tsx`, `ManagerSchedulingInputs.tsx`, tests):
+- **Team (`/team`) — Scheduling Constraints UI** (`TeamDirectory.tsx`, `team-quick-edit.ts`, `team/actions.ts`, `page.tsx`, tests):
+  - **"Days they never work"** (always-visible red pills in quick edit) — populates `offs_dow` on `work_patterns`; shows for all therapist/lead rows regardless of pattern toggle.
+  - **"Has a fixed weekly pattern" toggle** — reveals blue work-day pills (`works_dow`), a hard/soft strictness radio, and weekend rotation + anchor-date controls; hidden inputs bridge pill state to server action form post.
+  - Upserts `work_patterns` row on save (one per therapist); deletes the row when the toggle is off.
+  - **Rotating shift limitation (documented):** Patterns like "4 on, 1 off, 2 on, 7 off" (14-day rotation) cannot be expressed in `work_patterns` — only weekly recurring patterns are supported. Recommended workflow for rotating-schedule workers: submit per-cycle availability + use copy-from-last-block.
+- **Availability (`/availability`) — copy manager overrides from the last block** (`src/app/availability/actions.ts`, `page.tsx`, `ManagerSchedulingInputs.tsx`, tests):
   - Managers now get a **Copy from last block** action in planner controls for the selected therapist and cycle.
   - The server action finds the most recent other cycle with manager-entered overrides for that therapist, shifts dates by the cycle-start gap, and upserts only dates that still land inside the target cycle.
   - Existing target-cycle manager overrides are preserved; conflicting shifted dates are skipped instead of overwritten.
   - Toast feedback covers: **copied N dates**, **no previous block found**, **nothing new to copy**, and **copy failed**.
-- **Lib - cycle copy helper** (`src/lib/copy-cycle-availability.ts`, tests):
+- **Lib — cycle copy helper** (`src/lib/copy-cycle-availability.ts`, tests):
   - `shiftOverridesToCycle` is the pure helper for date shifting, target-window filtering, and conflict skipping.
-- **Docs** (`docs/WORKFLOWS.md`, `docs/superpowers/plans/2026-04-08-copy-cycle-availability.md`):
-  - Availability workflow docs now describe the manager copy-from-last-block path, and the implementation plan is marked as shipped.
 - **Verification:** `npx tsc --noEmit`, `npx vitest run` (**444 tests** passing).
 
 ## Latest Updates (2026-04-09, session 39)
@@ -878,6 +881,8 @@ Typography classes:
 - **Responsive stat grids:** Always `grid-cols-2 lg:grid-cols-4` — never bare `grid-cols-4` which clips on narrower viewports.
 - **Repo-local Next build lock on Windows:** if `npm run build` throws `EPERM` under `.next`, check for a running `next dev` process from this repo and stop it before rebuilding.
 - **Session end workflow:** update CLAUDE.md with learnings → `git add CLAUDE.md && git commit && git push`
+- **`availability_overrides` are cycle-scoped:** Manager-entered overrides (`force_on`/`force_off`) do NOT carry forward between cycles. Use `copyAvailabilityFromPreviousCycleAction` (or the "Copy from last block" UI) to shift them into the next cycle. Rotating-schedule workers should submit availability each block or use the copy feature.
+- **Supabase mock builder must include all chained methods used by the action under test:** `neq`, `order`, `limit` are no-ops on most mocks — add them as chainable builders that return `this`. Forgetting them causes `TypeError: builder.neq is not a function` even when the test assertions look correct. Also extend `then()` to handle every select column shape the action calls (keyed by the column string).
 
 ## Scheduling Rules
 
