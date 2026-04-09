@@ -5,7 +5,8 @@ Focused view of the active schema used by scheduling, coverage, publish, and req
 ## Core Scheduling Tables
 
 - `profiles`
-  - User identity + staffing fields (`role`, `shift_type`, `employment_type`, `max_work_days_per_week`, `is_lead_eligible`, `on_fmla`, `is_active`, `site_id`).
+  - User identity + staffing fields (`role`, `phone_number`, `shift_type`, `employment_type`, `max_work_days_per_week`, `is_lead_eligible`, `on_fmla`, `is_active`, `site_id`).
+  - `role` is nullable for pending self-signup users awaiting manager approval.
   - `id` references `auth.users.id`.
 - `schedule_cycles`
   - Scheduling windows (`label`, `start_date`, `end_date`, `published`, `archived_at`).
@@ -86,6 +87,10 @@ Focused view of the active schema used by scheduling, coverage, publish, and req
 - The cycle itself lives in `schedule_cycles`.
 - Publish history lives in `publish_events`.
 - If an old cycle should disappear from Coverage and Availability, archive the `schedule_cycles` row; deleting `publish_events` alone is not enough.
+- Public signup lifecycle:
+  - self-signup users are created as pending (`profiles.role = null`)
+  - manager approval sets role (`therapist` or `lead`)
+  - manager decline deletes the pending account
 
 ## Legacy/Transitional Tables
 

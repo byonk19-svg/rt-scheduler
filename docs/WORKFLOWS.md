@@ -2,6 +2,15 @@
 
 Operational workflows as implemented in the current codebase.
 
+## 0) Public Auth + Access Approval
+
+1. User lands on `/` and chooses `Sign in` or `Create account`.
+2. Therapist self-signup at `/signup` creates a pending account (`profiles.role = null`) and immediately signs in.
+3. Pending users are routed to `/pending-setup` and have no operational dashboard access.
+4. Manager reviews pending users at `/requests/user-access`.
+5. Manager approves with required role selection (`therapist` or `lead`) or declines.
+6. Approve activates access and sends approval email; decline deletes the pending auth account.
+
 ## 1) Manager: Build and Publish a Cycle
 
 1. Create/select a cycle in `/coverage`.

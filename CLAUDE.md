@@ -1,10 +1,44 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-09 (session 41)
+Updated: 2026-04-09 (session 45)
 
 ## Session History
 
 Sessions 11–38 archived to `docs/SESSION_HISTORY.md`.
+
+## Latest Updates (2026-04-09, session 45)
+
+- **Manager Inbox dashboard layout rebuild** (`src/components/manager/ManagerTriageDashboard.tsx`, `src/app/dashboard/manager/page.tsx`, `src/components/manager/ManagerTriageDashboard.test.ts`):
+  - Two-column layout `xl:grid-cols-[2fr_1fr]`: left column (3 metric cards → ScheduleProgress → Coverage Risks → Recent Activity), sticky right sidebar (Manager Inbox + Upcoming Days).
+  - 4th metric card "Publish Readiness" removed — redundant with `ScheduleProgress` overall %.
+  - `activeCycleDateRange` computed on the manager page from the active cycle (`formatCycleDate(start) – formatCycleDate(end)`, year-free) and passed as a header pill next to the risk/pending/shift badges.
+- **Screenshots:** `npm run screens:all` (dev server on `127.0.0.1:3000` + `.env.local` with `NEXT_PUBLIC_SUPABASE_*`) writes PNGs under `artifacts/screen-capture/<iso-timestamp>/` and mirrors the same set to `artifacts/screen-capture/latest`.
+- **Plan doc:** `docs/superpowers/plans/2026-04-09-manager-dashboard-layout-rebuild.md`
+- **Verification:** `npx vitest run src/components/manager/ManagerTriageDashboard.test.ts`, `npx tsc --noEmit`, `npm run lint`
+
+## Latest Updates (2026-04-09, session 43)
+
+- **Home page + pending-setup polish** (`src/app/page.tsx`, `src/app/pending-setup/page.tsx`, `public/images/app-preview.png`, tests):
+  - Home page now shows a faded coverage calendar screenshot below the CTAs + a one-line approval note ("Your manager will need to approve your account before your first sign-in.").
+  - `next/image` with `fill` + `unoptimized` used for the preview; container is `h-[360px] rounded-2xl` with a `h-2/3` gradient fade to `var(--background)`.
+  - Pending-setup body copy updated to "No action needed on your end. Sit tight while your manager reviews your account…" (h1 and sign-out button unchanged).
+- **Spec/plan docs added:** `docs/superpowers/specs/2026-04-09-home-and-pending-setup-design.md`, `docs/superpowers/plans/2026-04-09-home-and-pending-setup.md`.
+
+## Latest Updates (2026-04-09, session 42)
+
+- **Public auth + pending access onboarding** (`src/app/page.tsx`, `src/app/login/page.tsx`, `src/app/signup/page.tsx`, `src/app/reset-password/page.tsx`, `src/app/pending-setup/page.tsx`, tests):
+  - Homepage is now homepage-first with practical copy and prominent **Sign in** / **Create account** CTAs.
+  - Dedicated auth routes now own their own copy and UX: sign-in, create account, forgot-password email request, and waiting-for-approval.
+  - Public self-signup no longer asks for role; accounts are created as pending and redirected to `/pending-setup` after immediate sign-in.
+- **Manager access approvals under Requests** (`src/app/requests/page.tsx`, `src/app/requests/user-access/*`, `src/components/AppShell.tsx`, `src/proxy.ts`, tests):
+  - Added **User Access Requests** manager flow under `/requests/user-access` with desktop table + mobile cards.
+  - Approve action requires role selection (**Therapist** or **Lead**) before activation; decline deletes pending account via admin API.
+  - Manager nav now includes **Requests** and **User Access Requests** with pending-count badges.
+- **Schema/auth hook support for pending users** (`supabase/migrations/20260409124000_pending_signup_access_requests.sql`, `20260409145500_fix_custom_access_token_hook_for_pending_users.sql`):
+  - `profiles.role` now supports null (pending users).
+  - `handle_new_user` stores pending signups with `role = null` when role is not explicitly provisioned.
+  - `custom_access_token_hook` now omits `user_role` claim when role is null so pending users can authenticate cleanly.
+- **Verification:** `npx tsc --noEmit`, `npm run lint`, `npx vitest run src/app/page.test.ts src/app/requests/user-access/actions.test.ts src/components/manager/ManagerTriageDashboard.test.ts`, `npx playwright test e2e/public-pages.spec.ts`.
 
 ## Latest Updates (2026-04-09, session 41)
 
@@ -106,7 +140,8 @@ All checks currently green:
 - `npm run lint` pass
 - `npm run format:check` pass (whole-repo Prettier; `.claude/**` excluded from ESLint)
 - `npm run build` pass
-- `npm run test:unit` pass (**453 tests**)
+- `npm run test:unit` pass (**~460 tests**)
+- Full `npx vitest run` may require `.env.local` (e.g. `assignment-status` route test uses admin client env vars)
 - `npm run test:e2e` pass (39 passed, 1 skipped)
 
 CI gates: format check → lint → tsc → build → Playwright E2E
@@ -135,7 +170,9 @@ E2E specs:
 - `/shift-board`
 - `/directory` compatibility redirect to `/team`
 - `/profile`
-- `/requests`, `/requests/new` shift request workflow
+- `/requests` manager requests hub
+- `/requests/user-access` manager access-approval queue
+- `/requests/new` shift request workflow
 - `/publish`, `/publish/[id]` publish history + async email queue
 - `/staff/*` legacy compatibility routes (redirects)
 
@@ -146,6 +183,7 @@ Role source: `profiles.role`.
 - `manager`: full scheduling + publish + team management controls
 - `lead`: therapist experience plus assignment-status updates
 - `therapist`: standard staff experience
+- `null` role: pending-access user; can sign in but is gated to `/pending-setup` until manager approval
 
 Coverage lead eligibility remains separate at `profiles.is_lead_eligible`.
 On the `/team` surface, lead eligibility is derived from the selected role when saving quick edit.
@@ -190,6 +228,7 @@ Typography classes:
 
 ## Tooling Gotchas
 
+- **`formatCycleDate` produces no year:** Uses `{ month: 'short', day: 'numeric' }` → `'Apr 13'` not `'Apr 13, 2026'`. Test fixtures asserting on date range strings must omit the year (e.g. `'Mar 17 – Apr 13'`).
 - **Browser verification on auth routes:** All app routes require login. Chrome DevTools MCP always redirects to `/login` — browser verification via screenshot is not possible without credentials. Confirm changes via `tsc`, `vitest`, and code review only.
 - **framer-motion `ease`:** `ease: 'easeOut'` fails `tsc` — the `Easing` type requires specific literals. Omit `ease` entirely to use framer-motion's safe default.
 - **Auto-draft algorithm lives in `src/lib/coverage/generate-draft.ts`:** `generateDraftForCycle(input: GenerateDraftInput): GenerateDraftResult` is a pure function. `generateDraftScheduleAction` in `src/app/schedule/actions/draft-actions.ts` is a thin wrapper that loads DB data, calls it, then saves results. Dry-run and preview features can call `generateDraftForCycle` directly without a server action.
@@ -206,6 +245,8 @@ Typography classes:
 - **`availability_overrides` are cycle-scoped:** Manager-entered overrides (`force_on`/`force_off`) do NOT carry forward between cycles. Use `copyAvailabilityFromPreviousCycleAction` (or the "Copy from last block" UI) to shift them into the next cycle. Rotating-schedule workers should submit availability each block or use the copy feature.
 - **Supabase mock builder must include all chained methods used by the action under test:** `neq`, `order`, `limit` are no-ops on most mocks — add them as chainable builders that return `this`. Forgetting them causes `TypeError: builder.neq is not a function` even when the test assertions look correct. Also extend `then()` to handle every select column shape the action calls (keyed by the column string).
 - **Publish email flow no longer depends on a Vercel cron deployment hook:** production publish now processes queued emails immediately in `toggleCyclePublishedAction`. Keep `/api/publish/process` as the shared retry/manual path, but do not reintroduce `vercel.json` cron config unless the deployment plan changes.
+- **AI agents and binary file copies:** When an agent (Cursor, Claude, etc.) is instructed to `cp` a binary file (PNG, PDF, etc.), always verify with `ls -lh` — agents frequently write a small placeholder instead of the real file.
+- **`next/image` static asset caching in dev:** Adding a new file to `public/` while `next dev` is running requires a server restart to pick it up. Add `unoptimized` prop to `<Image>` to bypass the optimization cache for local static assets during development.
 
 ## Scheduling Rules
 
@@ -280,7 +321,7 @@ Assignment status is informational only (does not affect coverage counts or publ
 - User avatar: `var(--attention)` amber
 - Manager badge: `bg-[var(--warning-subtle)] text-[var(--warning-text)] border-[var(--warning-border)]`
 - App shell header `z-30`; coverage slide-over `z-50`
-- Manager nav order: Inbox -> Schedule -> Availability -> Open shifts -> Team -> Approvals -> Publish History
+- Manager nav order: Inbox -> Schedule -> Availability -> Requests -> User Access Requests -> Team -> Approvals -> Publish History
 
 ## Assignment Status
 
@@ -333,7 +374,7 @@ Resend: `mail.teamwise.work` is **Verified**. No test-mode restriction — email
 
 Core tables:
 
-- `profiles` — `full_name`, `email`, `role`, `shift_type`, `employment_type`, `max_work_days_per_week`, `is_lead_eligible`, `on_fmla`, `is_active`, `default_calendar_view`, `default_landing_page`, `site_id`
+- `profiles` — `full_name`, `email`, `phone_number`, `role` (nullable for pending users), `shift_type`, `employment_type`, `max_work_days_per_week`, `is_lead_eligible`, `on_fmla`, `is_active`, `default_calendar_view`, `default_landing_page`, `site_id`
 - `schedule_cycles`
 - `shifts` — `cycle_id`, `user_id`, `date`, `shift_type`, `status`, `role`, `unfilled_reason`, assignment-status fields, `site_id`
 - `work_patterns` — `works_dow`, `offs_dow`, `weekend_rotation`, `weekend_anchor_date`, `works_dow_mode`
@@ -355,6 +396,8 @@ Core tables:
 - `20260227143000_add_work_patterns_and_cycle_overrides.sql`
 - `20260227184500_add_source_to_availability_overrides.sql`
 - `20260407140000_therapist_availability_submissions.sql` (`therapist_availability_submissions`, `schedule_cycles.availability_due_at`)
+- `20260409124000_pending_signup_access_requests.sql` (nullable `profiles.role`, pending-aware `handle_new_user`)
+- `20260409145500_fix_custom_access_token_hook_for_pending_users.sql` (omit null `user_role` claim)
 
 ## Next High-Value Priorities
 

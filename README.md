@@ -2,12 +2,22 @@
 
 Web app for respiratory therapy scheduling with role-based workflows:
 
-- Auth + role-aware dashboard
+- Auth + role-aware dashboard with pending-access onboarding
 - Availability requests
 - 6-week schedule cycle management
 - **Canonical staff schedule:** [`/coverage`](./src/app/coverage/page.tsx) (`view=week`); server entry is `page.tsx` and interactive client logic lives in [`CoverageClientPage.tsx`](./src/app/coverage/CoverageClientPage.tsx). Compatibility routes (`/schedule`, `/therapist/schedule`) redirect there
 - **Therapist availability:** 6-week grid on `/therapist/availability` — **Available** (default: neutral day, no forced on/off), **Unavailable**, **Must work** (hard autodraft `force_on`); see [`CLAUDE.md`](./CLAUDE.md)
 - Shift board (swap/pickup posts with manager approval)
+
+## Auth + Access Model
+
+- Public homepage (`/`) is homepage-first with clear `Sign in` and `Create account` entry points.
+- Therapists self-create accounts via `/signup` (first/last name, phone number, email, password).
+- Managers are **not** created via public signup; they are provisioned admin-side.
+- Self-signup users start with pending access (`profiles.role = null`), are signed in immediately, and land on `/pending-setup`.
+- Pending users can authenticate but are gated away from app workflows until manager approval.
+- Manager approves pending users in `Requests -> User Access Requests` and assigns role at approval time (`therapist` or `lead`).
+- Declining an access request deletes the pending account.
 
 Current architecture and quality snapshot: [`docs/REPO_HEALTH.md`](docs/REPO_HEALTH.md)
 
