@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
@@ -113,5 +116,17 @@ describe('AvailabilityEntriesTable', () => {
 
     expect(html).toContain('>Shift</th>')
     expect(html).toContain('Day shift')
+  })
+
+  it('uses Entry saved + last activity timestamp in expanded row detail (source)', () => {
+    const src = readFileSync(
+      resolve(process.cwd(), 'src/app/availability/availability-requests-table.tsx'),
+      'utf8'
+    )
+    expect(src).toContain('Entry saved')
+    expect(src).toContain('formatDateTime(row.updatedAt ?? row.createdAt)')
+    expect(src).not.toMatch(
+      />[\s\n]*Submitted[\s\n]*<\/p>[\s\n]*<p className="text-sm text-foreground">[\s\n]*\{formatDateTime\(row\.createdAt\)\}/
+    )
   })
 })

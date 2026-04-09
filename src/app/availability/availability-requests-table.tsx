@@ -366,10 +366,10 @@ export function AvailabilityEntriesTable({
                           </div>
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                              Submitted
+                              Entry saved
                             </p>
                             <p className="text-sm text-foreground">
-                              {formatDateTime(row.createdAt)}
+                              {formatDateTime(row.updatedAt ?? row.createdAt)}
                             </p>
                           </div>
                           {showShiftColumn && (

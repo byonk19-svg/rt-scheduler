@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
@@ -56,5 +59,14 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('Week 1')
     expect(html).not.toContain('Must work')
     expect(html).not.toContain('Unavailable')
+  })
+
+  it('documents that Available days do not persist notes (source)', () => {
+    const src = readFileSync(
+      resolve(process.cwd(), 'src/components/availability/TherapistAvailabilityWorkspace.tsx'),
+      'utf8'
+    )
+    expect(src).toContain('Notes are only saved for Need Off or Request to Work days.')
+    expect(src).toContain('Persisted notes only exist for Need Off')
   })
 })
