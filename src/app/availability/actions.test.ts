@@ -21,6 +21,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 import {
+  copyAvailabilityFromPreviousCycleAction,
   deleteAvailabilityEntryAction,
   deleteManagerPlannerDateAction,
   saveManagerPlannerDatesAction,
@@ -45,6 +46,9 @@ function createSupabaseMock(context: TestContext = {}) {
     }>,
     deletes: [] as Array<{ table: string; filters: Record<string, unknown> }>,
     selectRows: [] as Array<Record<string, unknown>>,
+    sourceCycleRows: null as Array<Record<string, unknown>> | null,
+    sourceOverrideRows: null as Array<Record<string, unknown>> | null,
+    existingTargetRows: null as Array<Record<string, unknown>> | null,
   }
 
   return {
@@ -66,6 +70,18 @@ function createSupabaseMock(context: TestContext = {}) {
         },
         eq(column: string, value: unknown) {
           filters.set(column, value)
+          return builder
+        },
+        neq(column: string, value: unknown) {
+          filters.set(`neq:${column}`, value)
+          return builder
+        },
+        order(column: string, options?: unknown) {
+          filters.set(`order:${column}`, options ?? true)
+          return builder
+        },
+        limit(count: number) {
+          filters.set('limit', count)
           return builder
         },
         in(column: string, values: unknown[]) {
@@ -149,6 +165,34 @@ function createSupabaseMock(context: TestContext = {}) {
             return Promise.resolve(
               resolve({
                 data: state.selectRows,
+                error: null,
+              })
+            )
+          }
+          if (table === 'availability_overrides' && selected.includes('cycle_id')) {
+            return Promise.resolve(
+              resolve({
+                data: state.sourceCycleRows ?? null,
+                error: null,
+              })
+            )
+          }
+          if (table === 'availability_overrides' && selected.includes('date, override_type')) {
+            return Promise.resolve(
+              resolve({
+                data: state.sourceOverrideRows ?? null,
+                error: null,
+              })
+            )
+          }
+          if (
+            table === 'availability_overrides' &&
+            selected.includes('date') &&
+            !selected.includes('override_type')
+          ) {
+            return Promise.resolve(
+              resolve({
+                data: state.existingTargetRows ?? null,
                 error: null,
               })
             )
@@ -395,5 +439,94 @@ describe('availability actions', () => {
         },
       },
     ])
+  })
+})
+
+describe('copyAvailabilityFromPreviousCycleAction', () => {
+  function makeCopyFormData() {
+    const formData = new FormData()
+    formData.set('cycle_id', 'cycle-new')
+    formData.set('therapist_id', 'therapist-1')
+    return formData
+  }
+
+  it('redirects to /availability when called by a non-manager', async () => {
+    const mock = createSupabaseMock({ userId: 'therapist-1', role: 'therapist' })
+    createClientMock.mockResolvedValue(mock)
+
+    await expect(copyAvailabilityFromPreviousCycleAction(makeCopyFormData())).rejects.toThrow(
+      'REDIRECT:/availability'
+    )
+  })
+
+  it('redirects with copy_no_source when no previous cycle has overrides', async () => {
+    const mock = createSupabaseMock({ userId: 'mgr-1', role: 'manager' })
+    mock.state.sourceCycleRows = null
+    createClientMock.mockResolvedValue(mock)
+
+    await expect(copyAvailabilityFromPreviousCycleAction(makeCopyFormData())).rejects.toThrow(
+      'REDIRECT:/availability?error=copy_no_source&cycle=cycle-new&therapist=therapist-1'
+    )
+  })
+
+  it('redirects with copy_no_source when source cycle has no overrides', async () => {
+    const mock = createSupabaseMock({ userId: 'mgr-1', role: 'manager' })
+    mock.state.sourceCycleRows = [
+      {
+        cycle_id: 'cycle-old',
+        schedule_cycles: { start_date: '2026-02-08', end_date: '2026-03-21' },
+      },
+    ]
+    mock.state.sourceOverrideRows = []
+    createClientMock.mockResolvedValue(mock)
+
+    await expect(copyAvailabilityFromPreviousCycleAction(makeCopyFormData())).rejects.toThrow(
+      'REDIRECT:/availability?error=copy_no_source&cycle=cycle-new&therapist=therapist-1'
+    )
+  })
+
+  it('upserts shifted overrides and redirects with copy_success', async () => {
+    const mock = createSupabaseMock({ userId: 'mgr-1', role: 'manager' })
+    mock.state.sourceCycleRows = [
+      {
+        cycle_id: 'cycle-old',
+        schedule_cycles: { start_date: '2026-02-08', end_date: '2026-03-21' },
+      },
+    ]
+    mock.state.sourceOverrideRows = [
+      { date: '2026-02-11', override_type: 'force_on', shift_type: 'both', note: null },
+      { date: '2026-02-13', override_type: 'force_off', shift_type: 'both', note: 'event' },
+    ]
+    mock.state.existingTargetRows = []
+    createClientMock.mockResolvedValue(mock)
+
+    await expect(copyAvailabilityFromPreviousCycleAction(makeCopyFormData())).rejects.toThrow(
+      'REDIRECT:/availability?cycle=cycle-new&therapist=therapist-1&success=copy_success&copied=2'
+    )
+
+    expect(mock.state.upsertPayloads).toHaveLength(1)
+    const payload = mock.state.upsertPayloads[0] as Array<Record<string, unknown>>
+    expect(payload).toHaveLength(2)
+    expect(payload[0].date).toBe('2026-03-25')
+    expect(payload[1].date).toBe('2026-03-27')
+  })
+
+  it('redirects with copy_nothing_new when all shifted dates already exist in target', async () => {
+    const mock = createSupabaseMock({ userId: 'mgr-1', role: 'manager' })
+    mock.state.sourceCycleRows = [
+      {
+        cycle_id: 'cycle-old',
+        schedule_cycles: { start_date: '2026-02-08', end_date: '2026-03-21' },
+      },
+    ]
+    mock.state.sourceOverrideRows = [
+      { date: '2026-02-11', override_type: 'force_on', shift_type: 'both', note: null },
+    ]
+    mock.state.existingTargetRows = [{ date: '2026-03-25' }]
+    createClientMock.mockResolvedValue(mock)
+
+    await expect(copyAvailabilityFromPreviousCycleAction(makeCopyFormData())).rejects.toThrow(
+      'REDIRECT:/availability?cycle=cycle-new&therapist=therapist-1&error=copy_nothing_new'
+    )
   })
 })

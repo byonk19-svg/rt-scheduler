@@ -8,6 +8,8 @@
 
 **Tech Stack:** Next.js App Router server actions, Supabase Postgres, Vitest, TypeScript, React
 
+**Status (2026-04-08):** Implemented and verified with `npx tsc --noEmit` and `npx vitest run`.
+
 ---
 
 ## File Map

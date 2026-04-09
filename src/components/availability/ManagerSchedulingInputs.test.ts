@@ -53,6 +53,7 @@ describe('ManagerSchedulingInputs', () => {
         missingRows: [{ therapistId: 'missing-1', therapistName: 'Layne P.' }],
         saveManagerPlannerDatesAction: async () => {},
         deleteManagerPlannerDateAction: async () => {},
+        copyAvailabilityFromPreviousCycleAction: async () => {},
       })
     )
 
@@ -63,6 +64,7 @@ describe('ManagerSchedulingInputs', () => {
     expect(html).toContain('Therapist')
     expect(html).toContain('Will work')
     expect(html).toContain('Cannot work')
+    expect(html).toContain('Copy from last block')
     expect(html).toContain('March 2026')
     expect(html).toContain('Response roster')
     expect(html).toContain('Not submitted yet')
@@ -84,6 +86,7 @@ describe('ManagerSchedulingInputs', () => {
         missingRows: [],
         saveManagerPlannerDatesAction: async () => {},
         deleteManagerPlannerDateAction: async () => {},
+        copyAvailabilityFromPreviousCycleAction: async () => {},
       })
     )
 

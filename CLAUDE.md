@@ -1,6 +1,19 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-09 (session 39)
+Updated: 2026-04-08 (session 40)
+
+## Latest Updates (2026-04-08, session 40)
+
+- **Availability (`/availability`) - copy manager overrides from the last block** (`src/app/availability/actions.ts`, `page.tsx`, `ManagerSchedulingInputs.tsx`, tests):
+  - Managers now get a **Copy from last block** action in planner controls for the selected therapist and cycle.
+  - The server action finds the most recent other cycle with manager-entered overrides for that therapist, shifts dates by the cycle-start gap, and upserts only dates that still land inside the target cycle.
+  - Existing target-cycle manager overrides are preserved; conflicting shifted dates are skipped instead of overwritten.
+  - Toast feedback covers: **copied N dates**, **no previous block found**, **nothing new to copy**, and **copy failed**.
+- **Lib - cycle copy helper** (`src/lib/copy-cycle-availability.ts`, tests):
+  - `shiftOverridesToCycle` is the pure helper for date shifting, target-window filtering, and conflict skipping.
+- **Docs** (`docs/WORKFLOWS.md`, `docs/superpowers/plans/2026-04-08-copy-cycle-availability.md`):
+  - Availability workflow docs now describe the manager copy-from-last-block path, and the implementation plan is marked as shipped.
+- **Verification:** `npx tsc --noEmit`, `npx vitest run` (**444 tests** passing).
 
 ## Latest Updates (2026-04-09, session 39)
 
@@ -768,7 +781,7 @@ All checks currently green:
 - `npm run lint` pass
 - `npm run format:check` pass (whole-repo Prettier; `.claude/**` excluded from ESLint)
 - `npm run build` pass
-- `npm run test:unit` pass (**439 tests**)
+- `npm run test:unit` pass (**444 tests**)
 - `npm run test:e2e` pass (39 passed, 1 skipped)
 
 CI gates: format check â†’ lint â†’ tsc â†’ build â†’ Playwright E2E

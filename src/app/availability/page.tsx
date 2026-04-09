@@ -7,6 +7,7 @@ import {
   type AvailabilityEntryTableRow,
 } from '@/app/availability/availability-requests-table'
 import {
+  copyAvailabilityFromPreviousCycleAction,
   deleteAvailabilityEntryAction,
   deleteManagerPlannerDateAction,
   saveManagerPlannerDatesAction,
@@ -74,6 +75,7 @@ type ManagerPlannerOverrideRow = {
 
 type AvailabilityPageSearchParams = {
   cycle?: string | string[]
+  copied?: string | string[]
   error?: string | string[]
   success?: string | string[]
   search?: string | string[]
@@ -146,6 +148,16 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
     }
   }
 
+  if (success === 'copy_success') {
+    const count = getSearchParam(params?.copied)
+    return {
+      message: count
+        ? `${count} date${Number(count) === 1 ? '' : 's'} copied from the previous block.`
+        : 'Availability copied from the previous block.',
+      variant: 'success',
+    }
+  }
+
   if (error === 'delete_failed') {
     return {
       message: 'Could not delete availability request.',
@@ -163,6 +175,27 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
   if (error === 'planner_delete_failed') {
     return {
       message: 'Could not remove that saved staffing date. Please try again.',
+      variant: 'error',
+    }
+  }
+
+  if (error === 'copy_no_source') {
+    return {
+      message: 'No previous block found with saved dates for this therapist.',
+      variant: 'error',
+    }
+  }
+
+  if (error === 'copy_nothing_new') {
+    return {
+      message: 'All dates from the previous block are already planned for this cycle.',
+      variant: 'error',
+    }
+  }
+
+  if (error === 'copy_failed') {
+    return {
+      message: 'Could not copy dates. Please try again.',
       variant: 'error',
     }
   }
@@ -452,6 +485,7 @@ export default async function AvailabilityPage({
             missingRows={missingAvailabilityRows}
             saveManagerPlannerDatesAction={saveManagerPlannerDatesAction}
             deleteManagerPlannerDateAction={deleteManagerPlannerDateAction}
+            copyAvailabilityFromPreviousCycleAction={copyAvailabilityFromPreviousCycleAction}
           />
           {entriesCard}
         </>

@@ -11,6 +11,7 @@ import {
   getPlannerDateValidationError,
   toOverrideType,
 } from '@/lib/availability-planner'
+import { shiftOverridesToCycle } from '@/lib/copy-cycle-availability'
 import { createClient } from '@/lib/supabase/server'
 
 async function upsertTherapistSubmissionAfterOfficialSave(
@@ -512,6 +513,150 @@ export async function deleteManagerPlannerDateAction(formData: FormData) {
       cycle: cycleId || undefined,
       therapist: therapistId || undefined,
       success: 'planner_deleted',
+    })
+  )
+}
+
+export async function copyAvailabilityFromPreviousCycleAction(formData: FormData) {
+  const { supabase, user, role } = await getAuthenticatedUserWithRole()
+
+  if (!can(role, 'access_manager_ui')) {
+    redirect('/availability')
+  }
+
+  const cycleId = String(formData.get('cycle_id') ?? '').trim()
+  const therapistId = String(formData.get('therapist_id') ?? '').trim()
+
+  if (!cycleId || !therapistId) {
+    redirect('/availability')
+  }
+
+  const noSourceUrl = buildAvailabilityUrl({
+    error: 'copy_no_source',
+    cycle: cycleId,
+    therapist: therapistId,
+  })
+
+  const { data: targetCycle } = await supabase
+    .from('schedule_cycles')
+    .select('start_date, end_date')
+    .eq('id', cycleId)
+    .maybeSingle()
+
+  if (!targetCycle) {
+    redirect(noSourceUrl)
+  }
+
+  const { data: sourceCycleRows } = await supabase
+    .from('availability_overrides')
+    .select('cycle_id, schedule_cycles(start_date, end_date)')
+    .eq('therapist_id', therapistId)
+    .eq('source', 'manager')
+    .neq('cycle_id', cycleId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  const rawSourceRow = (sourceCycleRows ?? [])[0] as
+    | {
+        cycle_id: string
+        schedule_cycles:
+          | { start_date: string; end_date: string }
+          | Array<{ start_date: string; end_date: string }>
+          | null
+      }
+    | undefined
+  const sourceCycle =
+    rawSourceRow == null
+      ? null
+      : Array.isArray(rawSourceRow.schedule_cycles)
+        ? (rawSourceRow.schedule_cycles[0] ?? null)
+        : rawSourceRow.schedule_cycles
+  const sourceRow =
+    rawSourceRow && sourceCycle
+      ? {
+          cycle_id: rawSourceRow.cycle_id,
+          schedule_cycles: sourceCycle,
+        }
+      : null
+
+  if (!sourceRow) {
+    redirect(noSourceUrl)
+  }
+
+  const { data: sourceOverrides } = await supabase
+    .from('availability_overrides')
+    .select('date, override_type, shift_type, note')
+    .eq('cycle_id', sourceRow.cycle_id)
+    .eq('therapist_id', therapistId)
+    .eq('source', 'manager')
+
+  if (!sourceOverrides || sourceOverrides.length === 0) {
+    redirect(noSourceUrl)
+  }
+
+  const { data: existingRows } = await supabase
+    .from('availability_overrides')
+    .select('date')
+    .eq('cycle_id', cycleId)
+    .eq('therapist_id', therapistId)
+    .eq('source', 'manager')
+
+  const shifted = shiftOverridesToCycle({
+    sourceOverrides: sourceOverrides.map((row) => ({
+      date: String(row.date),
+      override_type: row.override_type as AvailabilityOverrideType,
+      shift_type: (row.shift_type ?? 'both') as AvailabilityShiftType,
+      note: row.note ?? null,
+    })),
+    sourceCycleStart: sourceRow.schedule_cycles.start_date,
+    targetCycleStart: targetCycle.start_date,
+    targetCycleEnd: targetCycle.end_date,
+    existingTargetDates: new Set((existingRows ?? []).map((row) => String(row.date))),
+  })
+
+  if (shifted.length === 0) {
+    redirect(
+      buildAvailabilityUrl({
+        cycle: cycleId,
+        therapist: therapistId,
+        error: 'copy_nothing_new',
+      })
+    )
+  }
+
+  const payload = shifted.map((row) => ({
+    therapist_id: therapistId,
+    cycle_id: cycleId,
+    date: row.date,
+    shift_type: row.shift_type,
+    override_type: row.override_type,
+    note: row.note,
+    created_by: user.id,
+    source: 'manager' as const,
+  }))
+
+  const { error: upsertError } = await supabase
+    .from('availability_overrides')
+    .upsert(payload, { onConflict: 'cycle_id,therapist_id,date,shift_type' })
+
+  if (upsertError) {
+    console.error('Failed to copy availability overrides:', upsertError)
+    redirect(
+      buildAvailabilityUrl({
+        cycle: cycleId,
+        therapist: therapistId,
+        error: 'copy_failed',
+      })
+    )
+  }
+
+  revalidatePath('/availability')
+  redirect(
+    buildAvailabilityUrl({
+      cycle: cycleId,
+      therapist: therapistId,
+      success: 'copy_success',
+      copied: String(shifted.length),
     })
   )
 }

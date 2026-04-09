@@ -43,6 +43,11 @@ Operational workflows as implemented in the current codebase.
 - Therapist grid (`/therapist/availability`, staff `/availability`): **Save progress** (draft) vs **Submit availability** / **Save changes** (updates submission timestamps per app rules).
 - Single-row therapist save (`submitAvailabilityEntryAction`) also upserts the submission row so it cannot drift from the grid path.
 - Manager planner entries use `source = manager` on `availability_overrides` (separate from therapist official submit).
+- Manager planner can also **Copy from last block** for one therapist on `/availability`:
+  - finds the most recent other cycle with manager-entered overrides for that therapist
+  - shifts dates by the difference between source and target cycle starts
+  - copies only rows that still land inside the target cycle
+  - skips dates already planned in the target cycle instead of overwriting them
 - Manager “who has submitted” for the cycle uses submission IDs, not “has any therapist override rows.”
 - No approval step for availability entries.
 

@@ -51,6 +51,7 @@ type Props = {
   missingRows: AvailabilityStatusSummaryRow[]
   saveManagerPlannerDatesAction: (formData: FormData) => void | Promise<void>
   deleteManagerPlannerDateAction: (formData: FormData) => void | Promise<void>
+  copyAvailabilityFromPreviousCycleAction: (formData: FormData) => void | Promise<void>
 }
 
 function employmentLabel(value: TherapistOption['employment_type']) {
@@ -87,6 +88,7 @@ export function ManagerSchedulingInputs({
   missingRows,
   saveManagerPlannerDatesAction,
   deleteManagerPlannerDateAction,
+  copyAvailabilityFromPreviousCycleAction,
 }: Props) {
   const initialSelectedCycleId = initialCycleId || cycles[0]?.id || ''
   const initialSelectedTherapistId = initialTherapistId || therapists[0]?.id || ''
@@ -281,6 +283,33 @@ export function ManagerSchedulingInputs({
                   assignments.
                 </p>
               </div>
+            ) : null}
+
+            {selectedCycleId && selectedTherapistId ? (
+              <form action={copyAvailabilityFromPreviousCycleAction}>
+                <input type="hidden" name="cycle_id" value={selectedCycleId} />
+                <input type="hidden" name="therapist_id" value={selectedTherapistId} />
+                <button
+                  type="submit"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-3.5 w-3.5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                  </svg>
+                  Copy from last block
+                </button>
+              </form>
             ) : null}
 
             <div className="space-y-2">
