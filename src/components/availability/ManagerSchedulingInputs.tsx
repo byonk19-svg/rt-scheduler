@@ -1,6 +1,6 @@
 'use client'
 
-import { useLayoutEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { useAvailabilityPlannerFocus } from '@/components/availability/availability-planner-focus-context'
@@ -126,10 +126,6 @@ export function ManagerSchedulingInputs({
     [selectedTherapistId, therapists]
   )
 
-  useLayoutEffect(() => {
-    plannerFocus?.setFocusedTherapistName(selectedTherapist?.full_name ?? null)
-  }, [plannerFocus, selectedTherapist?.full_name])
-
   const savedOverrides = useMemo(
     () =>
       overrides.filter(
@@ -159,6 +155,8 @@ export function ManagerSchedulingInputs({
 
   function handleTherapistChange(nextTherapistId: string) {
     setSelectedTherapistId(nextTherapistId)
+    const nextTherapist = therapists.find((t) => t.id === nextTherapistId) ?? null
+    plannerFocus?.setFocusedTherapistName(nextTherapist?.full_name ?? null)
     syncSelection(mode, selectedCycleId, nextTherapistId)
   }
 

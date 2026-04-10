@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useLayoutEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 
 import {
   DEFAULT_TABLE_FILTERS,
@@ -115,17 +115,12 @@ export function AvailabilityEntriesTable({
     sort: initialSort,
   })
 
-  useLayoutEffect(() => {
-    if (
-      !syncSearchFromPlannerFocus ||
-      !canManageAvailability ||
-      !plannerFocus?.focusedTherapistName
-    ) {
-      return
-    }
-    const next = plannerFocus.focusedTherapistName ?? ''
-    // Mirror Plan staffing therapist into table search when selection changes (parent is source of truth).
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- controlled sync from planner context, not external subscription
+  useEffect(() => {
+    if (!syncSearchFromPlannerFocus || !canManageAvailability) return
+    const next = plannerFocus?.focusedTherapistName?.trim() ?? ''
+    if (!next) return
+    // Post-hydration only — sync when Plan staffing therapist changes (avoid useLayoutEffect hydration mismatch).
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mirrors planner selection into controlled search after mount
     setFilters((prev) => (prev.search === next ? prev : { ...prev, search: next }))
   }, [syncSearchFromPlannerFocus, canManageAvailability, plannerFocus?.focusedTherapistName])
 

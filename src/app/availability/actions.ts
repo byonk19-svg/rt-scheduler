@@ -11,7 +11,9 @@ import {
   getPlannerDateValidationError,
   toOverrideType,
 } from '@/lib/availability-planner'
+import { sanitizeParsedRequests } from '@/lib/availability-email-intake'
 import { shiftOverridesToCycle } from '@/lib/copy-cycle-availability'
+import { buildManagerOverrideInput } from '@/lib/employee-directory'
 import { createClient } from '@/lib/supabase/server'
 
 async function upsertTherapistSubmissionAfterOfficialSave(
@@ -515,6 +517,77 @@ export async function deleteManagerPlannerDateAction(formData: FormData) {
       success: 'planner_deleted',
     })
   )
+}
+
+export async function applyEmailAvailabilityImportAction(formData: FormData) {
+  const { supabase, user, role } = await getAuthenticatedUserWithRole()
+
+  if (!can(role, 'access_manager_ui')) {
+    redirect('/availability')
+  }
+
+  const intakeId = String(formData.get('intake_id') ?? '').trim()
+  if (!intakeId) {
+    redirect(buildAvailabilityUrl({ error: 'email_intake_apply_failed' }))
+  }
+
+  const { data: intake, error: intakeError } = await supabase
+    .from('availability_email_intakes')
+    .select('id, matched_therapist_id, matched_cycle_id, parsed_requests, parse_status')
+    .eq('id', intakeId)
+    .maybeSingle()
+
+  if (intakeError || !intake) {
+    console.error('Failed to load availability email intake:', intakeError)
+    redirect(buildAvailabilityUrl({ error: 'email_intake_apply_failed' }))
+  }
+
+  if (!intake.matched_therapist_id || !intake.matched_cycle_id) {
+    redirect(buildAvailabilityUrl({ error: 'email_intake_apply_failed' }))
+  }
+
+  const parsedRequests = sanitizeParsedRequests(intake.parsed_requests)
+  if (parsedRequests.length === 0) {
+    redirect(buildAvailabilityUrl({ error: 'email_intake_apply_failed' }))
+  }
+
+  const payload = parsedRequests.map((request) =>
+    buildManagerOverrideInput({
+      cycleId: intake.matched_cycle_id,
+      therapistId: intake.matched_therapist_id,
+      date: request.date,
+      shiftType: request.shift_type,
+      overrideType: request.override_type,
+      note: request.note ?? `Imported from email: ${request.source_line}`,
+      managerId: user.id,
+    })
+  )
+
+  const { error: upsertError } = await supabase
+    .from('availability_overrides')
+    .upsert(payload, { onConflict: 'cycle_id,therapist_id,date,shift_type' })
+
+  if (upsertError) {
+    console.error('Failed to apply availability email intake:', upsertError)
+    redirect(buildAvailabilityUrl({ error: 'email_intake_apply_failed' }))
+  }
+
+  const { error: updateError } = await supabase
+    .from('availability_email_intakes')
+    .update({
+      parse_status: 'applied',
+      applied_at: new Date().toISOString(),
+      applied_by: user.id,
+    })
+    .eq('id', intakeId)
+
+  if (updateError) {
+    console.error('Failed to mark availability email intake as applied:', updateError)
+    redirect(buildAvailabilityUrl({ error: 'email_intake_apply_failed' }))
+  }
+
+  revalidatePath('/availability')
+  redirect(buildAvailabilityUrl({ success: 'email_intake_applied' }))
 }
 
 export async function copyAvailabilityFromPreviousCycleAction(formData: FormData) {

@@ -7,6 +7,7 @@ import {
   type AvailabilityEntryTableRow,
 } from '@/app/availability/availability-requests-table'
 import {
+  applyEmailAvailabilityImportAction,
   copyAvailabilityFromPreviousCycleAction,
   deleteAvailabilityEntryAction,
   deleteManagerPlannerDateAction,
@@ -15,6 +16,10 @@ import {
 } from '@/app/availability/actions'
 import { AvailabilityPlannerFocusProvider } from '@/components/availability/availability-planner-focus-context'
 import { AvailabilityOverviewHeader } from '@/components/availability/AvailabilityOverviewHeader'
+import {
+  EmailIntakePanel,
+  type EmailIntakePanelRow,
+} from '@/components/availability/EmailIntakePanel'
 import { ManagerSchedulingInputs } from '@/components/availability/ManagerSchedulingInputs'
 import type { TableToolbarFilters } from '@/components/TableToolbar'
 import { FeedbackToast } from '@/components/feedback-toast'
@@ -75,6 +80,32 @@ type ManagerPlannerOverrideRow = {
   override_type: AvailabilityOverrideType
   note: string | null
   source: 'manager' | 'therapist'
+}
+
+type AvailabilityEmailIntakeRow = {
+  id: string
+  from_email: string
+  from_name: string | null
+  subject: string | null
+  received_at: string
+  parse_status: 'parsed' | 'needs_review' | 'failed' | 'applied'
+  parse_summary: string | null
+  parsed_requests: Array<{
+    date: string
+    override_type: 'force_off' | 'force_on'
+  }> | null
+  profiles: { full_name: string } | { full_name: string }[] | null
+  schedule_cycles:
+    | { label: string; start_date: string; end_date: string }
+    | { label: string; start_date: string; end_date: string }[]
+    | null
+}
+
+type AvailabilityEmailAttachmentRow = {
+  intake_id: string
+  filename: string
+  download_status: 'stored' | 'skipped' | 'failed'
+  ocr_status: 'not_run' | 'completed' | 'failed' | 'skipped'
 }
 
 type AvailabilityPageSearchParams = {
@@ -204,6 +235,20 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
     }
   }
 
+  if (success === 'email_intake_applied') {
+    return {
+      message: 'Inbound email dates applied to staff availability.',
+      variant: 'success',
+    }
+  }
+
+  if (error === 'email_intake_apply_failed') {
+    return {
+      message: 'Could not apply the inbound email. Review the parsed match first.',
+      variant: 'error',
+    }
+  }
+
   return null
 }
 
@@ -230,13 +275,6 @@ export default async function AvailabilityPage({
   const feedback = getAvailabilityFeedback(params)
   const initialStatus = getSearchParam(params?.status)
   const initialSort = getSearchParam(params?.sort)
-  const initialFilters: Partial<TableToolbarFilters> = {
-    search: getSearchParam(params?.search) ?? '',
-    status: initialStatus ?? undefined,
-    startDate: getSearchParam(params?.startDate) ?? '',
-    endDate: getSearchParam(params?.endDate) ?? '',
-    sort: initialSort === 'oldest' ? 'oldest' : 'newest',
-  }
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -336,6 +374,54 @@ export default async function AvailabilityPage({
       : { data: [] }
   const plannerTherapists = (plannerTherapistsResult.data ?? []) as ManagerPlannerTherapistRow[]
   const plannerOverrides = (plannerOverridesResult.data ?? []) as ManagerPlannerOverrideRow[]
+  const emailIntakesResult = canManageAvailability
+    ? await supabase
+        .from('availability_email_intakes')
+        .select(
+          'id, from_email, from_name, subject, received_at, parse_status, parse_summary, parsed_requests, profiles!availability_email_intakes_matched_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
+        )
+        .order('received_at', { ascending: false })
+        .limit(12)
+    : { data: [] }
+  const rawEmailIntakeRows = (emailIntakesResult.data ?? []) as AvailabilityEmailIntakeRow[]
+  const emailIntakeIds = rawEmailIntakeRows.map((row) => row.id)
+  const emailAttachmentResult =
+    canManageAvailability && emailIntakeIds.length > 0
+      ? await supabase
+          .from('availability_email_attachments')
+          .select('intake_id, filename, download_status, ocr_status')
+          .in('intake_id', emailIntakeIds)
+      : { data: [] }
+  const emailAttachmentRows = (emailAttachmentResult.data ?? []) as AvailabilityEmailAttachmentRow[]
+  const attachmentsByIntakeId = new Map<string, AvailabilityEmailAttachmentRow[]>()
+  for (const attachment of emailAttachmentRows) {
+    const current = attachmentsByIntakeId.get(attachment.intake_id) ?? []
+    current.push(attachment)
+    attachmentsByIntakeId.set(attachment.intake_id, current)
+  }
+  const emailIntakeRows: EmailIntakePanelRow[] = rawEmailIntakeRows.map((row) => {
+    const matchedTherapist = getOne(row.profiles)
+    const matchedCycle = getOne(row.schedule_cycles)
+    return {
+      id: row.id,
+      fromEmail: row.from_email,
+      fromName: row.from_name,
+      subject: row.subject,
+      receivedAt: row.received_at,
+      parseStatus: row.parse_status,
+      parseSummary: row.parse_summary,
+      matchedTherapistName: matchedTherapist?.full_name ?? null,
+      matchedCycleLabel: matchedCycle
+        ? `${matchedCycle.label} (${matchedCycle.start_date} to ${matchedCycle.end_date})`
+        : null,
+      parsedRequests: Array.isArray(row.parsed_requests) ? row.parsed_requests : [],
+      attachments: (attachmentsByIntakeId.get(row.id) ?? []).map((attachment) => ({
+        filename: attachment.filename,
+        download_status: attachment.download_status,
+        ocr_status: attachment.ocr_status,
+      })),
+    }
+  })
   const selectedPlannerTherapistId =
     plannerTherapists.find((therapist) => therapist.id === selectedTherapistIdFromParams)?.id ??
     plannerTherapists[0]?.id ??
@@ -398,6 +484,22 @@ export default async function AvailabilityPage({
     }
   })
 
+  const searchFromUrl = getSearchParam(params?.search) ?? ''
+  const plannerTherapistNameForDefault =
+    canManageAvailability && selectedPlannerTherapistId
+      ? (plannerTherapists.find((t) => t.id === selectedPlannerTherapistId)?.full_name ?? null)
+      : null
+  const mergedSearchForTable =
+    searchFromUrl.trim() !== '' ? searchFromUrl : (plannerTherapistNameForDefault ?? '')
+
+  const initialFilters: Partial<TableToolbarFilters> = {
+    search: mergedSearchForTable,
+    status: initialStatus ?? undefined,
+    startDate: getSearchParam(params?.startDate) ?? '',
+    endDate: getSearchParam(params?.endDate) ?? '',
+    sort: initialSort === 'oldest' ? 'oldest' : 'newest',
+  }
+
   const entriesCard = (
     <AvailabilityEntriesTable
       role={role}
@@ -407,6 +509,12 @@ export default async function AvailabilityPage({
       syncSearchFromPlannerFocus={canManageAvailability}
     />
   )
+  const emailIntakePanel = canManageAvailability ? (
+    <EmailIntakePanel
+      rows={emailIntakeRows}
+      applyEmailAvailabilityImportAction={applyEmailAvailabilityImportAction}
+    />
+  ) : null
 
   const therapistWorkspace = (
     <TherapistAvailabilityWorkspace
@@ -488,7 +596,9 @@ export default async function AvailabilityPage({
       />
 
       {canManageAvailability ? (
-        <AvailabilityPlannerFocusProvider>
+        <AvailabilityPlannerFocusProvider
+          initialFocusedTherapistName={plannerTherapistNameForDefault}
+        >
           <ManagerSchedulingInputs
             cycles={cycles}
             therapists={plannerTherapists}
@@ -502,6 +612,7 @@ export default async function AvailabilityPage({
             copyAvailabilityFromPreviousCycleAction={copyAvailabilityFromPreviousCycleAction}
             reviewRequestsPanel={entriesCard}
           />
+          {emailIntakePanel}
         </AvailabilityPlannerFocusProvider>
       ) : (
         <>

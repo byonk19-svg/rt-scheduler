@@ -21,6 +21,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 import {
+  applyEmailAvailabilityImportAction,
   copyAvailabilityFromPreviousCycleAction,
   deleteAvailabilityEntryAction,
   deleteManagerPlannerDateAction,
@@ -49,6 +50,7 @@ function createSupabaseMock(context: TestContext = {}) {
     sourceCycleRows: null as Array<Record<string, unknown>> | null,
     sourceOverrideRows: null as Array<Record<string, unknown>> | null,
     existingTargetRows: null as Array<Record<string, unknown>> | null,
+    emailIntakeRow: null as Record<string, unknown> | null,
   }
 
   return {
@@ -116,16 +118,25 @@ function createSupabaseMock(context: TestContext = {}) {
           return Promise.resolve({ error: null })
         },
         update(payload: Record<string, unknown>) {
+          const commitUpdate = () => {
+            state.updates.push({
+              table,
+              payload,
+              filters: Object.fromEntries(filters.entries()),
+            })
+            return Promise.resolve({ error: null })
+          }
+
           return {
             eq(column: string, value: unknown) {
+              filters.set(column, value)
               return {
                 eq(column2: string, value2: unknown) {
-                  state.updates.push({
-                    table,
-                    payload,
-                    filters: { [column]: value, [column2]: value2 },
-                  })
-                  return Promise.resolve({ error: null })
+                  filters.set(column2, value2)
+                  return commitUpdate()
+                },
+                then(resolve: (value: unknown) => unknown) {
+                  return commitUpdate().then(resolve)
                 },
               }
             },
@@ -155,6 +166,12 @@ function createSupabaseMock(context: TestContext = {}) {
           if (table === 'therapist_availability_submissions' && selected.includes('id')) {
             return {
               data: context.therapistSubmissionExists ? { id: 'sub-1' } : null,
+              error: null,
+            }
+          }
+          if (table === 'availability_email_intakes') {
+            return {
+              data: state.emailIntakeRow,
               error: null,
             }
           }
@@ -437,6 +454,73 @@ describe('availability actions', () => {
           id: 'override-1',
           source: 'manager',
         },
+      },
+    ])
+  })
+
+  it('applies parsed inbound email requests into manager availability', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    supabase.state.emailIntakeRow = {
+      id: 'intake-1',
+      matched_therapist_id: 'therapist-1',
+      matched_cycle_id: 'cycle-1',
+      parse_status: 'parsed',
+      parsed_requests: [
+        {
+          date: '2026-03-24',
+          override_type: 'force_off',
+          shift_type: 'both',
+          note: null,
+          source_line: 'Off Mar 24',
+        },
+        {
+          date: '2026-03-26',
+          override_type: 'force_on',
+          shift_type: 'both',
+          note: null,
+          source_line: 'Work Mar 26',
+        },
+      ],
+    }
+    createClientMock.mockResolvedValue(supabase)
+    const formData = new FormData()
+    formData.set('intake_id', 'intake-1')
+
+    await expect(applyEmailAvailabilityImportAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?success=email_intake_applied'
+    )
+
+    expect(supabase.state.upsertPayloads[0]).toEqual([
+      {
+        cycle_id: 'cycle-1',
+        therapist_id: 'therapist-1',
+        date: '2026-03-24',
+        shift_type: 'both',
+        override_type: 'force_off',
+        note: 'Imported from email: Off Mar 24',
+        created_by: 'manager-1',
+        source: 'manager',
+      },
+      {
+        cycle_id: 'cycle-1',
+        therapist_id: 'therapist-1',
+        date: '2026-03-26',
+        shift_type: 'both',
+        override_type: 'force_on',
+        note: 'Imported from email: Work Mar 26',
+        created_by: 'manager-1',
+        source: 'manager',
+      },
+    ])
+    expect(supabase.state.updates).toEqual([
+      {
+        table: 'availability_email_intakes',
+        payload: expect.objectContaining({
+          parse_status: 'applied',
+          applied_by: 'manager-1',
+          applied_at: expect.any(String),
+        }),
+        filters: { id: 'intake-1' },
       },
     ])
   })

@@ -179,6 +179,51 @@ If you only want in-app publish without email delivery, run:
 npm run verify:publish -- --allow-no-email
 ```
 
+## Inbound Availability Email Intake
+
+Managers can now receive staff request emails and apply parsed dates into availability planning.
+
+What the app does:
+
+- accepts `email.received` webhooks at `/api/inbound/availability-email`
+- fetches full email content plus attachments from Resend receiving
+- matches the sender email to an employee profile when possible
+- parses text like `Need off Mar 24, Mar 26` or `Can work Apr 2`
+- can OCR supported image attachments through the OpenAI Responses API when configured
+- creates an intake record for manager review on [`/availability`](./src/app/availability/page.tsx)
+- applies parsed dates into `availability_overrides` as manager-entered inputs
+
+Required env vars:
+
+- `RESEND_API_KEY`
+- `RESEND_WEBHOOK_SECRET`
+- `NEXT_PUBLIC_APP_URL`
+
+Optional OCR env vars:
+
+- `OPENAI_API_KEY`
+- `OPENAI_OCR_MODEL` (defaults to `gpt-4.1-mini`)
+
+Setup outline:
+
+1. In Resend, enable receiving for either a custom inbox domain or a Resend-managed receiving domain.
+2. Create a webhook for `email.received` pointing to:
+
+```text
+https://your-app-domain/api/inbound/availability-email
+```
+
+3. Copy the webhook signing secret into `RESEND_WEBHOOK_SECRET`.
+4. Forward or send request emails/forms to the receiving inbox.
+5. Open `/availability` as a manager and review the **Email Intake** panel.
+
+Current MVP limits:
+
+- automatic parsing is best when the email body is typed and structured
+- image attachments (`png`, `jpg`, `jpeg`, `webp`, `gif`) can be OCR'd when OpenAI is configured
+- PDF attachments are stored for review but are not OCR'd automatically yet
+- sender matching currently uses the sender email address against `profiles.email`
+
 ## CI (GitHub Actions)
 
 Workflow: `.github/workflows/ci.yml`

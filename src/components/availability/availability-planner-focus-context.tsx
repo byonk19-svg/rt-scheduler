@@ -11,8 +11,19 @@ const AvailabilityPlannerFocusContext = createContext<AvailabilityPlannerFocusCo
   null
 )
 
-export function AvailabilityPlannerFocusProvider({ children }: { children: ReactNode }) {
-  const [focusedTherapistName, setFocusedTherapistNameState] = useState<string | null>(null)
+export function AvailabilityPlannerFocusProvider({
+  children,
+  initialFocusedTherapistName = null,
+}: {
+  children: ReactNode
+  /** Server-known therapist name for the selected planner row — keeps SSR and client first paint aligned. */
+  initialFocusedTherapistName?: string | null
+}) {
+  const [focusedTherapistName, setFocusedTherapistNameState] = useState<string | null>(() =>
+    initialFocusedTherapistName == null || initialFocusedTherapistName.trim() === ''
+      ? null
+      : initialFocusedTherapistName.trim()
+  )
 
   const setFocusedTherapistName = useCallback((name: string | null) => {
     setFocusedTherapistNameState(name)
