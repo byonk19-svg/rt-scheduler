@@ -1,4 +1,4 @@
-# Repository Health Snapshot (April 8, 2026)
+# Repository Health Snapshot (April 10, 2026)
 
 ## Current Shape
 
@@ -27,7 +27,7 @@ Last verified on branch `main`:
 - `npm run lint` passed
 - `npx tsc --noEmit` passed
 - `npm run test:unit` passed (`424` tests) — re-run after pulls; count drifts with new tests
-- `npx playwright test --workers=1` passed for active suites (`23` passed, `1` skipped) — re-verify after major route changes
+- `npm run test:e2e` passed (`42` passed) with the checked-in Playwright default worker count set to `2`
 
 ## Known Exceptions / Gaps
 
@@ -38,7 +38,7 @@ Last verified on branch `main`:
 ## Risk Notes
 
 - E2E tests use a live app server and Supabase-seeded data; timing and environment isolation are the primary reliability risk.
-- Parallel Playwright workers can intermittently trigger seeded-user FK race conditions in manager planner E2E setup; serial execution (`--workers=1`) is currently the stable verification lane.
+- The local `next dev` server on this machine is reliable at Playwright `workers=2`; higher parallelism caused false negatives during schedule/auth/dashboard flows.
 - Mutation trust boundaries depend on origin/referer checks; local loopback alias handling (`localhost`, `127.0.0.1`, `[::1]`) is now normalized and should remain covered by tests.
 
 ## Suggested Next Maintenance Steps

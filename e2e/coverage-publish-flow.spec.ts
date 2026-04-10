@@ -244,7 +244,10 @@ test.describe.serial('coverage publish flow', () => {
     }
 
     if (!(await cyclePublished())) {
-      await expect(overrideButton).toBeVisible({ timeout: 15_000 })
+      await expect(page.getByText(/Weekly workload rule failed/i).first()).toBeVisible({
+        timeout: 30_000,
+      })
+      await expect(overrideButton).toBeVisible({ timeout: 30_000 })
       await submitPublishForm(page, 'Publish with weekly override')
     }
 

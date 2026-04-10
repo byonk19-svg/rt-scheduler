@@ -1,20 +1,20 @@
 import type { Metadata } from 'next'
-import { Inter, Space_Grotesk } from 'next/font/google'
+import { DM_Sans, Plus_Jakarta_Sans } from 'next/font/google'
 import { Suspense } from 'react'
 import { AppShell, type AppShellUser } from '@/components/AppShell'
 import { toUiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 import './globals.css'
 
-const inter = Inter({
+const dmSans = DM_Sans({
   subsets: ['latin'],
-  variable: '--font-inter',
   display: 'swap',
 })
 
-const spaceGrotesk = Space_Grotesk({
+const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
-  variable: '--font-space-grotesk',
+  weight: ['600', '700', '800'],
+  variable: '--font-plus-jakarta',
   display: 'swap',
 })
 
@@ -67,8 +67,8 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
-      <body className={`${inter.className} antialiased`}>
+    <html lang="en" className={plusJakarta.variable}>
+      <body className={`${dmSans.className} antialiased`}>
         <Suspense fallback={children}>
           <AppShell user={appShellUser}>{children}</AppShell>
         </Suspense>

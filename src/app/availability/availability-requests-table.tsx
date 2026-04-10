@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useLayoutEffect, useMemo, useState } from 'react'
 
 import {
   DEFAULT_TABLE_FILTERS,
@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { useAvailabilityPlannerFocus } from '@/components/availability/availability-planner-focus-context'
 import { can } from '@/lib/auth/can'
 import type { UiRole } from '@/lib/auth/roles'
 import { formatDate } from '@/lib/schedule-helpers'
@@ -52,6 +53,8 @@ type AvailabilityEntriesTableProps = {
   titleOverride?: string
   descriptionOverride?: string
   emptyMessageOverride?: string
+  /** When true, search is kept in sync with the therapist selected in Plan staffing (managers). */
+  syncSearchFromPlannerFocus?: boolean
 }
 
 const STATUS_OPTIONS: TableStatusOption[] = [
@@ -85,7 +88,9 @@ export function AvailabilityEntriesTable({
   titleOverride,
   descriptionOverride,
   emptyMessageOverride,
+  syncSearchFromPlannerFocus = false,
 }: AvailabilityEntriesTableProps) {
+  const plannerFocus = useAvailabilityPlannerFocus()
   const canManageAvailability = can(role, 'access_manager_ui')
   const [scope, setScope] = useState<'all-staff' | 'my-entries'>(
     canManageAvailability ? 'all-staff' : 'my-entries'
@@ -110,6 +115,20 @@ export function AvailabilityEntriesTable({
     sort: initialSort,
   })
 
+  useLayoutEffect(() => {
+    if (
+      !syncSearchFromPlannerFocus ||
+      !canManageAvailability ||
+      !plannerFocus?.focusedTherapistName
+    ) {
+      return
+    }
+    const next = plannerFocus.focusedTherapistName ?? ''
+    // Mirror Plan staffing therapist into table search when selection changes (parent is source of truth).
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- controlled sync from planner context, not external subscription
+    setFilters((prev) => (prev.search === next ? prev : { ...prev, search: next }))
+  }, [syncSearchFromPlannerFocus, canManageAvailability, plannerFocus?.focusedTherapistName])
+
   function toggleDetails(entryId: string) {
     setExpandedEntryIds((current) => {
       const next = new Set(current)
@@ -122,10 +141,14 @@ export function AvailabilityEntriesTable({
     })
   }
 
-  const filteredRows = useMemo(() => {
-    const scopedRows =
-      canManageAvailability && scope === 'my-entries' ? rows.filter((row) => row.canDelete) : rows
+  const scopedRows = useMemo(() => {
+    if (canManageAvailability && scope === 'my-entries') {
+      return rows.filter((row) => row.canDelete)
+    }
+    return rows
+  }, [canManageAvailability, rows, scope])
 
+  const filteredRows = useMemo(() => {
     const mappedRows: Array<AvailabilityEntryTableRow & FilterableRow> = scopedRows.map((row) => ({
       ...row,
       searchText: `${row.requestedBy} ${row.reason ?? ''} ${row.cycleLabel} ${formatDate(row.date)} ${row.entryType} ${row.shiftType}`,
@@ -135,7 +158,7 @@ export function AvailabilityEntriesTable({
     }))
 
     return filterAndSortRows(mappedRows, filters)
-  }, [canManageAvailability, rows, filters, scope])
+  }, [scopedRows, filters])
 
   /** Hide shift column when every row is full-day (`both`) — typical therapist grid submissions. */
   const showShiftColumn = useMemo(() => rows.some((row) => row.shiftType !== 'both'), [rows])
@@ -157,6 +180,31 @@ export function AvailabilityEntriesTable({
     const requestToWork = filteredRows.filter((r) => r.entryType === 'force_on').length
     return { n, needOff, requestToWork }
   }, [filteredRows])
+
+  const filtersExcludedAllRows = scopedRows.length > 0 && filteredRows.length === 0
+
+  const emptyFilteredMessage = useMemo(() => {
+    if (emptyMessageOverride) return emptyMessageOverride
+    if (
+      canManageAvailability &&
+      scope === 'my-entries' &&
+      rows.length > 0 &&
+      scopedRows.length === 0
+    ) {
+      return "You don't have your own entries in this list. Switch to All staff to see the full team."
+    }
+    if (filtersExcludedAllRows) {
+      return 'No rows match your current filters. Try clearing the search, widening the date range, setting request type to All, or switching to All staff.'
+    }
+    return 'No availability requests match your filters.'
+  }, [
+    emptyMessageOverride,
+    canManageAvailability,
+    scope,
+    rows.length,
+    scopedRows.length,
+    filtersExcludedAllRows,
+  ])
 
   if (!canManageAvailability && rows.length === 0) {
     return (
@@ -200,8 +248,8 @@ export function AvailabilityEntriesTable({
               variant={scope === 'all-staff' ? 'default' : 'outline'}
               className={
                 scope === 'all-staff'
-                  ? 'bg-[#2d5a5a] text-white hover:bg-[#244a4a]'
-                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  : 'border-border bg-card text-muted-foreground hover:bg-muted'
               }
               onClick={() => setScope('all-staff')}
             >
@@ -213,8 +261,8 @@ export function AvailabilityEntriesTable({
               variant={scope === 'my-entries' ? 'default' : 'outline'}
               className={
                 scope === 'my-entries'
-                  ? 'bg-[#2d5a5a] text-white hover:bg-[#244a4a]'
-                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  : 'border-border bg-card text-muted-foreground hover:bg-muted'
               }
               onClick={() => setScope('my-entries')}
             >
@@ -235,6 +283,14 @@ export function AvailabilityEntriesTable({
           showDateRange={canManageAvailability}
           compact
         />
+
+        {syncSearchFromPlannerFocus && plannerFocus?.focusedTherapistName ? (
+          <p className="text-xs text-muted-foreground">
+            Review table search follows the therapist selected in{' '}
+            <span className="font-medium text-foreground">Plan staffing</span> (
+            {plannerFocus.focusedTherapistName}). Edit the search box to filter further.
+          </p>
+        ) : null}
 
         {entrySummary && (
           <p className="text-xs leading-relaxed text-muted-foreground/85">
@@ -283,7 +339,7 @@ export function AvailabilityEntriesTable({
                   colSpan={tableColumnCount}
                   className="py-8 text-center text-muted-foreground"
                 >
-                  {emptyMessageOverride ?? 'No availability requests match your filters.'}
+                  {emptyFilteredMessage}
                 </TableCell>
               </TableRow>
             )}

@@ -190,7 +190,7 @@ test.describe.serial('coverage manager dialog interactions', () => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
+    await page.goto(`/coverage?cycle=${ctx!.cycle.id}`, { waitUntil: 'domcontentloaded' })
 
     await waitForCalendar(page, ctx!.targetDate)
     await openShiftEditor(page, ctx!.targetDate)
@@ -201,7 +201,7 @@ test.describe.serial('coverage manager dialog interactions', () => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
+    await page.goto(`/coverage?cycle=${ctx!.cycle.id}`, { waitUntil: 'domcontentloaded' })
 
     await waitForCalendar(page, ctx!.targetDate)
     await page
@@ -216,7 +216,7 @@ test.describe.serial('coverage manager dialog interactions', () => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
+    await page.goto(`/coverage?cycle=${ctx!.cycle.id}`, { waitUntil: 'domcontentloaded' })
 
     await waitForCalendar(page, ctx!.targetDate)
     await openShiftEditor(page, ctx!.targetDate)
@@ -229,9 +229,10 @@ test.describe.serial('coverage manager dialog interactions', () => {
     page,
   }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+    test.setTimeout(60_000)
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
+    await page.goto(`/coverage?cycle=${ctx!.cycle.id}`, { waitUntil: 'domcontentloaded' })
 
     await waitForCalendar(page, ctx!.assignDate)
     await openShiftEditor(page, ctx!.assignDate)
@@ -240,24 +241,28 @@ test.describe.serial('coverage manager dialog interactions', () => {
       page.getByTestId(`coverage-assign-toggle-${ctx!.therapist2.id}-staff`)
     ).toBeVisible()
     await page.getByTestId(`coverage-assign-toggle-${ctx!.therapist2.id}-staff`).click()
+
+    await expect
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('shifts')
+            .select('id')
+            .eq('cycle_id', ctx!.cycle.id)
+            .eq('user_id', ctx!.therapist2.id)
+            .eq('date', ctx!.assignDate)
+            .eq('shift_type', 'day')
+          if (result.error) throw new Error(result.error.message)
+          return result.data?.length ?? 0
+        },
+        { timeout: 20_000 }
+      )
+      .toBe(1)
+
     const unassignButton = page.getByRole('button', {
       name: `Unassign ${ctx!.therapist2.fullName}`,
     })
-    await expect(unassignButton).toBeVisible()
-
-    await expect
-      .poll(async () => {
-        const result = await ctx!.supabase
-          .from('shifts')
-          .select('id')
-          .eq('cycle_id', ctx!.cycle.id)
-          .eq('user_id', ctx!.therapist2.id)
-          .eq('date', ctx!.assignDate)
-          .eq('shift_type', 'day')
-        if (result.error) throw new Error(result.error.message)
-        return result.data?.length ?? 0
-      })
-      .toBe(1)
+    await expect(unassignButton).toBeVisible({ timeout: 15_000 })
 
     await unassignButton.click()
     await expect(
@@ -265,17 +270,20 @@ test.describe.serial('coverage manager dialog interactions', () => {
     ).toBeVisible()
 
     await expect
-      .poll(async () => {
-        const result = await ctx!.supabase
-          .from('shifts')
-          .select('id')
-          .eq('cycle_id', ctx!.cycle.id)
-          .eq('user_id', ctx!.therapist2.id)
-          .eq('date', ctx!.assignDate)
-          .eq('shift_type', 'day')
-        if (result.error) throw new Error(result.error.message)
-        return result.data?.length ?? 0
-      })
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('shifts')
+            .select('id')
+            .eq('cycle_id', ctx!.cycle.id)
+            .eq('user_id', ctx!.therapist2.id)
+            .eq('date', ctx!.assignDate)
+            .eq('shift_type', 'day')
+          if (result.error) throw new Error(result.error.message)
+          return result.data?.length ?? 0
+        },
+        { timeout: 20_000 }
+      )
       .toBe(0)
   })
 })

@@ -25,4 +25,19 @@ describe('AvailabilityWorkspaceShell', () => {
     expect(html).toContain('data-slot="availability-workspace-aside"')
     expect(html).toContain('data-slot="availability-workspace-lower"')
   })
+
+  it('places trailing content beside the roster column on wide layouts when provided', () => {
+    const html = renderToStaticMarkup(
+      createElement(AvailabilityWorkspaceShell, {
+        controls: createElement('div', undefined, 'Controls'),
+        calendar: createElement('div', undefined, 'Calendar'),
+        aside: createElement('div', undefined, 'Aside'),
+        lower: createElement('div', undefined, 'Lower'),
+        trailing: createElement('div', undefined, 'Review panel'),
+      })
+    )
+
+    expect(html).toContain('data-slot="availability-workspace-split"')
+    expect(html).toContain('Review panel')
+  })
 })

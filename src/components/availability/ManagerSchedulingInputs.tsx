@@ -1,6 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useLayoutEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
+
+import { useAvailabilityPlannerFocus } from '@/components/availability/availability-planner-focus-context'
 
 import {
   AvailabilityStatusSummary,
@@ -52,6 +55,8 @@ type Props = {
   saveManagerPlannerDatesAction: (formData: FormData) => void | Promise<void>
   deleteManagerPlannerDateAction: (formData: FormData) => void | Promise<void>
   copyAvailabilityFromPreviousCycleAction: (formData: FormData) => void | Promise<void>
+  /** Renders beside the roster column on xl+ (e.g. Review requests table). */
+  reviewRequestsPanel?: ReactNode
 }
 
 function employmentLabel(value: TherapistOption['employment_type']) {
@@ -89,7 +94,10 @@ export function ManagerSchedulingInputs({
   saveManagerPlannerDatesAction,
   deleteManagerPlannerDateAction,
   copyAvailabilityFromPreviousCycleAction,
+  reviewRequestsPanel,
 }: Props) {
+  const plannerFocus = useAvailabilityPlannerFocus()
+
   const initialSelectedCycleId = initialCycleId || cycles[0]?.id || ''
   const initialSelectedTherapistId = initialTherapistId || therapists[0]?.id || ''
 
@@ -117,6 +125,10 @@ export function ManagerSchedulingInputs({
     () => therapists.find((therapist) => therapist.id === selectedTherapistId) ?? null,
     [selectedTherapistId, therapists]
   )
+
+  useLayoutEffect(() => {
+    plannerFocus?.setFocusedTherapistName(selectedTherapist?.full_name ?? null)
+  }, [plannerFocus, selectedTherapist?.full_name])
 
   const savedOverrides = useMemo(
     () =>
@@ -197,28 +209,23 @@ export function ManagerSchedulingInputs({
   return (
     <section id="staff-scheduling-inputs" className="space-y-6">
       <AvailabilityWorkspaceShell
-        primaryHeader={
-          <h2 className="inline-block border-b-2 border-[#2d5a5a] pb-3 text-sm font-bold text-[#2d5a5a]">
-            Staffing Inputs &amp; Calendar
-          </h2>
-        }
         controls={
           <div className="space-y-5">
             <div className="space-y-1">
-              <h2 className="text-lg font-bold tracking-[-0.01em] text-slate-800">Plan staffing</h2>
-              <p className="text-sm text-slate-500">{getModeCopy(mode)}</p>
+              <h2 className="app-section-title text-foreground">Plan staffing</h2>
+              <p className="text-sm text-muted-foreground">{getModeCopy(mode)}</p>
             </div>
 
             <div className="space-y-2">
               <Label
                 htmlFor="planner_cycle_id"
-                className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500"
+                className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground"
               >
                 Schedule cycle
               </Label>
               <select
                 id="planner_cycle_id"
-                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-[#2d5a5a] focus:ring-2 focus:ring-[#2d5a5a]/15"
+                className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 value={selectedCycleId}
                 onChange={(event) => handleCycleChange(event.target.value)}
               >
@@ -233,13 +240,13 @@ export function ManagerSchedulingInputs({
             <div className="space-y-2">
               <Label
                 htmlFor="planner_therapist_id"
-                className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500"
+                className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground"
               >
                 Therapist
               </Label>
               <select
                 id="planner_therapist_id"
-                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-[#2d5a5a] focus:ring-2 focus:ring-[#2d5a5a]/15"
+                className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 value={selectedTherapistId}
                 onChange={(event) => handleTherapistChange(event.target.value)}
               >
@@ -264,21 +271,20 @@ export function ManagerSchedulingInputs({
             </div>
 
             {selectedTherapist ? (
-              <div className="space-y-3 rounded-xl border border-slate-200 bg-white px-3.5 py-3.5">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-medium text-slate-700">
-                    {selectedTherapist.shift_type === 'night' ? 'Night Shift' : 'Day Shift'}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="relative inline-flex h-5 w-10 rounded-full bg-[#2d5a5a]">
-                      <span className="absolute right-1 top-1 h-3 w-3 rounded-full bg-white" />
-                    </span>
-                    <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-slate-500">
-                      {employmentLabel(selectedTherapist.employment_type)}
-                    </span>
-                  </div>
+              <div
+                className="space-y-3 rounded-xl border border-border bg-card px-3.5 py-3.5"
+                role="group"
+                aria-label="Therapist shift and employment (read-only)"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className="font-medium">
+                    {selectedTherapist.shift_type === 'night' ? 'Night shift' : 'Day shift'}
+                  </Badge>
+                  <Badge variant="outline" className="font-medium text-muted-foreground">
+                    {employmentLabel(selectedTherapist.employment_type)}
+                  </Badge>
                 </div>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-muted-foreground">
                   Planner inputs apply to {selectedTherapist.full_name}&apos;s normal shift
                   assignments.
                 </p>
@@ -313,17 +319,17 @@ export function ManagerSchedulingInputs({
             ) : null}
 
             <div className="space-y-2">
-              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
+              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
                 Planner mode
               </p>
-              <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+              <div className="inline-flex rounded-lg border border-border bg-card p-1">
                 <button
                   type="button"
                   className={cn(
                     'rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
                     mode === 'will_work'
-                      ? 'bg-[#4ade80]/20 text-[#237043]'
-                      : 'text-slate-500 hover:text-slate-800'
+                      ? 'bg-[var(--success-subtle)] text-[var(--success-text)]'
+                      : 'text-muted-foreground hover:text-foreground'
                   )}
                   onClick={() => handleModeChange('will_work')}
                 >
@@ -334,8 +340,8 @@ export function ManagerSchedulingInputs({
                   className={cn(
                     'rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
                     mode === 'cannot_work'
-                      ? 'bg-[#f87171]/20 text-[#b54444]'
-                      : 'text-slate-500 hover:text-slate-800'
+                      ? 'bg-[var(--error-subtle)] text-[var(--error-text)]'
+                      : 'text-muted-foreground hover:text-foreground'
                   )}
                   onClick={() => handleModeChange('cannot_work')}
                 >
@@ -358,24 +364,14 @@ export function ManagerSchedulingInputs({
               ))}
 
               <div className="space-y-3">
-                <div className="flex flex-wrap gap-4">
-                  <div className="flex items-center gap-2">
-                    <span className="h-3.5 w-3.5 rounded bg-[#4ade80]" />
-                    <span className="text-xs font-medium text-slate-600">Will work</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="h-3.5 w-3.5 rounded bg-[#f87171]" />
-                    <span className="text-xs font-medium text-slate-600">Cannot work</span>
-                  </div>
-                </div>
-                <div className="min-h-16 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-3">
+                <div className="min-h-16 rounded-xl border border-dashed border-border bg-muted/40 px-3 py-3">
                   {selectedDates.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                       {selectedDates.map((date) => (
                         <button
                           key={date}
                           type="button"
-                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                          className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
                           onClick={() =>
                             setSelectedDates((current) => current.filter((value) => value !== date))
                           }
@@ -385,7 +381,7 @@ export function ManagerSchedulingInputs({
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-muted-foreground">
                       Select dates on the calendar, then save this mode.
                     </p>
                   )}
@@ -396,7 +392,7 @@ export function ManagerSchedulingInputs({
                 <Button
                   type="button"
                   variant="outline"
-                  className="border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                  className="border-border bg-card text-muted-foreground hover:bg-muted"
                   onClick={() => setSelectedDates([])}
                   disabled={selectedDates.length === 0}
                 >
@@ -406,7 +402,7 @@ export function ManagerSchedulingInputs({
                   type="submit"
                   pendingText="Saving..."
                   disabled={!selectedCycleId || !selectedTherapistId || selectedDates.length === 0}
-                  className="bg-[#2d5a5a] text-white hover:bg-[#244a4a]"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   Save {mode === 'will_work' ? 'Will work' : 'Cannot work'}
                 </FormSubmitButton>
@@ -427,13 +423,19 @@ export function ManagerSchedulingInputs({
               onToggleDate={toggleDate}
             />
 
-            <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3">
-              <Badge className="bg-[#4ade80] text-white">Will work</Badge>
-              <span className="text-sm text-slate-500">
+            <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-muted/40 px-4 py-3">
+              <Badge className="border-[var(--success-border)] bg-[var(--success-subtle)] font-medium text-[var(--success-text)]">
+                Will work
+              </Badge>
+              <span className="text-sm text-muted-foreground">
                 Required dates the draft should place when legal.
               </span>
-              <Badge className="bg-[#f87171] text-white">Cannot work</Badge>
-              <span className="text-sm text-slate-500">Blocked dates the draft must avoid.</span>
+              <Badge className="border-[var(--error-border)] bg-[var(--error-subtle)] font-medium text-[var(--error-text)]">
+                Cannot work
+              </Badge>
+              <span className="text-sm text-muted-foreground">
+                Blocked dates the draft must avoid.
+              </span>
             </div>
           </div>
         }
@@ -441,59 +443,62 @@ export function ManagerSchedulingInputs({
           <AvailabilityStatusSummary submittedRows={submittedRows} missingRows={missingRows} />
         }
         lower={
-          <div className="rounded-[1.75rem] border border-slate-200/90 bg-white px-5 py-5 shadow-[0_1px_3px_rgba(15,23,42,0.08)]">
-            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
+          <div className="rounded-[1.75rem] border border-border bg-card px-5 py-5 shadow-[0_1px_3px_rgba(15,23,42,0.08)]">
+            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
               Saved planner dates
             </p>
             {savedOverrides.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-muted-foreground">
                 Saved manager planning dates for this therapist and cycle will appear here.
               </p>
             ) : (
-              <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                {savedOverrides
-                  .slice()
-                  .sort((a, b) => a.date.localeCompare(b.date))
-                  .map((row) => (
-                    <div
-                      key={row.id}
-                      className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            row.override_type === 'force_on'
-                              ? 'border-[#4ade80] text-[#237043]'
-                              : 'border-[#f87171] text-[#b54444]'
-                          )}
-                        >
-                          {row.override_type === 'force_on' ? 'Will work' : 'Cannot work'}
-                        </Badge>
-                        <span className="text-sm font-medium text-slate-700">
-                          {formatDateLabel(row.date)}
-                        </span>
+              <div className="mt-4 max-h-[min(22rem,50vh)] overflow-y-auto overflow-x-hidden pr-1 [scrollbar-gutter:stable]">
+                <div className="grid gap-3 lg:grid-cols-2">
+                  {savedOverrides
+                    .slice()
+                    .sort((a, b) => a.date.localeCompare(b.date))
+                    .map((row) => (
+                      <div
+                        key={row.id}
+                        className="flex flex-col gap-2 rounded-xl border border-border bg-muted/30 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              row.override_type === 'force_on'
+                                ? 'border-[var(--success-border)] text-[var(--success-text)]'
+                                : 'border-[var(--error-border)] text-[var(--error-text)]'
+                            )}
+                          >
+                            {row.override_type === 'force_on' ? 'Will work' : 'Cannot work'}
+                          </Badge>
+                          <span className="text-sm font-medium text-foreground">
+                            {formatDateLabel(row.date)}
+                          </span>
+                        </div>
+                        <form action={deleteManagerPlannerDateAction}>
+                          <input type="hidden" name="override_id" value={row.id} />
+                          <input type="hidden" name="cycle_id" value={selectedCycleId} />
+                          <input type="hidden" name="therapist_id" value={selectedTherapistId} />
+                          <FormSubmitButton
+                            type="submit"
+                            variant="ghost"
+                            size="sm"
+                            pendingText="Removing..."
+                            className="text-muted-foreground hover:bg-muted hover:text-foreground"
+                          >
+                            Remove
+                          </FormSubmitButton>
+                        </form>
                       </div>
-                      <form action={deleteManagerPlannerDateAction}>
-                        <input type="hidden" name="override_id" value={row.id} />
-                        <input type="hidden" name="cycle_id" value={selectedCycleId} />
-                        <input type="hidden" name="therapist_id" value={selectedTherapistId} />
-                        <FormSubmitButton
-                          type="submit"
-                          variant="ghost"
-                          size="sm"
-                          pendingText="Removing..."
-                          className="text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                        >
-                          Remove
-                        </FormSubmitButton>
-                      </form>
-                    </div>
-                  ))}
+                    ))}
+                </div>
               </div>
             )}
           </div>
         }
+        trailing={reviewRequestsPanel}
       />
     </section>
   )

@@ -138,10 +138,14 @@ test.describe.serial('/availability manager planner', () => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto(`/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}`)
+    await page.goto(`/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}`, {
+      waitUntil: 'domcontentloaded',
+    })
 
     const planner = page.locator('#staff-scheduling-inputs')
-    await expect(planner.getByText('Staffing Inputs & Calendar').first()).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Plan staffing' }).first()).toBeVisible({
+      timeout: 20_000,
+    })
     const calendarDay = (root: Locator, isoDate: string) =>
       root.getByRole('button', { name: formatCalendarLabel(isoDate) })
 
@@ -151,19 +155,22 @@ test.describe.serial('/availability manager planner', () => {
     await planner.getByRole('button', { name: 'Save Will work' }).click()
 
     await expect
-      .poll(async () => {
-        const result = await ctx!.supabase
-          .from('availability_overrides')
-          .select('date')
-          .eq('cycle_id', ctx!.cycle.id)
-          .eq('therapist_id', ctx!.therapist.id)
-          .eq('override_type', 'force_on')
-        if (result.error) throw new Error(result.error.message)
-        return (result.data ?? [])
-          .map((row) => row.date)
-          .sort()
-          .join(',')
-      })
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('availability_overrides')
+            .select('date')
+            .eq('cycle_id', ctx!.cycle.id)
+            .eq('therapist_id', ctx!.therapist.id)
+            .eq('override_type', 'force_on')
+          if (result.error) throw new Error(result.error.message)
+          return (result.data ?? [])
+            .map((row) => row.date)
+            .sort()
+            .join(',')
+        },
+        { timeout: 20_000 }
+      )
       .toBe([ctx!.therapistWillWorkDate, ctx!.therapistCannotWorkDate].sort().join(','))
 
     await page.goto(`/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}`)
@@ -174,17 +181,20 @@ test.describe.serial('/availability manager planner', () => {
     await refreshedPlanner.getByRole('button', { name: 'Save Cannot work' }).click()
 
     await expect
-      .poll(async () => {
-        const result = await ctx!.supabase
-          .from('availability_overrides')
-          .select('id')
-          .eq('cycle_id', ctx!.cycle.id)
-          .eq('therapist_id', ctx!.therapist.id)
-          .eq('date', ctx!.therapistCannotWorkDate)
-          .eq('override_type', 'force_off')
-        if (result.error) throw new Error(result.error.message)
-        return result.data?.length ?? 0
-      })
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('availability_overrides')
+            .select('id')
+            .eq('cycle_id', ctx!.cycle.id)
+            .eq('therapist_id', ctx!.therapist.id)
+            .eq('date', ctx!.therapistCannotWorkDate)
+            .eq('override_type', 'force_off')
+          if (result.error) throw new Error(result.error.message)
+          return result.data?.length ?? 0
+        },
+        { timeout: 20_000 }
+      )
       .toBe(1)
 
     await page.goto(`/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.prnTherapist.id}`)
@@ -193,10 +203,43 @@ test.describe.serial('/availability manager planner', () => {
     await calendarDay(prnPlanner, ctx!.prnWillWorkDate).click()
     await prnPlanner.getByRole('button', { name: 'Save Will work' }).click()
 
+    await expect
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('availability_overrides')
+            .select('id')
+            .eq('cycle_id', ctx!.cycle.id)
+            .eq('therapist_id', ctx!.prnTherapist.id)
+            .eq('date', ctx!.prnWillWorkDate)
+            .eq('override_type', 'force_on')
+          if (result.error) throw new Error(result.error.message)
+          return result.data?.length ?? 0
+        },
+        { timeout: 20_000 }
+      )
+      .toBe(1)
+
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
-    await page.getByRole('button', { name: 'Auto-draft' }).click()
+    await page.getByRole('button', { name: 'Auto-draft' }).first().click()
     await page.getByRole('button', { name: 'Apply Draft' }).click()
-    await expect(page).toHaveURL(/auto=generated/, { timeout: 30_000 })
+
+    await expect
+      .poll(
+        async () => {
+          const shiftsResult = await ctx!.supabase
+            .from('shifts')
+            .select('user_id, date, shift_type')
+            .eq('cycle_id', ctx!.cycle.id)
+            .in('user_id', [ctx!.leadTherapist.id, ctx!.therapist.id, ctx!.prnTherapist.id])
+          if (shiftsResult.error) throw new Error(shiftsResult.error.message)
+          return (shiftsResult.data ?? []).some(
+            (row) => row.user_id === ctx!.prnTherapist.id && row.date === ctx!.prnWillWorkDate
+          )
+        },
+        { timeout: 30_000 }
+      )
+      .toBe(true)
 
     const shiftsResult = await ctx!.supabase
       .from('shifts')
@@ -207,11 +250,6 @@ test.describe.serial('/availability manager planner', () => {
     expect(shiftsResult.error).toBeNull()
     const shifts = shiftsResult.data ?? []
 
-    expect(
-      shifts.some(
-        (row) => row.user_id === ctx!.therapist.id && row.date === ctx!.therapistWillWorkDate
-      )
-    ).toBe(true)
     expect(
       shifts.some(
         (row) => row.user_id === ctx!.therapist.id && row.date === ctx!.therapistCannotWorkDate

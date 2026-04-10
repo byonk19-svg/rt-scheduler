@@ -76,8 +76,9 @@ export function AvailabilityStatusSummary({
           type="button"
           className={cn(
             'border-b-2 px-4 py-3 text-left text-xs font-bold transition-colors',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2',
             activeTab === 'missing'
-              ? 'border-[var(--warning-text)] text-foreground'
+              ? 'border-primary text-foreground'
               : 'border-transparent text-muted-foreground hover:text-foreground'
           )}
           onClick={() => setActiveTab('missing')}
@@ -91,8 +92,9 @@ export function AvailabilityStatusSummary({
           type="button"
           className={cn(
             'border-b-2 px-4 py-3 text-left text-xs font-bold transition-colors',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2',
             activeTab === 'submitted'
-              ? 'border-[var(--success-text)] text-foreground'
+              ? 'border-primary text-foreground'
               : 'border-transparent text-muted-foreground hover:text-foreground'
           )}
           onClick={() => setActiveTab('submitted')}

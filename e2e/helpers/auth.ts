@@ -47,7 +47,16 @@ export async function loginAs(page: Page, email: string, password: string) {
     }))
   )
 
-  await page.goto('/dashboard', { waitUntil: 'domcontentloaded' })
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await page.goto('/dashboard', { waitUntil: 'domcontentloaded' })
+      break
+    } catch (error) {
+      if (attempt === 1) {
+        throw error
+      }
+    }
+  }
   await expect(page).toHaveURL(/\/dashboard(?:\/(?:manager|staff))?(?:[/?].*)?$/, {
     timeout: 30_000,
   })

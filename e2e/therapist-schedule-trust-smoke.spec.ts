@@ -202,10 +202,44 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
 
   test('Submitted Availability row detail shows Entry saved', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required.')
+    const detailNote = `E2E detail note ${randomString('detail')}`
+
+    const upsertResult = await ctx!.supabase.from('availability_overrides').upsert(
+      {
+        therapist_id: ctx!.dayTherapist.id,
+        cycle_id: ctx!.cycleId,
+        date: ctx!.availabilityDate,
+        shift_type: 'both',
+        override_type: 'force_off',
+        note: detailNote,
+        created_by: ctx!.dayTherapist.id,
+        source: 'therapist',
+      },
+      { onConflict: 'cycle_id,therapist_id,date,shift_type' }
+    )
+    expect(upsertResult.error).toBeNull()
+
+    const submissionResult = await ctx!.supabase.from('therapist_availability_submissions').upsert(
+      {
+        therapist_id: ctx!.dayTherapist.id,
+        schedule_cycle_id: ctx!.cycleId,
+        submitted_at: new Date().toISOString(),
+        last_edited_at: new Date().toISOString(),
+      },
+      { onConflict: 'therapist_id,schedule_cycle_id' }
+    )
+    expect(submissionResult.error).toBeNull()
+
     await loginAs(page, ctx!.dayTherapist.email, ctx!.dayTherapist.password)
     await page.goto(`/therapist/availability?cycle=${ctx!.cycleId}`)
-    await page.locator('table').getByRole('button', { name: 'View' }).first().click()
-    await expect(page.getByText('Entry saved').first()).toBeVisible({ timeout: 15_000 })
+    const row = page.locator('tr').filter({ hasText: detailNote }).first()
+    await expect(row).toBeVisible({ timeout: 15_000 })
+    const viewButton = row.getByRole('button', { name: 'View' })
+    await expect(viewButton).toBeVisible({ timeout: 15_000 })
+    await viewButton.click()
+    await expect(row.getByRole('button', { name: 'Hide' })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('Entry saved').last()).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(detailNote).last()).toBeVisible({ timeout: 15_000 })
   })
 
   test('selecting Available shows truthful note copy (no editable note field)', async ({

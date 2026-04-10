@@ -170,18 +170,21 @@ test.describe.serial('publish history lifecycle', () => {
       .first()
     await expect(eventRow).toBeVisible()
     await eventRow.getByRole('button', { name: 'Delete history' }).click()
-    await expect(page.getByText('Publish history entry deleted.')).toBeVisible({ timeout: 20_000 })
+    await expect(page).toHaveURL(/success=publish_event_deleted/, { timeout: 30_000 })
 
     await expect
-      .poll(async () => {
-        const result = await ctx!.supabase
-          .from('publish_events')
-          .select('id')
-          .eq('id', eventInsert.data.id)
-          .maybeSingle()
-        if (result.error) throw new Error(result.error.message)
-        return result.data?.id ?? null
-      })
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('publish_events')
+            .select('id')
+            .eq('id', eventInsert.data.id)
+            .maybeSingle()
+          if (result.error) throw new Error(result.error.message)
+          return result.data?.id ?? null
+        },
+        { timeout: 30_000 }
+      )
       .toBeNull()
   })
 

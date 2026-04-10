@@ -169,7 +169,7 @@ export function CalendarGrid({
                           tabIndex={absoluteIndex === 0 ? 0 : -1}
                           data-testid={`coverage-day-cell-button-${day.id}`}
                           aria-label={`${schedulingViewOnly ? 'View' : 'Edit'} ${day.label}`}
-                          className="absolute inset-0 rounded-[20px]"
+                          className="absolute inset-0 z-0 rounded-[20px]"
                           onClick={() => onSelect(day.id)}
                           onKeyDown={(event) => {
                             if (
@@ -227,6 +227,7 @@ export function CalendarGrid({
                         <div
                           className={cn(
                             'mt-1.5 rounded-xl border px-1.75 py-1',
+                            day.leadShift && allowAssignmentStatusEdits && 'pointer-events-auto',
                             day.leadShift
                               ? 'border-[var(--info-border)]/40 bg-[var(--info-subtle)]/22 text-[var(--info-text)]'
                               : 'border-[var(--warning-border)]/55 bg-[var(--warning-subtle)]/18 text-[var(--warning-text)]'
@@ -282,7 +283,14 @@ export function CalendarGrid({
                           </div>
                         )}
 
-                        <div className="mt-1.5 space-y-0.5 border-t border-border/45 pt-1.5">
+                        <div
+                          className={cn(
+                            'mt-1.5 space-y-0.5 border-t border-border/45 pt-1.5',
+                            day.staffShifts.length > 0 &&
+                              allowAssignmentStatusEdits &&
+                              'pointer-events-auto'
+                          )}
+                        >
                           {day.staffShifts.map((shift) => (
                             <div key={shift.id} className="flex items-center gap-1 text-[0.62rem] leading-snug">
                               {allowAssignmentStatusEdits ? (

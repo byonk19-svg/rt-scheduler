@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { isTrustedMutationRequest } from '@/lib/security/request-origin'
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 
 function toSafeRedirectPath(path: string | null): string {
   if (!path) return '/'
@@ -9,17 +10,32 @@ function toSafeRedirectPath(path: string | null): string {
   return path
 }
 
+async function clearSupabaseAuthCookies(response: NextResponse) {
+  const cookieStore = await cookies()
+  for (const cookie of cookieStore.getAll()) {
+    if (!cookie.name.startsWith('sb-')) continue
+    response.cookies.set({
+      name: cookie.name,
+      value: '',
+      path: '/',
+      expires: new Date(0),
+    })
+  }
+}
+
 export async function GET(request: Request) {
   const supabase = await createClient()
   await supabase.auth.signOut()
 
   const url = new URL(request.url)
-  return NextResponse.redirect(
+  const response = NextResponse.redirect(
     new URL(toSafeRedirectPath(url.searchParams.get('next')), request.url),
     {
       status: 303,
     }
   )
+  await clearSupabaseAuthCookies(response)
+  return response
 }
 
 export async function POST(request: Request) {
@@ -29,5 +45,7 @@ export async function POST(request: Request) {
 
   const supabase = await createClient()
   await supabase.auth.signOut()
-  return NextResponse.redirect(new URL('/', request.url), { status: 303 })
+  const response = NextResponse.redirect(new URL('/', request.url), { status: 303 })
+  await clearSupabaseAuthCookies(response)
+  return response
 }

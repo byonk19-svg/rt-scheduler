@@ -1,6 +1,19 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-09 (session 45)
+Updated: 2026-04-10 (session 46)
+
+## Latest Updates (2026-04-10, session 46)
+
+- **End-to-end workflow stabilization + auth signout hardening** (`e2e/*.spec.ts`, `e2e/helpers/auth.ts`, `src/app/auth/signout/route.ts`, `playwright.config.ts`):
+  - Full Playwright verification now passes with the real manager auth flow enabled: **42 passed**.
+  - `authenticated-flow.spec.ts` now uses the current login labels and verifies logout through `/auth/signout?next=/login`.
+  - `/auth/signout` explicitly clears Supabase auth cookies on redirect responses so browser-driven logout behaves consistently in E2E.
+  - Playwright default workers reduced to **2** via `PLAYWRIGHT_WORKERS`-aware config to avoid local `next dev` saturation on this machine.
+- **Coverage + planner E2E tightening** (`CoverageClientPage.tsx`, `CalendarGrid.tsx`, `AssignmentStatusPopover.tsx`, coverage/planner/publish/team trust E2E specs):
+  - Fixed the real coverage click-target bug where assignment-status chips could be obscured by the day-cell overlay.
+  - Coverage now surfaces real backend assignment errors (for example `PRN not offered for this date`) instead of collapsing them into a generic failure message.
+  - Replaced brittle toast/URL assertions across the suite with persisted-state checks where the UI intentionally redirects or updates asynchronously.
+- **Verification:** `npm run test:e2e` (**42 passed**), `npm run lint`, `npx tsc --noEmit`
 
 ## Session History
 
@@ -142,7 +155,8 @@ All checks currently green:
 - `npm run build` pass
 - `npm run test:unit` pass (**~460 tests**)
 - Full `npx vitest run` may require `.env.local` (e.g. `assignment-status` route test uses admin client env vars)
-- `npm run test:e2e` pass (39 passed, 1 skipped)
+- `npm run test:e2e` pass (**42 passed**) with default Playwright workers set to `2`
+- Auth E2E happy path requires `.env.local` (or shell env) entries for `E2E_USER_EMAIL` and `E2E_USER_PASSWORD`
 
 CI gates: format check → lint → tsc → build → Playwright E2E
 

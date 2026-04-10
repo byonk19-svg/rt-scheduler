@@ -13,6 +13,7 @@ import {
   saveManagerPlannerDatesAction,
   submitTherapistAvailabilityGridAction,
 } from '@/app/availability/actions'
+import { AvailabilityPlannerFocusProvider } from '@/components/availability/availability-planner-focus-context'
 import { AvailabilityOverviewHeader } from '@/components/availability/AvailabilityOverviewHeader'
 import { ManagerSchedulingInputs } from '@/components/availability/ManagerSchedulingInputs'
 import type { TableToolbarFilters } from '@/components/TableToolbar'
@@ -22,6 +23,7 @@ import { PrintMenuItem } from '@/components/print-menu-item'
 import { TherapistAvailabilityWorkspace } from '@/components/availability/TherapistAvailabilityWorkspace'
 import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
+import { formatHumanCycleRange } from '@/lib/calendar-utils'
 import { buildMissingAvailabilityRows } from '@/lib/employee-directory'
 import { toUiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
@@ -402,6 +404,7 @@ export default async function AvailabilityPage({
       rows={availabilityRows}
       deleteAvailabilityEntryAction={deleteAvailabilityEntryAction}
       initialFilters={initialFilters}
+      syncSearchFromPlannerFocus={canManageAvailability}
     />
   )
 
@@ -426,15 +429,15 @@ export default async function AvailabilityPage({
       : null
 
   return (
-    <div className="space-y-7">
+    <div className="availability-page-print space-y-7">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
       <AvailabilityOverviewHeader
         canManageAvailability={canManageAvailability}
-        title="Availability"
+        title={canManageAvailability ? 'Staff Availability Management' : 'Availability'}
         subtitle={
           selectedCycle
-            ? `${selectedCycle.label} - ${selectedCycle.start_date} to ${selectedCycle.end_date}`
+            ? `${selectedCycle.label} · ${formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)}`
             : 'No upcoming cycle selected'
         }
         totalRequests={totalRequests}
@@ -446,7 +449,7 @@ export default async function AvailabilityPage({
             <Button
               asChild
               size="sm"
-              className="gap-1.5 bg-[#2d5a5a] text-xs text-white hover:bg-[#244a4a]"
+              className="gap-1.5 bg-primary text-xs text-primary-foreground hover:bg-primary/90"
             >
               <a
                 href={
@@ -459,10 +462,18 @@ export default async function AvailabilityPage({
                 {canManageAvailability ? 'Plan staffing' : 'Add availability'}
               </a>
             </Button>
-            <Button asChild variant="outline" size="sm" className="text-xs">
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="border-border/80 bg-transparent text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
               <Link href="/shift-board">Shift board</Link>
             </Button>
-            <MoreActionsMenu label="Utilities">
+            <MoreActionsMenu
+              label="Utilities"
+              triggerClassName="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-border/80 bg-transparent px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
+            >
               <a
                 href="/api/availability/export"
                 className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-secondary"
@@ -477,7 +488,7 @@ export default async function AvailabilityPage({
       />
 
       {canManageAvailability ? (
-        <>
+        <AvailabilityPlannerFocusProvider>
           <ManagerSchedulingInputs
             cycles={cycles}
             therapists={plannerTherapists}
@@ -489,9 +500,9 @@ export default async function AvailabilityPage({
             saveManagerPlannerDatesAction={saveManagerPlannerDatesAction}
             deleteManagerPlannerDateAction={deleteManagerPlannerDateAction}
             copyAvailabilityFromPreviousCycleAction={copyAvailabilityFromPreviousCycleAction}
+            reviewRequestsPanel={entriesCard}
           />
-          {entriesCard}
-        </>
+        </AvailabilityPlannerFocusProvider>
       ) : (
         <>
           {therapistWorkspace}

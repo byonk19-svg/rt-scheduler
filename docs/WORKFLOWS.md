@@ -10,6 +10,7 @@ Operational workflows as implemented in the current codebase.
 4. Manager reviews pending users at `/requests/user-access`.
 5. Manager approves with required role selection (`therapist` or `lead`) or declines.
 6. Approve activates access and sends approval email; decline deletes the pending auth account.
+7. E2E auth smoke uses a dedicated real account via `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` and verifies both login and logout.
 
 ## 1) Manager: Build and Publish a Cycle
 

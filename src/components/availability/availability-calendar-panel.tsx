@@ -48,11 +48,11 @@ export function AvailabilityCalendarPanel({
           size="sm"
           onClick={onPreviousMonth}
           aria-label="Previous month"
-          className="h-8 w-8 rounded-md border border-slate-200 p-0 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+          className="h-8 w-8 rounded-md border border-border p-0 text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <p className="text-sm font-bold tracking-[-0.01em] text-slate-800">
+        <p className="text-sm font-bold tracking-[-0.01em] text-foreground">
           {formatMonthLabel(monthStart)}
         </p>
         <Button
@@ -61,7 +61,7 @@ export function AvailabilityCalendarPanel({
           size="sm"
           onClick={onNextMonth}
           aria-label="Next month"
-          className="h-8 w-8 rounded-md border border-slate-200 p-0 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+          className="h-8 w-8 rounded-md border border-border p-0 text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
@@ -69,7 +69,7 @@ export function AvailabilityCalendarPanel({
 
       <div className="grid grid-cols-7 gap-1.5">
         {WEEKDAYS.map((day) => (
-          <p key={day} className="text-center text-[11px] font-medium text-slate-500">
+          <p key={day} className="text-center text-[11px] font-medium text-muted-foreground">
             {day.slice(0, 2)}
           </p>
         ))}
@@ -97,13 +97,15 @@ export function AvailabilityCalendarPanel({
                   onClick={() => onToggleDate(dayKey)}
                   className={cn(
                     'flex h-11 items-center justify-center rounded-md text-sm transition-all',
-                    !isCurrentMonth && 'text-slate-400',
-                    isInCycle && !status && !isSelected && 'text-slate-700 hover:bg-slate-100',
-                    !isInCycle && 'cursor-not-allowed text-slate-300 opacity-50',
-                    status === 'saved' && 'bg-[#4ade80] font-bold text-white hover:bg-[#4ade80]',
-                    status === 'blocked' && 'bg-[#f87171] font-bold text-white hover:bg-[#f87171]',
+                    !isCurrentMonth && 'text-muted-foreground/70',
+                    isInCycle && !status && !isSelected && 'text-foreground hover:bg-muted',
+                    !isInCycle && 'cursor-not-allowed text-muted-foreground/40 opacity-50',
+                    status === 'saved' &&
+                      'bg-[var(--success-text)] font-bold text-primary-foreground hover:bg-[var(--success-text)]',
+                    status === 'blocked' &&
+                      'bg-[var(--error-text)] font-bold text-primary-foreground hover:bg-[var(--error-text)]',
                     isSelected &&
-                      'bg-[#2d5a5a] font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]'
+                      'bg-primary font-bold text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]'
                   )}
                 >
                   {day.getDate()}

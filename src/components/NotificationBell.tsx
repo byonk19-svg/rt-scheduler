@@ -215,7 +215,7 @@ export function NotificationBell({ variant = 'default' }: NotificationBellProps)
         }}
         className={`relative inline-flex h-9 w-9 items-center justify-center rounded-md border ${
           isShellVariant
-            ? 'border-border bg-muted/60 text-foreground hover:bg-muted'
+            ? 'border-sidebar-border bg-sidebar-accent/35 text-sidebar-foreground hover:bg-sidebar-accent'
             : `border-border bg-card text-foreground ${isStaffVariant ? '' : 'hover:bg-secondary'}`
         }`}
         aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}

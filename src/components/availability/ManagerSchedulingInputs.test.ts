@@ -58,7 +58,6 @@ describe('ManagerSchedulingInputs', () => {
     )
 
     expect(html).toContain('data-slot="availability-workspace-primary"')
-    expect(html).toContain('Staffing Inputs &amp; Calendar')
     expect(html).toContain('Plan staffing')
     expect(html).toContain('Schedule cycle')
     expect(html).toContain('Therapist')

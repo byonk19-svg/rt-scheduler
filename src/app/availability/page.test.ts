@@ -33,4 +33,10 @@ describe('availability page role-specific actions', () => {
     expect(source).toContain('source')
     expect(source).toContain("entry.source === 'manager' ? 'manager' : 'therapist'")
   })
+
+  it('embeds the review table beside the roster column for managers', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/app/availability/page.tsx'), 'utf8')
+    expect(source).toContain('reviewRequestsPanel={entriesCard}')
+    expect(source).toContain('formatHumanCycleRange')
+  })
 })

@@ -84,17 +84,20 @@ test.describe.serial('coverage cycle controls', () => {
 
     let cycleId: string | null = null
     await expect
-      .poll(async () => {
-        const result = await ctx!.supabase
-          .from('schedule_cycles')
-          .select('id')
-          .eq('label', label)
-          .maybeSingle()
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('schedule_cycles')
+            .select('id')
+            .eq('label', label)
+            .maybeSingle()
 
-        if (result.error) throw new Error(result.error.message)
-        cycleId = result.data?.id ?? null
-        return cycleId !== null
-      })
+          if (result.error) throw new Error(result.error.message)
+          cycleId = result.data?.id ?? null
+          return cycleId !== null
+        },
+        { timeout: 20_000 }
+      )
       .toBe(true)
 
     createdCycleIds.push(cycleId!)
@@ -106,19 +109,21 @@ test.describe.serial('coverage cycle controls', () => {
       .first()
     await expect(cycleRow).toBeVisible()
     await cycleRow.getByRole('button', { name: 'Delete draft' }).click()
-    await expect(page.getByText('Draft schedule block deleted.')).toBeVisible({ timeout: 20_000 })
 
     await expect
-      .poll(async () => {
-        const result = await ctx!.supabase
-          .from('schedule_cycles')
-          .select('id')
-          .eq('id', cycleId!)
-          .maybeSingle()
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('schedule_cycles')
+            .select('id')
+            .eq('id', cycleId!)
+            .maybeSingle()
 
-        if (result.error) throw new Error(result.error.message)
-        return result.data?.id ?? null
-      })
+          if (result.error) throw new Error(result.error.message)
+          return result.data?.id ?? null
+        },
+        { timeout: 20_000 }
+      )
       .toBeNull()
   })
 
@@ -196,17 +201,23 @@ test.describe.serial('coverage cycle controls', () => {
     const clearDialog = page.getByRole('dialog')
     await expect(clearDialog).toBeVisible()
     await clearDialog.getByRole('button', { name: 'Clear draft' }).click()
+    await expect(page.getByText(/Draft cleared\. Removed/i).first()).toBeVisible({
+      timeout: 20_000,
+    })
 
     await expect
-      .poll(async () => {
-        const result = await ctx!.supabase
-          .from('shifts')
-          .select('id')
-          .eq('cycle_id', cycleInsert.data.id)
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('shifts')
+            .select('id')
+            .eq('cycle_id', cycleInsert.data.id)
 
-        if (result.error) throw new Error(result.error.message)
-        return (result.data ?? []).length
-      })
+          if (result.error) throw new Error(result.error.message)
+          return (result.data ?? []).length
+        },
+        { timeout: 20_000 }
+      )
       .toBe(0)
   })
 })

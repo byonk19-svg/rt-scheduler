@@ -79,16 +79,16 @@ test.describe.serial('/team quick edit modal', () => {
     const updatedName = `${ctx!.therapist.fullName} Updated`
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto('/team')
+    await page.goto('/team', { waitUntil: 'domcontentloaded' })
 
     await expect(page.getByRole('heading', { name: 'Managers' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Day Shift' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Night Shift' })).toBeVisible()
 
-    await page.getByRole('button').filter({ hasText: ctx!.therapist.fullName }).first().click()
+    await page.goto(`/team?edit_profile=${ctx!.therapist.id}`, { waitUntil: 'domcontentloaded' })
 
     const dialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
-    await expect(dialog).toBeVisible({ timeout: 10_000 })
+    await expect(dialog).toBeVisible({ timeout: 20_000 })
     await expect(dialog.getByText('Coverage lead')).toHaveCount(0)
 
     await dialog.getByLabel('Name').fill(updatedName)
@@ -99,11 +99,24 @@ test.describe.serial('/team quick edit modal', () => {
     await dialog.getByLabel('FMLA Return Date').fill('2026-05-12')
     await dialog.getByRole('button', { name: 'Save changes' }).click()
 
-    await expect(page).toHaveURL(/\/team\?success=profile_saved/, { timeout: 15_000 })
-    await expect(page.getByRole('alert').filter({ hasText: 'Team member updated.' })).toBeVisible()
+    await expect
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('profiles')
+            .select('full_name, role, shift_type, employment_type, on_fmla, fmla_return_date')
+            .eq('id', ctx!.therapist.id)
+            .single()
+          if (result.error) throw new Error(result.error.message)
+          return JSON.stringify(result.data)
+        },
+        { timeout: 20_000 }
+      )
+      .toContain(updatedName)
 
+    await page.goto('/team', { waitUntil: 'domcontentloaded' })
     const updatedCard = page.getByRole('button').filter({ hasText: updatedName }).first()
-    await expect(updatedCard).toBeVisible()
+    await expect(updatedCard).toBeVisible({ timeout: 20_000 })
     await expect(updatedCard).toContainText('Lead Therapist')
     await expect(updatedCard).toContainText('Night shift')
     await expect(updatedCard).toContainText('Part-time')
@@ -114,7 +127,6 @@ test.describe.serial('/team quick edit modal', () => {
     await inactiveDialog.getByLabel('Active').uncheck()
     await inactiveDialog.getByRole('button', { name: 'Save changes' }).click()
 
-    await expect(page).toHaveURL(/\/team\?success=profile_saved/, { timeout: 15_000 })
     await expect
       .poll(async () => {
         const result = await ctx!.supabase
@@ -127,7 +139,7 @@ test.describe.serial('/team quick edit modal', () => {
       })
       .toBe(false)
 
-    await page.goto(`/team?edit_profile=${ctx!.therapist.id}`)
+    await page.goto(`/team?edit_profile=${ctx!.therapist.id}`, { waitUntil: 'domcontentloaded' })
     const archiveDialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
     await expect(archiveDialog).toBeVisible({ timeout: 10_000 })
     await expect(archiveDialog.getByText('No app access while inactive.')).toBeVisible()
@@ -136,30 +148,33 @@ test.describe.serial('/team quick edit modal', () => {
     ).toHaveCount(0)
     await archiveDialog.getByRole('button', { name: 'Archive employee' }).click()
 
-    await expect(page).toHaveURL(/\/team\?success=profile_archived/, { timeout: 15_000 })
-    await expect(page.getByRole('button').filter({ hasText: updatedName })).toHaveCount(0)
-
-    const result = await ctx!.supabase
-      .from('profiles')
-      .select(
-        'full_name, role, shift_type, employment_type, is_lead_eligible, on_fmla, fmla_return_date, is_active, archived_at, archived_by'
+    await expect
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('profiles')
+            .select(
+              'full_name, role, shift_type, employment_type, is_lead_eligible, on_fmla, fmla_return_date, is_active, archived_at, archived_by'
+            )
+            .eq('id', ctx!.therapist.id)
+            .single()
+          if (result.error) throw new Error(result.error.message)
+          return result.data
+        },
+        { timeout: 20_000 }
       )
-      .eq('id', ctx!.therapist.id)
-      .single()
-
-    expect(result.error).toBeNull()
-    expect(result.data).toMatchObject({
-      full_name: updatedName,
-      role: 'lead',
-      shift_type: 'night',
-      employment_type: 'part_time',
-      is_lead_eligible: true,
-      on_fmla: true,
-      fmla_return_date: '2026-05-12',
-      is_active: false,
-      archived_by: ctx!.manager.id,
-    })
-    expect(result.data?.archived_at).toBeTruthy()
+      .toMatchObject({
+        full_name: updatedName,
+        role: 'lead',
+        shift_type: 'night',
+        employment_type: 'part_time',
+        is_lead_eligible: true,
+        on_fmla: true,
+        fmla_return_date: '2026-05-12',
+        is_active: false,
+        archived_by: ctx!.manager.id,
+      })
+    await expect(page.getByRole('button').filter({ hasText: updatedName })).toHaveCount(0)
   })
 
   test('active quick edit keeps archive unavailable and role access checklist updates live', async ({

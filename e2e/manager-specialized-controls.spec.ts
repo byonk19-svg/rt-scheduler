@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
-import { createClient as createSupabaseClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
-import { addDays, formatDateKey, getEnv, randomString } from './helpers/env'
+import { addDays, formatDateKey, randomString } from './helpers/env'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type ManagerCtx = {
@@ -10,22 +10,6 @@ type ManagerCtx = {
   manager: { id: string; email: string; password: string }
   requester: { id: string; email: string; password: string }
   partner: { id: string; email: string; password: string }
-}
-
-async function createAuthenticatedClient(email: string, password: string) {
-  const supabaseUrl = getEnv('NEXT_PUBLIC_SUPABASE_URL')
-  const anonKey = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
-  if (!supabaseUrl || !anonKey) {
-    throw new Error('Missing Supabase env for authenticated manager-specialized client.')
-  }
-  const client = createSupabaseClient(supabaseUrl, anonKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-  const signIn = await client.auth.signInWithPassword({ email, password })
-  if (signIn.error) {
-    throw new Error(`Could not sign in ${email}: ${signIn.error.message}`)
-  }
-  return client
 }
 
 test.describe.serial('manager specialized controls', () => {
@@ -158,6 +142,22 @@ test.describe.serial('manager specialized controls', () => {
     await requesterPage.getByLabel('Message').fill(requestMessage)
     await requesterPage.getByRole('button', { name: 'Submit request' }).click()
 
+    await expect
+      .poll(
+        async () => {
+          const post = await ctx!.supabase
+            .from('shift_posts')
+            .select('id')
+            .eq('posted_by', ctx!.requester.id)
+            .eq('message', requestMessage)
+            .maybeSingle()
+          if (post.error) throw new Error(post.error.message)
+          return post.data?.id ?? null
+        },
+        { timeout: 20_000 }
+      )
+      .not.toBeNull()
+
     const managerPage = await page.context().browser()?.newPage()
     if (!managerPage) throw new Error('Could not create manager page for swap approval test.')
     try {
@@ -167,26 +167,27 @@ test.describe.serial('manager specialized controls', () => {
         .locator('div.rounded-xl')
         .filter({ has: managerPage.getByText(requestMessage) })
         .first()
-      await expect(card).toBeVisible()
+      await expect(card).toBeVisible({ timeout: 20_000 })
       await card.locator('select').selectOption(ctx!.partner.id)
       await card.getByRole('button', { name: 'Approve' }).click()
+      await expect
+        .poll(
+          async () => {
+            const post = await ctx!.supabase
+              .from('shift_posts')
+              .select('status, claimed_by')
+              .eq('posted_by', ctx!.requester.id)
+              .eq('message', requestMessage)
+              .maybeSingle()
+            if (post.error) throw new Error(post.error.message)
+            return `${post.data?.status ?? ''}:${post.data?.claimed_by ?? ''}`
+          },
+          { timeout: 20_000 }
+        )
+        .toBe(`approved:${ctx!.partner.id}`)
     } finally {
       await managerPage.close()
     }
-
-    const managerClient = await createAuthenticatedClient(ctx!.manager.email, ctx!.manager.password)
-    await expect
-      .poll(async () => {
-        const post = await ctx!.supabase
-          .from('shift_posts')
-          .select('status, claimed_by')
-          .eq('posted_by', ctx!.requester.id)
-          .eq('message', requestMessage)
-          .maybeSingle()
-        if (post.error) throw new Error(post.error.message)
-        return `${post.data?.status ?? ''}:${post.data?.claimed_by ?? ''}`
-      })
-      .toBe(`approved:${ctx!.partner.id}`)
 
     // The trigger swaps user assignments; both shifts should still be assigned, just exchanged.
     const shiftRows = await ctx!.supabase
@@ -198,7 +199,6 @@ test.describe.serial('manager specialized controls', () => {
     if (shiftRows.error) throw new Error(shiftRows.error.message)
     const assignedIds = (shiftRows.data ?? []).map((row) => row.user_id).sort()
     expect(assignedIds).toEqual([ctx!.partner.id, ctx!.requester.id].sort())
-    void managerClient
   })
 
   test('manager can archive a draft cycle from publish history', async ({ page }) => {
@@ -231,22 +231,20 @@ test.describe.serial('manager specialized controls', () => {
       .first()
     await expect(row).toBeVisible()
     await row.getByRole('button', { name: 'Archive' }).click()
-    await expect(
-      page.getByText('Cycle archived. It will no longer appear in Coverage or availability views.')
-    ).toBeVisible({
-      timeout: 20_000,
-    })
 
     await expect
-      .poll(async () => {
-        const cycle = await ctx!.supabase
-          .from('schedule_cycles')
-          .select('archived_at')
-          .eq('id', cycleInsert.data.id)
-          .maybeSingle()
-        if (cycle.error) throw new Error(cycle.error.message)
-        return Boolean(cycle.data?.archived_at)
-      })
+      .poll(
+        async () => {
+          const cycle = await ctx!.supabase
+            .from('schedule_cycles')
+            .select('archived_at')
+            .eq('id', cycleInsert.data.id)
+            .maybeSingle()
+          if (cycle.error) throw new Error(cycle.error.message)
+          return Boolean(cycle.data?.archived_at)
+        },
+        { timeout: 20_000 }
+      )
       .toBe(true)
   })
 })

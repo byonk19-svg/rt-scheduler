@@ -238,7 +238,7 @@ test.describe.serial('availability override scheduling', () => {
     const prnOption = page.getByTestId(`coverage-assign-toggle-${ctx!.prnTherapist.id}-staff`)
     await expect(prnOption).toBeVisible()
     await prnOption.click()
-    await expect(page.getByTestId('coverage-assign-error')).toBeVisible()
+    await expect(page.getByText('PRN not offered for this date')).toBeVisible()
 
     const assignedShiftResult = await ctx!.supabase
       .from('shifts')

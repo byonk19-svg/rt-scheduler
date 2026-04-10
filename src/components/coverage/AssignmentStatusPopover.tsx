@@ -86,7 +86,7 @@ export function AssignmentStatusPopover({
           type="button"
           disabled={disabled}
           data-testid={triggerTestId}
-          className="pointer-events-auto inline-flex max-w-full items-center gap-1 rounded-md text-left transition-colors hover:text-foreground"
+          className="pointer-events-auto relative z-20 inline-flex max-w-full items-center gap-1 rounded-md text-left transition-colors hover:text-foreground"
           onClick={(event) => event.stopPropagation()}
         >
           {children}

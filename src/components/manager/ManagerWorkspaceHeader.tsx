@@ -6,6 +6,8 @@ type ManagerWorkspaceHeaderProps = {
   summary?: ReactNode
   actions?: ReactNode
   className?: string
+  /** Override default h1 styling (e.g. `app-page-title` on availability). */
+  titleClassName?: string
 }
 
 export function ManagerWorkspaceHeader({
@@ -14,6 +16,7 @@ export function ManagerWorkspaceHeader({
   summary,
   actions,
   className,
+  titleClassName,
 }: ManagerWorkspaceHeaderProps) {
   return (
     <div
@@ -21,7 +24,12 @@ export function ManagerWorkspaceHeader({
     >
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
-          <h1 className="font-heading text-[1.4rem] font-semibold leading-tight tracking-tight text-foreground">
+          <h1
+            className={
+              titleClassName ??
+              'font-heading text-[1.4rem] font-semibold leading-tight tracking-tight text-foreground'
+            }
+          >
             {title}
           </h1>
           <div className="text-sm text-muted-foreground">{subtitle}</div>

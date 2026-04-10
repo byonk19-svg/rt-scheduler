@@ -772,7 +772,7 @@ export function CoverageClientPage({
         if (insertError?.code === '23505') {
           setAssignError(`${selectedTherapist?.full_name ?? 'This therapist'} is already assigned on this day.`)
         } else {
-          setAssignError('Could not assign therapist. Please try again.')
+          setAssignError(insertError?.message ?? 'Could not assign therapist. Please try again.')
         }
         setAssigning(false)
         return
