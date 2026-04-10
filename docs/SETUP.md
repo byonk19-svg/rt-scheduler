@@ -88,6 +88,28 @@ If email delivery is intentionally disabled and you only want in-app publishing:
 npm run verify:publish -- --allow-no-email
 ```
 
+## Inbound Availability Intake
+
+The app supports two manager-side intake paths for availability requests:
+
+- **Inbound email webhook:** Resend sends `email.received` events to `POST /api/inbound/availability-email`
+- **Manual intake fallback:** manager creates an intake item directly from `/availability` by pasting request text and/or uploading a form image/PDF
+
+Required env vars for webhook + OCR:
+
+- `RESEND_API_KEY`
+- `RESEND_WEBHOOK_SECRET`
+- `OPENAI_API_KEY` (optional, required only for image OCR)
+- `OPENAI_OCR_MODEL` (optional, defaults to `gpt-4.1-mini`)
+
+Important Resend requirement:
+
+- The Resend API key used by the app must have **receiving-capable permissions**. A key restricted to **Sending access** will fail on `/emails/receiving`, and the intake route will not be able to fetch inbound email content or attachments.
+
+Operational note:
+
+- If inbound email is configured but Resend still shows no received emails, managers can immediately test the workflow through the manual intake form on `/availability`.
+
 ## Demo Seed Data
 
 Run:

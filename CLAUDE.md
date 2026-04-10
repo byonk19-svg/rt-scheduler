@@ -1,6 +1,18 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-10 (session 46)
+Updated: 2026-04-10 (session 47)
+
+## Latest Updates (2026-04-10, session 47)
+
+- **Availability intake now has a manager-controlled fallback path** (`src/app/availability/actions.ts`, `src/app/availability/page.tsx`, `src/components/availability/EmailIntakePanel.tsx`, `supabase/migrations/20260410162000_allow_manual_email_intake_provider.sql`):
+  - `/availability` now lets managers create intake items directly by choosing therapist + cycle, pasting request text, and/or uploading a request-form image/PDF.
+  - The manual form stores rows in the same `availability_email_intakes` / `availability_email_attachments` tables as the webhook path, so review/apply behavior stays identical across channels.
+  - Uploaded images can be OCR'd through the OpenAI Responses API when `OPENAI_API_KEY` is configured; PDFs are stored for review but still require manual reading.
+- **Inbound email channel is configured but still vendor-blocked**:
+  - `mail.teamwise.work` receiving is verified in Resend, the webhook is enabled, and production middleware now leaves `POST /api/inbound/availability-email` public so signature-verified provider calls are not redirected to `/login`.
+  - The original `RESEND_API_KEY` was send-only; intake processing requires a key that can call `/emails/receiving`.
+  - Even after swapping in a receiving-capable key and redeploying production, Resend still returned zero inbound emails during this session, so the manual intake form is the operational path while inbound delivery is investigated with Resend.
+- **Verification:** `supabase db push`, `npm run test:unit` (25 passing across intake/OCR/proxy suites), `npm run lint`, `npm run build`, `vercel deploy --prod --yes`
 
 ## Latest Updates (2026-04-10, session 46)
 
@@ -262,6 +274,12 @@ Typography classes:
 - **AI agents and binary file copies:** When an agent (Cursor, Claude, etc.) is instructed to `cp` a binary file (PNG, PDF, etc.), always verify with `ls -lh` — agents frequently write a small placeholder instead of the real file.
 - **`next/image` static asset caching in dev:** Adding a new file to `public/` while `next dev` is running requires a server restart to pick it up. Add `unoptimized` prop to `<Image>` to bypass the optimization cache for local static assets during development.
 
+Additional intake gotchas:
+
+- Resend inbound email requires the webhook route to stay public through proxy middleware (`/api/inbound/availability-email` in `PUBLIC_API_ROUTES`) or provider POSTs will be redirected to `/login`.
+- `RESEND_API_KEY` must support receiving APIs, not just sending. A send-only key fails on `/emails/receiving` with `401 restricted_api_key`.
+- If Resend inbound is still empty after domain verification, managers can still test the workflow immediately from the `Email Intake` card on `/availability` by pasting request text or uploading a request-form image/PDF.
+
 ## Scheduling Rules
 
 - Coverage target: 3–5 per shift slot
@@ -383,6 +401,12 @@ Supabase Auth (production):
 - Redirect URL: `https://www.teamwise.work/auth/callback`
 
 Resend: `mail.teamwise.work` is **Verified**. No test-mode restriction — emails go to all recipients.
+
+Inbound intake notes:
+
+- `POST /api/inbound/availability-email` verifies the Resend webhook signature itself and must remain publicly reachable through middleware.
+- `RESEND_API_KEY` must support receiving APIs, not just sending. A send-only key fails on `/emails/receiving` with `401 restricted_api_key`.
+- If inbound email still does not appear in Resend after receiving is verified, use the manual intake form on `/availability` to keep validating the scheduling workflow.
 
 ## Data Model Snapshot
 

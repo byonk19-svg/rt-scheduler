@@ -63,6 +63,35 @@ Operational workflows as implemented in the current codebase.
 - Manager “who has submitted” for the cycle uses submission IDs, not “has any therapist override rows.”
 - No approval step for availability entries.
 
+## 3.1) Manager: Email Intake / Manual Intake
+
+- Review surface: `/availability` -> **Email Intake**
+- Intake storage:
+  - `availability_email_intakes`
+  - `availability_email_attachments`
+- Supported channels:
+  - `provider = resend` for inbound webhook-driven requests
+  - `provider = manual` for manager-created fallback intake rows
+- Webhook path:
+  - `POST /api/inbound/availability-email`
+  - route verifies the Resend webhook signature
+  - route fetches inbound email content + attachments from Resend receiving APIs
+  - route parses request dates and stores a reviewable intake row
+- Manual fallback path:
+  - manager selects therapist + cycle
+  - manager pastes request text and/or uploads an image/PDF form
+  - image uploads can be OCR'd through the OpenAI Responses API when configured
+  - PDFs are stored for review but are not OCR'd automatically yet
+- Apply path:
+  - manager clicks **Apply dates**
+  - parsed dates are written into `availability_overrides` with `source = manager`
+  - intake row is marked `applied`
+
+Current operational guidance:
+
+- Use the manual intake form to test the workflow immediately.
+- Treat inbound email as an additional channel, not the only path, until Resend receiving reliably emits `email.received` events for the domain.
+
 ## 4) Assignment Status Updates
 
 - API: `POST /api/schedule/assignment-status`
