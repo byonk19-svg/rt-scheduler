@@ -91,9 +91,7 @@ async function listReceivedEmailAttachments(
   )
 }
 
-async function downloadAttachment(
-  url: string
-): Promise<{
+async function downloadAttachment(url: string): Promise<{
   contentBase64: string | null
   status: 'stored' | 'skipped' | 'failed'
   error: string | null
