@@ -9,6 +9,7 @@ import {
 import {
   applyEmailAvailabilityImportAction,
   copyAvailabilityFromPreviousCycleAction,
+  createManualEmailIntakeAction,
   deleteAvailabilityEntryAction,
   deleteManagerPlannerDateAction,
   saveManagerPlannerDatesAction,
@@ -242,9 +243,24 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
     }
   }
 
+  if (success === 'email_intake_created') {
+    return {
+      message: 'Manual intake created. Review the parsed dates below.',
+      variant: 'success',
+    }
+  }
+
   if (error === 'email_intake_apply_failed') {
     return {
       message: 'Could not apply the inbound email. Review the parsed match first.',
+      variant: 'error',
+    }
+  }
+
+  if (error === 'email_intake_create_failed') {
+    return {
+      message:
+        'Could not create the intake. Choose a therapist and cycle, then add text or a file.',
       variant: 'error',
     }
   }
@@ -513,6 +529,15 @@ export default async function AvailabilityPage({
     <EmailIntakePanel
       rows={emailIntakeRows}
       applyEmailAvailabilityImportAction={applyEmailAvailabilityImportAction}
+      createManualEmailIntakeAction={createManualEmailIntakeAction}
+      therapistOptions={plannerTherapists.map((therapist) => ({
+        id: therapist.id,
+        fullName: therapist.full_name,
+      }))}
+      cycleOptions={cycles.map((cycle) => ({
+        id: cycle.id,
+        label: `${cycle.label} (${cycle.start_date} to ${cycle.end_date})`,
+      }))}
     />
   ) : null
 

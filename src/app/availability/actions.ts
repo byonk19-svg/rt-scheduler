@@ -11,9 +11,14 @@ import {
   getPlannerDateValidationError,
   toOverrideType,
 } from '@/lib/availability-planner'
-import { sanitizeParsedRequests } from '@/lib/availability-email-intake'
+import {
+  parseAvailabilityEmail,
+  sanitizeParsedRequests,
+  type IntakeCycle,
+} from '@/lib/availability-email-intake'
 import { shiftOverridesToCycle } from '@/lib/copy-cycle-availability'
 import { buildManagerOverrideInput } from '@/lib/employee-directory'
+import { extractTextFromImageAttachment } from '@/lib/openai-ocr'
 import { createClient } from '@/lib/supabase/server'
 
 async function upsertTherapistSubmissionAfterOfficialSave(
@@ -110,6 +115,17 @@ function buildAvailabilityUrl(
   }
   const query = search.toString()
   return query.length > 0 ? `${returnPath}?${query}` : returnPath
+}
+
+function normalizeUploadSourceEmail(value: string): string {
+  const trimmed = value.trim().toLowerCase()
+  if (!trimmed || !trimmed.includes('@')) return 'manual-upload@teamwise.local'
+  return trimmed
+}
+
+async function fileToBase64(file: File): Promise<string> {
+  const buffer = Buffer.from(await file.arrayBuffer())
+  return buffer.toString('base64')
 }
 
 async function getAuthenticatedUserWithRole() {
@@ -588,6 +604,156 @@ export async function applyEmailAvailabilityImportAction(formData: FormData) {
 
   revalidatePath('/availability')
   redirect(buildAvailabilityUrl({ success: 'email_intake_applied' }))
+}
+
+export async function createManualEmailIntakeAction(formData: FormData) {
+  const { supabase, role } = await getAuthenticatedUserWithRole()
+
+  if (!can(role, 'access_manager_ui')) {
+    redirect('/availability')
+  }
+
+  const therapistId = String(formData.get('therapist_id') ?? '').trim()
+  const cycleId = String(formData.get('cycle_id') ?? '').trim()
+  const subject = String(formData.get('subject') ?? '').trim() || 'Manual availability intake'
+  const sourceEmail = normalizeUploadSourceEmail(String(formData.get('source_email') ?? ''))
+  const pastedText = String(formData.get('pasted_text') ?? '').trim()
+  const attachment = formData.get('attachment')
+
+  if (
+    !therapistId ||
+    !cycleId ||
+    (!pastedText && !(attachment instanceof File && attachment.size > 0))
+  ) {
+    redirect(buildAvailabilityUrl({ error: 'email_intake_create_failed' }))
+  }
+
+  const { data: cycle, error: cycleError } = await supabase
+    .from('schedule_cycles')
+    .select('id, label, start_date, end_date')
+    .eq('id', cycleId)
+    .maybeSingle()
+
+  if (cycleError || !cycle) {
+    console.error('Failed to load cycle for manual email intake:', cycleError)
+    redirect(buildAvailabilityUrl({ error: 'email_intake_create_failed' }))
+  }
+
+  let attachmentRows: Array<{
+    id: string
+    filename: string
+    content_type: string
+    content_disposition: string | null
+    size_bytes: number | null
+    content_base64: string | null
+    download_status: 'stored' | 'skipped' | 'failed'
+    download_error: string | null
+    ocr_status: 'not_run' | 'completed' | 'failed' | 'skipped'
+    ocr_text: string | null
+    ocr_model: string | null
+  }> = []
+  let ocrText = ''
+
+  if (attachment instanceof File && attachment.size > 0) {
+    const contentType = attachment.type || 'application/octet-stream'
+    const contentBase64 = await fileToBase64(attachment)
+    const ocrResult = await extractTextFromImageAttachment({
+      contentBase64,
+      contentType,
+      filename: attachment.name,
+    })
+    ocrText = ocrResult.text ?? ''
+
+    attachmentRows = [
+      {
+        id: `manual-attachment-${crypto.randomUUID()}`,
+        filename: attachment.name || 'upload',
+        content_type: contentType,
+        content_disposition: null,
+        size_bytes: attachment.size,
+        content_base64: contentBase64,
+        download_status: 'stored',
+        download_error: null,
+        ocr_status: ocrResult.status,
+        ocr_text: ocrResult.text,
+        ocr_model: ocrResult.model,
+      },
+    ]
+  }
+
+  const cycleScope: IntakeCycle[] = [
+    {
+      id: cycle.id,
+      label: cycle.label,
+      start_date: cycle.start_date,
+      end_date: cycle.end_date,
+    },
+  ]
+  const combinedText = [pastedText, ocrText].filter((value) => value.length > 0).join('\n\n')
+  const parsed = parseAvailabilityEmail(combinedText, cycleScope)
+  const intakeId = crypto.randomUUID()
+  const parseStatus: 'parsed' | 'needs_review' | 'failed' =
+    parsed.requests.length === 0
+      ? 'failed'
+      : parsed.unresolvedLines.length > 0
+        ? 'needs_review'
+        : 'parsed'
+
+  const { error: intakeError } = await supabase.from('availability_email_intakes').insert({
+    id: intakeId,
+    provider: 'manual',
+    provider_email_id: `manual-${intakeId}`,
+    provider_message_id: null,
+    from_email: sourceEmail,
+    from_name: null,
+    subject,
+    text_content: combinedText || null,
+    html_content: null,
+    received_at: new Date().toISOString(),
+    matched_therapist_id: therapistId,
+    matched_cycle_id: cycleId,
+    parse_status: parseStatus,
+    parse_summary: parsed.summary,
+    parsed_requests: parsed.requests,
+    raw_payload: {
+      type: 'manual_upload',
+      subject,
+      source_email: sourceEmail,
+      had_attachment: attachmentRows.length > 0,
+    },
+  })
+
+  if (intakeError) {
+    console.error('Failed to create manual email intake:', intakeError)
+    redirect(buildAvailabilityUrl({ error: 'email_intake_create_failed' }))
+  }
+
+  if (attachmentRows.length > 0) {
+    const { error: attachmentError } = await supabase.from('availability_email_attachments').insert(
+      attachmentRows.map((row) => ({
+        intake_id: intakeId,
+        provider_attachment_id: row.id,
+        filename: row.filename,
+        content_type: row.content_type,
+        content_disposition: row.content_disposition,
+        size_bytes: row.size_bytes,
+        content_base64: row.content_base64,
+        download_status: row.download_status,
+        download_error: row.download_error,
+        ocr_status: row.ocr_status,
+        ocr_text: row.ocr_text,
+        ocr_model: row.ocr_model,
+      }))
+    )
+
+    if (attachmentError) {
+      console.error('Failed to store manual email intake attachment:', attachmentError)
+      redirect(buildAvailabilityUrl({ error: 'email_intake_create_failed' }))
+    }
+  }
+
+  revalidatePath('/availability')
+  redirect(buildAvailabilityUrl({ success: 'email_intake_created' }))
 }
 
 export async function copyAvailabilityFromPreviousCycleAction(formData: FormData) {

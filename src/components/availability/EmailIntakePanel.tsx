@@ -1,6 +1,8 @@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 type EmailIntakeAttachmentRow = {
   filename: string
@@ -56,9 +58,15 @@ function formatRequestLabel(request: EmailIntakePanelRow['parsedRequests'][numbe
 export function EmailIntakePanel({
   rows,
   applyEmailAvailabilityImportAction,
+  createManualEmailIntakeAction,
+  therapistOptions,
+  cycleOptions,
 }: {
   rows: EmailIntakePanelRow[]
   applyEmailAvailabilityImportAction: (formData: FormData) => void | Promise<void>
+  createManualEmailIntakeAction: (formData: FormData) => void | Promise<void>
+  therapistOptions: Array<{ id: string; fullName: string }>
+  cycleOptions: Array<{ id: string; label: string }>
 }) {
   return (
     <Card className="overflow-hidden">
@@ -70,6 +78,107 @@ export function EmailIntakePanel({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 pt-4">
+        <form
+          action={createManualEmailIntakeAction}
+          className="rounded-xl border border-border/70 bg-muted/15 p-4"
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="manual_intake_therapist">Therapist</Label>
+              <select
+                id="manual_intake_therapist"
+                name="therapist_id"
+                required
+                className="border-input bg-[var(--input-background)] focus-visible:border-ring focus-visible:ring-ring/50 h-10 w-full rounded-lg border px-3 py-2 text-sm outline-none focus-visible:ring-[3px]"
+                defaultValue=""
+              >
+                <option value="" disabled>
+                  Select therapist
+                </option>
+                {therapistOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.fullName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="manual_intake_cycle">Schedule block</Label>
+              <select
+                id="manual_intake_cycle"
+                name="cycle_id"
+                required
+                className="border-input bg-[var(--input-background)] focus-visible:border-ring focus-visible:ring-ring/50 h-10 w-full rounded-lg border px-3 py-2 text-sm outline-none focus-visible:ring-[3px]"
+                defaultValue=""
+              >
+                <option value="" disabled>
+                  Select schedule block
+                </option>
+                {cycleOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div className="space-y-2">
+              <Label htmlFor="manual_intake_source_email">Source email</Label>
+              <Input
+                id="manual_intake_source_email"
+                name="source_email"
+                type="email"
+                placeholder="employee@example.com"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="manual_intake_subject">Subject</Label>
+              <Input
+                id="manual_intake_subject"
+                name="subject"
+                type="text"
+                placeholder="Availability request"
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+            <div className="space-y-2">
+              <Label htmlFor="manual_intake_text">Paste request text</Label>
+              <textarea
+                id="manual_intake_text"
+                name="pasted_text"
+                rows={5}
+                placeholder="Need off Apr 14, Apr 16&#10;Can work Apr 18"
+                className="border-input bg-[var(--input-background)] focus-visible:border-ring focus-visible:ring-ring/50 min-h-28 w-full rounded-lg border px-3 py-2 text-sm outline-none focus-visible:ring-[3px]"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="manual_intake_attachment">Upload form image or PDF</Label>
+              <Input
+                id="manual_intake_attachment"
+                name="attachment"
+                type="file"
+                accept=".png,.jpg,.jpeg,.webp,.gif,.pdf"
+              />
+              <p className="text-xs text-muted-foreground">
+                Images can be OCR&apos;d automatically. PDFs are stored for review.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex justify-end">
+            <Button size="sm" type="submit">
+              Create intake
+            </Button>
+          </div>
+        </form>
+
         {rows.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
             No inbound request emails yet.
