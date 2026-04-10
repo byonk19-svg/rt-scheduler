@@ -14,6 +14,8 @@ const PUBLIC_ROUTES = [
   '/auth/signout',
 ] as const
 
+const PUBLIC_API_ROUTES = ['/api/inbound/availability-email'] as const
+
 // Manager-only paths. Do not include shared staff surfaces (schedule, shift board, /requests alias)
 // or therapists/leads will be bounced by the guard below.
 const MANAGER_ROUTES = [
@@ -39,7 +41,7 @@ function matchesRoute(pathname: string, route: string): boolean {
 }
 
 function isPublicRoute(pathname: string): boolean {
-  return PUBLIC_ROUTES.some((route) => {
+  return [...PUBLIC_ROUTES, ...PUBLIC_API_ROUTES].some((route) => {
     if (route === '/') return pathname === '/'
     return matchesRoute(pathname, route)
   })
