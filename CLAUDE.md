@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-11 (session 50)
+Updated: 2026-04-11 (session 51)
 
 ## Handoff Snapshot
 
@@ -39,6 +39,18 @@ No intentional local-only product changes are pending. The current tracked chang
 - `vercel deploy --prod --yes` for production shipping
 
 The session entries below are historical context. They may describe local-only or superseded work and should not override the snapshot above.
+
+## Latest Updates (2026-04-11, session 51)
+
+- **Design system restored to documented spec** (`src/app/globals.css`, `src/app/layout.tsx`):
+  - A prior tool pass had replaced the color tokens with a "Lovable core theme" (teal primary, warm-cream background, teal-dark sidebar). This directly conflicted with the documented `--primary #0667a9` blue and left the hero aurora gradient (which still referenced the old blue) visually mismatched with buttons and nav pills.
+  - Restored the full token set: `--primary hsl(205 92% 35%)` ≈ `#0667a9`, cool near-white background, navy sidebar, `--attention hsl(32 95% 44%)` ≈ `#d97706`, and blue-family info tokens.
+  - Fixed `DM Sans` font variable: added `variable: '--font-dm-sans'` to the `DM_Sans()` config and applied `dmSans.variable` on `<html>` so the `--font-sans → var(--font-dm-sans)` CSS chain resolves to the Next.js-optimized font instead of falling back to a plain string name.
+- **Local CI offline build fix** (`scripts/local-ci-fallback.mjs`, `scripts/google-font-mock-responses.json`):
+  - The pre-push hook runs `next build`, which fetches Google Fonts at build time. Sandboxed/offline environments have no network access to `fonts.googleapis.com`, blocking all pushes.
+  - Added `scripts/google-font-mock-responses.json` with minimal `@font-face` stubs for DM Sans and Plus Jakarta Sans, keyed by their exact Google Fonts API URLs.
+  - Updated `local-ci-fallback.mjs` to set `NEXT_FONT_GOOGLE_MOCKED_RESPONSES` pointing at that file (caller can override). Production Vercel builds hit the real API and self-host the actual woff2 files unaffected.
+- **Verification:** `npx tsc --noEmit`, `npm run lint`, `npm run build` (with font mock), full pre-push CI hook green.
 
 ## Latest Updates (2026-04-11, session 50)
 
@@ -297,8 +309,11 @@ All permission checks go through `can(role, permission)` in `src/lib/auth/can.ts
 
 CSS tokens (defined in `src/app/globals.css`):
 
-- `--primary` (`#0667a9`) — all primary actions: buttons, nav pills, links, focus rings
-- `--attention` (`#d97706`) — brand personality only: user avatar, logo accent; **not** for primary actions
+- `--primary` (`hsl(205 92% 35%)` ≈ `#0667a9` blue) — all primary actions: buttons, nav pills, links, focus rings
+- `--attention` (`hsl(32 95% 44%)` ≈ `#d97706` amber) — brand personality only: user avatar, logo accent; **not** for primary actions
+- `--background` (`hsl(210 20% 98%)`) — cool near-white page background
+- `--card` (`hsl(0 0% 100%)`) — pure white card surfaces
+- `--sidebar` (`hsl(213 55% 16%)`) — dark navy sidebar
 - `--warning-*` / `--success-*` / `--error-*` / `--info-*` — all status badge families
 - `--foreground`, `--muted-foreground`, `--border`, `--card`, `--muted`, `--secondary` — layout tokens
 
@@ -318,6 +333,9 @@ Typography classes:
 
 ## Tooling Gotchas
 
+- **Google Fonts fetched at build time — offline builds fail:** `next build` downloads DM Sans and Plus Jakarta Sans from `fonts.googleapis.com` and self-hosts them. In offline/sandboxed environments this blocks the build. Fix: `local-ci-fallback.mjs` now sets `NEXT_FONT_GOOGLE_MOCKED_RESPONSES` pointing at `scripts/google-font-mock-responses.json`. Production Vercel builds are unaffected.
+- **Next.js font `variable` vs `className`:** `DM_Sans({ variable: '--font-dm-sans' })` must be used (not just `.className`) and `dmSans.variable` applied to `<html>` for the `--font-sans: var(--font-dm-sans, ...)` CSS chain to resolve properly. Without the `variable` option, all `var(--font-dm-sans)` references fall back silently to the plain string name.
+- **Design token integrity — watch for AI tool overwrites:** External tools (Lovable, v0, etc.) may replace `globals.css` `:root` tokens wholesale. The canonical values are: `--primary hsl(205 92% 35%)` ≈ `#0667a9` (blue), `--attention hsl(32 95% 44%)` ≈ `#d97706` (amber), cool near-white background, navy sidebar. If the site looks "teal" or "warm cream", check whether the token block was replaced.
 - **`formatCycleDate` produces no year:** Uses `{ month: 'short', day: 'numeric' }` → `'Apr 13'` not `'Apr 13, 2026'`. Test fixtures asserting on date range strings must omit the year (e.g. `'Mar 17 – Apr 13'`).
 - **Browser verification on auth routes:** All app routes require login. Chrome DevTools MCP always redirects to `/login` — browser verification via screenshot is not possible without credentials. Confirm changes via `tsc`, `vitest`, and code review only.
 - **framer-motion `ease`:** `ease: 'easeOut'` fails `tsc` — the `Easing` type requires specific literals. Omit `ease` entirely to use framer-motion's safe default.
