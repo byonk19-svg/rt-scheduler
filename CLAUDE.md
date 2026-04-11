@@ -1,6 +1,69 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-10 (session 47)
+Updated: 2026-04-11 (session 49)
+
+## Handoff Snapshot
+
+### Current Truth
+
+- Production is live on `https://www.teamwise.work`.
+- The working inbound availability webhook URL is:
+  - `https://www.teamwise.work/api/inbound/availability-email`
+- `mail.teamwise.work` receiving is verified in Resend, and the webhook has now delivered a real `email.received` event successfully.
+- Availability intake currently supports:
+  - inbound email webhook
+  - manager-created manual intake from pasted text
+  - uploaded form image/PDF on `/availability`
+- Uploaded images can OCR through the OpenAI Responses API when `OPENAI_API_KEY` is configured. PDFs are stored for review but are not OCR'd automatically yet.
+- Managers can now fix therapist matches inline on the intake card and then apply parsed dates from the same surface.
+- Mixed off/work sentences are parsed more accurately than before, but parser changes should continue to be driven by real inbound examples.
+- `RESEND_API_KEY` must support receiving APIs, not just sending. A send-only key fails on `/emails/receiving` with `401 restricted_api_key`.
+
+### Local In-Progress Work
+
+These files are currently modified locally and should be treated as in-progress work, not committed/deployed truth, until intentionally reviewed and committed:
+
+- `src/app/approvals/page.tsx`
+- `src/app/availability/availability-requests-table.tsx`
+- `src/app/availability/page.tsx`
+- `src/app/coverage/CoverageClientPage.tsx`
+- `src/app/login/page.tsx`
+- `src/app/page.tsx`
+- `src/app/publish/page.tsx`
+- `src/app/signup/page.tsx`
+- `src/components/coverage/AutoDraftConfirmDialog.tsx`
+- `src/components/coverage/CalendarGrid.tsx`
+- `src/components/manager/ManagerTriageDashboard.tsx`
+- `src/components/manager/ScheduleProgress.tsx`
+- `src/components/team/TeamDirectory.tsx`
+
+These look like the current design/content refinement pass. Do not let an AI assume they are already shipped just because they exist in the working tree.
+
+### Where We Want To Go
+
+1. Move `Email Intake` higher on `/availability` and make the review/apply workflow more obvious.
+2. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
+3. Review and intentionally commit the current local design-pass files instead of leaving them as ambiguous working-tree state.
+4. Keep manual intake first-class even if Resend inbound is healthy. It is the practical fallback path for operations.
+
+### Verification Baseline
+
+- `npm run lint`
+- `npm run build`
+- `npm run test:unit`
+- `npm run test:e2e` when auth/env setup is available
+- `vercel deploy --prod --yes` for production shipping
+
+The session entries below are historical context. They may describe local-only or superseded work and should not override the snapshot above.
+
+## Latest Updates (2026-04-10, session 48)
+
+- **Design improvement passes** (`/bolder`, `/clarify`, `/colorize`, `/onboard`):
+  - **Bold pass:** Home page hero headline scale (`text-[6rem]` on lg), login/signup split layout (`hidden lg:flex` sidebar with `--sidebar` bg), manager dashboard h1 `text-5xl font-bold`, MetricCard values `text-4xl font-bold`
+  - **Clarify pass:** Toast copy (`"Could not"` → `"Couldn't"`, `"Please try again."` → `"Try again."`), Approvals CTAs, Publish actions (`"Unpublish (keep shifts)"` → `"Take offline"`, `"Start over"` → `"Clear & restart"`), availability hint text
+  - **Colorize pass:** CalendarGrid day/night card tint opacities strengthened; Live/Draft pill badges on coverage header; TeamDirectory shift-group tinted headers + colored dots in profile cards (info/teal = day, warning/amber = night)
+  - **Onboard pass:** Dashboard replaces 0%/0% ScheduleProgress with "No draft started yet" card when `dayShiftsTotal === 0 && nightShiftsTotal === 0`; coverage `noCycleSelected` redesigned with icon + numbered 3-step flow; `showEmptyDraftState` redesigned with icon + dual Auto-draft / Assign-manually CTAs
+- **Verification:** `npx tsc --noEmit`, live browser screenshots via preview MCP
 
 ## Latest Updates (2026-04-10, session 47)
 
@@ -261,6 +324,8 @@ Typography classes:
 - **`src/app/schedule/actions.ts` is a barrel:** Real logic is in `src/app/schedule/actions/` sub-modules (`helpers.ts`, `cycle-actions.ts`, `publish-actions.ts`, `shift-actions.ts`, `draft-actions.ts`, `preliminary-actions.ts`). Each action file has `'use server'`; `helpers.ts` and `index.ts` do not.
 - **FK column names in schedule tables:** `work_patterns` and `availability_overrides` use `therapist_id` (not `user_id`) as the FK column — match what `generateDraftScheduleAction` uses when writing new queries against those tables.
 - **CalendarGrid has no React import:** `src/components/coverage/CalendarGrid.tsx` uses `'use client'` but has no `import ... from 'react'`. Add hooks as a fresh single import statement — don't look for an existing one to amend.
+- **`CoverageClientPage.tsx` lucide imports are minimal:** Default set is `ChevronRight, Printer, Send, Sparkles`. Adding any new icon (e.g. `CalendarDays`) requires updating that import line explicitly.
+- **`days` array in CalendarGrid is always populated:** Entries exist for every day in the cycle date range even before any shifts are drafted. `days[0]` reliably selects the first day and opens the shift editor — safe to use as a "Assign manually" CTA target on the `showEmptyDraftState` panel.
 - **`@/components/ui/progress` not installed by default:** Run `npx shadcn@latest add progress` before importing the Progress primitive. Not in the original shadcn set for this repo (added session 21).
 - **Preview MCP on Windows:** `preview_start` server tracking doesn't persist between tool calls. Chrome MCP also returns "Permission denied" on localhost. For local visual verification, use saved screenshots in `artifacts/screen-capture/latest/`. To confirm server health use `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000`.
 - **Zombie dev server on Windows:** Stale `next dev` processes can hold port 3000 silently (visible as ~994MB node.exe in tasklist). Find the PID with `netstat -ano | grep ":3000" | grep LISTENING` then kill with `taskkill //PID <pid> //F`. Follow with `rm -rf .next` before rebuilding.
@@ -329,6 +394,7 @@ Assignment status is informational only (does not affect coverage counts or publ
 - Dialog density is controlled centrally in `src/components/coverage/shift-editor-dialog-layout.ts`
 - **Constraint warning gotcha:** `constraintBlockedSlotKeys` in `CoverageClientPage.tsx` is built from unfilled shift rows (`user_id IS NULL`). After the loop, any slot key that also has an assigned therapist is deleted from the set — so "No eligible therapists (constraints)" only appears for truly empty slots; manually assigned therapists suppress it.
 - **Day-card warning treatment:** `hasCoverageIssue` in `CalendarGrid.tsx` is `day.constraintBlocked` only — **not** `missingLead || constraintBlocked`. Missing-lead-only days show their warning exclusively through the lead sub-section widget inside the card (which uses `day.leadShift` directly). Do not restore `missingLead` to `hasCoverageIssue` — it caused the entire 6-week calendar to look permanently alarmed in the demo data.
+- **Coverage empty states:** Two distinct flags in `CoverageClientPage.tsx` (around line 703): `noCycleSelected` (no cycle row active) and `showEmptyDraftState` (`activeCycleId` set but `selectedCycleHasShiftRows` is false). They render separate `<section>` panels before `<CalendarGrid>`. Edit those blocks to change empty state copy or layout.
 
 ## Team UX
 
