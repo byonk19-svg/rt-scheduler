@@ -95,12 +95,12 @@ export default async function ApprovalsPage({
           subtitle="Review live claims and schedule change requests before final publish."
           summary={
             <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 font-medium text-foreground">
-              Couldn't load requests
+              Couldn&apos;t load requests
             </span>
           }
         />
         <div className="rounded-xl border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 py-3 text-sm font-medium text-[var(--error-text)]">
-          Couldn't load approval requests. Try refreshing the page.
+          Couldn&apos;t load approval requests. Try refreshing the page.
         </div>
       </div>
     )
@@ -205,7 +205,7 @@ export default async function ApprovalsPage({
 
       {error === 'preliminary_review_failed' && (
         <div className="rounded-xl border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 py-3 text-sm font-medium text-[var(--error-text)]">
-          Couldn't save that decision. Try again.
+          Couldn&apos;t save that decision. Try again.
         </div>
       )}
 
