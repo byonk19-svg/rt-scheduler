@@ -18,6 +18,7 @@ export type EmailIntakePanelRow = {
   receivedAt: string
   parseStatus: 'parsed' | 'needs_review' | 'failed' | 'applied'
   parseSummary: string | null
+  matchedTherapistId: string | null
   matchedTherapistName: string | null
   matchedCycleLabel: string | null
   parsedRequests: Array<{
@@ -59,12 +60,14 @@ export function EmailIntakePanel({
   rows,
   applyEmailAvailabilityImportAction,
   createManualEmailIntakeAction,
+  updateEmailIntakeTherapistAction,
   therapistOptions,
   cycleOptions,
 }: {
   rows: EmailIntakePanelRow[]
   applyEmailAvailabilityImportAction: (formData: FormData) => void | Promise<void>
   createManualEmailIntakeAction: (formData: FormData) => void | Promise<void>
+  updateEmailIntakeTherapistAction: (formData: FormData) => void | Promise<void>
   therapistOptions: Array<{ id: string; fullName: string }>
   cycleOptions: Array<{ id: string; label: string }>
 }) {
@@ -206,7 +209,7 @@ export function EmailIntakePanel({
                   </p>
                 </div>
 
-                {row.parseStatus === 'parsed' ? (
+                {row.matchedTherapistId && row.parsedRequests.length > 0 ? (
                   <form action={applyEmailAvailabilityImportAction}>
                     <input type="hidden" name="intake_id" value={row.id} />
                     <Button size="sm" type="submit">
@@ -244,6 +247,39 @@ export function EmailIntakePanel({
                   </>
                 ) : null}
               </div>
+
+              {!row.matchedTherapistId ? (
+                <form
+                  action={updateEmailIntakeTherapistAction}
+                  className="mt-3 flex flex-wrap gap-3"
+                >
+                  <input type="hidden" name="intake_id" value={row.id} />
+                  <div className="min-w-60 flex-1 space-y-1">
+                    <Label htmlFor={`intake_match_${row.id}`}>Match therapist</Label>
+                    <select
+                      id={`intake_match_${row.id}`}
+                      name="therapist_id"
+                      required
+                      defaultValue=""
+                      className="border-input bg-[var(--input-background)] focus-visible:border-ring focus-visible:ring-ring/50 h-10 w-full rounded-lg border px-3 py-2 text-sm outline-none focus-visible:ring-[3px]"
+                    >
+                      <option value="" disabled>
+                        Select therapist
+                      </option>
+                      {therapistOptions.map((option) => (
+                        <option key={`${row.id}-${option.id}`} value={option.id}>
+                          {option.fullName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-end">
+                    <Button size="sm" type="submit" variant="outline">
+                      Save match
+                    </Button>
+                  </div>
+                </form>
+              ) : null}
 
               {row.parseSummary ? (
                 <p className="mt-3 text-sm text-muted-foreground">{row.parseSummary}</p>

@@ -69,6 +69,21 @@ const WORK_PATTERNS = [
   /\bwork\b/i,
 ]
 
+const INTENT_MATCHERS: Array<{ type: AvailabilityOverrideType; pattern: RegExp }> = [
+  { type: 'force_off', pattern: /\bneed off\b/gi },
+  { type: 'force_off', pattern: /\bcannot work\b/gi },
+  { type: 'force_off', pattern: /\bcan'?t work\b/gi },
+  { type: 'force_off', pattern: /\bunavailable\b/gi },
+  { type: 'force_off', pattern: /\bvacation\b/gi },
+  { type: 'force_off', pattern: /\bpto\b/gi },
+  { type: 'force_off', pattern: /\boff\b/gi },
+  { type: 'force_on', pattern: /\bwant to work\b/gi },
+  { type: 'force_on', pattern: /\bcan work\b/gi },
+  { type: 'force_on', pattern: /\bmust work\b/gi },
+  { type: 'force_on', pattern: /\bavailable\b/gi },
+  { type: 'force_on', pattern: /\bwork\b/gi },
+]
+
 const DATE_TOKEN_PATTERN =
   /\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+\d{1,2}(?:,\s*\d{4})?\b/gi
 
@@ -177,6 +192,43 @@ function classifyOverrideType(line: string): AvailabilityOverrideType | null {
   return null
 }
 
+function splitLineIntoIntentSegments(
+  line: string
+): Array<{ overrideType: AvailabilityOverrideType; segment: string }> {
+  const matches: Array<{
+    overrideType: AvailabilityOverrideType
+    index: number
+    text: string
+  }> = []
+
+  for (const matcher of INTENT_MATCHERS) {
+    matcher.pattern.lastIndex = 0
+    let match: RegExpExecArray | null
+    while ((match = matcher.pattern.exec(line)) !== null) {
+      matches.push({
+        overrideType: matcher.type,
+        index: match.index,
+        text: match[0],
+      })
+    }
+  }
+
+  if (matches.length === 0) return []
+
+  const dedupedMatches = Array.from(
+    new Map(
+      matches
+        .sort((a, b) => a.index - b.index || b.text.length - a.text.length)
+        .map((match) => [`${match.index}:${match.overrideType}`, match])
+    ).values()
+  ).sort((a, b) => a.index - b.index)
+
+  return dedupedMatches.map((match, index) => ({
+    overrideType: match.overrideType,
+    segment: line.slice(match.index, dedupedMatches[index + 1]?.index ?? line.length).trim(),
+  }))
+}
+
 function extractDateTokens(line: string): string[] {
   const matches = line.match(DATE_TOKEN_PATTERN)
   if (!matches) return []
@@ -270,23 +322,48 @@ export function parseAvailabilityEmail(
   const unresolvedLines: string[] = []
 
   for (const rawLine of lines) {
-    const overrideType = classifyOverrideType(rawLine)
-    if (!overrideType) continue
+    const segments = splitLineIntoIntentSegments(rawLine)
+    if (segments.length === 0) {
+      const overrideType = classifyOverrideType(rawLine)
+      if (!overrideType) continue
 
-    const dates = resolveLineDates(rawLine, cycles)
-    if (dates.length === 0) {
-      unresolvedLines.push(rawLine)
+      const dates = resolveLineDates(rawLine, cycles)
+      if (dates.length === 0) {
+        unresolvedLines.push(rawLine)
+        continue
+      }
+
+      for (const date of dates) {
+        requests.push({
+          date,
+          override_type: overrideType,
+          shift_type: 'both',
+          note: null,
+          source_line: rawLine,
+        })
+      }
       continue
     }
 
-    for (const date of dates) {
-      requests.push({
-        date,
-        override_type: overrideType,
-        shift_type: 'both',
-        note: null,
-        source_line: rawLine,
-      })
+    let matchedAnyDate = false
+    for (const segment of segments) {
+      const dates = resolveLineDates(segment.segment, cycles)
+      if (dates.length === 0) continue
+      matchedAnyDate = true
+
+      for (const date of dates) {
+        requests.push({
+          date,
+          override_type: segment.overrideType,
+          shift_type: 'both',
+          note: null,
+          source_line: segment.segment,
+        })
+      }
+    }
+
+    if (!matchedAnyDate) {
+      unresolvedLines.push(rawLine)
     }
   }
 

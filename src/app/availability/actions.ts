@@ -606,6 +606,52 @@ export async function applyEmailAvailabilityImportAction(formData: FormData) {
   redirect(buildAvailabilityUrl({ success: 'email_intake_applied' }))
 }
 
+export async function updateEmailIntakeTherapistAction(formData: FormData) {
+  const { supabase, role } = await getAuthenticatedUserWithRole()
+
+  if (!can(role, 'access_manager_ui')) {
+    redirect('/availability')
+  }
+
+  const intakeId = String(formData.get('intake_id') ?? '').trim()
+  const therapistId = String(formData.get('therapist_id') ?? '').trim()
+
+  if (!intakeId || !therapistId) {
+    redirect(buildAvailabilityUrl({ error: 'email_intake_match_failed' }))
+  }
+
+  const { data: intake, error: loadError } = await supabase
+    .from('availability_email_intakes')
+    .select('matched_cycle_id, parsed_requests')
+    .eq('id', intakeId)
+    .maybeSingle()
+
+  if (loadError || !intake) {
+    console.error('Failed to load intake for therapist update:', loadError)
+    redirect(buildAvailabilityUrl({ error: 'email_intake_match_failed' }))
+  }
+
+  const parsedRequests = sanitizeParsedRequests(intake.parsed_requests)
+  const nextStatus: 'parsed' | 'needs_review' | 'failed' =
+    !intake.matched_cycle_id || parsedRequests.length === 0 ? 'failed' : 'parsed'
+
+  const { error: updateError } = await supabase
+    .from('availability_email_intakes')
+    .update({
+      matched_therapist_id: therapistId,
+      parse_status: nextStatus,
+    })
+    .eq('id', intakeId)
+
+  if (updateError) {
+    console.error('Failed to update intake therapist match:', updateError)
+    redirect(buildAvailabilityUrl({ error: 'email_intake_match_failed' }))
+  }
+
+  revalidatePath('/availability')
+  redirect(buildAvailabilityUrl({ success: 'email_intake_match_saved' }))
+}
+
 export async function createManualEmailIntakeAction(formData: FormData) {
   const { supabase, role } = await getAuthenticatedUserWithRole()
 

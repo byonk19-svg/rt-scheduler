@@ -14,6 +14,7 @@ import {
   deleteManagerPlannerDateAction,
   saveManagerPlannerDatesAction,
   submitTherapistAvailabilityGridAction,
+  updateEmailIntakeTherapistAction,
 } from '@/app/availability/actions'
 import { AvailabilityPlannerFocusProvider } from '@/components/availability/availability-planner-focus-context'
 import { AvailabilityOverviewHeader } from '@/components/availability/AvailabilityOverviewHeader'
@@ -91,6 +92,7 @@ type AvailabilityEmailIntakeRow = {
   received_at: string
   parse_status: 'parsed' | 'needs_review' | 'failed' | 'applied'
   parse_summary: string | null
+  matched_therapist_id: string | null
   parsed_requests: Array<{
     date: string
     override_type: 'force_off' | 'force_on'
@@ -250,6 +252,13 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
     }
   }
 
+  if (success === 'email_intake_match_saved') {
+    return {
+      message: 'Therapist match saved. You can apply the intake now.',
+      variant: 'success',
+    }
+  }
+
   if (error === 'email_intake_apply_failed') {
     return {
       message: 'Could not apply the inbound email. Review the parsed match first.',
@@ -261,6 +270,13 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
     return {
       message:
         'Could not create the intake. Choose a therapist and cycle, then add text or a file.',
+      variant: 'error',
+    }
+  }
+
+  if (error === 'email_intake_match_failed') {
+    return {
+      message: 'Could not save the therapist match. Please try again.',
       variant: 'error',
     }
   }
@@ -394,7 +410,7 @@ export default async function AvailabilityPage({
     ? await supabase
         .from('availability_email_intakes')
         .select(
-          'id, from_email, from_name, subject, received_at, parse_status, parse_summary, parsed_requests, profiles!availability_email_intakes_matched_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
+          'id, from_email, from_name, subject, received_at, parse_status, parse_summary, matched_therapist_id, parsed_requests, profiles!availability_email_intakes_matched_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
         )
         .order('received_at', { ascending: false })
         .limit(12)
@@ -426,6 +442,7 @@ export default async function AvailabilityPage({
       receivedAt: row.received_at,
       parseStatus: row.parse_status,
       parseSummary: row.parse_summary,
+      matchedTherapistId: row.matched_therapist_id,
       matchedTherapistName: matchedTherapist?.full_name ?? null,
       matchedCycleLabel: matchedCycle
         ? `${matchedCycle.label} (${matchedCycle.start_date} to ${matchedCycle.end_date})`
@@ -530,6 +547,7 @@ export default async function AvailabilityPage({
       rows={emailIntakeRows}
       applyEmailAvailabilityImportAction={applyEmailAvailabilityImportAction}
       createManualEmailIntakeAction={createManualEmailIntakeAction}
+      updateEmailIntakeTherapistAction={updateEmailIntakeTherapistAction}
       therapistOptions={plannerTherapists.map((therapist) => ({
         id: therapist.id,
         fullName: therapist.full_name,

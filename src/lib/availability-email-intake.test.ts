@@ -31,21 +31,21 @@ describe('parseAvailabilityEmail', () => {
         override_type: 'force_off',
         shift_type: 'both',
         note: null,
-        source_line: 'Need off Mar 24, Mar 26',
+        source_line: 'off Mar 24, Mar 26',
       },
       {
         date: '2026-03-26',
         override_type: 'force_off',
         shift_type: 'both',
         note: null,
-        source_line: 'Need off Mar 24, Mar 26',
+        source_line: 'off Mar 24, Mar 26',
       },
       {
         date: '2026-03-28',
         override_type: 'force_on',
         shift_type: 'both',
         note: null,
-        source_line: 'Can work Mar 28',
+        source_line: 'work Mar 28',
       },
     ])
   })
@@ -56,6 +56,34 @@ describe('parseAvailabilityEmail', () => {
     expect(parsed.status).toBe('failed')
     expect(parsed.requests).toEqual([])
     expect(parsed.unresolvedLines).toEqual(['Need off next Friday'])
+  })
+
+  it('splits mixed off/work sentences into separate intent segments', () => {
+    const parsed = parseAvailabilityEmail('Need off Apr 14, Apr 16 Can work Apr 18', cycles)
+
+    expect(parsed.requests).toEqual([
+      {
+        date: '2026-04-14',
+        override_type: 'force_off',
+        shift_type: 'both',
+        note: null,
+        source_line: 'off Apr 14, Apr 16',
+      },
+      {
+        date: '2026-04-16',
+        override_type: 'force_off',
+        shift_type: 'both',
+        note: null,
+        source_line: 'off Apr 14, Apr 16',
+      },
+      {
+        date: '2026-04-18',
+        override_type: 'force_on',
+        shift_type: 'both',
+        note: null,
+        source_line: 'work Apr 18',
+      },
+    ])
   })
 })
 

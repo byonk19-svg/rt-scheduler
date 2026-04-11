@@ -29,6 +29,7 @@ import {
   saveManagerPlannerDatesAction,
   submitAvailabilityEntryAction,
   submitTherapistAvailabilityGridAction,
+  updateEmailIntakeTherapistAction,
 } from '@/app/availability/actions'
 
 type TestContext = {
@@ -562,18 +563,52 @@ describe('availability actions', () => {
             override_type: 'force_off',
             shift_type: 'both',
             note: null,
-            source_line: 'Need off Mar 24, Mar 26',
+            source_line: 'off Mar 24, Mar 26',
           },
           {
             date: '2026-03-26',
             override_type: 'force_off',
             shift_type: 'both',
             note: null,
-            source_line: 'Need off Mar 24, Mar 26',
+            source_line: 'off Mar 24, Mar 26',
           },
         ],
       })
     )
+  })
+
+  it('updates the therapist match on an intake and marks it parsed when actionable', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    supabase.state.emailIntakeRow = {
+      matched_cycle_id: 'cycle-1',
+      parsed_requests: [
+        {
+          date: '2026-03-24',
+          override_type: 'force_off',
+          shift_type: 'both',
+          source_line: 'Need off Mar 24',
+        },
+      ],
+    }
+    createClientMock.mockResolvedValue(supabase)
+    const formData = new FormData()
+    formData.set('intake_id', 'intake-1')
+    formData.set('therapist_id', 'therapist-1')
+
+    await expect(updateEmailIntakeTherapistAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?success=email_intake_match_saved'
+    )
+
+    expect(supabase.state.updates).toEqual([
+      {
+        table: 'availability_email_intakes',
+        payload: {
+          matched_therapist_id: 'therapist-1',
+          parse_status: 'parsed',
+        },
+        filters: { id: 'intake-1' },
+      },
+    ])
   })
 })
 
