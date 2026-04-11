@@ -20,6 +20,7 @@ export type EmailIntakePanelRow = {
   parseSummary: string | null
   matchedTherapistId: string | null
   matchedTherapistName: string | null
+  matchedCycleId: string | null
   matchedCycleLabel: string | null
   parsedRequests: Array<{
     date: string
@@ -209,7 +210,7 @@ export function EmailIntakePanel({
                   </p>
                 </div>
 
-                {row.matchedTherapistId && row.parsedRequests.length > 0 ? (
+                {row.matchedTherapistId && row.matchedCycleId && row.parsedRequests.length > 0 ? (
                   <form action={applyEmailAvailabilityImportAction}>
                     <input type="hidden" name="intake_id" value={row.id} />
                     <Button size="sm" type="submit">
@@ -248,7 +249,7 @@ export function EmailIntakePanel({
                 ) : null}
               </div>
 
-              {!row.matchedTherapistId ? (
+              {!row.matchedTherapistId || !row.matchedCycleId ? (
                 <form
                   action={updateEmailIntakeTherapistAction}
                   className="mt-3 flex flex-wrap gap-3"
@@ -260,7 +261,7 @@ export function EmailIntakePanel({
                       id={`intake_match_${row.id}`}
                       name="therapist_id"
                       required
-                      defaultValue=""
+                      defaultValue={row.matchedTherapistId ?? ''}
                       className="border-input bg-[var(--input-background)] focus-visible:border-ring focus-visible:ring-ring/50 h-10 w-full rounded-lg border px-3 py-2 text-sm outline-none focus-visible:ring-[3px]"
                     >
                       <option value="" disabled>
@@ -273,9 +274,28 @@ export function EmailIntakePanel({
                       ))}
                     </select>
                   </div>
+                  <div className="min-w-60 flex-1 space-y-1">
+                    <Label htmlFor={`intake_cycle_${row.id}`}>Match schedule block</Label>
+                    <select
+                      id={`intake_cycle_${row.id}`}
+                      name="cycle_id"
+                      required
+                      defaultValue={row.matchedCycleId ?? ''}
+                      className="border-input bg-[var(--input-background)] focus-visible:border-ring focus-visible:ring-ring/50 h-10 w-full rounded-lg border px-3 py-2 text-sm outline-none focus-visible:ring-[3px]"
+                    >
+                      <option value="" disabled>
+                        Select schedule block
+                      </option>
+                      {cycleOptions.map((option) => (
+                        <option key={`${row.id}-${option.id}`} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="flex items-end">
                     <Button size="sm" type="submit" variant="outline">
-                      Save match
+                      Save matches
                     </Button>
                   </div>
                 </form>
