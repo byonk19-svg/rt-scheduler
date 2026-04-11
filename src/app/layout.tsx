@@ -8,6 +8,7 @@ import './globals.css'
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
+  variable: '--font-dm-sans',
   display: 'swap',
 })
 
@@ -67,7 +68,7 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="en" className={plusJakarta.variable}>
+    <html lang="en" className={`${plusJakarta.variable} ${dmSans.variable}`}>
       <body className={`${dmSans.className} antialiased`}>
         <Suspense fallback={children}>
           <AppShell user={appShellUser}>{children}</AppShell>

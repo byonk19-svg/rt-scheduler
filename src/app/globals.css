@@ -52,49 +52,48 @@
     'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   --radius: 0.625rem;
 
-  /* Lovable core theme */
-  --background: hsl(38 18% 96%);
+  --background: hsl(210 20% 98%);
   --foreground: hsl(220 25% 12%);
-  --card: hsl(38 14% 99%);
+  --card: hsl(0 0% 100%);
   --card-foreground: hsl(220 25% 12%);
   --popover: hsl(0 0% 100%);
   --popover-foreground: hsl(220 25% 12%);
-  --primary: hsl(187 55% 28%);
+  --primary: hsl(205 92% 35%);
   --primary-foreground: hsl(0 0% 100%);
-  --secondary: hsl(32 18% 91%);
+  --secondary: hsl(210 25% 93%);
   --secondary-foreground: hsl(220 25% 12%);
-  --muted: hsl(32 12% 93%);
+  --muted: hsl(210 20% 95%);
   --muted-foreground: hsl(220 10% 45%);
-  --accent: hsl(38 90% 55%);
+  --accent: hsl(32 95% 44%);
   --accent-foreground: hsl(220 25% 12%);
   --destructive: hsl(0 65% 55%);
   --destructive-foreground: hsl(0 0% 100%);
-  --border: hsl(32 14% 86%);
-  --input: hsl(32 14% 86%);
-  --input-background: hsl(38 14% 99%);
-  --ring: hsl(187 55% 28%);
+  --border: hsl(210 20% 88%);
+  --input: hsl(210 20% 88%);
+  --input-background: hsl(0 0% 100%);
+  --ring: hsl(205 92% 35%);
 
-  --sidebar: hsl(192 24% 24%);
-  --sidebar-foreground: hsl(190 10% 78%);
+  --sidebar: hsl(213 55% 16%);
+  --sidebar-foreground: hsl(215 25% 70%);
   --sidebar-primary: hsl(0 0% 100%);
-  --sidebar-primary-foreground: hsl(192 30% 20%);
-  --sidebar-accent: hsl(192 35% 28%);
-  --sidebar-accent-foreground: hsl(38 25% 96%);
-  --sidebar-border: hsl(192 20% 26%);
-  --sidebar-ring: hsl(38 90% 55%);
-  --sidebar-muted: hsl(192 14% 52%);
+  --sidebar-primary-foreground: hsl(213 55% 16%);
+  --sidebar-accent: hsl(213 50% 22%);
+  --sidebar-accent-foreground: hsl(210 40% 95%);
+  --sidebar-border: hsl(213 45% 20%);
+  --sidebar-ring: hsl(32 95% 44%);
+  --sidebar-muted: hsl(213 22% 58%);
 
-  --chart-1: hsl(187 55% 28%);
-  --chart-2: hsl(192 35% 28%);
-  --chart-3: hsl(38 90% 55%);
+  --chart-1: hsl(205 92% 35%);
+  --chart-2: hsl(213 50% 30%);
+  --chart-3: hsl(32 95% 44%);
   --chart-4: hsl(220 25% 12%);
-  --chart-5: hsl(32 12% 93%);
+  --chart-5: hsl(210 20% 95%);
 
   --success: hsl(152 50% 38%);
   --success-subtle: hsl(150 45% 93%);
   --success-border: hsl(150 30% 82%);
   --success-text: hsl(152 50% 30%);
-  --warning: hsl(38 90% 55%);
+  --warning: hsl(32 95% 44%);
   --warning-subtle: hsl(45 95% 90%);
   --warning-border: hsl(40 85% 76%);
   --warning-text: hsl(35 70% 35%);
@@ -102,13 +101,13 @@
   --error-subtle: hsl(0 70% 94%);
   --error-border: hsl(0 60% 83%);
   --error-text: hsl(0 55% 38%);
-  --info: hsl(187 55% 35%);
-  --info-subtle: hsl(187 50% 92%);
-  --info-border: hsl(187 35% 80%);
-  --info-text: hsl(187 60% 30%);
+  --info: hsl(205 75% 35%);
+  --info-subtle: hsl(205 70% 94%);
+  --info-border: hsl(205 50% 82%);
+  --info-text: hsl(205 80% 30%);
 
-  --highlight: hsl(187 55% 28%);
-  --attention: hsl(38 90% 55%);
+  --highlight: hsl(205 92% 35%);
+  --attention: hsl(32 95% 44%);
 }
 
 /* Dark mode is not yet implemented — tokens are intentionally absent.
