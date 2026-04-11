@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+import { dirname, resolve } from 'node:path'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dir = dirname(__filename)
 
 const args = new Set(process.argv.slice(2))
 const quick = args.has('--quick')
@@ -13,6 +18,11 @@ const env = {
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://example.supabase.co',
   NEXT_PUBLIC_SUPABASE_ANON_KEY:
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'ci-placeholder-anon-key',
+  // Mock Google Fonts responses so builds succeed in offline environments (e.g. CI).
+  // Vercel production builds hit the real API; this file only affects local CI.
+  NEXT_FONT_GOOGLE_MOCKED_RESPONSES:
+    process.env.NEXT_FONT_GOOGLE_MOCKED_RESPONSES ??
+    resolve(__dir, 'google-font-mock-responses.json'),
 }
 
 const securityRegressionTests = [
