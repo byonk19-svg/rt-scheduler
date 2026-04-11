@@ -61,8 +61,8 @@ export default function HomePage() {
           className="absolute right-[8%] top-16 h-56 w-56 rounded-full bg-[var(--home-glow-cool)] blur-3xl"
         />
 
-        <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 pb-16 pt-16 lg:gap-14 lg:pb-24 lg:pt-24">
-          <div className="max-w-3xl space-y-6 fade-up">
+        <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 pb-16 pt-16 lg:grid lg:grid-cols-[minmax(0,0.94fr)_minmax(340px,0.88fr)] lg:items-start lg:gap-x-12 lg:gap-y-8 lg:pb-24 lg:pt-24">
+          <div className="max-w-3xl space-y-6 fade-up lg:max-w-2xl">
             <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--attention)]/25 bg-white/55 px-3.5 py-1.5 text-xs font-semibold tracking-[0.01em] text-[var(--attention)]">
               <CalendarDays className="h-3 w-3" />
               Built for respiratory therapy teams
@@ -79,7 +79,7 @@ export default function HomePage() {
           </div>
 
           <div
-            className="fade-up flex flex-col gap-4 sm:flex-row sm:items-center"
+            className="fade-up flex flex-col gap-4 sm:flex-row sm:items-center lg:max-w-xl"
             style={{ animationDelay: '80ms' }}
           >
             <Button
@@ -99,7 +99,10 @@ export default function HomePage() {
             </Button>
           </div>
 
-          <div className="fade-up flex flex-col gap-3" style={{ animationDelay: '120ms' }}>
+          <div
+            className="fade-up flex flex-col gap-3 lg:max-w-xl"
+            style={{ animationDelay: '120ms' }}
+          >
             <p className="text-sm text-muted-foreground">
               Your manager will need to approve your account before your first sign-in.
             </p>
@@ -113,7 +116,10 @@ export default function HomePage() {
             </ul>
           </div>
 
-          <div className="fade-up relative mt-2 w-full" style={{ animationDelay: '160ms' }}>
+          <div
+            className="fade-up relative mt-2 w-full lg:col-start-2 lg:row-span-3 lg:row-start-1 lg:mt-6 lg:self-start"
+            style={{ animationDelay: '160ms' }}
+          >
             <div
               aria-hidden
               className="absolute inset-x-10 -bottom-10 h-16 rounded-full bg-[var(--home-glow-cool)]/60 blur-3xl"

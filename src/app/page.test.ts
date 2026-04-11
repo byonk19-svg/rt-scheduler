@@ -22,7 +22,7 @@ describe('public homepage redesign contract', () => {
 
   it('makes the hero create-account CTA primary and sign-in secondary', () => {
     const heroCtaBlockMatch = pageSource.match(
-      /<div\s+className="fade-up flex flex-col gap-4 sm:flex-row sm:items-center"[\s\S]*?<\/div>\s*\n\s*<div className="fade-up flex flex-col gap-3"/
+      /<div\s+className="fade-up flex flex-col gap-4 sm:flex-row sm:items-center[^"]*"[\s\S]*?<\/div>\s*\n\s*<div className="fade-up flex flex-col gap-3[^"]*"/
     )
 
     expect(heroCtaBlockMatch).toBeTruthy()
@@ -51,5 +51,10 @@ describe('public homepage redesign contract', () => {
     expect(pageSource).toContain('teamwise-home-grid')
     expect(pageSource).toContain('teamwise-home-preview-shell')
     expect(pageSource).toContain('teamwise-home-preview-sheen')
+  })
+
+  it('anchors the preview beside the hero content on large screens', () => {
+    expect(pageSource).toContain('lg:grid lg:grid-cols-[minmax(0,0.94fr)_minmax(340px,0.88fr)]')
+    expect(pageSource).toContain('lg:col-start-2 lg:row-span-3 lg:row-start-1')
   })
 })
