@@ -87,7 +87,7 @@ export default function HomePage() {
               size="lg"
               className="h-12 min-w-[170px] rounded-xl text-base shadow-[0_20px_36px_-22px_var(--home-shadow)]"
             >
-              <Link href="/login">Sign in</Link>
+              <Link href="/signup">Create account</Link>
             </Button>
             <Button
               asChild
@@ -95,7 +95,7 @@ export default function HomePage() {
               size="lg"
               className="h-12 min-w-[170px] rounded-xl border-white/70 bg-white/65 text-base hover:bg-white"
             >
-              <Link href="/signup">Create account</Link>
+              <Link href="/login">Sign in</Link>
             </Button>
           </div>
 

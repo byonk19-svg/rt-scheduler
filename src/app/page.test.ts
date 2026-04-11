@@ -18,7 +18,24 @@ describe('public homepage redesign contract', () => {
     expect(signInMatches.length).toBeGreaterThanOrEqual(2)
 
     expect(pageSource).toContain('<Link href="/signup">Get started</Link>')
-    expect(pageSource).toContain('<Link href="/signup">Create account</Link>')
+  })
+
+  it('makes the hero create-account CTA primary and sign-in secondary', () => {
+    const heroCtaBlockMatch = pageSource.match(
+      /<div\s+className="fade-up flex flex-col gap-4 sm:flex-row sm:items-center"[\s\S]*?<\/div>\s*\n\s*<div className="fade-up flex flex-col gap-3"/
+    )
+
+    expect(heroCtaBlockMatch).toBeTruthy()
+
+    const heroButtons = [
+      ...(heroCtaBlockMatch?.[0].matchAll(/<Button[\s\S]*?<\/Button>/g) ?? []),
+    ].map(([button]) => button)
+
+    expect(heroButtons).toHaveLength(2)
+    expect(heroButtons[0]).toContain('<Link href="/signup">Create account</Link>')
+    expect(heroButtons[0]).not.toContain('variant="outline"')
+    expect(heroButtons[1]).toContain('<Link href="/login">Sign in</Link>')
+    expect(heroButtons[1]).toContain('variant="outline"')
   })
 
   it('keeps the approval note and trust bullets visible', () => {
