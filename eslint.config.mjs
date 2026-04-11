@@ -9,6 +9,8 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     '.next/**',
+    // Git worktrees may live under repo root; never lint their build output (avoids ENOENT on partial .next).
+    '.worktrees/**',
     'out/**',
     'build/**',
     'next-env.d.ts',
