@@ -401,8 +401,9 @@ describe('availability actions', () => {
     ])
     expect(supabase.state.inserts).toHaveLength(1)
     expect(supabase.state.inserts[0].table).toBe('therapist_availability_submissions')
-    expect(supabase.state.inserts[0].payload.therapist_id).toBe('therapist-1')
-    expect(supabase.state.inserts[0].payload.schedule_cycle_id).toBe('cycle-1')
+    const submissionPayload = supabase.state.inserts[0].payload as Record<string, unknown>
+    expect(submissionPayload.therapist_id).toBe('therapist-1')
+    expect(submissionPayload.schedule_cycle_id).toBe('cycle-1')
     expect(revalidatePathMock).toHaveBeenCalledWith('/dashboard/staff')
   })
 

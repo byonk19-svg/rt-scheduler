@@ -31,7 +31,7 @@ Current architecture and quality snapshot: [`docs/REPO_HEALTH.md`](docs/REPO_HEA
 
 ## Tech Stack
 
-- Next.js (App Router; **16.1.x** patch line) + TypeScript + Tailwind + shadcn/ui
+- Next.js (App Router; **16.2.3**) + TypeScript + Tailwind + shadcn/ui
 - Supabase (Postgres + Auth + RLS)
 
 Local tooling noise (Playwright MCP dumps, generated `artifacts/`) is gitignored — see `.gitignore`.
@@ -42,6 +42,11 @@ Local tooling noise (Playwright MCP dumps, generated `artifacts/`) is gitignored
 - Real-time operational status (for example `on_call`, `call_in`, `cancelled`, `left_early`) is stored in `shift_operational_entries`.
 - Coverage/headcount metrics use "working scheduled" semantics: planned assignments minus active operational entries.
 - Assignment status updates are written through `update_assignment_status` RPC and audited.
+
+## Mutation Guardrails
+
+- Schedule mutation routes reject untrusted cross-origin requests using shared origin/referer checks in `src/lib/security/request-origin.ts`.
+- Post-publish audit logging for coverage edits is derived server-side from the affected slot state (past date or active operational entry), not from client-supplied flags.
 
 ## Local Setup
 

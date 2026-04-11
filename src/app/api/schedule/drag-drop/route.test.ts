@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { POST } from '@/app/api/schedule/drag-drop/route'
 import { createClient } from '@/lib/supabase/server'
@@ -304,6 +304,12 @@ function makeSupabaseMock(scenario: Scenario) {
 describe('drag-drop API behavior', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-05T12:00:00Z'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('rejects cross-origin mutation requests', async () => {
@@ -494,6 +500,81 @@ describe('drag-drop API behavior', () => {
       expect.objectContaining({
         eventType: 'published_schedule_changed',
         message: 'Your published schedule changed: you were added to a day shift on Mar 10.',
+      })
+    )
+  })
+
+  it('ignores client-supplied post-publish audit flags for future slots without operational entries', async () => {
+    const supabase = makeSupabaseMock({
+      coverageStatuses: ['scheduled', 'scheduled'],
+      weeklyShifts: [],
+    })
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          action: 'assign',
+          cycleId: 'cycle-1',
+          userId: 'therapist-1',
+          shiftType: 'day',
+          date: '2026-03-10',
+          overrideWeeklyRules: false,
+          isPostPublishModification: true,
+        }),
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(writeAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: 'shift_added',
+        targetId: 'shift-new-1',
+      })
+    )
+    expect(writeAuditLog).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: 'post_publish_modification',
+      })
+    )
+  })
+
+  it('records post-publish audit when assigning into a slot with active operational entries', async () => {
+    const supabase = makeSupabaseMock({
+      coverageStatuses: ['on_call', 'scheduled'],
+      weeklyShifts: [],
+    })
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          action: 'assign',
+          cycleId: 'cycle-1',
+          userId: 'therapist-1',
+          shiftType: 'day',
+          date: '2026-03-10',
+          overrideWeeklyRules: false,
+        }),
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(writeAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: 'post_publish_modification',
+        targetId: 'shift-new-1',
       })
     )
   })

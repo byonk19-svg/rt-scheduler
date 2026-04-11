@@ -18,6 +18,7 @@ import {
   getDefaultWeeklyLimitForEmploymentType,
   sanitizeWeeklyLimit,
 } from '@/lib/scheduling-constants'
+import { toIsoDate } from '@/lib/calendar-utils'
 import {
   countsTowardWeeklyLimit,
   getWeekBoundsForDate,
@@ -58,7 +59,6 @@ type DragAction =
       overrideWeeklyRules: boolean
       availabilityOverride?: boolean
       availabilityOverrideReason?: string
-      isPostPublishModification?: boolean
     }
   | {
       action: 'move'
@@ -69,13 +69,11 @@ type DragAction =
       overrideWeeklyRules: boolean
       availabilityOverride?: boolean
       availabilityOverrideReason?: string
-      isPostPublishModification?: boolean
     }
   | {
       action: 'remove'
       cycleId: string
       shiftId: string
-      isPostPublishModification?: boolean
     }
   | {
       action: 'remove'
@@ -83,7 +81,6 @@ type DragAction =
       userId: string
       date: string
       shiftType: 'day' | 'night'
-      isPostPublishModification?: boolean
     }
   | {
       action: 'set_lead'
@@ -94,8 +91,11 @@ type DragAction =
       overrideWeeklyRules: boolean
       availabilityOverride?: boolean
       availabilityOverrideReason?: string
-      isPostPublishModification?: boolean
     }
+
+type ShiftSlotRow = {
+  id: string
+}
 
 async function getCoverageCountForSlot(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -277,6 +277,44 @@ async function getTherapistAvailabilityState(
   }
 }
 
+async function slotHasActiveOperationalEntries(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  cycleId: string,
+  date: string,
+  shiftType: 'day' | 'night'
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('shifts')
+    .select('id')
+    .eq('cycle_id', cycleId)
+    .eq('date', date)
+    .eq('shift_type', shiftType)
+
+  if (error) {
+    console.error('Could not load slot shifts for post-publish audit:', error)
+    return false
+  }
+
+  const shiftIds = ((data ?? []) as ShiftSlotRow[]).map((shift) => shift.id).filter(Boolean)
+  if (shiftIds.length === 0) return false
+
+  const activeOperationalEntries = await fetchActiveOperationalCodeMap(supabase, shiftIds)
+  return activeOperationalEntries.size > 0
+}
+
+async function shouldLogPostPublishModificationForSlot(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  cycleId: string,
+  date: string,
+  shiftType: 'day' | 'night'
+): Promise<boolean> {
+  if (date < toIsoDate(new Date())) {
+    return true
+  }
+
+  return await slotHasActiveOperationalEntries(supabase, cycleId, date, shiftType)
+}
+
 function parseActionBody(raw: unknown): DragAction | null {
   if (typeof raw !== 'object' || raw === null) return null
   const r = raw as Record<string, unknown>
@@ -300,10 +338,6 @@ function parseActionBody(raw: unknown): DragAction | null {
           typeof r.availabilityOverrideReason === 'string'
             ? r.availabilityOverrideReason
             : undefined,
-        isPostPublishModification:
-          typeof r.isPostPublishModification === 'boolean'
-            ? r.isPostPublishModification
-            : undefined,
       }
     case 'move':
       if (typeof r.shiftId !== 'string') return null
@@ -322,10 +356,6 @@ function parseActionBody(raw: unknown): DragAction | null {
           typeof r.availabilityOverrideReason === 'string'
             ? r.availabilityOverrideReason
             : undefined,
-        isPostPublishModification:
-          typeof r.isPostPublishModification === 'boolean'
-            ? r.isPostPublishModification
-            : undefined,
       }
     case 'remove':
       if (typeof r.shiftId === 'string') {
@@ -333,10 +363,6 @@ function parseActionBody(raw: unknown): DragAction | null {
           action: 'remove',
           cycleId: r.cycleId,
           shiftId: r.shiftId,
-          isPostPublishModification:
-            typeof r.isPostPublishModification === 'boolean'
-              ? r.isPostPublishModification
-              : undefined,
         }
       }
       if (
@@ -350,10 +376,6 @@ function parseActionBody(raw: unknown): DragAction | null {
           userId: r.userId,
           date: r.date,
           shiftType: r.shiftType,
-          isPostPublishModification:
-            typeof r.isPostPublishModification === 'boolean'
-              ? r.isPostPublishModification
-              : undefined,
         }
       }
       return null
@@ -373,10 +395,6 @@ function parseActionBody(raw: unknown): DragAction | null {
         availabilityOverrideReason:
           typeof r.availabilityOverrideReason === 'string'
             ? r.availabilityOverrideReason
-            : undefined,
-        isPostPublishModification:
-          typeof r.isPostPublishModification === 'boolean'
-            ? r.isPostPublishModification
             : undefined,
       }
     default:
@@ -557,7 +575,14 @@ export async function POST(request: Request) {
       })
     }
 
-    if (payload.isPostPublishModification && insertedShift?.id) {
+    const shouldLogPostPublishModification = await shouldLogPostPublishModificationForSlot(
+      supabase,
+      payload.cycleId,
+      payload.date,
+      payload.shiftType
+    )
+
+    if (shouldLogPostPublishModification && insertedShift?.id) {
       await writeAuditLog(supabase, {
         userId: user.id,
         action: 'post_publish_modification',
@@ -755,7 +780,20 @@ export async function POST(request: Request) {
       overrideWeeklyRules: true,
     }
 
-    if (payload.isPostPublishModification) {
+    const sourceNeedsAudit = await shouldLogPostPublishModificationForSlot(
+      supabase,
+      payload.cycleId,
+      shift.date,
+      shift.shift_type as 'day' | 'night'
+    )
+    const targetNeedsAudit = await shouldLogPostPublishModificationForSlot(
+      supabase,
+      payload.cycleId,
+      payload.targetDate,
+      payload.targetShiftType
+    )
+
+    if (sourceNeedsAudit || targetNeedsAudit) {
       await writeAuditLog(supabase, {
         userId: user.id,
         action: 'post_publish_modification',
@@ -825,7 +863,14 @@ export async function POST(request: Request) {
       overrideWeeklyRules: true,
     }
 
-    if (payload.isPostPublishModification) {
+    const shouldLogPostPublishModification = await shouldLogPostPublishModificationForSlot(
+      supabase,
+      payload.cycleId,
+      shift.date,
+      shift.shift_type
+    )
+
+    if (shouldLogPostPublishModification) {
       const targetId = 'shiftId' in payload ? payload.shiftId : `${payload.userId}:${payload.date}`
       await writeAuditLog(supabase, {
         userId: user.id,
@@ -1041,7 +1086,14 @@ export async function POST(request: Request) {
       ).data?.id ??
       `${payload.cycleId}:${payload.therapistId}:${payload.date}:${payload.shiftType}`
 
-    if (payload.isPostPublishModification) {
+    const shouldLogPostPublishModification = await shouldLogPostPublishModificationForSlot(
+      supabase,
+      payload.cycleId,
+      payload.date,
+      payload.shiftType
+    )
+
+    if (shouldLogPostPublishModification) {
       await writeAuditLog(supabase, {
         userId: user.id,
         action: 'post_publish_modification',

@@ -46,7 +46,7 @@ import {
   fetchScheduleCyclesForCoverage,
   type CoverageScheduleCycleRow,
 } from '@/lib/coverage/fetch-schedule-cycles'
-import { getCoverageStatusLabel } from '@/lib/coverage/status-ui'
+import { getCoverageStatusLabel, toCoverageAssignmentPayload } from '@/lib/coverage/status-ui'
 import { can } from '@/lib/auth/can'
 import { parseRole, type Role } from '@/lib/auth/roles'
 import { dateRange, formatHumanCycleRange, toIsoDate } from '@/lib/calendar-utils'
@@ -58,6 +58,7 @@ import {
   fetchActiveOperationalCodeMap,
   toLegacyShiftStatusFromOperationalCode,
 } from '@/lib/operational-codes'
+import type { OperationalCode } from '@/lib/operational-codes'
 import {
   COVERAGE_SHIFT_QUERY_KEY,
   defaultCoverageShiftTabFromProfileShift,
@@ -274,6 +275,20 @@ export function CoverageClientPage({
     () => days.filter((d) => d.dayStatus === 'missing_lead').length,
     [days]
   )
+
+  const syncOperationalCodeState = useCallback((shiftId: string, nextStatus: UiStatus) => {
+    const assignmentStatus = toCoverageAssignmentPayload(nextStatus).assignment_status
+
+    setActiveOpCodes((current) => {
+      const next = new Map(current)
+      if (assignmentStatus === 'scheduled') {
+        next.delete(shiftId)
+      } else {
+        next.set(shiftId, assignmentStatus as OperationalCode)
+      }
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     if (urlShiftTab != null) {
@@ -709,7 +724,6 @@ export function CoverageClientPage({
     ...(selectedDay?.staffShifts.map((shift) => shift.id) ?? []),
   ]
   const hasOperationalEntries = selectedDayShiftIds.some((id) => activeOpCodes.has(id))
-  const isPostPublishModification = isPastDate || hasOperationalEntries
 
   // Compute how many shifts each therapist is working in the week that contains the selected day.
   // Used in the assign dropdown so managers can avoid overscheduling within a single week.
@@ -768,7 +782,6 @@ export function CoverageClientPage({
         isoDate: selectedDay.isoDate,
         shiftType,
         role,
-        isPostPublishModification,
       })
 
       if (insertError || !inserted) {
@@ -821,7 +834,7 @@ export function CoverageClientPage({
 
       setAssigning(false)
     },
-    [activeCycleId, allTherapists, isPostPublishModification, selectedDay, setDays]
+    [activeCycleId, allTherapists, selectedDay, setDays]
   )
 
   const handleChangeStatus = useCallback(
@@ -904,7 +917,7 @@ export function CoverageClientPage({
             }
           })
 
-      await updateCoverageAssignmentStatus({
+      const updated = await updateCoverageAssignmentStatus({
         shiftId: targetShift.id,
         nextStatus,
         setState: setDays,
@@ -918,8 +931,12 @@ export function CoverageClientPage({
           console.error(message, error)
         },
       })
+
+      if (updated) {
+        syncOperationalCodeState(targetShift.id, nextStatus)
+      }
     },
-    [canUpdateAssignmentStatus, days, setDays, shiftTab, supabase]
+    [canUpdateAssignmentStatus, days, setDays, shiftTab, supabase, syncOperationalCodeState]
   )
 
   const handleUnassign = useCallback(
@@ -946,7 +963,6 @@ export function CoverageClientPage({
       const { error: deleteError } = await unassignCoverageShiftViaApi({
         cycleId: activeCycleId ?? '',
         shiftId,
-        isPostPublishModification,
       })
 
       if (!deleteError) {
@@ -959,7 +975,7 @@ export function CoverageClientPage({
       setError('Could not unassign therapist. Changes were rolled back.')
       setUnassigningShiftId(null)
     },
-    [activeCycleId, days, isPostPublishModification, setDays, unassigningShiftId]
+    [activeCycleId, days, setDays, unassigningShiftId]
   )
 
   return (

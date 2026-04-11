@@ -95,24 +95,22 @@ describe('assignCoverageShift', () => {
 
 describe('assignCoverageShiftViaApi', () => {
   it('returns inserted shift data from the drag-drop API', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            shift: {
-              id: 'shift-api-1',
-              user_id: 'user-1',
-              date: '2026-03-01',
-              shift_type: 'day',
-              status: 'scheduled',
-              assignment_status: null,
-            },
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } }
-        )
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          shift: {
+            id: 'shift-api-1',
+            user_id: 'user-1',
+            date: '2026-03-01',
+            shift_type: 'day',
+            status: 'scheduled',
+            assignment_status: null,
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
       )
     )
+    vi.stubGlobal('fetch', fetchMock)
 
     const result = await assignCoverageShiftViaApi({
       cycleId: 'cycle-1',
@@ -124,6 +122,21 @@ describe('assignCoverageShiftViaApi', () => {
 
     expect(result.error).toBe(null)
     expect(result.data).toMatchObject({ id: 'shift-api-1', user_id: 'user-1' })
+    expect(fetchMock).toHaveBeenCalledWith('/api/schedule/drag-drop', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'assign',
+        cycleId: 'cycle-1',
+        userId: 'user-1',
+        date: '2026-03-01',
+        shiftType: 'day',
+        role: 'lead',
+        overrideWeeklyRules: false,
+      }),
+    })
   })
 })
 
@@ -147,10 +160,13 @@ describe('unassignCoverageShiftViaApi', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () =>
-        new Response(JSON.stringify({ error: 'Could not remove shift' }), {
-          status: 500,
-          headers: { 'content-type': 'application/json' },
-        })
+        new Response(
+          JSON.stringify({ error: 'Could not remove shift' }),
+          {
+            status: 500,
+            headers: { 'content-type': 'application/json' },
+          }
+        )
       )
     )
 
@@ -160,6 +176,27 @@ describe('unassignCoverageShiftViaApi', () => {
     })
 
     expect(result.error).toEqual({ message: 'Could not remove shift' })
+  })
+  it('calls drag-drop API without client-controlled audit flags', async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await unassignCoverageShiftViaApi({
+      cycleId: 'cycle-1',
+      shiftId: 'shift-1',
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/schedule/drag-drop', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'remove',
+        cycleId: 'cycle-1',
+        shiftId: 'shift-1',
+      }),
+    })
   })
 })
 

@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-11 (session 49)
+Updated: 2026-04-11 (session 50)
 
 ## Handoff Snapshot
 
@@ -21,23 +21,7 @@ Updated: 2026-04-11 (session 49)
 
 ### Local In-Progress Work
 
-These files are currently modified locally and should be treated as in-progress work, not committed/deployed truth, until intentionally reviewed and committed:
-
-- `src/app/approvals/page.tsx`
-- `src/app/availability/availability-requests-table.tsx`
-- `src/app/availability/page.tsx`
-- `src/app/coverage/CoverageClientPage.tsx`
-- `src/app/login/page.tsx`
-- `src/app/page.tsx`
-- `src/app/publish/page.tsx`
-- `src/app/signup/page.tsx`
-- `src/components/coverage/AutoDraftConfirmDialog.tsx`
-- `src/components/coverage/CalendarGrid.tsx`
-- `src/components/manager/ManagerTriageDashboard.tsx`
-- `src/components/manager/ScheduleProgress.tsx`
-- `src/components/team/TeamDirectory.tsx`
-
-These look like the current design/content refinement pass. Do not let an AI assume they are already shipped just because they exist in the working tree.
+No intentional local-only product changes are pending. The current tracked changes in this session are intended to be committed truth.
 
 ### Where We Want To Go
 
@@ -55,6 +39,19 @@ These look like the current design/content refinement pass. Do not let an AI ass
 - `vercel deploy --prod --yes` for production shipping
 
 The session entries below are historical context. They may describe local-only or superseded work and should not override the snapshot above.
+
+## Latest Updates (2026-04-11, session 50)
+
+- **Coverage mutation trust-boundary hardening** (`src/app/api/schedule/drag-drop/route.ts`, `src/lib/coverage/mutations.ts`, tests):
+  - Removed the client-controlled `isPostPublishModification` path from coverage mutations.
+  - Post-publish audit logging is now derived server-side from the affected slot state: past dates always audit, and future slots audit when they already have active operational entries.
+  - Added route/unit regressions proving callers cannot force or suppress the audit path with request-body flags.
+- **Coverage client operational-state sync** (`src/app/coverage/CoverageClientPage.tsx`):
+  - Status changes now keep `activeOpCodes` aligned in-memory after successful updates, so follow-up assign/unassign decisions use current operational state without needing a reload.
+- **Repo health cleanup** (`src/app/availability/actions.test.ts`, lockfile/docs):
+  - Fixed the pre-existing type drift in `actions.test.ts` so `npx tsc --noEmit` is green again.
+  - Bumped locked Next.js packages to `16.2.3` after clearing the `npm audit` high-severity Server Components DoS advisory.
+- **Verification:** `npx tsc --noEmit`, `npm run build`, `npm audit --omit=dev`, targeted Vitest lanes for availability actions + coverage mutations, Playwright CLI smoke on `/` and `/coverage?shift=day`.
 
 ## Latest Updates (2026-04-10, session 48)
 
@@ -182,7 +179,7 @@ Core domains: coverage planning, cycles, availability requests, shift board, app
 
 ## Current Stack
 
-- Next.js 16.1.7 (App Router) + TypeScript
+- Next.js 16.2.3 (App Router) + TypeScript
 - Supabase (Auth + Postgres + RLS + RPC)
 - Tailwind + shadcn/ui patterns
 - Vitest (unit) + Playwright (e2e)
@@ -222,15 +219,19 @@ Generate new HMAC/cron secrets: `openssl rand -hex 32`
 
 ## Quality Status
 
-All checks currently green:
+Current session checks green:
 
 - `npx tsc --noEmit` pass
-- `npm run lint` pass
-- `npm run format:check` pass (whole-repo Prettier; `.claude/**` excluded from ESLint)
 - `npm run build` pass
-- `npm run test:unit` pass (**~460 tests**)
-- Full `npx vitest run` may require `.env.local` (e.g. `assignment-status` route test uses admin client env vars)
+- `npm audit --omit=dev` pass
+- targeted `npx vitest run src/app/availability/actions.test.ts src/app/api/schedule/drag-drop/route.test.ts src/lib/coverage/mutations.test.ts` pass
+- targeted `npx eslint` on touched files pass
+- Playwright CLI smoke pass on `/` and `/coverage?shift=day` (redirect to login as expected, no console warnings)
+
+Broader historical baseline:
+
 - `npm run test:e2e` pass (**42 passed**) with default Playwright workers set to `2`
+- Full `npx vitest run` may require `.env.local` (for example `assignment-status` route test uses admin client env vars)
 - Auth E2E happy path requires `.env.local` (or shell env) entries for `E2E_USER_EMAIL` and `E2E_USER_PASSWORD`
 
 CI gates: format check → lint → tsc → build → Playwright E2E
