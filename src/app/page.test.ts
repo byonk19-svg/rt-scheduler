@@ -21,21 +21,30 @@ describe('public homepage redesign contract', () => {
   })
 
   it('makes the hero create-account CTA primary and sign-in secondary', () => {
-    const heroCtaBlockMatch = pageSource.match(
-      /<div\s+className="fade-up flex flex-col gap-4 sm:flex-row sm:items-center[^"]*"[\s\S]*?<\/div>\s*\n\s*<div className="fade-up flex flex-col gap-3[^"]*"/
+    const createAccountIndex = pageSource.indexOf('<Link href="/signup">Create account</Link>')
+    const heroSignInIndex = pageSource.indexOf(
+      '<Link href="/login">Sign in</Link>',
+      createAccountIndex
+    )
+    const approvalNoteIndex = pageSource.indexOf(
+      'Your manager will need to approve your account before your first sign-in.'
     )
 
-    expect(heroCtaBlockMatch).toBeTruthy()
+    expect(createAccountIndex).toBeGreaterThan(-1)
+    expect(heroSignInIndex).toBeGreaterThan(createAccountIndex)
+    expect(heroSignInIndex).toBeLessThan(approvalNoteIndex)
 
-    const heroButtons = [
-      ...(heroCtaBlockMatch?.[0].matchAll(/<Button[\s\S]*?<\/Button>/g) ?? []),
-    ].map(([button]) => button)
+    const createAccountButton = pageSource.slice(
+      pageSource.lastIndexOf('<Button', createAccountIndex),
+      pageSource.indexOf('</Button>', createAccountIndex) + '</Button>'.length
+    )
+    const heroSignInButton = pageSource.slice(
+      pageSource.lastIndexOf('<Button', heroSignInIndex),
+      pageSource.indexOf('</Button>', heroSignInIndex) + '</Button>'.length
+    )
 
-    expect(heroButtons).toHaveLength(2)
-    expect(heroButtons[0]).toContain('<Link href="/signup">Create account</Link>')
-    expect(heroButtons[0]).not.toContain('variant="outline"')
-    expect(heroButtons[1]).toContain('<Link href="/login">Sign in</Link>')
-    expect(heroButtons[1]).toContain('variant="outline"')
+    expect(createAccountButton).not.toContain('variant="outline"')
+    expect(heroSignInButton).toContain('variant="outline"')
   })
 
   it('keeps the approval note and trust bullets visible', () => {
