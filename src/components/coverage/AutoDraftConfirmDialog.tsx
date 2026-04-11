@@ -53,8 +53,8 @@ export function AutoDraftConfirmDialog({
               Auto-Draft Schedule
             </DialogTitle>
             <DialogDescription className="max-w-[30rem] text-sm leading-relaxed text-muted-foreground">
-              Generate a draft that respects therapist availability, patterns, and scheduling
-              rules. This replaces all current unfinalized assignments.
+              Builds a full schedule draft using availability, recurring patterns, and scheduling
+              rules. Draft assignments are replaced — published schedules stay protected.
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -110,7 +110,7 @@ export function AutoDraftConfirmDialog({
             className="min-w-[8.5rem] gap-1.5 shadow-[0_10px_24px_-14px_rgba(6,103,169,0.55)]"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            Apply Draft
+            Generate draft
           </Button>
         </DialogFooter>
       </DialogContent>

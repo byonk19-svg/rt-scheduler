@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { ChevronRight, Printer, Send, Sparkles } from 'lucide-react'
+import { CalendarDays, ChevronRight, Printer, Send, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 import { AutoDraftConfirmDialog } from '@/components/coverage/AutoDraftConfirmDialog'
@@ -320,9 +320,13 @@ export function CoverageClientPage({
     }
     const range = formatHumanCycleRange(printCycle.start_date, printCycle.end_date)
     const statusChip = activeCyclePublished ? (
-      <span className="font-medium text-[var(--success-text)]"> · Live</span>
+      <span className="ml-1.5 inline-flex items-center rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--success-text)]">
+        Live
+      </span>
     ) : (
-      <span className="font-medium text-muted-foreground"> · Draft</span>
+      <span className="ml-1.5 inline-flex items-center rounded-full border border-border/70 bg-muted/20 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+        Draft
+      </span>
     )
     if (!selectedCycleHasShiftRows) {
       return (
@@ -1366,50 +1370,84 @@ export function CoverageClientPage({
           </div>
         )}
         {noCycleSelected ? (
-          <section className="rounded-[1.75rem] border border-border/70 bg-card px-6 py-6 shadow-[0_1px_0_rgba(15,23,42,0.04)]">
-            <h2 className="text-lg font-semibold text-foreground">
-              {canManageCoverage ? 'No open 6-week block' : 'No schedule available'}
+          <section className="rounded-[1.75rem] border border-dashed border-border/70 bg-muted/8 px-6 py-10 text-center shadow-none">
+            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
+              <CalendarDays className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <h2 className="font-heading text-xl font-semibold tracking-[-0.03em] text-foreground">
+              {canManageCoverage ? 'Ready to build your first block' : 'No schedule available yet'}
             </h2>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
               {canManageCoverage
-                ? 'Create the next 6-week block to start staffing this calendar. Once a block exists, the day and night schedule grids will appear here.'
-                : 'A manager has not published the next schedule block yet. Check back after the next cycle is created and published.'}
+                ? '6-week blocks are your scheduling windows. Create one to open the day and night staffing grids.'
+                : 'A manager has not created a schedule block yet. Check back after the next cycle is set up.'}
             </p>
             {canManageCoverage && (
-              <Button
-                type="button"
-                size="sm"
-                className="mt-4 gap-1.5 text-xs"
-                onClick={() => setCycleDialogOpen(true)}
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                New 6-week block
-              </Button>
+              <div className="mt-7">
+                <ol className="mx-auto mb-6 flex max-w-xs flex-col gap-2.5 text-left">
+                  {[
+                    'Create a 6-week block',
+                    'Run Auto-draft to fill shifts',
+                    'Publish to notify your team',
+                  ].map((step, i) => (
+                    <li key={step} className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-foreground/60">
+                        {i + 1}
+                      </span>
+                      {step}
+                    </li>
+                  ))}
+                </ol>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => setCycleDialogOpen(true)}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  New 6-week block
+                </Button>
+              </div>
             )}
           </section>
         ) : (
           <>
             {showEmptyDraftState && (
-              <section className="mb-3 rounded-[1.75rem] border border-border/70 bg-card px-6 py-6 shadow-[0_1px_0_rgba(15,23,42,0.04)]">
-                <h2 className="text-lg font-semibold text-foreground">
-                  {canManageCoverage ? 'No staffing drafted yet' : 'No staffing published yet'}
+              <section className="mb-4 rounded-[1.75rem] border border-dashed border-border/70 bg-muted/8 px-6 py-9 text-center shadow-none">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
+                  <Sparkles className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <h2 className="font-heading text-lg font-semibold tracking-[-0.03em] text-foreground">
+                  {canManageCoverage ? 'Block ready — no shifts yet' : 'No staffing published yet'}
                 </h2>
-                <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+                <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
                   {canManageCoverage
-                    ? 'This block exists, but it does not have any shift rows yet. Auto-draft it or click a day to start assigning the first shifts manually.'
-                    : 'This schedule block exists, but no staffing has been published into it yet. Check another cycle pill or come back after the schedule is drafted.'}
+                    ? 'Run Auto-draft to fill the grid based on therapist availability and constraints, or click any day to assign shifts manually.'
+                    : 'This schedule block exists, but no staffing has been published yet. Check back soon or try another cycle above.'}
                 </p>
                 {canManageCoverage && (
-                  <div className="mt-4">
+                  <div className="mt-5 flex justify-center gap-2">
                     <Button
                       type="button"
                       size="sm"
-                      className="gap-1.5 text-xs"
+                      className="gap-1.5"
                       disabled={!activeCycleId || activeCyclePublished}
                       onClick={() => setAutoDraftDialogOpen(true)}
                     >
                       <Sparkles className="h-3.5 w-3.5" />
                       Auto-draft
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 text-muted-foreground"
+                      onClick={() => {
+                        const first = days[0]
+                        if (first) handleSelect(first.id)
+                      }}
+                    >
+                      Assign manually
                     </Button>
                   </div>
                 )}

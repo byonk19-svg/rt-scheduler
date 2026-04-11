@@ -144,15 +144,15 @@ export function CalendarGrid({
                           'relative min-h-[156px] rounded-[20px] border bg-card px-2.75 py-2.25 text-left shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-[border-color,box-shadow,transform] duration-200',
                           'hover:-translate-y-px hover:border-primary/35 hover:shadow-[0_18px_36px_-28px_rgba(15,23,42,0.42)]',
                           cardTone === 'constraint' &&
-                            'border-[var(--warning-border)] bg-[var(--warning-subtle)]/35 shadow-[0_1px_0_rgba(15,23,42,0.02),0_0_0_1px_var(--warning-border)]',
+                            'border-[var(--warning-border)] bg-[var(--warning-subtle)]/55 shadow-[0_1px_0_rgba(15,23,42,0.02),0_0_0_1px_var(--warning-border)]',
                           cardTone === 'missing_lead' &&
-                            'border-[var(--warning-border)]/85 bg-[var(--warning-subtle)]/28 shadow-[0_0_0_1px_rgba(217,119,6,0.12)]',
+                            'border-[var(--warning-border)]/85 bg-[var(--warning-subtle)]/42 shadow-[0_0_0_1px_rgba(217,119,6,0.12)]',
                           cardTone === 'under' &&
-                            'border-[var(--error-border)]/80 bg-[var(--error-subtle)]/25 shadow-[0_0_0_1px_rgba(220,38,38,0.08)]',
+                            'border-[var(--error-border)]/80 bg-[var(--error-subtle)]/45 shadow-[0_0_0_1px_rgba(220,38,38,0.08)]',
                           cardTone === 'partial' &&
-                            'border-[var(--warning-border)]/55 bg-[var(--warning-subtle)]/16',
+                            'border-[var(--warning-border)]/55 bg-[var(--warning-subtle)]/30',
                           cardTone === 'full' &&
-                            'border-[var(--success-border)]/45 bg-[var(--success-subtle)]/14',
+                            'border-[var(--success-border)]/45 bg-[var(--success-subtle)]/35',
                           selectedId === day.id &&
                             'border-primary/60 shadow-[0_0_0_1px_rgba(6,103,169,0.3),0_18px_36px_-30px_rgba(6,103,169,0.4)]'
                         )}

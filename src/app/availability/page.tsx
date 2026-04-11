@@ -146,7 +146,7 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
 
   if (error === 'submit_failed') {
     return {
-      message: 'Could not save your availability request. Please try again.',
+      message: "Couldn't save your availability. Try again.",
       variant: 'error',
     }
   }
@@ -198,28 +198,29 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
 
   if (error === 'delete_failed') {
     return {
-      message: 'Could not delete availability request.',
+      message: "Couldn't delete that request. Try again.",
       variant: 'error',
     }
   }
 
   if (error === 'planner_save_failed') {
     return {
-      message: 'Could not save staff scheduling inputs. Please try again.',
+      message: "Couldn't save staffing dates. Try again.",
       variant: 'error',
     }
   }
 
   if (error === 'planner_delete_failed') {
     return {
-      message: 'Could not remove that saved staffing date. Please try again.',
+      message: "Couldn't remove that date. Try again.",
       variant: 'error',
     }
   }
 
   if (error === 'copy_no_source') {
     return {
-      message: 'No previous block found with saved dates for this therapist.',
+      message:
+        'Nothing to copy — this therapist has no saved dates in the previous schedule block.',
       variant: 'error',
     }
   }
@@ -233,7 +234,7 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
 
   if (error === 'copy_failed') {
     return {
-      message: 'Could not copy dates. Please try again.',
+      message: "Couldn't copy dates. Try again.",
       variant: 'error',
     }
   }
@@ -261,7 +262,7 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
 
   if (error === 'email_intake_apply_failed') {
     return {
-      message: 'Could not apply the inbound email. Review the parsed match first.',
+      message: "Couldn't apply this request. Review the matched dates first.",
       variant: 'error',
     }
   }
@@ -269,14 +270,14 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
   if (error === 'email_intake_create_failed') {
     return {
       message:
-        'Could not create the intake. Choose a therapist and cycle, then add text or a file.',
+        'To create an intake, choose a therapist and schedule block, then paste text or upload a file.',
       variant: 'error',
     }
   }
 
   if (error === 'email_intake_match_failed') {
     return {
-      message: 'Could not save the therapist match. Please try again.',
+      message: "Couldn't save that match. Try again.",
       variant: 'error',
     }
   }
@@ -610,7 +611,7 @@ export default async function AvailabilityPage({
                 }
               >
                 <Plus className="h-3.5 w-3.5" />
-                {canManageAvailability ? 'Plan staffing' : 'Add availability'}
+                {canManageAvailability ? 'Open planner' : 'Add availability'}
               </a>
             </Button>
             <Button

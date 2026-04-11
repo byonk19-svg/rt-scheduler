@@ -205,7 +205,15 @@ function TeamMemberCard({ profile, onClick }: { profile: TeamProfileRecord; onCl
           )}
         </div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-muted-foreground">
-          <span>{shiftLabel(profile.shift_type)}</span>
+          <span className="flex items-center gap-1.5">
+            <span
+              className={cn(
+                'h-1.5 w-1.5 shrink-0 rounded-full',
+                profile.shift_type === 'night' ? 'bg-[var(--warning)]' : 'bg-[var(--info)]'
+              )}
+            />
+            {shiftLabel(profile.shift_type)}
+          </span>
           <span className="h-1 w-1 rounded-full bg-border" />
           <span>{employmentLabel(profile.employment_type)}</span>
           {profile.on_fmla && profile.fmla_return_date && (
@@ -256,11 +264,13 @@ function TeamSection({
 
 function ShiftGroup({
   title,
+  shiftType,
   leads,
   therapists,
   onOpen,
 }: {
   title: string
+  shiftType: 'day' | 'night'
   leads: TeamProfileRecord[]
   therapists: TeamProfileRecord[]
   onOpen: (profileId: string) => void
@@ -268,9 +278,27 @@ function ShiftGroup({
   if (leads.length === 0 && therapists.length === 0) return null
 
   return (
-    <section className="mb-8 rounded-2xl border border-border/60 bg-muted/10 p-4 last:mb-0 sm:p-5">
+    <section
+      className={cn(
+        'mb-8 rounded-2xl border p-4 last:mb-0 sm:p-5',
+        shiftType === 'night'
+          ? 'border-[var(--warning-border)]/40 bg-[var(--warning-subtle)]/20'
+          : 'border-[var(--info-border)]/40 bg-[var(--info-subtle)]/20'
+      )}
+    >
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <h2
+          className={cn(
+            'flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em]',
+            shiftType === 'night' ? 'text-[var(--warning-text)]' : 'text-[var(--info-text)]'
+          )}
+        >
+          <span
+            className={cn(
+              'h-2 w-2 rounded-full',
+              shiftType === 'night' ? 'bg-[var(--warning)]' : 'bg-[var(--info)]'
+            )}
+          />
           {title}
         </h2>
         <span className="rounded-full border border-border/70 bg-card px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
@@ -398,12 +426,14 @@ export function TeamDirectory({
       </div>
       <ShiftGroup
         title="Day Shift"
+        shiftType="day"
         leads={sections.dayLeads}
         therapists={sections.dayTherapists}
         onOpen={openEditor}
       />
       <ShiftGroup
         title="Night Shift"
+        shiftType="night"
         leads={sections.nightLeads}
         therapists={sections.nightTherapists}
         onOpen={openEditor}

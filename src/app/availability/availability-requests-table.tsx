@@ -281,9 +281,9 @@ export function AvailabilityEntriesTable({
 
         {syncSearchFromPlannerFocus && plannerFocus?.focusedTherapistName ? (
           <p className="text-xs text-muted-foreground">
-            Review table search follows the therapist selected in{' '}
-            <span className="font-medium text-foreground">Plan staffing</span> (
-            {plannerFocus.focusedTherapistName}). Edit the search box to filter further.
+            Showing requests for{' '}
+            <span className="font-medium text-foreground">{plannerFocus.focusedTherapistName}</span>{' '}
+            — the therapist open in the planner. Edit the search box to filter further.
           </p>
         ) : null}
 

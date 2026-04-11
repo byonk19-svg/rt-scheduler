@@ -401,7 +401,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                   type="submit"
                                   className="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80"
                                 >
-                                  Unpublish (keep shifts)
+                                  Take offline
                                 </button>
                               </form>
                               <form action={restartPublishedCycleAction}>
@@ -411,7 +411,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                   title="Draft again and clear all assignments for this block"
                                   className="inline-flex h-8 items-center rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 text-xs font-semibold text-[var(--warning-text)] transition-opacity hover:opacity-80"
                                 >
-                                  Start over
+                                  Clear & restart
                                 </button>
                               </form>
                             </>
@@ -553,7 +553,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                   type="submit"
                                   className="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80"
                                 >
-                                  Unpublish (keep shifts)
+                                  Take offline
                                 </button>
                               </form>
                               <form action={restartPublishedCycleAction}>
@@ -563,7 +563,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                   title="Draft again and clear all assignments for this block"
                                   className="inline-flex h-8 items-center rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 text-xs font-semibold text-[var(--warning-text)] transition-opacity hover:opacity-80"
                                 >
-                                  Start over
+                                  Clear & restart
                                 </button>
                               </form>
                             </>

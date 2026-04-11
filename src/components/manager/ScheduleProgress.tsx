@@ -66,12 +66,12 @@ export function ScheduleProgress({
             Schedule Completion
           </h3>
         </div>
-        <div className="rounded-full border border-[var(--info-border)] bg-[var(--info-subtle)] px-3 py-1 text-right">
-          <p className="font-heading text-sm font-semibold leading-none text-[var(--info-text)]">
+        <div className="rounded-full border border-border/70 bg-card px-3 py-1 text-right shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
+          <p className="font-heading text-sm font-semibold leading-none text-foreground">
             {overall.pct}%
           </p>
-          <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--info-text)]/80">
-            Active cycle
+          <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            Overall
           </p>
         </div>
       </div>

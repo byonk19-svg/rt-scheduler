@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { CalendarDays, Eye, EyeOff, Loader2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -112,122 +112,162 @@ export default function SignUpPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md items-center px-6 py-10">
-      <section className="w-full rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
-        <h1 className="app-page-title text-3xl">Create your account</h1>
-        <p className="mt-1 text-sm text-foreground/80">
-          Create your account to access schedules, availability, and open shifts.
-        </p>
-        <p className="mt-1 text-xs text-foreground/70">
-          After signup, your account will be reviewed before access is enabled.
-        </p>
-
-        {error && (
-          <p
-            aria-live="polite"
-            className="mt-4 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]"
-          >
-            {error}
+    <main className="flex min-h-screen">
+      {/* Left brand panel — desktop only */}
+      <aside className="relative hidden overflow-hidden bg-[var(--sidebar)] lg:flex lg:w-[440px] lg:shrink-0 lg:flex-col lg:justify-between lg:p-12">
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px)',
+            backgroundSize: '28px 28px',
+          }}
+        />
+        <div className="relative flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--attention)]">
+            <CalendarDays className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <p className="font-heading text-base font-bold text-white">Teamwise</p>
+            <p className="text-[0.7rem] text-[var(--sidebar-foreground)]">Respiratory Therapy</p>
+          </div>
+        </div>
+        <div className="relative">
+          <p className="font-heading text-3xl font-bold leading-tight tracking-tight text-white">
+            Scheduling that keeps care moving.
           </p>
-        )}
+          <p className="mt-4 text-sm leading-relaxed text-[var(--sidebar-foreground)]">
+            Coverage planning, availability, and shift management — built for RT departments.
+          </p>
+        </div>
+      </aside>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+      {/* Right form panel */}
+      <div className="flex flex-1 flex-col items-center justify-center bg-background px-6 py-10">
+        <div className="mb-6 flex items-center gap-2.5 lg:hidden">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--attention)]">
+            <CalendarDays className="h-4 w-4 text-white" />
+          </div>
+          <p className="font-heading text-sm font-bold text-foreground">Teamwise</p>
+        </div>
+
+        <section className="w-full max-w-[420px]">
+          <h1 className="app-page-title text-3xl">Create your account</h1>
+          <p className="mt-1.5 text-sm text-foreground/70">
+            Access schedules, availability, and open shifts.
+          </p>
+          <p className="mt-1 text-xs text-foreground/50">
+            After signup, your account will be reviewed before access is enabled.
+          </p>
+
+          {error && (
+            <p
+              aria-live="polite"
+              className="mt-4 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]"
+            >
+              {error}
+            </p>
+          )}
+
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="firstName">First name</Label>
+                <Input
+                  id="firstName"
+                  name="firstName"
+                  autoComplete="given-name"
+                  value={firstName}
+                  onChange={(event) => setFirstName(event.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="lastName">Last name</Label>
+                <Input
+                  id="lastName"
+                  name="lastName"
+                  autoComplete="family-name"
+                  value={lastName}
+                  onChange={(event) => setLastName(event.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
             <div className="space-y-1.5">
-              <Label htmlFor="firstName">First name</Label>
+              <Label htmlFor="phone">Phone number</Label>
               <Input
-                id="firstName"
-                name="firstName"
-                autoComplete="given-name"
-                value={firstName}
-                onChange={(event) => setFirstName(event.target.value)}
+                id="phone"
+                name="phone"
+                type="tel"
+                autoComplete="tel"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
                 required
               />
             </div>
+
             <div className="space-y-1.5">
-              <Label htmlFor="lastName">Last name</Label>
+              <Label htmlFor="email">Email address</Label>
               <Input
-                id="lastName"
-                name="lastName"
-                autoComplete="family-name"
-                value={lastName}
-                onChange={(event) => setLastName(event.target.value)}
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                spellCheck={false}
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
                 required
               />
             </div>
-          </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="phone">Phone number</Label>
-            <Input
-              id="phone"
-              name="phone"
-              type="tel"
-              autoComplete="tel"
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-              required
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email address</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              spellCheck={false}
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="password">Password</Label>
-            <div className="relative">
-              <Input
-                id="password"
-                name="password"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="new-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                minLength={8}
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((value) => !value)}
-                className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-muted-foreground hover:text-foreground"
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-              >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  minLength={8}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((value) => !value)}
+                  className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">At least 8 characters</p>
             </div>
-            <p className="text-xs text-muted-foreground">At least 8 characters</p>
-          </div>
 
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Creating account
-              </>
-            ) : (
-              'Create account'
-            )}
-          </Button>
-        </form>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creating account
+                </>
+              ) : (
+                'Create account'
+              )}
+            </Button>
+          </form>
 
-        <p className="mt-5 text-center text-sm text-muted-foreground">
-          Already have an account?{' '}
-          <Link href="/login" className="font-semibold text-primary hover:underline">
-            Sign in
-          </Link>
-        </p>
-      </section>
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            Already have an account?{' '}
+            <Link href="/login" className="font-semibold text-primary hover:underline">
+              Sign in
+            </Link>
+          </p>
+        </section>
+      </div>
     </main>
   )
 }
