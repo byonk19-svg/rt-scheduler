@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-12 (session 54)
+Updated: 2026-04-12 (session 55)
 
 ## Handoff Snapshot
 
@@ -24,6 +24,7 @@ Updated: 2026-04-12 (session 54)
 ### Local In-Progress Work
 
 - `main` includes the merged email-intake apply gating fix from PR `#27` and the **therapist-first luminous homepage** (replaces the older `codex/therapist-homepage-redesign` intent; that branch may be deleted when convenient).
+- `claude/review-ui-flow-7Weav` has the **top nav redesign** (session 55) — sidebar replaced with a fixed horizontal top nav. Needs review and merge to `main` before deploying.
 
 ### Where We Want To Go
 
@@ -41,6 +42,21 @@ Updated: 2026-04-12 (session 54)
 - `vercel deploy --prod --yes` for production shipping
 
 The session entries below are historical context. They may describe local-only or superseded work and should not override the snapshot above.
+
+## Latest Updates (2026-04-12, session 55)
+
+- **Top nav redesign — sidebar replaced with fixed horizontal nav** (`src/components/AppShell.tsx`, `src/components/AppShell.test.ts`):
+  - Sidebar removed entirely. All roles now get a **fixed top nav bar** (`h-14`, `bg-sidebar` dark teal) with logo left, nav center, notification bell + user avatar dropdown right.
+  - **Manager nav** consolidates 8 flat items into 3 primary sections: **Today** (→ `/dashboard/manager`), **Schedule** (→ `/coverage`), **People** (→ `/team`). A **secondary sub-nav bar** (`h-11`) appears below the primary bar when inside Schedule or People, showing sub-items with an amber underline active indicator.
+    - Schedule sub-items: Coverage · Availability · Publish · Approvals
+    - People sub-items: Team · Requests (merged from old "Requests" + "User Access Requests")
+  - **Staff nav** is a flat horizontal bar: Dashboard · Schedule · Availability · Open shifts. Notifications removed as a nav item (bell icon in top bar is sufficient). "Schedule Preview" (preliminary) removed as a permanent nav item.
+  - **User dropdown**: avatar initials button → dropdown with Settings, Therapist view (manager only), Log out.
+  - **Mobile**: hamburger in top nav opens the same slide-over drawer; manager sections shown as labeled groups.
+  - Main content gets `pt-14` (primary nav only) or `pt-[100px]` (primary + secondary nav) via a wrapper div. Coverage page remains full-bleed horizontally.
+  - Exported constants (`APP_SHELL_SIDEBAR_CLASS`, `APP_SHELL_ACTIVE_NAV_CLASS`, `APP_SHELL_PROFILE_CARD_CLASS`) preserved for backwards compatibility. Tests updated: 12 passing.
+  - **Verification:** `npx vitest run src/components/AppShell.test.ts`, `npx eslint src/components/AppShell.tsx`
+  - Branch: `claude/review-ui-flow-7Weav`
 
 ## Latest Updates (2026-04-12, session 54)
 
@@ -447,7 +463,10 @@ Assignment status is informational only (does not affect coverage counts or publ
 - User avatar: `var(--attention)` amber
 - Manager badge: `bg-[var(--warning-subtle)] text-[var(--warning-text)] border-[var(--warning-border)]`
 - App shell header `z-30`; coverage slide-over `z-50`
-- Manager nav order: Inbox -> Schedule -> Availability -> Requests -> User Access Requests -> Team -> Approvals -> Publish History
+- Manager nav (top bar): Today → Schedule → People (user avatar dropdown → Settings / Therapist view / Log out)
+  - Schedule sub-nav: Coverage → Availability → Publish → Approvals
+  - People sub-nav: Team → Requests (merged; includes access requests with badge)
+- **Old sidebar is gone** — do not restore it. Nav is now a fixed horizontal top bar.
 
 ## Assignment Status
 
