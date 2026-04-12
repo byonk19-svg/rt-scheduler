@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-11 (session 50)
+Updated: 2026-04-12 (session 51)
 
 ## Handoff Snapshot
 
@@ -39,6 +39,17 @@ No intentional local-only product changes are pending. The current tracked chang
 - `vercel deploy --prod --yes` for production shipping
 
 The session entries below are historical context. They may describe local-only or superseded work and should not override the snapshot above.
+
+## Latest Updates (2026-04-12, session 51)
+
+- **Repo health: code deduplication** (`src/lib/security/worker-auth.ts`, `src/app/api/cron/process-publish/route.ts`, `src/app/api/schedule/assignment-status/route.ts`, `src/lib/publish-events.ts`, `src/app/api/availability/export/route.ts`):
+  - Exported `toHex` and `hmacSha256Hex` from `src/lib/security/worker-auth.ts`; removed the copy-pasted duplicates that lived in the cron route.
+  - Removed three independent `getOne<T>()` definitions from `assignment-status/route.ts`, `publish-events.ts`, and `export/route.ts`; all three now import the shared version from `src/lib/schedule-helpers`.
+- **New API route tests — 26 tests across 3 previously untested security-boundary routes**:
+  - `src/app/api/cron/process-publish/route.test.ts` (10 tests): missing/wrong cron secret → 401/500, missing worker env → 500, correct bearer → signs and forwards worker headers, downstream failure → 502, network error → 500, trailing-slash URL normalization.
+  - `src/app/api/inbound/availability-email/route.test.ts` (7 tests): invalid Resend webhook signature → 400, malformed JSON body → 400, non-`email.received` event type → ignored, missing email ID → 400, admin client init failure → 500, happy-path intake creation, DB upsert failure → 500.
+  - `src/app/api/publish/process/route.test.ts` (9 tests): valid worker auth bypasses user auth, batch_size/publish_event_id forwarding, batch_size clamped to 100, admin client failure → 500, cross-origin browser request → 403, unauthenticated → 401, non-manager role → 403, manager success path, processor throws → 500.
+- **Verification:** `npx vitest run` on all 5 affected test files — 33 tests passing. Format and lint clean.
 
 ## Latest Updates (2026-04-11, session 50)
 
@@ -331,6 +342,7 @@ Typography classes:
 - **Preview MCP on Windows:** `preview_start` server tracking doesn't persist between tool calls. Chrome MCP also returns "Permission denied" on localhost. For local visual verification, use saved screenshots in `artifacts/screen-capture/latest/`. To confirm server health use `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000`.
 - **Zombie dev server on Windows:** Stale `next dev` processes can hold port 3000 silently (visible as ~994MB node.exe in tasklist). Find the PID with `netstat -ano | grep ":3000" | grep LISTENING` then kill with `taskkill //PID <pid> //F`. Follow with `rm -rf .next` before rebuilding.
 - **"Supabase lookup failed" in build output is not an error:** During `npm run build`, Next.js tries to statically pre-render all routes; auth routes that call `cookies()` bail out and log this message. All routes correctly render as `ƒ` (dynamic). Safe to ignore.
+- **Pre-push hook builds the app (`npm run build`) and will fail in network-restricted environments** because `next/font` fetches Google Fonts at build time. If the network is unavailable but format/lint/tests are green, push with `SKIP_LOCAL_CI=1 git push ...`. The escape hatch is defined in `.husky/pre-push`. Do not use `--no-verify`.
 - **Responsive stat grids:** Always `grid-cols-2 lg:grid-cols-4` — never bare `grid-cols-4` which clips on narrower viewports.
 - **Repo-local Next build lock on Windows:** if `npm run build` throws `EPERM` under `.next`, check for a running `next dev` process from this repo and stop it before rebuilding.
 - **Session end workflow:** update CLAUDE.md with learnings → `git add CLAUDE.md && git commit && git push`
