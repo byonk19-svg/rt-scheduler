@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-11 (session 50)
+Updated: 2026-04-12 (session 52)
 
 ## Handoff Snapshot
 
@@ -16,12 +16,15 @@ Updated: 2026-04-11 (session 50)
   - uploaded form image/PDF on `/availability`
 - Uploaded images can OCR through the OpenAI Responses API when `OPENAI_API_KEY` is configured. PDFs are stored for review but are not OCR'd automatically yet.
 - Managers can now fix therapist matches inline on the intake card and then apply parsed dates from the same surface.
+- Managers must now match both the therapist and the schedule block before `Apply dates` appears on an intake card. This prevents the old dead-end `email_intake_apply_failed` redirect when a therapist was matched but no cycle was attached yet.
 - Mixed off/work sentences are parsed more accurately than before, but parser changes should continue to be driven by real inbound examples.
 - `RESEND_API_KEY` must support receiving APIs, not just sending. A send-only key fails on `/emails/receiving` with `401 restricted_api_key`.
 
 ### Local In-Progress Work
 
-No intentional local-only product changes are pending. The current tracked changes in this session are intended to be committed truth.
+- `main` includes the merged email-intake apply gating fix from PR `#27`.
+- The therapist-first homepage redesign is implemented and pushed on `codex/therapist-homepage-redesign`, but it is not merged into `main` yet.
+- The main workspace currently has unrelated uncommitted tracked changes. Do not stage or revert them casually while doing handoff/doc-only updates.
 
 ### Where We Want To Go
 
@@ -39,6 +42,19 @@ No intentional local-only product changes are pending. The current tracked chang
 - `vercel deploy --prod --yes` for production shipping
 
 The session entries below are historical context. They may describe local-only or superseded work and should not override the snapshot above.
+
+## Latest Updates (2026-04-12, session 52)
+
+- **Email intake apply gating fix merged to `main`** (`src/app/availability/actions.ts`, `src/app/availability/page.tsx`, `src/components/availability/EmailIntakePanel.tsx`, tests):
+  - Intake cards now require both a therapist match and a schedule block match before `Apply dates` is shown.
+  - Saving intake matches now persists `matched_cycle_id` along with `matched_therapist_id`.
+  - The previous dead-end state from `/availability?error=email_intake_apply_failed` was caused by the UI exposing `Apply dates` too early even though the server action correctly required both matches.
+  - Added regression coverage for both the action contract and the intake panel gating.
+- **Local verification after merge:**
+  - Confirmed the broken state is prevented: a parsed intake with therapist matched but no cycle matched shows `Save matches` and `Match schedule block`, not `Apply dates`.
+  - Confirmed the happy path works: a fully matched intake redirects to `/availability?success=email_intake_applied`, marks the intake row as `applied`, and writes the expected `availability_overrides` row.
+- **Open but unmerged branch:** `codex/therapist-homepage-redesign`
+  - Homepage redesign is pushed and verified on its feature branch/worktree, but `main` still has the pre-redesign public homepage.
 
 ## Latest Updates (2026-04-11, session 50)
 
