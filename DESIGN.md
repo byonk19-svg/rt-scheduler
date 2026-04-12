@@ -119,6 +119,7 @@ All elevation uses **named classes** in `src/app/globals.css` (search for `Eleva
 - **Data density:** Inbox metric card values use `tabular-nums` (`ManagerTriageDashboard`); extend the same class anywhere counts and dates should align in columns.
 - **2026-04-11 (pass 2):** `tabular-nums` on `StatsCard` and shift-board `KpiTile` values; `Geist_Mono` loaded in `layout.tsx` with `--font-geist-mono` (see `@theme` `--font-mono`); decorative backgrounds in `globals.css` (`.teamwise-grid-bg*`, `.teamwise-aurora-bg`, table row hover, new `.teamwise-hero-grid-bg`) use `color-mix` with `var(--primary)` / `var(--muted)` instead of hardcoded RGB; homepage hero grid uses `.teamwise-hero-grid-bg`; `StatsCard` shadow uses `color-mix` with `var(--foreground)`.
 - **2026-04-11 (pass 3 — elevation):** Legacy arbitrary slate shadows removed; canonical list and usage guidance is **Shadow map** above (source: `globals.css` → `Elevation shadows`).
+- **2026-04-12 (homepage — luminous shell):** Public `/` adds `--home-glow-warm`, `--home-glow-cool`, `--home-panel`, `--home-panel-border`, and `--home-shadow` plus utilities `.teamwise-home-luminous`, `.teamwise-home-grid`, `.teamwise-home-preview-shell`, and `.teamwise-home-preview-sheen` in `globals.css`. The glass preview frame’s depth is defined **in CSS** on `.teamwise-home-preview-shell` (not as arbitrary Tailwind `shadow-[…]` in JSX). On-page CTAs use existing map entries **`shadow-tw-primary-glow`** and **`shadow-tw-md-soft`** (`src/app/page.tsx`).
 
 ## Decisions Log
 

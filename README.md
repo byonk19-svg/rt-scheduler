@@ -11,7 +11,7 @@ Web app for respiratory therapy scheduling with role-based workflows:
 
 ## Auth + Access Model
 
-- Public homepage (`/`) is homepage-first with clear `Sign in` and `Create account` entry points.
+- Public homepage (`/`) is therapist-first marketing: luminous background, trust-forward copy, product preview frame, and clear CTAs — **Get started** + **Sign in** in the header, **Sign in** + **Create account** in the hero (Vitest contracts in `src/app/page.test.ts`).
 - Therapists request access via `/signup` (first/last name, optional phone, email, password).
 - Managers are **not** created via public signup; they are provisioned admin-side.
 - After a successful request, users are redirected to `/login?status=requested` (no automatic session). Self-signup accounts still start with pending access (`profiles.role = null`); once approved, they sign in and the app routes them through `/pending-setup` until activation is complete.

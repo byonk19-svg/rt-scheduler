@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-12 (session 53)
+Updated: 2026-04-12 (session 54)
 
 ## Handoff Snapshot
 
@@ -17,20 +17,19 @@ Updated: 2026-04-12 (session 53)
 - Uploaded images can OCR through the OpenAI Responses API when `OPENAI_API_KEY` is configured. PDFs are stored for review but are not OCR'd automatically yet.
 - Managers can now fix therapist matches inline on the intake card and then apply parsed dates from the same surface.
 - Managers must now match both the therapist and the schedule block before `Apply dates` appears on an intake card. This prevents the old dead-end `email_intake_apply_failed` redirect when a therapist was matched but no cycle was attached yet.
-- **Auth entry (`/login`, `/signup`):** `src/lib/auth/login-utils.ts` parses auth errors from top-level query params **or nested inside `redirectTo`** (e.g. `/availability?error=...`), maps friendly copy, and `router.replace` cleans error keys while preserving a sanitized `redirectTo`. Approval/allowlist copy shows as a **warning** banner with optional **Request access** link and dismiss; credential failures stay **destructive**. Successful access **request** redirects to **`/login?status=requested`** with an **info** banner (dismiss + URL strip); signup no longer auto-signs-in before that redirect. Homepage header CTA reads **Create account**; shared **Input** focus ring uses **`--ring`**; **`:autofill`** + **`-webkit-autofill`** theming lives in `globals.css`.
+- **Auth entry (`/login`, `/signup`):** `src/lib/auth/login-utils.ts` parses auth errors from top-level query params **or nested inside `redirectTo`** (e.g. `/availability?error=...`), maps friendly copy, and `router.replace` cleans error keys while preserving a sanitized `redirectTo`. Approval/allowlist copy shows as a **warning** banner with optional **Request access** link and dismiss; credential failures stay **destructive**. Successful access **request** redirects to **`/login?status=requested`** with an **info** banner (dismiss + URL strip); signup no longer auto-signs-in before that redirect. **Public homepage (`/`):** therapist-first copy, luminous background utilities (`--home-*`, `.teamwise-home-*`), header **Get started** (`/signup`) + **Sign in**, hero **Sign in** + **Create account** (`/signup`); Vitest contracts in `src/app/page.test.ts` and `src/app/globals.test.ts`. Shared **Input** focus ring uses **`--ring`**; **`:autofill`** + **`-webkit-autofill`** theming lives in `globals.css`.
 - Mixed off/work sentences are parsed more accurately than before, but parser changes should continue to be driven by real inbound examples.
 - `RESEND_API_KEY` must support receiving APIs, not just sending. A send-only key fails on `/emails/receiving` with `401 restricted_api_key`.
 
 ### Local In-Progress Work
 
-- `main` includes the merged email-intake apply gating fix from PR `#27`.
-- The therapist-first homepage redesign is implemented and pushed on `codex/therapist-homepage-redesign`, but it is not merged into `main` yet.
+- `main` includes the merged email-intake apply gating fix from PR `#27` and the **therapist-first luminous homepage** (replaces the older `codex/therapist-homepage-redesign` intent; that branch may be deleted when convenient).
 
 ### Where We Want To Go
 
 1. Move `Email Intake` higher on `/availability` and make the review/apply workflow more obvious.
 2. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
-3. Review and intentionally commit the current local design-pass files instead of leaving them as ambiguous working-tree state.
+3. Deploy production after significant public-surface changes (`vercel deploy --prod`) so `www.teamwise.work` matches `main`.
 4. Keep manual intake first-class even if Resend inbound is healthy. It is the practical fallback path for operations.
 
 ### Verification Baseline
@@ -42,6 +41,12 @@ Updated: 2026-04-12 (session 53)
 - `vercel deploy --prod --yes` for production shipping
 
 The session entries below are historical context. They may describe local-only or superseded work and should not override the snapshot above.
+
+## Latest Updates (2026-04-12, session 54)
+
+- **Therapist-first luminous homepage on `main`** (`src/app/page.tsx`, `src/app/globals.css`, `src/app/page.test.ts`, `src/app/globals.test.ts`, `DESIGN.md`, `TODOS.md`, `README.md`):
+  - Public `/` uses trust-forward RT copy, layered luminous background, glass preview shell, trust bullets, and dual CTAs (header vs hero) per `docs/superpowers/plans/2026-04-11-therapist-homepage-redesign.md`.
+  - **Verification:** `npx vitest run src/app/globals.test.ts src/app/page.test.ts`, `npm run lint`, `npx tsc --noEmit`, `npm run build`, pre-push `ci:local:quick`.
 
 ## Latest Updates (2026-04-12, session 53)
 
@@ -61,8 +66,6 @@ The session entries below are historical context. They may describe local-only o
 - **Local verification after merge:**
   - Confirmed the broken state is prevented: a parsed intake with therapist matched but no cycle matched shows `Save matches` and `Match schedule block`, not `Apply dates`.
   - Confirmed the happy path works: a fully matched intake redirects to `/availability?success=email_intake_applied`, marks the intake row as `applied`, and writes the expected `availability_overrides` row.
-- **Open but unmerged branch:** `codex/therapist-homepage-redesign`
-  - Homepage redesign is pushed and verified on its feature branch/worktree, but `main` still has the pre-redesign public homepage.
 
 ## Latest Updates (2026-04-11, session 50)
 
@@ -270,7 +273,7 @@ E2E specs:
 
 ## Primary Routes
 
-- `/` public marketing
+- `/` public marketing (therapist-first luminous homepage; `globals.test` + `page.test` contracts)
 - `/login`, `/signup`
 - `/auth/signout`
 - `/pending-setup` post-signup onboarding gate
