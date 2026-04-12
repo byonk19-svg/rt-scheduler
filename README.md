@@ -119,6 +119,37 @@ Optional env overrides:
 - `SEED_USERS_PASSWORD`
 - `SEED_INCLUDE_MANAGER` (`true` creates `manager@<domain>`)
 
+## Cleanup Seeded Demo Users
+
+Removes seeded/demo auth users and their cascaded profile/schedule data.
+
+Default behavior is a dry run:
+
+```bash
+npm run cleanup:seed-users
+```
+
+Execute the deletion:
+
+```bash
+npm run cleanup:seed-users -- --execute
+```
+
+Default match rules are intentionally narrow:
+
+- domain: `teamwise.test`
+- prefixes: `demo-manager`, `demo-lead-`, `demo-therapist`, `employee`
+- exact email: `manager@teamwise.test`
+
+Optional overrides:
+
+- `--domain=<domain1,domain2>`
+- `--prefix=<prefix1,prefix2>`
+- `--email=<email1,email2>`
+- env: `CLEANUP_ALLOWED_DOMAINS`, `CLEANUP_EMAIL_PREFIXES`, `CLEANUP_EXACT_EMAILS`
+
+Use archive/inactive status in the Team UI for real staff whose history should remain visible. Use this cleanup command only for seeded/demo auth accounts that should be fully removed.
+
 ## E2E Tests
 
 Playwright smoke tests are in `e2e/`.
@@ -274,5 +305,6 @@ npm run lint
 npm run build
 npm run ci:local
 npm run seed:users
+npm run cleanup:seed-users
 npm run test:e2e
 ```
