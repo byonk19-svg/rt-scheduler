@@ -93,6 +93,7 @@ type AvailabilityEmailIntakeRow = {
   parse_status: 'parsed' | 'needs_review' | 'failed' | 'applied'
   parse_summary: string | null
   matched_therapist_id: string | null
+  matched_cycle_id: string | null
   parsed_requests: Array<{
     date: string
     override_type: 'force_off' | 'force_on'
@@ -411,7 +412,7 @@ export default async function AvailabilityPage({
     ? await supabase
         .from('availability_email_intakes')
         .select(
-          'id, from_email, from_name, subject, received_at, parse_status, parse_summary, matched_therapist_id, parsed_requests, profiles!availability_email_intakes_matched_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
+          'id, from_email, from_name, subject, received_at, parse_status, parse_summary, matched_therapist_id, matched_cycle_id, parsed_requests, profiles!availability_email_intakes_matched_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
         )
         .order('received_at', { ascending: false })
         .limit(12)
@@ -445,6 +446,7 @@ export default async function AvailabilityPage({
       parseSummary: row.parse_summary,
       matchedTherapistId: row.matched_therapist_id,
       matchedTherapistName: matchedTherapist?.full_name ?? null,
+      matchedCycleId: row.matched_cycle_id,
       matchedCycleLabel: matchedCycle
         ? `${matchedCycle.label} (${matchedCycle.start_date} to ${matchedCycle.end_date})`
         : null,

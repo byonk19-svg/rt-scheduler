@@ -578,7 +578,7 @@ describe('availability actions', () => {
     )
   })
 
-  it('updates the therapist match on an intake and marks it parsed when actionable', async () => {
+  it('updates the therapist and cycle match on an intake and marks it parsed when actionable', async () => {
     const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
     supabase.state.emailIntakeRow = {
       matched_cycle_id: 'cycle-1',
@@ -595,6 +595,7 @@ describe('availability actions', () => {
     const formData = new FormData()
     formData.set('intake_id', 'intake-1')
     formData.set('therapist_id', 'therapist-1')
+    formData.set('cycle_id', 'cycle-1')
 
     await expect(updateEmailIntakeTherapistAction(formData)).rejects.toThrow(
       'REDIRECT:/availability?success=email_intake_match_saved'
@@ -605,11 +606,26 @@ describe('availability actions', () => {
         table: 'availability_email_intakes',
         payload: {
           matched_therapist_id: 'therapist-1',
+          matched_cycle_id: 'cycle-1',
           parse_status: 'parsed',
         },
         filters: { id: 'intake-1' },
       },
     ])
+  })
+
+  it('requires a cycle match before saving an intake match', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    createClientMock.mockResolvedValue(supabase)
+    const formData = new FormData()
+    formData.set('intake_id', 'intake-1')
+    formData.set('therapist_id', 'therapist-1')
+
+    await expect(updateEmailIntakeTherapistAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?error=email_intake_match_failed'
+    )
+
+    expect(supabase.state.updates).toEqual([])
   })
 })
 

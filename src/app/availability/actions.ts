@@ -615,8 +615,9 @@ export async function updateEmailIntakeTherapistAction(formData: FormData) {
 
   const intakeId = String(formData.get('intake_id') ?? '').trim()
   const therapistId = String(formData.get('therapist_id') ?? '').trim()
+  const cycleId = String(formData.get('cycle_id') ?? '').trim()
 
-  if (!intakeId || !therapistId) {
+  if (!intakeId || !therapistId || !cycleId) {
     redirect(buildAvailabilityUrl({ error: 'email_intake_match_failed' }))
   }
 
@@ -633,12 +634,13 @@ export async function updateEmailIntakeTherapistAction(formData: FormData) {
 
   const parsedRequests = sanitizeParsedRequests(intake.parsed_requests)
   const nextStatus: 'parsed' | 'needs_review' | 'failed' =
-    !intake.matched_cycle_id || parsedRequests.length === 0 ? 'failed' : 'parsed'
+    !cycleId || parsedRequests.length === 0 ? 'failed' : 'parsed'
 
   const { error: updateError } = await supabase
     .from('availability_email_intakes')
     .update({
       matched_therapist_id: therapistId,
+      matched_cycle_id: cycleId,
       parse_status: nextStatus,
     })
     .eq('id', intakeId)
