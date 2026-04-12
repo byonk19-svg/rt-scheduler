@@ -12,9 +12,9 @@ Web app for respiratory therapy scheduling with role-based workflows:
 ## Auth + Access Model
 
 - Public homepage (`/`) is homepage-first with clear `Sign in` and `Create account` entry points.
-- Therapists self-create accounts via `/signup` (first/last name, phone number, email, password).
+- Therapists request access via `/signup` (first/last name, optional phone, email, password).
 - Managers are **not** created via public signup; they are provisioned admin-side.
-- Self-signup users start with pending access (`profiles.role = null`), are signed in immediately, and land on `/pending-setup`.
+- After a successful request, users are redirected to `/login?status=requested` (no automatic session). Self-signup accounts still start with pending access (`profiles.role = null`); once approved, they sign in and the app routes them through `/pending-setup` until activation is complete.
 - Pending users can authenticate but are gated away from app workflows until manager approval.
 - Manager approves pending users in `Requests -> User Access Requests` and assigns role at approval time (`therapist` or `lead`).
 - Declining an access request deletes the pending account.

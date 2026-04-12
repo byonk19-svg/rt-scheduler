@@ -55,6 +55,16 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const errLower = error?.toLowerCase() ?? ''
+  const emailFieldInvalid =
+    Boolean(error) &&
+    (errLower.includes('email') ||
+      errLower.includes('already') ||
+      errLower.includes('registered') ||
+      errLower.includes('exists'))
+  const passwordFieldInvalid = Boolean(error) && errLower.includes('password')
+  const allRequiredInvalid = Boolean(error) && !emailFieldInvalid && !passwordFieldInvalid
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     setLoading(true)
@@ -77,12 +87,12 @@ export default function SignUpPage() {
               full_name: fullName,
               first_name: firstName,
               last_name: lastName,
-              phone_number: phone,
+              ...(phone.trim() ? { phone_number: phone.trim() } : {}),
               shift_type: 'day',
             },
           },
         }),
-        'Create account'
+        'Submit request'
       )
 
       if (signUpError) {
@@ -91,17 +101,7 @@ export default function SignUpPage() {
         return
       }
 
-      const { error: signInError } = await withAuthTimeout(
-        supabase.auth.signInWithPassword({ email, password }),
-        'Sign in'
-      )
-      if (signInError) {
-        setError(toFriendlySignupError(signInError.message))
-        setLoading(false)
-        return
-      }
-
-      router.push('/pending-setup?success=access_requested')
+      router.push('/login?status=requested')
       router.refresh()
     } catch (requestError) {
       const message =
@@ -144,8 +144,8 @@ export default function SignUpPage() {
       </aside>
 
       {/* Right form panel */}
-      <div className="flex flex-1 flex-col items-center justify-center bg-background px-6 py-10">
-        <div className="mb-6 flex items-center gap-2.5 lg:hidden">
+      <div className="flex flex-1 flex-col items-center justify-center bg-background px-6 py-5 sm:py-6 lg:py-6">
+        <div className="mb-4 flex items-center gap-2.5 lg:hidden">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--attention)]">
             <CalendarDays className="h-4 w-4 text-white" />
           </div>
@@ -153,78 +153,113 @@ export default function SignUpPage() {
         </div>
 
         <section className="w-full max-w-[420px]">
-          <h1 className="app-page-title text-3xl">Create your account</h1>
-          <p className="mt-1.5 text-sm text-foreground/70">
+          <h1 className="app-page-title text-3xl">Request access</h1>
+          <p className="mt-0.5 text-sm text-foreground/70">
             Access schedules, availability, and open shifts.
           </p>
-          <p className="mt-1 text-xs text-foreground/50">
-            After signup, your account will be reviewed before access is enabled.
+          <p className="mt-1 text-xs font-medium leading-snug text-foreground/75">
+            Your manager reviews requests before access is enabled.
           </p>
+          <p className="mt-1 text-xs text-muted-foreground">Fields marked with * are required.</p>
 
           {error && (
             <p
+              id="signup-form-error"
+              role="alert"
               aria-live="polite"
-              className="mt-4 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]"
+              className="mt-2 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-sm text-[var(--error-text)]"
             >
               {error}
             </p>
           )}
 
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="firstName">First name</Label>
+          <form onSubmit={handleSubmit} className="mt-4 space-y-2.5">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label htmlFor="firstName">
+                  First name{' '}
+                  <span className="text-[var(--error-text)]" aria-hidden>
+                    *
+                  </span>
+                </Label>
                 <Input
                   id="firstName"
                   name="firstName"
+                  type="text"
                   autoComplete="given-name"
                   value={firstName}
                   onChange={(event) => setFirstName(event.target.value)}
                   required
+                  aria-required="true"
+                  aria-invalid={allRequiredInvalid ? true : undefined}
+                  aria-describedby={error ? 'signup-form-error' : undefined}
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="lastName">Last name</Label>
+              <div className="space-y-1">
+                <Label htmlFor="lastName">
+                  Last name{' '}
+                  <span className="text-[var(--error-text)]" aria-hidden>
+                    *
+                  </span>
+                </Label>
                 <Input
                   id="lastName"
                   name="lastName"
+                  type="text"
                   autoComplete="family-name"
                   value={lastName}
                   onChange={(event) => setLastName(event.target.value)}
                   required
+                  aria-required="true"
+                  aria-invalid={allRequiredInvalid ? true : undefined}
+                  aria-describedby={error ? 'signup-form-error' : undefined}
                 />
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="phone">Phone number</Label>
+            <div className="space-y-1">
+              <Label htmlFor="phone">Phone number (optional)</Label>
               <Input
                 id="phone"
                 name="phone"
                 type="tel"
+                inputMode="tel"
                 autoComplete="tel"
                 value={phone}
                 onChange={(event) => setPhone(event.target.value)}
-                required
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="email">Email address</Label>
+            <div className="space-y-1">
+              <Label htmlFor="email">
+                Email address{' '}
+                <span className="text-[var(--error-text)]" aria-hidden>
+                  *
+                </span>
+              </Label>
               <Input
                 id="email"
                 name="email"
                 type="email"
                 autoComplete="email"
+                inputMode="email"
                 spellCheck={false}
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 required
+                aria-required="true"
+                aria-invalid={emailFieldInvalid || allRequiredInvalid ? true : undefined}
+                aria-describedby={error ? 'signup-form-error' : undefined}
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
+            <div className="space-y-1">
+              <Label htmlFor="password">
+                Password{' '}
+                <span className="text-[var(--error-text)]" aria-hidden>
+                  *
+                </span>
+              </Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -235,6 +270,9 @@ export default function SignUpPage() {
                   onChange={(event) => setPassword(event.target.value)}
                   minLength={8}
                   required
+                  aria-required="true"
+                  aria-invalid={passwordFieldInvalid || allRequiredInvalid ? true : undefined}
+                  aria-describedby={error ? 'signup-form-error password-hint' : 'password-hint'}
                 />
                 <button
                   type="button"
@@ -245,22 +283,24 @@ export default function SignUpPage() {
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-              <p className="text-xs text-muted-foreground">At least 8 characters</p>
+              <p id="password-hint" className="text-xs text-muted-foreground">
+                At least 8 characters
+              </p>
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Creating account
+                  Submitting request
                 </>
               ) : (
-                'Create account'
+                'Submit request'
               )}
             </Button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-muted-foreground">
+          <p className="mt-3.5 text-center text-sm text-muted-foreground">
             Already have an account?{' '}
             <Link href="/login" className="font-semibold text-primary hover:underline">
               Sign in

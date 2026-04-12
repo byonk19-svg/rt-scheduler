@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-12 (session 52)
+Updated: 2026-04-12 (session 53)
 
 ## Handoff Snapshot
 
@@ -17,6 +17,7 @@ Updated: 2026-04-12 (session 52)
 - Uploaded images can OCR through the OpenAI Responses API when `OPENAI_API_KEY` is configured. PDFs are stored for review but are not OCR'd automatically yet.
 - Managers can now fix therapist matches inline on the intake card and then apply parsed dates from the same surface.
 - Managers must now match both the therapist and the schedule block before `Apply dates` appears on an intake card. This prevents the old dead-end `email_intake_apply_failed` redirect when a therapist was matched but no cycle was attached yet.
+- **Auth entry (`/login`, `/signup`):** `src/lib/auth/login-utils.ts` parses auth errors from top-level query params **or nested inside `redirectTo`** (e.g. `/availability?error=...`), maps friendly copy, and `router.replace` cleans error keys while preserving a sanitized `redirectTo`. Approval/allowlist copy shows as a **warning** banner with optional **Request access** link and dismiss; credential failures stay **destructive**. Successful access **request** redirects to **`/login?status=requested`** with an **info** banner (dismiss + URL strip); signup no longer auto-signs-in before that redirect. Homepage header CTA reads **Create account**; shared **Input** focus ring uses **`--ring`**; **`:autofill`** + **`-webkit-autofill`** theming lives in `globals.css`.
 - Mixed off/work sentences are parsed more accurately than before, but parser changes should continue to be driven by real inbound examples.
 - `RESEND_API_KEY` must support receiving APIs, not just sending. A send-only key fails on `/emails/receiving` with `401 restricted_api_key`.
 
@@ -24,7 +25,6 @@ Updated: 2026-04-12 (session 52)
 
 - `main` includes the merged email-intake apply gating fix from PR `#27`.
 - The therapist-first homepage redesign is implemented and pushed on `codex/therapist-homepage-redesign`, but it is not merged into `main` yet.
-- The main workspace currently has unrelated uncommitted tracked changes. Do not stage or revert them casually while doing handoff/doc-only updates.
 
 ### Where We Want To Go
 
@@ -42,6 +42,14 @@ Updated: 2026-04-12 (session 52)
 - `vercel deploy --prod --yes` for production shipping
 
 The session entries below are historical context. They may describe local-only or superseded work and should not override the snapshot above.
+
+## Latest Updates (2026-04-12, session 53)
+
+- **Login + signup UX + auth query helpers** (`src/app/login/page.tsx`, `src/app/signup/page.tsx`, `src/lib/auth/login-utils.ts`, `src/lib/auth/login-utils.test.ts`, `src/components/ui/input.tsx`, `src/app/globals.css`, `src/app/page.tsx`):
+  - `extractAuthErrorFromSearchParams` + `sanitizeRedirectTo` + `buildCleanedLoginSearchParams` handle nested errors inside `redirectTo`, strip them from the stored redirect, and keep open-redirect guards.
+  - Login banners: severity (warning vs destructive), dismiss (X), caps-lock hint, `redirectTo` after `signInWithPassword`, post-signup **`/login?status=requested`** acknowledgement (info banner + URL cleanup).
+  - Signup: **Request access** copy, optional phone, required-field legend + `aria-*` wiring, Vitest coverage for helpers.
+  - **Verification:** `npm run lint`, `npx tsc --noEmit`, `npx vitest run src/lib/auth/login-utils.test.ts`
 
 ## Latest Updates (2026-04-12, session 52)
 

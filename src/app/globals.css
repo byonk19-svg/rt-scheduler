@@ -130,6 +130,32 @@
     color: color-mix(in srgb, var(--primary) 82%, black);
     text-decoration: underline;
   }
+
+  /* Autofill (standard + WebKit): match themed inputs instead of default blue */
+  input:autofill,
+  input:autofill:hover,
+  input:autofill:focus,
+  input:autofill:active,
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px var(--input-background) inset !important;
+    box-shadow: 0 0 0 1000px var(--input-background) inset !important;
+    -webkit-text-fill-color: var(--foreground) !important;
+    caret-color: var(--foreground);
+  }
+
+  input:autofill:focus,
+  input:-webkit-autofill:focus {
+    border-color: var(--ring);
+    -webkit-box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--ring) 50%, transparent),
+      0 0 0 1000px var(--input-background) inset !important;
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--ring) 50%, transparent),
+      0 0 0 1000px var(--input-background) inset !important;
+  }
 }
 
 .teamwise-grid-bg {
