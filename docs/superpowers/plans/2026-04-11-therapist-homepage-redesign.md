@@ -237,7 +237,7 @@ export default function HomePage() {
       <header className="relative z-20 border-b border-white/60 bg-background/88 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--attention)] shadow-[0_14px_30px_-18px_var(--home-shadow)]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--attention)] shadow-tw-md-soft">
               <CalendarDays className="h-4 w-4 text-white" />
             </div>
             <div>
@@ -258,11 +258,7 @@ export default function HomePage() {
             >
               <Link href="/login">Sign in</Link>
             </Button>
-            <Button
-              asChild
-              size="sm"
-              className="rounded-xl px-5 shadow-[0_14px_30px_-18px_var(--home-shadow)]"
-            >
+            <Button asChild size="sm" className="rounded-xl px-5 shadow-tw-primary-glow">
               <Link href="/signup">Get started</Link>
             </Button>
           </div>
@@ -288,7 +284,7 @@ export default function HomePage() {
             </div>
 
             <div className="space-y-6">
-              <h1 className="max-w-[12ch] font-heading text-[3.4rem] font-bold leading-[0.97] tracking-[-0.055em] text-foreground sm:text-[4.8rem] lg:text-[6.4rem]">
+              <h1 className="max-w-[12ch] font-display text-[3.4rem] font-bold leading-[0.97] tracking-[-0.055em] text-foreground sm:text-[4.8rem] lg:text-[6.4rem]">
                 Keep your schedule, availability, and coverage in one calm view.
               </h1>
               <p className="max-w-xl text-[1.05rem] leading-7 text-foreground/72 sm:text-lg">
@@ -305,7 +301,7 @@ export default function HomePage() {
             <Button
               asChild
               size="lg"
-              className="h-12 min-w-[170px] rounded-xl text-base shadow-[0_20px_36px_-22px_var(--home-shadow)]"
+              className="h-12 min-w-[170px] rounded-xl text-base shadow-tw-primary-glow"
             >
               <Link href="/login">Sign in</Link>
             </Button>
@@ -464,6 +460,98 @@ git status --short
 ```
 
 Expected: clean working tree. If verification required follow-up edits, make them before concluding and create one final commit with the fix.
+
+---
+
+## Design specification addendum (plan-design-review, 2026-04-12)
+
+This section closes gaps between the approved **spec** (`docs/superpowers/specs/2026-04-11-therapist-homepage-redesign-design.md`), **`DESIGN.md`**, and this **implementation plan**. Treat it as blocking acceptance criteria alongside Tasks 1–4.
+
+### Pass 1 — Information architecture (target: 10/10)
+
+**Above-the-fold order (desktop, `lg+`):** calm chrome → proof-of-specialty → promise headline → supporting proof → dual CTAs → approval honesty → product window.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ HEADER: brand (icon + wordmark + discipline) │ Sign in │ CTA│  ← wayfinding, quiet
+├─────────────────────────────────────────────────────────────┤
+│ HERO: eyebrow (who it's for)                                 │  ← specialty signal
+│      headline (outcome in one breath)                       │  ← primary read
+│      subcopy (day-to-day usefulness)                        │  ← trust + utility
+│      [ Sign in ] [ Create account / Get started per row ]   │  ← action (see CTA matrix)
+│      approval note + trust bullets                          │  ← risk reduction
+│      preview frame (embedded “window”, not floating card)   │  ← proof
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Mobile (`<sm`):** same vertical order; header actions stay reachable (no hidden-only critical paths).
+
+### Pass 2 — Interaction state coverage (target: 10/10)
+
+| Surface         | Loading                                                                      | Empty                      | Error                                                                                         | Success                                           | Partial                                                                                     |
+| --------------- | ---------------------------------------------------------------------------- | -------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Public homepage | Hero/preview paint; fonts may swap (Fraunces) — no blocking spinner required | N/A (always branded shell) | Missing `/images/app-preview.png` → broken image; show alt text clearly; CI should keep asset | Full hero + preview visible; CTAs route correctly | `prefers-reduced-motion`: `.fade-up` must not animate (repo already gates in `globals.css`) |
+| Primary CTA     | —                                                                            | —                          | —                                                                                             | Focus ring visible (`--ring`)                     | —                                                                                           |
+| Preview         | `next/image` priority load                                                   | —                          | `onError` not required for static asset; verify file exists in `public/`                      | Image fills shell, gradient foot reads            | Slow network: image may pop in — acceptable if layout reserves `min-h-*`                    |
+
+### Pass 3 — User journey & emotional arc (target: 10/10)
+
+| Step | User does                  | User should feel                       | Plan / spec coverage              |
+| ---- | -------------------------- | -------------------------------------- | --------------------------------- |
+| 1    | Lands from search/referral | “This is for my job, not generic SaaS” | Eyebrow + RT copy (Task 3)        |
+| 2    | Scans headline             | Calm confidence, not hype              | Single-sentence outcome headline  |
+| 3    | Reads subcopy              | “This reduces coordination pain”       | Therapist-first paragraph         |
+| 4    | Chooses CTA                | Clear, low-risk next step              | Header vs hero CTA matrix (below) |
+| 5    | Sees approval note         | Treated honestly                       | Unchanged approval sentence       |
+| 6    | Sees preview               | “I can picture the workspace”          | Luminous shell + embedded preview |
+
+### Pass 4 — AI slop risk (target: 10/10)
+
+**Avoid:** purple/indigo gradients, three-column icon features, Inter-default marketing, unrelated stock imagery.
+
+**Differentiation checklist (must read intentional on `/`):**
+
+- Copy names **respiratory therapy** and **handoff/shift clarity** (not “streamline workflows”).
+- Visual move is **warm clinical light + restrained grid texture**, not a loud gradient mesh.
+- Preview reads as a **window** (shell + sheen + depth) using **system shadow vocabulary** (`shadow-tw-*`), not a raw screenshot drop-shadow in arbitrary Tailwind.
+
+### Pass 5 — `DESIGN.md` alignment (target: 10/10)
+
+**Blocking rules for implementation:**
+
+1. **Hero headline typography:** large marketing line uses **`.font-display` (Fraunces)**, not `.font-heading` (sans). Wordmark / UI chrome stays **sans** (`font-heading` / body weights). Update Task 3 snippet accordingly before coding.
+2. **Shadows in JSX:** **No** `shadow-[0_…]` arbitrary utilities on shipped homepage. Use existing **`shadow-tw-*`** classes from `globals.css` (`shadow-tw-hero-media`, `shadow-tw-primary-glow`, `shadow-tw-md-soft`, etc.). If luminous depth truly needs a new recipe, add a **named** utility beside the elevation table in `globals.css` and document one line in `DESIGN.md`’s shadow map (same PR).
+3. **Motion:** `.fade-up` is allowed; it already respects **`prefers-reduced-motion`** in repo `globals.css` — keep using it; do not add continuous/looping motion.
+4. **Color:** keep marketing accents on **`--primary`**, **`--attention`**, **`--background`**, and the new **`--home-*`** translucency tokens — no new random hex literals in JSX.
+
+### Pass 6 — Responsive & accessibility (target: 10/10)
+
+- **Touch targets:** header and hero buttons use `size="sm"` / `size="lg"` with `min-h` where specified — verify **≥44px** hit height on mobile for both CTAs in header and hero.
+- **Keyboard:** tab order follows visual order (header left → header actions → hero content); focus rings use shared `--ring` pattern from `Button`.
+- **Landmarks:** keep a single `<main>`; header remains `<header>`; decorative layers use `aria-hidden`.
+- **Contrast:** translucent `bg-white/55` chips and ghost buttons must meet readable text on luminous background — if verification fails, darken text one step (`text-foreground/80` → higher opacity) rather than adding outlines everywhere.
+- **Preview alt:** keep descriptive `alt` on `Image` (schedule context, not “image of app”).
+
+### Pass 7 — CTA matrix (resolved design decision)
+
+| Location | Primary (forward)             | Secondary                          |
+| -------- | ----------------------------- | ---------------------------------- |
+| Header   | **`Get started` → `/signup`** | `Sign in` ghost                    |
+| Hero     | **`Sign in`** (returning)     | **`Create account`** outline (new) |
+
+Tests in Task 2 must assert **both** “Get started” (header) and “Create account” (hero), and **≥2** literal `Sign in` links (header + hero), matching the matrix above.
+
+### NOT in scope (explicit)
+
+- Multi-section marketing site, pricing, testimonials wall, or nav model changes.
+- Replacing the real app screenshot with illustration or lifestyle photography.
+- Converting the homepage to a client component or adding animation libraries.
+
+### What already exists (reuse)
+
+- **`DESIGN.md`** — typography roles, shadow map discipline, anti-slop list.
+- **`src/app/page.tsx` on `main`** — already uses `.font-display` on hero and `shadow-tw-hero-media` on preview; redesign should **evolve** this file, not fight established system rules.
+- **`globals.css`** — `.fade-up` + reduced-motion gate, `shadow-tw-*` family, existing aurora/hero-grid utilities (luminous work may extend, not duplicate randomly).
 
 ---
 
