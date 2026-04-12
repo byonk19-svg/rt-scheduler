@@ -19,6 +19,7 @@ Updated: 2026-04-12 (session 55)
 - Managers must now match both the therapist and the schedule block before `Apply dates` appears on an intake card. This prevents the old dead-end `email_intake_apply_failed` redirect when a therapist was matched but no cycle was attached yet.
 - **Auth entry (`/login`, `/signup`):** `src/lib/auth/login-utils.ts` parses auth errors from top-level query params **or nested inside `redirectTo`** (e.g. `/availability?error=...`), maps friendly copy, and `router.replace` cleans error keys while preserving a sanitized `redirectTo`. Approval/allowlist copy shows as a **warning** banner with optional **Request access** link and dismiss; credential failures stay **destructive**. Successful access **request** redirects to **`/login?status=requested`** with an **info** banner (dismiss + URL strip); signup no longer auto-signs-in before that redirect. **Public homepage (`/`):** therapist-first copy, luminous background utilities (`--home-*`, `.teamwise-home-*`), header **Get started** (`/signup`) + **Sign in**, hero **Sign in** + **Create account** (`/signup`); Vitest contracts in `src/app/page.test.ts` and `src/app/globals.test.ts`. Shared **Input** focus ring uses **`--ring`**; **`:autofill`** + **`-webkit-autofill`** theming lives in `globals.css`.
 - Mixed off/work sentences are parsed more accurately than before, but parser changes should continue to be driven by real inbound examples.
+- **Accessibility / theming pass (UI review branch):** root layout wraps the app in **`MotionProvider`** (`src/components/motion-provider.tsx`) with Framer **`MotionConfig reducedMotion="user"`** so motion respects **`prefers-reduced-motion`**. Prefer design tokens over raw **`text-white`** / **`bg-white`** / stray **`dark:`** on shared surfaces; destructive actions use **`text-destructive-foreground`**. **`globals.css`:** stronger **`--muted-foreground`**, **`--color-destructive-foreground`** in **`@theme`**, table row hover scoped to **`table:not(.no-row-hover)`**, marketing header + home preview shell reduce **`backdrop-filter`** under **`prefers-reduced-motion: reduce`**. **`/requests/new`** and **`/publish/[id]`** use **`ManagerWorkspaceHeader`**. **`LEAD_ELIGIBLE_BADGE_CLASS`** uses **`--info-*`** tokens (`src/lib/employee-tag-badges.ts`).
 - `RESEND_API_KEY` must support receiving APIs, not just sending. A send-only key fails on `/emails/receiving` with `401 restricted_api_key`.
 
 ### Local In-Progress Work
@@ -57,6 +58,11 @@ The session entries below are historical context. They may describe local-only o
   - Exported constants (`APP_SHELL_SIDEBAR_CLASS`, `APP_SHELL_ACTIVE_NAV_CLASS`, `APP_SHELL_PROFILE_CARD_CLASS`) preserved for backwards compatibility. Tests updated: 12 passing.
   - **Verification:** `npx vitest run src/components/AppShell.test.ts`, `npx eslint src/components/AppShell.tsx`
   - Branch: `claude/review-ui-flow-7Weav`
+- **UI review / a11y alignment + unit test repair** (`src/app/layout.tsx`, `src/components/motion-provider.tsx`, `src/app/globals.css`, `src/components/ui/{button,badge,input}.tsx`, `src/app/page.tsx`, `src/app/login/page.tsx`, `src/app/signup/page.tsx`, `src/components/AppShell.tsx`, `src/app/publish/[id]/page.tsx`, `src/app/requests/new/page.tsx`, `src/app/shift-board/page.tsx`, `src/components/EmployeeDirectory.tsx`, `src/lib/employee-tag-badges.ts`, Vitest files under `src/app/**` and `src/components/manager/`):
+  - Framer Motion respects reduced motion; token cleanup on marketing and staff surfaces; publish detail and staff **My Requests** headers aligned with **`ManagerWorkspaceHeader`**.
+  - **Vitest:** full **`npx vitest run`** now **516 passing** after updating copy-based tests (approvals empty state, coverage file-contract strings, pending-setup multiline copy, manager inbox metric typography), **`publish/actions`** admin mock for preliminary snapshot close, **`auth/signout`** route test **`cookies()`** mock, and **`assignment-status`** route test **`createAdminClient`** + RPC row alignment for manager **`cancelled`** notification expectations.
+- **Operational docs:** `docs/WORKFLOWS.md` and **`CLAUDE.md`** Key Shared Components / Schedule UX / Navbar sections document manager shell IA (**Today** / **Schedule** / **People**), **`/schedule` → `/coverage`** active-tab contract, and horizontal scroll on the manager secondary nav. Seeded-auth cleanup remains **`npm run cleanup:seed-users`** (see **`docs/ENVIRONMENT_CLEANUP.md`** and prior commit on this branch).
+- **Verification:** `npx vitest run` (516 tests), `npm run lint`, `npm run build`.
 
 ## Latest Updates (2026-04-12, session 54)
 
@@ -267,6 +273,7 @@ Current session checks green:
 - `npx tsc --noEmit` pass
 - `npm run build` pass
 - `npm audit --omit=dev` pass
+- full `npx vitest run` pass (**516 tests**, session 55)
 - targeted `npx vitest run src/app/availability/actions.test.ts src/app/api/schedule/drag-drop/route.test.ts src/lib/coverage/mutations.test.ts` pass
 - targeted `npx eslint` on touched files pass
 - Playwright CLI smoke pass on `/` and `/coverage?shift=day` (redirect to login as expected, no console warnings)
@@ -274,7 +281,7 @@ Current session checks green:
 Broader historical baseline:
 
 - `npm run test:e2e` pass (**42 passed**) with default Playwright workers set to `2`
-- Full `npx vitest run` may require `.env.local` (for example `assignment-status` route test uses admin client env vars)
+- Full `npx vitest run` is green without real Supabase admin env: **`assignment-status`** route tests mock **`@/lib/supabase/admin`** (`createAdminClient`).
 - Auth E2E happy path requires `.env.local` (or shell env) entries for `E2E_USER_EMAIL` and `E2E_USER_PASSWORD`
 
 CI gates: format check → lint → tsc → build → Playwright E2E
@@ -325,11 +332,12 @@ All permission checks go through `can(role, permission)` in `src/lib/auth/can.ts
 ## Key Shared Components
 
 - `src/components/ui/page-header.tsx` — `<PageHeader>` is DEPRECATED for new pages; only remaining on legacy pages not yet migrated
-- `src/components/manager/ManagerWorkspaceHeader.tsx` — canonical manager route header for `/availability`, `/coverage`, `/team`, and `/approvals`
+- `src/components/motion-provider.tsx` — client root wrapper: Framer **`MotionConfig reducedMotion="user"`** (respects **`prefers-reduced-motion`**); used from `src/app/layout.tsx`
+- `src/components/manager/ManagerWorkspaceHeader.tsx` — canonical manager-style route header for `/availability`, `/coverage`, `/team`, `/approvals`, `/publish/[id]`, and staff **`/requests/new`**
 - `src/components/availability/AvailabilityOverviewHeader.tsx` — manager-specific availability wrapper around the shared manager workspace header
 - `src/components/ui/skeleton.tsx` — `<Skeleton>`, `<SkeletonLine>`, `<SkeletonCard>`, `<SkeletonListItem>` loading states
 - `src/components/NotificationBell.tsx` — real-time bell with Supabase subscription; variants: `default` | `staff`
-- `src/components/AppShell.tsx` — nav shell; add routes to `MANAGER_NAV` / `STAFF_NAV` arrays
+- `src/components/AppShell.tsx` — nav shell; manager nav is built from `buildManagerSections()` (`Today`, `Schedule`, `People`) and staff nav still uses `STAFF_NAV_ITEMS`. Keep `/schedule` treated as a coverage alias in the manager `Schedule` section, and keep the fixed secondary nav horizontally scrollable for mobile widths.
 - `src/components/feedback-toast.tsx` — `<FeedbackToast message variant>` for success/error toasts
 - `src/lib/auth/can.ts` — `can(role, permission)` — all permission checks go through here
 - `src/lib/coverage/selectors.ts` — `buildDayItems`, `toUiStatus`
@@ -455,6 +463,7 @@ Assignment status is informational only (does not affect coverage counts or publ
 
 `/coverage` is the shared schedule workspace for all roles; actions and edits are permission-gated.
 `/schedule` is retained as a compatibility route and redirects into `/coverage`.
+The manager shell must still show the `Schedule` primary section as active on `/schedule`, with the `Coverage` secondary tab highlighted because that route is a legacy alias into the same workflow.
 
 ## Navbar / Branding
 
@@ -467,6 +476,10 @@ Assignment status is informational only (does not affect coverage counts or publ
   - Schedule sub-nav: Coverage → Availability → Publish → Approvals
   - People sub-nav: Team → Requests (merged; includes access requests with badge)
 - **Old sidebar is gone** — do not restore it. Nav is now a fixed horizontal top bar.
+- Manager shell IA uses primary sections `Today`, `Schedule`, and `People`
+- `Schedule` secondary nav items are `Coverage`, `Availability`, `Publish`, and `Approvals`
+- `People` secondary nav items are `Team` and `Requests`
+- The fixed secondary nav must preserve `overflow-x-auto` with non-shrinking items so narrow mobile widths scroll instead of clipping tabs
 
 ## Assignment Status
 

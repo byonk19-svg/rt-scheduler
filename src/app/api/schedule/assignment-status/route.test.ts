@@ -11,6 +11,10 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
 }))
 
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: vi.fn(() => ({})),
+}))
+
 vi.mock('@/lib/published-schedule-notifications', () => ({
   notifyPublishedShiftStatusChanged: notifyPublishedShiftStatusChangedMock,
 }))
@@ -223,6 +227,17 @@ describe('assignment status API', () => {
         user_id: 'therapist-1',
         published: true,
       },
+      rpcData: [
+        {
+          id: 'shift-1',
+          assignment_status: 'cancelled',
+          status_note: null,
+          left_early_time: null,
+          status_updated_at: '2026-02-23T18:00:00.000Z',
+          status_updated_by: 'manager-1',
+          status_updated_by_name: 'Manager User',
+        },
+      ],
     })
     vi.mocked(createClient).mockResolvedValue(
       supabase as unknown as Awaited<ReturnType<typeof createClient>>
@@ -248,7 +263,7 @@ describe('assignment status API', () => {
         userId: 'therapist-1',
         date: '2026-02-23',
         shiftType: 'day',
-        nextStatus: 'call_in',
+        nextStatus: 'cancelled',
         targetId: 'shift-1',
       })
     )

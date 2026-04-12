@@ -238,7 +238,7 @@ function UserDropdown({
         aria-label="User menu"
         className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 transition-colors duration-150 hover:bg-sidebar-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
       >
-        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--attention)] text-[10px] font-bold text-white select-none">
+        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--attention)] text-[10px] font-bold text-accent-foreground select-none">
           {initials(user?.fullName ?? 'TM')}
         </span>
         <span className="hidden md:block max-w-[120px] truncate text-xs font-semibold text-sidebar-primary">
@@ -375,7 +375,7 @@ export function AppShell({ user, children }: AppShellProps) {
                   >
                     {section.label}
                     {section.key === 'people' && pendingCount > 0 && (
-                      <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[color:var(--attention)] px-1 text-[10px] font-bold text-white">
+                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--attention)] px-1.5 text-[10px] font-bold text-accent-foreground">
                         {pendingCount}
                       </span>
                     )}
@@ -451,7 +451,7 @@ export function AppShell({ user, children }: AppShellProps) {
                   >
                     {item.label}
                     {item.showBadge && (
-                      <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[color:var(--attention)] px-1 text-[10px] font-bold text-white">
+                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--attention)] px-1.5 text-[10px] font-bold text-accent-foreground">
                         {pendingCount}
                       </span>
                     )}
@@ -543,7 +543,7 @@ export function AppShell({ user, children }: AppShellProps) {
                             >
                               <span>{item.label}</span>
                               {item.showBadge && (
-                                <span className="ml-auto inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[color:var(--attention)] px-1 text-[10px] font-bold text-white">
+                                <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--attention)] px-1.5 text-[10px] font-bold text-accent-foreground">
                                   {pendingCount}
                                 </span>
                               )}
@@ -600,7 +600,7 @@ export function AppShell({ user, children }: AppShellProps) {
             <div className="mt-auto shrink-0 space-y-1 border-t border-sidebar-border bg-sidebar px-3 py-3">
               <div className={APP_SHELL_PROFILE_CARD_CLASS}>
                 <div className="flex items-center gap-2.5">
-                  <span className="inline-flex h-[1.625rem] w-[1.625rem] shrink-0 items-center justify-center rounded-full bg-[color:var(--attention)] text-[10px] font-bold text-white">
+                  <span className="inline-flex h-[1.625rem] w-[1.625rem] shrink-0 items-center justify-center rounded-full bg-[color:var(--attention)] text-[10px] font-bold text-accent-foreground">
                     {initials(user?.fullName ?? 'Team member')}
                   </span>
                   <div className="min-w-0">

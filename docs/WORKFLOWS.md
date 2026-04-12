@@ -17,6 +17,8 @@ Operational workflows as implemented in the current codebase.
 1. Create/select a cycle in `/coverage`.
    - `New 6-week block` creates a draft cycle.
    - `/schedule` is a compatibility route that redirects into `/coverage`.
+   - Navigation contract: manager AppShell must still treat `/schedule` as part of the `Schedule` section and highlight the `Coverage` secondary tab, since users still land there from legacy links and server redirects.
+   - The fixed manager secondary nav must stay horizontally scrollable on narrow widths rather than shrinking or clipping workflow tabs.
 2. Build draft assignments:
    - Manual add/move/remove/set lead, or
    - Auto-generate (`generateDraftScheduleAction`) using recurring patterns + cycle overrides.

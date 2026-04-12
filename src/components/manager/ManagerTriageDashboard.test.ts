@@ -120,7 +120,7 @@ describe('ManagerTriageDashboard', () => {
     )
 
     expect(html).not.toContain('Publish Readiness')
-    expect(html).toContain('text-lg font-semibold text-muted-foreground')
+    expect(html).toContain('text-xl font-semibold text-muted-foreground')
   })
 
   it('renders Schedule Completion before Recent Activity', () => {
