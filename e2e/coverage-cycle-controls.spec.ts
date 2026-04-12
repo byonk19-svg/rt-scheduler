@@ -178,7 +178,7 @@ test.describe.serial('coverage cycle controls', () => {
     await page.getByRole('button', { name: 'Auto-draft' }).click()
     const autoDialog = page.getByRole('dialog')
     await expect(autoDialog).toBeVisible()
-    await autoDialog.getByRole('button', { name: 'Apply Draft' }).click()
+    await autoDialog.getByRole('button', { name: 'Generate draft' }).click()
 
     await expect(page.getByText(/Draft generated with/i).first()).toBeVisible({
       timeout: 20_000,

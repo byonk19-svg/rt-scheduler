@@ -1149,7 +1149,7 @@ test.describe.serial('role journeys', () => {
       .filter({ has: page.getByText(publishReady.label).first() })
       .first()
     await expect(publishRow).toBeVisible()
-    await publishRow.getByRole('button', { name: 'Unpublish (keep shifts)' }).click()
+    await publishRow.getByRole('button', { name: 'Take offline' }).click()
     await expect(
       page.getByText(
         'Block unpublished. Assignments stay on the draft grid; staff no longer see it as a published schedule until you publish again.'
@@ -1364,11 +1364,11 @@ test.describe.serial('role journeys', () => {
     await expect(page.getByText('Coverage Issues').first()).toBeVisible()
 
     await page.goto(`/availability?cycle=${ctx!.draftCycle.id}&therapist=${ctx!.therapist.id}`)
-    await expect(page.getByText('Staffing Inputs & Calendar').first()).toBeVisible()
-    await expect(page.getByLabel('Therapist')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Plan staffing' }).first()).toBeVisible()
+    await expect(page.locator('#planner_therapist_id')).toBeVisible()
 
     await page.goto('/team')
-    await expect(page.getByRole('heading', { name: 'Team' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Team', level: 1 })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Managers' })).toBeVisible()
 
     await page.goto('/requests')

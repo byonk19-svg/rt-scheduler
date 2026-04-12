@@ -118,7 +118,7 @@ test.describe.serial('publish history lifecycle', () => {
     await page.goto(`/publish/${eventInsert.data.id}`)
     await expect(page.getByRole('heading', { name: 'Publish Details' })).toBeVisible()
     await expect(page.getByText('Failed Recipient').first()).toBeVisible()
-    await expect(page.getByText('SMTP provider rejected the message.')).toBeVisible()
+    await expect(page.getByText('SMTP provider rejected the message.').first()).toBeVisible()
   })
 
   test('manager can delete a non-live publish history entry', async ({ page }) => {
@@ -262,10 +262,10 @@ test.describe.serial('publish history lifecycle', () => {
     const cycleRow = page
       .locator('tr')
       .filter({ has: page.getByText(cycleLabel).first() })
-      .filter({ has: page.getByRole('button', { name: 'Start over' }) })
+      .filter({ has: page.getByRole('button', { name: 'Clear & restart' }) })
       .first()
     await expect(cycleRow).toBeVisible()
-    await cycleRow.getByRole('button', { name: 'Start over' }).click()
+    await cycleRow.getByRole('button', { name: 'Clear & restart' }).click()
 
     await expect
       .poll(async () => {

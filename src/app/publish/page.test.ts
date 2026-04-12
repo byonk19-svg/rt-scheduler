@@ -159,8 +159,8 @@ describe('PublishHistoryPage', () => {
 
     expect(html).toContain('Schedule blocks')
     expect(html).toContain('Publish email log')
-    expect(html).toContain('Unpublish (keep shifts)')
-    expect(html).toContain('Start over')
+    expect(html).toContain('Take offline')
+    expect(html).toContain('Clear &amp; restart')
     expect(html).toContain('Archive cycle')
     expect(html).toContain('Delete history')
     expect(html).toContain('Open cycle')

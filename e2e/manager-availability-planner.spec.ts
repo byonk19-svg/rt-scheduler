@@ -149,7 +149,7 @@ test.describe.serial('/availability manager planner', () => {
     const calendarDay = (root: Locator, isoDate: string) =>
       root.getByRole('button', { name: formatCalendarLabel(isoDate) })
 
-    await planner.getByLabel('Therapist').selectOption(ctx!.therapist.id)
+    await planner.locator('#planner_therapist_id').selectOption(ctx!.therapist.id)
     await calendarDay(planner, ctx!.therapistWillWorkDate).click()
     await calendarDay(planner, ctx!.therapistCannotWorkDate).click()
     await planner.getByRole('button', { name: 'Save Will work' }).click()
@@ -199,7 +199,7 @@ test.describe.serial('/availability manager planner', () => {
 
     await page.goto(`/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.prnTherapist.id}`)
     const prnPlanner = page.locator('#staff-scheduling-inputs')
-    await prnPlanner.getByLabel('Therapist').selectOption(ctx!.prnTherapist.id)
+    await prnPlanner.locator('#planner_therapist_id').selectOption(ctx!.prnTherapist.id)
     await calendarDay(prnPlanner, ctx!.prnWillWorkDate).click()
     await prnPlanner.getByRole('button', { name: 'Save Will work' }).click()
 
@@ -222,7 +222,7 @@ test.describe.serial('/availability manager planner', () => {
 
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
     await page.getByRole('button', { name: 'Auto-draft' }).first().click()
-    await page.getByRole('button', { name: 'Apply Draft' }).click()
+    await page.getByRole('button', { name: 'Generate draft' }).click()
 
     await expect
       .poll(

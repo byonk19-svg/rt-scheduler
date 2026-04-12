@@ -214,9 +214,11 @@ test.describe.serial('coverage display regressions', () => {
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.emptyDraftCycle.id}`)
 
-    await expect(page.getByRole('heading', { name: 'No staffing drafted yet' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Block ready — no shifts yet' })).toBeVisible()
     await expect(
-      page.getByText('Auto-draft it or click a day to start assigning the first shifts manually.')
+      page.getByText(
+        'Run Auto-draft to fill the grid based on therapist availability and constraints, or click any day to assign shifts manually.'
+      )
     ).toBeVisible()
 
     const dayCellButton = page.getByTestId(
