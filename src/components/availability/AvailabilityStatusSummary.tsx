@@ -29,7 +29,7 @@ function TherapistRow({
   tone: 'warning' | 'success'
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 shadow-tw-sm">
       <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-[11px] font-bold uppercase text-muted-foreground">
         {name
           .split(/\s+/)

@@ -1,0 +1,129 @@
+# Design System — Teamwise (RT Scheduler)
+
+## Product Context
+
+- **What this is:** A web application for respiratory therapy scheduling — six-week coverage cycles, availability intake, publish workflows, and role-aware dashboards for managers and clinical staff.
+- **Who it's for:** Hospital and department managers (planning, publish, roster edits) and therapists/leads (availability, schedule visibility, operational status).
+- **Space/industry:** Healthcare operations / workforce scheduling SaaS — users expect trust, legibility under stress, and fast scanning of dense calendars.
+- **Project type:** Web app / operational dashboard (Next.js App Router) with a smaller marketing/auth shell on public routes.
+
+## Aesthetic Direction
+
+- **Direction:** Industrial/utilitarian with calm warmth — “control room” clarity on schedule surfaces, softened by a paper-like canvas so the product feels human, not sterile ERP.
+- **Decoration level:** Intentional but minimal — avoid heavy gradients, illustration clutter, or decorative noise behind data grids.
+- **Mood:** Confident, calm, and direct. Managers should feel in control; staff should read status at a glance.
+- **Reference research:** Healthcare scheduling UX emphasizes accessibility, reduced cognitive load, semantic status color, and mobile-friendly density (see industry write-ups on healthcare dashboards and nurse scheduling UX — patterns inform this doc; no single competitor is copied).
+
+## Typography
+
+- **Display/Hero (marketing + rare page titles):** Fraunces — short headlines only; evokes craft and care without sacrificing web performance when loaded selectively.
+- **Body/UI:** DM Sans — primary interface type; already integrated via `globals.css` / Next font pipeline.
+- **UI/Labels:** Same family as body; use weight (500–700) and letter-spacing for hierarchy instead of a third sans.
+- **Data/Tables:** DM Sans with `font-variant-numeric: tabular-nums` on counts, times, and schedule columns so digits align in coverage views.
+- **Code:** Geist Mono (or system monospace stack) for technical surfaces, IDs, and developer-facing diagnostics.
+- **Loading:** Google Fonts (or self-host subset WOFF2 for display + DM Sans) — prefer self-hosting if privacy/perf policies tighten.
+- **Scale (initial targets):**
+  - `text-xs` 0.75rem / labels, meta
+  - `text-sm` 0.875rem / dense table cells
+  - `text-base` 1rem / default body
+  - `text-lg`–`text-xl` section headers
+  - `text-2xl`+ reserved for page titles and marketing hero
+
+## Color
+
+- **Approach:** Restrained — one dominant primary for actions and wayfinding, neutrals for surfaces, semantic colors reserved for meaning.
+- **Primary:** `#1e5c64` (HSL reference `187 55% 28%`) — trust / clinical calm; all primary buttons, key links, focus rings.
+- **Attention / brand accent:** `#e9a43a` (HSL reference `38 90% 55%`) — avatar, logo mark, subtle highlights; **not** a second competing CTA color on forms.
+- **Neutrals:** Warm paper field (`~hsl(38 18% 96%)` background), off-white cards, cool-warm slate text (`~hsl(220 25% 12%)` foreground), muted lines at `~hsl(32 14% 86%)`.
+- **Semantic:**
+  - Success: green family for “live / healthy / complete” states
+  - Warning: amber family for drafts, deadlines, “needs attention”
+  - Error: red family for blockers and validation failures
+  - Info: blue family for neutral informational callouts  
+    Map to existing CSS variables (`--success-*`, `--warning-*`, etc.) and keep pairs legible in WCAG-ish terms.
+- **Dark mode:** Reduce saturation ~10–20% on large fields; lift contrast on sidebar text; keep primary legible on dark surfaces (lighter teal is acceptable).
+
+## Spacing
+
+- **Base unit:** 8px (Tailwind default); prefer multiples of 4 only for fine alignment inside components.
+- **Density:** Comfortable default for manager surfaces; consider a future “compact” calendar mode rather than shrinking global padding everywhere.
+- **Scale:** `2xs` 4 · `xs` 8 · `sm` 12–16 · `md` 16–24 · `lg` 24–32 · `xl` 32–40 · `2xl` 48 · `3xl` 64 (map to Tailwind tokens in implementation).
+
+## Layout
+
+- **Approach:** Hybrid — strict grid alignment and predictable chrome inside the app; marketing may use slightly more expressive vertical rhythm while still sharing tokens.
+- **Grid:** 12-column mental model at `lg+`; collapse to single column on mobile with bottom nav or drawer patterns as already established in the app shell.
+- **Max content width:** Marketing `min(1120px, 100% - 2rem)`; tool pages often full-width with internal max width on prose blocks only.
+- **Border radius:** Hierarchical — small controls 6–8px, cards 10–14px, pills 9999px; avoid one global “bubble radius” on every surface.
+
+## Motion
+
+- **Approach:** Minimal-functional — motion explains state change; no ornamental loops on data-heavy pages.
+- **Easing:** Enter `ease-out`, exit `ease-in`, spatial moves `ease-in-out`.
+- **Duration:** micro 50–100ms (hover), short 150–220ms (dialogs), medium 250–360ms (page transitions if any).
+
+## Shadow map (elevation utilities)
+
+All elevation uses **named classes** in `src/app/globals.css` (search for `Elevation shadows`). They compose `box-shadow` from **`color-mix(in srgb, var(--foreground) …)`** or **`var(--primary)`** / **`var(--attention)`** / **`var(--destructive)`** / **`var(--warning-border)`** — not hardcoded slate RGB.
+
+**Rules for new UI**
+
+- Prefer an existing **`shadow-tw-*`** class before adding a new one.
+- If nothing fits, add a **new utility** next to the others in `globals.css` and document it in the table below — do not use ad-hoc `shadow-[0_…rgba(…)]` in JSX.
+- **Print:** on the availability print surface, `shadow-tw-md` and `shadow-tw-md-strong` are stripped (see `@media print` in `globals.css`).
+
+| Class                        | Basis                            | When to use                                                                         |
+| ---------------------------- | -------------------------------- | ----------------------------------------------------------------------------------- |
+| `shadow-tw-2xs`              | Foreground hairline (~2%)        | Default “paper edge” on dense cells (e.g. coverage day panel).                      |
+| `shadow-tw-2xs-soft`         | Foreground hairline (~3%)        | Softer bottom edge on large bordered shells (e.g. therapist workspace container).   |
+| `shadow-tw-xs`               | Foreground hairline (~4%)        | Slightly stronger section divider shadow (e.g. availability request strip).         |
+| `shadow-tw-sm`               | Foreground ~5%, small blur       | **Default card** elevation — `Card`, list rows, publish tables, preliminary blocks. |
+| `shadow-tw-md`               | Foreground ~6%                   | Cards that need a bit more separation (badges, nested cards).                       |
+| `shadow-tw-md-soft`          | Foreground ~5%                   | **Metrics / stats** — `StatsCard`, schedule progress card shell.                    |
+| `shadow-tw-md-strong`        | Foreground ~8%                   | **Workspace shells** — availability split, manager scheduling panel.                |
+| `shadow-tw-float`            | Foreground ~6%, wider spread     | **Section shells** — shift board header area, notifications list container.         |
+| `shadow-tw-float-lg`         | Foreground ~7%, larger spread    | **Hero / summary sections** — staff dashboard featured block.                       |
+| `shadow-tw-float-tight`      | Foreground ~5%, 8px spread       | **Tiled cards** — inbox sidebar cards, manager triage secondary `Card`s.            |
+| `shadow-tw-pill`             | Foreground ~6%, tight            | **Pills / chips** with numeric content (e.g. coverage headcount badge).             |
+| `shadow-tw-inbox-hero`       | Large soft lift                  | **Single hero band** — manager inbox top banner.                                    |
+| `shadow-tw-metric`           | Large soft lift                  | **Clickable metric tiles** — inbox KPI link cards.                                  |
+| `shadow-tw-panel`            | Large panel depth                | **Primary analytics panel** — schedule progress outer container.                    |
+| `shadow-tw-panel-inner`      | Medium depth                     | **Nested panel** inside a panel — schedule progress inner summary.                  |
+| `shadow-tw-panel-inner-soft` | Softer medium                    | **Nested callout** — auto-draft dialog inner rule card.                             |
+| `shadow-tw-modal`            | Deep modal                       | **Standard dialogs** — cycle management, clear draft confirm.                       |
+| `shadow-tw-modal-lg`         | Deeper modal                     | **Large / full-bleed dialogs** — auto-draft confirm shell.                          |
+| `shadow-tw-popover`          | Floating near-modal              | **Popovers / floating panels** — assignment status popover.                         |
+| `shadow-tw-hero-media`       | Wide marketing lift              | **Marketing imagery** — homepage app preview frame.                                 |
+| `shadow-tw-header`           | Double layer (tight + wide)      | **Deprecated page header** chrome — `PageHeader` legacy shell.                      |
+| `shadow-tw-double-panel`     | Double layer (stacked)           | **Stacked elevation** — request composer panel on tinted surface.                   |
+| `shadow-tw-day-hover`        | Lift on hover                    | **Coverage calendar** — day cell hover (non-warning).                               |
+| `shadow-tw-day-warning`      | Hairline + `warning-border` ring | **Coverage** — constraint / warning day tone.                                       |
+| `shadow-tw-day-selected`     | Primary ring + primary lift      | **Coverage** — selected day (keyboard / mouse focus).                               |
+| `shadow-tw-ring-attention`   | `attention` 1px ring             | **Coverage** — missing-lead day (amber signal, no fill change alone).               |
+| `shadow-tw-ring-error-soft`  | `destructive` 1px ring           | **Coverage** — under-staffed / error signal ring.                                   |
+| `shadow-tw-cell-error`       | Neutral depth + error context    | **Therapist availability grid** — error cell (pairs with error border/bg).          |
+| `shadow-tw-cell-info`        | Slightly lighter depth           | **Therapist availability grid** — info / neutral emphasis cell.                     |
+| `shadow-tw-primary-glow`     | Primary-colored glow             | **Primary CTA emphasis** — high-impact actions (e.g. generate draft).               |
+| `shadow-tw-inset-highlight`  | Inset top gloss                  | **Inset “specular”** on tinted callout surfaces (warning panel top edge).           |
+
+## Implementation Alignment
+
+- **Source of truth during migration:** `DESIGN.md` states intent; `src/app/globals.css` holds shipped tokens. When they diverge, update CSS in small, testable steps and keep CLAUDE.md constraints (no random hex literals in JSX — use tokens).
+- **Anti-slop (explicit):** No purple gradient hero, no three-column “feature + icon circle” filler, no Inter-as-default without a deliberate reason.
+
+### Shipped wiring (2026-04-11)
+
+- **`src/app/layout.tsx`:** `DM_Sans` with CSS variable `--font-dm-sans` (body + UI); `Fraunces` with `--font-display` (loaded on `<html>`). Plus Jakarta removed per typography spec.
+- **`src/app/globals.css`:** `--font-sans` resolves to DM Sans; `.font-heading` / `.app-page-title` use sans only; `.font-display` uses `var(--font-display)` for serif display.
+- **Marketing / auth:** Homepage hero (`src/app/page.tsx`) and login/signup brand column use `.font-display` for the large line only; forms and page titles stay sans.
+- **Data density:** Inbox metric card values use `tabular-nums` (`ManagerTriageDashboard`); extend the same class anywhere counts and dates should align in columns.
+- **2026-04-11 (pass 2):** `tabular-nums` on `StatsCard` and shift-board `KpiTile` values; `Geist_Mono` loaded in `layout.tsx` with `--font-geist-mono` (see `@theme` `--font-mono`); decorative backgrounds in `globals.css` (`.teamwise-grid-bg*`, `.teamwise-aurora-bg`, table row hover, new `.teamwise-hero-grid-bg`) use `color-mix` with `var(--primary)` / `var(--muted)` instead of hardcoded RGB; homepage hero grid uses `.teamwise-hero-grid-bg`; `StatsCard` shadow uses `color-mix` with `var(--foreground)`.
+- **2026-04-11 (pass 3 — elevation):** Legacy arbitrary slate shadows removed; canonical list and usage guidance is **Shadow map** above (source: `globals.css` → `Elevation shadows`).
+
+## Decisions Log
+
+| Date       | Decision                                     | Rationale                                                                 |
+| ---------- | -------------------------------------------- | ------------------------------------------------------------------------- |
+| 2026-04-11 | Initial design system created                | `/design-consultation` — product context + healthcare scheduling research |
+| 2026-04-11 | Fraunces for display; DM Sans for UI         | Split keeps marketing memorable and grids fast to read                    |
+| 2026-04-11 | Warm canvas + teal primary + amber attention | Matches category trust signals while staying distinct from cold gray SaaS |

@@ -97,7 +97,7 @@ export default function LoginPage() {
           </div>
         </div>
         <div className="relative">
-          <p className="font-heading text-3xl font-bold leading-tight tracking-tight text-white">
+          <p className="font-display text-3xl font-bold leading-tight tracking-tight text-white">
             Scheduling that keeps care moving.
           </p>
           <p className="mt-4 text-sm leading-relaxed text-[var(--sidebar-foreground)]">

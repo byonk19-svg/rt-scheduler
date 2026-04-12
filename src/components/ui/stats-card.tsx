@@ -28,7 +28,7 @@ export function StatsCard({
     <Component
       onClick={onClick}
       className={cn(
-        'rounded-xl border border-border bg-card px-5 py-4 text-left shadow-[0_1px_3px_rgba(15,23,42,0.05)]',
+        'rounded-xl border border-border bg-card px-5 py-4 text-left shadow-tw-md-soft',
         clickable &&
           'cursor-pointer transition-colors duration-150 hover:bg-muted/25 active:scale-[0.98]',
         className
@@ -40,7 +40,7 @@ export function StatsCard({
             {label}
           </p>
           <p
-            className={cn('mt-1 font-heading text-2xl font-semibold tracking-tight', {
+            className={cn('mt-1 font-heading text-2xl font-semibold tracking-tight tabular-nums', {
               'text-foreground': variant === 'default',
               'text-[var(--success-text)]': variant === 'success',
               'text-[var(--warning-text)]': variant === 'warning',

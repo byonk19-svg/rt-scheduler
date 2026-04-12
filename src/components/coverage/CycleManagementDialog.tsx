@@ -75,7 +75,7 @@ export function CycleManagementDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[34rem] border-border/80 bg-card shadow-[0_30px_80px_-28px_rgba(15,23,42,0.45)]">
+      <DialogContent className="max-w-[34rem] border-border/80 bg-card shadow-tw-modal">
         <DialogHeader className="text-left">
           <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--info-border)] bg-[var(--info-subtle)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--info-text)]">
             <CalendarPlus className="h-3.5 w-3.5" />

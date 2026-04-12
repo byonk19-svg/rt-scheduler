@@ -245,7 +245,7 @@ export default async function StaffDashboardPage({
     <div className="space-y-4">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
-      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_12px_rgba(15,23,42,0.06)]">
+      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-tw-float-lg">
         <div className="flex flex-col gap-3 border-b border-border px-4 py-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">

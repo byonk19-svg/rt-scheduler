@@ -125,7 +125,7 @@ export function ManagerTriageDashboard({
 
   return (
     <div className="max-w-[1120px] space-y-4 px-5 py-5 xl:px-7">
-      <div className="teamwise-aurora-bg relative overflow-hidden rounded-[26px] border border-border/70 bg-card p-5 shadow-[0_20px_40px_-34px_rgba(15,23,42,0.5)]">
+      <div className="teamwise-aurora-bg relative overflow-hidden rounded-[26px] border border-border/70 bg-card p-5 shadow-tw-inbox-hero">
         <div className="teamwise-grid-bg-subtle absolute inset-0 opacity-70" />
         <div className="relative flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -217,7 +217,7 @@ export function ManagerTriageDashboard({
               />
             ))}
 
-          <Card className="rounded-2xl border-border/70 bg-card shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
+          <Card className="rounded-2xl border-border/70 bg-card shadow-tw-float-tight">
             <CardHeader className="pb-2 pt-4">
               <CardTitle className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                 Coverage Risks
@@ -258,7 +258,7 @@ export function ManagerTriageDashboard({
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border-border/70 bg-card shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
+          <Card className="rounded-2xl border-border/70 bg-card shadow-tw-float-tight">
             <CardHeader className="pb-2 pt-4">
               <CardTitle className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                 Recent Activity
@@ -287,7 +287,7 @@ export function ManagerTriageDashboard({
         </div>
 
         <div className="space-y-4 xl:sticky xl:top-4 xl:self-start">
-          <Card className="rounded-2xl border-border/70 bg-card shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
+          <Card className="rounded-2xl border-border/70 bg-card shadow-tw-float-tight">
             <CardHeader className="pb-2 pt-4">
               <CardTitle className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                 Manager Inbox
@@ -325,7 +325,7 @@ export function ManagerTriageDashboard({
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border-border/70 bg-card shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
+          <Card className="rounded-2xl border-border/70 bg-card shadow-tw-float-tight">
             <CardHeader className="pb-2 pt-4">
               <CardTitle className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                 Upcoming Days
@@ -387,7 +387,7 @@ function MetricCard({
     <Link href={href} className="block">
       <Card
         className={cn(
-          'relative overflow-hidden rounded-[24px] border-border/70 bg-card/95 shadow-[0_16px_36px_-32px_rgba(15,23,42,0.5)] transition-transform duration-200 hover:-translate-y-0.5',
+          'relative overflow-hidden rounded-[24px] border-border/70 bg-card/95 shadow-tw-metric transition-transform duration-200 hover:-translate-y-0.5',
           isEmpty && 'border-dashed bg-muted/20 shadow-none'
         )}
       >
@@ -399,7 +399,7 @@ function MetricCard({
         <CardContent className="space-y-1 pb-4">
           <p
             className={cn(
-              'font-heading leading-none tracking-[-0.04em]',
+              'font-heading tabular-nums leading-none tracking-[-0.04em]',
               isEmpty
                 ? 'text-xl font-semibold text-muted-foreground'
                 : 'text-4xl font-bold text-foreground'

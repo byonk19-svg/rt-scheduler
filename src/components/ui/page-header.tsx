@@ -29,7 +29,7 @@ export function PageHeader({ title, subtitle, badge, actions, className }: PageH
       className={cn(
         'relative overflow-hidden rounded-2xl border border-border/90 px-6 py-5',
         'bg-[color-mix(in_oklch,var(--card)_92%,var(--secondary))]',
-        'shadow-[0_1px_3px_rgba(15,23,42,0.08),0_16px_40px_rgba(15,23,42,0.06)]',
+        'shadow-tw-header',
         className
       )}
     >

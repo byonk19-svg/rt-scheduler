@@ -25,7 +25,7 @@ export function AvailabilityWorkspaceShell({
     <div className="space-y-6">
       <section
         data-slot="availability-workspace-aside"
-        className="overflow-hidden rounded-[1.75rem] border border-border bg-card shadow-[0_1px_3px_rgba(15,23,42,0.08)]"
+        className="overflow-hidden rounded-[1.75rem] border border-border bg-card shadow-tw-md-strong"
       >
         {aside}
       </section>
@@ -37,7 +37,7 @@ export function AvailabilityWorkspaceShell({
     <div className="space-y-6">
       <section
         data-slot="availability-workspace-primary"
-        className="overflow-hidden rounded-[1.75rem] border border-border bg-card shadow-[0_1px_3px_rgba(15,23,42,0.08)]"
+        className="overflow-hidden rounded-[1.75rem] border border-border bg-card shadow-tw-md-strong"
       >
         {primaryHeader ? (
           <div className="border-b border-border/80 px-6 py-4">{primaryHeader}</div>

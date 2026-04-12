@@ -102,7 +102,7 @@ export function PreliminaryScheduleView({
 
         <div className="space-y-10">
           {cards.length === 0 ? (
-            <div className="rounded-xl border border-border bg-card px-6 py-10 text-center shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+            <div className="rounded-xl border border-border bg-card px-6 py-10 text-center shadow-tw-sm">
               <p className="text-sm font-semibold text-foreground">
                 No preliminary items need your attention right now.
               </p>

@@ -56,7 +56,7 @@ export function PreliminaryShiftCard({
   const actionable = card.canClaim || card.canRequestChange
 
   return (
-    <article className="rounded-xl border border-border bg-card px-4 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+    <article className="rounded-xl border border-border bg-card px-4 py-4 shadow-tw-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">

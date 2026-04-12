@@ -339,7 +339,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
             removes the block. Email log is below.
           </p>
         </div>
-        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-tw-sm">
           {cyclesLoadError ? (
             <div className="px-4 py-8 text-center text-sm text-muted-foreground">
               Could not load schedule blocks. Refresh, or run database migrations.
@@ -459,7 +459,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
             only removes the log entry, not the schedule block—use Schedule blocks above to archive.
           </p>
         </div>
-        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-tw-sm">
           {events.length === 0 ? (
             <div className="flex flex-col items-center gap-3 px-6 py-14 text-center">
               <div className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-muted">

@@ -7,8 +7,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-dm-sans, 'DM Sans', 'Segoe UI', sans-serif);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-dm-sans), 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -48,8 +48,7 @@
 }
 
 :root {
-  --font-geist-mono:
-    'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  /* --font-geist-mono: set on <html> via next/font (layout.tsx) */
   --radius: 0.625rem;
 
   /* Lovable core theme */
@@ -135,15 +134,23 @@
 
 .teamwise-grid-bg {
   background-image:
-    linear-gradient(rgba(106, 165, 200, 0.2) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(106, 165, 200, 0.2) 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--primary) 22%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--primary) 22%, transparent) 1px, transparent 1px);
   background-size: 28px 28px;
 }
 
 .teamwise-grid-bg-subtle {
   background-image:
-    linear-gradient(rgba(106, 165, 200, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(106, 165, 200, 0.04) 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--primary) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--primary) 7%, transparent) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* Marketing hero — same grid language as `.teamwise-grid-bg-subtle`, tuned for light sections */
+.teamwise-hero-grid-bg {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--primary) 9%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--primary) 9%, transparent) 1px, transparent 1px);
   background-size: 28px 28px;
 }
 
@@ -153,8 +160,16 @@
 
 .teamwise-aurora-bg {
   background-image:
-    radial-gradient(ellipse at 12% 10%, rgba(6, 103, 169, 0.1), transparent 40%),
-    radial-gradient(ellipse at 90% 2%, rgba(206, 223, 227, 0.35), transparent 45%);
+    radial-gradient(
+      ellipse at 12% 10%,
+      color-mix(in srgb, var(--primary) 12%, transparent),
+      transparent 40%
+    ),
+    radial-gradient(
+      ellipse at 90% 2%,
+      color-mix(in srgb, var(--muted) 42%, transparent),
+      transparent 45%
+    );
 }
 
 /* ─── Typography ──────────────────────────────────────────────────────────── */
@@ -165,7 +180,7 @@
   font-weight: 700;
   letter-spacing: -0.025em;
   color: var(--foreground);
-  font-family: var(--font-plus-jakarta), 'DM Sans', sans-serif;
+  font-family: var(--font-sans);
 }
 
 .app-section-title {
@@ -174,11 +189,151 @@
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--foreground);
-  font-family: var(--font-plus-jakarta), 'DM Sans', sans-serif;
+  font-family: var(--font-sans);
 }
 
+/* Section titles, dialogs, nav — same as body (DESIGN.md) */
 .font-heading {
-  font-family: var(--font-plus-jakarta), 'DM Sans', sans-serif;
+  font-family: var(--font-sans);
+}
+
+/* Homepage hero, auth marketing column — set by next/font on <html> as --font-display */
+.font-display {
+  font-family: var(--font-display), ui-serif, Georgia, 'Times New Roman', serif;
+}
+
+/* ─── Elevation shadows (token-based; replaces rgba(15,23,42,…) in components) ─── */
+
+.shadow-tw-2xs {
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--foreground) 2%, transparent);
+}
+
+.shadow-tw-xs {
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--foreground) 4%, transparent);
+}
+
+.shadow-tw-2xs-soft {
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--foreground) 3%, transparent);
+}
+
+.shadow-tw-sm {
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+
+.shadow-tw-md {
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+.shadow-tw-md-soft {
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+
+.shadow-tw-md-strong {
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+
+.shadow-tw-float {
+  box-shadow: 0 1px 10px color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+.shadow-tw-float-lg {
+  box-shadow: 0 1px 12px color-mix(in srgb, var(--foreground) 7%, transparent);
+}
+
+.shadow-tw-float-tight {
+  box-shadow: 0 1px 8px color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+
+.shadow-tw-pill {
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+.shadow-tw-inbox-hero {
+  box-shadow: 0 20px 40px -34px color-mix(in srgb, var(--foreground) 22%, transparent);
+}
+
+.shadow-tw-metric {
+  box-shadow: 0 16px 36px -32px color-mix(in srgb, var(--foreground) 22%, transparent);
+}
+
+.shadow-tw-panel {
+  box-shadow: 0 18px 40px -32px color-mix(in srgb, var(--foreground) 18%, transparent);
+}
+
+.shadow-tw-panel-inner {
+  box-shadow: 0 12px 28px -28px color-mix(in srgb, var(--foreground) 20%, transparent);
+}
+
+.shadow-tw-panel-inner-soft {
+  box-shadow: 0 10px 30px -24px color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+.shadow-tw-modal {
+  box-shadow: 0 30px 80px -28px color-mix(in srgb, var(--foreground) 20%, transparent);
+}
+
+.shadow-tw-modal-lg {
+  box-shadow: 0 32px 80px -28px color-mix(in srgb, var(--foreground) 20%, transparent);
+}
+
+.shadow-tw-popover {
+  box-shadow: 0 24px 56px -28px color-mix(in srgb, var(--foreground) 20%, transparent);
+}
+
+.shadow-tw-hero-media {
+  box-shadow: 0 40px 80px -24px color-mix(in srgb, var(--foreground) 14%, transparent);
+}
+
+.shadow-tw-header {
+  box-shadow:
+    0 1px 3px color-mix(in srgb, var(--foreground) 8%, transparent),
+    0 16px 40px color-mix(in srgb, var(--foreground) 7%, transparent);
+}
+
+.shadow-tw-double-panel {
+  box-shadow:
+    0 1px 3px color-mix(in srgb, var(--foreground) 8%, transparent),
+    0 10px 28px color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+.shadow-tw-day-hover {
+  box-shadow: 0 18px 36px -28px color-mix(in srgb, var(--foreground) 18%, transparent);
+}
+
+.shadow-tw-day-warning {
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--foreground) 2%, transparent),
+    0 0 0 1px var(--warning-border);
+}
+
+.shadow-tw-cell-error {
+  box-shadow: 0 2px 8px -4px color-mix(in srgb, var(--foreground) 14%, transparent);
+}
+
+.shadow-tw-cell-info {
+  box-shadow: 0 2px 8px -4px color-mix(in srgb, var(--foreground) 12%, transparent);
+}
+
+.shadow-tw-primary-glow {
+  box-shadow: 0 10px 24px -14px color-mix(in srgb, var(--primary) 38%, transparent);
+}
+
+.shadow-tw-day-selected {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--primary) 30%, transparent),
+    0 18px 36px -30px color-mix(in srgb, var(--primary) 32%, transparent);
+}
+
+.shadow-tw-ring-attention {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--attention) 12%, transparent);
+}
+
+.shadow-tw-ring-error-soft {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--destructive) 8%, transparent);
+}
+
+.shadow-tw-inset-highlight {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--card) 45%, white 55%);
 }
 
 /* ─── Print ───────────────────────────────────────────────────────────────── */
@@ -325,8 +480,8 @@
     margin-top: 1rem;
   }
 
-  .availability-page-print .shadow-\[0_1px_3px_rgba\(15\,23\,42\,0\.06\)\],
-  .availability-page-print .shadow-\[0_1px_3px_rgba\(15\,23\,42\,0\.08\)\] {
+  .availability-page-print .shadow-tw-md,
+  .availability-page-print .shadow-tw-md-strong {
     box-shadow: none !important;
   }
 }
@@ -355,7 +510,7 @@
 
 /* Use box-shadow overlay so status-colored cells keep their background color */
 tr:hover td {
-  box-shadow: inset 0 0 0 9999px rgba(6, 103, 169, 0.04);
+  box-shadow: inset 0 0 0 9999px color-mix(in srgb, var(--primary) 5%, transparent);
 }
 
 tr {

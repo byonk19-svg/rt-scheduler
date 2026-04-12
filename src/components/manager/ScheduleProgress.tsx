@@ -54,7 +54,7 @@ export function ScheduleProgress({
   ]
 
   return (
-    <div className="relative overflow-hidden rounded-[26px] border border-border/70 bg-card shadow-[0_18px_40px_-32px_rgba(15,23,42,0.42)]">
+    <div className="relative overflow-hidden rounded-[26px] border border-border/70 bg-card shadow-tw-panel">
       <div className="teamwise-grid-bg-subtle teamwise-aurora-bg absolute inset-x-0 top-0 h-28 opacity-80" />
 
       <div className="relative flex items-start justify-between gap-3 border-b border-border/70 px-5 py-4">
@@ -66,7 +66,7 @@ export function ScheduleProgress({
             Schedule Completion
           </h3>
         </div>
-        <div className="rounded-full border border-border/70 bg-card px-3 py-1 text-right shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
+        <div className="rounded-full border border-border/70 bg-card px-3 py-1 text-right shadow-tw-md">
           <p className="font-heading text-sm font-semibold leading-none text-foreground">
             {overall.pct}%
           </p>
@@ -80,7 +80,7 @@ export function ScheduleProgress({
         {rows.map((row, index) => (
           <motion.div
             key={row.label}
-            className="rounded-[22px] border border-border/75 bg-card/95 px-4 py-3.5 shadow-[0_12px_28px_-28px_rgba(15,23,42,0.45)]"
+            className="rounded-[22px] border border-border/75 bg-card/95 px-4 py-3.5 shadow-tw-panel-inner"
             initial={{ opacity: 0, x: -16 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: index * 0.08, duration: 0.3 }}

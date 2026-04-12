@@ -441,7 +441,7 @@ export function ManagerSchedulingInputs({
           <AvailabilityStatusSummary submittedRows={submittedRows} missingRows={missingRows} />
         }
         lower={
-          <div className="rounded-[1.75rem] border border-border bg-card px-5 py-5 shadow-[0_1px_3px_rgba(15,23,42,0.08)]">
+          <div className="rounded-[1.75rem] border border-border bg-card px-5 py-5 shadow-tw-md-strong">
             <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
               Saved planner dates
             </p>

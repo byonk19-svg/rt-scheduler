@@ -42,7 +42,7 @@ export function AutoDraftConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[34rem] overflow-hidden border-border/80 bg-card p-0 shadow-[0_32px_80px_-28px_rgba(15,23,42,0.45)]">
+      <DialogContent className="max-w-[34rem] overflow-hidden border-border/80 bg-card p-0 shadow-tw-modal-lg">
         <div className="teamwise-grid-bg-subtle teamwise-aurora-bg border-b border-border/70 px-5 py-4 sm:px-6">
           <div className="inline-flex items-center gap-2 rounded-full border border-[var(--info-border)] bg-[var(--info-subtle)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--info-text)]">
             <Sparkles className="h-3.5 w-3.5" />
@@ -60,7 +60,7 @@ export function AutoDraftConfirmDialog({
         </div>
 
         <div className="space-y-4 px-5 py-5 sm:px-6">
-          <div className="rounded-[20px] border border-[var(--warning-border)] bg-[var(--warning-subtle)]/70 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
+          <div className="rounded-[20px] border border-[var(--warning-border)] bg-[var(--warning-subtle)]/70 p-4 shadow-tw-inset-highlight">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--warning-text)]">
               High-impact action
             </p>
@@ -70,7 +70,7 @@ export function AutoDraftConfirmDialog({
             </p>
           </div>
 
-          <div className="rounded-[22px] border border-border/80 bg-card/90 p-4 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.35)]">
+          <div className="rounded-[22px] border border-border/80 bg-card/90 p-4 shadow-tw-panel-inner-soft">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               Autodraft ruleset
             </p>
@@ -107,7 +107,7 @@ export function AutoDraftConfirmDialog({
             size="sm"
             onClick={handleApply}
             disabled={!canSubmit}
-            className="min-w-[8.5rem] gap-1.5 shadow-[0_10px_24px_-14px_rgba(6,103,169,0.55)]"
+            className="min-w-[8.5rem] gap-1.5 shadow-tw-primary-glow"
           >
             <Sparkles className="h-3.5 w-3.5" />
             Generate draft

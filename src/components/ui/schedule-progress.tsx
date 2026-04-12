@@ -58,7 +58,7 @@ export function ScheduleProgress({
   return (
     <div
       className={cn(
-        'flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(15,23,42,0.05)]',
+        'flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card shadow-tw-md-soft',
         className
       )}
     >

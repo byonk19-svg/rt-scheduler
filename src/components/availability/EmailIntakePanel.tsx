@@ -190,7 +190,7 @@ export function EmailIntakePanel({
           rows.map((row) => (
             <div
               key={row.id}
-              className="rounded-xl border border-border/70 bg-card/70 p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+              className="rounded-xl border border-border/70 bg-card/70 p-4 shadow-tw-sm"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-1">

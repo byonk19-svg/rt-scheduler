@@ -95,7 +95,7 @@ export function AssignmentStatusPopover({
       <PopoverContent
         side="right"
         align="start"
-        className="w-64 rounded-[24px] border-border/70 p-2.5 shadow-[0_24px_56px_-28px_rgba(15,23,42,0.45)]"
+        className="w-64 rounded-[24px] border-border/70 p-2.5 shadow-tw-popover"
         data-testid="coverage-status-popover"
         onClick={(event) => event.stopPropagation()}
       >

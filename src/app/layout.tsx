@@ -1,21 +1,30 @@
 import type { Metadata } from 'next'
-import { DM_Sans, Plus_Jakarta_Sans } from 'next/font/google'
+import { DM_Sans, Fraunces, Geist_Mono } from 'next/font/google'
 import { Suspense } from 'react'
 import { AppShell, type AppShellUser } from '@/components/AppShell'
 import { toUiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 import './globals.css'
 
+/** UI + body — DESIGN.md */
 const dmSans = DM_Sans({
   subsets: ['latin'],
   display: 'swap',
+  variable: '--font-dm-sans',
 })
 
-const plusJakarta = Plus_Jakarta_Sans({
+/** Marketing hero + auth brand panel only — DESIGN.md */
+const fraunces = Fraunces({
   subsets: ['latin'],
-  weight: ['600', '700', '800'],
-  variable: '--font-plus-jakarta',
   display: 'swap',
+  variable: '--font-display',
+})
+
+/** Code / IDs — DESIGN.md */
+const geistMono = Geist_Mono({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-geist-mono',
 })
 
 export const metadata: Metadata = {
@@ -67,7 +76,7 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="en" className={plusJakarta.variable}>
+    <html lang="en" className={`${dmSans.variable} ${fraunces.variable} ${geistMono.variable}`}>
       <body className={`${dmSans.className} antialiased`}>
         <Suspense fallback={children}>
           <AppShell user={appShellUser}>{children}</AppShell>

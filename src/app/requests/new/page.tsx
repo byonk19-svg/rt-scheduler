@@ -574,7 +574,7 @@ function SwapRequestPageContent() {
       )}
 
       {view === 'form' && (
-        <div className="rounded-2xl border border-border/90 bg-[color-mix(in_oklch,var(--card)_92%,var(--secondary))] px-4 py-4 shadow-[0_1px_3px_rgba(15,23,42,0.08),0_10px_28px_rgba(15,23,42,0.06)] sm:px-5">
+        <div className="rounded-2xl border border-border/90 bg-[color-mix(in_oklch,var(--card)_92%,var(--secondary))] px-4 py-4 shadow-tw-double-panel sm:px-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <Button variant="outline" size="sm" onClick={handleBack}>

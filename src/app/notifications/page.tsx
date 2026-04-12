@@ -166,7 +166,7 @@ export default async function NotificationsPage({
 
   return (
     <div className="mx-auto max-w-4xl space-y-4 px-2 pb-6">
-      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_10px_rgba(15,23,42,0.05)]">
+      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-tw-float">
         <div className="flex flex-col gap-4 border-b border-border px-5 py-5 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-[1.85rem] font-bold tracking-tight text-foreground">

@@ -247,7 +247,7 @@ export default async function PublishEventDetailPage({
       />
 
       {/* Event metadata */}
-      <div className="rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="rounded-xl border border-border bg-card shadow-tw-sm">
         <div className="border-b border-border px-5 py-3">
           <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
             Event summary
@@ -306,7 +306,7 @@ export default async function PublishEventDetailPage({
       </div>
 
       {/* Failed recipients */}
-      <div className="rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="rounded-xl border border-border bg-card shadow-tw-sm">
         <div className="flex items-center justify-between gap-2 border-b border-border px-5 py-3">
           <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
             Failed recipients

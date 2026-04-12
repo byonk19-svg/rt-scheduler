@@ -22,7 +22,7 @@ function formatHistoryLabel(item: PreliminaryHistoryItem) {
 
 export function PreliminaryRequestHistory({ items, cancelAction }: PreliminaryRequestHistoryProps) {
   return (
-    <section className="rounded-xl border border-border bg-card px-4 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+    <section className="rounded-xl border border-border bg-card px-4 py-4 shadow-tw-sm">
       <h2 className="text-sm font-semibold text-foreground">Request history</h2>
       {items.length === 0 ? (
         <p className="mt-2 text-sm text-muted-foreground">No preliminary requests yet.</p>

@@ -653,7 +653,7 @@ export default function ShiftBoardPage() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-border/70 bg-card px-6 pb-4 pt-5 shadow-[0_1px_10px_rgba(15,23,42,0.05)]">
+      <div className="rounded-2xl border border-border/70 bg-card px-6 pb-4 pt-5 shadow-tw-float">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
@@ -989,7 +989,7 @@ function KpiTile({
         <span className="font-medium uppercase tracking-wide">{label}</span>
         <span className="text-muted-foreground">{icon}</span>
       </div>
-      <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">{value}</p>
+      <p className="mt-2 text-3xl font-bold tracking-tight text-foreground tabular-nums">{value}</p>
       <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
     </div>
   )

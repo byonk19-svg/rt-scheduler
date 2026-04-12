@@ -141,20 +141,20 @@ export function CalendarGrid({
                         role="gridcell"
                         data-testid={`coverage-day-panel-${day.id}`}
                         className={cn(
-                          'relative min-h-[156px] rounded-[20px] border bg-card px-2.75 py-2.25 text-left shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-[border-color,box-shadow,transform] duration-200',
-                          'hover:-translate-y-px hover:border-primary/35 hover:shadow-[0_18px_36px_-28px_rgba(15,23,42,0.42)]',
+                          'relative min-h-[156px] rounded-[20px] border bg-card px-2.75 py-2.25 text-left shadow-tw-2xs transition-[border-color,box-shadow,transform] duration-200',
+                          'hover:-translate-y-px hover:border-primary/35 hover:shadow-tw-day-hover',
                           cardTone === 'constraint' &&
-                            'border-[var(--warning-border)] bg-[var(--warning-subtle)]/55 shadow-[0_1px_0_rgba(15,23,42,0.02),0_0_0_1px_var(--warning-border)]',
+                            'border-[var(--warning-border)] bg-[var(--warning-subtle)]/55 shadow-tw-day-warning',
                           cardTone === 'missing_lead' &&
-                            'border-[var(--warning-border)]/85 bg-[var(--warning-subtle)]/42 shadow-[0_0_0_1px_rgba(217,119,6,0.12)]',
+                            'border-[var(--warning-border)]/85 bg-[var(--warning-subtle)]/42 shadow-tw-ring-attention',
                           cardTone === 'under' &&
-                            'border-[var(--error-border)]/80 bg-[var(--error-subtle)]/45 shadow-[0_0_0_1px_rgba(220,38,38,0.08)]',
+                            'border-[var(--error-border)]/80 bg-[var(--error-subtle)]/45 shadow-tw-ring-error-soft',
                           cardTone === 'partial' &&
                             'border-[var(--warning-border)]/55 bg-[var(--warning-subtle)]/30',
                           cardTone === 'full' &&
                             'border-[var(--success-border)]/45 bg-[var(--success-subtle)]/35',
                           selectedId === day.id &&
-                            'border-primary/60 shadow-[0_0_0_1px_rgba(6,103,169,0.3),0_18px_36px_-30px_rgba(6,103,169,0.4)]'
+                            'border-primary/60 shadow-tw-day-selected'
                         )}
                       >
                         <button
@@ -200,7 +200,7 @@ export function CalendarGrid({
                           <div className="flex flex-col items-end gap-1">
                             <span
                               className={cn(
-                                'min-w-[2.85rem] rounded-full px-2.5 py-1.5 text-center text-[0.7rem] font-extrabold leading-none tabular-nums shadow-[0_1px_2px_rgba(15,23,42,0.06)]',
+                                'min-w-[2.85rem] rounded-full px-2.5 py-1.5 text-center text-[0.7rem] font-extrabold leading-none tabular-nums shadow-tw-pill',
                                 threshold === 'red' &&
                                   'bg-[var(--error-subtle)] text-[var(--error-text)] ring-2 ring-[var(--error-border)]/50',
                                 threshold === 'yellow' &&

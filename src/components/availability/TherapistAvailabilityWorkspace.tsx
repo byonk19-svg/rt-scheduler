@@ -431,7 +431,7 @@ export function TherapistAvailabilityWorkspace({
 
       <form
         action={submitTherapistAvailabilityGridAction}
-        className="overflow-hidden rounded-[20px] border border-border/80 bg-card shadow-[0_1px_0_rgba(15,23,42,0.03)]"
+        className="overflow-hidden rounded-[20px] border border-border/80 bg-card shadow-tw-2xs-soft"
       >
         <input type="hidden" name="cycle_id" value={selectedCycleId} />
         <input type="hidden" name="return_to" value={returnToPath} />
@@ -514,14 +514,14 @@ export function TherapistAvailabilityWorkspace({
                       type="button"
                       onClick={() => handleDayClick(date)}
                       className={cn(
-                        'relative flex min-h-[5.75rem] flex-col items-center justify-center rounded-[20px] border px-1 py-2 text-center shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-[border-color,box-shadow,transform,background-color] duration-200',
+                        'relative flex min-h-[5.75rem] flex-col items-center justify-center rounded-[20px] border px-1 py-2 text-center shadow-tw-2xs transition-[border-color,box-shadow,transform,background-color] duration-200',
                         'hover:-translate-y-px focus-visible:border-ring focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
                         status === 'none' &&
                           'border-border/25 bg-muted/10 text-muted-foreground/85 shadow-none hover:border-primary/15 hover:bg-muted/18',
                         status === 'force_off' &&
-                          'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)] shadow-[0_2px_8px_-4px_rgba(15,23,42,0.2)] ring-1 ring-[var(--error-border)]/35',
+                          'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)] shadow-tw-cell-error ring-1 ring-[var(--error-border)]/35',
                         status === 'force_on' &&
-                          'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)] shadow-[0_2px_8px_-4px_rgba(15,23,42,0.18)] ring-1 ring-[var(--info-border)]/40',
+                          'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)] shadow-tw-cell-info ring-1 ring-[var(--info-border)]/40',
                         selectedDate === date &&
                           'z-[1] ring-1 ring-primary/70 ring-offset-1 ring-offset-card'
                       )}
