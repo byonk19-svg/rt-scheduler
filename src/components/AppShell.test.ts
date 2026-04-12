@@ -7,6 +7,7 @@ import {
   APP_SHELL_ACTIVE_NAV_CLASS,
   APP_SHELL_PROFILE_CARD_CLASS,
   APP_SHELL_SIDEBAR_CLASS,
+  buildManagerSections,
 } from '@/components/AppShell'
 
 const appShellSource = fs.readFileSync(
@@ -48,6 +49,13 @@ describe('AppShell navigation structure', () => {
     expect(appShellSource).toContain("label: 'Availability'")
   })
 
+  it('keeps the manager Schedule section active on the legacy /schedule route', () => {
+    const scheduleSection = buildManagerSections(0).find((section) => section.key === 'schedule')
+
+    expect(scheduleSection).toBeDefined()
+    expect(scheduleSection?.isActive('/schedule', null as never)).toBe(true)
+  })
+
   it('uses Open shifts wording in staff shell navigation', () => {
     expect(appShellSource).toContain("label: 'Open shifts'")
     expect(appShellSource).not.toContain("label: 'Shift Swaps'")
@@ -69,6 +77,10 @@ describe('AppShell navigation structure', () => {
     expect(appShellSource).toContain("label: 'Availability'")
     expect(appShellSource).toContain("label: 'Publish'")
     expect(appShellSource).toContain("label: 'Approvals'")
+  })
+
+  it('allows the fixed secondary nav to scroll horizontally on narrow screens', () => {
+    expect(appShellSource).toContain('overflow-x-auto')
   })
 
   it('merges Team and Requests under the People section', () => {

@@ -49,10 +49,21 @@ type PrimarySection = {
   subItems: SubNavItem[]
 }
 
+function isManagerScheduleRoute(pathname: string): boolean {
+  return (
+    pathname === '/coverage' ||
+    pathname === '/schedule' ||
+    pathname === '/availability' ||
+    pathname === '/publish' ||
+    pathname.startsWith('/publish/') ||
+    pathname === '/approvals'
+  )
+}
+
 // ─── Manager sections ──────────────────────────────────────────────────────
 // Three top-level sections: Today (inbox), Schedule (cycle workflow),
 // People (roster + requests). Sub-items appear in a secondary nav bar.
-function buildManagerSections(pendingCount: number): readonly PrimarySection[] {
+export function buildManagerSections(pendingCount: number): readonly PrimarySection[] {
   return [
     {
       key: 'today',
@@ -65,17 +76,13 @@ function buildManagerSections(pendingCount: number): readonly PrimarySection[] {
       key: 'schedule',
       label: 'Schedule',
       href: '/coverage',
-      isActive: (p) =>
-        p === '/coverage' ||
-        p === '/availability' ||
-        p === '/publish' ||
-        p.startsWith('/publish/') ||
-        p === '/approvals',
+      isActive: (p) => isManagerScheduleRoute(p),
       subItems: [
         {
           href: '/coverage',
           label: 'Coverage',
-          isActive: (p) => p === '/coverage',
+          // `/schedule` still redirects into the coverage workflow.
+          isActive: (p) => p === '/coverage' || p === '/schedule',
         },
         {
           href: '/availability',
@@ -426,30 +433,32 @@ export function AppShell({ user, children }: AppShellProps) {
           className="no-print print:hidden fixed top-14 left-0 right-0 z-20 h-11 border-b border-sidebar-border/50 bg-sidebar"
           aria-label="Section navigation"
         >
-          <div className="flex h-full items-center gap-0.5 px-5">
-            {activeSection.subItems.map((item) => {
-              const active = item.isActive(pathname, searchParams)
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    'relative flex h-full items-center gap-1.5 px-3 text-[13px] font-medium transition-colors duration-150',
-                    active
-                      ? 'text-sidebar-primary after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-t-full after:bg-[color:var(--sidebar-ring)]'
-                      : 'text-sidebar-foreground hover:text-sidebar-accent-foreground'
-                  )}
-                  aria-current={active ? 'page' : undefined}
-                >
-                  {item.label}
-                  {item.showBadge && (
-                    <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[color:var(--attention)] px-1 text-[10px] font-bold text-white">
-                      {pendingCount}
-                    </span>
-                  )}
-                </Link>
-              )
-            })}
+          <div className="h-full overflow-x-auto">
+            <div className="flex h-full min-w-max items-center gap-0.5 px-5">
+              {activeSection.subItems.map((item) => {
+                const active = item.isActive(pathname, searchParams)
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      'relative flex h-full shrink-0 items-center gap-1.5 px-3 text-[13px] font-medium transition-colors duration-150',
+                      active
+                        ? 'text-sidebar-primary after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-t-full after:bg-[color:var(--sidebar-ring)]'
+                        : 'text-sidebar-foreground hover:text-sidebar-accent-foreground'
+                    )}
+                    aria-current={active ? 'page' : undefined}
+                  >
+                    {item.label}
+                    {item.showBadge && (
+                      <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[color:var(--attention)] px-1 text-[10px] font-bold text-white">
+                        {pendingCount}
+                      </span>
+                    )}
+                  </Link>
+                )
+              })}
+            </div>
           </div>
         </nav>
       )}
