@@ -6,6 +6,7 @@ import { notifyPublishedShiftStatusChanged } from '@/lib/published-schedule-noti
 import { isTrustedMutationRequest } from '@/lib/security/request-origin'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { getOne } from '@/lib/schedule-helpers'
 
 const ASSIGNMENT_STATUS_VALUES = [
   'scheduled',
@@ -46,11 +47,6 @@ type ShiftNotificationLookupRow = {
   shift_type: 'day' | 'night'
   user_id: string | null
   schedule_cycles: { published: boolean } | { published: boolean }[] | null
-}
-
-function getOne<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null
-  return value ?? null
 }
 
 function isAllowedAssignmentStatus(value: string): value is AssignmentStatus {

@@ -1,27 +1,10 @@
 import { NextResponse } from 'next/server'
 
+import { hmacSha256Hex } from '@/lib/security/worker-auth'
+
 const WORKER_KEY_HEADER = 'x-publish-worker-key'
 const WORKER_TIMESTAMP_HEADER = 'x-publish-worker-timestamp'
 const WORKER_SIGNATURE_HEADER = 'x-publish-worker-signature'
-
-function toHex(bytes: ArrayBuffer): string {
-  return Array.from(new Uint8Array(bytes))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('')
-}
-
-async function hmacSha256Hex(secret: string, payload: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  )
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(payload))
-  return toHex(signature)
-}
 
 export async function GET(request: Request) {
   // Vercel cron sends: Authorization: Bearer <CRON_SECRET>

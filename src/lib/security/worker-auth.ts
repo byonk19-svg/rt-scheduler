@@ -4,7 +4,7 @@ const WORKER_TIMESTAMP_HEADER = 'x-publish-worker-timestamp'
 const WORKER_SIGNATURE_HEADER = 'x-publish-worker-signature'
 const MAX_TIMESTAMP_SKEW_SECONDS = 300
 
-function toHex(bytes: ArrayBuffer): string {
+export function toHex(bytes: ArrayBuffer): string {
   return Array.from(new Uint8Array(bytes))
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('')
@@ -42,7 +42,7 @@ function buildSignaturePayload(
   return [request.method.toUpperCase(), pathname, String(timestamp)].join('\n')
 }
 
-async function hmacSha256Hex(secret: string, payload: string): Promise<string> {
+export async function hmacSha256Hex(secret: string, payload: string): Promise<string> {
   const encoder = new TextEncoder()
   const key = await crypto.subtle.importKey(
     'raw',

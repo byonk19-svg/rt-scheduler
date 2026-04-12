@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import { getOne } from '@/lib/schedule-helpers'
+
 export type PublishDeliveryStatus = 'queued' | 'sent' | 'failed'
 
 export type PublishDeliveryCount = {
@@ -42,11 +44,6 @@ const RESEND_MAX_ATTEMPTS = 3
 
 function dedupeEventIds(eventIds: string[]): string[] {
   return Array.from(new Set(eventIds.filter(Boolean)))
-}
-
-function getOne<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null
-  return value ?? null
 }
 
 export function getPublishEmailConfig() {

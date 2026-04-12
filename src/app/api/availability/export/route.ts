@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
+import { getOne } from '@/lib/schedule-helpers'
 
 type AvailabilityExportRow = {
   date: string
@@ -17,11 +18,6 @@ type AvailabilityExportRow = {
     | { label: string; start_date: string; end_date: string }
     | { label: string; start_date: string; end_date: string }[]
     | null
-}
-
-function getOne<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null
-  return value ?? null
 }
 
 function escapeCsv(value: string): string {
