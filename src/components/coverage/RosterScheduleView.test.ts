@@ -53,9 +53,9 @@ describe('chunkRosterWeeks', () => {
 })
 
 describe('resolveRosterCellIntent', () => {
-  it('gives managers assignment editing for any day cell', () => {
-    expect(resolveRosterCellIntent(true, true, false)).toBe('assignment')
-    expect(resolveRosterCellIntent(true, true, true)).toBe('assignment')
+  it('gives managers quick-assign on empty cells and actions on filled cells', () => {
+    expect(resolveRosterCellIntent(true, true, false)).toBe('quick_assign')
+    expect(resolveRosterCellIntent(true, true, true)).toBe('manage')
   })
 
   it('gives non-manager leads status editing only when a shift exists', () => {

@@ -234,6 +234,11 @@ export function CoverageClientPage({
   const [cycleDialogOpen, setCycleDialogOpen] = useState(false)
   const [error, setError] = useState<string>('')
   const [assignError, setAssignError] = useState<string>('')
+  const [rosterCellError, setRosterCellError] = useState<{
+    dayId: string
+    memberId: string
+    message: string
+  } | null>(null)
   const [canManageCoverage, setCanManageCoverage] = useState(false)
   const [canUpdateAssignmentStatus, setCanUpdateAssignmentStatus] = useState(false)
   const [actorRole, setActorRole] = useState<Role | null>(null)
@@ -836,6 +841,7 @@ export function CoverageClientPage({
     profileDefaultAppliedRef.current = true
     setSelectedId(null)
     setAssignError('')
+    setRosterCellError(null)
     const params = new URLSearchParams(search.toString())
     params.set(COVERAGE_SHIFT_QUERY_KEY, shiftTabToQueryValue(tab))
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
@@ -845,53 +851,69 @@ export function CoverageClientPage({
     setViewMode(nextViewMode)
     setSelectedId(null)
     setAssignError('')
+    setRosterCellError(null)
     const params = new URLSearchParams(search.toString())
     params.set('view', nextViewMode)
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
-  const handleSelect = (id: string) => {
+  const handleSelect = useCallback((id: string) => {
     window.requestAnimationFrame(() => {
       setSelectedId((prev) => (prev === id ? null : id))
     })
     setAssignError('')
-  }
+    setRosterCellError(null)
+  }, [])
   const handleClose = () => {
     setSelectedId(null)
     setAssigning(false)
     setAssignError('')
+    setRosterCellError(null)
   }
 
-  const handleAssignTherapist = useCallback(
-    async (userId: string, role: 'lead' | 'staff') => {
-      if (!selectedDay || !userId || !activeCycleId) return
+  const assignTherapistToDay = useCallback(
+    async (dayId: string, userId: string, role: 'lead' | 'staff', options?: { inline?: boolean }) => {
+      const targetDay = days.find((day) => day.id === dayId)
+      if (!targetDay || !userId || !activeCycleId) return
 
       setAssigning(true)
       setError('')
+      if (options?.inline) {
+        setRosterCellError(null)
+      }
 
       const selectedTherapist = allTherapists.find((t) => t.id === userId) ?? null
-      const shiftType = selectedDay.shiftType === 'Day' ? 'day' : 'night'
+      const shiftType = shiftTab === 'Day' ? 'day' : 'night'
 
       const { data: inserted, error: insertError } = await assignCoverageShiftViaApi({
         cycleId: activeCycleId,
         userId,
-        isoDate: selectedDay.isoDate,
+        isoDate: targetDay.isoDate,
         shiftType,
         role,
       })
 
       if (insertError || !inserted) {
         console.error('Assign failed:', insertError)
-        if (insertError?.code === '23505') {
-          setAssignError(`${selectedTherapist?.full_name ?? 'This therapist'} is already assigned on this day.`)
+        const message =
+          insertError?.code === '23505'
+            ? `${selectedTherapist?.full_name ?? 'This therapist'} is already assigned on this day.`
+            : insertError?.message ?? 'Could not assign therapist. Please try again.'
+        if (options?.inline) {
+          setRosterCellError({
+            dayId,
+            memberId: userId,
+            message,
+          })
         } else {
-          setAssignError(insertError?.message ?? 'Could not assign therapist. Please try again.')
+          setAssignError(message)
         }
         setAssigning(false)
         return
       }
 
       setAssignError('')
+      setRosterCellError(null)
       const insertedRow = inserted as {
         id: string
         user_id: string
@@ -910,14 +932,14 @@ export function CoverageClientPage({
       if (role === 'lead') {
         setDays((current) =>
           current.map((day) => {
-            if (day.id !== selectedDay.id) return day
+            if (day.id !== targetDay.id) return day
             return { ...day, leadShift: nextShift, dayStatus: 'published' as DayStatus }
           })
         )
       } else {
         setDays((current) =>
           current.map((day) => {
-            if (day.id !== selectedDay.id) return day
+            if (day.id !== targetDay.id) return day
             return {
               ...day,
               staffShifts: [...day.staffShifts, nextShift].sort((a, b) =>
@@ -930,7 +952,29 @@ export function CoverageClientPage({
 
       setAssigning(false)
     },
-    [activeCycleId, allTherapists, selectedDay, setDays]
+    [activeCycleId, allTherapists, days, setDays, shiftTab]
+  )
+
+  const handleAssignTherapist = useCallback(
+    async (userId: string, role: 'lead' | 'staff') => {
+      if (!selectedDay) return
+      await assignTherapistToDay(selectedDay.id, userId, role)
+    },
+    [assignTherapistToDay, selectedDay]
+  )
+
+  const handleRosterQuickAssign = useCallback(
+    async (dayId: string, memberId: string, role: 'lead' | 'staff') => {
+      await assignTherapistToDay(dayId, memberId, role, { inline: true })
+    },
+    [assignTherapistToDay]
+  )
+
+  const handleRosterOpenEditor = useCallback(
+    (dayId: string) => {
+      handleSelect(dayId)
+    },
+    [handleSelect]
   )
 
   const handleChangeStatus = useCallback(
@@ -1506,18 +1550,18 @@ export function CoverageClientPage({
               <CalendarDays className="h-6 w-6 text-muted-foreground" />
             </div>
             <h2 className="font-heading text-xl font-semibold tracking-[-0.03em] text-foreground">
-              {canManageCoverage ? 'Ready to build your first block' : 'No schedule available yet'}
+              {canManageCoverage ? 'Ready to build your first cycle' : 'No schedule available yet'}
             </h2>
             <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
               {canManageCoverage
-                ? '6-week blocks are your scheduling windows. Create one to open the day and night staffing grids.'
+                  ? '6-week cycles are your scheduling windows. Create one to open the day and night staffing grids.'
                 : 'A manager has not created a schedule block yet. Check back after the next cycle is set up.'}
             </p>
             {canManageCoverage && (
               <div className="mt-7">
                 <ol className="mx-auto mb-6 flex max-w-xs flex-col gap-2.5 text-left">
                   {[
-                    'Create a 6-week block',
+                    'Create a 6-week cycle',
                     'Run Auto-draft to fill shifts',
                     'Publish to notify your team',
                   ].map((step, i) => (
@@ -1584,6 +1628,63 @@ export function CoverageClientPage({
                 )}
               </section>
             )}
+            {showEmptyDraftState && renderedViewMode === 'roster' && (
+              <section className="mb-4 rounded-[1.75rem] border border-dashed border-border/70 bg-muted/8 px-6 py-9 text-center shadow-none">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
+                  <CalendarDays className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <h2 className="font-heading text-lg font-semibold tracking-[-0.03em] text-foreground">
+                  {canManageCoverage ? 'Roster is ready for first assignments' : 'No staffing published yet'}
+                </h2>
+                <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+                  {canManageCoverage
+                    ? 'Use Auto-draft for a fast first pass, then click any roster date cell to fine-tune staffing and assignment status.'
+                    : 'This block exists in roster view, but staffing has not been published yet. Check back soon or switch cycles above.'}
+                </p>
+                {canManageCoverage && (
+                  <>
+                    <ol className="mx-auto mt-5 flex max-w-xs flex-col gap-2.5 text-left">
+                      {[
+                        'Run Auto-draft to populate shifts',
+                        'Click a roster cell to edit assignments',
+                        'Publish when coverage is ready',
+                      ].map((step, i) => (
+                        <li key={step} className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-foreground/60">
+                            {i + 1}
+                          </span>
+                          {step}
+                        </li>
+                      ))}
+                    </ol>
+                    <div className="mt-5 flex justify-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="gap-1.5"
+                        disabled={!activeCycleId || activeCyclePublished}
+                        onClick={() => setAutoDraftDialogOpen(true)}
+                      >
+                        <Sparkles className="h-3.5 w-3.5" />
+                        Auto-draft
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 text-muted-foreground"
+                        onClick={() => {
+                          const first = days[0]
+                          if (first) handleSelect(first.id)
+                        }}
+                      >
+                        Open first day
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </section>
+            )}
           {renderedViewMode === 'roster' ? (
             <RosterScheduleView
               title={`Respiratory Therapy ${shiftTab} Shift`}
@@ -1594,8 +1695,11 @@ export function CoverageClientPage({
               canManageCoverage={canManageCoverage}
               canUpdateAssignmentStatus={canUpdateAssignmentStatus && !canManageCoverage}
               selectedDayId={selectedId}
-              onSelectDay={handleSelect}
+              cellError={rosterCellError}
+              onAssignCell={handleRosterQuickAssign}
+              onOpenEditor={handleRosterOpenEditor}
               onChangeStatus={handleChangeStatus}
+              onUnassign={handleUnassign}
             />
           ) : (
             <CalendarGrid

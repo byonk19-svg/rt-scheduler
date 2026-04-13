@@ -66,5 +66,6 @@ security_best_practices_report.md
 .codex-dev.err.log
 .codex-start.log
 .codex-start.err.log
+.tmp-dev*.log
 .omx/
 .codex/
