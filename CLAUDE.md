@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-12 (session 54)
+Updated: 2026-04-13 (session 55)
 
 ## Handoff Snapshot
 
@@ -41,6 +41,21 @@ Updated: 2026-04-12 (session 54)
 - `vercel deploy --prod --yes` for production shipping
 
 The session entries below are historical context. They may describe local-only or superseded work and should not override the snapshot above.
+
+## Latest Updates (2026-04-13, session 55)
+
+- **Shift assignment dialog audit + improvement planning** (`src/components/coverage/ShiftEditorDialog.tsx`, `src/app/coverage/CoverageClientPage.tsx`):
+  - Audited what data is already fetched/displayed vs. what is missing.
+  - `TherapistOption` type already includes: `id`, `full_name`, `shift_type`, `isLeadEligible`, `employment_type`, `max_work_days_per_week`.
+  - Already built in dialog: `atLimit` / "Weekly limit reached", "Already assigned on this day" conflict check, FMLA staff excluded at query level, shift_type filtering at query level.
+  - **NOT yet queried:** `availability_overrides` (needed for force_off display + PRN eligibility filter), `work_patterns` (needed for preferred-day cues).
+  - Notifications fire at **publish time**, not per-assignment — "Save & Notify" pattern would be misleading; do not implement.
+  - **Three easy wins identified and implementation prompt written** (no schema changes needed):
+    1. **Employment type badge** — render `[PRN]` / `[PT]` inline after therapist name using `employment_type` already in props
+    2. **Coverage progress bar** — `X / 5 covered` in dialog header derived from `selectedDay.leadShift` + `selectedDay.staffShifts`; red < 3, green 3–5, amber > 5
+    3. **Lead required alert** — amber `AlertTriangle` banner above therapist sections when `selectedDay.leadShift` is null and `canEdit` is true
+  - Key file line refs: therapist fetch `CoverageClientPage.tsx:669–676`, weekly count logic `728–744`, dialog invocation `1485–1502`.
+- **Installed `claude-mem` plugin** (v12.1.0, user scope) — worker runs on port 37777 on the remote server; not accessible from local browser without SSH port forwarding. Memory capture is automatic within Claude Code sessions; `/mem-search` available for searching past context.
 
 ## Latest Updates (2026-04-12, session 54)
 
