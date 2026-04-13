@@ -117,15 +117,7 @@ export default function SignUpPage() {
     <main className="flex min-h-screen">
       {/* Left brand panel — desktop only */}
       <aside className="relative hidden overflow-hidden bg-[var(--sidebar)] lg:flex lg:w-[440px] lg:shrink-0 lg:flex-col lg:justify-between lg:p-12">
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px)',
-            backgroundSize: '28px 28px',
-          }}
-        />
+        <div aria-hidden className="teamwise-login-grid-bg absolute inset-0" />
         <div className="relative flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--attention)]">
             <CalendarDays className="h-5 w-5 text-accent-foreground" />

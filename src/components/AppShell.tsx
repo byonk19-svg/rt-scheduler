@@ -345,7 +345,7 @@ export function AppShell({ user, children }: AppShellProps) {
       </a>
 
       {/* ── Primary top nav ─────────────────────────────────────────────── */}
-      <header className="no-print print:hidden fixed top-0 left-0 right-0 z-30 h-14 border-b border-sidebar-border/70 bg-sidebar text-sidebar-foreground shadow-[0_1px_8px_rgba(0,0,0,0.08)]">
+      <header className="no-print print:hidden fixed top-0 left-0 right-0 z-30 h-14 border-b border-sidebar-border/70 bg-sidebar text-sidebar-foreground shadow-tw-header">
         <div className="flex h-full items-center gap-3 px-4">
           {/* Logo */}
           <Link
