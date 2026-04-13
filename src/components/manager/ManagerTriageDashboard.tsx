@@ -88,6 +88,9 @@ export function ManagerTriageDashboard({
     pendingRequests === '--' ? LOADING_LABEL : `${pendingRequests} pending`
   const teamLoadLabel =
     upcomingShiftCount === '--' ? LOADING_LABEL : `${upcomingShiftCount} upcoming shifts`
+  const approvalsWaitingLabel =
+    approvalsWaiting === '--' ? LOADING_LABEL : `${approvalsWaiting} waiting for review`
+
   const fadeUp = {
     hidden: { opacity: 0, y: 8 },
     show: (index: number) => ({
@@ -124,10 +127,11 @@ export function ManagerTriageDashboard({
   ]
 
   return (
-    <div className="max-w-[1120px] space-y-4 px-5 py-5 xl:px-7">
-      <div className="teamwise-aurora-bg relative overflow-hidden rounded-[26px] border border-border/70 bg-card p-5 shadow-tw-inbox-hero">
+    <div className="max-w-[1120px] space-y-6 px-5 py-5 xl:px-7">
+      {/* Hero header — more internal breathing room */}
+      <div className="teamwise-aurora-bg relative overflow-hidden rounded-[26px] border border-border/70 bg-card px-6 py-6 shadow-tw-inbox-hero">
         <div className="teamwise-grid-bg-subtle absolute inset-0 opacity-70" />
-        <div className="relative flex flex-wrap items-start justify-between gap-3">
+        <div className="relative flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
               <h1 className="font-heading text-5xl font-bold tracking-[-0.05em] text-foreground">
@@ -157,8 +161,9 @@ export function ManagerTriageDashboard({
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
-        <div className="space-y-4">
+      <div className="grid gap-5 xl:grid-cols-[2fr_1fr]">
+        {/* Main column — varied spacing between sections */}
+        <div className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-3">
             {metricCards.map((card, index) => (
               <motion.div
@@ -178,7 +183,7 @@ export function ManagerTriageDashboard({
             nightShiftsFilled !== '--' &&
             nightShiftsTotal !== '--' &&
             (dayShiftsTotal === 0 && nightShiftsTotal === 0 ? (
-              <div className="relative overflow-hidden rounded-[26px] border border-dashed border-border/70 bg-card/80 px-5 py-5 shadow-none">
+              <div className="relative overflow-hidden rounded-[26px] border border-dashed border-border/70 bg-card/80 px-6 py-5 shadow-none">
                 <div className="flex items-start gap-4">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
                     <CalendarDays className="h-5 w-5 text-muted-foreground" />
@@ -217,64 +222,76 @@ export function ManagerTriageDashboard({
               />
             ))}
 
+          {/* Coverage Risks — divider rows instead of nested bordered boxes */}
           <Card className="rounded-2xl border-border/70 bg-card shadow-tw-float-tight">
-            <CardHeader className="pb-2 pt-4">
+            <CardHeader className="pb-3 pt-4">
               <CardTitle className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                 Coverage Risks
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 pb-4">
+            <CardContent className="pb-4">
               {todayActiveShifts.length > 0 ? (
-                todayActiveShifts.map((shift, index) => (
-                  <div
-                    key={`${shift.label}-${shift.detail}-${index}`}
-                    className="flex items-center justify-between rounded-lg border border-border/70 bg-card px-3 py-2.5"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <AlertTriangle className="h-4 w-4 text-[var(--warning-text)]" />
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{shift.label}</p>
-                        <p className="text-xs text-muted-foreground">{shift.detail}</p>
+                <div>
+                  {todayActiveShifts.map((shift, index) => (
+                    <div
+                      key={`${shift.label}-${shift.detail}-${index}`}
+                      className={cn(
+                        'flex items-center justify-between py-2.5',
+                        index > 0 && 'border-t border-border/50'
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--warning-text)]" />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{shift.label}</p>
+                          <p className="text-xs text-muted-foreground">{shift.detail}</p>
+                        </div>
                       </div>
+                      <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--warning-text)]">
+                        Review
+                      </span>
                     </div>
-                    <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--warning-text)]">
-                      Review
-                    </span>
+                  ))}
+                  <div className="mt-1 border-t border-border/50 pt-2">
+                    <Button variant="ghost" size="sm" className="h-7 gap-1 px-0 text-xs" asChild>
+                      <Link href={scheduleHref}>
+                        Fix coverage
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
                   </div>
-                ))
+                </div>
               ) : (
                 <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
                   {isLoading ? LOADING_LABEL : 'No active shift risks right now.'}
                 </p>
               )}
-              {todayActiveShifts.length > 0 && (
-                <Button variant="ghost" size="sm" className="h-7 gap-1 px-0 text-xs" asChild>
-                  <Link href={scheduleHref}>
-                    Fix coverage
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </Link>
-                </Button>
-              )}
             </CardContent>
           </Card>
 
+          {/* Recent Activity — dividers between items */}
           <Card className="rounded-2xl border-border/70 bg-card shadow-tw-float-tight">
-            <CardHeader className="pb-2 pt-4">
+            <CardHeader className="pb-3 pt-4">
               <CardTitle className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                 Recent Activity
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2.5 pb-4">
+            <CardContent className="pb-4">
               {recentActivity.length > 0 ? (
-                recentActivity.map((item, index) => (
-                  <div
-                    key={`${item.title}-${index}`}
-                    className="flex items-center justify-between gap-3"
-                  >
-                    <p className="text-sm text-foreground">{item.title}</p>
-                    <p className="text-xs text-muted-foreground">{item.timeLabel}</p>
-                  </div>
-                ))
+                <div>
+                  {recentActivity.map((item, index) => (
+                    <div
+                      key={`${item.title}-${index}`}
+                      className={cn(
+                        'flex items-center justify-between gap-3 py-2.5',
+                        index > 0 && 'border-t border-border/50'
+                      )}
+                    >
+                      <p className="text-sm text-foreground">{item.title}</p>
+                      <p className="shrink-0 text-xs text-muted-foreground">{item.timeLabel}</p>
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <p className="rounded-lg border border-dashed border-border px-3 py-5 text-center text-xs text-muted-foreground">
                   {isLoading
@@ -286,59 +303,72 @@ export function ManagerTriageDashboard({
           </Card>
         </div>
 
-        <div className="space-y-4 xl:sticky xl:top-4 xl:self-start">
+        {/* Sidebar — sticky, matches main column gap */}
+        <div className="space-y-5 xl:sticky xl:top-4 xl:self-start">
+          {/* Manager Inbox — dividers between rows */}
           <Card className="rounded-2xl border-border/70 bg-card shadow-tw-float-tight">
-            <CardHeader className="pb-2 pt-4">
+            <CardHeader className="pb-3 pt-4">
               <CardTitle className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                 Manager Inbox
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 pb-4">
-              <InboxRow
-                label="Current cycle"
-                value={currentCycleStatus}
-                detail={currentCycleDetail}
-                ctaHref={currentCycleCtaHref}
-                ctaLabel="New 6-week block"
-              />
-              <InboxRow
-                label="Next 6-week cycle"
-                value={nextCycleLabel}
-                detail={nextCycleDetail}
-                ctaHref={nextCycleCtaHref}
-                ctaLabel="Plan next cycle"
-              />
-              <InboxRow
-                label="Needs review"
-                value={needsReviewCount === '--' ? '--' : String(needsReviewCount)}
-                detail={needsReviewDetail}
-              />
-              <p className="text-[11px] text-muted-foreground">
-                {approvalsWaiting === '--' ? LOADING_LABEL : `${approvalsWaiting} waiting`}
-              </p>
-              <Button variant="ghost" size="sm" className="h-7 gap-1 px-0 text-xs" asChild>
-                <Link href={reviewHref}>
-                  Review updates
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </Button>
+            <CardContent className="pb-4">
+              <div className="space-y-0">
+                <InboxRow
+                  label="Current cycle"
+                  value={currentCycleStatus}
+                  detail={currentCycleDetail}
+                  ctaHref={currentCycleCtaHref}
+                  ctaLabel="New 6-week block"
+                />
+                <div className="border-t border-border/50 pt-3">
+                  <InboxRow
+                    label="Next 6-week cycle"
+                    value={nextCycleLabel}
+                    detail={nextCycleDetail}
+                    ctaHref={nextCycleCtaHref}
+                    ctaLabel="Plan next cycle"
+                  />
+                </div>
+                <div className="border-t border-border/50 pt-3">
+                  <InboxRow
+                    label="Needs review"
+                    value={needsReviewCount === '--' ? '--' : String(needsReviewCount)}
+                    detail={needsReviewDetail}
+                    subDetail={approvalsWaitingLabel}
+                    ctaHref={reviewHref}
+                    ctaLabel="Review updates"
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
 
+          {/* Upcoming Days — dividers between day rows */}
           <Card className="rounded-2xl border-border/70 bg-card shadow-tw-float-tight">
-            <CardHeader className="pb-2 pt-4">
+            <CardHeader className="pb-3 pt-4">
               <CardTitle className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                 Upcoming Days
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 pb-4">
+            <CardContent className="pb-4">
               {upcomingShiftDays.length > 0 ? (
-                upcomingShiftDays.map((item) => (
-                  <div key={item.label} className="flex items-center justify-between text-xs">
-                    <span className="text-foreground">{item.label}</span>
-                    <span className="text-muted-foreground">{item.count} shifts</span>
-                  </div>
-                ))
+                <div>
+                  {upcomingShiftDays.map((item, index) => (
+                    <div
+                      key={item.label}
+                      className={cn(
+                        'flex items-center justify-between py-2 text-xs',
+                        index > 0 && 'border-t border-border/50'
+                      )}
+                    >
+                      <span className="text-foreground">{item.label}</span>
+                      <span className="tabular-nums text-muted-foreground">
+                        {item.count} shifts
+                      </span>
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <p className="text-xs text-muted-foreground">
                   {isLoading ? LOADING_LABEL : 'No upcoming shift clusters right now.'}
@@ -396,7 +426,7 @@ function MetricCard({
           <CardTitle className="text-sm font-medium text-foreground">{title}</CardTitle>
           <div className={cn('rounded-full p-2', toneClasses.badge)}>{icon}</div>
         </CardHeader>
-        <CardContent className="space-y-1 pb-4">
+        <CardContent className="space-y-1 pb-5">
           <p
             className={cn(
               'font-heading tabular-nums leading-none tracking-[-0.04em]',
@@ -418,12 +448,14 @@ function InboxRow({
   label,
   value,
   detail,
+  subDetail,
   ctaHref,
   ctaLabel,
 }: {
   label: string
   value: string
   detail: string
+  subDetail?: string
   ctaHref?: string
   ctaLabel?: string
 }) {
@@ -434,6 +466,7 @@ function InboxRow({
       </p>
       <p className="mt-1 text-sm font-semibold text-foreground">{value}</p>
       <p className="text-[11px] text-muted-foreground">{detail}</p>
+      {subDetail && <p className="mt-0.5 text-[11px] text-muted-foreground">{subDetail}</p>}
       {ctaHref && ctaLabel && (
         <Button
           variant="ghost"
