@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process'
+import { createRequire } from 'node:module'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const args = new Set(process.argv.slice(2))
 const quick = args.has('--quick')
@@ -13,6 +18,12 @@ const env = {
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://example.supabase.co',
   NEXT_PUBLIC_SUPABASE_ANON_KEY:
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'ci-placeholder-anon-key',
+  // Stub Google Fonts at build time so CI passes without external network access.
+  // next/font/google supports NEXT_FONT_GOOGLE_MOCKED_RESPONSES for exactly this purpose.
+  // Only set it when not already provided by the caller.
+  NEXT_FONT_GOOGLE_MOCKED_RESPONSES:
+    process.env.NEXT_FONT_GOOGLE_MOCKED_RESPONSES ??
+    path.resolve(__dirname, 'google-fonts-mock.json'),
 }
 
 const securityRegressionTests = [

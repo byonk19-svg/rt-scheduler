@@ -1,0 +1,5 @@
+{
+  "https://fonts.googleapis.com/css2?family=DM+Sans:wght@100..1000&display=swap": "/* latin */\n@font-face {\n  font-family: 'DM Sans';\n  font-style: normal;\n  font-weight: 100 1000;\n  font-display: swap;\n  src: url(https://fonts.gstatic.com/mock/dmsans-n-latin.woff2) format('woff2');\n  unicode-range: U+0000-00FF;\n}\n",
+  "https://fonts.googleapis.com/css2?family=Fraunces:wght@100..900&display=swap": "/* latin */\n@font-face {\n  font-family: 'Fraunces';\n  font-style: normal;\n  font-weight: 100 900;\n  font-display: swap;\n  src: url(https://fonts.gstatic.com/mock/fraunces-n-latin.woff2) format('woff2');\n  unicode-range: U+0000-00FF;\n}\n",
+  "https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&display=swap": "/* latin */\n@font-face {\n  font-family: 'Geist Mono';\n  font-style: normal;\n  font-weight: 100 900;\n  font-display: swap;\n  src: url(https://fonts.gstatic.com/mock/geistmono-n-latin.woff2) format('woff2');\n  unicode-range: U+0000-00FF;\n}\n"
+}
