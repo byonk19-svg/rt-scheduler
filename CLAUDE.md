@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-12 (session 55)
+Updated: 2026-04-12 (session 56)
 
 ## Handoff Snapshot
 
@@ -29,10 +29,12 @@ Updated: 2026-04-12 (session 55)
 
 ### Where We Want To Go
 
-1. Move `Email Intake` higher on `/availability` and make the review/apply workflow more obvious.
-2. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
-3. Deploy production after significant public-surface changes (`vercel deploy --prod`) so `www.teamwise.work` matches `main`.
-4. Keep manual intake first-class even if Resend inbound is healthy. It is the practical fallback path for operations.
+1. **Coverage grid redesign** — Stitch explorations in session 56 converged on a swimlane grid (therapist rows × date columns) that mirrors the physical paper schedule managers already use. Target aesthetic: mostly white grid, color only for exceptions (FMLA = soft red, missing lead = amber flag, scheduled = small teal dot or plain "1"). When a final Stitch frame is approved, implement it in `src/components/coverage/CalendarGrid.tsx` and `CoverageClientPage.tsx`.
+2. Merge `claude/review-ui-flow-7Weav` (top nav) into `main` and deploy to production.
+3. Move `Email Intake` higher on `/availability` and make the review/apply workflow more obvious.
+4. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
+5. Deploy production after significant public-surface changes (`vercel deploy --prod`) so `www.teamwise.work` matches `main`.
+6. Keep manual intake first-class even if Resend inbound is healthy. It is the practical fallback path for operations.
 
 ### Verification Baseline
 
@@ -43,6 +45,15 @@ Updated: 2026-04-12 (session 55)
 - `vercel deploy --prod --yes` for production shipping
 
 The session entries below are historical context. They may describe local-only or superseded work and should not override the snapshot above.
+
+## Latest Updates (2026-04-12, session 56)
+
+- **Coverage grid design exploration (Stitch / no code yet)**:
+  - Reviewed the physical paper schedule (RT Night Shift, swimlane grid) as the reference mental model for the digital coverage view.
+  - Explored redesigns in Stitch iterating toward: therapist name rows × date columns, week-of groupings across the top, daily tally pinned at the bottom — directly mirroring the paper format managers already know.
+  - Established visual principle: **color = exception only**. Scheduled cells should be plain (white bg, small teal indicator or "1" in dark gray). Only FMLA (soft red), missing lead (amber), and gaps get color treatment. Full teal cell fills were rejected as too noisy.
+  - Target implementation files when design is finalized: `src/components/coverage/CalendarGrid.tsx`, `src/app/coverage/CoverageClientPage.tsx`.
+  - No code changes this session — waiting for approved Stitch frame before implementing.
 
 ## Latest Updates (2026-04-12, session 55)
 
