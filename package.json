@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
     "start:prod:local": "next start --port 3001",
@@ -16,6 +16,7 @@
     "screens:all": "node --env-file=.env.local scripts/capture-all-screens.mjs",
     "seed:users": "node --env-file=.env.local scripts/seed-users.mjs",
     "cleanup:seed-users": "node --env-file=.env.local scripts/cleanup-seed-users.mjs",
+    "sync:roster": "node --env-file=.env.local scripts/sync-team-roster.mjs",
     "verify:publish": "node --env-file=.env.local scripts/verify-publish-readiness.mjs",
     "ci:local": "node scripts/local-ci-fallback.mjs",
     "ci:local:quick": "node scripts/local-ci-fallback.mjs --quick",

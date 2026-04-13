@@ -5,12 +5,16 @@ Operational workflows as implemented in the current codebase.
 ## 0) Public Auth + Access Approval
 
 1. User lands on `/` and chooses `Sign in` or `Create account`.
-2. Therapist self-signup at `/signup` creates a pending account (`profiles.role = null`) and immediately signs in.
-3. Pending users are routed to `/pending-setup` and have no operational dashboard access.
+2. Therapist self-signup at `/signup` creates an auth user. The **`handle_new_user`** trigger inserts **`profiles`**:
+   - **Name roster match:** if the new user’s **normalized full name** matches an active row in **`employee_roster`** (managed on **`/team`**), the profile is created with the roster’s **role**, **shift**, **employment**, **max_work_days_per_week**, and **is_lead_eligible** (not pending). The roster row stores **`matched_profile_id`**. Signup then routes to **`/login?status=matched`** for a “ready to sign in” banner.
+   - **No match:** **`profiles.role`** stays **`null`** (pending). Signup routes to **`/login?status=requested`**.
+3. Pending users (`role = null`) are routed to `/pending-setup` and have no operational dashboard access.
 4. Manager reviews pending users at `/requests/user-access`.
 5. Manager approves with required role selection (`therapist` or `lead`) or declines.
 6. Approve activates access and sends approval email; decline deletes the pending auth account.
 7. E2E auth smoke uses a dedicated real account via `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` and verifies both login and logout.
+
+**Manager preload:** On **`/team`**, use **Employee roster** (single add or **bulk paste**) so names match what staff type at signup. For an ops-only **email list → auth + profiles** sync (not the name roster table), use **`npm run sync:roster`** (see **README**).
 
 ## 1) Manager: Build and Publish a Cycle
 

@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-13 (session 57)
+Updated: 2026-04-13 (session 58)
 
 ## Handoff Snapshot
 
@@ -19,7 +19,7 @@ Updated: 2026-04-13 (session 57)
 - Managers must now match both the therapist and the schedule block before `Apply dates` appears on an intake card. This prevents the old dead-end `email_intake_apply_failed` redirect when a therapist was matched but no cycle was attached yet.
 - **Schedule layout + role consistency:** `/coverage` now supports both **Grid** and **Roster** layouts. Managers can edit staffing from either layout by clicking a day cell; leads can update staffed cells to **`OC`**, **`LE`**, **`CX`**, or **`CI`** through the shared assignment-status flow. Users can save a default schedule layout (`Grid` or `Roster`) in `/profile`, and compatibility routes (`/schedule`, `/therapist/schedule`) now defer default layout selection to `/coverage` so a saved preference wins unless an explicit `view` query is present.
 - **Lead role source of truth:** product behavior now treats `profiles.role = 'lead'` as the source of truth for lead-only UI/actions. The legacy `is_lead_eligible` column is kept in sync to `role`, but Coverage, print/export, profile badges, swap partner filtering, and designated-lead actions should all be reasoned about in terms of `role`, not the legacy flag.
-- **Auth entry (`/login`, `/signup`):** `src/lib/auth/login-utils.ts` parses auth errors from top-level query params **or nested inside `redirectTo`** (e.g. `/availability?error=...`), maps friendly copy, and `router.replace` cleans error keys while preserving a sanitized `redirectTo`. Approval/allowlist copy shows as a **warning** banner with optional **Request access** link and dismiss; credential failures stay **destructive**. Successful access **request** redirects to **`/login?status=requested`** with an **info** banner (dismiss + URL strip); signup no longer auto-signs-in before that redirect. **Public homepage (`/`):** therapist-first copy, luminous background utilities (`--home-*`, `.teamwise-home-*`), header **Get started** (`/signup`) + **Sign in**, hero **Sign in** + **Create account** (`/signup`); Vitest contracts in `src/app/page.test.ts` and `src/app/globals.test.ts`. Shared **Input** focus ring uses **`--ring`**; **`:autofill`** + **`-webkit-autofill`** theming lives in `globals.css`.
+- **Auth entry (`/login`, `/signup`):** `src/lib/auth/login-utils.ts` parses auth errors from top-level query params **or nested inside `redirectTo`** (e.g. `/availability?error=...`), maps friendly copy, and `router.replace` cleans error keys while preserving a sanitized `redirectTo`. Approval/allowlist copy shows as a **warning** banner with optional **Request access** link and dismiss; credential failures stay **destructive**. Successful access **request** redirects to **`/login?status=requested`** with an **info** banner (dismiss + URL strip); signup no longer auto-signs-in before that redirect. **Name roster auto-match:** managers maintain **`employee_roster`** on **`/team`** (single row, **bulk paste**, or ops script). On signup, **`handle_new_user`** matches **normalized full name** to an active roster row; the new profile gets roster **role/settings** immediately (non-pending), the roster row records **`matched_profile_id`**, and signup sends users to **`/login?status=matched`** with a ready-to-sign-in banner. Unmatched signups stay **`profiles.role = null`** pending approval. **Migration:** `20260413123000_add_employee_roster_and_name_match_signup.sql`. **Ops:** `npm run sync:roster` bulk-creates **auth + profiles** from an email list file (separate from **`employee_roster`** name pre-match). **Public homepage (`/`):** therapist-first copy, luminous background utilities (`--home-*`, `.teamwise-home-*`), header **Get started** (`/signup`) + **Sign in**, hero **Sign in** + **Create account** (`/signup`); Vitest contracts in `src/app/page.test.ts` and `src/app/globals.test.ts`. Shared **Input** focus ring uses **`--ring`**; **`:autofill`** + **`-webkit-autofill`** theming lives in `globals.css`.
 - Mixed off/work sentences are parsed more accurately than before, but parser changes should continue to be driven by real inbound examples.
 - **Accessibility / theming pass (UI review branch):** root layout wraps the app in **`MotionProvider`** (`src/components/motion-provider.tsx`) with Framer **`MotionConfig reducedMotion="user"`** so motion respects **`prefers-reduced-motion`**. Prefer design tokens over raw **`text-white`** / **`bg-white`** / stray **`dark:`** on shared surfaces; destructive actions use **`text-destructive-foreground`**. **`globals.css`:** stronger **`--muted-foreground`**, **`--color-destructive-foreground`** in **`@theme`**, table row hover scoped to **`table:not(.no-row-hover)`**, marketing header + home preview shell reduce **`backdrop-filter`** under **`prefers-reduced-motion: reduce`**. **`/requests/new`** and **`/publish/[id]`** use **`ManagerWorkspaceHeader`**. **`LEAD_ELIGIBLE_BADGE_CLASS`** uses **`--info-*`** tokens (`src/lib/employee-tag-badges.ts`).
 - `RESEND_API_KEY` must support receiving APIs, not just sending. A send-only key fails on `/emails/receiving` with `401 restricted_api_key`.
@@ -77,6 +77,15 @@ The session entries below are historical context. They may describe local-only o
   - Added explicit Email Intake flow guidance (create intake → match therapist/cycle → apply dates), plus per-card next-step messaging so managers can tell what to do next at a glance.
   - Added therapist-side onboarding reminders clarifying **Save progress** (draft) vs **Submit availability** (official submission), then aligned related feedback toasts to the same concise voice.
 - **Verification:** focused Vitest coverage for schedule view routing, roster helpers, and drag-drop lead rules; `npm run lint`; `npm run build`.
+
+## Latest Updates (2026-04-13, session 58)
+
+- **Employee roster + name-based signup auto-link** (`supabase/migrations/20260413123000_add_employee_roster_and_name_match_signup.sql`, `src/app/team/actions.ts`, `src/app/team/page.tsx`, `src/components/team/EmployeeRosterPanel.tsx`, `src/app/signup/page.tsx`, `src/app/login/page.tsx`):
+  - New **`employee_roster`** table with manager RLS; **`handle_new_user`** matches **normalized full name** to an active unmatched roster row and provisions **`profiles`** with roster role, shift, employment, weekly cap, and lead eligibility; marks roster row **`matched_profile_id`** / **`matched_at`**.
+  - **`/team`**: single-row add + **bulk paste** import (`src/lib/employee-roster-bulk.ts`, `bulkUpsertEmployeeRosterAction`); list shows signed-up vs not.
+  - **Signup** calls **`checkNameRosterMatchAction`** after successful **`signUp`** to choose **`/login?status=matched`** vs **`requested`** (banner-only distinction; DB truth is the trigger).
+- **Ops script — email list → auth users** (`scripts/sync-team-roster.mjs`, `scripts/lib/parse-roster-line.mjs`, `npm run sync:roster`): service-role bulk create/update **therapist** profiles from a text file (separate workflow from **`employee_roster`** name pre-match).
+- **Verification:** `npm run lint` on touched files; `npx tsc --noEmit`; `npx vitest run src/lib/employee-roster-bulk.test.ts src/lib/parse-roster-line.test.ts`.
 
 ## Latest Updates (2026-04-12, session 55)
 
@@ -490,6 +499,7 @@ Assignment status is informational only (does not affect coverage counts or publ
 - Clicking a team member card opens a quick-edit modal on the same page
 - Sections are grouped by: managers, day shift (Lead Therapists, Therapists), night shift (Lead Therapists, Therapists), inactive
 - Quick edit is meant for roster/access fields: name, app role, shift type, employment type, FMLA, FMLA return date, active/inactive, recurring **work pattern** (works/offs DOW, hard/soft works mode, weekend rotation + anchor) for therapist/lead rows
+- **Employee roster (signup pre-match):** below the directory, **`EmployeeRosterPanel`** (`src/components/team/EmployeeRosterPanel.tsx`) edits **`employee_roster`** — preload **full names** (and optional role/shift/employment via bulk paste) so first-time signup can auto-link by **name** (see **Auth entry** above). Do not confuse this with **`npm run sync:roster`**, which is an email-list **auth/profile** sync for ops.
 - `Lead Therapist` is the visible manager-facing role label; the separate `Coverage lead` control was removed from `/team`
 - The page now shares the quieter manager workspace header pattern and lighter card framing used on `/availability` and `/approvals`
 - `/directory` should be treated as a compatibility redirect only, not a feature surface
@@ -603,6 +613,7 @@ Core tables:
 - `20260409145500_fix_custom_access_token_hook_for_pending_users.sql` (omit null `user_role` claim)
 - `20260412164000_sync_lead_eligibility_to_role.sql` (sync legacy `is_lead_eligible` to `role`)
 - `20260413083000_add_default_schedule_view_to_profiles.sql` (`profiles.default_schedule_view`)
+- `20260413123000_add_employee_roster_and_name_match_signup.sql` (`employee_roster`, name-match **`handle_new_user`**)
 
 ## Next High-Value Priorities
 

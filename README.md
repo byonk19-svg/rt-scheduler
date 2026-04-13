@@ -122,6 +122,19 @@ Optional env overrides:
 - `SEED_USERS_PASSWORD`
 - `SEED_INCLUDE_MANAGER` (`true` creates `manager@<domain>`)
 
+## Sync team roster from a file (ops / email list)
+
+Creates or updates **Auth** users and **`profiles`** from a text file (emails + names). This is **not** the same as the **`employee_roster`** name pre-match table on **`/team`** (used at signup to skip pending when the **name** matches).
+
+Requires **`NEXT_PUBLIC_SUPABASE_URL`** and **`SUPABASE_SERVICE_ROLE_KEY`** (e.g. via `.env.local`).
+
+```bash
+npm run sync:roster -- --file ./roster.txt --dry-run
+npm run sync:roster -- --file ./roster.txt
+```
+
+See comments at the top of `scripts/sync-team-roster.mjs` for line formats and options.
+
 ## Cleanup Seeded Demo Users
 
 Removes seeded/demo auth users and their cascaded profile/schedule data.

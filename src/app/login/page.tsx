@@ -30,6 +30,7 @@ const AUTH_REQUEST_TIMEOUT_MS = 10000
 
 const POST_SIGNUP_ACK_MESSAGE =
   'Request submitted. Your manager must approve access before you can sign in.'
+const POST_MATCHED_ACK_MESSAGE = 'Your account is ready. Sign in to get started.'
 
 function toFriendlyAuthError(message: string): string {
   const normalized = message.toLowerCase()
@@ -108,9 +109,10 @@ function LoginPageClient() {
   }, [extraction, router, searchParams])
 
   useEffect(() => {
-    if (searchParams.get('status') !== 'requested') return
+    const status = searchParams.get('status')
+    if (status !== 'requested' && status !== 'matched') return
     // eslint-disable-next-line react-hooks/set-state-in-effect -- persist post-signup acknowledgement, then strip transient status from URL (preserve redirectTo)
-    setPostSignupBanner(POST_SIGNUP_ACK_MESSAGE)
+    setPostSignupBanner(status === 'matched' ? POST_MATCHED_ACK_MESSAGE : POST_SIGNUP_ACK_MESSAGE)
     const next = new URLSearchParams(searchParams.toString())
     next.delete('status')
     const qs = next.toString()
