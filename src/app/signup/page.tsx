@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CalendarDays, Eye, EyeOff, Loader2 } from 'lucide-react'
 
+import { checkNameRosterMatchAction } from '@/app/team/roster-actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -101,7 +102,10 @@ export default function SignUpPage() {
         return
       }
 
-      router.push('/login?status=requested')
+      // Check if the signed-up name matched a pre-seeded roster entry.
+      // Roster-matched users get a real role immediately; others wait for manager approval.
+      const isRosterMatch = await checkNameRosterMatchAction(fullName).catch(() => false)
+      router.push(isRosterMatch ? '/login?status=matched' : '/login?status=requested')
       router.refresh()
     } catch (requestError) {
       const message =

@@ -1,8 +1,14 @@
 import { redirect } from 'next/navigation'
 
 import { archiveTeamMemberAction, saveTeamQuickEditAction } from '@/app/team/actions'
+import {
+  addRosterEmployeeAction,
+  removeRosterEmployeeAction,
+  type RosterEntry,
+} from '@/app/team/roster-actions'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
+import { EmployeeRosterPanel } from '@/components/team/EmployeeRosterPanel'
 import { TeamDirectory, type WorkPatternRecord } from '@/components/team/TeamDirectory'
 import { can } from '@/lib/auth/can'
 import { MANAGED_TEAM_ROLE_VALUES, parseRole } from '@/lib/auth/roles'
@@ -32,6 +38,8 @@ type TeamSearchParams = {
   success?: string | string[]
   error?: string | string[]
   edit_profile?: string | string[]
+  roster_success?: string | string[]
+  roster_error?: string | string[]
 }
 
 function getSearchParam(value: string | string[] | undefined): string | undefined {
@@ -43,6 +51,43 @@ function getTeamFeedback(params?: TeamSearchParams): {
   message: string
   variant: 'success' | 'error'
 } | null {
+  const rosterSuccess = getSearchParam(params?.roster_success)
+  const rosterError = getSearchParam(params?.roster_error)
+
+  if (rosterSuccess === 'employee_added') {
+    return { message: 'Employee added to roster.', variant: 'success' }
+  }
+  if (rosterSuccess === 'employee_removed') {
+    return { message: 'Roster entry removed.', variant: 'success' }
+  }
+  if (rosterError === 'missing_name') {
+    return { message: 'Name is required.', variant: 'error' }
+  }
+  if (rosterError === 'duplicate_name') {
+    return {
+      message: 'An unmatched roster entry with that name already exists.',
+      variant: 'error',
+    }
+  }
+  if (rosterError === 'invalid_role') {
+    return { message: 'Choose a valid role.', variant: 'error' }
+  }
+  if (rosterError === 'invalid_shift') {
+    return { message: 'Choose a valid shift.', variant: 'error' }
+  }
+  if (rosterError === 'add_failed') {
+    return { message: "Couldn't add employee to roster. Try again.", variant: 'error' }
+  }
+  if (rosterError === 'already_matched') {
+    return {
+      message: 'This employee has already signed up and cannot be removed.',
+      variant: 'error',
+    }
+  }
+  if (rosterError === 'remove_failed') {
+    return { message: "Couldn't remove roster entry. Try again.", variant: 'error' }
+  }
+
   const success = getSearchParam(params?.success)
   const error = getSearchParam(params?.error)
 
@@ -121,6 +166,15 @@ export default async function TeamPage({
 
   const allProfiles = (profiles ?? []) as ProfileRow[]
 
+  const { data: rosterRows } = await supabase
+    .from('employee_roster')
+    .select(
+      'id, full_name, email, role, shift_type, employment_type, is_lead_eligible, max_work_days_per_week, matched_profile_id, matched_at, created_at'
+    )
+    .order('created_at', { ascending: true })
+
+  const rosterEntries = (rosterRows ?? []) as RosterEntry[]
+
   const { data: patternRows } = await supabase
     .from('work_patterns')
     .select(
@@ -178,6 +232,12 @@ export default async function TeamPage({
         initialEditProfileId={initialEditProfileId}
         archiveTeamMemberAction={archiveTeamMemberAction}
         saveTeamQuickEditAction={saveTeamQuickEditAction}
+      />
+
+      <EmployeeRosterPanel
+        entries={rosterEntries}
+        addRosterEmployeeAction={addRosterEmployeeAction}
+        removeRosterEmployeeAction={removeRosterEmployeeAction}
       />
     </div>
   )
