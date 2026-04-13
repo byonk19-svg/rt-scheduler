@@ -222,6 +222,7 @@ export function CoverageClientPage({
   const [printUsers, setPrintUsers] = useState<PrintTherapist[]>([])
   const [printShiftByUserDate, setPrintShiftByUserDate] = useState<Record<string, ShiftStatus>>({})
   const [allTherapists, setAllTherapists] = useState<TherapistOption[]>([])
+  const [rosterProfiles, setRosterProfiles] = useState<RosterMemberRow[]>([])
   const [activeOpCodes, setActiveOpCodes] = useState<Map<string, string>>(new Map())
   const [assigning, setAssigning] = useState(false)
   const [unassigningShiftId, setUnassigningShiftId] = useState<string | null>(null)
@@ -407,14 +408,8 @@ export function CoverageClientPage({
 
   const showFullPrintRoster = canManageCoverage || actorRole === 'lead'
   const rosterMembers = useMemo<RosterMemberRow[]>(
-    () =>
-      (shiftTab === 'Day' ? printDayTeam : printNightTeam).map((member) => ({
-        id: member.id,
-        full_name: member.full_name,
-        role: member.role === 'lead' ? 'lead' : 'therapist',
-        employment_type: member.employment_type ?? 'full_time',
-      })),
-    [printDayTeam, printNightTeam, shiftTab]
+    () => rosterProfiles,
+    [rosterProfiles]
   )
   const clearLoadedScheduleState = useCallback(() => {
     setDayDays([])
@@ -756,6 +751,48 @@ export function CoverageClientPage({
       active = false
     }
   }, [shiftTab, supabase, canManageCoverage])
+
+  useEffect(() => {
+    let active = true
+    const shiftType = shiftTab === 'Day' ? 'day' : 'night'
+
+    void (async () => {
+      const { data, error: loadError } = await supabase
+        .from('profiles')
+        .select('id, full_name, role, employment_type')
+        .eq('shift_type', shiftType)
+        .eq('is_active', true)
+        .in('role', ['therapist', 'lead'])
+        .order('full_name', { ascending: true })
+
+      if (!active) return
+      if (loadError) {
+        console.error('Could not load roster profiles for schedule view:', loadError)
+        setRosterProfiles([])
+        return
+      }
+
+      setRosterProfiles(
+        (
+          (data ?? []) as Array<{
+            id: string
+            full_name: string
+            role: 'therapist' | 'lead'
+            employment_type: 'full_time' | 'part_time' | 'prn' | null
+          }>
+        ).map((row) => ({
+          id: row.id,
+          full_name: row.full_name,
+          role: row.role,
+          employment_type: row.employment_type ?? 'full_time',
+        }))
+      )
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [shiftTab, supabase])
 
   const selectedDayBase = useMemo(
     () => days.find((row) => row.id === selectedId) ?? null,
@@ -1506,7 +1543,7 @@ export function CoverageClientPage({
           </section>
         ) : (
           <>
-            {showEmptyDraftState && (
+            {showEmptyDraftState && renderedViewMode !== 'roster' && (
               <section className="mb-4 rounded-[1.75rem] border border-dashed border-border/70 bg-muted/8 px-6 py-9 text-center shadow-none">
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
                   <Sparkles className="h-5 w-5 text-muted-foreground" />
