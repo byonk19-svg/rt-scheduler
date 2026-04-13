@@ -56,11 +56,7 @@ function sanitizeOcrText(value: string): string {
 }
 
 function installPdfCanvasPolyfills() {
-  const canvasGlobals = globalThis as typeof globalThis & {
-    DOMMatrix?: typeof DOMMatrix
-    ImageData?: typeof ImageData
-    Path2D?: typeof Path2D
-  }
+  const canvasGlobals = globalThis as Record<string, unknown>
 
   canvasGlobals.DOMMatrix ??= DOMMatrix
   canvasGlobals.ImageData ??= ImageData
@@ -77,7 +73,7 @@ export async function renderPdfToImages(params: {
     data,
     disableWorker: true,
     useSystemFonts: false,
-  })
+  } as never)
   const pdf = await loadingTask.promise
   const images: RenderedPdfImage[] = []
 
@@ -95,7 +91,7 @@ export async function renderPdfToImages(params: {
       await page.render({
         canvasContext: context as never,
         viewport,
-      }).promise
+      } as never).promise
 
       images.push({
         contentType: 'image/png',
