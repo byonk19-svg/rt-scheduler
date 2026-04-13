@@ -170,7 +170,7 @@ function RosterMatrixTable({
       member.role === 'lead' && day && !day.leadShift ? 'lead' : 'staff'
     const cellHasError = cellError?.dayId === date && cellError?.memberId === member.id
     const sharedClass = cn(
-      'flex h-8 w-full items-center justify-center rounded-md text-[11px] font-semibold tracking-[0.04em] transition-colors',
+      'flex min-h-11 w-full touch-manipulation items-center justify-center rounded-md text-[11px] font-semibold tracking-[0.04em] transition-colors sm:h-8 sm:min-h-8',
       token.length > 0 ? 'text-primary' : 'text-transparent',
       cell?.isLead && 'text-[var(--warning-text)]',
       selectedDayId === date && 'bg-primary/10 ring-1 ring-primary/25',
@@ -204,7 +204,7 @@ function RosterMatrixTable({
             {onOpenEditor ? (
               <button
                 type="button"
-                className="mt-2 w-full rounded-lg bg-white px-2 py-1.5 text-left text-[12px] font-medium text-foreground hover:bg-muted/40"
+                className="mt-2 flex min-h-11 w-full items-center rounded-lg bg-card px-2 py-2 text-left text-[12px] font-medium text-foreground hover:bg-muted/40 sm:min-h-0 sm:py-1.5"
                 onClick={() => onOpenEditor(date)}
               >
                 Open editor
@@ -226,14 +226,14 @@ function RosterMatrixTable({
           <PopoverContent side="top" align="center" className="w-44 rounded-xl border-border/70 p-1.5 shadow-sm">
             <button
               type="button"
-              className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-muted/50"
+              className="flex min-h-11 w-full touch-manipulation items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-muted/50 sm:min-h-0"
               onClick={() => onUnassign?.(day.id, cell.shift.id, cell.isLead)}
             >
               Remove
             </button>
             <button
               type="button"
-              className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-muted/50"
+              className="flex min-h-11 w-full touch-manipulation items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-muted/50 sm:min-h-0"
               onClick={() => onOpenEditor?.(day.id)}
             >
               Open editor
@@ -261,7 +261,7 @@ function RosterMatrixTable({
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto overscroll-x-contain pb-0.5 [-webkit-overflow-scrolling:touch]">
       <table className="w-full min-w-[880px] table-fixed border-collapse">
         <thead>
           <tr className="bg-[var(--info-subtle)]/55">
@@ -275,14 +275,14 @@ function RosterMatrixTable({
               Week of {formatWeekLabel(weekDates[0] ?? '')}
             </th>
           </tr>
-          <tr className="bg-slate-50/90">
-            <th className="sticky left-0 z-20 border-b border-r border-border/70 bg-slate-50 px-4 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+          <tr className="bg-muted/90">
+            <th className="sticky left-0 z-20 border-b border-r border-border/70 bg-muted px-4 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
               Therapist name
             </th>
             {weekDates.map((date) => (
               <th
                 key={`head-${date}`}
-                className="border-b border-border/70 px-1 py-2 text-center text-[10px] font-bold text-muted-foreground"
+                className="border-b border-border/70 px-1 py-2.5 text-center text-[10px] font-bold text-muted-foreground sm:py-2"
               >
                 <div className="leading-none">{formatWeekdayShort(date)}</div>
                 <div className="mt-1 leading-none text-foreground/80">{formatDayNumber(date)}</div>
@@ -302,14 +302,17 @@ function RosterMatrixTable({
               <th
                 scope="row"
                 className={cn(
-                  'sticky left-0 z-10 border-r border-border/70 bg-white px-4 py-2 text-left text-[13px] font-medium text-foreground',
+                  'sticky left-0 z-10 border-r border-border/70 bg-card px-4 py-2 text-left text-[13px] font-medium text-foreground',
                   member.role === 'lead' && 'bg-primary/[0.06] font-semibold text-primary'
                 )}
               >
                 {member.full_name}
               </th>
               {weekDates.map((date) => (
-                <td key={`${member.id}-${date}`} className="border-l border-border/35 px-1 py-1 text-center">
+                <td
+                  key={`${member.id}-${date}`}
+                  className="border-l border-border/35 px-1 py-1.5 text-center sm:py-1"
+                >
                   {renderCell(member, date)}
                 </td>
               ))}
@@ -378,7 +381,10 @@ export function RosterScheduleView({
         />
       </div>
 
-      <section className="space-y-5 rounded-2xl border border-border/70 bg-white p-4 shadow-sm">
+      <section className="space-y-5 rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
+        <p className="text-xs text-muted-foreground md:hidden" aria-hidden="true">
+          Swipe sideways on the grid to see every day.
+        </p>
         <RosterMatrixTable
           weekDates={effectiveCycleDates}
           rows={sections.regularRows}

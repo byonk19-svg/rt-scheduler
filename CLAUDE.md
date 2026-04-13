@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-13 (session 58)
+Updated: 2026-04-13 (session 59)
 
 ## Handoff Snapshot
 
@@ -47,6 +47,13 @@ Updated: 2026-04-13 (session 58)
 - `vercel deploy --prod --yes` for production shipping
 
 The session entries below are historical context. They may describe local-only or superseded work and should not override the snapshot above.
+
+## Latest Updates (2026-04-13, session 59)
+
+- **Manager inbox** (`src/components/manager/ManagerTriageDashboard.tsx`, tests): **What to do next** card; removed duplicate hero **Open schedule / Approvals** buttons (destinations remain via metric cards + sidebar). **Metric cards**: helper copy (tap vs click), **Open** + chevron affordance, descriptive **`aria-label`** on links; softer hero grid overlay (`opacity-45`). **Schedule Completion** (`ScheduleProgress.tsx`): removed **Framer** row stagger; lowered decorative strip opacity.
+- **Coverage** (`CoverageClientPage.tsx`, `CalendarGrid.tsx`, `AssignmentStatusPopover.tsx`, `CoverageInteractionHint.tsx`, `src/lib/use-media-query.ts`): Dropped **page-level `motion`** wrappers on coverage shell; **managers** no longer see the redundant **“Draft — not visible…”** header chip when the **yellow draft banner** is shown (non-managers still see the chip). **Publish** action ordered **first** on narrow viewports in the header action row. **Schedule cycle** label uses **`text-xs`**. **Grid**: on **≤767px**, days with **>2 staff** show **two rows + “+N more”** expand control; **popover** uses bottom/center below **`md`**. **`CoverageInteractionHint`**: dismissible tip; **`useSyncExternalStore`** + custom event for **`localStorage`** (lint-safe, no sync `setState` in `useEffect`). **`eslint.config.mjs`**: ignore **`.cursor/**` for lint.
+- **Polish / adapt** (prior same-session passes): Homepage **`next/image`** pipeline (`page.tsx`, `page.test.ts`); **login** subtitle; **AppShell** / **NotificationBell** touch targets; **Roster** `bg-muted` tokens; **dialog** / **PreliminaryShiftCard** `focus-visible`.
+- **Verification:** `npm run lint`; `npx tsc --noEmit`; Vitest: `ManagerTriageDashboard`, `coverage/page`, `CalendarGrid`, `ScheduleProgress`.
 
 ## Latest Updates (2026-04-12, session 56)
 
@@ -380,6 +387,9 @@ All permission checks go through `can(role, permission)` in `src/lib/auth/can.ts
 - `src/components/availability/AvailabilityOverviewHeader.tsx` — manager-specific availability wrapper around the shared manager workspace header
 - `src/components/ui/skeleton.tsx` — `<Skeleton>`, `<SkeletonLine>`, `<SkeletonCard>`, `<SkeletonListItem>` loading states
 - `src/components/NotificationBell.tsx` — real-time bell with Supabase subscription; variants: `default` | `staff`
+- `src/components/manager/ManagerTriageDashboard.tsx` — manager **Inbox**: **What to do next**, metric deep-links to schedule/approvals (helper copy + chevron + **`aria-label`**)
+- `src/components/coverage/CoverageInteractionHint.tsx` — mobile-only dismissible coverage affordance tip; dismissal in **`localStorage`** via **`useSyncExternalStore`**
+- `src/lib/use-media-query.ts` — **`useSyncExternalStore`** + **`matchMedia`** (narrow layouts, popovers, calendar staff collapse)
 - `src/components/AppShell.tsx` — nav shell; manager nav is built from `buildManagerSections()` (`Today`, `Schedule`, `People`) and staff nav still uses `STAFF_NAV_ITEMS`. Keep `/schedule` treated as a coverage alias in the manager `Schedule` section, and keep the fixed secondary nav horizontally scrollable for mobile widths.
 - `src/components/feedback-toast.tsx` — `<FeedbackToast message variant>` for success/error toasts
 - `src/lib/auth/can.ts` — `can(role, permission)` — all permission checks go through here

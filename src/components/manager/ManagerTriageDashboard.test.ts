@@ -42,6 +42,9 @@ describe('ManagerTriageDashboard', () => {
     )
 
     expect(html).toContain('>Inbox</h1>')
+    expect(html).toContain('one workspace')
+    expect(html).toContain('What to do next')
+    expect(html).toContain('Address coverage risks')
     expect(html).not.toContain('Manager Dashboard')
     expect(html).toContain('Coverage Issues')
     expect(html).toContain('Pending Approvals')
@@ -84,9 +87,10 @@ describe('ManagerTriageDashboard', () => {
     )
 
     expect(html).toContain('Loading...')
+    expect(html).not.toContain('What to do next')
     expect(html).toContain('border-dashed')
-    expect(html).toContain('Review updates')
-    expect(html).toContain('Open schedule')
+    expect(html).toContain('Open approvals')
+    expect(html).toContain('Coverage Issues')
     expect(html).toContain('href="/approvals"')
     expect(html).toContain('href="/coverage?view=week"')
   })
@@ -120,6 +124,7 @@ describe('ManagerTriageDashboard', () => {
     )
 
     expect(html).not.toContain('Publish Readiness')
+    expect(html).toContain('Continue the active block')
     expect(html).toContain('text-xl font-semibold text-muted-foreground')
   })
 

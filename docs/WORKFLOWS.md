@@ -16,6 +16,11 @@ Operational workflows as implemented in the current codebase.
 
 **Manager preload:** On **`/team`**, use **Employee roster** (single add or **bulk paste**) so names match what staff type at signup. For an ops-only **email list → auth + profiles** sync (not the name roster table), use **`npm run sync:roster`** (see **README**).
 
+### Manager inbox (`/dashboard/manager`)
+
+- The **What to do next** card surfaces the highest-priority action (coverage gaps → pending approvals → reviews → continue block).
+- The three **metric cards** deep-link to **schedule** or **approvals**; on small screens helper copy clarifies that cards are tappable.
+
 ## 1) Manager: Build and Publish a Cycle
 
 1. Create/select a cycle in `/coverage`.
@@ -24,6 +29,7 @@ Operational workflows as implemented in the current codebase.
    - Navigation contract: manager AppShell must still treat `/schedule` as part of the `Schedule` section and highlight the `Coverage` secondary tab, since users still land there from legacy links and server redirects.
    - The fixed manager secondary nav must stay horizontally scrollable on narrow widths rather than shrinking or clipping workflow tabs.
    - `/coverage` supports both `Grid` and `Roster` layouts. Explicit `view` params are preserved through `/schedule` and `/therapist/schedule`, and the saved profile layout preference is resolved in `/coverage` when no explicit `view` is supplied.
+   - On **narrow viewports**, the coverage header action row orders **Publish** ahead of **Auto-draft** / **Send preliminary** so the ship action is easier to find first; a **dismissible tip** (mobile) explains tapping a day vs a therapist name for assignment status.
 2. Build draft assignments:
    - Manual add/move/remove/set lead, or
    - Auto-generate (`generateDraftScheduleAction`) using recurring patterns + cycle overrides.

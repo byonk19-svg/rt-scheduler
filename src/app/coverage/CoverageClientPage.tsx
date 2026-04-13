@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { CalendarDays, ChevronRight, Printer, Send, Sparkles } from 'lucide-react'
-import { motion } from 'framer-motion'
 
 import { AutoDraftConfirmDialog } from '@/components/coverage/AutoDraftConfirmDialog'
 import { ClearDraftConfirmDialog } from '@/components/coverage/ClearDraftConfirmDialog'
@@ -23,6 +22,7 @@ import {
   toggleCyclePublishedAction,
 } from '@/app/schedule/actions'
 import { StatusPill } from '@/components/coverage/AssignmentStatusPopover'
+import { CoverageInteractionHint } from '@/components/coverage/CoverageInteractionHint'
 import { CalendarGrid } from '@/components/coverage/CalendarGrid'
 import { RosterScheduleView, type RosterMemberRow } from '@/components/coverage/RosterScheduleView'
 import { ShiftEditorDialog } from '@/components/coverage/ShiftEditorDialog'
@@ -122,15 +122,6 @@ const VIEW_OPTIONS = [
   { value: 'week', label: 'Grid' },
   { value: 'roster', label: 'Roster' },
 ] as const
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 14 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.07, duration: 0.4 },
-  }),
-}
 
 function timestamp(): string {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -1120,13 +1111,7 @@ export function CoverageClientPage({
 
   return (
     <div className="min-h-screen bg-background">
-      <motion.div
-        variants={fadeUp}
-        initial="hidden"
-        animate="visible"
-        custom={0}
-        className="no-print"
-      >
+      <div className="no-print">
         <ManagerWorkspaceHeader
           title="Schedule"
           subtitle={scheduleSubtitle}
@@ -1162,11 +1147,14 @@ export function CoverageClientPage({
                       {preliminarySentLabel ? ` · ${preliminarySentLabel}` : ''}
                     </span>
                   )}
-                  {issueCount === 0 && !preliminaryLive && !activeCyclePublished && (
-                    <span className="text-[11px] text-muted-foreground/75">
-                      Draft — not visible to staff until published.
-                    </span>
-                  )}
+                  {issueCount === 0 &&
+                    !preliminaryLive &&
+                    !activeCyclePublished &&
+                    !canManageCoverage && (
+                      <span className="text-[11px] text-muted-foreground/75">
+                        Draft — not visible to staff until published.
+                      </span>
+                    )}
                 </>
               )}
             </>
@@ -1215,60 +1203,67 @@ export function CoverageClientPage({
                     </Link>
                   </>
                 ) : (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5 text-xs"
-                      disabled={!activeCycleId || activeCyclePublished}
-                      onClick={() => setAutoDraftDialogOpen(true)}
-                    >
-                      <Sparkles className="h-3.5 w-3.5" />
-                      Auto-draft
-                    </Button>
-                    <form action={sendPreliminaryScheduleAction}>
-                      <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
-                      <input type="hidden" name="view" value="week" />
-                      <input type="hidden" name="show_unavailable" value="false" />
-                      <input type="hidden" name="return_to" value="coverage" />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="order-2 inline-flex md:order-none">
                       <Button
-                        type="submit"
+                        type="button"
                         variant="outline"
                         size="sm"
                         className="gap-1.5 text-xs"
                         disabled={!activeCycleId || activeCyclePublished}
+                        onClick={() => setAutoDraftDialogOpen(true)}
                       >
-                        <Send className="h-3.5 w-3.5" />
-                        {preliminaryLive ? 'Refresh preliminary' : 'Send preliminary'}
+                        <Sparkles className="h-3.5 w-3.5" />
+                        Auto-draft
                       </Button>
-                    </form>
+                    </span>
+                    <span className="order-3 inline-flex md:order-none">
+                      <form action={sendPreliminaryScheduleAction}>
+                        <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+                        <input type="hidden" name="view" value="week" />
+                        <input type="hidden" name="show_unavailable" value="false" />
+                        <input type="hidden" name="return_to" value="coverage" />
+                        <Button
+                          type="submit"
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-xs"
+                          disabled={!activeCycleId || activeCyclePublished}
+                        >
+                          <Send className="h-3.5 w-3.5" />
+                          {preliminaryLive ? 'Refresh preliminary' : 'Send preliminary'}
+                        </Button>
+                      </form>
+                    </span>
                     {activeCyclePublished ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-1 text-xs font-medium text-[var(--success-text)]">
+                      <span className="order-1 inline-flex items-center gap-1.5 rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-1 text-xs font-medium text-[var(--success-text)] md:order-none">
                         <span className="h-1.5 w-1.5 rounded-full bg-[var(--success-text)]" />
                         Published
                       </span>
                     ) : (
-                      <form action={toggleCyclePublishedAction}>
-                        <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
-                        <input type="hidden" name="view" value="week" />
-                        <input type="hidden" name="show_unavailable" value="false" />
-                        <input type="hidden" name="currently_published" value="false" />
-                        <input type="hidden" name="override_weekly_rules" value="false" />
-                        <input type="hidden" name="override_shift_rules" value="false" />
-                        <input type="hidden" name="return_to" value="coverage" />
-                        <Button
-                          type="submit"
-                          size="sm"
-                          className="gap-1.5 text-xs"
-                          disabled={!activeCycleId}
-                        >
-                          <Send className="h-3.5 w-3.5" />
-                          Publish
-                        </Button>
-                      </form>
+                      <span className="order-1 inline-flex md:order-none">
+                        <form action={toggleCyclePublishedAction}>
+                          <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+                          <input type="hidden" name="view" value="week" />
+                          <input type="hidden" name="show_unavailable" value="false" />
+                          <input type="hidden" name="currently_published" value="false" />
+                          <input type="hidden" name="override_weekly_rules" value="false" />
+                          <input type="hidden" name="override_shift_rules" value="false" />
+                          <input type="hidden" name="return_to" value="coverage" />
+                          <Button
+                            type="submit"
+                            size="sm"
+                            className="gap-1.5 text-xs"
+                            disabled={!activeCycleId}
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                            Publish
+                          </Button>
+                        </form>
+                      </span>
                     )}
-                    <MoreActionsMenu>
+                    <span className="order-4 md:order-none">
+                      <MoreActionsMenu>
                       <button
                         type="button"
                         onClick={() => setCycleDialogOpen(true)}
@@ -1300,7 +1295,8 @@ export function CoverageClientPage({
                         Print
                       </button>
                     </MoreActionsMenu>
-                  </>
+                    </span>
+                  </div>
                 )}
               </>
             ) : (
@@ -1323,9 +1319,14 @@ export function CoverageClientPage({
         <div className="px-6 pb-2 pt-2">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-4">
             <div className="min-w-0 space-y-1">
-              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground/90">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground/90">
                 Schedule cycle
               </p>
+              {printCycle ? (
+                <p className="text-[11px] text-muted-foreground md:hidden">
+                  Active block: {formatHumanCycleRange(printCycle.start_date, printCycle.end_date)}
+                </p>
+              ) : null}
               <div className="flex flex-wrap items-center gap-1.5">
                 {availableCycles.slice(0, 4).map((cycle) => {
                   const isActive = cycle.id === activeCycleId
@@ -1396,15 +1397,26 @@ export function CoverageClientPage({
             )}
           </div>
         </div>
-      </motion.div>
+      </div>
 
-      <motion.div
-        variants={fadeUp}
-        initial="hidden"
-        animate="visible"
-        custom={1}
-        className="no-print px-6 py-4"
-      >
+      <div className="no-print px-6 py-4">
+        {!noCycleSelected && canManageCoverage && !activeCyclePublished && !preliminaryLive && (
+          <div className="mb-3 rounded-lg border border-[var(--warning-border)]/65 bg-[var(--warning-subtle)]/35 px-3 py-2 text-xs leading-snug text-[var(--warning-text)]">
+            <span className="font-semibold">Draft</span>
+            <span className="font-normal text-[var(--warning-text)]/88">
+              {' '}
+              · Therapists see this only after publish. Send a preliminary first if you want a
+              preview round.
+            </span>
+          </div>
+        )}
+        <CoverageInteractionHint
+          show={
+            !noCycleSelected &&
+            !showEmptyDraftState &&
+            (canManageCoverage || canUpdateAssignmentStatus)
+          }
+        />
         {/* Future: quick exception filters (understaffed, open slots, missing lead, conflicts). */}
         {activeCyclePublished && (
           <>
@@ -1714,7 +1726,7 @@ export function CoverageClientPage({
           )}
           </>
         )}
-      </motion.div>
+      </div>
 
       <ShiftEditorDialog
         open={Boolean(selectedDay)}

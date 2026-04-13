@@ -90,7 +90,7 @@ export function PreliminaryShiftCard({
             id={`shift-note-${card.shiftId}`}
             name="note"
             rows={2}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/30"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
             placeholder={
               card.canClaim
                 ? 'Optional note for the manager'
@@ -99,7 +99,7 @@ export function PreliminaryShiftCard({
           />
           <button
             type="submit"
-            className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
+            className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground outline-none transition hover:bg-primary/90 focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
             {card.canClaim ? 'Claim shift' : 'Request change'}
           </button>

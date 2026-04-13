@@ -213,7 +213,7 @@ export function NotificationBell({ variant = 'default' }: NotificationBellProps)
             }
           }
         }}
-        className={`relative inline-flex h-9 w-9 items-center justify-center rounded-md border ${
+        className={`relative inline-flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-md border ${
           isShellVariant
             ? 'border-sidebar-border bg-sidebar-accent/35 text-sidebar-foreground hover:bg-sidebar-accent'
             : `border-border bg-card text-foreground ${isStaffVariant ? '' : 'hover:bg-secondary'}`

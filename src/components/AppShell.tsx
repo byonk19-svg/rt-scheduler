@@ -236,7 +236,7 @@ function UserDropdown({
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-label="User menu"
-        className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 transition-colors duration-150 hover:bg-sidebar-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+        className="flex min-h-11 min-w-11 touch-manipulation items-center justify-center gap-1.5 rounded-lg px-2 transition-colors duration-150 hover:bg-sidebar-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring md:min-w-0 md:justify-start md:px-2 md:py-1.5"
       >
         <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--attention)] text-[10px] font-bold text-accent-foreground select-none">
           {initials(user?.fullName ?? 'TM')}
@@ -346,7 +346,7 @@ export function AppShell({ user, children }: AppShellProps) {
 
       {/* ── Primary top nav ─────────────────────────────────────────────── */}
       <header className="no-print print:hidden fixed top-0 left-0 right-0 z-30 h-14 border-b border-sidebar-border/70 bg-sidebar text-sidebar-foreground shadow-[0_1px_8px_rgba(0,0,0,0.08)]">
-        <div className="flex h-full items-center gap-3 px-4">
+        <div className="flex h-full touch-manipulation items-center gap-2 px-3 sm:gap-3 sm:px-4">
           {/* Logo */}
           <Link
             href={dashboardHref}
@@ -416,8 +416,8 @@ export function AppShell({ user, children }: AppShellProps) {
           <Button
             type="button"
             variant="ghost"
-            size="icon-sm"
-            className="md:hidden text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            size="icon"
+            className="md:hidden min-h-11 min-w-11 shrink-0 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             onClick={() => setMobileMenuOpen((o) => !o)}
             aria-expanded={mobileMenuOpen}
             aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
@@ -433,8 +433,8 @@ export function AppShell({ user, children }: AppShellProps) {
           className="no-print print:hidden fixed top-14 left-0 right-0 z-20 h-11 border-b border-sidebar-border/50 bg-sidebar"
           aria-label="Section navigation"
         >
-          <div className="h-full overflow-x-auto">
-            <div className="flex h-full min-w-max items-center gap-0.5 px-5">
+          <div className="h-full overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
+            <div className="flex h-full min-w-max items-center gap-0.5 px-4 sm:px-5">
               {activeSection.subItems.map((item) => {
                 const active = item.isActive(pathname, searchParams)
                 return (
@@ -505,8 +505,8 @@ export function AppShell({ user, children }: AppShellProps) {
               <Button
                 type="button"
                 variant="ghost"
-                size="icon-sm"
-                className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                size="icon"
+                className="min-h-11 min-w-11 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 onClick={() => setMobileMenuOpen(false)}
                 aria-label="Close navigation menu"
               >
@@ -533,7 +533,7 @@ export function AppShell({ user, children }: AppShellProps) {
                               key={item.href}
                               href={item.href}
                               className={cn(
-                                'flex min-h-[42px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
+                                'flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-sm font-medium',
                                 active
                                   ? APP_SHELL_ACTIVE_NAV_CLASS
                                   : 'text-sidebar-foreground hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground transition-colors duration-150'
@@ -556,7 +556,7 @@ export function AppShell({ user, children }: AppShellProps) {
                         key={section.key}
                         href={section.href}
                         className={cn(
-                          'flex min-h-[42px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
+                          'flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-sm font-medium',
                           section.isActive(pathname, searchParams)
                             ? APP_SHELL_ACTIVE_NAV_CLASS
                             : 'text-sidebar-foreground hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground transition-colors duration-150'
@@ -581,7 +581,7 @@ export function AppShell({ user, children }: AppShellProps) {
                         key={item.href}
                         href={item.href}
                         className={cn(
-                          'flex min-h-[42px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
+                          'flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-sm font-medium',
                           active
                             ? APP_SHELL_ACTIVE_NAV_CLASS
                             : 'text-sidebar-foreground hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground transition-colors duration-150'
@@ -620,7 +620,7 @@ export function AppShell({ user, children }: AppShellProps) {
               {canAccessManagerUi && (
                 <Link
                   href="/therapist"
-                  className="flex min-h-[38px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-[color:var(--sidebar-muted)] transition-colors hover:text-sidebar-foreground"
+                  className="flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-sm font-medium text-[color:var(--sidebar-muted)] transition-colors hover:text-sidebar-foreground"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden="true" />
@@ -629,7 +629,7 @@ export function AppShell({ user, children }: AppShellProps) {
               )}
               <Link
                 href="/settings"
-                className="flex min-h-[38px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/45"
+                className="flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/45"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Settings
@@ -637,7 +637,7 @@ export function AppShell({ user, children }: AppShellProps) {
               <form action="/auth/signout" method="post">
                 <button
                   type="submit"
-                  className="flex min-h-[38px] w-full items-center rounded-lg px-2.5 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
+                  className="flex min-h-11 w-full items-center rounded-lg px-2.5 py-2.5 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
                 >
                   Log out
                 </button>
