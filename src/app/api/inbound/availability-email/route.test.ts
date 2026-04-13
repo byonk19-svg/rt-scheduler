@@ -234,6 +234,80 @@ describe('POST /api/inbound/availability-email', () => {
     ])
   })
 
+  it('treats generic pdf attachments as PDFs and auto-applies when confidence is high', async () => {
+    const admin = createAdminMock()
+    createAdminClientMock.mockReturnValue(admin)
+
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input.endsWith('/email-1/attachments')) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: [
+              {
+                id: 'attachment-1',
+                filename: 'request-form.pdf',
+                content_type: 'application/octet-stream',
+                url: 'https://download.test/request-form.pdf',
+              },
+            ],
+          }),
+        }
+      }
+
+      if (input.endsWith('/email-1')) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              id: 'email-1',
+              from: { email: 'manager@example.com', name: 'Manager' },
+              subject: 'PDF request',
+              text: '',
+              created_at: '2026-03-20T12:00:00Z',
+              message_id: 'msg-1',
+            },
+          }),
+        }
+      }
+
+      if (input === 'https://download.test/request-form.pdf') {
+        return {
+          ok: true,
+          arrayBuffer: async () => Uint8Array.from([1, 2, 3]).buffer,
+        }
+      }
+
+      if (input === 'https://api.openai.com/v1/responses') {
+        return {
+          ok: true,
+          json: async () => ({
+            output_text: 'Employee Name: Brianna Brown\nNeed off Mar 24',
+          }),
+        }
+      }
+
+      throw new Error(`Unhandled fetch: ${input}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const response = await POST(createWebhookRequest())
+    const payload = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(payload).toMatchObject({
+      ok: true,
+      item_count: 2,
+    })
+    expect(admin.state.overrideUpserts[0]).toEqual([
+      expect.objectContaining({
+        therapist_id: 'therapist-1',
+        cycle_id: 'cycle-1',
+        date: '2026-03-24',
+      }),
+    ])
+  })
+
   it('keeps processing when one attachment download fails', async () => {
     const admin = createAdminMock()
     createAdminClientMock.mockReturnValue(admin)

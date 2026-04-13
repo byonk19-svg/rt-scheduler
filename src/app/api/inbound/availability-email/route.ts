@@ -229,6 +229,16 @@ function buildItemParseStatus(item: ParsedAvailabilityEmailItem): ParsedAvailabi
   return item.parseStatus
 }
 
+function inferAttachmentContentType(params: { filename: string; contentType: string }): string {
+  const normalized = params.contentType.toLowerCase()
+  if (normalized !== 'application/octet-stream' && normalized !== 'binary/octet-stream') {
+    return params.contentType
+  }
+  const lowerName = params.filename.toLowerCase()
+  if (lowerName.endsWith('.pdf')) return 'application/pdf'
+  return params.contentType
+}
+
 export async function POST(request: Request) {
   const rawBody = await request.text()
 
@@ -298,12 +308,16 @@ export async function POST(request: Request) {
           : typeof attachment.name === 'string'
             ? String(attachment.name).trim()
             : 'attachment'
-      const contentType =
+      const rawContentType =
         typeof attachment.content_type === 'string'
           ? attachment.content_type
           : typeof attachment.type === 'string'
             ? attachment.type
             : 'application/octet-stream'
+      const contentType = inferAttachmentContentType({
+        filename,
+        contentType: rawContentType,
+      })
       const downloadUrl =
         typeof attachment.url === 'string'
           ? attachment.url
