@@ -1,6 +1,6 @@
 'use client'
 
-import { AlertCircle, Check, Clock } from 'lucide-react'
+import { AlertCircle, AlertTriangle, Check, Clock } from 'lucide-react'
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { shiftEditorDialogLayout } from '@/components/coverage/shift-editor-dialog-layout'
@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 type TherapistOption = {
   id: string
   full_name: string
+  role: 'therapist' | 'lead'
   shift_type: 'day' | 'night'
   isLeadEligible: boolean
   employment_type: string | null
@@ -90,6 +91,13 @@ function TherapistRow({
   const processing =
     (assigning && !assignedInThisRole) || (shiftId !== null && unassigningShiftId === shiftId)
   const disabled = !canEdit || leadSlotTaken || assignedElsewhere || processing
+  const employmentTypeLabel =
+    therapist.employment_type?.toLowerCase() === 'prn'
+      ? '[PRN]'
+      : therapist.employment_type?.toLowerCase() === 'part_time' ||
+          therapist.employment_type?.toLowerCase() === 'pt'
+        ? '[PT]'
+        : null
 
   return (
     <div
@@ -107,7 +115,12 @@ function TherapistRow({
       </span>
 
       <div className="min-w-0 flex-1">
-        <p className={shiftEditorDialogLayout.name}>{therapist.full_name}</p>
+        <p className={shiftEditorDialogLayout.name}>
+          {therapist.full_name}
+          {employmentTypeLabel ? (
+            <span className="ml-1 text-xs font-medium text-muted-foreground">{employmentTypeLabel}</span>
+          ) : null}
+        </p>
         <div className={shiftEditorDialogLayout.meta}>
           <span>{weekCount} shifts this week</span>
           {assignedElsewhere && (
@@ -183,7 +196,7 @@ export function ShiftEditorDialog({
   onAssignTherapist,
   onUnassign,
 }: ShiftEditorDialogProps) {
-  const leadTherapists = therapists.filter((therapist) => therapist.isLeadEligible)
+  const leadTherapists = therapists.filter((therapist) => therapist.role === 'lead')
   const assignedShiftMap = new Map<string, { shiftId: string; isLead: boolean }>()
 
   if (selectedDay?.leadShift) {
@@ -201,6 +214,13 @@ export function ShiftEditorDialog({
   }
 
   const hasLead = Boolean(selectedDay?.leadShift)
+  const assignedCount = (selectedDay?.leadShift ? 1 : 0) + (selectedDay?.staffShifts.length ?? 0)
+  const coverageStatusColorClass =
+    assignedCount < 3
+      ? 'text-[var(--error-text)]'
+      : assignedCount > 5
+        ? 'text-[var(--warning-text)]'
+        : 'text-[var(--success-text)]'
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -221,6 +241,24 @@ export function ShiftEditorDialog({
               <p className={shiftEditorDialogLayout.activeSummary}>
                 OK {countActive(selectedDay)} active
               </p>
+              <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                <span className={cn('font-semibold', coverageStatusColorClass)}>
+                  {assignedCount} / 5 covered
+                </span>
+                <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={cn(
+                      'h-full rounded-full transition-all',
+                      assignedCount < 3
+                        ? 'bg-[var(--error-text)]'
+                        : assignedCount > 5
+                          ? 'bg-[var(--warning-text)]'
+                          : 'bg-[var(--success-text)]'
+                    )}
+                    style={{ width: `${Math.min((assignedCount / 5) * 100, 100)}%` }}
+                  />
+                </div>
+              </div>
             </DialogHeader>
 
             <div className={shiftEditorDialogLayout.body}>
@@ -262,6 +300,17 @@ export function ShiftEditorDialog({
                   {isPastDate
                     ? 'This date is in the past. Changes will be logged as a post-publish modification.'
                     : 'This date has active operational entries. Changes will be logged as a post-publish modification.'}
+                </div>
+              )}
+              {!hasLead && canEdit && (
+                <div
+                  className={cn(
+                    shiftEditorDialogLayout.alert,
+                    'flex items-start gap-2 border border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+                  )}
+                >
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>No lead assigned — a lead therapist is required for this shift</span>
                 </div>
               )}
 

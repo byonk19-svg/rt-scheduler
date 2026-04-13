@@ -49,6 +49,7 @@ Operational workflows as implemented in the current codebase.
 - Applies eligibility checks (inactive/FMLA, cycle overrides, recurring pattern, PRN strict).
 - Enforces daily coverage max and weekly limits unless manager override flag is set.
 - Returns conflict payload when override confirmation is required.
+- Shift editor surfaces compact in-dialog staffing guidance: `X / 5 covered` progress (3-5 target), non-FT employment badges (`[PRN]`, `[PT]`), and a persistent lead-required warning when editable shifts have no assigned lead.
 
 ## 3) Therapist/Manager: Availability Input
 

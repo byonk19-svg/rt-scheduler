@@ -6,6 +6,7 @@ import {
   normalizeActorShiftType,
   parseCoverageShiftSearchParam,
 } from '@/lib/coverage/coverage-shift-tab'
+import { normalizeViewMode } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/server'
 
 function firstSearchParam(value: string | string[] | undefined): string | undefined {
@@ -20,7 +21,15 @@ export default async function CoveragePage({
 }) {
   const sp = (await searchParams) ?? {}
   const shiftRaw = firstSearchParam(sp.shift)
+  const viewRaw = firstSearchParam(sp.view)
   const urlShiftTab = parseCoverageShiftSearchParam(shiftRaw ?? null)
+  const normalizedViewMode = normalizeViewMode(viewRaw)
+  const initialViewMode =
+    normalizedViewMode === 'week' ||
+    normalizedViewMode === 'calendar' ||
+    normalizedViewMode === 'roster'
+      ? normalizedViewMode
+      : 'week'
   const supabase = await createClient()
   const {
     data: { user },
@@ -44,6 +53,7 @@ export default async function CoveragePage({
       <CoverageClientPage
         initialShiftTab={initialShiftTab}
         shiftTabLockedFromUrl={shiftTabLockedFromUrl}
+        initialViewMode={initialViewMode}
       />
     </Suspense>
   )
