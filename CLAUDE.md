@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-12 (session 54)
+Updated: 2026-04-13 (session 55)
 
 ## Handoff Snapshot
 
@@ -18,19 +18,22 @@ Updated: 2026-04-12 (session 54)
 - Managers can now fix therapist matches inline on the intake card and then apply parsed dates from the same surface.
 - Managers must now match both the therapist and the schedule block before `Apply dates` appears on an intake card. This prevents the old dead-end `email_intake_apply_failed` redirect when a therapist was matched but no cycle was attached yet.
 - **Auth entry (`/login`, `/signup`):** `src/lib/auth/login-utils.ts` parses auth errors from top-level query params **or nested inside `redirectTo`** (e.g. `/availability?error=...`), maps friendly copy, and `router.replace` cleans error keys while preserving a sanitized `redirectTo`. Approval/allowlist copy shows as a **warning** banner with optional **Request access** link and dismiss; credential failures stay **destructive**. Successful access **request** redirects to **`/login?status=requested`** with an **info** banner (dismiss + URL strip); signup no longer auto-signs-in before that redirect. **Public homepage (`/`):** therapist-first copy, luminous background utilities (`--home-*`, `.teamwise-home-*`), header **Get started** (`/signup`) + **Sign in**, hero **Sign in** + **Create account** (`/signup`); Vitest contracts in `src/app/page.test.ts` and `src/app/globals.test.ts`. Shared **Input** focus ring uses **`--ring`**; **`:autofill`** + **`-webkit-autofill`** theming lives in `globals.css`.
+- **Employee roster + auto-match on signup** (`supabase/migrations/20260413000000_employee_roster.sql`, `src/app/team/roster-actions.ts`, `src/components/team/EmployeeRosterPanel.tsx`, `src/app/team/page.tsx`, `src/app/signup/page.tsx`, `src/app/login/page.tsx`): Manager pre-seeds employees on `/team` with name/role/shift. When an employee signs up with a matching name the `handle_new_user` trigger auto-provisions them with the configured role — bypassing the pending-approval queue. Unmatched signups fall through to the existing pending flow unchanged. **Requires `supabase db push` before production use.**
 - Mixed off/work sentences are parsed more accurately than before, but parser changes should continue to be driven by real inbound examples.
 - `RESEND_API_KEY` must support receiving APIs, not just sending. A send-only key fails on `/emails/receiving` with `401 restricted_api_key`.
 
 ### Local In-Progress Work
 
+- `claude/auto-match-employee-signup-R7TGc` holds the employee roster feature (session 55). Needs `supabase db push` then can be merged to `main`.
 - `main` includes the merged email-intake apply gating fix from PR `#27` and the **therapist-first luminous homepage** (replaces the older `codex/therapist-homepage-redesign` intent; that branch may be deleted when convenient).
 
 ### Where We Want To Go
 
-1. Move `Email Intake` higher on `/availability` and make the review/apply workflow more obvious.
-2. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
-3. Deploy production after significant public-surface changes (`vercel deploy --prod`) so `www.teamwise.work` matches `main`.
-4. Keep manual intake first-class even if Resend inbound is healthy. It is the practical fallback path for operations.
+1. Merge `claude/auto-match-employee-signup-R7TGc` → run `supabase db push` → verify auto-match works with a real signup.
+2. Move `Email Intake` higher on `/availability` and make the review/apply workflow more obvious.
+3. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
+4. Deploy production after significant public-surface changes (`vercel deploy --prod`) so `www.teamwise.work` matches `main`.
+5. Keep manual intake first-class even if Resend inbound is healthy. It is the practical fallback path for operations.
 
 ### Verification Baseline
 
@@ -41,6 +44,19 @@ Updated: 2026-04-12 (session 54)
 - `vercel deploy --prod --yes` for production shipping
 
 The session entries below are historical context. They may describe local-only or superseded work and should not override the snapshot above.
+
+## Latest Updates (2026-04-13, session 55)
+
+- **Employee roster + auto-match signup** (`supabase/migrations/20260413000000_employee_roster.sql`, `src/app/team/roster-actions.ts`, `src/components/team/EmployeeRosterPanel.tsx`, `src/app/team/page.tsx`, `src/app/signup/page.tsx`, `src/app/login/page.tsx`):
+  - New `employee_roster` table: stores name, role, shift type, employment type, lead-eligibility, max days/week, optional email (reference only). Unique partial index on normalised unmatched name. Manager-only RLS.
+  - Updated `handle_new_user` Postgres trigger: on every new signup, normalises the signed-up full name (lowercase + collapse spaces) and looks for a matching unmatched roster entry. Match → creates profile with roster role/shift/employment, active immediately, records `matched_profile_id` + `matched_at` on the roster row. No match → existing pending-profile behaviour unchanged.
+  - `EmployeeRosterPanel` on `/team` (below `TeamDirectory`): "Awaiting signup" / "Signed up" groups, **Add employee** dialog (name required; role, shift, employment, max days, lead-eligible, optional email), remove button for unmatched entries.
+  - `addRosterEmployeeAction` / `removeRosterEmployeeAction` server actions gated by `manage_directory` permission; duplicate-name detection returns `roster_error=duplicate_name`.
+  - `checkNameRosterMatchAction`: called client-side after `signUp()` succeeds; finds recently-matched roster entries (within 2 min) with same normalised name; returns boolean so signup can redirect to `/login?status=matched` vs `/login?status=requested`.
+  - Login page now handles `status=matched` → info banner "Your account is ready. Sign in to get started."
+  - **Matching is by name (case + space normalised), not email.** Manager must enter the name exactly as the employee will at signup.
+  - **Requires `supabase db push` before this works in production.**
+  - **Verification:** `npm run lint` clean; tsc errors are pre-existing env issues (no new errors introduced).
 
 ## Latest Updates (2026-04-12, session 54)
 
@@ -362,6 +378,8 @@ Typography classes:
 - **Repo-local Next build lock on Windows:** if `npm run build` throws `EPERM` under `.next`, check for a running `next dev` process from this repo and stop it before rebuilding.
 - **Session end workflow:** update CLAUDE.md with learnings → `git add CLAUDE.md && git commit && git push`
 - **`availability_overrides` are cycle-scoped:** Manager-entered overrides (`force_on`/`force_off`) do NOT carry forward between cycles. Use `copyAvailabilityFromPreviousCycleAction` (or the "Copy from last block" UI) to shift them into the next cycle. Rotating-schedule workers should submit availability each block or use the copy feature.
+- **Employee roster matching is by normalised full name, not email:** `handle_new_user` trigger normalises both sides with `trim(regexp_replace(lower(name), '\s+', ' ', 'g'))`. The manager must enter the employee's name exactly as they will at signup (ignoring case and extra spaces). If a name is misspelled in the roster the signup will fall through to pending approval — manager can then fix the name on the roster and the next signup attempt will match. The `employee_roster.email` column is informational only and has no effect on matching.
+- **`checkNameRosterMatchAction` has a 2-minute window:** It looks for roster entries whose `matched_at` is within the last 2 minutes. If the signup page delays calling it (e.g. network slow), it can return `false` even after a successful match. The user still gets the right role — they just see the "pending approval" banner on the login page instead of "account ready". This is cosmetic only; the profile is already active.
 - **Supabase mock builder must include all chained methods used by the action under test:** `neq`, `order`, `limit` are no-ops on most mocks — add them as chainable builders that return `this`. Forgetting them causes `TypeError: builder.neq is not a function` even when the test assertions look correct. Also extend `then()` to handle every select column shape the action calls (keyed by the column string).
 - **Publish email flow no longer depends on a Vercel cron deployment hook:** production publish now processes queued emails immediately in `toggleCyclePublishedAction`. Keep `/api/publish/process` as the shared retry/manual path, but do not reintroduce `vercel.json` cron config unless the deployment plan changes.
 - **AI agents and binary file copies:** When an agent (Cursor, Claude, etc.) is instructed to `cp` a binary file (PNG, PDF, etc.), always verify with `ls -lh` — agents frequently write a small placeholder instead of the real file.
