@@ -180,81 +180,7 @@ The session entries below are historical context. They may describe local-only o
 
 ## Session History
 
-Sessions 11–38 archived to `docs/SESSION_HISTORY.md`.
-
-## Latest Updates (2026-04-09, session 45)
-
-- **Manager Inbox dashboard layout rebuild** (`src/components/manager/ManagerTriageDashboard.tsx`, `src/app/dashboard/manager/page.tsx`, `src/components/manager/ManagerTriageDashboard.test.ts`):
-  - Two-column layout `xl:grid-cols-[2fr_1fr]`: left column (3 metric cards → ScheduleProgress → Coverage Risks → Recent Activity), sticky right sidebar (Manager Inbox + Upcoming Days).
-  - 4th metric card "Publish Readiness" removed — redundant with `ScheduleProgress` overall %.
-  - `activeCycleDateRange` computed on the manager page from the active cycle (`formatCycleDate(start) – formatCycleDate(end)`, year-free) and passed as a header pill next to the risk/pending/shift badges.
-- **Screenshots:** `npm run screens:all` (dev server on `127.0.0.1:3000` + `.env.local` with `NEXT_PUBLIC_SUPABASE_*`) writes PNGs under `artifacts/screen-capture/<iso-timestamp>/` and mirrors the same set to `artifacts/screen-capture/latest`.
-- **Plan doc:** `docs/superpowers/plans/2026-04-09-manager-dashboard-layout-rebuild.md`
-- **Verification:** `npx vitest run src/components/manager/ManagerTriageDashboard.test.ts`, `npx tsc --noEmit`, `npm run lint`
-
-## Latest Updates (2026-04-09, session 43)
-
-- **Home page + pending-setup polish** (`src/app/page.tsx`, `src/app/pending-setup/page.tsx`, `public/images/app-preview.png`, tests):
-  - Home page now shows a faded coverage calendar screenshot below the CTAs + a one-line approval note ("Your manager will need to approve your account before your first sign-in.").
-  - `next/image` with `fill` + `unoptimized` used for the preview; container is `h-[360px] rounded-2xl` with a `h-2/3` gradient fade to `var(--background)`.
-  - Pending-setup body copy updated to "No action needed on your end. Sit tight while your manager reviews your account…" (h1 and sign-out button unchanged).
-- **Spec/plan docs added:** `docs/superpowers/specs/2026-04-09-home-and-pending-setup-design.md`, `docs/superpowers/plans/2026-04-09-home-and-pending-setup.md`.
-
-## Latest Updates (2026-04-09, session 42)
-
-- **Public auth + pending access onboarding** (`src/app/page.tsx`, `src/app/login/page.tsx`, `src/app/signup/page.tsx`, `src/app/reset-password/page.tsx`, `src/app/pending-setup/page.tsx`, tests):
-  - Homepage is now homepage-first with practical copy and prominent **Sign in** / **Create account** CTAs.
-  - Dedicated auth routes now own their own copy and UX: sign-in, create account, forgot-password email request, and waiting-for-approval.
-  - Public self-signup no longer asks for role; accounts are created as pending and redirected to `/pending-setup` after immediate sign-in.
-- **Manager access approvals under Requests** (`src/app/requests/page.tsx`, `src/app/requests/user-access/*`, `src/components/AppShell.tsx`, `src/proxy.ts`, tests):
-  - Added **User Access Requests** manager flow under `/requests/user-access` with desktop table + mobile cards.
-  - Approve action requires role selection (**Therapist** or **Lead**) before activation; decline deletes pending account via admin API.
-  - Manager nav now includes **Requests** and **User Access Requests** with pending-count badges.
-- **Schema/auth hook support for pending users** (`supabase/migrations/20260409124000_pending_signup_access_requests.sql`, `20260409145500_fix_custom_access_token_hook_for_pending_users.sql`):
-  - `profiles.role` now supports null (pending users).
-  - `handle_new_user` stores pending signups with `role = null` when role is not explicitly provisioned.
-  - `custom_access_token_hook` now omits `user_role` claim when role is null so pending users can authenticate cleanly.
-- **Verification:** `npx tsc --noEmit`, `npm run lint`, `npx vitest run src/app/page.test.ts src/app/requests/user-access/actions.test.ts src/components/manager/ManagerTriageDashboard.test.ts`, `npx playwright test e2e/public-pages.spec.ts`.
-
-## Latest Updates (2026-04-09, session 41)
-
-- **Publish flow â€” immediate email processing, no deploy-blocking Vercel cron requirement** (`src/app/schedule/actions/publish-actions.ts`, `src/lib/publish-events.ts`, `src/app/api/publish/process/route.ts`, tests):
-  - Publishing a cycle still writes `publish_events` and queues `notification_outbox` rows, but now the publish action immediately processes the queued emails in the same flow.
-  - `/api/publish/process` now reuses the same shared processor as the publish action for retry/manual processing instead of owning a separate Resend loop.
-  - `vercel.json` cron config was removed, so Hobby-plan production deploys are no longer blocked by the old every-minute cron expression.
-- **Published schedule operations â€” clearer live status visibility** (`CoverageClientPage.tsx`, assignment-status route, published-schedule notifications, tests):
-  - Shared `/coverage` live-schedule UI now explicitly calls out operational status badges on the published schedule: **On Call**, **Leave Early**, **Cancelled**, **Call In**.
-  - Published assignment-status changes now trigger `published_schedule_changed` notifications for the affected therapist.
-  - Staff still need to refresh or reopen the schedule to see a managerâ€™s latest status change; realtime cross-client syncing is intentionally not implemented yet.
-- **Verification:** `npm run lint`, `npx vitest run` (**453 tests** passing), `npm run build`.
-
-## Latest Updates (2026-04-08, session 40)
-
-- **Team (`/team`) — Scheduling Constraints UI** (`TeamDirectory.tsx`, `team-quick-edit.ts`, `team/actions.ts`, `page.tsx`, tests):
-  - **"Days they never work"** (always-visible red pills in quick edit) — populates `offs_dow` on `work_patterns`; shows for all therapist/lead rows regardless of pattern toggle.
-  - **"Has a fixed weekly pattern" toggle** — reveals blue work-day pills (`works_dow`), a hard/soft strictness radio, and weekend rotation + anchor-date controls; hidden inputs bridge pill state to server action form post.
-  - Upserts `work_patterns` row on save (one per therapist); deletes the row when the toggle is off.
-  - **Rotating shift limitation (documented):** Patterns like "4 on, 1 off, 2 on, 7 off" (14-day rotation) cannot be expressed in `work_patterns` — only weekly recurring patterns are supported. Recommended workflow for rotating-schedule workers: submit per-cycle availability + use copy-from-last-block.
-- **Availability (`/availability`) — copy manager overrides from the last block** (`src/app/availability/actions.ts`, `page.tsx`, `ManagerSchedulingInputs.tsx`, tests):
-  - Managers now get a **Copy from last block** action in planner controls for the selected therapist and cycle.
-  - The server action finds the most recent other cycle with manager-entered overrides for that therapist, shifts dates by the cycle-start gap, and upserts only dates that still land inside the target cycle.
-  - Existing target-cycle manager overrides are preserved; conflicting shifted dates are skipped instead of overwritten.
-  - Toast feedback covers: **copied N dates**, **no previous block found**, **nothing new to copy**, and **copy failed**.
-- **Lib — cycle copy helper** (`src/lib/copy-cycle-availability.ts`, tests):
-  - `shiftOverridesToCycle` is the pure helper for date shifting, target-window filtering, and conflict skipping.
-- **Verification:** `npx tsc --noEmit`, `npx vitest run` (**444 tests** passing).
-
-## Latest Updates (2026-04-09, session 39)
-
-- **Schedule / Coverage (`/coverage`) — default shift tab + URL sync** (`page.tsx`, `coverage-shift-tab.ts`, tests):
-  - Default **Day Shift** / **Night Shift** tab from signed-in `profiles.shift_type` when `?shift=` is absent; **`?shift=day|night`** overrides (case-insensitive).
-  - **Toggle** calls **`router.replace`** so the query string stays aligned; **cycle pills** and **View published schedule** preserve the active shift.
-  - Helpers live in **`src/lib/coverage/coverage-shift-tab.ts`** (parse, profile default, query value); **`/schedule`** redirect already passes query through to `/coverage`.
-- **Schedule screen polish (prior pass, same files)** (`CalendarGrid.tsx`, `page.tsx`): **Schedule cycle** label above pills; stronger **coverage** count pill; softer **lead** block; trimmed duplicate live copy near title; **View published schedule** link with chevron + focus/hover.
-- **Team (`/team`) — recurring pattern in quick edit** (`TeamDirectory.tsx`, `team-quick-edit.ts`, `team/actions.ts`, `page.tsx`, tests):
-  - Quick-edit modal can capture **work pattern** fields (works/offs DOW, mode, weekend rotation/anchor) for therapist/lead rows.
-- **Lib — copy availability between cycles (pure)** (`copy-cycle-availability.ts`, tests): **`shiftOverridesToCycle`** maps override dates from a source cycle into a target window (gap from cycle starts); supports future copy-availability UX.
-- **Verification:** `npx tsc --noEmit`, ESLint on touched files, `npx vitest run` (**439 tests** passing, including **`copy-cycle-availability.test.ts`**).
+Sessions 11–47 archived to `docs/SESSION_HISTORY.md`.
 
 ## Data model gotcha — publish history ≠ schedule cycles
 
@@ -286,7 +212,7 @@ From audit: workflow/usability issues being addressed one at a time.
 - [ ] **#5** Auto-draft result: surface summary (shifts assigned, unfilled, forced-date misses)
 - [ ] **#6** Approvals: sort by age, add urgency signal
 - [ ] **#7** Availability deadline: countdown chip on therapist dashboard
-- [ ] **#8** Coverage empty state: guided first-time manager flow
+- [x] **#8** Coverage empty state: guided first-time manager flow (done session 48 — `noCycleSelected` redesigned with icon + numbered 3-step flow)
 
 ## Resume Checklist
 
@@ -310,7 +236,7 @@ Generate new HMAC/cron secrets: `openssl rand -hex 32`
 
 ## Quality Status
 
-Current session checks green:
+Run these fresh at the start of each session:
 
 - `npx tsc --noEmit` pass
 - `npm run build` pass
@@ -462,7 +388,7 @@ Additional intake gotchas:
   - recurring weekday patterns alone are not enough for PRN auto-draft eligibility
   - PRN without explicit `force_on` = not eligible
 
-Auto-generate (`src/lib/schedule-helpers.ts`):
+Auto-generate (`src/lib/coverage/generate-draft.ts` → `generateDraftForCycle`):
 
 - Targets 4 therapists first; slot is "unfilled" only below 3
 - Excludes inactive + FMLA by default
@@ -579,7 +505,6 @@ Resend: `mail.teamwise.work` is **Verified**. No test-mode restriction — email
 Inbound intake notes:
 
 - `POST /api/inbound/availability-email` verifies the Resend webhook signature itself and must remain publicly reachable through middleware.
-- `RESEND_API_KEY` must support receiving APIs, not just sending. A send-only key fails on `/emails/receiving` with `401 restricted_api_key`.
 - If inbound email still does not appear in Resend after receiving is verified, use the manual intake form on `/availability` to keep validating the scheduling workflow.
 
 ## Data Model Snapshot
@@ -616,10 +541,9 @@ Core tables:
 
 ## Next High-Value Priorities
 
-1. **Deploy to production** — run `vercel --prod` from project root. GitHub auto-deploy is NOT wired to Vercel; CLI deploy is the current method. All env vars and code are ready.
-2. **Verify end-to-end publish email flow in production** — publish a schedule from `/coverage`, check `/publish` for queue status, confirm recipient receives email from `noreply@mail.teamwise.work`.
-3. **Wire GitHub → Vercel auto-deploy** (optional) — connect `byonk19-svg/rt-scheduler` repo in Vercel dashboard under Git Integration so pushes trigger builds automatically.
-4. **Production UAT for the newer manager workflows** — verify `/availability`, `/coverage`, `/team`, `/approvals`, `/preliminary`, and `/publish` together against a real cycle before broader visual/branding work.
+1. **Verify end-to-end publish email flow in production** — publish a schedule from `/coverage`, check `/publish` for queue status, confirm recipient receives email from `noreply@mail.teamwise.work`.
+2. **Wire GitHub → Vercel auto-deploy** (optional) — connect `byonk19-svg/rt-scheduler` repo in Vercel dashboard under Git Integration so pushes trigger builds automatically.
+3. **Production UAT for the newer manager workflows** — verify `/availability`, `/coverage`, `/team`, `/approvals`, `/preliminary`, and `/publish` together against a real cycle before broader visual/branding work.
 
 ## Design System
 
