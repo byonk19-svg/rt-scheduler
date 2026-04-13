@@ -8,6 +8,6 @@ test('login page renders', async ({ page }) => {
 
 test('signup page renders', async ({ page }) => {
   await page.goto('/signup', { waitUntil: 'domcontentloaded' })
-  await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Create account' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Request access' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Submit request' })).toBeVisible()
 })
