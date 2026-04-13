@@ -5,8 +5,14 @@ import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
+import { normalizeRosterFullName, parseBulkEmployeeRosterText } from '@/lib/employee-roster-bulk'
 import { parseTeamQuickEditFormData } from '@/lib/team-quick-edit'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+
+type ManagedRole = 'manager' | 'therapist' | 'lead'
+type ShiftType = 'day' | 'night'
+type EmploymentType = 'full_time' | 'part_time' | 'prn'
 
 function buildTeamUrl(params: Record<string, string | undefined>): string {
   const search = new URLSearchParams()
@@ -214,4 +220,159 @@ export async function archiveTeamMemberAction(formData: FormData) {
   revalidatePath('/dashboard/manager')
 
   redirect(buildTeamUrl({ success: 'profile_archived' }))
+}
+
+function parseManagedRole(value: FormDataEntryValue | null): ManagedRole | null {
+  const raw = String(value ?? '')
+    .trim()
+    .toLowerCase()
+  if (raw === 'manager' || raw === 'therapist' || raw === 'lead') return raw
+  return null
+}
+
+function parseShiftType(value: FormDataEntryValue | null): ShiftType | null {
+  const raw = String(value ?? '')
+    .trim()
+    .toLowerCase()
+  if (raw === 'day' || raw === 'night') return raw
+  return null
+}
+
+function parseEmploymentType(value: FormDataEntryValue | null): EmploymentType | null {
+  const raw = String(value ?? '')
+    .trim()
+    .toLowerCase()
+  if (raw === 'full_time' || raw === 'part_time' || raw === 'prn') return raw
+  return null
+}
+
+export async function upsertEmployeeRosterEntryAction(formData: FormData) {
+  const { supabase, userId } = await requireManager()
+
+  const fullName = String(formData.get('full_name') ?? '').trim()
+  if (!fullName) {
+    redirect(buildTeamUrl({ error: 'roster_missing_name' }))
+  }
+
+  const role = parseManagedRole(formData.get('role'))
+  if (!role) {
+    redirect(buildTeamUrl({ error: 'roster_invalid_role' }))
+  }
+
+  const shiftType = parseShiftType(formData.get('shift_type'))
+  if (!shiftType) {
+    redirect(buildTeamUrl({ error: 'roster_invalid_shift' }))
+  }
+
+  const employmentType = parseEmploymentType(formData.get('employment_type'))
+  if (!employmentType) {
+    redirect(buildTeamUrl({ error: 'roster_invalid_employment' }))
+  }
+
+  const maxDays = Number(formData.get('max_work_days_per_week') ?? 3)
+  if (!Number.isInteger(maxDays) || maxDays < 1 || maxDays > 7) {
+    redirect(buildTeamUrl({ error: 'roster_invalid_max_days' }))
+  }
+
+  const isLeadEligible = formData.get('is_lead_eligible') === 'on'
+
+  const { error } = await supabase.from('employee_roster').upsert(
+    {
+      full_name: fullName,
+      normalized_full_name: normalizeRosterFullName(fullName),
+      role,
+      shift_type: shiftType,
+      employment_type: employmentType,
+      max_work_days_per_week: maxDays,
+      is_lead_eligible: isLeadEligible,
+      is_active: true,
+      updated_by: userId,
+      created_by: userId,
+    },
+    { onConflict: 'normalized_full_name' }
+  )
+
+  if (error) {
+    console.error('Failed to upsert employee roster entry:', error)
+    redirect(buildTeamUrl({ error: 'roster_save_failed' }))
+  }
+
+  revalidatePath('/team')
+  redirect(buildTeamUrl({ success: 'roster_saved' }))
+}
+
+export async function bulkUpsertEmployeeRosterAction(formData: FormData) {
+  const { supabase, userId } = await requireManager()
+  const text = String(formData.get('bulk_roster_text') ?? '')
+  const parsed = parseBulkEmployeeRosterText(text)
+  if (!parsed.ok) {
+    console.error('Bulk roster parse error:', parsed.message)
+    redirect(
+      buildTeamUrl({
+        error: 'roster_bulk_invalid',
+        bulk_line: String(parsed.line),
+      })
+    )
+  }
+  if (parsed.rows.length === 0) {
+    redirect(buildTeamUrl({ error: 'roster_bulk_empty' }))
+  }
+
+  const payload = parsed.rows.map((row) => ({
+    ...row,
+    updated_by: userId,
+    created_by: userId,
+  }))
+
+  const { error } = await supabase.from('employee_roster').upsert(payload, {
+    onConflict: 'normalized_full_name',
+  })
+
+  if (error) {
+    console.error('Failed bulk upsert employee roster:', error)
+    redirect(buildTeamUrl({ error: 'roster_bulk_save_failed' }))
+  }
+
+  revalidatePath('/team')
+  redirect(
+    buildTeamUrl({
+      success: 'roster_bulk_saved',
+      roster_bulk_count: String(payload.length),
+    })
+  )
+}
+
+export async function deleteEmployeeRosterEntryAction(formData: FormData) {
+  const { supabase } = await requireManager()
+  const rosterId = String(formData.get('roster_id') ?? '').trim()
+  if (!rosterId) {
+    redirect(buildTeamUrl({ error: 'roster_missing_entry' }))
+  }
+
+  const { error } = await supabase.from('employee_roster').delete().eq('id', rosterId)
+  if (error) {
+    console.error('Failed to delete employee roster entry:', error)
+    redirect(buildTeamUrl({ error: 'roster_delete_failed' }))
+  }
+
+  revalidatePath('/team')
+  redirect(buildTeamUrl({ success: 'roster_deleted' }))
+}
+
+export async function checkNameRosterMatchAction(fullName: string): Promise<boolean> {
+  const normalized = normalizeRosterFullName(fullName)
+  if (!normalized) return false
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from('employee_roster')
+    .select('id')
+    .eq('normalized_full_name', normalized)
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle()
+  if (error) {
+    console.error('Failed to check name roster match:', error)
+    return false
+  }
+  return Boolean(data?.id)
 }

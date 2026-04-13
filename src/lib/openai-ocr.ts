@@ -7,6 +7,7 @@ const IMAGE_CONTENT_TYPES = new Set([
   'image/webp',
   'image/gif',
 ])
+const PDF_CONTENT_TYPES = new Set(['application/pdf'])
 
 export type OcrResult = {
   status: 'completed' | 'failed' | 'skipped'
@@ -18,6 +19,11 @@ export type OcrResult = {
 export function isOcrSupportedContentType(contentType: string | null | undefined): boolean {
   if (!contentType) return false
   return IMAGE_CONTENT_TYPES.has(contentType.toLowerCase())
+}
+
+export function isPdfContentType(contentType: string | null | undefined): boolean {
+  if (!contentType) return false
+  return PDF_CONTENT_TYPES.has(contentType.toLowerCase())
 }
 
 export function getOpenAiOcrConfig(): {
@@ -120,4 +126,97 @@ export async function extractTextFromImageAttachment(params: {
     model: config.model,
     error: null,
   }
+}
+
+export async function extractTextFromPdfAttachment(params: {
+  contentBase64: string | null
+  contentType: string | null
+  filename: string
+}): Promise<OcrResult> {
+  const config = getOpenAiOcrConfig()
+  if (!config.enabled) {
+    return {
+      status: 'skipped',
+      text: null,
+      model: null,
+      error: 'OPENAI_API_KEY not configured.',
+    }
+  }
+
+  if (!params.contentBase64 || !isPdfContentType(params.contentType)) {
+    return {
+      status: 'skipped',
+      text: null,
+      model: null,
+      error: 'Attachment type is not supported for PDF extraction.',
+    }
+  }
+
+  const prompt =
+    'Read this PDF employee scheduling request form and transcribe only the useful scheduling text. Return plain text only. Preserve dates and employee names exactly when visible. If there is no readable scheduling text, return NO_TEXT.'
+
+  const response = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${config.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: config.model,
+      input: [
+        {
+          role: 'user',
+          content: [
+            { type: 'input_text', text: prompt },
+            {
+              type: 'input_file',
+              filename: params.filename,
+              file_data: `data:${params.contentType};base64,${params.contentBase64}`,
+            },
+          ],
+        },
+      ],
+    }),
+  })
+
+  if (!response.ok) {
+    const details = await response.text()
+    return {
+      status: 'failed',
+      text: null,
+      model: config.model,
+      error: `OpenAI PDF extraction failed (${response.status}): ${details}`,
+    }
+  }
+
+  const payload = (await response.json()) as { output_text?: string | null }
+  const outputText = sanitizeOcrText(payload.output_text ?? '')
+
+  if (!outputText || outputText === 'NO_TEXT') {
+    return {
+      status: 'skipped',
+      text: null,
+      model: config.model,
+      error: 'No readable scheduling text detected.',
+    }
+  }
+
+  return {
+    status: 'completed',
+    text: outputText,
+    model: config.model,
+    error: null,
+  }
+}
+
+export async function extractTextFromAttachment(params: {
+  contentBase64: string | null
+  contentType: string | null
+  filename: string
+}): Promise<OcrResult> {
+  if (isPdfContentType(params.contentType)) {
+    return extractTextFromPdfAttachment(params)
+  }
+
+  return extractTextFromImageAttachment(params)
 }

@@ -15,11 +15,11 @@ const therapistSubcopy =
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-background">
-      <header className="relative z-20 border-b border-white/60 bg-background/88 backdrop-blur-xl">
+      <header className="teamwise-marketing-header relative z-20 border-b border-border/50 bg-background/90">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--attention)] shadow-tw-md-soft">
-              <CalendarDays className="h-4 w-4 text-white" />
+              <CalendarDays className="h-4 w-4 text-accent-foreground" />
             </div>
             <div>
               <p className="font-heading text-sm font-bold tracking-[-0.02em] text-foreground">
@@ -35,7 +35,7 @@ export default function HomePage() {
               asChild
               variant="ghost"
               size="sm"
-              className="text-foreground/80 hover:bg-white/60"
+              className="text-foreground/80 hover:bg-card/75"
             >
               <Link href="/login">Sign in</Link>
             </Button>
@@ -59,7 +59,7 @@ export default function HomePage() {
 
         <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 pb-16 pt-16 lg:gap-14 lg:pb-24 lg:pt-24">
           <div className="max-w-3xl space-y-6 fade-up">
-            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--attention)]/25 bg-white/55 px-3.5 py-1.5 text-xs font-semibold tracking-[0.01em] text-[var(--attention)]">
+            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--attention)]/25 bg-card/70 px-3.5 py-1.5 text-xs font-semibold tracking-[0.01em] text-[var(--attention)]">
               <CalendarDays className="h-3 w-3" />
               Built for respiratory therapy teams
             </div>
@@ -89,7 +89,7 @@ export default function HomePage() {
               asChild
               variant="outline"
               size="lg"
-              className="h-12 min-h-11 min-w-[170px] rounded-xl border-white/70 bg-white/65 text-base hover:bg-white"
+              className="h-12 min-h-11 min-w-[170px] rounded-xl border-border/70 bg-card/75 text-base hover:bg-card"
             >
               <Link href="/signup">Create account</Link>
             </Button>
@@ -119,7 +119,7 @@ export default function HomePage() {
                 aria-hidden
                 className="teamwise-home-preview-sheen pointer-events-none absolute inset-x-0 top-0 h-24"
               />
-              <div className="relative min-h-[320px] overflow-hidden rounded-[1.5rem] border border-black/5 bg-white/80 sm:min-h-[420px] lg:min-h-[500px]">
+              <div className="relative min-h-[320px] overflow-hidden rounded-[1.5rem] border border-border/50 bg-card/85 sm:min-h-[420px] lg:min-h-[500px]">
                 <Image
                   src="/images/app-preview.png"
                   alt="Teamwise schedule view"

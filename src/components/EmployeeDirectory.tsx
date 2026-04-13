@@ -1741,7 +1741,7 @@ export function EmployeeDirectory({
                                       className={cn(
                                         'h-8 rounded-md text-xs transition-colors',
                                         isSelected
-                                          ? 'bg-[var(--warning)] font-semibold text-foreground hover:bg-[var(--warning-text)] hover:text-white'
+                                          ? 'bg-[var(--warning)] font-semibold text-foreground hover:bg-[var(--warning-text)] hover:text-primary-foreground'
                                           : 'bg-background',
                                         !isSelected && isInCycle && 'hover:bg-secondary',
                                         !isCurrentMonth && !isSelected && 'text-muted-foreground',

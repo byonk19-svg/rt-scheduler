@@ -32,10 +32,6 @@ export default async function SchedulePage({
     passthrough.set(key, value)
   }
 
-  if (!passthrough.has('view')) {
-    passthrough.set('view', 'week')
-  }
-
   const query = passthrough.toString()
-  redirect(query ? `/coverage?${query}` : '/coverage?view=week')
+  redirect(query ? `/coverage?${query}` : '/coverage')
 }

@@ -895,7 +895,7 @@ export default function ShiftBoardPage() {
                         type="button"
                         disabled={savingState[candidate.id]}
                         onClick={() => void handleAction(candidate.id, 'approve')}
-                        className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
+                        className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                       >
                         {savingState[candidate.id] ? 'Selecting...' : 'Select'}
                       </button>
@@ -1081,7 +1081,7 @@ function RequestCard({
       <div className="flex items-start gap-3">
         {/* Avatar */}
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--attention)]">
-          <span className="text-xs font-bold text-white">{req.avatar}</span>
+          <span className="text-xs font-bold text-accent-foreground">{req.avatar}</span>
         </div>
 
         <div className="min-w-0 flex-1">
@@ -1139,7 +1139,7 @@ function RequestCard({
               Select swap partner
             </label>
             {needsLeadPartner && (
-              <span className="rounded-full bg-[var(--warning)] px-2 py-0.5 text-[10px] font-bold text-white">
+              <span className="rounded-full bg-[var(--warning)] px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
                 Lead shift - lead-eligible only
               </span>
             )}
@@ -1230,9 +1230,10 @@ function RequestCard({
           />
           <Button
             size="sm"
+            variant="destructive"
             disabled={saving || !overrideReason.trim()}
             onClick={onForceApprove}
-            className="w-full bg-[var(--error)] text-white hover:bg-[var(--error)]/90"
+            className="w-full"
           >
             {saving ? 'Saving...' : 'Force approve'}
           </Button>

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import type { AvailabilityOverrideRow, Therapist } from '@/app/schedule/types'
-import { getScheduleFeedback, pickTherapistForDate } from '@/lib/schedule-helpers'
+import {
+  getScheduleFeedback,
+  normalizeDefaultScheduleView,
+  normalizeViewMode,
+  pickTherapistForDate,
+} from '@/lib/schedule-helpers'
 
 function buildTherapist(overrides?: Partial<Therapist>): Therapist {
   return {
@@ -38,6 +43,17 @@ function buildOverride(overrides?: Partial<AvailabilityOverrideRow>): Availabili
 }
 
 describe('schedule feedback messaging', () => {
+  it('accepts roster as a first-class schedule view', () => {
+    expect(normalizeViewMode('roster')).toBe('roster')
+  })
+
+  it('normalizes persisted default schedule view to week or roster', () => {
+    expect(normalizeDefaultScheduleView('roster')).toBe('roster')
+    expect(normalizeDefaultScheduleView('week')).toBe('week')
+    expect(normalizeDefaultScheduleView('calendar')).toBe('week')
+    expect(normalizeDefaultScheduleView(undefined)).toBe('week')
+  })
+
   it('summarizes publish blocking with lead and coverage issue counts', () => {
     const feedback = getScheduleFeedback({
       error: 'publish_shift_rule_violation',

@@ -15,7 +15,7 @@ import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { Button } from '@/components/ui/button'
-import { PageHeader } from '@/components/ui/page-header'
+import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
 import { buildScheduleUrl, parseCount } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/server'
 import { ProcessQueuedButton } from '@/app/publish/process-queued-button'
@@ -162,7 +162,10 @@ export default async function PublishEventDetailPage({
   if (eventError || !eventData) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Publish Details" subtitle="Schedule email delivery details." />
+        <ManagerWorkspaceHeader
+          title="Publish Details"
+          subtitle="Schedule email delivery details."
+        />
         <div
           className="flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium"
           style={{
@@ -203,15 +206,15 @@ export default async function PublishEventDetailPage({
         <FeedbackToast variant="error" message="Could not re-queue failed recipients." />
       )}
 
-      <PageHeader
+      <ManagerWorkspaceHeader
         title="Publish Details"
         subtitle={
           cycle
             ? `${cycle.label} | ${new Date(event.published_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
             : 'Schedule email delivery details.'
         }
-        badge={
-          <div className="flex flex-wrap items-center gap-2">
+        summary={
+          <div className="flex flex-wrap items-center gap-2 text-foreground">
             <StatusChip status={event.status} />
             <span className="inline-flex items-center gap-1 rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold text-foreground">
               <CheckCircle2 className="h-3.5 w-3.5 text-[var(--success-text)]" />

@@ -23,7 +23,6 @@ vi.mock('@/lib/supabase/server', () => ({
 import {
   applyEmailAvailabilityImportAction,
   copyAvailabilityFromPreviousCycleAction,
-  createManualEmailIntakeAction,
   deleteAvailabilityEntryAction,
   deleteManagerPlannerDateAction,
   saveManagerPlannerDatesAction,
@@ -531,51 +530,6 @@ describe('availability actions', () => {
         filters: { id: 'intake-1' },
       },
     ])
-  })
-
-  it('creates a manual intake from pasted text for a selected therapist and cycle', async () => {
-    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
-    createClientMock.mockResolvedValue(supabase)
-    const formData = new FormData()
-    formData.set('therapist_id', 'therapist-1')
-    formData.set('cycle_id', 'cycle-1')
-    formData.set('subject', 'Uploaded request form')
-    formData.set('source_email', 'employee@example.com')
-    formData.set('pasted_text', 'Need off Mar 24, Mar 26')
-
-    await expect(createManualEmailIntakeAction(formData)).rejects.toThrow(
-      'REDIRECT:/availability?success=email_intake_created'
-    )
-
-    expect(supabase.state.inserts).toHaveLength(1)
-    expect(supabase.state.inserts[0]?.table).toBe('availability_email_intakes')
-    expect(supabase.state.inserts[0]?.payload).toEqual(
-      expect.objectContaining({
-        provider: 'manual',
-        provider_email_id: expect.stringMatching(/^manual-/),
-        from_email: 'employee@example.com',
-        subject: 'Uploaded request form',
-        matched_therapist_id: 'therapist-1',
-        matched_cycle_id: 'cycle-1',
-        parse_status: 'parsed',
-        parsed_requests: [
-          {
-            date: '2026-03-24',
-            override_type: 'force_off',
-            shift_type: 'both',
-            note: null,
-            source_line: 'off Mar 24, Mar 26',
-          },
-          {
-            date: '2026-03-26',
-            override_type: 'force_off',
-            shift_type: 'both',
-            note: null,
-            source_line: 'off Mar 24, Mar 26',
-          },
-        ],
-      })
-    )
   })
 
   it('updates the therapist and cycle match on an intake and marks it parsed when actionable', async () => {

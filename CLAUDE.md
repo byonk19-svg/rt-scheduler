@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-12 (session 54)
+Updated: 2026-04-13 (session 58)
 
 ## Handoff Snapshot
 
@@ -17,20 +17,26 @@ Updated: 2026-04-12 (session 54)
 - Uploaded images can OCR through the OpenAI Responses API when `OPENAI_API_KEY` is configured. PDFs are stored for review but are not OCR'd automatically yet.
 - Managers can now fix therapist matches inline on the intake card and then apply parsed dates from the same surface.
 - Managers must now match both the therapist and the schedule block before `Apply dates` appears on an intake card. This prevents the old dead-end `email_intake_apply_failed` redirect when a therapist was matched but no cycle was attached yet.
-- **Auth entry (`/login`, `/signup`):** `src/lib/auth/login-utils.ts` parses auth errors from top-level query params **or nested inside `redirectTo`** (e.g. `/availability?error=...`), maps friendly copy, and `router.replace` cleans error keys while preserving a sanitized `redirectTo`. Approval/allowlist copy shows as a **warning** banner with optional **Request access** link and dismiss; credential failures stay **destructive**. Successful access **request** redirects to **`/login?status=requested`** with an **info** banner (dismiss + URL strip); signup no longer auto-signs-in before that redirect. **Public homepage (`/`):** therapist-first copy, luminous background utilities (`--home-*`, `.teamwise-home-*`), header **Get started** (`/signup`) + **Sign in**, hero **Sign in** + **Create account** (`/signup`); Vitest contracts in `src/app/page.test.ts` and `src/app/globals.test.ts`. Shared **Input** focus ring uses **`--ring`**; **`:autofill`** + **`-webkit-autofill`** theming lives in `globals.css`.
+- **Schedule layout + role consistency:** `/coverage` now supports both **Grid** and **Roster** layouts. Managers can edit staffing from either layout by clicking a day cell; leads can update staffed cells to **`OC`**, **`LE`**, **`CX`**, or **`CI`** through the shared assignment-status flow. Users can save a default schedule layout (`Grid` or `Roster`) in `/profile`, and compatibility routes (`/schedule`, `/therapist/schedule`) now defer default layout selection to `/coverage` so a saved preference wins unless an explicit `view` query is present.
+- **Lead role source of truth:** product behavior now treats `profiles.role = 'lead'` as the source of truth for lead-only UI/actions. The legacy `is_lead_eligible` column is kept in sync to `role`, but Coverage, print/export, profile badges, swap partner filtering, and designated-lead actions should all be reasoned about in terms of `role`, not the legacy flag.
+- **Auth entry (`/login`, `/signup`):** `src/lib/auth/login-utils.ts` parses auth errors from top-level query params **or nested inside `redirectTo`** (e.g. `/availability?error=...`), maps friendly copy, and `router.replace` cleans error keys while preserving a sanitized `redirectTo`. Approval/allowlist copy shows as a **warning** banner with optional **Request access** link and dismiss; credential failures stay **destructive**. Successful access **request** redirects to **`/login?status=requested`** with an **info** banner (dismiss + URL strip); signup no longer auto-signs-in before that redirect. **Name roster auto-match:** managers maintain **`employee_roster`** on **`/team`** (single row, **bulk paste**, or ops script). On signup, **`handle_new_user`** matches **normalized full name** to an active roster row; the new profile gets roster **role/settings** immediately (non-pending), the roster row records **`matched_profile_id`**, and signup sends users to **`/login?status=matched`** with a ready-to-sign-in banner. Unmatched signups stay **`profiles.role = null`** pending approval. **Migration:** `20260413123000_add_employee_roster_and_name_match_signup.sql`. **Ops:** `npm run sync:roster` bulk-creates **auth + profiles** from an email list file (separate from **`employee_roster`** name pre-match). **Public homepage (`/`):** therapist-first copy, luminous background utilities (`--home-*`, `.teamwise-home-*`), header **Get started** (`/signup`) + **Sign in**, hero **Sign in** + **Create account** (`/signup`); Vitest contracts in `src/app/page.test.ts` and `src/app/globals.test.ts`. Shared **Input** focus ring uses **`--ring`**; **`:autofill`** + **`-webkit-autofill`** theming lives in `globals.css`.
 - Mixed off/work sentences are parsed more accurately than before, but parser changes should continue to be driven by real inbound examples.
+- **Accessibility / theming pass (UI review branch):** root layout wraps the app in **`MotionProvider`** (`src/components/motion-provider.tsx`) with Framer **`MotionConfig reducedMotion="user"`** so motion respects **`prefers-reduced-motion`**. Prefer design tokens over raw **`text-white`** / **`bg-white`** / stray **`dark:`** on shared surfaces; destructive actions use **`text-destructive-foreground`**. **`globals.css`:** stronger **`--muted-foreground`**, **`--color-destructive-foreground`** in **`@theme`**, table row hover scoped to **`table:not(.no-row-hover)`**, marketing header + home preview shell reduce **`backdrop-filter`** under **`prefers-reduced-motion: reduce`**. **`/requests/new`** and **`/publish/[id]`** use **`ManagerWorkspaceHeader`**. **`LEAD_ELIGIBLE_BADGE_CLASS`** uses **`--info-*`** tokens (`src/lib/employee-tag-badges.ts`).
 - `RESEND_API_KEY` must support receiving APIs, not just sending. A send-only key fails on `/emails/receiving` with `401 restricted_api_key`.
 
 ### Local In-Progress Work
 
 - `main` includes the merged email-intake apply gating fix from PR `#27` and the **therapist-first luminous homepage** (replaces the older `codex/therapist-homepage-redesign` intent; that branch may be deleted when convenient).
+- `claude/review-ui-flow-7Weav` has the **top nav redesign** (session 55) — sidebar replaced with a fixed horizontal top nav. Needs review and merge to `main` before deploying.
 
 ### Where We Want To Go
 
-1. Move `Email Intake` higher on `/availability` and make the review/apply workflow more obvious.
-2. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
-3. Deploy production after significant public-surface changes (`vercel deploy --prod`) so `www.teamwise.work` matches `main`.
-4. Keep manual intake first-class even if Resend inbound is healthy. It is the practical fallback path for operations.
+1. **Coverage grid redesign** — Stitch explorations in session 56 converged on a swimlane grid (therapist rows × date columns) that mirrors the physical paper schedule managers already use. Target aesthetic: mostly white grid, color only for exceptions (FMLA = soft red, missing lead = amber flag, scheduled = small teal dot or plain "1"). When a final Stitch frame is approved, implement it in `src/components/coverage/CalendarGrid.tsx` and `CoverageClientPage.tsx`.
+2. Merge `claude/review-ui-flow-7Weav` (top nav) into `main` and deploy to production.
+3. Move `Email Intake` higher on `/availability` and make the review/apply workflow more obvious.
+4. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
+5. Deploy production after significant public-surface changes (`vercel deploy --prod`) so `www.teamwise.work` matches `main`.
+6. Keep manual intake first-class even if Resend inbound is healthy. It is the practical fallback path for operations.
 
 ### Verification Baseline
 
@@ -41,6 +47,65 @@ Updated: 2026-04-12 (session 54)
 - `vercel deploy --prod --yes` for production shipping
 
 The session entries below are historical context. They may describe local-only or superseded work and should not override the snapshot above.
+
+## Latest Updates (2026-04-12, session 56)
+
+- **Coverage grid design exploration (Stitch / no code yet)**:
+  - Reviewed the physical paper schedule (RT Night Shift, swimlane grid) as the reference mental model for the digital coverage view.
+  - Explored redesigns in Stitch iterating toward: therapist name rows × date columns, week-of groupings across the top, daily tally pinned at the bottom — directly mirroring the paper format managers already know.
+  - Established visual principle: **color = exception only**. Scheduled cells should be plain (white bg, small teal indicator or "1" in dark gray). Only FMLA (soft red), missing lead (amber), and gaps get color treatment. Full teal cell fills were rejected as too noisy.
+  - Target implementation files when design is finalized: `src/components/coverage/CalendarGrid.tsx`, `src/app/coverage/CoverageClientPage.tsx`.
+  - No code changes this session — waiting for approved Stitch frame before implementing.
+
+## Latest Updates (2026-04-13, session 57)
+
+- **Roster schedule view shipped in coverage** (`src/app/coverage/CoverageClientPage.tsx`, `src/components/coverage/RosterScheduleView.tsx`, tests):
+  - `/coverage` now supports a second **Roster** presentation alongside the existing grid.
+  - The roster view is paper-schedule-inspired: therapist rows × date columns, split into week groupings, leads pinned/highlighted, regular staff above PRN, and day/night layouts handled through the existing shift tab.
+  - Managers can click roster day cells to open the shared staffing editor; non-manager leads can click staffed roster cells to change assignment status (`OC`, `LE`, `CX`, `CI`) via the same popover flow used elsewhere.
+- **Saved schedule layout preference** (`src/app/profile/page.tsx`, `src/app/coverage/page.tsx`, `src/app/schedule/page.tsx`, `src/app/therapist/schedule/page.tsx`, `src/lib/schedule-helpers.ts`, migration `20260413083000_add_default_schedule_view_to_profiles.sql`):
+  - Profiles can now save `default_schedule_view` (`week` or `roster`).
+  - Compatibility routes no longer force `view=week`; `/coverage` resolves the default layout using profile context when no explicit `view` query is present.
+- **Lead semantics hardened** (`src/lib/auth/roles.ts`, coverage/shift-board/profile/schedule mutation files, migration `20260412164000_sync_lead_eligibility_to_role.sql`):
+  - Lead-only behavior is now role-driven across the app.
+  - Demo seed data no longer marks ordinary therapists as lead-eligible by default.
+  - Existing profile rows were synced so therapist-role users (for example Aleyce) stop appearing in lead buckets.
+- **Print/export alignment** (`src/components/print-schedule.tsx`, `src/app/globals.css`):
+  - Printed completed schedules now better match the paper reference layout: separate day/night sheets, full-time above PRN, and visible lead emphasis in the printed roster.
+- **Onboarding + microcopy consistency pass** (`src/app/coverage/CoverageClientPage.tsx`, `src/components/availability/EmailIntakePanel.tsx`, `src/components/availability/TherapistAvailabilityWorkspace.tsx`, `src/app/availability/page.tsx`, `src/app/therapist/availability/page.tsx`):
+  - Added a roster-view empty-state onboarding panel in `/coverage` so first-time managers get the same guided next steps in both Grid and Roster layouts.
+  - Added explicit Email Intake flow guidance (create intake → match therapist/cycle → apply dates), plus per-card next-step messaging so managers can tell what to do next at a glance.
+  - Added therapist-side onboarding reminders clarifying **Save progress** (draft) vs **Submit availability** (official submission), then aligned related feedback toasts to the same concise voice.
+- **Verification:** focused Vitest coverage for schedule view routing, roster helpers, and drag-drop lead rules; `npm run lint`; `npm run build`.
+
+## Latest Updates (2026-04-13, session 58)
+
+- **Employee roster + name-based signup auto-link** (`supabase/migrations/20260413123000_add_employee_roster_and_name_match_signup.sql`, `src/app/team/actions.ts`, `src/app/team/page.tsx`, `src/components/team/EmployeeRosterPanel.tsx`, `src/app/signup/page.tsx`, `src/app/login/page.tsx`):
+  - New **`employee_roster`** table with manager RLS; **`handle_new_user`** matches **normalized full name** to an active unmatched roster row and provisions **`profiles`** with roster role, shift, employment, weekly cap, and lead eligibility; marks roster row **`matched_profile_id`** / **`matched_at`**.
+  - **`/team`**: single-row add + **bulk paste** import (`src/lib/employee-roster-bulk.ts`, `bulkUpsertEmployeeRosterAction`); list shows signed-up vs not.
+  - **Signup** calls **`checkNameRosterMatchAction`** after successful **`signUp`** to choose **`/login?status=matched`** vs **`requested`** (banner-only distinction; DB truth is the trigger).
+- **Ops script — email list → auth users** (`scripts/sync-team-roster.mjs`, `scripts/lib/parse-roster-line.mjs`, `npm run sync:roster`): service-role bulk create/update **therapist** profiles from a text file (separate workflow from **`employee_roster`** name pre-match).
+- **Verification:** `npm run lint` on touched files; `npx tsc --noEmit`; `npx vitest run src/lib/employee-roster-bulk.test.ts src/lib/parse-roster-line.test.ts`.
+
+## Latest Updates (2026-04-12, session 55)
+
+- **Top nav redesign — sidebar replaced with fixed horizontal nav** (`src/components/AppShell.tsx`, `src/components/AppShell.test.ts`):
+  - Sidebar removed entirely. All roles now get a **fixed top nav bar** (`h-14`, `bg-sidebar` dark teal) with logo left, nav center, notification bell + user avatar dropdown right.
+  - **Manager nav** consolidates 8 flat items into 3 primary sections: **Today** (→ `/dashboard/manager`), **Schedule** (→ `/coverage`), **People** (→ `/team`). A **secondary sub-nav bar** (`h-11`) appears below the primary bar when inside Schedule or People, showing sub-items with an amber underline active indicator.
+    - Schedule sub-items: Coverage · Availability · Publish · Approvals
+    - People sub-items: Team · Requests (merged from old "Requests" + "User Access Requests")
+  - **Staff nav** is a flat horizontal bar: Dashboard · Schedule · Availability · Open shifts. Notifications removed as a nav item (bell icon in top bar is sufficient). "Schedule Preview" (preliminary) removed as a permanent nav item.
+  - **User dropdown**: avatar initials button → dropdown with Settings, Therapist view (manager only), Log out.
+  - **Mobile**: hamburger in top nav opens the same slide-over drawer; manager sections shown as labeled groups.
+  - Main content gets `pt-14` (primary nav only) or `pt-[100px]` (primary + secondary nav) via a wrapper div. Coverage page remains full-bleed horizontally.
+  - Exported constants (`APP_SHELL_SIDEBAR_CLASS`, `APP_SHELL_ACTIVE_NAV_CLASS`, `APP_SHELL_PROFILE_CARD_CLASS`) preserved for backwards compatibility. Tests updated: 12 passing.
+  - **Verification:** `npx vitest run src/components/AppShell.test.ts`, `npx eslint src/components/AppShell.tsx`
+  - Branch: `claude/review-ui-flow-7Weav`
+- **UI review / a11y alignment + unit test repair** (`src/app/layout.tsx`, `src/components/motion-provider.tsx`, `src/app/globals.css`, `src/components/ui/{button,badge,input}.tsx`, `src/app/page.tsx`, `src/app/login/page.tsx`, `src/app/signup/page.tsx`, `src/components/AppShell.tsx`, `src/app/publish/[id]/page.tsx`, `src/app/requests/new/page.tsx`, `src/app/shift-board/page.tsx`, `src/components/EmployeeDirectory.tsx`, `src/lib/employee-tag-badges.ts`, Vitest files under `src/app/**` and `src/components/manager/`):
+  - Framer Motion respects reduced motion; token cleanup on marketing and staff surfaces; publish detail and staff **My Requests** headers aligned with **`ManagerWorkspaceHeader`**.
+  - **Vitest:** full **`npx vitest run`** now **516 passing** after updating copy-based tests (approvals empty state, coverage file-contract strings, pending-setup multiline copy, manager inbox metric typography), **`publish/actions`** admin mock for preliminary snapshot close, **`auth/signout`** route test **`cookies()`** mock, and **`assignment-status`** route test **`createAdminClient`** + RPC row alignment for manager **`cancelled`** notification expectations.
+- **Operational docs:** `docs/WORKFLOWS.md` and **`CLAUDE.md`** Key Shared Components / Schedule UX / Navbar sections document manager shell IA (**Today** / **Schedule** / **People**), **`/schedule` → `/coverage`** active-tab contract, and horizontal scroll on the manager secondary nav. Seeded-auth cleanup remains **`npm run cleanup:seed-users`** (see **`docs/ENVIRONMENT_CLEANUP.md`** and prior commit on this branch).
+- **Verification:** `npx vitest run` (516 tests), `npm run lint`, `npm run build`.
 
 ## Latest Updates (2026-04-12, session 54)
 
@@ -91,14 +156,13 @@ The session entries below are historical context. They may describe local-only o
 
 ## Latest Updates (2026-04-10, session 47)
 
-- **Availability intake now has a manager-controlled fallback path** (`src/app/availability/actions.ts`, `src/app/availability/page.tsx`, `src/components/availability/EmailIntakePanel.tsx`, `supabase/migrations/20260410162000_allow_manual_email_intake_provider.sql`):
-  - `/availability` now lets managers create intake items directly by choosing therapist + cycle, pasting request text, and/or uploading a request-form image/PDF.
-  - The manual form stores rows in the same `availability_email_intakes` / `availability_email_attachments` tables as the webhook path, so review/apply behavior stays identical across channels.
-  - Uploaded images can be OCR'd through the OpenAI Responses API when `OPENAI_API_KEY` is configured; PDFs are stored for review but still require manual reading.
+- **Availability intake now runs through inbound email only** (`src/app/api/inbound/availability-email/route.ts`, `src/components/availability/EmailIntakePanel.tsx`):
+  - Request emails are parsed into intake items and can auto-apply when confidence is high.
+  - Uploaded images and PDFs are parsed through the OpenAI Responses API when `OPENAI_API_KEY` is configured.
 - **Inbound email channel is configured but still vendor-blocked**:
   - `mail.teamwise.work` receiving is verified in Resend, the webhook is enabled, and production middleware now leaves `POST /api/inbound/availability-email` public so signature-verified provider calls are not redirected to `/login`.
   - The original `RESEND_API_KEY` was send-only; intake processing requires a key that can call `/emails/receiving`.
-  - Even after swapping in a receiving-capable key and redeploying production, Resend still returned zero inbound emails during this session, so the manual intake form is the operational path while inbound delivery is investigated with Resend.
+  - Even after swapping in a receiving-capable key and redeploying production, Resend still returned zero inbound emails during this session, so delivery must be resolved with Resend support.
 - **Verification:** `supabase db push`, `npm run test:unit` (25 passing across intake/OCR/proxy suites), `npm run lint`, `npm run build`, `vercel deploy --prod --yes`
 
 ## Latest Updates (2026-04-10, session 46)
@@ -251,6 +315,7 @@ Current session checks green:
 - `npx tsc --noEmit` pass
 - `npm run build` pass
 - `npm audit --omit=dev` pass
+- full `npx vitest run` pass (**516 tests**, session 55)
 - targeted `npx vitest run src/app/availability/actions.test.ts src/app/api/schedule/drag-drop/route.test.ts src/lib/coverage/mutations.test.ts` pass
 - targeted `npx eslint` on touched files pass
 - Playwright CLI smoke pass on `/` and `/coverage?shift=day` (redirect to login as expected, no console warnings)
@@ -258,7 +323,7 @@ Current session checks green:
 Broader historical baseline:
 
 - `npm run test:e2e` pass (**42 passed**) with default Playwright workers set to `2`
-- Full `npx vitest run` may require `.env.local` (for example `assignment-status` route test uses admin client env vars)
+- Full `npx vitest run` is green without real Supabase admin env: **`assignment-status`** route tests mock **`@/lib/supabase/admin`** (`createAdminClient`).
 - Auth E2E happy path requires `.env.local` (or shell env) entries for `E2E_USER_EMAIL` and `E2E_USER_PASSWORD`
 
 CI gates: format check → lint → tsc → build → Playwright E2E
@@ -309,11 +374,12 @@ All permission checks go through `can(role, permission)` in `src/lib/auth/can.ts
 ## Key Shared Components
 
 - `src/components/ui/page-header.tsx` — `<PageHeader>` is DEPRECATED for new pages; only remaining on legacy pages not yet migrated
-- `src/components/manager/ManagerWorkspaceHeader.tsx` — canonical manager route header for `/availability`, `/coverage`, `/team`, and `/approvals`
+- `src/components/motion-provider.tsx` — client root wrapper: Framer **`MotionConfig reducedMotion="user"`** (respects **`prefers-reduced-motion`**); used from `src/app/layout.tsx`
+- `src/components/manager/ManagerWorkspaceHeader.tsx` — canonical manager-style route header for `/availability`, `/coverage`, `/team`, `/approvals`, `/publish/[id]`, and staff **`/requests/new`**
 - `src/components/availability/AvailabilityOverviewHeader.tsx` — manager-specific availability wrapper around the shared manager workspace header
 - `src/components/ui/skeleton.tsx` — `<Skeleton>`, `<SkeletonLine>`, `<SkeletonCard>`, `<SkeletonListItem>` loading states
 - `src/components/NotificationBell.tsx` — real-time bell with Supabase subscription; variants: `default` | `staff`
-- `src/components/AppShell.tsx` — nav shell; add routes to `MANAGER_NAV` / `STAFF_NAV` arrays
+- `src/components/AppShell.tsx` — nav shell; manager nav is built from `buildManagerSections()` (`Today`, `Schedule`, `People`) and staff nav still uses `STAFF_NAV_ITEMS`. Keep `/schedule` treated as a coverage alias in the manager `Schedule` section, and keep the fixed secondary nav horizontally scrollable for mobile widths.
 - `src/components/feedback-toast.tsx` — `<FeedbackToast message variant>` for success/error toasts
 - `src/lib/auth/can.ts` — `can(role, permission)` — all permission checks go through here
 - `src/lib/coverage/selectors.ts` — `buildDayItems`, `toUiStatus`
@@ -420,6 +486,7 @@ Assignment status is informational only (does not affect coverage counts or publ
 - Lead/staff assignment actions still use current Teamwise mutations and rules
 - Coverage E2E now validates dialog/popover workflow instead of the removed drawer
 - Dialog density is controlled centrally in `src/components/coverage/shift-editor-dialog-layout.ts`
+- Shift editor header includes compact coverage progress (`X / 5 covered`) with threshold colors (`<3` error, `3-5` success, `>5` warning); therapist rows show non-FT employment badges (`[PRN]`, `[PT]`); and editable shifts with no lead show an amber lead-required banner.
 - **Constraint warning gotcha:** `constraintBlockedSlotKeys` in `CoverageClientPage.tsx` is built from unfilled shift rows (`user_id IS NULL`). After the loop, any slot key that also has an assigned therapist is deleted from the set — so "No eligible therapists (constraints)" only appears for truly empty slots; manually assigned therapists suppress it.
 - **Day-card warning treatment:** `hasCoverageIssue` in `CalendarGrid.tsx` is `day.constraintBlocked` only — **not** `missingLead || constraintBlocked`. Missing-lead-only days show their warning exclusively through the lead sub-section widget inside the card (which uses `day.leadShift` directly). Do not restore `missingLead` to `hasCoverageIssue` — it caused the entire 6-week calendar to look permanently alarmed in the demo data.
 - **Coverage empty states:** Two distinct flags in `CoverageClientPage.tsx` (around line 703): `noCycleSelected` (no cycle row active) and `showEmptyDraftState` (`activeCycleId` set but `selectedCycleHasShiftRows` is false). They render separate `<section>` panels before `<CalendarGrid>`. Edit those blocks to change empty state copy or layout.
@@ -431,6 +498,7 @@ Assignment status is informational only (does not affect coverage counts or publ
 - Clicking a team member card opens a quick-edit modal on the same page
 - Sections are grouped by: managers, day shift (Lead Therapists, Therapists), night shift (Lead Therapists, Therapists), inactive
 - Quick edit is meant for roster/access fields: name, app role, shift type, employment type, FMLA, FMLA return date, active/inactive, recurring **work pattern** (works/offs DOW, hard/soft works mode, weekend rotation + anchor) for therapist/lead rows
+- **Employee roster (signup pre-match):** below the directory, **`EmployeeRosterPanel`** (`src/components/team/EmployeeRosterPanel.tsx`) edits **`employee_roster`** — preload **full names** (and optional role/shift/employment via bulk paste) so first-time signup can auto-link by **name** (see **Auth entry** above). Do not confuse this with **`npm run sync:roster`**, which is an email-list **auth/profile** sync for ops.
 - `Lead Therapist` is the visible manager-facing role label; the separate `Coverage lead` control was removed from `/team`
 - The page now shares the quieter manager workspace header pattern and lighter card framing used on `/availability` and `/approvals`
 - `/directory` should be treated as a compatibility redirect only, not a feature surface
@@ -439,6 +507,9 @@ Assignment status is informational only (does not affect coverage counts or publ
 
 `/coverage` is the shared schedule workspace for all roles; actions and edits are permission-gated.
 `/schedule` is retained as a compatibility route and redirects into `/coverage`.
+The manager shell must still show the `Schedule` primary section as active on `/schedule`, with the `Coverage` secondary tab highlighted because that route is a legacy alias into the same workflow.
+
+- `/coverage` supports both `Grid` and `Roster` layouts. Explicit `view` params must survive compatibility redirects, and default layout selection belongs in `/coverage` where profile context is available.
 
 ## Navbar / Branding
 
@@ -447,7 +518,14 @@ Assignment status is informational only (does not affect coverage counts or publ
 - User avatar: `var(--attention)` amber
 - Manager badge: `bg-[var(--warning-subtle)] text-[var(--warning-text)] border-[var(--warning-border)]`
 - App shell header `z-30`; coverage slide-over `z-50`
-- Manager nav order: Inbox -> Schedule -> Availability -> Requests -> User Access Requests -> Team -> Approvals -> Publish History
+- Manager nav (top bar): Today → Schedule → People (user avatar dropdown → Settings / Therapist view / Log out)
+  - Schedule sub-nav: Coverage → Availability → Publish → Approvals
+  - People sub-nav: Team → Requests (merged; includes access requests with badge)
+- **Old sidebar is gone** — do not restore it. Nav is now a fixed horizontal top bar.
+- Manager shell IA uses primary sections `Today`, `Schedule`, and `People`
+- `Schedule` secondary nav items are `Coverage`, `Availability`, `Publish`, and `Approvals`
+- `People` secondary nav items are `Team` and `Requests`
+- The fixed secondary nav must preserve `overflow-x-auto` with non-shrinking items so narrow mobile widths scroll instead of clipping tabs
 
 ## Assignment Status
 
@@ -456,6 +534,8 @@ Backend values: `scheduled`, `call_in`, `cancelled`, `on_call`, `left_early`
 Shift fields: `assignment_status`, `status_note`, `left_early_time`, `status_updated_at`, `status_updated_by`
 
 Write path: `POST /api/schedule/assignment-status` with optimistic local update + rollback.
+
+- Allowed actors: manager or lead.
 
 ## Notifications
 
@@ -506,7 +586,7 @@ Inbound intake notes:
 
 Core tables:
 
-- `profiles` — `full_name`, `email`, `phone_number`, `role` (nullable for pending users), `shift_type`, `employment_type`, `max_work_days_per_week`, `is_lead_eligible`, `on_fmla`, `is_active`, `default_calendar_view`, `default_landing_page`, `site_id`
+- `profiles` — `full_name`, `email`, `phone_number`, `role` (nullable for pending users), `shift_type`, `employment_type`, `max_work_days_per_week`, `is_lead_eligible` (legacy synced field), `on_fmla`, `is_active`, `default_calendar_view`, `default_schedule_view`, `default_landing_page`, `site_id`
 - `schedule_cycles`
 - `shifts` — `cycle_id`, `user_id`, `date`, `shift_type`, `status`, `role`, `unfilled_reason`, assignment-status fields, `site_id`
 - `work_patterns` — `works_dow`, `offs_dow`, `weekend_rotation`, `weekend_anchor_date`, `works_dow_mode`
@@ -530,6 +610,9 @@ Core tables:
 - `20260407140000_therapist_availability_submissions.sql` (`therapist_availability_submissions`, `schedule_cycles.availability_due_at`)
 - `20260409124000_pending_signup_access_requests.sql` (nullable `profiles.role`, pending-aware `handle_new_user`)
 - `20260409145500_fix_custom_access_token_hook_for_pending_users.sql` (omit null `user_role` claim)
+- `20260412164000_sync_lead_eligibility_to_role.sql` (sync legacy `is_lead_eligible` to `role`)
+- `20260413083000_add_default_schedule_view_to_profiles.sql` (`profiles.default_schedule_view`)
+- `20260413123000_add_employee_roster_and_name_match_signup.sql` (`employee_roster`, name-match **`handle_new_user`**)
 
 ## Next High-Value Priorities
 

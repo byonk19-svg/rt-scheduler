@@ -259,7 +259,8 @@ describe('approvals preliminary queue', () => {
     const html = renderToStaticMarkup(await ApprovalsPage({ searchParams: Promise.resolve({}) }))
 
     expect(html).toContain('No pending preliminary requests')
-    expect(html).toContain('Go to coverage to send preliminary')
+    expect(html).toContain('Send a preliminary schedule from Coverage to open this queue.')
+    expect(html).toContain('Send preliminary from Coverage')
     expect(html).not.toContain('Approve')
   })
 

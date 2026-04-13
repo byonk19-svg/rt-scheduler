@@ -8,6 +8,7 @@ import { CalendarDays, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { checkNameRosterMatchAction } from '@/app/team/actions'
 import { createClient } from '@/lib/supabase/client'
 
 const AUTH_REQUEST_TIMEOUT_MS = 10000
@@ -101,7 +102,8 @@ export default function SignUpPage() {
         return
       }
 
-      router.push('/login?status=requested')
+      const rosterMatched = await checkNameRosterMatchAction(fullName)
+      router.push(rosterMatched ? '/login?status=matched' : '/login?status=requested')
       router.refresh()
     } catch (requestError) {
       const message =
@@ -126,15 +128,15 @@ export default function SignUpPage() {
         />
         <div className="relative flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--attention)]">
-            <CalendarDays className="h-5 w-5 text-white" />
+            <CalendarDays className="h-5 w-5 text-accent-foreground" />
           </div>
           <div>
-            <p className="font-heading text-base font-bold text-white">Teamwise</p>
+            <p className="font-heading text-base font-bold text-sidebar-primary">Teamwise</p>
             <p className="text-[0.7rem] text-[var(--sidebar-foreground)]">Respiratory Therapy</p>
           </div>
         </div>
         <div className="relative">
-          <p className="font-display text-3xl font-bold leading-tight tracking-tight text-white">
+          <p className="font-display text-3xl font-bold leading-tight tracking-tight text-sidebar-primary">
             Scheduling that keeps care moving.
           </p>
           <p className="mt-4 text-sm leading-relaxed text-[var(--sidebar-foreground)]">
@@ -147,7 +149,7 @@ export default function SignUpPage() {
       <div className="flex flex-1 flex-col items-center justify-center bg-background px-6 py-5 sm:py-6 lg:py-6">
         <div className="mb-4 flex items-center gap-2.5 lg:hidden">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--attention)]">
-            <CalendarDays className="h-4 w-4 text-white" />
+            <CalendarDays className="h-4 w-4 text-accent-foreground" />
           </div>
           <p className="font-heading text-sm font-bold text-foreground">Teamwise</p>
         </div>
