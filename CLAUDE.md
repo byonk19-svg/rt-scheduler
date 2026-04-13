@@ -156,14 +156,13 @@ The session entries below are historical context. They may describe local-only o
 
 ## Latest Updates (2026-04-10, session 47)
 
-- **Availability intake now has a manager-controlled fallback path** (`src/app/availability/actions.ts`, `src/app/availability/page.tsx`, `src/components/availability/EmailIntakePanel.tsx`, `supabase/migrations/20260410162000_allow_manual_email_intake_provider.sql`):
-  - `/availability` now lets managers create intake items directly by choosing therapist + cycle, pasting request text, and/or uploading a request-form image/PDF.
-  - The manual form stores rows in the same `availability_email_intakes` / `availability_email_attachments` tables as the webhook path, so review/apply behavior stays identical across channels.
-  - Uploaded images can be OCR'd through the OpenAI Responses API when `OPENAI_API_KEY` is configured; PDFs are stored for review but still require manual reading.
+- **Availability intake now runs through inbound email only** (`src/app/api/inbound/availability-email/route.ts`, `src/components/availability/EmailIntakePanel.tsx`):
+  - Request emails are parsed into intake items and can auto-apply when confidence is high.
+  - Uploaded images and PDFs are parsed through the OpenAI Responses API when `OPENAI_API_KEY` is configured.
 - **Inbound email channel is configured but still vendor-blocked**:
   - `mail.teamwise.work` receiving is verified in Resend, the webhook is enabled, and production middleware now leaves `POST /api/inbound/availability-email` public so signature-verified provider calls are not redirected to `/login`.
   - The original `RESEND_API_KEY` was send-only; intake processing requires a key that can call `/emails/receiving`.
-  - Even after swapping in a receiving-capable key and redeploying production, Resend still returned zero inbound emails during this session, so the manual intake form is the operational path while inbound delivery is investigated with Resend.
+  - Even after swapping in a receiving-capable key and redeploying production, Resend still returned zero inbound emails during this session, so delivery must be resolved with Resend support.
 - **Verification:** `supabase db push`, `npm run test:unit` (25 passing across intake/OCR/proxy suites), `npm run lint`, `npm run build`, `vercel deploy --prod --yes`
 
 ## Latest Updates (2026-04-10, session 46)

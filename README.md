@@ -245,7 +245,6 @@ What the app does:
 - can OCR supported image attachments through the OpenAI Responses API when configured
 - creates an intake record for manager review on [`/availability`](./src/app/availability/page.tsx)
 - applies parsed dates into `availability_overrides` as manager-entered inputs
-- also provides a manual fallback on `/availability` so managers can create intake items directly from pasted text or uploaded request forms
 
 Required env vars:
 
@@ -275,10 +274,9 @@ Current MVP limits:
 
 - automatic parsing is best when the email body is typed and structured
 - image attachments (`png`, `jpg`, `jpeg`, `webp`, `gif`) can be OCR'd when OpenAI is configured
-- PDF attachments are stored for review but are not OCR'd automatically yet
+- PDF attachments are parsed through the OpenAI extraction flow when configured
 - sender matching currently uses the sender email address against `profiles.email`
 - the Resend API key must have receiving-capable permissions; a send-only key cannot fetch inbound email content
-- if Resend inbound is still not yielding events, the manual intake form on `/availability` is the intended operational fallback
 
 ## CI (GitHub Actions)
 
