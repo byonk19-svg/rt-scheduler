@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-12 (session 56)
+Updated: 2026-04-13 (session 57)
 
 ## Handoff Snapshot
 
@@ -17,6 +17,8 @@ Updated: 2026-04-12 (session 56)
 - Uploaded images can OCR through the OpenAI Responses API when `OPENAI_API_KEY` is configured. PDFs are stored for review but are not OCR'd automatically yet.
 - Managers can now fix therapist matches inline on the intake card and then apply parsed dates from the same surface.
 - Managers must now match both the therapist and the schedule block before `Apply dates` appears on an intake card. This prevents the old dead-end `email_intake_apply_failed` redirect when a therapist was matched but no cycle was attached yet.
+- **Schedule layout + role consistency:** `/coverage` now supports both **Grid** and **Roster** layouts. Managers can edit staffing from either layout by clicking a day cell; leads can update staffed cells to **`OC`**, **`LE`**, **`CX`**, or **`CI`** through the shared assignment-status flow. Users can save a default schedule layout (`Grid` or `Roster`) in `/profile`, and compatibility routes (`/schedule`, `/therapist/schedule`) now defer default layout selection to `/coverage` so a saved preference wins unless an explicit `view` query is present.
+- **Lead role source of truth:** product behavior now treats `profiles.role = 'lead'` as the source of truth for lead-only UI/actions. The legacy `is_lead_eligible` column is kept in sync to `role`, but Coverage, print/export, profile badges, swap partner filtering, and designated-lead actions should all be reasoned about in terms of `role`, not the legacy flag.
 - **Auth entry (`/login`, `/signup`):** `src/lib/auth/login-utils.ts` parses auth errors from top-level query params **or nested inside `redirectTo`** (e.g. `/availability?error=...`), maps friendly copy, and `router.replace` cleans error keys while preserving a sanitized `redirectTo`. Approval/allowlist copy shows as a **warning** banner with optional **Request access** link and dismiss; credential failures stay **destructive**. Successful access **request** redirects to **`/login?status=requested`** with an **info** banner (dismiss + URL strip); signup no longer auto-signs-in before that redirect. **Public homepage (`/`):** therapist-first copy, luminous background utilities (`--home-*`, `.teamwise-home-*`), header **Get started** (`/signup`) + **Sign in**, hero **Sign in** + **Create account** (`/signup`); Vitest contracts in `src/app/page.test.ts` and `src/app/globals.test.ts`. Shared **Input** focus ring uses **`--ring`**; **`:autofill`** + **`-webkit-autofill`** theming lives in `globals.css`.
 - Mixed off/work sentences are parsed more accurately than before, but parser changes should continue to be driven by real inbound examples.
 - **Accessibility / theming pass (UI review branch):** root layout wraps the app in **`MotionProvider`** (`src/components/motion-provider.tsx`) with Framer **`MotionConfig reducedMotion="user"`** so motion respects **`prefers-reduced-motion`**. Prefer design tokens over raw **`text-white`** / **`bg-white`** / stray **`dark:`** on shared surfaces; destructive actions use **`text-destructive-foreground`**. **`globals.css`:** stronger **`--muted-foreground`**, **`--color-destructive-foreground`** in **`@theme`**, table row hover scoped to **`table:not(.no-row-hover)`**, marketing header + home preview shell reduce **`backdrop-filter`** under **`prefers-reduced-motion: reduce`**. **`/requests/new`** and **`/publish/[id]`** use **`ManagerWorkspaceHeader`**. **`LEAD_ELIGIBLE_BADGE_CLASS`** uses **`--info-*`** tokens (`src/lib/employee-tag-badges.ts`).
@@ -54,6 +56,23 @@ The session entries below are historical context. They may describe local-only o
   - Established visual principle: **color = exception only**. Scheduled cells should be plain (white bg, small teal indicator or "1" in dark gray). Only FMLA (soft red), missing lead (amber), and gaps get color treatment. Full teal cell fills were rejected as too noisy.
   - Target implementation files when design is finalized: `src/components/coverage/CalendarGrid.tsx`, `src/app/coverage/CoverageClientPage.tsx`.
   - No code changes this session — waiting for approved Stitch frame before implementing.
+
+## Latest Updates (2026-04-13, session 57)
+
+- **Roster schedule view shipped in coverage** (`src/app/coverage/CoverageClientPage.tsx`, `src/components/coverage/RosterScheduleView.tsx`, tests):
+  - `/coverage` now supports a second **Roster** presentation alongside the existing grid.
+  - The roster view is paper-schedule-inspired: therapist rows × date columns, split into week groupings, leads pinned/highlighted, regular staff above PRN, and day/night layouts handled through the existing shift tab.
+  - Managers can click roster day cells to open the shared staffing editor; non-manager leads can click staffed roster cells to change assignment status (`OC`, `LE`, `CX`, `CI`) via the same popover flow used elsewhere.
+- **Saved schedule layout preference** (`src/app/profile/page.tsx`, `src/app/coverage/page.tsx`, `src/app/schedule/page.tsx`, `src/app/therapist/schedule/page.tsx`, `src/lib/schedule-helpers.ts`, migration `20260413083000_add_default_schedule_view_to_profiles.sql`):
+  - Profiles can now save `default_schedule_view` (`week` or `roster`).
+  - Compatibility routes no longer force `view=week`; `/coverage` resolves the default layout using profile context when no explicit `view` query is present.
+- **Lead semantics hardened** (`src/lib/auth/roles.ts`, coverage/shift-board/profile/schedule mutation files, migration `20260412164000_sync_lead_eligibility_to_role.sql`):
+  - Lead-only behavior is now role-driven across the app.
+  - Demo seed data no longer marks ordinary therapists as lead-eligible by default.
+  - Existing profile rows were synced so therapist-role users (for example Aleyce) stop appearing in lead buckets.
+- **Print/export alignment** (`src/components/print-schedule.tsx`, `src/app/globals.css`):
+  - Printed completed schedules now better match the paper reference layout: separate day/night sheets, full-time above PRN, and visible lead emphasis in the printed roster.
+- **Verification:** focused Vitest coverage for schedule view routing, roster helpers, and drag-drop lead rules; `npm run lint`; `npm run build`.
 
 ## Latest Updates (2026-04-12, session 55)
 
@@ -477,6 +496,8 @@ Assignment status is informational only (does not affect coverage counts or publ
 `/schedule` is retained as a compatibility route and redirects into `/coverage`.
 The manager shell must still show the `Schedule` primary section as active on `/schedule`, with the `Coverage` secondary tab highlighted because that route is a legacy alias into the same workflow.
 
+- `/coverage` supports both `Grid` and `Roster` layouts. Explicit `view` params must survive compatibility redirects, and default layout selection belongs in `/coverage` where profile context is available.
+
 ## Navbar / Branding
 
 - Logo: amber icon (`var(--attention)`) + Teamwise wordmark
@@ -500,6 +521,8 @@ Backend values: `scheduled`, `call_in`, `cancelled`, `on_call`, `left_early`
 Shift fields: `assignment_status`, `status_note`, `left_early_time`, `status_updated_at`, `status_updated_by`
 
 Write path: `POST /api/schedule/assignment-status` with optimistic local update + rollback.
+
+- Allowed actors: manager or lead.
 
 ## Notifications
 
@@ -550,7 +573,7 @@ Inbound intake notes:
 
 Core tables:
 
-- `profiles` — `full_name`, `email`, `phone_number`, `role` (nullable for pending users), `shift_type`, `employment_type`, `max_work_days_per_week`, `is_lead_eligible`, `on_fmla`, `is_active`, `default_calendar_view`, `default_landing_page`, `site_id`
+- `profiles` — `full_name`, `email`, `phone_number`, `role` (nullable for pending users), `shift_type`, `employment_type`, `max_work_days_per_week`, `is_lead_eligible` (legacy synced field), `on_fmla`, `is_active`, `default_calendar_view`, `default_schedule_view`, `default_landing_page`, `site_id`
 - `schedule_cycles`
 - `shifts` — `cycle_id`, `user_id`, `date`, `shift_type`, `status`, `role`, `unfilled_reason`, assignment-status fields, `site_id`
 - `work_patterns` — `works_dow`, `offs_dow`, `weekend_rotation`, `weekend_anchor_date`, `works_dow_mode`
@@ -574,6 +597,8 @@ Core tables:
 - `20260407140000_therapist_availability_submissions.sql` (`therapist_availability_submissions`, `schedule_cycles.availability_due_at`)
 - `20260409124000_pending_signup_access_requests.sql` (nullable `profiles.role`, pending-aware `handle_new_user`)
 - `20260409145500_fix_custom_access_token_hook_for_pending_users.sql` (omit null `user_role` claim)
+- `20260412164000_sync_lead_eligibility_to_role.sql` (sync legacy `is_lead_eligible` to `role`)
+- `20260413083000_add_default_schedule_view_to_profiles.sql` (`profiles.default_schedule_view`)
 
 ## Next High-Value Priorities
 

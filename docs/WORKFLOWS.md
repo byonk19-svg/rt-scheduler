@@ -19,6 +19,7 @@ Operational workflows as implemented in the current codebase.
    - `/schedule` is a compatibility route that redirects into `/coverage`.
    - Navigation contract: manager AppShell must still treat `/schedule` as part of the `Schedule` section and highlight the `Coverage` secondary tab, since users still land there from legacy links and server redirects.
    - The fixed manager secondary nav must stay horizontally scrollable on narrow widths rather than shrinking or clipping workflow tabs.
+   - `/coverage` supports both `Grid` and `Roster` layouts. Explicit `view` params are preserved through `/schedule` and `/therapist/schedule`, and the saved profile layout preference is resolved in `/coverage` when no explicit `view` is supplied.
 2. Build draft assignments:
    - Manual add/move/remove/set lead, or
    - Auto-generate (`generateDraftScheduleAction`) using recurring patterns + cycle overrides.
@@ -50,6 +51,7 @@ Operational workflows as implemented in the current codebase.
 - Enforces daily coverage max and weekly limits unless manager override flag is set.
 - Returns conflict payload when override confirmation is required.
 - Shift editor surfaces compact in-dialog staffing guidance: `X / 5 covered` progress (3-5 target), non-FT employment badges (`[PRN]`, `[PT]`), and a persistent lead-required warning when editable shifts have no assigned lead.
+- Managers can open staffing edits from the roster layout by clicking a day cell. The roster view reuses the same assignment editor and schedule mutations as the grid view.
 
 ## 3) Therapist/Manager: Availability Input
 
@@ -98,10 +100,11 @@ Current operational guidance:
 ## 4) Assignment Status Updates
 
 - API: `POST /api/schedule/assignment-status`
-- Allowed actors: manager, lead, or lead-eligible therapist/staff.
+- Allowed actors: manager or lead.
 - Persists via RPC `update_assignment_status`.
 - Updates status metadata on `shifts` and writes `shift_status_changes` audit rows.
 - Used by manager month/week calendar and coverage status flows.
+- The roster layout reuses the same assignment-status popover/status write path as the grid view. Leads can update staffed roster cells to `OC`, `LE`, `CX`, or `CI`.
 - If the cycle is already published, the affected therapist also receives a `published_schedule_changed` in-app notification describing the new status.
 
 ## 5) Shift Board Requests

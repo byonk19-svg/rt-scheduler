@@ -24,6 +24,7 @@ import {
 } from '@/app/schedule/actions'
 import { StatusPill } from '@/components/coverage/AssignmentStatusPopover'
 import { CalendarGrid } from '@/components/coverage/CalendarGrid'
+import { RosterScheduleView, type RosterMemberRow } from '@/components/coverage/RosterScheduleView'
 import { ShiftEditorDialog } from '@/components/coverage/ShiftEditorDialog'
 import { PrintSchedule } from '@/components/print-schedule'
 import { updateCoverageAssignmentStatus } from '@/lib/coverage/updateAssignmentStatus'
@@ -73,6 +74,7 @@ type CycleRow = CoverageScheduleCycleRow
 type TherapistOption = {
   id: string
   full_name: string
+  role?: 'therapist' | 'lead'
   shift_type: 'day' | 'night'
   isLeadEligible: boolean
   employment_type: string | null
@@ -81,6 +83,7 @@ type TherapistOption = {
 type PrintTherapist = {
   id: string
   full_name: string
+  role?: 'therapist' | 'lead'
   shift_type: 'day' | 'night'
   employment_type?: 'full_time' | 'part_time' | 'prn'
 }
@@ -94,8 +97,16 @@ type ShiftRow = {
   unfilled_reason: string | null
   role: ShiftRole
   profiles:
-    | { full_name: string; employment_type: 'full_time' | 'part_time' | 'prn' | null }
-    | { full_name: string; employment_type: 'full_time' | 'part_time' | 'prn' | null }[]
+    | {
+        full_name: string
+        role?: 'therapist' | 'lead' | null
+        employment_type: 'full_time' | 'part_time' | 'prn' | null
+      }
+    | {
+        full_name: string
+        role?: 'therapist' | 'lead' | null
+        employment_type: 'full_time' | 'part_time' | 'prn' | null
+      }[]
     | null
 }
 type AssignedShiftRow = Omit<ShiftRow, 'user_id'> & { user_id: string }
@@ -103,8 +114,14 @@ type PreliminarySnapshotRow = {
   id: string
   sent_at: string
 }
+type CoverageViewMode = 'week' | 'calendar' | 'roster'
+type RenderedCoverageViewMode = 'week' | 'roster'
 
 const NO_ELIGIBLE_CONSTRAINT_REASON = 'no_eligible_candidates_due_to_constraints'
+const VIEW_OPTIONS = [
+  { value: 'week', label: 'Grid' },
+  { value: 'roster', label: 'Roster' },
+] as const
 
 const fadeUp = {
   hidden: { opacity: 0, y: 14 },
@@ -117,6 +134,10 @@ const fadeUp = {
 
 function timestamp(): string {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function toRenderedCoverageViewMode(viewMode: CoverageViewMode): RenderedCoverageViewMode {
+  return viewMode === 'roster' ? 'roster' : 'week'
 }
 
 function buildEmptyCoverageDays(
@@ -159,9 +180,11 @@ async function fetchCoverageNamesByUserId(cycleId: string): Promise<Record<strin
 export function CoverageClientPage({
   initialShiftTab,
   shiftTabLockedFromUrl,
+  initialViewMode,
 }: {
   initialShiftTab: ShiftTab
   shiftTabLockedFromUrl: boolean
+  initialViewMode: CoverageViewMode
 }) {
   const search = useSearchParams()
   const pathname = usePathname()
@@ -179,6 +202,7 @@ export function CoverageClientPage({
     [search]
   )
   const [shiftTab, setShiftTab] = useState<ShiftTab>(() => initialShiftTab)
+  const [viewMode, setViewMode] = useState<CoverageViewMode>(() => initialViewMode)
   const [actorScheduleShift, setActorScheduleShift] = useState<{
     resolved: boolean
     type: 'day' | 'night' | null
@@ -298,6 +322,10 @@ export function CoverageClientPage({
   }, [urlShiftTab])
 
   useEffect(() => {
+    setViewMode(initialViewMode)
+  }, [initialViewMode])
+
+  useEffect(() => {
     if (urlShiftTab != null) return
     if (!actorScheduleShift.resolved) return
     if (profileDefaultAppliedRef.current) return
@@ -308,10 +336,14 @@ export function CoverageClientPage({
   const weekRosterHref = useMemo(() => {
     const params = new URLSearchParams()
     if (activeCycleId) params.set('cycle', activeCycleId)
-    params.set('view', 'week')
+    params.set('view', viewMode)
     params.set(COVERAGE_SHIFT_QUERY_KEY, shiftTabToQueryValue(shiftTab))
     return `/coverage?${params.toString()}`
-  }, [activeCycleId, shiftTab])
+  }, [activeCycleId, shiftTab, viewMode])
+  const renderedViewMode = useMemo(
+    () => toRenderedCoverageViewMode(viewMode),
+    [viewMode]
+  )
   const preliminaryLive = Boolean(activePreliminarySnapshot)
   const preliminarySentLabel = useMemo(() => {
     if (!activePreliminarySnapshot) return null
@@ -374,6 +406,16 @@ export function CoverageClientPage({
   ])
 
   const showFullPrintRoster = canManageCoverage || actorRole === 'lead'
+  const rosterMembers = useMemo<RosterMemberRow[]>(
+    () =>
+      (shiftTab === 'Day' ? printDayTeam : printNightTeam).map((member) => ({
+        id: member.id,
+        full_name: member.full_name,
+        role: member.role === 'lead' ? 'lead' : 'therapist',
+        employment_type: member.employment_type ?? 'full_time',
+      })),
+    [printDayTeam, printNightTeam, shiftTab]
+  )
   const clearLoadedScheduleState = useCallback(() => {
     setDayDays([])
     setNightDays([])
@@ -497,7 +539,7 @@ export function CoverageClientPage({
         const shiftsQuery = supabase
           .from('shifts')
           .select(
-            'id,user_id,date,shift_type,status,assignment_status,unfilled_reason,role,profiles:profiles!shifts_user_id_fkey(full_name,employment_type)'
+            'id,user_id,date,shift_type,status,assignment_status,unfilled_reason,role,profiles:profiles!shifts_user_id_fkey(full_name,role,employment_type)'
           )
           .gte('date', selectedCycle.start_date)
           .lte('date', selectedCycle.end_date)
@@ -558,6 +600,7 @@ export function CoverageClientPage({
             full_name: string
             day: number
             night: number
+            role?: 'therapist' | 'lead'
             employment_type?: 'full_time' | 'part_time' | 'prn'
           }
         >()
@@ -571,6 +614,7 @@ export function CoverageClientPage({
             full_name: fullName,
             day: 0,
             night: 0,
+            role: profile?.role === 'lead' ? 'lead' : 'therapist',
             employment_type:
               profile?.employment_type === 'part_time' || profile?.employment_type === 'prn'
                 ? profile.employment_type
@@ -580,6 +624,9 @@ export function CoverageClientPage({
           else current.day += 1
           if (profile?.employment_type === 'part_time' || profile?.employment_type === 'prn') {
             current.employment_type = profile.employment_type
+          }
+          if (profile?.role === 'lead') {
+            current.role = 'lead'
           }
           therapistTallies.set(row.user_id, current)
           nextShiftByUserDate[`${row.user_id}:${row.date}`] = toLegacyShiftStatusFromOperationalCode(
@@ -592,6 +639,7 @@ export function CoverageClientPage({
           .map<PrintTherapist>((row) => ({
             id: row.id,
             full_name: row.full_name,
+            role: row.role,
             shift_type: row.night > row.day ? 'night' : 'day',
             employment_type: row.employment_type ?? 'full_time',
           }))
@@ -668,7 +716,7 @@ export function CoverageClientPage({
     void (async () => {
       const { data, error: loadError } = await supabase
         .from('profiles')
-        .select('id, full_name, shift_type, is_lead_eligible, employment_type, max_work_days_per_week')
+        .select('id, full_name, role, shift_type, is_lead_eligible, employment_type, max_work_days_per_week')
         .eq('shift_type', shiftType)
         .eq('is_active', true)
         .eq('on_fmla', false)
@@ -686,6 +734,7 @@ export function CoverageClientPage({
           (data ?? []) as Array<{
             id: string
             full_name: string
+            role?: 'therapist' | 'lead'
             shift_type: 'day' | 'night'
             is_lead_eligible: boolean | null
             employment_type: string | null
@@ -694,6 +743,7 @@ export function CoverageClientPage({
         ).map((row) => ({
           id: row.id,
           full_name: row.full_name,
+          role: row.role,
           shift_type: row.shift_type,
           isLeadEligible: row.is_lead_eligible ?? false,
           employment_type: row.employment_type ?? null,
@@ -751,6 +801,15 @@ export function CoverageClientPage({
     setAssignError('')
     const params = new URLSearchParams(search.toString())
     params.set(COVERAGE_SHIFT_QUERY_KEY, shiftTabToQueryValue(tab))
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
+  const handleViewModeChange = (nextViewMode: 'week' | 'roster') => {
+    setViewMode(nextViewMode)
+    setSelectedId(null)
+    setAssignError('')
+    const params = new URLSearchParams(search.toString())
+    params.set('view', nextViewMode)
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
@@ -1193,7 +1252,7 @@ export function CoverageClientPage({
                   return (
                     <Link
                       key={cycle.id}
-                      href={`/coverage?cycle=${cycle.id}&view=week&${COVERAGE_SHIFT_QUERY_KEY}=${shiftTabToQueryValue(shiftTab)}`}
+                      href={`/coverage?cycle=${cycle.id}&view=${viewMode}&${COVERAGE_SHIFT_QUERY_KEY}=${shiftTabToQueryValue(shiftTab)}`}
                       title={cycle.label}
                       aria-current={isActive ? 'page' : undefined}
                       className={cn(
@@ -1216,23 +1275,42 @@ export function CoverageClientPage({
             </div>
 
             {!noCycleSelected && (
-              <div className="inline-flex shrink-0 overflow-hidden rounded-lg border border-border">
-                {(['Day', 'Night'] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => handleTabSwitch(tab)}
-                    data-testid={`coverage-shift-tab-${tab.toLowerCase()}`}
-                    className={cn(
-                      'px-3 py-1.5 text-xs font-medium transition-colors',
-                      shiftTab === tab
-                        ? 'bg-primary/90 text-primary-foreground'
-                        : 'bg-card text-muted-foreground hover:bg-muted/30 hover:text-foreground'
-                    )}
-                  >
-                    {tab} Shift
-                  </button>
-                ))}
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <div className="inline-flex overflow-hidden rounded-lg border border-border">
+                  {VIEW_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => handleViewModeChange(option.value)}
+                      className={cn(
+                        'px-3 py-1.5 text-xs font-medium transition-colors',
+                        viewMode === option.value
+                          ? 'bg-primary/90 text-primary-foreground'
+                          : 'bg-card text-muted-foreground hover:bg-muted/30 hover:text-foreground'
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="inline-flex overflow-hidden rounded-lg border border-border">
+                  {(['Day', 'Night'] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => handleTabSwitch(tab)}
+                      data-testid={`coverage-shift-tab-${tab.toLowerCase()}`}
+                      className={cn(
+                        'px-3 py-1.5 text-xs font-medium transition-colors',
+                        shiftTab === tab
+                          ? 'bg-primary/90 text-primary-foreground'
+                          : 'bg-card text-muted-foreground hover:bg-muted/30 hover:text-foreground'
+                      )}
+                    >
+                      {tab} Shift
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -1469,15 +1547,30 @@ export function CoverageClientPage({
                 )}
               </section>
             )}
-          <CalendarGrid
-            days={days}
-            loading={loading}
-            selectedId={selectedId}
-            schedulingViewOnly={!canManageCoverage}
-            allowAssignmentStatusEdits={canUpdateAssignmentStatus}
-            onSelect={handleSelect}
-            onChangeStatus={handleChangeStatus}
-          />
+          {renderedViewMode === 'roster' ? (
+            <RosterScheduleView
+              title={`Respiratory Therapy ${shiftTab} Shift`}
+              cycleLabel={printCycle ? formatHumanCycleRange(printCycle.start_date, printCycle.end_date) : null}
+              cycleDates={printCycleDates}
+              members={rosterMembers}
+              days={days}
+              canManageCoverage={canManageCoverage}
+              canUpdateAssignmentStatus={canUpdateAssignmentStatus && !canManageCoverage}
+              selectedDayId={selectedId}
+              onSelectDay={handleSelect}
+              onChangeStatus={handleChangeStatus}
+            />
+          ) : (
+            <CalendarGrid
+              days={days}
+              loading={loading}
+              selectedId={selectedId}
+              schedulingViewOnly={!canManageCoverage}
+              allowAssignmentStatusEdits={canUpdateAssignmentStatus}
+              onSelect={handleSelect}
+              onChangeStatus={handleChangeStatus}
+            />
+          )}
           </>
         )}
       </motion.div>

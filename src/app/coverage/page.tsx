@@ -6,6 +6,7 @@ import {
   normalizeActorShiftType,
   parseCoverageShiftSearchParam,
 } from '@/lib/coverage/coverage-shift-tab'
+import { normalizeDefaultScheduleView, normalizeViewMode } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/server'
 
 function firstSearchParam(value: string | string[] | undefined): string | undefined {
@@ -20,6 +21,7 @@ export default async function CoveragePage({
 }) {
   const sp = (await searchParams) ?? {}
   const shiftRaw = firstSearchParam(sp.shift)
+  const viewRaw = firstSearchParam(sp.view)
   const urlShiftTab = parseCoverageShiftSearchParam(shiftRaw ?? null)
   const supabase = await createClient()
   const {
@@ -27,15 +29,20 @@ export default async function CoveragePage({
   } = await supabase.auth.getUser()
 
   let profileShift: ReturnType<typeof normalizeActorShiftType> = null
+  let defaultScheduleView: 'week' | 'roster' = 'week'
   if (user) {
     const { data: prof } = await supabase
       .from('profiles')
-      .select('shift_type')
+      .select('shift_type, default_schedule_view')
       .eq('id', user.id)
       .maybeSingle()
     profileShift = normalizeActorShiftType(prof?.shift_type)
+    defaultScheduleView = normalizeDefaultScheduleView(
+      (prof as { default_schedule_view?: string | null } | null)?.default_schedule_view ?? undefined
+    )
   }
 
+  const initialViewMode = viewRaw ? normalizeViewMode(viewRaw) : defaultScheduleView
   const initialShiftTab = urlShiftTab ?? defaultCoverageShiftTabFromProfileShift(profileShift)
   const shiftTabLockedFromUrl = urlShiftTab != null
 
@@ -44,6 +51,7 @@ export default async function CoveragePage({
       <CoverageClientPage
         initialShiftTab={initialShiftTab}
         shiftTabLockedFromUrl={shiftTabLockedFromUrl}
+        initialViewMode={initialViewMode as 'week' | 'calendar' | 'roster'}
       />
     </Suspense>
   )
