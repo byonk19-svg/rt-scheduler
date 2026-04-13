@@ -14,7 +14,6 @@ import { cn } from '@/lib/utils'
 type TherapistOption = {
   id: string
   full_name: string
-  role: 'therapist' | 'lead'
   shift_type: 'day' | 'night'
   isLeadEligible: boolean
   employment_type: string | null
@@ -196,7 +195,7 @@ export function ShiftEditorDialog({
   onAssignTherapist,
   onUnassign,
 }: ShiftEditorDialogProps) {
-  const leadTherapists = therapists.filter((therapist) => therapist.role === 'lead')
+  const leadTherapists = therapists.filter((therapist) => therapist.isLeadEligible)
   const assignedShiftMap = new Map<string, { shiftId: string; isLead: boolean }>()
 
   if (selectedDay?.leadShift) {
