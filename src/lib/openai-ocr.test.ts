@@ -11,6 +11,8 @@ import {
 
 const ORIGINAL_API_KEY = process.env.OPENAI_API_KEY
 const ORIGINAL_MODEL = process.env.OPENAI_OCR_MODEL
+const ONE_PAGE_PDF_BASE64 =
+  'JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAyMDAgMjAwXSA+PgplbmRvYmoKeHJlZgowIDQKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDExNSAwMDAwMCBuIAp0cmFpbGVyCjw8IC9Sb290IDEgMCBSIC9TaXplIDQgPj4Kc3RhcnR4cmVmCjE4NgolJUVPRg=='
 
 describe('openai OCR helpers', () => {
   afterEach(() => {
@@ -103,6 +105,39 @@ describe('openai OCR helpers', () => {
         Authorization: 'Bearer test-key',
       }),
     })
+  })
+
+  it('falls back to image OCR when PDF extraction returns NO_TEXT', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+
+    const fetchMock = vi.fn(async (_input: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        input?: Array<{ content?: Array<{ type: string }> }>
+      }
+      const content = body.input?.[0]?.content ?? []
+      const isPdfRequest = content.some((part) => part.type === 'input_file')
+
+      return {
+        ok: true,
+        json: async () => ({
+          output_text: isPdfRequest ? 'NO_TEXT' : 'Employee Name: Brianna Brown\nNeed off Mar 24',
+        }),
+      }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      extractTextFromPdfAttachment({
+        contentBase64: ONE_PAGE_PDF_BASE64,
+        contentType: 'application/pdf',
+        filename: 'scan.pdf',
+      })
+    ).resolves.toMatchObject({
+      status: 'completed',
+      text: expect.stringContaining('Need off Mar 24'),
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('routes PDF attachments through the generic extractor', async () => {
