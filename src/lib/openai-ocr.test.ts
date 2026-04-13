@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  extractTextFromAttachment,
   extractTextFromImageAttachment,
+  extractTextFromPdfAttachment,
   getOpenAiOcrConfig,
+  isPdfContentType,
   isOcrSupportedContentType,
 } from '@/lib/openai-ocr'
 
@@ -19,6 +22,7 @@ describe('openai OCR helpers', () => {
   it('recognizes supported image content types', () => {
     expect(isOcrSupportedContentType('image/png')).toBe(true)
     expect(isOcrSupportedContentType('application/pdf')).toBe(false)
+    expect(isPdfContentType('application/pdf')).toBe(true)
   })
 
   it('returns skipped when OCR is not configured', async () => {
@@ -67,5 +71,57 @@ describe('openai OCR helpers', () => {
       enabled: true,
     })
     expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it('extracts text from PDF attachments using input_file', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+    process.env.OPENAI_OCR_MODEL = 'gpt-test-vision'
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ output_text: 'Employee Name: Brianna Brown\nNeed off Mar 24' }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      extractTextFromPdfAttachment({
+        contentBase64: 'Zm9v',
+        contentType: 'application/pdf',
+        filename: 'request.pdf',
+      })
+    ).resolves.toEqual({
+      status: 'completed',
+      text: 'Employee Name: Brianna Brown\nNeed off Mar 24',
+      model: 'gpt-test-vision',
+      error: null,
+    })
+
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      method: 'POST',
+      headers: expect.objectContaining({
+        Authorization: 'Bearer test-key',
+      }),
+    })
+  })
+
+  it('routes PDF attachments through the generic extractor', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ output_text: 'Need off Mar 24' }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      extractTextFromAttachment({
+        contentBase64: 'Zm9v',
+        contentType: 'application/pdf',
+        filename: 'request.pdf',
+      })
+    ).resolves.toMatchObject({
+      status: 'completed',
+      text: 'Need off Mar 24',
+    })
   })
 })

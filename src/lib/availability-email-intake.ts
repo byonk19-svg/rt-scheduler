@@ -1,3 +1,8 @@
+import {
+  matchAvailabilityEmailEmployee,
+  type AvailabilityEmailEmployeeCandidate,
+} from '@/lib/availability-email-item-matcher'
+
 type AvailabilityOverrideType = 'force_off' | 'force_on'
 type AvailabilityShiftType = 'day' | 'night' | 'both'
 
@@ -22,6 +27,36 @@ export type ParsedAvailabilityEmail = {
   summary: string
   status: 'parsed' | 'needs_review' | 'failed'
   unresolvedLines: string[]
+}
+
+export type ParsedAvailabilityEmailItem = {
+  sourceType: 'body' | 'attachment'
+  sourceLabel: string
+  extractedEmployeeName: string | null
+  employeeMatchCandidates: AvailabilityEmailEmployeeCandidate[]
+  matchedTherapistId: string | null
+  matchedCycleId: string | null
+  parseStatus: 'parsed' | 'auto_applied' | 'needs_review' | 'failed'
+  confidenceLevel: 'high' | 'medium' | 'low'
+  confidenceReasons: string[]
+  requests: ParsedAvailabilityRequest[]
+  unresolvedLines: string[]
+  rawText: string
+}
+
+export type ParsedAvailabilityEmailBatch = {
+  items: ParsedAvailabilityEmailItem[]
+  itemCount: number
+  autoAppliedCount: number
+  needsReviewCount: number
+  failedCount: number
+  summary: string
+}
+
+type MatchableProfile = {
+  id: string
+  full_name: string
+  is_active?: boolean | null
 }
 
 const MONTHS: Record<string, number> = {
@@ -281,6 +316,110 @@ function summarizeRequests(
   return summaryParts.join(' | ')
 }
 
+function shouldIgnoreUnresolvedRequestLine(line: string): boolean {
+  return /\bpto\b/i.test(line) && /\brequest\b/i.test(line) && extractDateTokens(line).length === 0
+}
+
+function buildConfidenceReasons(params: {
+  therapistMatch: ReturnType<typeof matchAvailabilityEmailEmployee>
+  parsed: ParsedAvailabilityEmail
+}): string[] {
+  const reasons = [...params.therapistMatch.reasons]
+  if (params.parsed.requests.length === 0) {
+    reasons.push('request_dates_missing')
+  }
+  if (params.parsed.requests.length > 0 && !params.parsed.matchedCycleId) {
+    reasons.push('cycle_match_missing')
+  }
+  if (params.parsed.unresolvedLines.length > 0) {
+    reasons.push('unresolved_lines_present')
+  }
+  return [...new Set(reasons)]
+}
+
+function classifyItemConfidence(params: {
+  therapistMatch: ReturnType<typeof matchAvailabilityEmailEmployee>
+  parsed: ParsedAvailabilityEmail
+  confidenceReasons: string[]
+}): 'high' | 'medium' | 'low' {
+  if (
+    params.therapistMatch.confidence === 'high' &&
+    params.parsed.requests.length > 0 &&
+    params.parsed.matchedCycleId &&
+    params.parsed.unresolvedLines.length === 0
+  ) {
+    return 'high'
+  }
+
+  if (params.parsed.requests.length > 0) {
+    return 'medium'
+  }
+
+  if (params.confidenceReasons.length > 0) {
+    return 'low'
+  }
+
+  return 'low'
+}
+
+export function parseAvailabilityEmailItem(params: {
+  sourceType: 'body' | 'attachment'
+  sourceLabel: string
+  rawText: string
+  cycles: IntakeCycle[]
+  profiles: MatchableProfile[]
+}): ParsedAvailabilityEmailItem {
+  const therapistMatch = matchAvailabilityEmailEmployee(params.rawText, params.profiles)
+  const parsed = parseAvailabilityEmail(params.rawText, params.cycles)
+  const confidenceReasons = buildConfidenceReasons({ therapistMatch, parsed })
+  const confidenceLevel = classifyItemConfidence({
+    therapistMatch,
+    parsed,
+    confidenceReasons,
+  })
+
+  const parseStatus: ParsedAvailabilityEmailItem['parseStatus'] =
+    parsed.requests.length === 0 ? 'failed' : confidenceLevel === 'high' ? 'parsed' : 'needs_review'
+
+  return {
+    sourceType: params.sourceType,
+    sourceLabel: params.sourceLabel,
+    extractedEmployeeName: therapistMatch.extractedName,
+    employeeMatchCandidates: therapistMatch.candidates,
+    matchedTherapistId: therapistMatch.matchedTherapistId,
+    matchedCycleId: parsed.matchedCycleId,
+    parseStatus,
+    confidenceLevel,
+    confidenceReasons,
+    requests: parsed.requests,
+    unresolvedLines: parsed.unresolvedLines,
+    rawText: params.rawText,
+  }
+}
+
+export function summarizeAvailabilityEmailBatch(
+  items: ParsedAvailabilityEmailItem[]
+): ParsedAvailabilityEmailBatch {
+  const autoAppliedCount = items.filter((item) => item.parseStatus === 'auto_applied').length
+  const failedCount = items.filter((item) => item.parseStatus === 'failed').length
+  const needsReviewCount = items.filter((item) => item.parseStatus === 'needs_review').length
+  const parsedCount = items.filter((item) => item.parseStatus === 'parsed').length
+
+  return {
+    items,
+    itemCount: items.length,
+    autoAppliedCount,
+    needsReviewCount,
+    failedCount,
+    summary: [
+      `${items.length} item${items.length === 1 ? '' : 's'}`,
+      `${parsedCount} parsed`,
+      `${needsReviewCount} need review`,
+      `${failedCount} failed`,
+    ].join(' | '),
+  }
+}
+
 export function stripHtmlToText(html: string | null | undefined): string {
   if (!html) return ''
   return html
@@ -329,6 +468,7 @@ export function parseAvailabilityEmail(
 
       const dates = resolveLineDates(rawLine, cycles)
       if (dates.length === 0) {
+        if (shouldIgnoreUnresolvedRequestLine(rawLine)) continue
         unresolvedLines.push(rawLine)
         continue
       }
@@ -363,6 +503,7 @@ export function parseAvailabilityEmail(
     }
 
     if (!matchedAnyDate) {
+      if (shouldIgnoreUnresolvedRequestLine(rawLine)) continue
       unresolvedLines.push(rawLine)
     }
   }

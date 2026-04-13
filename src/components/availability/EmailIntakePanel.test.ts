@@ -10,18 +10,48 @@ const baseRow = {
   fromName: 'Employee Example',
   subject: 'Need off Mar 24',
   receivedAt: '2026-03-20T12:00:00Z',
-  parseStatus: 'parsed' as const,
-  parseSummary: 'Found one day off request',
-  matchedTherapistId: 'therapist-1',
-  matchedTherapistName: 'Adrienne Solt',
-  matchedCycleId: 'cycle-1',
-  matchedCycleLabel: 'Critique Cycle (2026-03-17 to 2026-04-27)',
-  parsedRequests: [{ date: '2026-03-24', override_type: 'force_off' as const }],
-  attachments: [],
+  batchStatus: 'needs_review' as const,
+  parseSummary: '2 items | 1 parsed | 1 need review | 0 failed',
+  itemCount: 2,
+  autoAppliedCount: 1,
+  needsReviewCount: 1,
+  failedCount: 0,
+  reviewItems: [
+    {
+      id: 'item-1',
+      sourceType: 'attachment' as const,
+      sourceLabel: 'form-1.jpg',
+      parseStatus: 'needs_review' as const,
+      confidenceLevel: 'medium' as const,
+      confidenceReasons: ['employee_match_ambiguous'],
+      extractedEmployeeName: 'Brianna Brown',
+      matchedTherapistId: null,
+      matchedTherapistName: null,
+      matchedCycleId: null,
+      matchedCycleLabel: null,
+      parsedRequests: [{ date: '2026-03-24', override_type: 'force_off' as const }],
+    },
+  ],
+  autoAppliedItems: [
+    {
+      id: 'item-2',
+      sourceType: 'body' as const,
+      sourceLabel: 'Email body',
+      parseStatus: 'auto_applied' as const,
+      confidenceLevel: 'high' as const,
+      confidenceReasons: [],
+      extractedEmployeeName: 'Employee Example',
+      matchedTherapistId: 'therapist-1',
+      matchedTherapistName: 'Adrienne Solt',
+      matchedCycleId: 'cycle-1',
+      matchedCycleLabel: 'Critique Cycle (2026-03-17 to 2026-04-27)',
+      parsedRequests: [{ date: '2026-03-24', override_type: 'force_off' as const }],
+    },
+  ],
 }
 
 describe('EmailIntakePanel', () => {
-  it('renders Apply dates only when therapist and cycle are both matched', () => {
+  it('renders separate review and auto-applied sections for a batch', () => {
     const html = renderToStaticMarkup(
       createElement(EmailIntakePanel, {
         rows: [baseRow],
@@ -33,14 +63,30 @@ describe('EmailIntakePanel', () => {
       })
     )
 
-    expect(html).toContain('Apply dates')
-    expect(html).not.toContain('Save matches')
+    expect(html).toContain('Needs review')
+    expect(html).toContain('Auto-applied recently')
+    expect(html).toContain('form-1.jpg')
+    expect(html).toContain('Email body')
+    expect(html).toContain('employee_match_ambiguous')
   })
 
-  it('requires a cycle match before exposing Apply dates', () => {
+  it('shows per-item apply only when the item is matched and has parsed requests', () => {
     const html = renderToStaticMarkup(
       createElement(EmailIntakePanel, {
-        rows: [{ ...baseRow, matchedCycleId: null, matchedCycleLabel: null }],
+        rows: [
+          {
+            ...baseRow,
+            reviewItems: [
+              {
+                ...baseRow.reviewItems[0],
+                matchedTherapistId: 'therapist-1',
+                matchedTherapistName: 'Adrienne Solt',
+                matchedCycleId: 'cycle-1',
+                matchedCycleLabel: 'Critique Cycle (2026-03-17 to 2026-04-27)',
+              },
+            ],
+          },
+        ],
         applyEmailAvailabilityImportAction: async () => {},
         createManualEmailIntakeAction: async () => {},
         updateEmailIntakeTherapistAction: async () => {},
@@ -49,9 +95,7 @@ describe('EmailIntakePanel', () => {
       })
     )
 
-    expect(html).not.toContain('Apply dates')
-    expect(html).toContain('Match schedule block')
-    expect(html).toContain('Save matches')
-    expect(html).toContain('Select schedule block')
+    expect(html).toContain('Apply item')
+    expect(html).not.toContain('Save matches')
   })
 })
