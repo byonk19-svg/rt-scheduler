@@ -8,7 +8,9 @@ import {
 describe('extractAvailabilityEmployeeName', () => {
   it('extracts an explicit employee name label', () => {
     expect(
-      extractAvailabilityEmployeeName('PTO REQUEST/EDIT FORM\nEmployee Name: Brianna Brown\nNeed off Apr 14')
+      extractAvailabilityEmployeeName(
+        'PTO REQUEST/EDIT FORM\nEmployee Name: Brianna Brown\nNeed off Apr 14'
+      )
     ).toBe('Brianna Brown')
   })
 
@@ -52,7 +54,9 @@ describe('matchAvailabilityEmailEmployee', () => {
   })
 
   it('returns a missing-match reason when no active profile matches', () => {
-    expect(matchAvailabilityEmailEmployee('Employee Name: Jordan Smith\nNeed off Apr 14', profiles)).toEqual({
+    expect(
+      matchAvailabilityEmailEmployee('Employee Name: Jordan Smith\nNeed off Apr 14', profiles)
+    ).toEqual({
       extractedName: 'Jordan Smith',
       matchedTherapistId: null,
       confidence: 'low',

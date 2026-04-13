@@ -36,23 +36,22 @@ const NOISE_LINE_PATTERNS = [
 ]
 
 function sanitizeExtractedName(value: string): string {
-  return value.replace(/\s+/g, ' ').replace(/^[^A-Za-z]+|[^A-Za-z.' -]+$/g, '').trim()
+  return value
+    .replace(/\s+/g, ' ')
+    .replace(/^[^A-Za-z]+|[^A-Za-z.' -]+$/g, '')
+    .trim()
 }
 
 function looksLikePersonName(value: string): boolean {
   if (!value || /\d/.test(value)) return false
-  const words = sanitizeExtractedName(value)
-    .split(/\s+/)
-    .filter(Boolean)
+  const words = sanitizeExtractedName(value).split(/\s+/).filter(Boolean)
 
   if (words.length < 2 || words.length > 4) return false
   return words.every((word) => /^[A-Za-z][A-Za-z.'-]*$/.test(word))
 }
 
 function looksLikeExplicitLabelName(value: string): boolean {
-  const words = sanitizeExtractedName(value)
-    .split(/\s+/)
-    .filter(Boolean)
+  const words = sanitizeExtractedName(value).split(/\s+/).filter(Boolean)
 
   if (words.length < 1 || words.length > 4) return false
   return words.every((word) => /^[A-Za-z][A-Za-z.'-]*$/.test(word))
@@ -143,7 +142,10 @@ export function matchAvailabilityEmailEmployee(
       matchedTherapistId: null,
       confidence: 'medium',
       reasons: ['employee_match_fuzzy'],
-      candidates: partialMatches.map((profile) => ({ id: profile.id, fullName: profile.full_name })),
+      candidates: partialMatches.map((profile) => ({
+        id: profile.id,
+        fullName: profile.full_name,
+      })),
     }
   }
 
@@ -153,7 +155,10 @@ export function matchAvailabilityEmailEmployee(
       matchedTherapistId: null,
       confidence: 'medium',
       reasons: ['employee_match_ambiguous'],
-      candidates: partialMatches.map((profile) => ({ id: profile.id, fullName: profile.full_name })),
+      candidates: partialMatches.map((profile) => ({
+        id: profile.id,
+        fullName: profile.full_name,
+      })),
     }
   }
 

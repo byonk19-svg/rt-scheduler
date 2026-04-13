@@ -85,8 +85,13 @@ function renderItemCard(params: {
   therapistOptions: Array<{ id: string; fullName: string }>
   cycleOptions: Array<{ id: string; label: string }>
 }) {
-  const { item, applyEmailAvailabilityImportAction, updateEmailIntakeTherapistAction, therapistOptions, cycleOptions } =
-    params
+  const {
+    item,
+    applyEmailAvailabilityImportAction,
+    updateEmailIntakeTherapistAction,
+    therapistOptions,
+    cycleOptions,
+  } = params
 
   return (
     <div key={item.id} className="rounded-lg border border-border/70 bg-muted/10 p-3">
