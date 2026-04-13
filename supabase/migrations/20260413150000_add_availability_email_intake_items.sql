@@ -119,7 +119,7 @@ for each row execute function public.touch_availability_email_intake_items_updat
 
 alter table public.availability_email_intake_items enable row level security;
 
-grant select, update on public.availability_email_intake_items to authenticated;
+grant select, insert, update on public.availability_email_intake_items to authenticated;
 grant all on public.availability_email_intake_items to service_role;
 
 drop policy if exists "Managers and leads can read all availability email intake items"
