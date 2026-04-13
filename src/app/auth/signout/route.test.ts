@@ -3,6 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { POST } from '@/app/auth/signout/route'
 import { createClient } from '@/lib/supabase/server'
 
+vi.mock('next/headers', () => ({
+  cookies: vi.fn(async () => ({
+    getAll: () => [],
+  })),
+}))
+
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
 }))

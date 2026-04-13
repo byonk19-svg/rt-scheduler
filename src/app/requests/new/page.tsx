@@ -7,7 +7,7 @@ import { AlertCircle, CalendarDays, CheckCircle2, ChevronLeft, Plus, Star } from
 import { dateKeyFromDate } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { PageHeader } from '@/components/ui/page-header'
+import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
 import { SkeletonCard, SkeletonListItem } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
@@ -548,11 +548,11 @@ function SwapRequestPageContent() {
   return (
     <div className="space-y-6">
       {view === 'list' && (
-        <PageHeader
+        <ManagerWorkspaceHeader
           title="My Requests"
           subtitle="Track your swap and pickup requests."
-          badge={
-            <div className="flex flex-wrap items-center gap-2">
+          summary={
+            <div className="flex flex-wrap items-center gap-2 text-foreground">
               <span className="inline-flex items-center rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold text-foreground">
                 {totalRequests} open total
               </span>
@@ -588,7 +588,7 @@ function SwapRequestPageContent() {
                     className={cn(
                       'flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold',
                       step >= n
-                        ? 'border-primary bg-primary text-white'
+                        ? 'border-primary bg-primary text-primary-foreground'
                         : 'border-border bg-card text-muted-foreground'
                     )}
                   >
@@ -835,7 +835,9 @@ function SwapRequestPageContent() {
                         )}
                       >
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--attention)]">
-                          <span className="text-xs font-bold text-white">{member.avatar}</span>
+                          <span className="text-xs font-bold text-accent-foreground">
+                            {member.avatar}
+                          </span>
                         </div>
                         <div className="flex-1">
                           <p className="text-sm font-semibold text-foreground">{member.name}</p>

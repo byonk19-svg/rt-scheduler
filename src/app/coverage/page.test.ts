@@ -66,7 +66,7 @@ describe('coverage publish override affordance', () => {
     const source = readFileSync(filePath, 'utf8')
 
     expect(source).toContain('No open 6-week block')
-    expect(source).toContain('Create the next 6-week block to start staffing this calendar.')
+    expect(source).toContain('create a new draft block to start staffing')
     expect(source).not.toContain('Current 6-week window')
   })
 
@@ -74,9 +74,9 @@ describe('coverage publish override affordance', () => {
     const filePath = resolve(process.cwd(), 'src/app/coverage/CoverageClientPage.tsx')
     const source = readFileSync(filePath, 'utf8')
 
-    expect(source).toContain('No staffing drafted yet')
+    expect(source).toContain('No staffing drafted yet.')
     expect(source).toContain(
-      'This block exists, but it does not have any shift rows yet. Auto-draft it or click a day to start assigning the first shifts manually.'
+      'Run Auto-draft to fill the grid based on therapist availability and constraints, or click any day to assign shifts manually.'
     )
   })
 

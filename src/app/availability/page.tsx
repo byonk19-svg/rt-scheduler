@@ -91,7 +91,23 @@ type AvailabilityEmailIntakeRow = {
   subject: string | null
   received_at: string
   parse_status: 'parsed' | 'needs_review' | 'failed' | 'applied'
+  batch_status: 'parsed' | 'needs_review' | 'failed' | 'applied'
   parse_summary: string | null
+  item_count: number
+  auto_applied_count: number
+  needs_review_count: number
+  failed_count: number
+}
+
+type AvailabilityEmailIntakeItemRow = {
+  id: string
+  intake_id: string
+  source_type: 'body' | 'attachment'
+  source_label: string
+  parse_status: 'parsed' | 'auto_applied' | 'needs_review' | 'failed'
+  confidence_level: 'high' | 'medium' | 'low'
+  confidence_reasons: string[] | null
+  extracted_employee_name: string | null
   matched_therapist_id: string | null
   matched_cycle_id: string | null
   parsed_requests: Array<{
@@ -103,13 +119,6 @@ type AvailabilityEmailIntakeRow = {
     | { label: string; start_date: string; end_date: string }
     | { label: string; start_date: string; end_date: string }[]
     | null
-}
-
-type AvailabilityEmailAttachmentRow = {
-  intake_id: string
-  filename: string
-  download_status: 'stored' | 'skipped' | 'failed'
-  ocr_status: 'not_run' | 'completed' | 'failed' | 'skipped'
 }
 
 type AvailabilityPageSearchParams = {
@@ -147,21 +156,20 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
 
   if (error === 'submit_failed') {
     return {
-      message: "Couldn't save your availability. Try again.",
+      message: "Couldn't save availability. Try again.",
       variant: 'error',
     }
   }
   if (success === 'entry_submitted') {
     return {
-      message: 'Availability saved and submitted for this cycle.',
+      message: 'Availability submitted for this cycle.',
       variant: 'success',
     }
   }
 
   if (success === 'draft_saved') {
     return {
-      message:
-        'Progress saved. Submit availability when you are ready for it to count as official.',
+      message: "Draft saved. Submit availability when you're ready.",
       variant: 'success',
     }
   }
@@ -175,7 +183,7 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
 
   if (success === 'planner_saved') {
     return {
-      message: 'Staff scheduling inputs saved.',
+      message: 'Planner dates saved.',
       variant: 'success',
     }
   }
@@ -191,8 +199,8 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
     const count = getSearchParam(params?.copied)
     return {
       message: count
-        ? `${count} date${Number(count) === 1 ? '' : 's'} copied from the previous block.`
-        : 'Availability copied from the previous block.',
+        ? `${count} date${Number(count) === 1 ? '' : 's'} copied from the previous cycle.`
+        : 'Availability copied from the previous cycle.',
       variant: 'success',
     }
   }
@@ -242,21 +250,21 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
 
   if (success === 'email_intake_applied') {
     return {
-      message: 'Inbound email dates applied to staff availability.',
+      message: 'Intake dates applied to availability.',
       variant: 'success',
     }
   }
 
   if (success === 'email_intake_created') {
     return {
-      message: 'Manual intake created. Review the parsed dates below.',
+      message: 'Intake created. Review parsed dates, then apply.',
       variant: 'success',
     }
   }
 
   if (success === 'email_intake_match_saved') {
     return {
-      message: 'Therapist match saved. You can apply the intake now.',
+      message: 'Matches saved. Apply dates when ready.',
       variant: 'success',
     }
   }
@@ -412,50 +420,91 @@ export default async function AvailabilityPage({
     ? await supabase
         .from('availability_email_intakes')
         .select(
-          'id, from_email, from_name, subject, received_at, parse_status, parse_summary, matched_therapist_id, matched_cycle_id, parsed_requests, profiles!availability_email_intakes_matched_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
+          'id, from_email, from_name, subject, received_at, parse_status, batch_status, parse_summary, item_count, auto_applied_count, needs_review_count, failed_count'
         )
         .order('received_at', { ascending: false })
         .limit(12)
     : { data: [] }
   const rawEmailIntakeRows = (emailIntakesResult.data ?? []) as AvailabilityEmailIntakeRow[]
   const emailIntakeIds = rawEmailIntakeRows.map((row) => row.id)
-  const emailAttachmentResult =
+  const emailItemResult =
     canManageAvailability && emailIntakeIds.length > 0
       ? await supabase
-          .from('availability_email_attachments')
-          .select('intake_id, filename, download_status, ocr_status')
+          .from('availability_email_intake_items')
+          .select(
+            'id, intake_id, source_type, source_label, parse_status, confidence_level, confidence_reasons, extracted_employee_name, matched_therapist_id, matched_cycle_id, parsed_requests, profiles!availability_email_intake_items_matched_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
+          )
           .in('intake_id', emailIntakeIds)
       : { data: [] }
-  const emailAttachmentRows = (emailAttachmentResult.data ?? []) as AvailabilityEmailAttachmentRow[]
-  const attachmentsByIntakeId = new Map<string, AvailabilityEmailAttachmentRow[]>()
-  for (const attachment of emailAttachmentRows) {
-    const current = attachmentsByIntakeId.get(attachment.intake_id) ?? []
-    current.push(attachment)
-    attachmentsByIntakeId.set(attachment.intake_id, current)
+  const emailItemRows = (emailItemResult.data ?? []) as AvailabilityEmailIntakeItemRow[]
+  const itemsByIntakeId = new Map<string, AvailabilityEmailIntakeItemRow[]>()
+  for (const item of emailItemRows) {
+    const current = itemsByIntakeId.get(item.intake_id) ?? []
+    current.push(item)
+    itemsByIntakeId.set(item.intake_id, current)
   }
   const emailIntakeRows: EmailIntakePanelRow[] = rawEmailIntakeRows.map((row) => {
-    const matchedTherapist = getOne(row.profiles)
-    const matchedCycle = getOne(row.schedule_cycles)
+    const childItems = itemsByIntakeId.get(row.id) ?? []
     return {
       id: row.id,
       fromEmail: row.from_email,
       fromName: row.from_name,
       subject: row.subject,
       receivedAt: row.received_at,
-      parseStatus: row.parse_status,
+      batchStatus: row.batch_status ?? row.parse_status,
       parseSummary: row.parse_summary,
-      matchedTherapistId: row.matched_therapist_id,
-      matchedTherapistName: matchedTherapist?.full_name ?? null,
-      matchedCycleId: row.matched_cycle_id,
-      matchedCycleLabel: matchedCycle
-        ? `${matchedCycle.label} (${matchedCycle.start_date} to ${matchedCycle.end_date})`
-        : null,
-      parsedRequests: Array.isArray(row.parsed_requests) ? row.parsed_requests : [],
-      attachments: (attachmentsByIntakeId.get(row.id) ?? []).map((attachment) => ({
-        filename: attachment.filename,
-        download_status: attachment.download_status,
-        ocr_status: attachment.ocr_status,
-      })),
+      itemCount: row.item_count,
+      autoAppliedCount: row.auto_applied_count,
+      needsReviewCount: row.needs_review_count,
+      failedCount: row.failed_count,
+      reviewItems: childItems
+        .filter((item) => item.parse_status !== 'auto_applied')
+        .map((item) => {
+          const matchedTherapist = getOne(item.profiles)
+          const matchedCycle = getOne(item.schedule_cycles)
+          return {
+            id: item.id,
+            sourceType: item.source_type,
+            sourceLabel: item.source_label,
+            parseStatus: item.parse_status,
+            confidenceLevel: item.confidence_level,
+            confidenceReasons: Array.isArray(item.confidence_reasons)
+              ? item.confidence_reasons
+              : [],
+            extractedEmployeeName: item.extracted_employee_name,
+            matchedTherapistId: item.matched_therapist_id,
+            matchedTherapistName: matchedTherapist?.full_name ?? null,
+            matchedCycleId: item.matched_cycle_id,
+            matchedCycleLabel: matchedCycle
+              ? `${matchedCycle.label} (${matchedCycle.start_date} to ${matchedCycle.end_date})`
+              : null,
+            parsedRequests: Array.isArray(item.parsed_requests) ? item.parsed_requests : [],
+          }
+        }),
+      autoAppliedItems: childItems
+        .filter((item) => item.parse_status === 'auto_applied')
+        .map((item) => {
+          const matchedTherapist = getOne(item.profiles)
+          const matchedCycle = getOne(item.schedule_cycles)
+          return {
+            id: item.id,
+            sourceType: item.source_type,
+            sourceLabel: item.source_label,
+            parseStatus: item.parse_status,
+            confidenceLevel: item.confidence_level,
+            confidenceReasons: Array.isArray(item.confidence_reasons)
+              ? item.confidence_reasons
+              : [],
+            extractedEmployeeName: item.extracted_employee_name,
+            matchedTherapistId: item.matched_therapist_id,
+            matchedTherapistName: matchedTherapist?.full_name ?? null,
+            matchedCycleId: item.matched_cycle_id,
+            matchedCycleLabel: matchedCycle
+              ? `${matchedCycle.label} (${matchedCycle.start_date} to ${matchedCycle.end_date})`
+              : null,
+            parsedRequests: Array.isArray(item.parsed_requests) ? item.parsed_requests : [],
+          }
+        }),
     }
   })
   const selectedPlannerTherapistId =

@@ -1,8 +1,15 @@
 import { redirect } from 'next/navigation'
 
-import { archiveTeamMemberAction, saveTeamQuickEditAction } from '@/app/team/actions'
+import {
+  archiveTeamMemberAction,
+  bulkUpsertEmployeeRosterAction,
+  deleteEmployeeRosterEntryAction,
+  saveTeamQuickEditAction,
+  upsertEmployeeRosterEntryAction,
+} from '@/app/team/actions'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
+import { EmployeeRosterPanel } from '@/components/team/EmployeeRosterPanel'
 import { TeamDirectory, type WorkPatternRecord } from '@/components/team/TeamDirectory'
 import { can } from '@/lib/auth/can'
 import { MANAGED_TEAM_ROLE_VALUES, parseRole } from '@/lib/auth/roles'
@@ -32,6 +39,20 @@ type TeamSearchParams = {
   success?: string | string[]
   error?: string | string[]
   edit_profile?: string | string[]
+  bulk_line?: string | string[]
+  roster_bulk_count?: string | string[]
+}
+
+type EmployeeRosterRow = {
+  id: string
+  full_name: string
+  role: 'manager' | 'therapist' | 'lead'
+  shift_type: 'day' | 'night'
+  employment_type: 'full_time' | 'part_time' | 'prn'
+  max_work_days_per_week: number
+  is_lead_eligible: boolean
+  matched_profile_id: string | null
+  matched_at: string | null
 }
 
 function getSearchParam(value: string | string[] | undefined): string | undefined {
@@ -52,6 +73,17 @@ function getTeamFeedback(params?: TeamSearchParams): {
 
   if (success === 'profile_archived') {
     return { message: 'Team member archived.', variant: 'success' }
+  }
+  if (success === 'roster_saved') {
+    return { message: 'Employee roster entry saved.', variant: 'success' }
+  }
+  if (success === 'roster_deleted') {
+    return { message: 'Employee roster entry removed.', variant: 'success' }
+  }
+  if (success === 'roster_bulk_saved') {
+    const count = getSearchParam(params?.roster_bulk_count) ?? ''
+    const suffix = count ? ` (${count} rows)` : ''
+    return { message: `Employee roster bulk import saved.${suffix}`, variant: 'success' }
   }
 
   if (error === 'missing_profile') {
@@ -84,6 +116,43 @@ function getTeamFeedback(params?: TeamSearchParams): {
 
   if (error === 'archive_failed') {
     return { message: 'Could not archive that team member. Please try again.', variant: 'error' }
+  }
+  if (error === 'roster_missing_name') {
+    return { message: 'Employee roster name is required.', variant: 'error' }
+  }
+  if (error === 'roster_invalid_role') {
+    return { message: 'Employee roster role is invalid.', variant: 'error' }
+  }
+  if (error === 'roster_invalid_shift') {
+    return { message: 'Employee roster shift is invalid.', variant: 'error' }
+  }
+  if (error === 'roster_invalid_employment') {
+    return { message: 'Employee roster employment type is invalid.', variant: 'error' }
+  }
+  if (error === 'roster_invalid_max_days') {
+    return { message: 'Employee roster max days must be between 1 and 7.', variant: 'error' }
+  }
+  if (error === 'roster_save_failed') {
+    return { message: 'Could not save employee roster entry.', variant: 'error' }
+  }
+  if (error === 'roster_delete_failed') {
+    return { message: 'Could not remove employee roster entry.', variant: 'error' }
+  }
+  if (error === 'roster_missing_entry') {
+    return { message: 'Employee roster entry is missing.', variant: 'error' }
+  }
+  if (error === 'roster_bulk_empty') {
+    return { message: 'Bulk import had no valid lines.', variant: 'error' }
+  }
+  if (error === 'roster_bulk_invalid') {
+    const line = getSearchParam(params?.bulk_line)
+    return {
+      message: `Bulk import failed${line ? ` on line ${line}` : ''}. Check name and column format.`,
+      variant: 'error',
+    }
+  }
+  if (error === 'roster_bulk_save_failed') {
+    return { message: 'Bulk import could not be saved. Try again.', variant: 'error' }
   }
 
   return null
@@ -138,6 +207,13 @@ export default async function TeamPage({
     }
   }
   const activeProfiles = allProfiles.filter((profile) => profile.is_active !== false)
+  const { data: rosterRows } = await supabase
+    .from('employee_roster')
+    .select(
+      'id, full_name, role, shift_type, employment_type, max_work_days_per_week, is_lead_eligible, matched_profile_id, matched_at'
+    )
+    .order('full_name', { ascending: true })
+  const employeeRoster = (rosterRows ?? []) as EmployeeRosterRow[]
   const managerCount = activeProfiles.filter((profile) => profile.role === 'manager').length
   const leadCount = activeProfiles.filter((profile) => profile.role === 'lead').length
   const therapistCount = activeProfiles.filter((profile) => profile.role === 'therapist').length
@@ -178,6 +254,12 @@ export default async function TeamPage({
         initialEditProfileId={initialEditProfileId}
         archiveTeamMemberAction={archiveTeamMemberAction}
         saveTeamQuickEditAction={saveTeamQuickEditAction}
+      />
+      <EmployeeRosterPanel
+        roster={employeeRoster}
+        upsertEmployeeRosterEntryAction={upsertEmployeeRosterEntryAction}
+        bulkUpsertEmployeeRosterAction={bulkUpsertEmployeeRosterAction}
+        deleteEmployeeRosterEntryAction={deleteEmployeeRosterEntryAction}
       />
     </div>
   )

@@ -81,21 +81,20 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
 
   if (error === 'submit_failed') {
     return {
-      message: 'Could not save your availability request. Please try again.',
+      message: "Couldn't save availability. Try again.",
       variant: 'error',
     }
   }
   if (success === 'entry_submitted') {
     return {
-      message: 'Availability saved and submitted for this cycle.',
+      message: 'Availability submitted for this cycle.',
       variant: 'success',
     }
   }
 
   if (success === 'draft_saved') {
     return {
-      message:
-        'Progress saved. Submit availability when you are ready for it to count as official.',
+      message: "Draft saved. Submit availability when you're ready.",
       variant: 'success',
     }
   }
@@ -109,7 +108,7 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
 
   if (error === 'delete_failed') {
     return {
-      message: 'Could not delete availability request.',
+      message: "Couldn't delete availability request.",
       variant: 'error',
     }
   }

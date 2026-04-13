@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 
 import {
@@ -14,7 +14,10 @@ import {
   headcountThreshold,
   shouldShowMonthTag,
 } from '@/lib/coverage/selectors'
+import { useMediaQuery } from '@/lib/use-media-query'
 import { cn } from '@/lib/utils'
+
+const STAFF_PREVIEW_NARROW = 2
 
 const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
@@ -90,6 +93,8 @@ export function CalendarGrid({
   onChangeStatus,
 }: CalendarGridProps) {
   const weeks = chunkWeeks(days)
+  const isNarrowViewport = useMediaQuery('(max-width: 767px)')
+  const [expandedStaffByDay, setExpandedStaffByDay] = useState<Record<string, boolean>>({})
   const cellRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
   const focusCell = useCallback((id: string) => {
     cellRefs.current.get(id)?.focus()
@@ -97,13 +102,16 @@ export function CalendarGrid({
   const flatDayIds = useMemo(() => days.map((day) => day.id), [days])
 
   return (
-    <div role="grid" aria-label="Coverage calendar" className="overflow-x-auto pb-2">
-      <div className="min-w-[980px]">
+    <div className="overflow-x-auto overscroll-x-contain pb-2 [-webkit-overflow-scrolling:touch]">
+      <p className="mb-2 text-xs text-muted-foreground md:hidden" aria-hidden="true">
+        Swipe sideways to see the full week row.
+      </p>
+      <div role="grid" aria-label="Coverage calendar" className="min-w-[980px]">
         <div className="mb-2 grid grid-cols-7 gap-3 border-y border-border bg-muted/25 py-2">
           {DOW.map((day) => (
             <div
               key={day}
-              className="text-center text-[0.72rem] font-bold tracking-[0.12em] text-foreground/70"
+              className="text-center text-[0.78rem] font-bold tracking-[0.12em] text-foreground/70 sm:text-[0.72rem]"
             >
               {day}
             </div>
@@ -119,13 +127,13 @@ export function CalendarGrid({
             {weeks.map((week, weekIndex) => (
               <section key={`week-${weekIndex}`} className="space-y-1.75">
                 <div className="flex items-center gap-2">
-                  <p className="text-[0.68rem] font-semibold uppercase tracking-[0.09em] text-muted-foreground">
+                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.09em] text-muted-foreground sm:text-[0.68rem]">
                     WEEK {weekIndex + 1}
                   </p>
                   <div className="h-px flex-1 bg-border/90" />
                 </div>
 
-                <div role="row" className="grid grid-cols-7 gap-2.5">
+                <div role="row" className="grid grid-cols-7 gap-2 sm:gap-2.5">
                   {week.map((day, dayOffset) => {
                     const absoluteIndex = weekIndex * 7 + dayOffset
                     const activeCount = countActive(day)
@@ -134,6 +142,15 @@ export function CalendarGrid({
                     const showMonthTag = shouldShowMonthTag(absoluteIndex, day.isoDate)
                     const cardTone = staffingCardTone(day, activeCount)
                     const showAttentionBadge = day.constraintBlocked
+                    const staffShifts = day.staffShifts
+                    const staffCollapsed =
+                      isNarrowViewport &&
+                      staffShifts.length > STAFF_PREVIEW_NARROW &&
+                      !expandedStaffByDay[day.id]
+                    const visibleStaff = staffCollapsed
+                      ? staffShifts.slice(0, STAFF_PREVIEW_NARROW)
+                      : staffShifts
+                    const staffOverflow = staffShifts.length - STAFF_PREVIEW_NARROW
 
                     return (
                       <article
@@ -141,7 +158,7 @@ export function CalendarGrid({
                         role="gridcell"
                         data-testid={`coverage-day-panel-${day.id}`}
                         className={cn(
-                          'relative min-h-[156px] rounded-[20px] border bg-card px-2.75 py-2.25 text-left shadow-tw-2xs transition-[border-color,box-shadow,transform] duration-200',
+                          'relative min-h-[168px] rounded-[20px] border bg-card px-2.75 py-2.25 text-left shadow-tw-2xs transition-[border-color,box-shadow,transform] duration-200 sm:min-h-[156px]',
                           'hover:-translate-y-px hover:border-primary/35 hover:shadow-tw-day-hover',
                           cardTone === 'constraint' &&
                             'border-[var(--warning-border)] bg-[var(--warning-subtle)]/55 shadow-tw-day-warning',
@@ -169,7 +186,7 @@ export function CalendarGrid({
                           tabIndex={absoluteIndex === 0 ? 0 : -1}
                           data-testid={`coverage-day-cell-button-${day.id}`}
                           aria-label={`${schedulingViewOnly ? 'View' : 'Edit'} ${day.label}`}
-                          className="absolute inset-0 z-0 rounded-[20px]"
+                          className="absolute inset-0 z-0 touch-manipulation rounded-[20px]"
                           onClick={() => onSelect(day.id)}
                           onKeyDown={(event) => {
                             if (
@@ -192,7 +209,7 @@ export function CalendarGrid({
                               {day.date}
                             </span>
                             {showMonthTag && (
-                              <span className="rounded-xl border border-border bg-muted px-1.75 py-0.5 text-[0.58rem] font-semibold text-muted-foreground">
+                              <span className="rounded-xl border border-border bg-muted px-1.75 py-0.5 text-[0.62rem] font-semibold text-muted-foreground sm:text-[0.58rem]">
                                 {formatMonthShort(day.isoDate)}
                               </span>
                             )}
@@ -200,7 +217,7 @@ export function CalendarGrid({
                           <div className="flex flex-col items-end gap-1">
                             <span
                               className={cn(
-                                'min-w-[2.85rem] rounded-full px-2.5 py-1.5 text-center text-[0.7rem] font-extrabold leading-none tabular-nums shadow-tw-pill',
+                                'min-w-[2.85rem] rounded-full px-2.5 py-1.5 text-center text-[0.74rem] font-extrabold leading-none tabular-nums shadow-tw-pill sm:text-[0.7rem]',
                                 threshold === 'red' &&
                                   'bg-[var(--error-subtle)] text-[var(--error-text)] ring-2 ring-[var(--error-border)]/50',
                                 threshold === 'yellow' &&
@@ -212,12 +229,12 @@ export function CalendarGrid({
                               {activeCount}/{totalCount}
                             </span>
                             {showAttentionBadge && (
-                              <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[0.54rem] font-semibold uppercase tracking-[0.08em] text-[var(--warning-text)]">
+                              <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[0.58rem] font-semibold uppercase tracking-[0.08em] text-[var(--warning-text)] sm:text-[0.54rem]">
                                 Needs attention
                               </span>
                             )}
                             {!day.constraintBlocked && !day.leadShift && (
-                              <span className="rounded-full border border-[var(--warning-border)]/70 bg-[var(--warning-subtle)]/50 px-2 py-0.5 text-[0.52rem] font-semibold uppercase tracking-[0.07em] text-[var(--warning-text)]">
+                              <span className="rounded-full border border-[var(--warning-border)]/70 bg-[var(--warning-subtle)]/50 px-2 py-0.5 text-[0.56rem] font-semibold uppercase tracking-[0.07em] text-[var(--warning-text)] sm:text-[0.52rem]">
                                 No lead
                               </span>
                             )}
@@ -233,7 +250,7 @@ export function CalendarGrid({
                               : 'border-[var(--warning-border)]/55 bg-[var(--warning-subtle)]/18 text-[var(--warning-text)]'
                           )}
                         >
-                          <p className="text-[0.5rem] font-semibold uppercase tracking-[0.2em] text-muted-foreground/75">
+                          <p className="text-[0.58rem] font-semibold uppercase tracking-[0.2em] text-muted-foreground/75 sm:text-[0.5rem]">
                             LEAD
                           </p>
                           {day.leadShift ? (
@@ -249,7 +266,7 @@ export function CalendarGrid({
                               >
                                 <span
                                   className={cn(
-                                    'mt-0.5 inline-flex items-center gap-1.25 text-[0.68rem] font-semibold leading-tight',
+                                    'mt-0.5 inline-flex items-center gap-1.25 text-[0.72rem] font-semibold leading-tight sm:text-[0.68rem]',
                                     isUnavailableStatus(day.leadShift.status) &&
                                       'line-through decoration-[var(--error-text)]/50'
                                   )}
@@ -261,7 +278,7 @@ export function CalendarGrid({
                             ) : (
                               <span
                                 className={cn(
-                                  'pointer-events-auto mt-0.5 inline-flex items-center gap-1.25 text-[0.68rem] font-semibold leading-tight',
+                                  'pointer-events-auto mt-0.5 inline-flex items-center gap-1.25 text-[0.72rem] font-semibold leading-tight sm:text-[0.68rem]',
                                   isUnavailableStatus(day.leadShift.status) &&
                                     'line-through decoration-[var(--error-text)]/50'
                                 )}
@@ -271,14 +288,14 @@ export function CalendarGrid({
                               </span>
                             )
                           ) : (
-                            <p className="mt-0.5 text-[0.68rem] font-medium leading-tight text-[var(--warning-text)]/60">
+                            <p className="mt-0.5 text-[0.72rem] font-medium leading-tight text-[var(--warning-text)]/60 sm:text-[0.68rem]">
                               &mdash;
                             </p>
                           )}
                         </div>
 
                         {day.constraintBlocked && (
-                          <div className="mt-1.75 rounded-[16px] border border-[var(--error-border)] bg-[var(--error-subtle)] px-2.75 py-1.5 text-[0.64rem] leading-tight text-[var(--error-text)]">
+                          <div className="mt-1.75 rounded-[16px] border border-[var(--error-border)] bg-[var(--error-subtle)] px-2.75 py-1.5 text-[0.68rem] leading-tight text-[var(--error-text)] sm:text-[0.64rem]">
                             No eligible therapists (constraints)
                           </div>
                         )}
@@ -286,13 +303,13 @@ export function CalendarGrid({
                         <div
                           className={cn(
                             'mt-1.5 space-y-0.5 border-t border-border/45 pt-1.5',
-                            day.staffShifts.length > 0 &&
+                            staffShifts.length > 0 &&
                               allowAssignmentStatusEdits &&
                               'pointer-events-auto'
                           )}
                         >
-                          {day.staffShifts.map((shift) => (
-                            <div key={shift.id} className="flex items-center gap-1 text-[0.62rem] leading-snug">
+                          {visibleStaff.map((shift) => (
+                            <div key={shift.id} className="flex items-center gap-1 text-[0.66rem] leading-snug sm:text-[0.62rem]">
                               {allowAssignmentStatusEdits ? (
                                 <AssignmentStatusPopover
                                   therapistName={shift.name}
@@ -304,7 +321,7 @@ export function CalendarGrid({
                                 >
                                   <span
                                     className={cn(
-                                      'inline-flex items-center gap-1 text-[0.62rem] text-muted-foreground/78',
+                                      'inline-flex items-center gap-1 text-[0.66rem] text-muted-foreground/78 sm:text-[0.62rem]',
                                       isUnavailableStatus(shift.status) &&
                                         'line-through decoration-[var(--error-text)]/50'
                                     )}
@@ -316,7 +333,7 @@ export function CalendarGrid({
                               ) : (
                                 <span
                                   className={cn(
-                                    'pointer-events-auto inline-flex items-center gap-1 text-[0.62rem] text-muted-foreground/78',
+                                    'pointer-events-auto inline-flex items-center gap-1 text-[0.66rem] text-muted-foreground/78 sm:text-[0.62rem]',
                                     isUnavailableStatus(shift.status) &&
                                       'line-through decoration-[var(--error-text)]/50'
                                   )}
@@ -330,6 +347,20 @@ export function CalendarGrid({
                               )}
                             </div>
                           ))}
+                          {staffCollapsed && staffOverflow > 0 ? (
+                            <button
+                              type="button"
+                              className="pointer-events-auto text-left text-[0.66rem] font-medium text-primary underline-offset-2 hover:underline sm:text-[0.62rem]"
+                              aria-label={`Show ${staffOverflow} more staff on ${day.label}`}
+                              onPointerDown={(event) => event.stopPropagation()}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                setExpandedStaffByDay((prev) => ({ ...prev, [day.id]: true }))
+                              }}
+                            >
+                              +{staffOverflow} more
+                            </button>
+                          ) : null}
                         </div>
                         </div>
                       </article>

@@ -1,13 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  extractTextFromAttachment,
   extractTextFromImageAttachment,
+  extractTextFromPdfAttachment,
   getOpenAiOcrConfig,
+  isPdfContentType,
   isOcrSupportedContentType,
 } from '@/lib/openai-ocr'
 
 const ORIGINAL_API_KEY = process.env.OPENAI_API_KEY
 const ORIGINAL_MODEL = process.env.OPENAI_OCR_MODEL
+const ONE_PAGE_PDF_BASE64 =
+  'JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAyMDAgMjAwXSA+PgplbmRvYmoKeHJlZgowIDQKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDExNSAwMDAwMCBuIAp0cmFpbGVyCjw8IC9Sb290IDEgMCBSIC9TaXplIDQgPj4Kc3RhcnR4cmVmCjE4NgolJUVPRg=='
 
 describe('openai OCR helpers', () => {
   afterEach(() => {
@@ -19,6 +24,7 @@ describe('openai OCR helpers', () => {
   it('recognizes supported image content types', () => {
     expect(isOcrSupportedContentType('image/png')).toBe(true)
     expect(isOcrSupportedContentType('application/pdf')).toBe(false)
+    expect(isPdfContentType('application/pdf')).toBe(true)
   })
 
   it('returns skipped when OCR is not configured', async () => {
@@ -67,5 +73,90 @@ describe('openai OCR helpers', () => {
       enabled: true,
     })
     expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it('extracts text from PDF attachments using input_file', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+    process.env.OPENAI_OCR_MODEL = 'gpt-test-vision'
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ output_text: 'Employee Name: Brianna Brown\nNeed off Mar 24' }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      extractTextFromPdfAttachment({
+        contentBase64: 'Zm9v',
+        contentType: 'application/pdf',
+        filename: 'request.pdf',
+      })
+    ).resolves.toEqual({
+      status: 'completed',
+      text: 'Employee Name: Brianna Brown\nNeed off Mar 24',
+      model: 'gpt-test-vision',
+      error: null,
+    })
+
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      method: 'POST',
+      headers: expect.objectContaining({
+        Authorization: 'Bearer test-key',
+      }),
+    })
+  })
+
+  it('falls back to image OCR when PDF extraction returns NO_TEXT', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+
+    const fetchMock = vi.fn(async (_input: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        input?: Array<{ content?: Array<{ type: string }> }>
+      }
+      const content = body.input?.[0]?.content ?? []
+      const isPdfRequest = content.some((part) => part.type === 'input_file')
+
+      return {
+        ok: true,
+        json: async () => ({
+          output_text: isPdfRequest ? 'NO_TEXT' : 'Employee Name: Brianna Brown\nNeed off Mar 24',
+        }),
+      }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      extractTextFromPdfAttachment({
+        contentBase64: ONE_PAGE_PDF_BASE64,
+        contentType: 'application/pdf',
+        filename: 'scan.pdf',
+      })
+    ).resolves.toMatchObject({
+      status: 'completed',
+      text: expect.stringContaining('Need off Mar 24'),
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('routes PDF attachments through the generic extractor', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ output_text: 'Need off Mar 24' }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      extractTextFromAttachment({
+        contentBase64: 'Zm9v',
+        contentType: 'application/pdf',
+        filename: 'request.pdf',
+      })
+    ).resolves.toMatchObject({
+      status: 'completed',
+      text: 'Need off Mar 24',
+    })
   })
 })

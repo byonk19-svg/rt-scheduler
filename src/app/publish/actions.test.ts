@@ -38,6 +38,21 @@ import {
   unpublishCycleKeepShiftsAction,
 } from '@/app/publish/actions'
 
+function mockAdminForSnapshotClose(cycleState: { closedSnapshots: string[] }) {
+  createAdminClientMock.mockReturnValue({
+    from: vi.fn(() => ({
+      update: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          eq: vi.fn(() => {
+            cycleState.closedSnapshots.push('cycle-1')
+            return Promise.resolve({ data: null, error: null })
+          }),
+        })),
+      })),
+    })),
+  })
+}
+
 type TestContext = {
   userId?: string | null
   role?: string | null
@@ -178,6 +193,7 @@ describe('restartPublishedCycleAction', () => {
       userId: 'manager-1',
       role: 'manager',
     })
+    mockAdminForSnapshotClose(supabase.state)
     createClientMock.mockResolvedValue(supabase)
 
     await expect(restartPublishedCycleAction(makeFormData())).rejects.toThrow(
@@ -212,6 +228,7 @@ describe('unpublishCycleKeepShiftsAction', () => {
       userId: 'manager-1',
       role: 'manager',
     })
+    mockAdminForSnapshotClose(supabase.state)
     createClientMock.mockResolvedValue(supabase)
 
     await expect(unpublishCycleKeepShiftsAction(makeFormData())).rejects.toThrow(

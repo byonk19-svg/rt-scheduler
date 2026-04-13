@@ -5,7 +5,7 @@ Web app for respiratory therapy scheduling with role-based workflows:
 - Auth + role-aware dashboard with pending-access onboarding
 - Availability requests
 - 6-week schedule cycle management
-- **Canonical staff schedule:** [`/coverage`](./src/app/coverage/page.tsx) (`view=week`); server entry is `page.tsx` and interactive client logic lives in [`CoverageClientPage.tsx`](./src/app/coverage/CoverageClientPage.tsx). Compatibility routes (`/schedule`, `/therapist/schedule`) redirect there
+- **Canonical staff schedule:** [`/coverage`](./src/app/coverage/page.tsx) supports both `Grid` and `Roster` layouts; server entry is `page.tsx` and interactive client logic lives in [`CoverageClientPage.tsx`](./src/app/coverage/CoverageClientPage.tsx). Compatibility routes (`/schedule`, `/therapist/schedule`) redirect there and preserve explicit `view` params
 - **Therapist availability:** 6-week grid on `/therapist/availability` — **Available** (default: neutral day, no forced on/off), **Unavailable**, **Must work** (hard autodraft `force_on`); see [`CLAUDE.md`](./CLAUDE.md)
 - Shift board (swap/pickup posts with manager approval)
 
@@ -23,8 +23,11 @@ Current architecture and quality snapshot: [`docs/REPO_HEALTH.md`](docs/REPO_HEA
 
 ## Cycle Workflow
 
-- **Schedule** (nav label; route [`/coverage`](./src/app/coverage/page.tsx), rendered via [`CoverageClientPage.tsx`](./src/app/coverage/CoverageClientPage.tsx)) — create **New 6-week block**, staff the grid, auto-draft, preliminary, **Publish**. Same cycle-selection rule everywhere: URL cycle if valid, else active window, else next upcoming, else none (empty state, not a fake grid).
+- **Schedule** (nav label; route [`/coverage`](./src/app/coverage/page.tsx), rendered via [`CoverageClientPage.tsx`](./src/app/coverage/CoverageClientPage.tsx)) — create **New 6-week block**, staff the schedule in either **Grid** or **Roster** view, auto-draft, preliminary, **Publish**. Same cycle-selection rule everywhere: URL cycle if valid, else active window, else next upcoming, else none (empty state, not a fake grid).
+- Managers can edit staffing from either schedule layout by clicking a day cell. Leads can update assignment status (`OC`, `LE`, `CX`, `CI`) from staffed cells in either layout.
+- Users can save a default schedule layout preference (`Grid` or `Roster`) in [`/profile`](./src/app/profile/page.tsx); compatibility routes defer default layout selection to `/coverage` so that saved preference wins unless an explicit `view` query is present.
 - **Availability** — therapist requests and manager **Plan staffing** for the selected cycle.
+- **Availability email intake** — managers can ingest one email with body text plus multiple form attachments; high-confidence items auto-apply while unresolved items stay in the `/availability` review queue.
 - **Publish History** ([`/publish`](./src/app/publish/page.tsx)) — two parts: (1) **Schedule blocks** — all non-archived cycles; archive drafts or delete drafts; **Start over** takes a live block offline; (2) **Publish email log** — delivery rows per publish; **Delete history** removes only that log row, not the block.
 - `New 6-week block` can optionally copy staffing from the latest published cycle. `Clear draft` clears draft assignments while unpublished.
 - Published cycles stay editable on Schedule; `Archive cycle` sets `archived_at` and hides the block from pickers (see [`CLAUDE.md`](./CLAUDE.md) for data model).
@@ -42,6 +45,7 @@ Local tooling noise (Playwright MCP dumps, generated `artifacts/`) is gitignored
 - Real-time operational status (for example `on_call`, `call_in`, `cancelled`, `left_early`) is stored in `shift_operational_entries`.
 - Coverage/headcount metrics use "working scheduled" semantics: planned assignments minus active operational entries.
 - Assignment status updates are written through `update_assignment_status` RPC and audited.
+- Lead-only schedule behavior is role-driven in product logic: `role = 'lead'` is the source of truth across Team, Coverage, print/export, and swap-partner filtering.
 
 ## Mutation Guardrails
 
@@ -118,6 +122,50 @@ Optional env overrides:
 - `SEED_USERS_PREFIX`
 - `SEED_USERS_PASSWORD`
 - `SEED_INCLUDE_MANAGER` (`true` creates `manager@<domain>`)
+
+## Sync team roster from a file (ops / email list)
+
+Creates or updates **Auth** users and **`profiles`** from a text file (emails + names). This is **not** the same as the **`employee_roster`** name pre-match table on **`/team`** (used at signup to skip pending when the **name** matches).
+
+Requires **`NEXT_PUBLIC_SUPABASE_URL`** and **`SUPABASE_SERVICE_ROLE_KEY`** (e.g. via `.env.local`).
+
+```bash
+npm run sync:roster -- --file ./roster.txt --dry-run
+npm run sync:roster -- --file ./roster.txt
+```
+
+See comments at the top of `scripts/sync-team-roster.mjs` for line formats and options.
+
+## Cleanup Seeded Demo Users
+
+Removes seeded/demo auth users and their cascaded profile/schedule data.
+
+Default behavior is a dry run:
+
+```bash
+npm run cleanup:seed-users
+```
+
+Execute the deletion:
+
+```bash
+npm run cleanup:seed-users -- --execute
+```
+
+Default match rules are intentionally narrow:
+
+- domain: `teamwise.test`
+- prefixes: `demo-manager`, `demo-lead-`, `demo-therapist`, `employee`
+- exact email: `manager@teamwise.test`
+
+Optional overrides:
+
+- `--domain=<domain1,domain2>`
+- `--prefix=<prefix1,prefix2>`
+- `--email=<email1,email2>`
+- env: `CLEANUP_ALLOWED_DOMAINS`, `CLEANUP_EMAIL_PREFIXES`, `CLEANUP_EXACT_EMAILS`
+
+Use archive/inactive status in the Team UI for real staff whose history should remain visible. Use this cleanup command only for seeded/demo auth accounts that should be fully removed.
 
 ## E2E Tests
 
@@ -274,5 +322,6 @@ npm run lint
 npm run build
 npm run ci:local
 npm run seed:users
+npm run cleanup:seed-users
 npm run test:e2e
 ```

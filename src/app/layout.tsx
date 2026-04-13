@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { DM_Sans, Fraunces, Geist_Mono } from 'next/font/google'
 import { Suspense } from 'react'
 import { AppShell, type AppShellUser } from '@/components/AppShell'
+import { MotionProvider } from '@/components/motion-provider'
 import { toUiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 import './globals.css'
@@ -78,9 +79,11 @@ export default async function RootLayout({
   return (
     <html lang="en" className={`${dmSans.variable} ${fraunces.variable} ${geistMono.variable}`}>
       <body className={`${dmSans.className} antialiased`}>
-        <Suspense fallback={children}>
-          <AppShell user={appShellUser}>{children}</AppShell>
-        </Suspense>
+        <MotionProvider>
+          <Suspense fallback={children}>
+            <AppShell user={appShellUser}>{children}</AppShell>
+          </Suspense>
+        </MotionProvider>
       </body>
     </html>
   )

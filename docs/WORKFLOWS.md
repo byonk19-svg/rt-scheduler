@@ -5,18 +5,31 @@ Operational workflows as implemented in the current codebase.
 ## 0) Public Auth + Access Approval
 
 1. User lands on `/` and chooses `Sign in` or `Create account`.
-2. Therapist self-signup at `/signup` creates a pending account (`profiles.role = null`) and immediately signs in.
-3. Pending users are routed to `/pending-setup` and have no operational dashboard access.
+2. Therapist self-signup at `/signup` creates an auth user. The **`handle_new_user`** trigger inserts **`profiles`**:
+   - **Name roster match:** if the new user’s **normalized full name** matches an active row in **`employee_roster`** (managed on **`/team`**), the profile is created with the roster’s **role**, **shift**, **employment**, **max_work_days_per_week**, and **is_lead_eligible** (not pending). The roster row stores **`matched_profile_id`**. Signup then routes to **`/login?status=matched`** for a “ready to sign in” banner.
+   - **No match:** **`profiles.role`** stays **`null`** (pending). Signup routes to **`/login?status=requested`**.
+3. Pending users (`role = null`) are routed to `/pending-setup` and have no operational dashboard access.
 4. Manager reviews pending users at `/requests/user-access`.
 5. Manager approves with required role selection (`therapist` or `lead`) or declines.
 6. Approve activates access and sends approval email; decline deletes the pending auth account.
 7. E2E auth smoke uses a dedicated real account via `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` and verifies both login and logout.
+
+**Manager preload:** On **`/team`**, use **Employee roster** (single add or **bulk paste**) so names match what staff type at signup. For an ops-only **email list → auth + profiles** sync (not the name roster table), use **`npm run sync:roster`** (see **README**).
+
+### Manager inbox (`/dashboard/manager`)
+
+- The **What to do next** card surfaces the highest-priority action (coverage gaps → pending approvals → reviews → continue block).
+- The three **metric cards** deep-link to **schedule** or **approvals**; on small screens helper copy clarifies that cards are tappable.
 
 ## 1) Manager: Build and Publish a Cycle
 
 1. Create/select a cycle in `/coverage`.
    - `New 6-week block` creates a draft cycle.
    - `/schedule` is a compatibility route that redirects into `/coverage`.
+   - Navigation contract: manager AppShell must still treat `/schedule` as part of the `Schedule` section and highlight the `Coverage` secondary tab, since users still land there from legacy links and server redirects.
+   - The fixed manager secondary nav must stay horizontally scrollable on narrow widths rather than shrinking or clipping workflow tabs.
+   - `/coverage` supports both `Grid` and `Roster` layouts. Explicit `view` params are preserved through `/schedule` and `/therapist/schedule`, and the saved profile layout preference is resolved in `/coverage` when no explicit `view` is supplied.
+   - On **narrow viewports**, the coverage header action row orders **Publish** ahead of **Auto-draft** / **Send preliminary** so the ship action is easier to find first; a **dismissible tip** (mobile) explains tapping a day vs a therapist name for assignment status.
 2. Build draft assignments:
    - Manual add/move/remove/set lead, or
    - Auto-generate (`generateDraftScheduleAction`) using recurring patterns + cycle overrides.
@@ -47,6 +60,8 @@ Operational workflows as implemented in the current codebase.
 - Applies eligibility checks (inactive/FMLA, cycle overrides, recurring pattern, PRN strict).
 - Enforces daily coverage max and weekly limits unless manager override flag is set.
 - Returns conflict payload when override confirmation is required.
+- Shift editor surfaces compact in-dialog staffing guidance: `X / 5 covered` progress (3-5 target), non-FT employment badges (`[PRN]`, `[PT]`), and a persistent lead-required warning when editable shifts have no assigned lead.
+- Managers can open staffing edits from the roster layout by clicking a day cell. The roster view reuses the same assignment editor and schedule mutations as the grid view.
 
 ## 3) Therapist/Manager: Availability Input
 
@@ -95,10 +110,11 @@ Current operational guidance:
 ## 4) Assignment Status Updates
 
 - API: `POST /api/schedule/assignment-status`
-- Allowed actors: manager, lead, or lead-eligible therapist/staff.
+- Allowed actors: manager or lead.
 - Persists via RPC `update_assignment_status`.
 - Updates status metadata on `shifts` and writes `shift_status_changes` audit rows.
 - Used by manager month/week calendar and coverage status flows.
+- The roster layout reuses the same assignment-status popover/status write path as the grid view. Leads can update staffed roster cells to `OC`, `LE`, `CX`, or `CI`.
 - If the cycle is already published, the affected therapist also receives a `published_schedule_changed` in-app notification describing the new status.
 
 ## 5) Shift Board Requests

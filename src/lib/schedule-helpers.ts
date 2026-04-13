@@ -80,11 +80,16 @@ export function isDateWithinRange(date: string, startDate: string, endDate: stri
 }
 
 export function normalizeViewMode(value: string | undefined): ViewMode {
+  if (value === 'roster') return 'roster' as ViewMode
   if (value === 'list') return 'week'
   if (value === 'grid') return 'week'
   if (value === 'calendar') return 'calendar'
   if (value === 'week') return 'week'
   return 'week'
+}
+
+export function normalizeDefaultScheduleView(value: string | undefined): 'week' | 'roster' {
+  return value === 'roster' ? 'roster' : 'week'
 }
 
 export function buildScheduleUrl(

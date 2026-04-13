@@ -26,6 +26,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -63,7 +64,7 @@
   --secondary: hsl(32 18% 91%);
   --secondary-foreground: hsl(220 25% 12%);
   --muted: hsl(32 12% 93%);
-  --muted-foreground: hsl(220 10% 45%);
+  --muted-foreground: hsl(220 12% 38%);
   --accent: hsl(38 90% 55%);
   --accent-foreground: hsl(220 25% 12%);
   --destructive: hsl(0 65% 55%);
@@ -118,7 +119,8 @@
 }
 
 /* Dark mode is not yet implemented — tokens are intentionally absent.
-   Do not add a .dark {} block with identical light-mode values. */
+   Do not add a .dark {} block with identical light-mode values.
+   UI primitives omit `dark:` Tailwind variants until a real dark palette ships. */
 
 @layer base {
   * {
@@ -237,6 +239,23 @@
     0 32px 72px -28px var(--home-shadow),
     inset 0 1px 0 rgba(255, 255, 255, 0.74);
   backdrop-filter: blur(14px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .teamwise-home-preview-shell {
+    backdrop-filter: none;
+  }
+}
+
+/* Public marketing header — blur disabled when user prefers reduced motion */
+.teamwise-marketing-header {
+  backdrop-filter: blur(20px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .teamwise-marketing-header {
+    backdrop-filter: none;
+  }
 }
 
 .teamwise-home-preview-sheen {
@@ -579,11 +598,11 @@
 
 /* ─── Table row hover ─────────────────────────────────────────────────────── */
 
-/* Use box-shadow overlay so status-colored cells keep their background color */
-tr:hover td {
+/* Scoped row hover — opt out with class `no-row-hover` on a table */
+table:not(.no-row-hover) tbody tr:hover td {
   box-shadow: inset 0 0 0 9999px color-mix(in srgb, var(--primary) 5%, transparent);
 }
 
-tr {
+table:not(.no-row-hover) tbody tr {
   transition: box-shadow 0.1s;
 }

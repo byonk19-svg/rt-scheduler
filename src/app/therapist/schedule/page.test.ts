@@ -1,14 +1,38 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { describe, expect, it, vi } from 'vitest'
 
-import { describe, expect, it } from 'vitest'
+const { redirectMock } = vi.hoisted(() => ({
+  redirectMock: vi.fn((url: string) => {
+    throw new Error(`REDIRECT:${url}`)
+  }),
+}))
+
+vi.mock('next/navigation', () => ({
+  redirect: redirectMock,
+}))
+
+import TherapistSchedulePage from '@/app/therapist/schedule/page'
 
 describe('therapist schedule route', () => {
-  it('redirects to the canonical coverage schedule (shared UI, permission-gated actions)', () => {
-    const filePath = resolve(process.cwd(), 'src/app/therapist/schedule/page.tsx')
-    const source = readFileSync(filePath, 'utf8')
+  it('preserves an explicit roster view when redirecting to coverage', async () => {
+    await expect(
+      TherapistSchedulePage({
+        searchParams: Promise.resolve({
+          view: 'roster',
+          cycle: 'cycle-7',
+          shift: 'night',
+        }),
+      })
+    ).rejects.toThrow('REDIRECT:/coverage?view=roster&cycle=cycle-7&shift=night')
+  })
 
-    expect(source).toContain("redirect('/coverage?view=week')")
-    expect(source).not.toContain("export { default } from '../../staff/schedule/page'")
+  it('defers default view selection to coverage when no explicit view is present', async () => {
+    await expect(
+      TherapistSchedulePage({
+        searchParams: Promise.resolve({
+          cycle: 'cycle-7',
+          shift: 'night',
+        }),
+      })
+    ).rejects.toThrow('REDIRECT:/coverage?cycle=cycle-7&shift=night')
   })
 })

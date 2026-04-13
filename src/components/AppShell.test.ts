@@ -7,6 +7,7 @@ import {
   APP_SHELL_ACTIVE_NAV_CLASS,
   APP_SHELL_PROFILE_CARD_CLASS,
   APP_SHELL_SIDEBAR_CLASS,
+  buildManagerSections,
 } from '@/components/AppShell'
 
 const appShellSource = fs.readFileSync(
@@ -14,23 +15,25 @@ const appShellSource = fs.readFileSync(
   'utf8'
 )
 
-describe('AppShell sidebar styling', () => {
-  it('keeps the sidebar present but less dominant than the content area', () => {
+describe('AppShell exported constants', () => {
+  it('keeps legacy sidebar class export for test compatibility', () => {
     expect(APP_SHELL_SIDEBAR_CLASS).toContain('border-sidebar-border/70')
     expect(APP_SHELL_SIDEBAR_CLASS).toContain('shadow-none')
   })
 
-  it('uses a calmer active nav state without the old heavy shadow treatment', () => {
+  it('uses a calmer active nav state without heavy shadow treatment', () => {
     expect(APP_SHELL_ACTIVE_NAV_CLASS).toContain('bg-sidebar-accent/60')
     expect(APP_SHELL_ACTIVE_NAV_CLASS).toContain('ring-1')
     expect(APP_SHELL_ACTIVE_NAV_CLASS).not.toContain('shadow-sm')
   })
 
-  it('tones down the profile block at the bottom of the sidebar', () => {
+  it('tones down the profile block', () => {
     expect(APP_SHELL_PROFILE_CARD_CLASS).toContain('bg-sidebar-accent/15')
     expect(APP_SHELL_PROFILE_CARD_CLASS).toContain('border-sidebar-border/70')
   })
+})
 
+describe('AppShell mobile menu', () => {
   it('uses a real button for the mobile backdrop dismiss target', () => {
     expect(appShellSource).toMatch(/<button[\s\S]*className="absolute inset-0 bg-black\/45"/)
   })
@@ -38,9 +41,19 @@ describe('AppShell sidebar styling', () => {
   it('contains overscroll within the mobile drawer', () => {
     expect(appShellSource).toContain('overscroll-contain')
   })
+})
 
-  it('routes staff future availability navigation to the therapist availability page', () => {
-    expect(appShellSource).toContain("href: '/therapist/availability', label: 'Availability'")
+describe('AppShell navigation structure', () => {
+  it('routes staff availability navigation to the therapist availability page', () => {
+    expect(appShellSource).toContain("'/therapist/availability'")
+    expect(appShellSource).toContain("label: 'Availability'")
+  })
+
+  it('keeps the manager Schedule section active on the legacy /schedule route', () => {
+    const scheduleSection = buildManagerSections(0).find((section) => section.key === 'schedule')
+
+    expect(scheduleSection).toBeDefined()
+    expect(scheduleSection?.isActive('/schedule', null as never)).toBe(true)
   })
 
   it('uses Open shifts wording in staff shell navigation', () => {
@@ -48,12 +61,36 @@ describe('AppShell sidebar styling', () => {
     expect(appShellSource).not.toContain("label: 'Shift Swaps'")
   })
 
-  it('uses Inbox wording in manager nav instead of Dashboard', () => {
-    expect(appShellSource).toContain(
-      "{ href: MANAGER_WORKFLOW_LINKS.dashboard, label: 'Inbox', icon: LayoutDashboard }"
-    )
-    expect(appShellSource).not.toContain(
-      "{ href: MANAGER_WORKFLOW_LINKS.dashboard, label: 'Dashboard', icon: LayoutDashboard }"
-    )
+  it('routes manager Today section to the manager dashboard', () => {
+    expect(appShellSource).toContain("label: 'Today'")
+    expect(appShellSource).toContain('MANAGER_WORKFLOW_LINKS.dashboard')
+  })
+
+  it('groups manager workflow into Today, Schedule, and People sections', () => {
+    expect(appShellSource).toContain("key: 'today'")
+    expect(appShellSource).toContain("key: 'schedule'")
+    expect(appShellSource).toContain("key: 'people'")
+  })
+
+  it('puts Coverage, Availability, Publish, and Approvals under the Schedule section', () => {
+    expect(appShellSource).toContain("label: 'Coverage'")
+    expect(appShellSource).toContain("label: 'Availability'")
+    expect(appShellSource).toContain("label: 'Publish'")
+    expect(appShellSource).toContain("label: 'Approvals'")
+  })
+
+  it('allows the fixed secondary nav to scroll horizontally on narrow screens', () => {
+    expect(appShellSource).toContain('overflow-x-auto')
+  })
+
+  it('merges Team and Requests under the People section', () => {
+    expect(appShellSource).toContain("label: 'Team'")
+    expect(appShellSource).toContain("label: 'Requests'")
+    // User Access Requests is no longer a separate top-level nav item
+    expect(appShellSource).not.toContain("label: 'User Access Requests'")
+  })
+
+  it('shows pending badge on Requests sub-item when there are pending access requests', () => {
+    expect(appShellSource).toContain('showBadge: pendingCount > 0')
   })
 })

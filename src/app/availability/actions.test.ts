@@ -547,7 +547,7 @@ describe('availability actions', () => {
       'REDIRECT:/availability?success=email_intake_created'
     )
 
-    expect(supabase.state.inserts).toHaveLength(1)
+    expect(supabase.state.inserts).toHaveLength(2)
     expect(supabase.state.inserts[0]?.table).toBe('availability_email_intakes')
     expect(supabase.state.inserts[0]?.payload).toEqual(
       expect.objectContaining({
@@ -576,6 +576,17 @@ describe('availability actions', () => {
         ],
       })
     )
+    expect(supabase.state.inserts[1]?.table).toBe('availability_email_intake_items')
+    expect(supabase.state.inserts[1]?.payload).toEqual([
+      expect.objectContaining({
+        intake_id: expect.any(String),
+        source_type: 'body',
+        source_label: 'Manual text',
+        parse_status: 'parsed',
+        matched_therapist_id: 'therapist-1',
+        matched_cycle_id: 'cycle-1',
+      }),
+    ])
   })
 
   it('updates the therapist and cycle match on an intake and marks it parsed when actionable', async () => {
