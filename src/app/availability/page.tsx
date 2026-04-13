@@ -9,7 +9,6 @@ import {
 import {
   applyEmailAvailabilityImportAction,
   copyAvailabilityFromPreviousCycleAction,
-  createManualEmailIntakeAction,
   deleteAvailabilityEntryAction,
   deleteManagerPlannerDateAction,
   saveManagerPlannerDatesAction,
@@ -255,13 +254,6 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
     }
   }
 
-  if (success === 'email_intake_created') {
-    return {
-      message: 'Intake created. Review parsed dates, then apply.',
-      variant: 'success',
-    }
-  }
-
   if (success === 'email_intake_match_saved') {
     return {
       message: 'Matches saved. Apply dates when ready.',
@@ -272,14 +264,6 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
   if (error === 'email_intake_apply_failed') {
     return {
       message: "Couldn't apply this request. Review the matched dates first.",
-      variant: 'error',
-    }
-  }
-
-  if (error === 'email_intake_create_failed') {
-    return {
-      message:
-        'To create an intake, choose a therapist and schedule block, then paste text or upload a file.',
       variant: 'error',
     }
   }
@@ -598,7 +582,6 @@ export default async function AvailabilityPage({
     <EmailIntakePanel
       rows={emailIntakeRows}
       applyEmailAvailabilityImportAction={applyEmailAvailabilityImportAction}
-      createManualEmailIntakeAction={createManualEmailIntakeAction}
       updateEmailIntakeTherapistAction={updateEmailIntakeTherapistAction}
       therapistOptions={plannerTherapists.map((therapist) => ({
         id: therapist.id,
