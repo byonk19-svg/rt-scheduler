@@ -624,7 +624,9 @@ export async function applyEmailAvailabilityImportAction(formData: FormData) {
   if (itemId) {
     const { data: item, error: itemError } = await supabase
       .from('availability_email_intake_items')
-      .select('id, intake_id, matched_therapist_id, matched_cycle_id, parsed_requests, source_label')
+      .select(
+        'id, intake_id, matched_therapist_id, matched_cycle_id, parsed_requests, source_label'
+      )
       .eq('id', itemId)
       .maybeSingle()
 
@@ -695,7 +697,10 @@ export async function applyEmailAvailabilityImportAction(formData: FormData) {
       .eq('id', itemId)
 
     if (itemUpdateError) {
-      console.error('Failed to mark availability email intake item as auto-applied:', itemUpdateError)
+      console.error(
+        'Failed to mark availability email intake item as auto-applied:',
+        itemUpdateError
+      )
       redirect(buildAvailabilityUrl({ error: 'email_intake_apply_failed' }))
     }
   } else {
