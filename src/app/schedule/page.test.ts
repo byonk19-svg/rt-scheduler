@@ -10,24 +10,32 @@ vi.mock('next/navigation', () => ({
   redirect: redirectMock,
 }))
 
-import TherapistSchedulePage from '@/app/therapist/schedule/page'
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: vi.fn(async () => ({
+    auth: {
+      getUser: async () => ({ data: { user: { id: 'user-1' } } }),
+    },
+  })),
+}))
 
-describe('therapist schedule route', () => {
-  it('preserves an explicit roster view when redirecting to coverage', async () => {
+import SchedulePage from '@/app/schedule/page'
+
+describe('schedule route', () => {
+  it('preserves an explicit calendar view when redirecting to coverage', async () => {
     await expect(
-      TherapistSchedulePage({
+      SchedulePage({
         searchParams: Promise.resolve({
-          view: 'roster',
+          view: 'calendar',
           cycle: 'cycle-7',
           shift: 'night',
         }),
       })
-    ).rejects.toThrow('REDIRECT:/coverage?view=roster&cycle=cycle-7&shift=night')
+    ).rejects.toThrow('REDIRECT:/coverage?view=calendar&cycle=cycle-7&shift=night')
   })
 
   it('defers default view selection to coverage when no explicit view is present', async () => {
     await expect(
-      TherapistSchedulePage({
+      SchedulePage({
         searchParams: Promise.resolve({
           cycle: 'cycle-7',
           shift: 'night',
