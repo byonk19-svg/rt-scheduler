@@ -57,6 +57,19 @@ function formatRequestLabel(request: EmailIntakePanelRow['parsedRequests'][numbe
   return `${label} ${request.override_type === 'force_off' ? 'off' : 'work'}`
 }
 
+function getIntakeNextStep(row: EmailIntakePanelRow): string {
+  if (row.parseStatus === 'applied') {
+    return 'Applied to availability. Review it in the planner or requests table.'
+  }
+  if (!row.matchedTherapistId || !row.matchedCycleId) {
+    return 'Match therapist and schedule block, then save matches.'
+  }
+  if (row.parsedRequests.length === 0) {
+    return 'No parsed dates yet. Add clearer text or upload a readable form, then create a new intake.'
+  }
+  return 'Ready to apply. Submit "Apply dates" to write these requests into availability.'
+}
+
 export function EmailIntakePanel({
   rows,
   applyEmailAvailabilityImportAction,
@@ -80,6 +93,20 @@ export function EmailIntakePanel({
           Forward staff request emails or forms into your intake inbox, then review and apply parsed
           dates into availability planning.
         </CardDescription>
+        <ol className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground">
+          {[
+            'Create an intake from pasted text or an uploaded form',
+            'Match the therapist and schedule block',
+            'Apply parsed dates to availability',
+          ].map((step, i) => (
+            <li key={step} className="flex items-center gap-2">
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-foreground/70">
+                {i + 1}
+              </span>
+              {step}
+            </li>
+          ))}
+        </ol>
       </CardHeader>
       <CardContent className="space-y-4 pt-4">
         <form
@@ -185,7 +212,7 @@ export function EmailIntakePanel({
 
         {rows.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
-            No inbound request emails yet.
+            No intake items yet. Create one above to parse dates, then match and apply in one pass.
           </div>
         ) : (
           rows.map((row) => (
@@ -248,6 +275,7 @@ export function EmailIntakePanel({
                   </>
                 ) : null}
               </div>
+              <p className="mt-2 text-xs text-muted-foreground">{getIntakeNextStep(row)}</p>
 
               {!row.matchedTherapistId || !row.matchedCycleId ? (
                 <form

@@ -147,21 +147,20 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
 
   if (error === 'submit_failed') {
     return {
-      message: "Couldn't save your availability. Try again.",
+      message: "Couldn't save availability. Try again.",
       variant: 'error',
     }
   }
   if (success === 'entry_submitted') {
     return {
-      message: 'Availability saved and submitted for this cycle.',
+      message: 'Availability submitted for this cycle.',
       variant: 'success',
     }
   }
 
   if (success === 'draft_saved') {
     return {
-      message:
-        'Progress saved. Submit availability when you are ready for it to count as official.',
+      message: "Draft saved. Submit availability when you're ready.",
       variant: 'success',
     }
   }
@@ -175,7 +174,7 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
 
   if (success === 'planner_saved') {
     return {
-      message: 'Staff scheduling inputs saved.',
+      message: 'Planner dates saved.',
       variant: 'success',
     }
   }
@@ -191,8 +190,8 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
     const count = getSearchParam(params?.copied)
     return {
       message: count
-        ? `${count} date${Number(count) === 1 ? '' : 's'} copied from the previous block.`
-        : 'Availability copied from the previous block.',
+        ? `${count} date${Number(count) === 1 ? '' : 's'} copied from the previous cycle.`
+        : 'Availability copied from the previous cycle.',
       variant: 'success',
     }
   }
@@ -242,21 +241,21 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
 
   if (success === 'email_intake_applied') {
     return {
-      message: 'Inbound email dates applied to staff availability.',
+      message: 'Intake dates applied to availability.',
       variant: 'success',
     }
   }
 
   if (success === 'email_intake_created') {
     return {
-      message: 'Manual intake created. Review the parsed dates below.',
+      message: 'Intake created. Review parsed dates, then apply.',
       variant: 'success',
     }
   }
 
   if (success === 'email_intake_match_saved') {
     return {
-      message: 'Therapist match saved. You can apply the intake now.',
+      message: 'Matches saved. Apply dates when ready.',
       variant: 'success',
     }
   }

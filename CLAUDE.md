@@ -72,6 +72,10 @@ The session entries below are historical context. They may describe local-only o
   - Existing profile rows were synced so therapist-role users (for example Aleyce) stop appearing in lead buckets.
 - **Print/export alignment** (`src/components/print-schedule.tsx`, `src/app/globals.css`):
   - Printed completed schedules now better match the paper reference layout: separate day/night sheets, full-time above PRN, and visible lead emphasis in the printed roster.
+- **Onboarding + microcopy consistency pass** (`src/app/coverage/CoverageClientPage.tsx`, `src/components/availability/EmailIntakePanel.tsx`, `src/components/availability/TherapistAvailabilityWorkspace.tsx`, `src/app/availability/page.tsx`, `src/app/therapist/availability/page.tsx`):
+  - Added a roster-view empty-state onboarding panel in `/coverage` so first-time managers get the same guided next steps in both Grid and Roster layouts.
+  - Added explicit Email Intake flow guidance (create intake → match therapist/cycle → apply dates), plus per-card next-step messaging so managers can tell what to do next at a glance.
+  - Added therapist-side onboarding reminders clarifying **Save progress** (draft) vs **Submit availability** (official submission), then aligned related feedback toasts to the same concise voice.
 - **Verification:** focused Vitest coverage for schedule view routing, roster helpers, and drag-drop lead rules; `npm run lint`; `npm run build`.
 
 ## Latest Updates (2026-04-12, session 55)
