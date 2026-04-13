@@ -66,7 +66,7 @@ describe('coverage publish override affordance', () => {
     const source = readFileSync(filePath, 'utf8')
 
     expect(source).toContain('No open 6-week block')
-    expect(source).toContain('create a new draft block to start staffing')
+    expect(source).toContain('No open 6-week block — create a new draft block to start staffing.')
     expect(source).not.toContain('Current 6-week window')
   })
 

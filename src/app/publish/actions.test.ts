@@ -171,6 +171,40 @@ function createSupabaseMock(context: TestContext) {
   }
 }
 
+function createAdminMock(state: { closedSnapshots: string[] }) {
+  return {
+    from(table: string) {
+      return {
+        update(payload: Record<string, unknown>) {
+          let col1 = ''
+          let val1: unknown = ''
+          return {
+            eq(column: string, value: unknown) {
+              col1 = column
+              val1 = value
+              return {
+                eq(column2: string, value2: unknown) {
+                  if (
+                    table === 'preliminary_snapshots' &&
+                    col1 === 'cycle_id' &&
+                    val1 === 'cycle-1' &&
+                    column2 === 'status' &&
+                    value2 === 'active' &&
+                    payload.status === 'closed'
+                  ) {
+                    state.closedSnapshots.push('cycle-1')
+                  }
+                  return Promise.resolve({ data: null, error: null })
+                },
+              }
+            },
+          }
+        },
+      }
+    },
+  }
+}
+
 function makeFormData() {
   const formData = new FormData()
   formData.set('cycle_id', 'cycle-1')
@@ -195,6 +229,7 @@ describe('restartPublishedCycleAction', () => {
     })
     mockAdminForSnapshotClose(supabase.state)
     createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(createAdminMock(supabase.state))
 
     await expect(restartPublishedCycleAction(makeFormData())).rejects.toThrow(
       'REDIRECT:/publish?success=cycle_restarted'
@@ -230,6 +265,7 @@ describe('unpublishCycleKeepShiftsAction', () => {
     })
     mockAdminForSnapshotClose(supabase.state)
     createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(createAdminMock(supabase.state))
 
     await expect(unpublishCycleKeepShiftsAction(makeFormData())).rejects.toThrow(
       'REDIRECT:/publish?success=unpublished_keep_shifts'

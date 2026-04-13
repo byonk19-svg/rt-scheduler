@@ -120,7 +120,8 @@ describe('ManagerTriageDashboard', () => {
     )
 
     expect(html).not.toContain('Publish Readiness')
-    expect(html).toContain('text-xl font-semibold text-muted-foreground')
+    expect(html).toContain('No draft started yet')
+    expect(html).toContain('Open schedule to auto-draft')
   })
 
   it('renders Schedule Completion before Recent Activity', () => {
