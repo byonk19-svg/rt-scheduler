@@ -23,6 +23,7 @@ import { parseRole } from '@/lib/auth/roles'
 import { formatDateLabel } from '@/lib/calendar-utils'
 import { fetchScheduleCyclesForCoverage } from '@/lib/coverage/fetch-schedule-cycles'
 import { Button } from '@/components/ui/button'
+import { ConfirmDestructiveButton } from '@/components/ui/confirm-destructive-button'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { createClient } from '@/lib/supabase/server'
 
@@ -395,25 +396,26 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                           </Link>
                           {cycle.published ? (
                             <>
-                              <form action={unpublishCycleKeepShiftsAction}>
-                                <input type="hidden" name="cycle_id" value={cycle.id} />
-                                <button
-                                  type="submit"
-                                  className="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80"
-                                >
-                                  Take offline
-                                </button>
-                              </form>
-                              <form action={restartPublishedCycleAction}>
-                                <input type="hidden" name="cycle_id" value={cycle.id} />
-                                <button
-                                  type="submit"
-                                  title="Draft again and clear all assignments for this block"
-                                  className="inline-flex h-8 items-center rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 text-xs font-semibold text-[var(--warning-text)] transition-opacity hover:opacity-80"
-                                >
-                                  Clear & restart
-                                </button>
-                              </form>
+                              <ConfirmDestructiveButton
+                                action={unpublishCycleKeepShiftsAction}
+                                fields={{ cycle_id: cycle.id }}
+                                triggerLabel="Take offline"
+                                triggerClassName="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80"
+                                title="Take this block offline?"
+                                description="The schedule will stop being visible to staff. Assignments are preserved — you can publish it again at any time."
+                                confirmLabel="Take offline"
+                                confirmVariant="warning"
+                              />
+                              <ConfirmDestructiveButton
+                                action={restartPublishedCycleAction}
+                                fields={{ cycle_id: cycle.id }}
+                                triggerLabel="Clear & restart"
+                                triggerClassName="inline-flex h-8 items-center rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 text-xs font-semibold text-[var(--warning-text)] transition-opacity hover:opacity-80"
+                                title="Clear all assignments and restart?"
+                                description="Every therapist assignment in this block will be permanently removed and the cycle returned to draft. Staff who have already been notified will lose their schedule. This cannot be undone."
+                                confirmLabel="Clear & restart"
+                                confirmVariant="destructive"
+                              />
                             </>
                           ) : (
                             <>
@@ -427,17 +429,21 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                   Archive
                                 </button>
                               </form>
-                              <form action={deleteCycleAction}>
-                                <input type="hidden" name="cycle_id" value={cycle.id} />
-                                <input type="hidden" name="return_to" value="publish" />
-                                <button
-                                  type="submit"
-                                  className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 text-xs font-semibold text-[var(--error-text)] transition-opacity hover:opacity-80"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                  Delete draft
-                                </button>
-                              </form>
+                              <ConfirmDestructiveButton
+                                action={deleteCycleAction}
+                                fields={{ cycle_id: cycle.id, return_to: 'publish' }}
+                                triggerLabel={
+                                  <>
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    Delete draft
+                                  </>
+                                }
+                                triggerClassName="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 text-xs font-semibold text-[var(--error-text)] transition-opacity hover:opacity-80"
+                                title="Delete this draft permanently?"
+                                description="The schedule block, all shift assignments, and availability data tied to it will be permanently deleted. This cannot be undone."
+                                confirmLabel="Delete draft"
+                                confirmVariant="destructive"
+                              />
                             </>
                           )}
                         </div>
@@ -547,25 +553,26 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                         <div className="flex justify-end gap-2">
                           {getOne(event.schedule_cycles)?.published && (
                             <>
-                              <form action={unpublishCycleKeepShiftsAction}>
-                                <input type="hidden" name="cycle_id" value={event.cycle_id} />
-                                <button
-                                  type="submit"
-                                  className="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80"
-                                >
-                                  Take offline
-                                </button>
-                              </form>
-                              <form action={restartPublishedCycleAction}>
-                                <input type="hidden" name="cycle_id" value={event.cycle_id} />
-                                <button
-                                  type="submit"
-                                  title="Draft again and clear all assignments for this block"
-                                  className="inline-flex h-8 items-center rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 text-xs font-semibold text-[var(--warning-text)] transition-opacity hover:opacity-80"
-                                >
-                                  Clear & restart
-                                </button>
-                              </form>
+                              <ConfirmDestructiveButton
+                                action={unpublishCycleKeepShiftsAction}
+                                fields={{ cycle_id: event.cycle_id }}
+                                triggerLabel="Take offline"
+                                triggerClassName="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80"
+                                title="Take this block offline?"
+                                description="The schedule will stop being visible to staff. Assignments are preserved — you can publish it again at any time."
+                                confirmLabel="Take offline"
+                                confirmVariant="warning"
+                              />
+                              <ConfirmDestructiveButton
+                                action={restartPublishedCycleAction}
+                                fields={{ cycle_id: event.cycle_id }}
+                                triggerLabel="Clear & restart"
+                                triggerClassName="inline-flex h-8 items-center rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 text-xs font-semibold text-[var(--warning-text)] transition-opacity hover:opacity-80"
+                                title="Clear all assignments and restart?"
+                                description="Every therapist assignment in this block will be permanently removed and the cycle returned to draft. Staff who have already been notified will lose their schedule. This cannot be undone."
+                                confirmLabel="Clear & restart"
+                                confirmVariant="destructive"
+                              />
                             </>
                           )}
                           {!getOne(event.schedule_cycles)?.published && (
@@ -580,16 +587,21 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                   Archive cycle
                                 </button>
                               </form>
-                              <form action={deletePublishEventAction}>
-                                <input type="hidden" name="publish_event_id" value={event.id} />
-                                <button
-                                  type="submit"
-                                  className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 text-xs font-semibold text-[var(--error-text)] transition-opacity hover:opacity-80"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                  Delete history
-                                </button>
-                              </form>
+                              <ConfirmDestructiveButton
+                                action={deletePublishEventAction}
+                                fields={{ publish_event_id: event.id }}
+                                triggerLabel={
+                                  <>
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    Delete history
+                                  </>
+                                }
+                                triggerClassName="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 text-xs font-semibold text-[var(--error-text)] transition-opacity hover:opacity-80"
+                                title="Delete this publish log entry?"
+                                description="This removes the delivery record from history. The schedule block itself is unaffected — use Schedule blocks above to archive or delete cycles."
+                                confirmLabel="Delete log entry"
+                                confirmVariant="destructive"
+                              />
                             </>
                           )}
                           <Link

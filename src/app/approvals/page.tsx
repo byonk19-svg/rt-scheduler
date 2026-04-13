@@ -8,6 +8,7 @@ import {
 } from '@/app/approvals/actions'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
 import { Button } from '@/components/ui/button'
+import { ConfirmDestructiveButton } from '@/components/ui/confirm-destructive-button'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
@@ -204,8 +205,13 @@ export default async function ApprovalsPage({
       />
 
       {error === 'preliminary_review_failed' && (
-        <div className="rounded-xl border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 py-3 text-sm font-medium text-[var(--error-text)]">
-          Couldn&apos;t save that decision. Try again.
+        <div className="rounded-xl border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 py-3 text-sm text-[var(--error-text)]">
+          <span className="font-medium">Couldn&apos;t save that decision.</span> The request is
+          still pending — try again below, or{' '}
+          <a href="/approvals" className="font-semibold underline underline-offset-2">
+            reload the page
+          </a>{' '}
+          if the problem continues.
         </div>
       )}
 
@@ -265,12 +271,16 @@ export default async function ApprovalsPage({
                       Approve
                     </Button>
                   </form>
-                  <form action={denyPreliminaryRequestAction}>
-                    <input type="hidden" name="request_id" value={request.id} />
-                    <Button type="submit" size="sm" variant="outline" className="text-xs">
-                      Deny
-                    </Button>
-                  </form>
+                  <ConfirmDestructiveButton
+                    action={denyPreliminaryRequestAction}
+                    fields={{ request_id: request.id }}
+                    triggerLabel="Deny"
+                    triggerClassName="inline-flex h-9 items-center rounded-md gap-1.5 px-4 border border-border bg-card text-foreground text-sm font-medium hover:bg-secondary/70 transition-all"
+                    title="Deny this request?"
+                    description={`${request.requesterName} will be notified that their request for ${formatShiftLabel(request.shiftDate, request.shiftType)} was not approved. This cannot be undone.`}
+                    confirmLabel="Deny request"
+                    confirmVariant="warning"
+                  />
                 </div>
               </div>
             </div>
