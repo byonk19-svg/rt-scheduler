@@ -56,7 +56,6 @@ describe('EmailIntakePanel', () => {
       createElement(EmailIntakePanel, {
         rows: [baseRow],
         applyEmailAvailabilityImportAction: async () => {},
-        createManualEmailIntakeAction: async () => {},
         updateEmailIntakeTherapistAction: async () => {},
         therapistOptions: [{ id: 'therapist-1', fullName: 'Adrienne Solt' }],
         cycleOptions: [{ id: 'cycle-1', label: 'Critique Cycle (2026-03-17 to 2026-04-27)' }],
@@ -88,7 +87,6 @@ describe('EmailIntakePanel', () => {
           },
         ],
         applyEmailAvailabilityImportAction: async () => {},
-        createManualEmailIntakeAction: async () => {},
         updateEmailIntakeTherapistAction: async () => {},
         therapistOptions: [{ id: 'therapist-1', fullName: 'Adrienne Solt' }],
         cycleOptions: [{ id: 'cycle-1', label: 'Critique Cycle (2026-03-17 to 2026-04-27)' }],
