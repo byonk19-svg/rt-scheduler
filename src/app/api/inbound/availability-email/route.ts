@@ -168,7 +168,9 @@ function flattenBatchRequests(items: ParsedAvailabilityEmailItem[]) {
   return items.flatMap((item) => item.requests)
 }
 
-function getBatchStatus(items: ParsedAvailabilityEmailItem[]): 'parsed' | 'needs_review' | 'failed' | 'applied' {
+function getBatchStatus(
+  items: ParsedAvailabilityEmailItem[]
+): 'parsed' | 'needs_review' | 'failed' | 'applied' {
   if (items.length === 0) return 'failed'
   if (items.some((item) => item.parseStatus === 'needs_review' || item.parseStatus === 'failed')) {
     return 'needs_review'
@@ -216,7 +218,9 @@ function buildSourceCandidates(params: {
   return candidates
 }
 
-function buildItemParseStatus(item: ParsedAvailabilityEmailItem): ParsedAvailabilityEmailItem['parseStatus'] {
+function buildItemParseStatus(
+  item: ParsedAvailabilityEmailItem
+): ParsedAvailabilityEmailItem['parseStatus'] {
   if (
     item.confidenceLevel === 'high' &&
     item.matchedTherapistId &&
@@ -447,8 +451,7 @@ export async function POST(request: Request) {
           matched_cycle_id: item.matchedCycleId,
           parsed_requests: item.requests,
           unresolved_lines: item.unresolvedLines,
-          auto_applied_at:
-            item.parseStatus === 'auto_applied' ? new Date().toISOString() : null,
+          auto_applied_at: item.parseStatus === 'auto_applied' ? new Date().toISOString() : null,
           auto_applied_by: null,
           apply_error: null,
         }))
@@ -464,18 +467,16 @@ export async function POST(request: Request) {
           item.requests.length > 0
       )
       .flatMap((item) =>
-        item.requests.map((request) =>
-          ({
-            cycle_id: item.matchedCycleId!,
-            therapist_id: item.matchedTherapistId!,
-            date: request.date,
-            shift_type: request.shift_type,
-            override_type: request.override_type,
-            note: request.note ?? `Imported from ${item.sourceLabel}: ${request.source_line}`,
-            created_by: null,
-            source: 'manager' as const,
-          })
-        )
+        item.requests.map((request) => ({
+          cycle_id: item.matchedCycleId!,
+          therapist_id: item.matchedTherapistId!,
+          date: request.date,
+          shift_type: request.shift_type,
+          override_type: request.override_type,
+          note: request.note ?? `Imported from ${item.sourceLabel}: ${request.source_line}`,
+          created_by: null,
+          source: 'manager' as const,
+        }))
       )
 
     if (autoApplyPayload.length > 0) {

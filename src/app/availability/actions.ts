@@ -638,7 +638,9 @@ export async function applyEmailAvailabilityImportAction(formData: FormData) {
   if (itemId) {
     const { data: item, error: itemError } = await supabase
       .from('availability_email_intake_items')
-      .select('id, intake_id, matched_therapist_id, matched_cycle_id, parsed_requests, source_label')
+      .select(
+        'id, intake_id, matched_therapist_id, matched_cycle_id, parsed_requests, source_label'
+      )
       .eq('id', itemId)
       .maybeSingle()
 
@@ -709,7 +711,10 @@ export async function applyEmailAvailabilityImportAction(formData: FormData) {
       .eq('id', itemId)
 
     if (itemUpdateError) {
-      console.error('Failed to mark availability email intake item as auto-applied:', itemUpdateError)
+      console.error(
+        'Failed to mark availability email intake item as auto-applied:',
+        itemUpdateError
+      )
       redirect(buildAvailabilityUrl({ error: 'email_intake_apply_failed' }))
     }
   } else {
@@ -938,7 +943,8 @@ export async function createManualEmailIntakeAction(formData: FormData) {
       matched_therapist_id: therapistId,
       matched_cycle_id: cycleId,
       parse_status: parseStatus,
-      confidence_level: parseStatus === 'parsed' ? 'high' : parseStatus === 'needs_review' ? 'medium' : 'low',
+      confidence_level:
+        parseStatus === 'parsed' ? 'high' : parseStatus === 'needs_review' ? 'medium' : 'low',
       confidence_reasons:
         parseStatus === 'needs_review'
           ? ['unresolved_lines_present']
@@ -1011,30 +1017,32 @@ export async function createManualEmailIntakeAction(formData: FormData) {
   }
 
   if (parsedItems.length > 0) {
-    const { error: itemInsertError } = await supabase.from('availability_email_intake_items').insert(
-      parsedItems.map((item) => ({
-        intake_id: intakeId,
-        source_type: item.source_type,
-        source_label: item.source_label,
-        attachment_id: null,
-        raw_text: item.raw_text || null,
-        ocr_status: item.ocr_status,
-        ocr_model: item.ocr_model,
-        ocr_error: null,
-        parse_status: item.parse_status,
-        confidence_level: item.confidence_level,
-        confidence_reasons: item.confidence_reasons,
-        extracted_employee_name: null,
-        employee_match_candidates: [],
-        matched_therapist_id: therapistId,
-        matched_cycle_id: cycleId,
-        parsed_requests: item.parsed_requests,
-        unresolved_lines: item.unresolved_lines,
-        auto_applied_at: null,
-        auto_applied_by: null,
-        apply_error: null,
-      }))
-    )
+    const { error: itemInsertError } = await supabase
+      .from('availability_email_intake_items')
+      .insert(
+        parsedItems.map((item) => ({
+          intake_id: intakeId,
+          source_type: item.source_type,
+          source_label: item.source_label,
+          attachment_id: null,
+          raw_text: item.raw_text || null,
+          ocr_status: item.ocr_status,
+          ocr_model: item.ocr_model,
+          ocr_error: null,
+          parse_status: item.parse_status,
+          confidence_level: item.confidence_level,
+          confidence_reasons: item.confidence_reasons,
+          extracted_employee_name: null,
+          employee_match_candidates: [],
+          matched_therapist_id: therapistId,
+          matched_cycle_id: cycleId,
+          parsed_requests: item.parsed_requests,
+          unresolved_lines: item.unresolved_lines,
+          auto_applied_at: null,
+          auto_applied_by: null,
+          apply_error: null,
+        }))
+      )
 
     if (itemInsertError) {
       console.error('Failed to store manual email intake items:', itemInsertError)
