@@ -128,7 +128,7 @@ export default function HomePage() {
                   priority
                   unoptimized
                 />
-                <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[var(--background)] via-[rgba(245,241,234,0.84)] to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[var(--background)] via-[var(--background)]/85 to-transparent" />
               </div>
             </div>
           </div>

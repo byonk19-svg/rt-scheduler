@@ -253,7 +253,7 @@ export function ManagerTriageDashboard({
                     </div>
                   ))}
                   <div className="mt-1 border-t border-border/50 pt-2">
-                    <Button variant="ghost" size="sm" className="h-7 gap-1 px-0 text-xs" asChild>
+                    <Button variant="ghost" size="sm" className="h-7 gap-1 px-1 text-xs" asChild>
                       <Link href={scheduleHref}>
                         Fix coverage
                         <ArrowRight className="h-3.5 w-3.5" />
@@ -471,7 +471,7 @@ function InboxRow({
         <Button
           variant="ghost"
           size="sm"
-          className="mt-1 h-6 gap-1 px-0 text-xs text-primary"
+          className="mt-1 h-7 gap-1 px-1 text-xs text-primary"
           asChild
         >
           <Link href={ctaHref}>

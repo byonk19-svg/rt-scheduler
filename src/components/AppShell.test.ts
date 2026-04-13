@@ -35,7 +35,7 @@ describe('AppShell exported constants', () => {
 
 describe('AppShell mobile menu', () => {
   it('uses a real button for the mobile backdrop dismiss target', () => {
-    expect(appShellSource).toMatch(/<button[\s\S]*className="absolute inset-0 bg-black\/45"/)
+    expect(appShellSource).toMatch(/<button[\s\S]*className="absolute inset-0 bg-foreground\/45"/)
   })
 
   it('contains overscroll within the mobile drawer', () => {

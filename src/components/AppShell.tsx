@@ -489,7 +489,7 @@ export function AppShell({ user, children }: AppShellProps) {
         >
           <button
             type="button"
-            className="absolute inset-0 bg-black/45"
+            className="absolute inset-0 bg-foreground/45"
             onClick={() => setMobileMenuOpen(false)}
             aria-label="Close navigation menu"
           />
