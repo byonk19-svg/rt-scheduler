@@ -55,7 +55,7 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
   distDir: process.env.NEXT_DIST_DIR ?? '.next',
-  serverExternalPackages: ['pdf-to-img', 'pdfjs-dist'],
+  serverExternalPackages: ['@napi-rs/canvas', 'pdf-to-img', 'pdfjs-dist'],
   async headers() {
     return [
       {
