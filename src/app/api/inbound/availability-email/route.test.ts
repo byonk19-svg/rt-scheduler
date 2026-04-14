@@ -560,5 +560,10 @@ describe('POST /api/inbound/availability-email', () => {
       ocr_status: 'failed',
       ocr_error: expect.stringContaining('PDF'),
     })
+    expect(admin.state.attachmentUpserts[0]).toMatchObject({
+      filename: 'scan.pdf',
+      ocr_status: 'failed',
+      ocr_error: expect.stringContaining('PDF'),
+    })
   })
 })

@@ -3,6 +3,20 @@ import { createOcrImageVariants, renderPdfToPngPages } from '@/lib/pdf-render-pa
 const DEFAULT_OCR_MODEL = 'gpt-4.1-mini'
 
 const NO_TEXT_SKIP_MESSAGE = 'No readable scheduling text detected.'
+const FULL_PAGE_ACCEPT_SCORE = 80
+const ZONE_ORDER = ['employee_name', 'request_top', 'request_mid', 'request_bottom'] as const
+const ZONE_PROMPTS: Record<string, string> = {
+  full_page:
+    'Read all visible text from this scheduling request page, including names, dates, handwritten notes, and request details. Return plain text only. If the page is blank or fully illegible, return NO_TEXT.',
+  employee_name:
+    'Read the employee name from this form region. Return just the name in plain text. If there is no readable name, return NO_TEXT.',
+  request_top:
+    'Read all visible scheduling request text from this form region. Preserve dates exactly. If there is no readable text, return NO_TEXT.',
+  request_mid:
+    'Read all visible scheduling request text from this form region. Preserve dates exactly. If there is no readable text, return NO_TEXT.',
+  request_bottom:
+    'Read all visible scheduling request text from this form region. Preserve dates exactly. If there is no readable text, return NO_TEXT.',
+}
 
 const IMAGE_CONTENT_TYPES = new Set([
   'image/png',
@@ -58,6 +72,7 @@ function scoreOcrText(value: string): number {
   let score = Math.min(text.length, 120)
 
   if (/\b(employee\s+name|name:)\b/i.test(text)) score += 120
+  if (/\b[A-Z][a-z]+ [A-Z][a-z]+\b/.test(text)) score += 60
   if (/\b(need off|cannot work|can work|available|vacation|pto|off)\b/i.test(text)) score += 80
   if (
     /\b(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i.test(
@@ -68,6 +83,108 @@ function scoreOcrText(value: string): number {
   }
 
   return score
+}
+
+async function extractTextFromImageVariants(params: {
+  imageBuffer: Buffer
+  filename: string
+}): Promise<OcrResult> {
+  let variants
+  try {
+    variants = await createOcrImageVariants(params.imageBuffer)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return {
+      status: 'failed',
+      text: null,
+      model: null,
+      error: `Could not prepare OCR image variants: ${message}`,
+    }
+  }
+
+  const variantErrors: string[] = []
+  const bestZoneText = new Map<string, { text: string; score: number }>()
+  let lastModel: string | null = null
+
+  const fullPageVariants = variants.filter((variant) => variant.zoneLabel === 'full_page')
+  for (const variant of fullPageVariants) {
+    const pageResult = await extractTextFromImageAttachment({
+      contentBase64: variant.base64,
+      contentType: variant.contentType,
+      filename: `${params.filename}:${variant.label}`,
+      promptOverride: ZONE_PROMPTS.full_page,
+    })
+
+    if (pageResult.model) {
+      lastModel = pageResult.model
+    }
+
+    if (pageResult.status === 'completed' && pageResult.text) {
+      const score = scoreOcrText(pageResult.text)
+      if (score >= FULL_PAGE_ACCEPT_SCORE) {
+        return {
+          status: 'completed',
+          text: pageResult.text,
+          model: pageResult.model,
+          error: null,
+        }
+      }
+    } else if (pageResult.error && pageResult.error !== NO_TEXT_SKIP_MESSAGE) {
+      variantErrors.push(`${variant.zoneLabel}/${variant.label}: ${pageResult.error}`)
+    }
+  }
+
+  for (const variant of variants) {
+    if (variant.zoneLabel === 'full_page') {
+      continue
+    }
+
+    const pageResult = await extractTextFromImageAttachment({
+      contentBase64: variant.base64,
+      contentType: variant.contentType,
+      filename: `${params.filename}:${variant.label}`,
+      promptOverride: ZONE_PROMPTS[variant.zoneLabel] ?? undefined,
+    })
+
+    if (pageResult.model) {
+      lastModel = pageResult.model
+    }
+
+    if (pageResult.status === 'completed' && pageResult.text) {
+      const score = scoreOcrText(pageResult.text)
+      const current = bestZoneText.get(variant.zoneLabel)
+      if (!current || score > current.score) {
+        bestZoneText.set(variant.zoneLabel, { text: pageResult.text, score })
+      }
+    } else if (pageResult.error && pageResult.error !== NO_TEXT_SKIP_MESSAGE) {
+      variantErrors.push(`${variant.zoneLabel}/${variant.label}: ${pageResult.error}`)
+    }
+  }
+
+  const mergedText = ZONE_ORDER.map((zoneLabel) => bestZoneText.get(zoneLabel)?.text ?? null)
+    .filter((value): value is string => Boolean(value))
+    .map((text, index) => (index === 0 ? `Employee Name: ${text}` : text))
+    .join('\n\n')
+    .trim()
+
+  if (mergedText) {
+    return {
+      status: 'completed',
+      text: mergedText,
+      model: lastModel,
+      error: null,
+    }
+  }
+
+  return {
+    status: 'failed',
+    text: null,
+    model: lastModel,
+    error:
+      variantErrors.length > 0
+        ? `All image variants failed OCR (${variantErrors.join('; ')})`
+        : 'Image OCR variants produced no readable text.',
+  }
 }
 
 export async function extractTextFromImageAttachment(params: {
@@ -97,7 +214,7 @@ export async function extractTextFromImageAttachment(params: {
 
   const prompt =
     params.promptOverride ??
-    'Read this employee scheduling request form image and transcribe only the useful scheduling text. Return plain text only. Preserve dates exactly when visible. If there is no readable scheduling text, return NO_TEXT.'
+    'Read all visible text from this employee scheduling request image. Include names, dates, handwritten notes, and scheduling details exactly as shown. Return plain text only. If the image is blank or fully illegible, return NO_TEXT.'
 
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
@@ -137,6 +254,26 @@ export async function extractTextFromImageAttachment(params: {
   const outputText = sanitizeOcrText(payload.output_text ?? '')
 
   if (!outputText || outputText === 'NO_TEXT') {
+    if (!params.promptOverride) {
+      const fallback = await extractTextFromImageVariants({
+        imageBuffer: Buffer.from(params.contentBase64, 'base64'),
+        filename: params.filename,
+      })
+
+      if (fallback.status === 'completed' && fallback.text) {
+        return fallback
+      }
+
+      if (fallback.status === 'failed') {
+        return {
+          status: 'failed',
+          text: null,
+          model: fallback.model ?? config.model,
+          error: `Direct image OCR found nothing; variant OCR failed: ${fallback.error ?? 'unknown error'}`,
+        }
+      }
+    }
+
     return {
       status: 'skipped',
       text: null,
@@ -169,7 +306,7 @@ async function extractTextFromPdfViaInputFile(params: {
   }
 
   const prompt =
-    'Read this PDF employee scheduling request form and transcribe only the useful scheduling text. Return plain text only. Preserve dates and employee names exactly when visible. If there is no readable scheduling text, return NO_TEXT.'
+    'Read all visible text from this employee scheduling request PDF. Include employee names, dates, handwritten notes, and scheduling details exactly as shown. Return plain text only. If the document is blank or fully illegible, return NO_TEXT.'
 
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
@@ -265,17 +402,8 @@ async function extractTextFromPdfViaRenderedPages(params: {
   const segments: string[] = []
   let lastModel: string | null = null
   const pageErrors: string[] = []
-  const zoneOrder = ['employee_name', 'request_top', 'request_mid', 'request_bottom']
-  const zonePrompts: Record<string, string> = {
-    employee_name:
-      'Read only the handwritten employee name from this form region. Return just the name in plain text. If there is no readable name, return NO_TEXT.',
-    request_top:
-      'Read only the handwritten availability or PTO request text from this form region. Preserve dates exactly. If there is no readable request text, return NO_TEXT.',
-    request_mid:
-      'Read only the handwritten availability or PTO request text from this form region. Preserve dates exactly. If there is no readable request text, return NO_TEXT.',
-    request_bottom:
-      'Read only the handwritten availability or PTO request text from this form region. Preserve dates exactly. If there is no readable request text, return NO_TEXT.',
-  }
+  const zoneOrder = ZONE_ORDER
+  const zonePrompts = ZONE_PROMPTS
 
   for (let i = 0; i < buffers.length; i++) {
     const pageBuffer = buffers[i]!
@@ -283,7 +411,39 @@ async function extractTextFromPdfViaRenderedPages(params: {
     const variantErrors: string[] = []
     const bestZoneText = new Map<string, { text: string; score: number }>()
 
+    const fullPageVariants = variants.filter((variant) => variant.zoneLabel === 'full_page')
+    for (const variant of fullPageVariants) {
+      const pageResult = await extractTextFromImageAttachment({
+        contentBase64: variant.base64,
+        contentType: variant.contentType,
+        filename: `${params.filename}#page-${i + 1}:${variant.label}`,
+        promptOverride: zonePrompts.full_page,
+      })
+
+      if (pageResult.model) {
+        lastModel = pageResult.model
+      }
+
+      if (pageResult.status === 'completed' && pageResult.text) {
+        const score = scoreOcrText(pageResult.text)
+        if (score >= FULL_PAGE_ACCEPT_SCORE) {
+          segments.push(`--- Page ${i + 1} ---\n${pageResult.text}`)
+          continue
+        }
+      } else if (pageResult.error && pageResult.error !== NO_TEXT_SKIP_MESSAGE) {
+        variantErrors.push(`${variant.zoneLabel}/${variant.label}: ${pageResult.error}`)
+      }
+    }
+
+    if (segments.length === i + 1) {
+      continue
+    }
+
     for (const variant of variants) {
+      if (variant.zoneLabel === 'full_page') {
+        continue
+      }
+
       const pageResult = await extractTextFromImageAttachment({
         contentBase64: variant.base64,
         contentType: variant.contentType,
@@ -365,7 +525,7 @@ export async function extractTextFromPdfAttachment(params: {
     filename: params.filename,
   })
 
-  if (primary.status === 'skipped' && primary.error === NO_TEXT_SKIP_MESSAGE) {
+  if (!primary.text) {
     const fallback = await extractTextFromPdfViaRenderedPages({
       contentBase64: params.contentBase64,
       contentType: params.contentType,

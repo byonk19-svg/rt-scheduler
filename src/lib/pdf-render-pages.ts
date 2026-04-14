@@ -2,7 +2,7 @@ import { createCanvas, loadImage, type Canvas } from '@napi-rs/canvas'
 
 export type OcrImageVariant = {
   label: string
-  zoneLabel: string
+  zoneLabel: 'full_page' | 'employee_name' | 'request_top' | 'request_mid' | 'request_bottom'
   contentType: 'image/png'
   base64: string
 }
@@ -34,7 +34,7 @@ export async function renderPdfToPngPages(contentBase64: string): Promise<Buffer
   canvasGlobals.Path2D ??= Path2D
 
   const { pdf } = await import('pdf-to-img')
-  const document = await pdf(Buffer.from(contentBase64, 'base64'), { scale: 2 })
+  const document = await pdf(Buffer.from(contentBase64, 'base64'), { scale: 3 })
   const buffers: Buffer[] = []
 
   for await (const image of document) {
@@ -46,35 +46,6 @@ export async function renderPdfToPngPages(contentBase64: string): Promise<Buffer
 
 function toPngBase64(canvas: Canvas): string {
   return canvas.toBuffer('image/png').toString('base64')
-}
-
-function createCanvasFromSource(source: Canvas, rotation: 0 | 90 | 180 | 270 = 0): Canvas {
-  const swapAxes = rotation === 90 || rotation === 270
-  const canvas = createCanvas(
-    swapAxes ? source.height : source.width,
-    swapAxes ? source.width : source.height
-  )
-  const context = canvas.getContext('2d')
-
-  if (!context) {
-    throw new Error('Canvas context unavailable while creating OCR image variant.')
-  }
-
-  context.save()
-  if (rotation === 90) {
-    context.translate(canvas.width, 0)
-    context.rotate(Math.PI / 2)
-  } else if (rotation === 180) {
-    context.translate(canvas.width, canvas.height)
-    context.rotate(Math.PI)
-  } else if (rotation === 270) {
-    context.translate(0, canvas.height)
-    context.rotate(-Math.PI / 2)
-  }
-  context.drawImage(source, 0, 0)
-  context.restore()
-
-  return canvas
 }
 
 function cropZoneCanvas(source: Canvas, zone: (typeof FORM_ZONES)[number]): Canvas {
@@ -166,6 +137,18 @@ export async function createOcrImageVariants(pageBuffer: Buffer): Promise<OcrIma
   baseContext.drawImage(image, 0, 0)
 
   const variants: OcrImageVariant[] = []
+  const fullPageGrayscale = applyContrastVariant(baseCanvas, {
+    grayscale: true,
+    contrast: 1.45,
+    brightness: 1.05,
+  })
+
+  variants.push({
+    label: 'grayscale',
+    zoneLabel: 'full_page',
+    contentType: 'image/png',
+    base64: toPngBase64(fullPageGrayscale),
+  })
 
   for (const zone of FORM_ZONES) {
     const zoneCanvas = cropZoneCanvas(baseCanvas, zone)
@@ -180,15 +163,6 @@ export async function createOcrImageVariants(pageBuffer: Buffer): Promise<OcrIma
       brightness: 1.1,
       threshold: DEFAULT_VARIANT_THRESHOLD,
     })
-    const inverted = applyContrastVariant(zoneCanvas, {
-      grayscale: true,
-      contrast: 1.9,
-      brightness: 1.1,
-      threshold: DEFAULT_VARIANT_THRESHOLD,
-      invert: true,
-    })
-    const rotated90 = createCanvasFromSource(zoneCanvas, 90)
-    const rotated270 = createCanvasFromSource(zoneCanvas, 270)
 
     variants.push(
       {
@@ -208,24 +182,6 @@ export async function createOcrImageVariants(pageBuffer: Buffer): Promise<OcrIma
         zoneLabel: zone.label,
         contentType: 'image/png',
         base64: toPngBase64(thresholded),
-      },
-      {
-        label: 'threshold-invert',
-        zoneLabel: zone.label,
-        contentType: 'image/png',
-        base64: toPngBase64(inverted),
-      },
-      {
-        label: 'rot90',
-        zoneLabel: zone.label,
-        contentType: 'image/png',
-        base64: toPngBase64(rotated90),
-      },
-      {
-        label: 'rot270',
-        zoneLabel: zone.label,
-        contentType: 'image/png',
-        base64: toPngBase64(rotated270),
       }
     )
   }

@@ -12,6 +12,8 @@ import { extractTextFromAttachment } from '@/lib/openai-ocr'
 import { isValidResendWebhookRequest } from '@/lib/security/resend-webhook'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+export const maxDuration = 60
+
 const RESEND_RECEIVING_API_URL = 'https://api.resend.com/emails/receiving'
 const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024
 
@@ -443,6 +445,7 @@ export async function POST(request: Request) {
           ocr_status: attachmentRow.ocr_status,
           ocr_text: attachmentRow.ocr_text,
           ocr_model: attachmentRow.ocr_model,
+          ocr_error: attachmentRow.ocr_error,
         },
         { onConflict: 'provider_attachment_id' }
       )

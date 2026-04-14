@@ -93,6 +93,53 @@ describe('openai OCR helpers', () => {
       enabled: true,
     })
     expect(fetchMock).toHaveBeenCalledOnce()
+    const requestBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body ?? '{}')) as {
+      input?: Array<{ content?: Array<{ type: string; text?: string }> }>
+    }
+    expect(requestBody.input?.[0]?.content?.[0]).toMatchObject({
+      type: 'input_text',
+    })
+    expect(requestBody.input?.[0]?.content?.[0]?.text).toContain('all visible text')
+  })
+
+  it('falls back to image variants when direct image OCR returns NO_TEXT', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+    vi.mocked(createOcrImageVariants).mockResolvedValue([
+      {
+        zoneLabel: 'full_page',
+        label: 'grayscale',
+        contentType: 'image/png',
+        base64: MIN_PNG_BASE64,
+      },
+    ])
+
+    let imageAttempts = 0
+    const fetchMock = vi.fn(async () => {
+      imageAttempts += 1
+      return {
+        ok: true,
+        json: async () => ({
+          output_text:
+            imageAttempts === 1 ? 'NO_TEXT' : 'Employee Name: Brianna Brown\nNeed off Mar 24',
+        }),
+      }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      extractTextFromImageAttachment({
+        contentBase64: MIN_PNG_BASE64,
+        contentType: 'image/jpeg',
+        filename: 'request.jpeg',
+      })
+    ).resolves.toMatchObject({
+      status: 'completed',
+      text: 'Employee Name: Brianna Brown\nNeed off Mar 24',
+      error: null,
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(createOcrImageVariants).toHaveBeenCalledOnce()
   })
 
   it('extracts text from PDF attachments using input_file', async () => {
@@ -188,6 +235,51 @@ describe('openai OCR helpers', () => {
     })
 
     expect(fetchMock).toHaveBeenCalledTimes(4)
+    expect(createOcrImageVariants).toHaveBeenCalledOnce()
+  })
+
+  it('falls back to image OCR when PDF extraction fails without text', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+    vi.mocked(renderPdfToPngPages).mockResolvedValue([Buffer.from(MIN_PNG_BASE64, 'base64')])
+    vi.mocked(createOcrImageVariants).mockResolvedValue([
+      {
+        zoneLabel: 'full_page',
+        label: 'grayscale',
+        contentType: 'image/png',
+        base64: MIN_PNG_BASE64,
+      },
+    ])
+
+    const fetchMock = vi.fn(async (_input: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        input?: Array<{ content?: Array<{ type: string }> }>
+      }
+      const content = body.input?.[0]?.content ?? []
+      const isPdfRequest = content.some((part) => part.type === 'input_file')
+
+      return {
+        ok: isPdfRequest ? false : true,
+        status: isPdfRequest ? 500 : 200,
+        text: async () => 'upstream pdf parse failed',
+        json: async () => ({
+          output_text: 'Employee Name: Brianna Brown\nNeed off Mar 24',
+        }),
+      }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      extractTextFromPdfAttachment({
+        contentBase64: ONE_PAGE_PDF_BASE64,
+        contentType: 'application/pdf',
+        filename: 'scan.pdf',
+      })
+    ).resolves.toMatchObject({
+      status: 'completed',
+      text: expect.stringContaining('Need off Mar 24'),
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(createOcrImageVariants).toHaveBeenCalledOnce()
   })
 
