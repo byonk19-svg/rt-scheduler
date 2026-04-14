@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-14 (session 60)
+Updated: 2026-04-14 (session 63)
 
 ## Handoff Snapshot
 
@@ -35,15 +35,17 @@ Updated: 2026-04-14 (session 60)
 
 - `main` includes the merged email-intake apply gating fix from PR `#27` and the **therapist-first luminous homepage** (replaces the older `codex/therapist-homepage-redesign` intent; that branch may be deleted when convenient).
 - `claude/review-ui-flow-7Weav` has the **top nav redesign** (session 55) — sidebar replaced with a fixed horizontal top nav. Needs review and merge to `main` before deploying.
+- `claude/review-ocr-changes-8TM8T` has the **OCR review + availability tab split** (session 63) — see session 63 updates below. Needs final polish fixes confirmed before merging.
 
 ### Where We Want To Go
 
 1. **Coverage grid redesign** — Stitch explorations in session 56 converged on a swimlane grid (therapist rows × date columns) that mirrors the physical paper schedule managers already use. Target aesthetic: mostly white grid, color only for exceptions (FMLA = soft red, missing lead = amber flag, scheduled = small teal dot or plain "1"). When a final Stitch frame is approved, implement it in `src/components/coverage/CalendarGrid.tsx` and `CoverageClientPage.tsx`.
 2. Merge `claude/review-ui-flow-7Weav` (top nav) into `main` and deploy to production.
-3. Move `Email Intake` higher on `/availability` and make the review/apply workflow more obvious.
-4. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
-5. Deploy production after significant public-surface changes (`vercel deploy --prod`) so `www.teamwise.work` matches `main`.
-6. Keep manual intake first-class even if Resend inbound is healthy. It is the practical fallback path for operations.
+3. **Email Intake tab split is done** (session 63). Remaining intake panel improvements: color-coded stat chips, human-readable confidence reason labels, "Show source text" toggle, Reparse/Delete row actions — see session 63 for the full list.
+4. **OCR bug fixes pending** (`src/lib/openai-ocr.ts`): two confirmed bugs identified in session 63 — dead zone definitions and index-based "Employee Name:" mislabeling in `extractTextFromPdfViaRenderedPages`. Plan written, not yet implemented.
+5. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
+6. Deploy production after significant public-surface changes (`vercel deploy --prod`) so `www.teamwise.work` matches `main`.
+7. Keep manual intake first-class even if Resend inbound is healthy. It is the practical fallback path for operations.
 
 ### Verification Baseline
 
@@ -83,6 +85,30 @@ Updated: 2026-04-14 (session 60)
   - Employee-name extraction now survives inline form labels on the same OCR line (for example `Employee Name: Brianna Yonkin   Kronos Number:`), and forwarded-email boilerplate in the body no longer becomes a fake availability request.
   - Table-style PTO rows with the date before the intent phrase now parse correctly.
 - **Current operational meaning of `needs_review` for photographed forms:** if OCR succeeds and the therapist matches but `matched_cycle_id` is null, treat that as a normal business-rule review item rather than a pipeline failure. The latest example stayed in review because the form dates were in `2024`, outside current schedule cycles.
+
+## Latest Updates (2026-04-14, session 63)
+
+- **OCR code review** (`src/lib/openai-ocr.ts`, `src/lib/pdf-render-pages.ts`):
+  - Identified two correctness bugs — not yet fixed, plan written and ready to give to Cursor:
+    1. **Dead zone definitions:** `ZONE_ORDER` and `ZONE_PROMPTS` reference `header_block`, `request_top`, `request_mid`, `request_bottom` but `createOcrImageVariants` in `pdf-render-pages.ts` only generates `full_page`, `employee_name`, `request_table` variants. Those four zones are never populated. Fix: trim `ZONE_ORDER` to `['employee_name', 'request_table']`, remove dead entries from `ZONE_PROMPTS`, simplify merge assembly in `extractTextFromImageVariants`.
+    2. **"Employee Name:" prefix mislabeling bug** (`extractTextFromPdfViaRenderedPages` line ~532): uses index-based labeling (`.map((text, index) => index === 0 ? Employee Name: ...`)`) instead of zone-label-based. If `employee_name` zone produces no text, `request_table` text gets mislabeled as an employee name. Fix: preserve zone labels through the filter chain and check `zoneLabel === 'employee_name'` explicitly.
+
+- **`/availability` Planner | Email Intake tab split** (`src/app/availability/page.tsx`, `src/components/availability/EmailIntakePanel.tsx`):
+  - Manager availability page now splits into two URL-driven tabs: `?tab=planner` (default) and `?tab=intake`.
+  - Tab strip sits between the page header and content; active tab uses `border-b-2 border-primary`.
+  - "Email Intake" tab shows a warning badge (amber, `border-warning-border bg-warning-subtle`) with the `needs_review` count when > 0.
+  - `EmailIntakePanel` Card wrapper removed — panel renders full-width in its own tab without card framing.
+  - The four sub-nav items under Schedule stay at four — `Intake` was deliberately NOT added as a fifth nav item.
+
+- **`/availability` polish fixes applied** (`src/app/availability/page.tsx`, `src/components/availability/ManagerSchedulingInputs.tsx`, `src/components/availability/AvailabilityStatusSummary.tsx`):
+  - Duplicate date removed from subtitle — now shows only `formatHumanCycleRange(start, end)` instead of label + range.
+  - Response roster list capped at `max-h-72 overflow-y-auto` so "Review requests" is reachable without scrolling past all 24+ therapist rows.
+  - "Saved planner dates" section moved from `lower` prop (outside the card) into `controls` left column (inside the Plan staffing card) — in progress via Cursor as of end of session.
+
+- **Stitch design prompts produced** for:
+  - Staff Availability Management full page (top nav, two-column planner + calendar, response roster, review requests)
+  - Email Intake detail view (top nav, intake card with match dropdowns)
+  - Manager inputting therapist availability — tabbed version
 
 The session entries below are historical context. They may describe local-only or superseded work and should not override the snapshot above.
 
