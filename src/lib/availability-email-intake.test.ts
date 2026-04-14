@@ -33,21 +33,21 @@ describe('parseAvailabilityEmail', () => {
         override_type: 'force_off',
         shift_type: 'both',
         note: null,
-        source_line: 'off Mar 24, Mar 26',
+        source_line: 'Need off Mar 24, Mar 26',
       },
       {
         date: '2026-03-26',
         override_type: 'force_off',
         shift_type: 'both',
         note: null,
-        source_line: 'off Mar 24, Mar 26',
+        source_line: 'Need off Mar 24, Mar 26',
       },
       {
         date: '2026-03-28',
         override_type: 'force_on',
         shift_type: 'both',
         note: null,
-        source_line: 'work Mar 28',
+        source_line: 'Can work Mar 28',
       },
     ])
   })
@@ -69,21 +69,35 @@ describe('parseAvailabilityEmail', () => {
         override_type: 'force_off',
         shift_type: 'both',
         note: null,
-        source_line: 'off Apr 14, Apr 16',
+        source_line: 'Need off Apr 14, Apr 16',
       },
       {
         date: '2026-04-16',
         override_type: 'force_off',
         shift_type: 'both',
         note: null,
-        source_line: 'off Apr 14, Apr 16',
+        source_line: 'Need off Apr 14, Apr 16',
       },
       {
         date: '2026-04-18',
         override_type: 'force_on',
         shift_type: 'both',
         note: null,
-        source_line: 'work Apr 18',
+        source_line: 'Can work Apr 18',
+      },
+    ])
+  })
+
+  it('parses lines where the date appears before the request intent', () => {
+    const parsed = parseAvailabilityEmail('Sunday 11/4/24 - need off for dr. appt', cycles)
+
+    expect(parsed.requests).toEqual([
+      {
+        date: '2024-11-04',
+        override_type: 'force_off',
+        shift_type: 'both',
+        note: null,
+        source_line: 'Sunday 11/4/24 - need off for dr. appt',
       },
     ])
   })

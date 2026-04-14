@@ -242,6 +242,7 @@ function splitLineIntoIntentSegments(
     overrideType: AvailabilityOverrideType
     index: number
     text: string
+    end: number
   }> = []
 
   for (const matcher of INTENT_MATCHERS) {
@@ -252,19 +253,21 @@ function splitLineIntoIntentSegments(
         overrideType: matcher.type,
         index: match.index,
         text: match[0],
+        end: match.index + match[0].length,
       })
     }
   }
 
   if (matches.length === 0) return []
 
-  const dedupedMatches = Array.from(
-    new Map(
-      matches
-        .sort((a, b) => a.index - b.index || b.text.length - a.text.length)
-        .map((match) => [`${match.index}:${match.overrideType}`, match])
-    ).values()
-  ).sort((a, b) => a.index - b.index)
+  const dedupedMatches: typeof matches = []
+  for (const match of matches.sort((a, b) => a.index - b.index || b.text.length - a.text.length)) {
+    const previous = dedupedMatches.at(-1)
+    if (previous && match.index < previous.end) {
+      continue
+    }
+    dedupedMatches.push(match)
+  }
 
   return dedupedMatches.map((match, index) => ({
     overrideType: match.overrideType,
@@ -499,7 +502,10 @@ export function parseAvailabilityEmail(
 
     let matchedAnyDate = false
     for (const segment of segments) {
-      const dates = resolveLineDates(segment.segment, cycles)
+      const dates =
+        segments.length === 1
+          ? resolveLineDates(rawLine, cycles)
+          : resolveLineDates(segment.segment, cycles)
       if (dates.length === 0) continue
       matchedAnyDate = true
 
@@ -509,7 +515,7 @@ export function parseAvailabilityEmail(
           override_type: segment.overrideType,
           shift_type: 'both',
           note: null,
-          source_line: segment.segment,
+          source_line: segments.length === 1 ? rawLine : segment.segment,
         })
       }
     }
