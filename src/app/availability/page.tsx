@@ -756,15 +756,18 @@ export default async function AvailabilityPage({
       />
 
       {canManageAvailability ? (
-        <div className="border-b border-border">
-          <nav className="-mb-px flex gap-0" aria-label="Availability sections">
+        <div>
+          <nav
+            className="inline-flex items-center gap-0.5 rounded-xl border border-border/60 bg-muted/50 p-1"
+            aria-label="Availability sections"
+          >
             <a
               href={plannerHref}
               className={cn(
-                'px-4 py-2.5 text-sm border-b-2 transition-colors',
+                'rounded-lg px-4 py-1.5 text-sm font-medium transition-colors',
                 activeTab === 'planner'
-                  ? 'border-primary text-foreground font-medium'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
+                  ? 'bg-card text-foreground shadow-tw-sm'
+                  : 'text-muted-foreground hover:text-foreground'
               )}
             >
               Planner
@@ -772,15 +775,15 @@ export default async function AvailabilityPage({
             <a
               href={intakeHref}
               className={cn(
-                'flex items-center gap-2 px-4 py-2.5 text-sm border-b-2 transition-colors',
+                'flex items-center gap-2 rounded-lg px-4 py-1.5 text-sm font-medium transition-colors',
                 activeTab === 'intake'
-                  ? 'border-primary text-foreground font-medium'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
+                  ? 'bg-card text-foreground shadow-tw-sm'
+                  : 'text-muted-foreground hover:text-foreground'
               )}
             >
               Email Intake
               {intakeNeedsReviewCount > 0 ? (
-                <span className="rounded-full border border-warning-border bg-warning-subtle px-1.5 py-0.5 text-[10px] font-semibold text-warning-text">
+                <span className="rounded-full border border-warning-border bg-warning-subtle px-1.5 py-0.5 text-[10px] font-bold text-warning-text">
                   {intakeNeedsReviewCount}
                 </span>
               ) : null}

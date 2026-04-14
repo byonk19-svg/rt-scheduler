@@ -34,18 +34,20 @@ export function AvailabilityOverviewHeader({
       summary={
         summaryContent ?? (
           <>
-            <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 font-medium text-foreground">
-              {totalRequests} requests on file
+            <span className="text-sm font-semibold text-foreground">{totalRequests}</span>
+            <span className="text-muted-foreground">requests on file</span>
+            <span className="text-border/90" aria-hidden="true">
+              ·
             </span>
             <span className="text-muted-foreground">{needOffRequests} need off</span>
             <span className="text-border/90" aria-hidden="true">
               /
             </span>
             <span className="text-muted-foreground">{availableToWorkRequests} request to work</span>
-            {!canManageAvailability && responseRatio ? (
+            {responseRatio ? (
               <>
                 <span className="text-border/90" aria-hidden="true">
-                  /
+                  ·
                 </span>
                 <span className="text-muted-foreground">{responseRatio} responded</span>
               </>

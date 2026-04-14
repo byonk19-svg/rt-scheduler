@@ -208,13 +208,13 @@ export function ManagerSchedulingInputs({
     <section id="staff-scheduling-inputs" className="space-y-6">
       <AvailabilityWorkspaceShell
         controls={
-          <div className="space-y-5">
-            <div className="space-y-1">
+          <div className="space-y-4">
+            <div className="space-y-0.5">
               <h2 className="app-section-title text-foreground">Plan staffing</h2>
-              <p className="text-sm text-muted-foreground">{getModeCopy(mode)}</p>
+              <p className="text-xs text-muted-foreground">{getModeCopy(mode)}</p>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label
                 htmlFor="planner_cycle_id"
                 className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground"
@@ -223,7 +223,7 @@ export function ManagerSchedulingInputs({
               </Label>
               <select
                 id="planner_cycle_id"
-                className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 value={selectedCycleId}
                 onChange={(event) => handleCycleChange(event.target.value)}
               >
@@ -235,7 +235,7 @@ export function ManagerSchedulingInputs({
               </select>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label
                 htmlFor="planner_therapist_id"
                 className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground"
@@ -244,7 +244,7 @@ export function ManagerSchedulingInputs({
               </Label>
               <select
                 id="planner_therapist_id"
-                className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 value={selectedTherapistId}
                 onChange={(event) => handleTherapistChange(event.target.value)}
               >
@@ -270,22 +270,20 @@ export function ManagerSchedulingInputs({
 
             {selectedTherapist ? (
               <div
-                className="space-y-3 rounded-xl border border-border bg-card px-3.5 py-3.5"
+                className="flex flex-wrap items-center gap-2"
                 role="group"
                 aria-label="Therapist shift and employment (read-only)"
               >
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className="font-medium">
-                    {selectedTherapist.shift_type === 'night' ? 'Night shift' : 'Day shift'}
-                  </Badge>
-                  <Badge variant="outline" className="font-medium text-muted-foreground">
-                    {employmentLabel(selectedTherapist.employment_type)}
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">
+                <Badge variant="outline" className="font-medium">
+                  {selectedTherapist.shift_type === 'night' ? 'Night shift' : 'Day shift'}
+                </Badge>
+                <Badge variant="outline" className="font-medium text-muted-foreground">
+                  {employmentLabel(selectedTherapist.employment_type)}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
                   Planner inputs apply to {selectedTherapist.full_name}&apos;s normal shift
                   assignments.
-                </p>
+                </span>
               </div>
             ) : null}
 
@@ -316,17 +314,17 @@ export function ManagerSchedulingInputs({
               </form>
             ) : null}
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
                 Planner mode
               </p>
-              <div className="inline-flex rounded-lg border border-border bg-card p-1">
+              <div className="flex w-full rounded-lg border border-border bg-muted/40 p-1">
                 <button
                   type="button"
                   className={cn(
-                    'rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
+                    'flex-1 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
                     mode === 'will_work'
-                      ? 'bg-[var(--success-subtle)] text-[var(--success-text)]'
+                      ? 'bg-[var(--success-subtle)] text-[var(--success-text)] shadow-tw-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   )}
                   onClick={() => handleModeChange('will_work')}
@@ -336,9 +334,9 @@ export function ManagerSchedulingInputs({
                 <button
                   type="button"
                   className={cn(
-                    'rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
+                    'flex-1 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
                     mode === 'cannot_work'
-                      ? 'bg-[var(--error-subtle)] text-[var(--error-text)]'
+                      ? 'bg-[var(--error-subtle)] text-[var(--error-text)] shadow-tw-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   )}
                   onClick={() => handleModeChange('cannot_work')}
