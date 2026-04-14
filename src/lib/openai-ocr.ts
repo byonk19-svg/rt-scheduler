@@ -4,18 +4,29 @@ const DEFAULT_OCR_MODEL = 'gpt-4.1-mini'
 
 const NO_TEXT_SKIP_MESSAGE = 'No readable scheduling text detected.'
 const FULL_PAGE_ACCEPT_SCORE = 80
-const ZONE_ORDER = ['employee_name', 'request_top', 'request_mid', 'request_bottom'] as const
+const ZONE_ORDER = [
+  'employee_name',
+  'header_block',
+  'request_table',
+  'request_top',
+  'request_mid',
+  'request_bottom',
+] as const
 const ZONE_PROMPTS: Record<string, string> = {
   full_page:
     'Read all visible text from this scheduling request page, including names, dates, handwritten notes, and request details. Return plain text only. If the page is blank or fully illegible, return NO_TEXT.',
   employee_name:
     'Read the employee name from this form region. Return just the name in plain text. If there is no readable name, return NO_TEXT.',
+  header_block:
+    'Read the top section of this PTO request form, including employee name, department, and any handwritten identifiers. Return plain text only. If there is no readable text, return NO_TEXT.',
   request_top:
     'Read all visible scheduling request text from this form region. Preserve dates exactly. If there is no readable text, return NO_TEXT.',
   request_mid:
     'Read all visible scheduling request text from this form region. Preserve dates exactly. If there is no readable text, return NO_TEXT.',
   request_bottom:
     'Read all visible scheduling request text from this form region. Preserve dates exactly. If there is no readable text, return NO_TEXT.',
+  request_table:
+    'Read the PTO request table rows from this form region. Preserve each date and its handwritten note exactly. Return plain text only, one row per line when possible. If there is no readable table text, return NO_TEXT.',
 }
 
 const IMAGE_CONTENT_TYPES = new Set([
@@ -161,9 +172,23 @@ async function extractTextFromImageVariants(params: {
     }
   }
 
-  const mergedText = ZONE_ORDER.map((zoneLabel) => bestZoneText.get(zoneLabel)?.text ?? null)
+  const employeeName = bestZoneText.get('employee_name')?.text?.trim() ?? null
+  const headerBlock = bestZoneText.get('header_block')?.text?.trim() ?? null
+  const requestTable = bestZoneText.get('request_table')?.text?.trim() ?? null
+  const fallbackRequestText = ZONE_ORDER.filter((zoneLabel) =>
+    ['request_top', 'request_mid', 'request_bottom'].includes(zoneLabel)
+  )
+    .map((zoneLabel) => bestZoneText.get(zoneLabel)?.text?.trim() ?? null)
     .filter((value): value is string => Boolean(value))
-    .map((text, index) => (index === 0 ? `Employee Name: ${text}` : text))
+    .join('\n\n')
+    .trim()
+
+  const mergedText = [
+    employeeName ? `Employee Name: ${employeeName}` : null,
+    headerBlock && headerBlock !== employeeName ? headerBlock : null,
+    requestTable || fallbackRequestText || null,
+  ]
+    .filter((value): value is string => Boolean(value))
     .join('\n\n')
     .trim()
 
