@@ -14,6 +14,23 @@ import { createClient } from '@/lib/supabase/server'
 type ManagedRole = 'manager' | 'therapist' | 'lead'
 type ShiftType = 'day' | 'night'
 type EmploymentType = 'full_time' | 'part_time' | 'prn'
+type EmployeeRosterSnapshotRow = {
+  id?: string
+  full_name?: string | null
+  normalized_full_name?: string | null
+  phone_number?: string | null
+  role?: ManagedRole | null
+  shift_type?: ShiftType | null
+  employment_type?: EmploymentType | null
+  max_work_days_per_week?: number | null
+  is_lead_eligible?: boolean | null
+  is_active?: boolean | null
+  matched_profile_id?: string | null
+  matched_email?: string | null
+  matched_at?: string | null
+  created_by?: string | null
+  updated_by?: string | null
+}
 
 function buildTeamUrl(params: Record<string, string | undefined>): string {
   const search = new URLSearchParams()
@@ -247,6 +264,26 @@ function parseEmploymentType(value: FormDataEntryValue | null): EmploymentType |
   return null
 }
 
+function mapRosterSnapshotForRestore(row: EmployeeRosterSnapshotRow) {
+  return {
+    id: String(row.id ?? ''),
+    full_name: String(row.full_name ?? ''),
+    normalized_full_name: String(row.normalized_full_name ?? ''),
+    phone_number: row.phone_number ?? null,
+    role: (row.role ?? 'therapist') as ManagedRole,
+    shift_type: (row.shift_type ?? 'day') as ShiftType,
+    employment_type: (row.employment_type ?? 'full_time') as EmploymentType,
+    max_work_days_per_week: Number(row.max_work_days_per_week ?? 3),
+    is_lead_eligible: row.is_lead_eligible === true,
+    is_active: row.is_active !== false,
+    matched_profile_id: row.matched_profile_id ?? null,
+    matched_email: row.matched_email ?? null,
+    matched_at: row.matched_at ?? null,
+    created_by: row.created_by ?? null,
+    updated_by: row.updated_by ?? null,
+  }
+}
+
 export async function upsertEmployeeRosterEntryAction(formData: FormData) {
   const { supabase, userId } = await requireManager()
 
@@ -372,12 +409,46 @@ export async function replaceTherapistRosterAction(formData: FormData) {
   const normalizedNames = new Set(payload.map((row) => row.normalized_full_name))
   const { data: existingTherapistLeadRows, error: existingTherapistLeadError } = await supabase
     .from('employee_roster')
-    .select('id, normalized_full_name, matched_profile_id')
+    .select(
+      'id, full_name, normalized_full_name, phone_number, role, shift_type, employment_type, max_work_days_per_week, is_lead_eligible, is_active, matched_profile_id, matched_email, matched_at, created_by, updated_by'
+    )
     .in('role', ['therapist', 'lead'])
 
   if (existingTherapistLeadError) {
     console.error('Failed to load current therapist roster rows:', existingTherapistLeadError)
     redirect(buildTeamUrl({ error: 'therapist_roster_replace_failed' }))
+  }
+
+  const priorSnapshot = (existingTherapistLeadRows ?? []) as EmployeeRosterSnapshotRow[]
+  const priorSnapshotPayload = priorSnapshot.map(mapRosterSnapshotForRestore)
+  const priorNormalizedNames = new Set(priorSnapshotPayload.map((row) => row.normalized_full_name))
+  const replacementOnlyNames = payload
+    .map((row) => row.normalized_full_name)
+    .filter((name) => !priorNormalizedNames.has(name))
+
+  async function rollbackRosterSnapshot() {
+    if (priorSnapshotPayload.length > 0) {
+      const { error: restoreError } = await supabase.from('employee_roster').upsert(
+        priorSnapshotPayload,
+        { onConflict: 'normalized_full_name' }
+      )
+
+      if (restoreError) {
+        console.error('Failed to restore prior therapist roster snapshot:', restoreError)
+      }
+    }
+
+    if (replacementOnlyNames.length > 0) {
+      const { error: cleanupError } = await supabase
+        .from('employee_roster')
+        .delete()
+        .in('normalized_full_name', replacementOnlyNames)
+        .in('role', ['therapist', 'lead'])
+
+      if (cleanupError) {
+        console.error('Failed to remove replacement-only therapist roster rows:', cleanupError)
+      }
+    }
   }
 
   const { data: conflictingRosterRows, error: conflictingRosterError } = await supabase
@@ -451,6 +522,7 @@ export async function replaceTherapistRosterAction(formData: FormData) {
 
     if (deleteError) {
       console.error('Failed to clear stale therapist roster rows:', deleteError)
+      await rollbackRosterSnapshot()
       redirect(buildTeamUrl({ error: 'therapist_roster_replace_failed' }))
     }
   }
@@ -464,6 +536,7 @@ export async function replaceTherapistRosterAction(formData: FormData) {
 
   if (activeProfilesError) {
     console.error('Failed to load active therapist roster profiles:', activeProfilesError)
+    await rollbackRosterSnapshot()
     redirect(buildTeamUrl({ error: 'therapist_roster_replace_failed' }))
   }
 
@@ -494,11 +567,18 @@ export async function replaceTherapistRosterAction(formData: FormData) {
 
     if (archiveError) {
       console.error('Failed to archive stale therapist roster profiles:', archiveError)
+      await rollbackRosterSnapshot()
       redirect(buildTeamUrl({ error: 'therapist_roster_replace_failed' }))
+    }
+
+    for (const profileId of staleProfileIds) {
+      await realignFutureDraftShiftsForEmployee(supabase, profileId)
     }
   }
 
   revalidatePath('/team')
+  revalidatePath('/schedule')
+  revalidatePath('/coverage')
   revalidatePath('/dashboard/manager')
   revalidatePath('/availability')
 

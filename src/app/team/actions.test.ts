@@ -36,6 +36,7 @@ type TestContext = {
   therapistLeadRosterRows?: Array<Record<string, unknown>>
   activeTherapistLeadProfiles?: Array<Record<string, unknown>>
   namedRosterRows?: Array<Record<string, unknown>>
+  draftCycleRows?: Array<Record<string, unknown>>
   employeeRosterUpsertError?: { message: string } | null
   employeeRosterDeleteError?: { message: string } | null
   profileArchiveError?: { message: string } | null
@@ -57,6 +58,7 @@ function createSupabaseMock(context: TestContext = {}) {
       payload: Record<string, unknown> | Array<Record<string, unknown>>
       options?: Record<string, unknown>
     }>,
+    employeeRosterDeleteCalls: 0,
   }
 
   return {
@@ -104,9 +106,19 @@ function createSupabaseMock(context: TestContext = {}) {
           return { data: null, error: null }
         },
         then(resolve: (value: { data: unknown; error: unknown }) => unknown) {
+          if (table === 'schedule_cycles' && selected === 'id') {
+            return Promise.resolve(
+              resolve({
+                data: context.draftCycleRows ?? [],
+                error: null,
+              })
+            )
+          }
+
           if (
             table === 'employee_roster' &&
-            selected === 'id, normalized_full_name, matched_profile_id'
+            selected ===
+              'id, full_name, normalized_full_name, phone_number, role, shift_type, employment_type, max_work_days_per_week, is_lead_eligible, is_active, matched_profile_id, matched_email, matched_at, created_by, updated_by'
           ) {
             return Promise.resolve(
               resolve({
@@ -172,6 +184,10 @@ function createSupabaseMock(context: TestContext = {}) {
               filters.set(column, value)
               return deleteBuilder
             },
+            gte(column: string, value: unknown) {
+              filters.set(`gte:${column}`, value)
+              return deleteBuilder
+            },
             in(column: string, values: unknown[]) {
               filters.set(column, values)
               return deleteBuilder
@@ -185,9 +201,15 @@ function createSupabaseMock(context: TestContext = {}) {
                 table,
                 filters: Object.fromEntries(filters.entries()),
               })
+              if (table === 'employee_roster') {
+                state.employeeRosterDeleteCalls += 1
+              }
               return Promise.resolve(
                 resolve({
-                  error: table === 'employee_roster' ? context.employeeRosterDeleteError ?? null : null,
+                  error:
+                    table === 'employee_roster' && state.employeeRosterDeleteCalls === 1
+                      ? context.employeeRosterDeleteError ?? null
+                      : null,
                 })
               )
             },
@@ -337,19 +359,44 @@ describe('replaceTherapistRosterAction', () => {
       therapistLeadRosterRows: [
         {
           id: 'roster-stale-1',
+          full_name: 'Old Therapist',
           normalized_full_name: 'old therapist',
+          phone_number: '(903) 111-1111',
+          role: 'therapist',
+          shift_type: 'day',
+          employment_type: 'full_time',
+          max_work_days_per_week: 3,
+          is_lead_eligible: false,
+          is_active: true,
           matched_profile_id: 'profile-stale-1',
+          matched_email: 'old@example.com',
+          matched_at: '2026-04-01T00:00:00.000Z',
+          created_by: 'manager-1',
+          updated_by: 'manager-1',
         },
         {
           id: 'roster-keep-1',
+          full_name: 'Tannie Brooks',
           normalized_full_name: 'tannie brooks',
+          phone_number: '(903) 217-7833',
+          role: 'therapist',
+          shift_type: 'day',
+          employment_type: 'full_time',
+          max_work_days_per_week: 3,
+          is_lead_eligible: false,
+          is_active: true,
           matched_profile_id: 'profile-keep-1',
+          matched_email: 'tannie@example.com',
+          matched_at: '2026-04-01T00:00:00.000Z',
+          created_by: 'manager-1',
+          updated_by: 'manager-1',
         },
       ],
       activeTherapistLeadProfiles: [
         { id: 'profile-stale-1', full_name: 'Old Therapist' },
         { id: 'profile-keep-1', full_name: 'Theresa Divergent' },
       ],
+      draftCycleRows: [{ id: 'draft-cycle-1' }],
       namedRosterRows: [
         {
           id: 'roster-keep-1',
@@ -432,6 +479,14 @@ describe('replaceTherapistRosterAction', () => {
           id: ['roster-stale-1'],
         },
       },
+      {
+        table: 'shifts',
+        filters: {
+          user_id: 'profile-stale-1',
+          'gte:date': expect.any(String),
+          cycle_id: ['draft-cycle-1'],
+        },
+      },
     ])
     expect(supabase.state.updates).toEqual([
       {
@@ -449,6 +504,8 @@ describe('replaceTherapistRosterAction', () => {
     expect(revalidatePathMock).toHaveBeenCalledWith('/team')
     expect(revalidatePathMock).toHaveBeenCalledWith('/dashboard/manager')
     expect(revalidatePathMock).toHaveBeenCalledWith('/availability')
+    expect(revalidatePathMock).toHaveBeenCalledWith('/schedule')
+    expect(revalidatePathMock).toHaveBeenCalledWith('/coverage')
   })
 
   it('does not delete stale rows or archive profiles when the staged roster write fails', async () => {
@@ -458,8 +515,20 @@ describe('replaceTherapistRosterAction', () => {
       therapistLeadRosterRows: [
         {
           id: 'roster-stale-1',
+          full_name: 'Old Therapist',
           normalized_full_name: 'old therapist',
+          phone_number: '(903) 111-1111',
+          role: 'therapist',
+          shift_type: 'day',
+          employment_type: 'full_time',
+          max_work_days_per_week: 3,
+          is_lead_eligible: false,
+          is_active: true,
           matched_profile_id: 'profile-stale-1',
+          matched_email: 'old@example.com',
+          matched_at: '2026-04-01T00:00:00.000Z',
+          created_by: 'manager-1',
+          updated_by: 'manager-1',
         },
       ],
       activeTherapistLeadProfiles: [
@@ -494,6 +563,239 @@ describe('replaceTherapistRosterAction', () => {
     expect(supabase.state.upserts).toHaveLength(1)
     expect(supabase.state.deletes).toEqual([])
     expect(supabase.state.updates).toEqual([])
+    expect(revalidatePathMock).not.toHaveBeenCalled()
+  })
+
+  it('rolls back the roster snapshot if deleting stale roster rows fails', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      therapistLeadRosterRows: [
+        {
+          id: 'roster-stale-1',
+          full_name: 'Old Therapist',
+          normalized_full_name: 'old therapist',
+          phone_number: '(903) 111-1111',
+          role: 'therapist',
+          shift_type: 'day',
+          employment_type: 'full_time',
+          max_work_days_per_week: 3,
+          is_lead_eligible: false,
+          is_active: true,
+          matched_profile_id: 'profile-stale-1',
+          matched_email: 'old@example.com',
+          matched_at: '2026-04-01T00:00:00.000Z',
+          created_by: 'manager-1',
+          updated_by: 'manager-1',
+        },
+      ],
+      employeeRosterDeleteError: { message: 'delete failed' },
+    })
+    createClientMock.mockResolvedValue(supabase)
+    parseTherapistRosterSourceMock.mockReturnValue({
+      ok: true,
+      rows: [
+        {
+          full_name: 'Tannie Brooks',
+          normalized_full_name: 'tannie brooks',
+          phone_number: '(903) 217-7833',
+          role: 'therapist',
+          shift_type: 'day',
+          employment_type: 'full_time',
+          max_work_days_per_week: 3,
+          is_lead_eligible: false,
+          is_active: true,
+        },
+      ],
+    })
+
+    await expect(replaceTherapistRosterAction(makeReplaceFormData())).rejects.toThrow(
+      'REDIRECT:/team?error=therapist_roster_replace_failed'
+    )
+
+    expect(supabase.state.upserts).toEqual([
+      {
+        table: 'employee_roster',
+        payload: [
+          {
+            full_name: 'Tannie Brooks',
+            normalized_full_name: 'tannie brooks',
+            phone_number: '(903) 217-7833',
+            role: 'therapist',
+            shift_type: 'day',
+            employment_type: 'full_time',
+            max_work_days_per_week: 3,
+            is_lead_eligible: false,
+            is_active: true,
+            created_by: 'manager-1',
+            updated_by: 'manager-1',
+          },
+        ],
+        options: { onConflict: 'normalized_full_name' },
+      },
+      {
+        table: 'employee_roster',
+        payload: [
+          {
+            id: 'roster-stale-1',
+            full_name: 'Old Therapist',
+            normalized_full_name: 'old therapist',
+            phone_number: '(903) 111-1111',
+            role: 'therapist',
+            shift_type: 'day',
+            employment_type: 'full_time',
+            max_work_days_per_week: 3,
+            is_lead_eligible: false,
+            is_active: true,
+            matched_profile_id: 'profile-stale-1',
+            matched_email: 'old@example.com',
+            matched_at: '2026-04-01T00:00:00.000Z',
+            created_by: 'manager-1',
+            updated_by: 'manager-1',
+          },
+        ],
+        options: { onConflict: 'normalized_full_name' },
+      },
+    ])
+    expect(supabase.state.deletes).toEqual([
+      {
+        table: 'employee_roster',
+        filters: {
+          id: ['roster-stale-1'],
+        },
+      },
+      {
+        table: 'employee_roster',
+        filters: {
+          normalized_full_name: ['tannie brooks'],
+          role: ['therapist', 'lead'],
+        },
+      },
+    ])
+    expect(supabase.state.updates).toEqual([])
+    expect(revalidatePathMock).not.toHaveBeenCalled()
+  })
+
+  it('rolls back the roster snapshot if archiving stale profiles fails', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      therapistLeadRosterRows: [
+        {
+          id: 'roster-stale-1',
+          full_name: 'Old Therapist',
+          normalized_full_name: 'old therapist',
+          phone_number: '(903) 111-1111',
+          role: 'therapist',
+          shift_type: 'day',
+          employment_type: 'full_time',
+          max_work_days_per_week: 3,
+          is_lead_eligible: false,
+          is_active: true,
+          matched_profile_id: 'profile-stale-1',
+          matched_email: 'old@example.com',
+          matched_at: '2026-04-01T00:00:00.000Z',
+          created_by: 'manager-1',
+          updated_by: 'manager-1',
+        },
+      ],
+      activeTherapistLeadProfiles: [{ id: 'profile-stale-1', full_name: 'Old Therapist' }],
+      profileArchiveError: { message: 'archive failed' },
+    })
+    createClientMock.mockResolvedValue(supabase)
+    parseTherapistRosterSourceMock.mockReturnValue({
+      ok: true,
+      rows: [
+        {
+          full_name: 'Tannie Brooks',
+          normalized_full_name: 'tannie brooks',
+          phone_number: '(903) 217-7833',
+          role: 'therapist',
+          shift_type: 'day',
+          employment_type: 'full_time',
+          max_work_days_per_week: 3,
+          is_lead_eligible: false,
+          is_active: true,
+        },
+      ],
+    })
+
+    await expect(replaceTherapistRosterAction(makeReplaceFormData())).rejects.toThrow(
+      'REDIRECT:/team?error=therapist_roster_replace_failed'
+    )
+
+    expect(supabase.state.upserts).toEqual([
+      {
+        table: 'employee_roster',
+        payload: [
+          {
+            full_name: 'Tannie Brooks',
+            normalized_full_name: 'tannie brooks',
+            phone_number: '(903) 217-7833',
+            role: 'therapist',
+            shift_type: 'day',
+            employment_type: 'full_time',
+            max_work_days_per_week: 3,
+            is_lead_eligible: false,
+            is_active: true,
+            created_by: 'manager-1',
+            updated_by: 'manager-1',
+          },
+        ],
+        options: { onConflict: 'normalized_full_name' },
+      },
+      {
+        table: 'employee_roster',
+        payload: [
+          {
+            id: 'roster-stale-1',
+            full_name: 'Old Therapist',
+            normalized_full_name: 'old therapist',
+            phone_number: '(903) 111-1111',
+            role: 'therapist',
+            shift_type: 'day',
+            employment_type: 'full_time',
+            max_work_days_per_week: 3,
+            is_lead_eligible: false,
+            is_active: true,
+            matched_profile_id: 'profile-stale-1',
+            matched_email: 'old@example.com',
+            matched_at: '2026-04-01T00:00:00.000Z',
+            created_by: 'manager-1',
+            updated_by: 'manager-1',
+          },
+        ],
+        options: { onConflict: 'normalized_full_name' },
+      },
+    ])
+    expect(supabase.state.deletes).toEqual([
+      {
+        table: 'employee_roster',
+        filters: {
+          id: ['roster-stale-1'],
+        },
+      },
+      {
+        table: 'employee_roster',
+        filters: {
+          normalized_full_name: ['tannie brooks'],
+          role: ['therapist', 'lead'],
+        },
+      },
+    ])
+    expect(supabase.state.updates).toEqual([
+      {
+        table: 'profiles',
+        payload: {
+          archived_at: expect.any(String),
+          archived_by: 'manager-1',
+          is_active: false,
+        },
+        filters: {
+          id: ['profile-stale-1'],
+        },
+      },
+    ])
     expect(revalidatePathMock).not.toHaveBeenCalled()
   })
 })
