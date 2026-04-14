@@ -239,6 +239,7 @@ Managers can now receive staff request emails and apply parsed dates into availa
 What the app does:
 
 - accepts `email.received` webhooks at `/api/inbound/availability-email`
+- acknowledges the webhook immediately, then completes OCR/parsing in background so Resend does not get stuck retrying long OCR requests
 - fetches full email content plus attachments from Resend receiving
 - matches the sender email to an employee profile when possible
 - parses text like `Need off Mar 24, Mar 26` or `Can work Apr 2`
@@ -246,6 +247,13 @@ What the app does:
 - creates an intake record for manager review on [`/availability`](./src/app/availability/page.tsx)
 - applies parsed dates into `availability_overrides` as manager-entered inputs
 - renders scanned PDF pages and retries OCR using multiple page-image variants and fixed-form-like region prompts when direct PDF extraction returns no text
+- reads OCR text from the actual OpenAI Responses message payload shape, not just `output_text`
+
+Current production behavior:
+
+- photographed PTO form images like `IMG_0262.jpeg` now OCR and parse into structured requests successfully
+- forwarded-email body boilerplate is ignored instead of becoming a fake availability request
+- items still land in `needs_review` when business rules require it, for example when OCR dates do not match any active schedule cycle
 
 Required env vars:
 

@@ -9,13 +9,16 @@ Updated: 2026-04-14 (session 60)
 - Production is live on `https://www.teamwise.work`.
 - The working inbound availability webhook URL is:
   - `https://www.teamwise.work/api/inbound/availability-email`
-- `mail.teamwise.work` receiving is verified in Resend, and the webhook has now delivered a real `email.received` event successfully.
+- `mail.teamwise.work` receiving is verified in Resend, and the webhook now acknowledges `email.received` events quickly enough for Resend delivery to succeed in production.
 - Availability intake currently supports:
   - inbound email webhook
   - manager-created manual intake from pasted text
   - uploaded form image/PDF on `/availability`
 - Uploaded images can OCR through the OpenAI Responses API when `OPENAI_API_KEY` is configured. PDFs now try direct PDF extraction first, then render pages to images and retry OCR when direct extraction returns no text using stronger preprocessing and fixed-form-like region prompts.
+- Production now successfully OCRs and parses the photographed PTO form example (`IMG_0262.jpeg`): employee name is extracted, therapist matching succeeds, and PTO rows parse into structured requests. The item remains `needs_review` only when schedule-cycle matching is missing (for example OCR dates from 2024 against current cycles).
 - The production pipeline is now instrumented enough to distinguish delivery failures, render failures, and OCR failures in `availability_email_intake_items.ocr_error`.
+- The inbound webhook route now returns immediately and continues OCR/database work in `after()`, preventing Resend retries caused by long OCR work inside the request.
+- The OpenAI Responses OCR parser now reads both `output_text` and nested `output[].content[].text`, matching the real production payload shape.
 - Replaying the same Resend inbound event does **not** reliably create a fresh processed intake row every time. Use `created_at` on the newest intake item rows to confirm whether a replay actually exercised the latest production code.
 - The real HCA multi-page handwritten scan used in session 60 proved that the end-to-end pipeline works, but generic OCR still fails to recover useful text from that specific document. Treat that as a document-readability ceiling, not a transport bug.
 - The latest production pass adds rotated/grayscale/threshold OCR variants plus region-specific prompts for handwritten name/request areas, but the replayed HCA scan still remains unreadable. Assume future progress will require either a truly template-anchored field extractor or a manager rescue workflow.
@@ -70,6 +73,16 @@ Updated: 2026-04-14 (session 60)
   - Production replay evidence for the HCA scan still ends in the explicit all-pages-`NO_TEXT` failure, which means the pipeline is operational but that specific 21-page handwritten document remains unreadable to the current OCR approach.
   - This is now a document-readability problem, not an email/webhook/runtime-packaging problem.
 - **Operational conclusion:** do not use repeated Resend replays as the only validation signal; a replay may not create a fresh intake item row. Always confirm a truly new run via the newest `availability_email_intake_items.created_at`.
+
+## Latest Updates (2026-04-14, session 62)
+
+- **Inbound photographed PTO form intake fixed in production** (`src/app/api/inbound/availability-email/route.ts`, `src/lib/openai-ocr.ts`, `src/lib/pdf-render-pages.ts`, `src/lib/availability-email-intake.ts`, `src/lib/availability-email-item-matcher.ts`, tests):
+  - The webhook route now acknowledges `email.received` immediately and moves OCR/DB work into `after()`, eliminating the production `504` timeout / Resend retry loop.
+  - The OCR helper now parses the real OpenAI Responses payload shape (`output[].content[].text`) instead of assuming `output_text` always exists.
+  - The photographed PTO form example `IMG_0262.jpeg` now OCRs successfully in production and produces parsed request rows like `11/4/24 - need off for dr. appt` and `12/29/24 -> please schedule me to work...`.
+  - Employee-name extraction now survives inline form labels on the same OCR line (for example `Employee Name: Brianna Yonkin   Kronos Number:`), and forwarded-email boilerplate in the body no longer becomes a fake availability request.
+  - Table-style PTO rows with the date before the intent phrase now parse correctly.
+- **Current operational meaning of `needs_review` for photographed forms:** if OCR succeeds and the therapist matches but `matched_cycle_id` is null, treat that as a normal business-rule review item rather than a pipeline failure. The latest example stayed in review because the form dates were in `2024`, outside current schedule cycles.
 
 The session entries below are historical context. They may describe local-only or superseded work and should not override the snapshot above.
 
