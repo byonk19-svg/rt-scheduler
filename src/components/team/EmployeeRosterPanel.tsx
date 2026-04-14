@@ -20,6 +20,7 @@ type EmployeeRosterPanelProps = {
   roster: EmployeeRosterRow[]
   upsertEmployeeRosterEntryAction: (formData: FormData) => void | Promise<void>
   bulkUpsertEmployeeRosterAction: (formData: FormData) => void | Promise<void>
+  replaceTherapistRosterAction: (formData: FormData) => void | Promise<void>
   deleteEmployeeRosterEntryAction: (formData: FormData) => void | Promise<void>
 }
 
@@ -39,6 +40,7 @@ export function EmployeeRosterPanel({
   roster,
   upsertEmployeeRosterEntryAction,
   bulkUpsertEmployeeRosterAction,
+  replaceTherapistRosterAction,
   deleteEmployeeRosterEntryAction,
 }: EmployeeRosterPanelProps) {
   return (
@@ -51,9 +53,20 @@ export function EmployeeRosterPanel({
       </div>
 
       <form action={upsertEmployeeRosterEntryAction} className="grid gap-3 rounded-xl border p-4">
-        <div className="grid gap-1.5">
-          <Label htmlFor="roster-full-name">Full name</Label>
-          <Input id="roster-full-name" name="full_name" required placeholder="Jane Doe" />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-1.5">
+            <Label htmlFor="roster-full-name">Full name</Label>
+            <Input id="roster-full-name" name="full_name" required placeholder="Jane Doe" />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="roster-phone-number">Phone number</Label>
+            <Input
+              id="roster-phone-number"
+              name="phone_number"
+              placeholder="(555) 101-2020"
+              inputMode="tel"
+            />
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="grid gap-1.5">
@@ -140,6 +153,34 @@ export function EmployeeRosterPanel({
         <div className="flex justify-end">
           <FormSubmitButton variant="secondary" className="h-9 px-4 text-sm">
             Import lines
+          </FormSubmitButton>
+        </div>
+      </form>
+
+      <form
+        action={replaceTherapistRosterAction}
+        className="mt-4 grid gap-2 rounded-xl border p-4"
+      >
+        <div className="grid gap-1.5">
+          <Label htmlFor="therapist-roster-source">Therapist roster replacement</Label>
+          <textarea
+            id="therapist-roster-source"
+            name="therapist_roster_source"
+            rows={6}
+            placeholder={'Brooks, Tannie 903-217-7833\nSmith, Jane (214)555-1212'}
+            className={cn(
+              'placeholder:text-muted-foreground border-input min-h-[120px] w-full min-w-0 rounded-lg border bg-[var(--input-background)] px-3 py-2 text-base transition-[color,box-shadow] outline-none md:text-sm',
+              'focus-visible:border-[var(--ring)] focus-visible:ring-[var(--ring)]/50 focus-visible:ring-[3px]'
+            )}
+          />
+          <p className="text-xs text-muted-foreground">
+            Replace therapist and lead roster rows from pasted source lines. Format each line as
+            Last, First Phone. Managers stay preserved.
+          </p>
+        </div>
+        <div className="flex justify-end">
+          <FormSubmitButton variant="secondary" className="h-9 px-4 text-sm">
+            Replace therapist roster
           </FormSubmitButton>
         </div>
       </form>
