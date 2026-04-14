@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
 
+// Allow up to 60 s on Vercel — needed for multi-page PDF OCR processing
+export const maxDuration = 60
+
 import {
   parseAvailabilityEmailItem,
   parseSender,
@@ -443,6 +446,7 @@ export async function POST(request: Request) {
           ocr_status: attachmentRow.ocr_status,
           ocr_text: attachmentRow.ocr_text,
           ocr_model: attachmentRow.ocr_model,
+          ocr_error: attachmentRow.ocr_error,
         },
         { onConflict: 'provider_attachment_id' }
       )
