@@ -4,6 +4,7 @@ import {
   archiveTeamMemberAction,
   bulkUpsertEmployeeRosterAction,
   deleteEmployeeRosterEntryAction,
+  replaceTherapistRosterAction,
   saveTeamQuickEditAction,
   upsertEmployeeRosterEntryAction,
 } from '@/app/team/actions'
@@ -85,6 +86,11 @@ function getTeamFeedback(params?: TeamSearchParams): {
     const suffix = count ? ` (${count} rows)` : ''
     return { message: `Employee roster bulk import saved.${suffix}`, variant: 'success' }
   }
+  if (success === 'therapist_roster_replaced') {
+    const count = getSearchParam(params?.roster_bulk_count) ?? ''
+    const suffix = count ? ` (${count} therapists)` : ''
+    return { message: `Therapist roster replaced.${suffix}`, variant: 'success' }
+  }
 
   if (error === 'missing_profile') {
     return { message: 'Could not find that team member.', variant: 'error' }
@@ -153,6 +159,22 @@ function getTeamFeedback(params?: TeamSearchParams): {
   }
   if (error === 'roster_bulk_save_failed') {
     return { message: 'Bulk import could not be saved. Try again.', variant: 'error' }
+  }
+  if (error === 'therapist_roster_invalid') {
+    const line = getSearchParam(params?.bulk_line)
+    return {
+      message: `Therapist roster source failed${line ? ` on line ${line}` : ''}. Check the roster format and phone numbers.`,
+      variant: 'error',
+    }
+  }
+  if (error === 'therapist_roster_empty') {
+    return { message: 'Therapist roster source did not include any therapists.', variant: 'error' }
+  }
+  if (error === 'therapist_roster_replace_failed') {
+    return {
+      message: 'Could not replace the therapist roster. Please try again.',
+      variant: 'error',
+    }
   }
 
   return null
@@ -259,6 +281,7 @@ export default async function TeamPage({
         roster={employeeRoster}
         upsertEmployeeRosterEntryAction={upsertEmployeeRosterEntryAction}
         bulkUpsertEmployeeRosterAction={bulkUpsertEmployeeRosterAction}
+        replaceTherapistRosterAction={replaceTherapistRosterAction}
         deleteEmployeeRosterEntryAction={deleteEmployeeRosterEntryAction}
       />
     </div>
