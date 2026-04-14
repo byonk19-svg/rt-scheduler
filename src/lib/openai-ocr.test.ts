@@ -191,7 +191,7 @@ describe('openai OCR helpers', () => {
         base64: MIN_PNG_BASE64,
       },
       {
-        zoneLabel: 'request_top',
+        zoneLabel: 'request_table',
         label: 'grayscale',
         contentType: 'image/png',
         base64: MIN_PNG_BASE64,

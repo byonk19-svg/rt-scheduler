@@ -2,37 +2,19 @@ import { createCanvas, loadImage, type Canvas } from '@napi-rs/canvas'
 
 export type OcrImageVariant = {
   label: string
-  zoneLabel:
-    | 'full_page'
-    | 'employee_name'
-    | 'header_block'
-    | 'request_top'
-    | 'request_mid'
-    | 'request_bottom'
-    | 'request_table'
+  zoneLabel: 'full_page' | 'employee_name' | 'request_table'
   contentType: 'image/png'
   base64: string
 }
 
-const DEFAULT_VARIANT_THRESHOLD = 176
 const FORM_ZONES: Array<{
-  label:
-    | 'employee_name'
-    | 'header_block'
-    | 'request_top'
-    | 'request_mid'
-    | 'request_bottom'
-    | 'request_table'
+  label: 'employee_name' | 'request_table'
   x: number
   y: number
   width: number
   height: number
 }> = [
   { label: 'employee_name', x: 0.08, y: 0.08, width: 0.84, height: 0.13 },
-  { label: 'header_block', x: 0.18, y: 0.06, width: 0.7, height: 0.22 },
-  { label: 'request_top', x: 0.08, y: 0.24, width: 0.84, height: 0.16 },
-  { label: 'request_mid', x: 0.08, y: 0.41, width: 0.84, height: 0.16 },
-  { label: 'request_bottom', x: 0.08, y: 0.58, width: 0.84, height: 0.16 },
   { label: 'request_table', x: 0.22, y: 0.39, width: 0.72, height: 0.5 },
 ]
 
@@ -157,13 +139,6 @@ export async function createOcrImageVariants(pageBuffer: Buffer): Promise<OcrIma
     contrast: 1.45,
     brightness: 1.05,
   })
-  const fullPageThreshold = applyContrastVariant(baseCanvas, {
-    grayscale: true,
-    contrast: 1.75,
-    brightness: 1.08,
-    threshold: DEFAULT_VARIANT_THRESHOLD,
-  })
-
   variants.push({
     label: 'original',
     zoneLabel: 'full_page',
@@ -176,25 +151,12 @@ export async function createOcrImageVariants(pageBuffer: Buffer): Promise<OcrIma
     contentType: 'image/png',
     base64: toPngBase64(fullPageGrayscale),
   })
-  variants.push({
-    label: 'threshold',
-    zoneLabel: 'full_page',
-    contentType: 'image/png',
-    base64: toPngBase64(fullPageThreshold),
-  })
-
   for (const zone of FORM_ZONES) {
     const zoneCanvas = cropZoneCanvas(baseCanvas, zone)
     const grayscale = applyContrastVariant(zoneCanvas, {
       grayscale: true,
       contrast: 1.65,
       brightness: 1.08,
-    })
-    const thresholded = applyContrastVariant(zoneCanvas, {
-      grayscale: true,
-      contrast: 1.9,
-      brightness: 1.1,
-      threshold: DEFAULT_VARIANT_THRESHOLD,
     })
 
     variants.push(
@@ -209,12 +171,6 @@ export async function createOcrImageVariants(pageBuffer: Buffer): Promise<OcrIma
         zoneLabel: zone.label,
         contentType: 'image/png',
         base64: toPngBase64(grayscale),
-      },
-      {
-        label: 'threshold',
-        zoneLabel: zone.label,
-        contentType: 'image/png',
-        base64: toPngBase64(thresholded),
       }
     )
   }
