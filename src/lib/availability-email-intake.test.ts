@@ -131,6 +131,23 @@ describe('parseAvailabilityEmailItem', () => {
       confidenceReasons: expect.arrayContaining(['employee_match_ambiguous']),
     })
   })
+
+  it('ignores forwarded email header lines in body text', () => {
+    expect(
+      parseAvailabilityEmailItem({
+        sourceType: 'body',
+        sourceLabel: 'Email body',
+        rawText:
+          'work>Sent: Monday, April 13, 2026 at 02:53:53 PM CDTSubject:\nFrom: byonkin19@yahoo.com',
+        cycles,
+        profiles,
+      })
+    ).toMatchObject({
+      parseStatus: 'failed',
+      requests: [],
+      extractedEmployeeName: null,
+    })
+  })
 })
 
 describe('summarizeAvailabilityEmailBatch', () => {

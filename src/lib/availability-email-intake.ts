@@ -221,6 +221,14 @@ function splitIntoCandidateLines(text: string): string[] {
     .filter((line) => line.length > 0)
 }
 
+function shouldIgnoreCandidateLine(line: string): boolean {
+  return (
+    /\b(?:from|to|sent|subject|cc)\s*:/i.test(line) ||
+    /teamwise\.work/i.test(line) ||
+    /mailto:/i.test(line)
+  )
+}
+
 function classifyOverrideType(line: string): AvailabilityOverrideType | null {
   if (OFF_PATTERNS.some((pattern) => pattern.test(line))) return 'force_off'
   if (WORK_PATTERNS.some((pattern) => pattern.test(line))) return 'force_on'
@@ -461,6 +469,10 @@ export function parseAvailabilityEmail(
   const unresolvedLines: string[] = []
 
   for (const rawLine of lines) {
+    if (shouldIgnoreCandidateLine(rawLine)) {
+      continue
+    }
+
     const segments = splitLineIntoIntentSegments(rawLine)
     if (segments.length === 0) {
       const overrideType = classifyOverrideType(rawLine)
