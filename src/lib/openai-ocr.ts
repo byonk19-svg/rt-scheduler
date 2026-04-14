@@ -1,7 +1,8 @@
-import { DOMMatrix, ImageData, Path2D, createCanvas } from '@napi-rs/canvas'
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import { renderPdfToPngPages } from '@/lib/pdf-render-pages'
 
 const DEFAULT_OCR_MODEL = 'gpt-4.1-mini'
+
+const NO_TEXT_SKIP_MESSAGE = 'No readable scheduling text detected.'
 
 const IMAGE_CONTENT_TYPES = new Set([
   'image/png',
@@ -17,11 +18,6 @@ export type OcrResult = {
   text: string | null
   model: string | null
   error: string | null
-}
-
-type RenderedPdfImage = {
-  contentType: 'image/png'
-  base64: string
 }
 
 export function isOcrSupportedContentType(contentType: string | null | undefined): boolean {
@@ -53,59 +49,6 @@ function sanitizeOcrText(value: string): string {
     .replace(/\r/g, '')
     .replace(/[ \t]+\n/g, '\n')
     .trim()
-}
-
-function installPdfCanvasPolyfills() {
-  const canvasGlobals = globalThis as Record<string, unknown>
-
-  canvasGlobals.DOMMatrix ??= DOMMatrix
-  canvasGlobals.ImageData ??= ImageData
-  canvasGlobals.Path2D ??= Path2D
-}
-
-export async function renderPdfToImages(params: {
-  contentBase64: string
-}): Promise<RenderedPdfImage[]> {
-  installPdfCanvasPolyfills()
-
-  const data = Uint8Array.from(Buffer.from(params.contentBase64, 'base64'))
-  const loadingTask = getDocument({
-    data,
-    disableWorker: true,
-    useSystemFonts: false,
-  } as never)
-  const pdf = await loadingTask.promise
-  const images: RenderedPdfImage[] = []
-
-  try {
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-      const page = await pdf.getPage(pageNumber)
-      const viewport = page.getViewport({ scale: 2 })
-      const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height))
-      const context = canvas.getContext('2d')
-
-      if (!context) {
-        throw new Error(`Canvas context unavailable for PDF page ${pageNumber}.`)
-      }
-
-      await page.render({
-        canvasContext: context as never,
-        viewport,
-      } as never).promise
-
-      images.push({
-        contentType: 'image/png',
-        base64: canvas.toBuffer('image/png').toString('base64'),
-      })
-
-      page.cleanup()
-    }
-  } finally {
-    pdf.cleanup()
-    await loadingTask.destroy()
-  }
-
-  return images
 }
 
 export async function extractTextFromImageAttachment(params: {
@@ -177,7 +120,7 @@ export async function extractTextFromImageAttachment(params: {
       status: 'skipped',
       text: null,
       model: config.model,
-      error: 'No readable scheduling text detected.',
+      error: NO_TEXT_SKIP_MESSAGE,
     }
   }
 
@@ -189,8 +132,8 @@ export async function extractTextFromImageAttachment(params: {
   }
 }
 
-export async function extractTextFromPdfAttachment(params: {
-  contentBase64: string | null
+async function extractTextFromPdfViaInputFile(params: {
+  contentBase64: string
   contentType: string | null
   filename: string
 }): Promise<OcrResult> {
@@ -201,15 +144,6 @@ export async function extractTextFromPdfAttachment(params: {
       text: null,
       model: null,
       error: 'OPENAI_API_KEY not configured.',
-    }
-  }
-
-  if (!params.contentBase64 || !isPdfContentType(params.contentType)) {
-    return {
-      status: 'skipped',
-      text: null,
-      model: null,
-      error: 'Attachment type is not supported for PDF extraction.',
     }
   }
 
@@ -254,48 +188,11 @@ export async function extractTextFromPdfAttachment(params: {
   const outputText = sanitizeOcrText(payload.output_text ?? '')
 
   if (!outputText || outputText === 'NO_TEXT') {
-    try {
-      const pageImages = await renderPdfToImages({
-        contentBase64: params.contentBase64,
-      })
-      const pageTexts: string[] = []
-
-      for (const [index, image] of pageImages.entries()) {
-        const imageResult = await extractTextFromImageAttachment({
-          contentBase64: image.base64,
-          contentType: image.contentType,
-          filename: `${params.filename}-page-${index + 1}.png`,
-        })
-
-        if (imageResult.text) {
-          pageTexts.push(`--- PAGE ${index + 1} ---\n${imageResult.text}`)
-        }
-      }
-
-      const combinedText = sanitizeOcrText(pageTexts.join('\n\n'))
-      if (combinedText) {
-        return {
-          status: 'completed',
-          text: combinedText,
-          model: config.model,
-          error: null,
-        }
-      }
-    } catch (error) {
-      const details = error instanceof Error ? error.message : 'Unknown PDF render failure.'
-      return {
-        status: 'failed',
-        text: null,
-        model: config.model,
-        error: `PDF OCR fallback failed: ${details}`,
-      }
-    }
-
     return {
-      status: 'failed',
+      status: 'skipped',
       text: null,
       model: config.model,
-      error: 'No readable scheduling text detected.',
+      error: NO_TEXT_SKIP_MESSAGE,
     }
   }
 
@@ -305,6 +202,131 @@ export async function extractTextFromPdfAttachment(params: {
     model: config.model,
     error: null,
   }
+}
+
+async function extractTextFromPdfViaRenderedPages(params: {
+  contentBase64: string
+  contentType: string | null
+  filename: string
+}): Promise<OcrResult> {
+  const config = getOpenAiOcrConfig()
+  if (!config.enabled) {
+    return {
+      status: 'skipped',
+      text: null,
+      model: null,
+      error: 'OPENAI_API_KEY not configured.',
+    }
+  }
+
+  let buffers: Buffer[]
+  try {
+    buffers = await renderPdfToPngPages(params.contentBase64)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return {
+      status: 'failed',
+      text: null,
+      model: null,
+      error: `Could not rasterize PDF for OCR: ${message}`,
+    }
+  }
+
+  if (buffers.length === 0) {
+    return {
+      status: 'failed',
+      text: null,
+      model: null,
+      error: 'PDF contained no pages to OCR.',
+    }
+  }
+
+  const segments: string[] = []
+  let lastModel: string | null = null
+  const pageErrors: string[] = []
+
+  for (let i = 0; i < buffers.length; i++) {
+    const pageBuffer = buffers[i]!
+    const pageResult = await extractTextFromImageAttachment({
+      contentBase64: pageBuffer.toString('base64'),
+      contentType: 'image/png',
+      filename: `${params.filename}#page-${i + 1}`,
+    })
+
+    if (pageResult.model) {
+      lastModel = pageResult.model
+    }
+
+    if (pageResult.status === 'completed' && pageResult.text) {
+      segments.push(`--- Page ${i + 1} ---\n${pageResult.text}`)
+    } else if (pageResult.error) {
+      pageErrors.push(`page ${i + 1}: ${pageResult.error}`)
+    }
+  }
+
+  const combined = segments.join('\n\n').trim()
+  if (!combined) {
+    return {
+      status: 'failed',
+      text: null,
+      model: lastModel,
+      error:
+        pageErrors.length > 0
+          ? `All pages failed OCR (${pageErrors.join('; ')})`
+          : 'Page-image OCR produced no text.',
+    }
+  }
+
+  return {
+    status: 'completed',
+    text: combined,
+    model: lastModel,
+    error: null,
+  }
+}
+
+export async function extractTextFromPdfAttachment(params: {
+  contentBase64: string | null
+  contentType: string | null
+  filename: string
+}): Promise<OcrResult> {
+  if (!params.contentBase64 || !isPdfContentType(params.contentType)) {
+    return {
+      status: 'skipped',
+      text: null,
+      model: null,
+      error: 'Attachment type is not supported for PDF extraction.',
+    }
+  }
+
+  const primary = await extractTextFromPdfViaInputFile({
+    contentBase64: params.contentBase64,
+    contentType: params.contentType,
+    filename: params.filename,
+  })
+
+  if (primary.status === 'skipped' && primary.error === NO_TEXT_SKIP_MESSAGE) {
+    const fallback = await extractTextFromPdfViaRenderedPages({
+      contentBase64: params.contentBase64,
+      contentType: params.contentType,
+      filename: params.filename,
+    })
+
+    if (fallback.status === 'completed' && fallback.text) {
+      return fallback
+    }
+
+    if (fallback.status === 'failed') {
+      return {
+        status: 'failed',
+        text: null,
+        model: fallback.model ?? primary.model,
+        error: `PDF text extraction found nothing; page-image OCR failed: ${fallback.error ?? 'unknown error'}`,
+      }
+    }
+  }
+
+  return primary
 }
 
 export async function extractTextFromAttachment(params: {

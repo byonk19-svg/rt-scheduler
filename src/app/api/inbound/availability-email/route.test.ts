@@ -451,9 +451,7 @@ describe('POST /api/inbound/availability-email', () => {
         return {
           ok: true,
           json: async () => ({
-            output_text: isPdfRequest
-              ? 'NO_TEXT'
-              : 'Employee Name: Brianna Brown\nNeed off Mar 24',
+            output_text: isPdfRequest ? 'NO_TEXT' : 'Employee Name: Brianna Brown\nNeed off Mar 24',
           }),
         }
       }
