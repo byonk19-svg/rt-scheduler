@@ -204,6 +204,10 @@ async function extractTextFromPdfViaInputFile(params: {
   }
 }
 
+/**
+ * When `input_file` PDF extraction finds no text (typical for scanned PDFs),
+ * rasterize each page and run the same image OCR path used for photo uploads.
+ */
 async function extractTextFromPdfViaRenderedPages(params: {
   contentBase64: string
   contentType: string | null

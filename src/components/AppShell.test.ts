@@ -21,9 +21,10 @@ describe('AppShell exported constants', () => {
     expect(APP_SHELL_SIDEBAR_CLASS).toContain('shadow-none')
   })
 
-  it('uses a calmer active nav state without heavy shadow treatment', () => {
-    expect(APP_SHELL_ACTIVE_NAV_CLASS).toContain('bg-sidebar-accent/60')
-    expect(APP_SHELL_ACTIVE_NAV_CLASS).toContain('ring-1')
+  it('uses a high-contrast active nav pill with attention ring for shell wayfinding', () => {
+    expect(APP_SHELL_ACTIVE_NAV_CLASS).toContain('bg-sidebar-accent/85')
+    expect(APP_SHELL_ACTIVE_NAV_CLASS).toContain('ring-2')
+    expect(APP_SHELL_ACTIVE_NAV_CLASS).toContain('ring-sidebar-ring')
     expect(APP_SHELL_ACTIVE_NAV_CLASS).not.toContain('shadow-sm')
   })
 
