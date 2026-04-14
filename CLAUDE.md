@@ -106,6 +106,14 @@ Updated: 2026-04-14 (session 63)
   - Intake review cards now show friendlier confidence-reason labels, parsed-date chips near the detected employee context, an amber **Action needed** accent when matching is incomplete, and stronger CTA hierarchy (`Save matches` primary, `Apply dates` label).
   - Auto-applied items are now collapsed behind a `<details>` summary to reduce review-noise once managers clear queued items.
 
+## Latest Updates (2026-04-14, session 65)
+
+- **Manager availability tabs: Planner vs Email Intake** (`src/app/availability/page.tsx`, `src/components/availability/EmailIntakePanel.tsx`, tests):
+  - `/availability` manager view now uses URL-driven server tabs (`?tab=planner|intake`) with a tab strip directly under `AvailabilityOverviewHeader`.
+  - **Planner** tab renders the existing `ManagerSchedulingInputs` flow (inside `AvailabilityPlannerFocusProvider`), while **Email Intake** tab renders the intake queue in a dedicated full-width context.
+  - Tab links preserve existing query params (cycle/filters/search) while overriding only `tab`, and the Email Intake tab shows a warning-style count badge for pending review items.
+  - `EmailIntakePanel` no longer wraps itself in an outer card shell; it now uses plain header/content containers while keeping inner intake item cards and actions unchanged.
+
 The session entries below are historical context. They may describe local-only or superseded work and should not override the snapshot above.
 
 ## Latest Updates (2026-04-12, session 56)
