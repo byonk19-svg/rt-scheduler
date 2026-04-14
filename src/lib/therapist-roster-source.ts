@@ -27,10 +27,7 @@ function parseTherapistSourceLine(
     return { ok: false, message: 'Expected "Last, First Phone" format.' }
   }
 
-  const lastName = line
-    .slice(0, commaIndex)
-    .trim()
-    .replace(/\s+/g, ' ')
+  const lastName = line.slice(0, commaIndex).trim().replace(/\s+/g, ' ')
   const remainder = line
     .slice(commaIndex + 1)
     .trim()

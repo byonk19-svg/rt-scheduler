@@ -428,10 +428,9 @@ export async function replaceTherapistRosterAction(formData: FormData) {
 
   async function rollbackRosterSnapshot() {
     if (priorSnapshotPayload.length > 0) {
-      const { error: restoreError } = await supabase.from('employee_roster').upsert(
-        priorSnapshotPayload,
-        { onConflict: 'normalized_full_name' }
-      )
+      const { error: restoreError } = await supabase
+        .from('employee_roster')
+        .upsert(priorSnapshotPayload, { onConflict: 'normalized_full_name' })
 
       if (restoreError) {
         console.error('Failed to restore prior therapist roster snapshot:', restoreError)
@@ -498,7 +497,9 @@ export async function replaceTherapistRosterAction(formData: FormData) {
           String((row as { normalized_full_name?: string }).normalized_full_name ?? '')
         )
       )
-      .map((row) => String((row as { matched_profile_id?: string | null }).matched_profile_id ?? ''))
+      .map((row) =>
+        String((row as { matched_profile_id?: string | null }).matched_profile_id ?? '')
+      )
       .filter((id) => id.length > 0)
   )
 
@@ -510,7 +511,9 @@ export async function replaceTherapistRosterAction(formData: FormData) {
             String((row as { normalized_full_name?: string }).normalized_full_name ?? '')
           )
       )
-      .map((row) => String((row as { matched_profile_id?: string | null }).matched_profile_id ?? ''))
+      .map((row) =>
+        String((row as { matched_profile_id?: string | null }).matched_profile_id ?? '')
+      )
       .filter((id) => id.length > 0 && !preservedLinkedProfileIds.has(id))
   )
 

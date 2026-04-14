@@ -171,7 +171,10 @@ function getTeamFeedback(params?: TeamSearchParams): {
     return { message: 'Therapist roster source did not include any therapists.', variant: 'error' }
   }
   if (error === 'therapist_roster_replace_failed') {
-    return { message: 'Could not replace the therapist roster. Please try again.', variant: 'error' }
+    return {
+      message: 'Could not replace the therapist roster. Please try again.',
+      variant: 'error',
+    }
   }
 
   return null

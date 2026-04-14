@@ -170,7 +170,7 @@ function createSupabaseMock(context: TestContext = {}) {
               })
               return Promise.resolve(
                 resolve({
-                  error: table === 'profiles' ? context.profileArchiveError ?? null : null,
+                  error: table === 'profiles' ? (context.profileArchiveError ?? null) : null,
                 })
               )
             },
@@ -208,7 +208,7 @@ function createSupabaseMock(context: TestContext = {}) {
                 resolve({
                   error:
                     table === 'employee_roster' && state.employeeRosterDeleteCalls === 1
-                      ? context.employeeRosterDeleteError ?? null
+                      ? (context.employeeRosterDeleteError ?? null)
                       : null,
                 })
               )
@@ -223,7 +223,7 @@ function createSupabaseMock(context: TestContext = {}) {
         ) {
           state.upserts.push({ table, payload, options })
           return Promise.resolve({
-            error: table === 'employee_roster' ? context.employeeRosterUpsertError ?? null : null,
+            error: table === 'employee_roster' ? (context.employeeRosterUpsertError ?? null) : null,
           })
         },
       }

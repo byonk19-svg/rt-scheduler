@@ -157,10 +157,7 @@ export function EmployeeRosterPanel({
         </div>
       </form>
 
-      <form
-        action={replaceTherapistRosterAction}
-        className="mt-4 grid gap-2 rounded-xl border p-4"
-      >
+      <form action={replaceTherapistRosterAction} className="mt-4 grid gap-2 rounded-xl border p-4">
         <div className="grid gap-1.5">
           <Label htmlFor="therapist-roster-source">Therapist roster replacement</Label>
           <textarea

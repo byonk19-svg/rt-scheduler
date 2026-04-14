@@ -18,7 +18,9 @@ describe('employee roster signup fallback migration contract', () => {
 
     const sql = readFileSync(migrationPath, 'utf8')
 
-    expect(sql).toMatch(/alter table public\.employee_roster\s+add column if not exists phone_number text;/i)
+    expect(sql).toMatch(
+      /alter table public\.employee_roster\s+add column if not exists phone_number text;/i
+    )
     expect(sql).toMatch(/create or replace function public\.handle_new_user\(\)/i)
     expect(sql).toMatch(
       /coalesce\s*\(\s*nullif\(new\.raw_user_meta_data->>'phone_number', ''\)\s*,\s*roster_match\.phone_number\s*\)/i

@@ -45,8 +45,6 @@ describe('EmployeeRosterPanel', () => {
 describe('Team page source contract', () => {
   it('wires the therapist roster replacement action through the employee roster panel', () => {
     expect(teamPageSource).toContain('replaceTherapistRosterAction')
-    expect(teamPageSource).toContain(
-      'replaceTherapistRosterAction={replaceTherapistRosterAction}'
-    )
+    expect(teamPageSource).toContain('replaceTherapistRosterAction={replaceTherapistRosterAction}')
   })
 })
