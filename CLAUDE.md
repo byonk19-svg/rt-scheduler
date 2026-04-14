@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-14 (session 66)
+Updated: 2026-04-14 (session 67)
 
 ## Handoff Snapshot
 
@@ -14,6 +14,7 @@ Updated: 2026-04-14 (session 66)
   - inbound email webhook
   - manager-created manual intake from pasted text
   - uploaded form image/PDF on `/availability`
+- OCR'd PTO REQUEST/EDIT FORM text is now detected and parsed by a dedicated form parser (`src/lib/pto-form-parser.ts`). Bare dates default to `force_off`; WORK/working rows become `force_on`; date ranges are expanded day-by-day. The generic line parser is bypassed for form text.
 - Uploaded images can OCR through the OpenAI Responses API when `OPENAI_API_KEY` is configured. PDFs now try direct PDF extraction first, then render pages to images and retry OCR when direct extraction returns no text using stronger preprocessing and fixed-form-like region prompts.
 - Production now successfully OCRs and parses the photographed PTO form example (`IMG_0262.jpeg`): employee name is extracted, therapist matching succeeds, and PTO rows parse into structured requests. The item remains `needs_review` only when schedule-cycle matching is missing (for example OCR dates from 2024 against current cycles).
 - The production pipeline is now instrumented enough to distinguish delivery failures, render failures, and OCR failures in `availability_email_intake_items.ocr_error`.
@@ -105,6 +106,21 @@ Updated: 2026-04-14 (session 66)
   - Added explicit `reparseEmailIntakeAction` and `deleteEmailIntakeAction` exports (with backward-compatible aliases), then wired row-level **Reparse** and **Delete** controls to those actions.
   - Intake review cards now show friendlier confidence-reason labels, parsed-date chips near the detected employee context, an amber **Action needed** accent when matching is incomplete, and stronger CTA hierarchy (`Save matches` primary, `Apply dates` label).
   - Auto-applied items are now collapsed behind a `<details>` summary to reduce review-noise once managers clear queued items.
+
+## Latest Updates (2026-04-14, session 67)
+
+- **PTO request form parser** (`src/lib/pto-form-parser.ts`, `src/lib/availability-email-intake.ts`, `src/lib/pto-form-parser.test.ts`):
+  - New `isPtoFormText()` detects the PTO REQUEST/EDIT FORM scaffold by title or `Employee Name:` + `Employee Signature:` headers.
+  - New `parsePtoForm()` replaces the generic line parser for form text, returning the same `ParsedAvailabilityEmail` shape.
+  - `parseAvailabilityEmail` now checks `isPtoFormText` first and delegates — zero changes to non-form email parsing.
+  - Bare dates inside a form default to `force_off`; rows containing `WORK`, `working`, `back to work`, or `will work` become `force_on`.
+  - Full date-range expansion engine: `M/D–M/D`, `thru`/`through`, cross-month `Month D – Month D`, compact within-month `Month D-D`, and dash-separated compound lists like `May 10th - May 23-26th - May 29-31st` (Audbriana pattern).
+  - `Employee Signature:` line and the `Date:` immediately following it are stripped so they never become fake availability requests.
+  - Table header rows, `Department:`, `Kronos Number:` lines are silently skipped.
+  - `will work rest of week` trailing clauses stripped; explicit off dates still parse.
+  - Weekday-recurrence phrases without calendar dates (`off Tuesdays + Wednesdays`) go to `unresolvedLines`.
+  - 41 unit tests covering all sample-form patterns from the real employee forms.
+  - Merged directly to `main`.
 
 ## Latest Updates (2026-04-14, session 66)
 
