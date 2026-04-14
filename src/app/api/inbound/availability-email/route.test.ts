@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { createAdminClientMock, isValidResendWebhookRequestMock } = vi.hoisted(() => ({
+const { createAdminClientMock, isValidResendWebhookRequestMock, afterMock } = vi.hoisted(() => ({
   createAdminClientMock: vi.fn(),
   isValidResendWebhookRequestMock: vi.fn(async () => true),
+  afterMock: vi.fn(async (callback: () => Promise<void> | void) => {
+    await callback()
+  }),
 }))
 
 vi.mock('@/lib/supabase/admin', () => ({
@@ -12,6 +15,14 @@ vi.mock('@/lib/supabase/admin', () => ({
 vi.mock('@/lib/security/resend-webhook', () => ({
   isValidResendWebhookRequest: isValidResendWebhookRequestMock,
 }))
+
+vi.mock('next/server', async () => {
+  const actual = await vi.importActual<typeof import('next/server')>('next/server')
+  return {
+    ...actual,
+    after: afterMock,
+  }
+})
 
 import { POST } from '@/app/api/inbound/availability-email/route'
 
@@ -144,11 +155,19 @@ function createWebhookRequest(emailId = 'email-1') {
   })
 }
 
+async function waitForAfterWork() {
+  const backgroundWork = afterMock.mock.results.at(-1)?.value
+  if (backgroundWork && typeof backgroundWork.then === 'function') {
+    await backgroundWork
+  }
+}
+
 describe('POST /api/inbound/availability-email', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     process.env.RESEND_API_KEY = 'resend-test'
     process.env.OPENAI_API_KEY = 'openai-test'
+    afterMock.mockClear()
   })
 
   it('creates batch items and auto-applies only high-confidence sources', async () => {
@@ -221,10 +240,11 @@ describe('POST /api/inbound/availability-email', () => {
     expect(response.status).toBe(200)
     expect(payload).toMatchObject({
       ok: true,
-      intake_id: 'intake-1',
-      parse_status: 'needs_review',
-      item_count: 2,
+      queued: true,
+      email_id: 'email-1',
     })
+    expect(afterMock).toHaveBeenCalledOnce()
+    await waitForAfterWork()
     expect(admin.state.intakeUpserts[0]).toMatchObject({
       item_count: 2,
       auto_applied_count: 1,
@@ -304,8 +324,10 @@ describe('POST /api/inbound/availability-email', () => {
     expect(response.status).toBe(200)
     expect(payload).toMatchObject({
       ok: true,
-      item_count: 2,
+      queued: true,
+      email_id: 'email-1',
     })
+    await waitForAfterWork()
     expect(admin.state.overrideUpserts[0]).toEqual([
       expect.objectContaining({
         therapist_id: 'therapist-1',
@@ -388,8 +410,10 @@ describe('POST /api/inbound/availability-email', () => {
     expect(response.status).toBe(200)
     expect(payload).toMatchObject({
       ok: true,
-      item_count: 2,
+      queued: true,
+      email_id: 'email-1',
     })
+    await waitForAfterWork()
     expect(admin.state.intakeUpserts[0]).toMatchObject({
       failed_count: 1,
       auto_applied_count: 1,
@@ -466,9 +490,10 @@ describe('POST /api/inbound/availability-email', () => {
     expect(response.status).toBe(200)
     expect(payload).toMatchObject({
       ok: true,
-      parse_status: 'applied',
-      item_count: 1,
+      queued: true,
+      email_id: 'email-1',
     })
+    await waitForAfterWork()
     expect(admin.state.intakeUpserts[0]).toMatchObject({
       auto_applied_count: 1,
       needs_review_count: 0,
@@ -552,9 +577,10 @@ describe('POST /api/inbound/availability-email', () => {
     expect(response.status).toBe(200)
     expect(payload).toMatchObject({
       ok: true,
-      parse_status: 'needs_review',
-      item_count: 1,
+      queued: true,
+      email_id: 'email-1',
     })
+    await waitForAfterWork()
     expect(admin.state.itemInserts[0]?.[0]).toMatchObject({
       source_label: 'scan.pdf',
       ocr_status: 'failed',
