@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-14 (session 63)
+Updated: 2026-04-14 (session 66)
 
 ## Handoff Snapshot
 
@@ -34,14 +34,14 @@ Updated: 2026-04-14 (session 63)
 
 ### Local In-Progress Work
 
-- `main` includes the merged email-intake apply gating fix from PR `#27` and the **therapist-first luminous homepage** (replaces the older `codex/therapist-homepage-redesign` intent; that branch may be deleted when convenient).
+- `main` includes the merged email-intake apply gating fix from PR `#27`, the **therapist-first luminous homepage**, and the **availability manager UI redesign** (session 66).
 - `claude/review-ui-flow-7Weav` has the **top nav redesign** (session 55) — sidebar replaced with a fixed horizontal top nav. Needs review and merge to `main` before deploying.
 
 ### Where We Want To Go
 
 1. **Coverage grid redesign** — Stitch explorations in session 56 converged on a swimlane grid (therapist rows × date columns) that mirrors the physical paper schedule managers already use. Target aesthetic: mostly white grid, color only for exceptions (FMLA = soft red, missing lead = amber flag, scheduled = small teal dot or plain "1"). When a final Stitch frame is approved, implement it in `src/components/coverage/CalendarGrid.tsx` and `CoverageClientPage.tsx`.
 2. Merge `claude/review-ui-flow-7Weav` (top nav) into `main` and deploy to production.
-3. Move `Email Intake` higher on `/availability` and make the review/apply workflow more obvious.
+3. Add a **"Send reminders"** bulk action to the response roster on `/availability` — 24 unresponded therapists with no in-app nudge is the main operational gap.
 4. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
 5. Deploy production after significant public-surface changes (`vercel deploy --prod`) so `www.teamwise.work` matches `main`.
 6. Keep manual intake first-class even if Resend inbound is healthy. It is the practical fallback path for operations.
@@ -105,6 +105,15 @@ Updated: 2026-04-14 (session 63)
   - Added explicit `reparseEmailIntakeAction` and `deleteEmailIntakeAction` exports (with backward-compatible aliases), then wired row-level **Reparse** and **Delete** controls to those actions.
   - Intake review cards now show friendlier confidence-reason labels, parsed-date chips near the detected employee context, an amber **Action needed** accent when matching is incomplete, and stronger CTA hierarchy (`Save matches` primary, `Apply dates` label).
   - Auto-applied items are now collapsed behind a `<details>` summary to reduce review-noise once managers clear queued items.
+
+## Latest Updates (2026-04-14, session 66)
+
+- **Availability manager UI redesign** (`src/app/availability/page.tsx`, `src/components/availability/AvailabilityOverviewHeader.tsx`, `src/components/availability/AvailabilityStatusSummary.tsx`, `src/components/availability/ManagerSchedulingInputs.tsx`):
+  - **Tab strip** replaced the underline-tab pattern with a pill/segmented control in a rounded muted container; the active tab lifts to a white card with a subtle shadow.
+  - **Response roster progress bar** added to `AvailabilityStatusSummary`: submitted/total counter in the heading row and a thin green progress bar below it. Therapist rows compacted (smaller avatar, tighter padding, `xs` font) so more names are visible without scrolling.
+  - **Header stats fixed:** `responseRatio` was populated only for managers but the display condition was `!canManageAvailability` — a bug meaning it was never shown to anyone. Condition corrected to show whenever non-null. Stat line also updated: bold number + plain label instead of a heavy chip.
+  - **Planner controls tightened:** `space-y-5` → `space-y-4`, select height `h-10` → `h-9`, therapist info de-nested from a bordered card into inline badges + caption, mode toggle made full-width so "Will work / Cannot work" are equal-size targets.
+- **Branch hygiene:** `claude/add-recommendations-2mmP4` merged to `main` via fast-forward and local branch deleted.
 
 ## Latest Updates (2026-04-14, session 65)
 
