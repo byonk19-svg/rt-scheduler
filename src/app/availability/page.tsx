@@ -9,10 +9,10 @@ import {
 import {
   applyEmailAvailabilityImportAction,
   copyAvailabilityFromPreviousCycleAction,
-  deleteAvailabilityEmailIntakeAction,
+  deleteEmailIntakeAction,
   deleteAvailabilityEntryAction,
   deleteManagerPlannerDateAction,
-  reparseAvailabilityEmailIntakeAction,
+  reparseEmailIntakeAction,
   saveManagerPlannerDatesAction,
   submitTherapistAvailabilityGridAction,
   updateEmailIntakeTherapistAction,
@@ -120,6 +120,7 @@ type AvailabilityEmailIntakeItemRow = {
   extracted_employee_name: string | null
   matched_therapist_id: string | null
   matched_cycle_id: string | null
+  raw_text: string | null
   parsed_requests: Array<{
     date: string
     override_type: 'force_off' | 'force_on'
@@ -443,7 +444,7 @@ export default async function AvailabilityPage({
       ? await supabase
           .from('availability_email_intake_items')
           .select(
-            'id, intake_id, source_type, source_label, parse_status, confidence_level, confidence_reasons, extracted_employee_name, matched_therapist_id, matched_cycle_id, parsed_requests, profiles!availability_email_intake_items_matched_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
+            'id, intake_id, source_type, source_label, parse_status, confidence_level, confidence_reasons, extracted_employee_name, matched_therapist_id, matched_cycle_id, raw_text, parsed_requests, profiles!availability_email_intake_items_matched_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
           )
           .in('intake_id', emailIntakeIds)
       : { data: [] }
@@ -510,6 +511,7 @@ export default async function AvailabilityPage({
             matchedCycleLabel: matchedCycle
               ? `${matchedCycle.label} (${matchedCycle.start_date} to ${matchedCycle.end_date})`
               : null,
+            rawText: item.raw_text,
             parsedRequests: Array.isArray(item.parsed_requests) ? item.parsed_requests : [],
           }
         }),
@@ -534,6 +536,7 @@ export default async function AvailabilityPage({
             matchedCycleLabel: matchedCycle
               ? `${matchedCycle.label} (${matchedCycle.start_date} to ${matchedCycle.end_date})`
               : null,
+            rawText: item.raw_text,
             parsedRequests: Array.isArray(item.parsed_requests) ? item.parsed_requests : [],
           }
         }),
@@ -630,8 +633,8 @@ export default async function AvailabilityPage({
     <EmailIntakePanel
       rows={emailIntakeRows}
       applyEmailAvailabilityImportAction={applyEmailAvailabilityImportAction}
-      deleteAvailabilityEmailIntakeAction={deleteAvailabilityEmailIntakeAction}
-      reparseAvailabilityEmailIntakeAction={reparseAvailabilityEmailIntakeAction}
+      deleteEmailIntakeAction={deleteEmailIntakeAction}
+      reparseEmailIntakeAction={reparseEmailIntakeAction}
       updateEmailIntakeTherapistAction={updateEmailIntakeTherapistAction}
       therapistOptions={plannerTherapists.map((therapist) => ({
         id: therapist.id,
@@ -727,6 +730,7 @@ export default async function AvailabilityPage({
         <AvailabilityPlannerFocusProvider
           initialFocusedTherapistName={plannerTherapistNameForDefault}
         >
+          {emailIntakePanel}
           <ManagerSchedulingInputs
             cycles={cycles}
             therapists={plannerTherapists}
@@ -740,7 +744,6 @@ export default async function AvailabilityPage({
             copyAvailabilityFromPreviousCycleAction={copyAvailabilityFromPreviousCycleAction}
             reviewRequestsPanel={entriesCard}
           />
-          {emailIntakePanel}
         </AvailabilityPlannerFocusProvider>
       ) : (
         <>

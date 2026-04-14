@@ -97,6 +97,15 @@ Updated: 2026-04-14 (session 63)
   - Fixed the rendered-PDF fallback so `request_table`-only OCR results are no longer mislabeled as `Employee Name: ...`.
   - Added regressions for both the request-table-only bug and the employee-name-plus-request-table merge path.
 
+## Latest Updates (2026-04-14, session 64)
+
+- **Availability intake triage UX polish + operator controls** (`src/app/availability/page.tsx`, `src/app/availability/actions.ts`, `src/components/availability/EmailIntakePanel.tsx`, tests):
+  - `/availability` now renders **Email Intake above planner inputs** so managers hit inbound triage first.
+  - Intake item rows now carry stored `raw_text` into the panel and expose a per-item **Show source text** details view for faster manual rescue.
+  - Added explicit `reparseEmailIntakeAction` and `deleteEmailIntakeAction` exports (with backward-compatible aliases), then wired row-level **Reparse** and **Delete** controls to those actions.
+  - Intake review cards now show friendlier confidence-reason labels, parsed-date chips near the detected employee context, an amber **Action needed** accent when matching is incomplete, and stronger CTA hierarchy (`Save matches` primary, `Apply dates` label).
+  - Auto-applied items are now collapsed behind a `<details>` summary to reduce review-noise once managers clear queued items.
+
 The session entries below are historical context. They may describe local-only or superseded work and should not override the snapshot above.
 
 ## Latest Updates (2026-04-12, session 56)

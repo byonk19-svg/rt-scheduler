@@ -861,7 +861,7 @@ export async function updateEmailIntakeTherapistAction(formData: FormData) {
   redirect(buildAvailabilityUrl({ success: 'email_intake_match_saved' }))
 }
 
-export async function reparseAvailabilityEmailIntakeAction(formData: FormData) {
+export async function reparseEmailIntakeAction(formData: FormData) {
   const { supabase, role } = await getAuthenticatedUserWithRole()
 
   if (!can(role, 'access_manager_ui')) {
@@ -1025,7 +1025,7 @@ export async function reparseAvailabilityEmailIntakeAction(formData: FormData) {
   redirect(buildAvailabilityUrl({ success: 'email_intake_reparsed' }))
 }
 
-export async function deleteAvailabilityEmailIntakeAction(formData: FormData) {
+export async function deleteEmailIntakeAction(formData: FormData) {
   const { supabase, role } = await getAuthenticatedUserWithRole()
 
   if (!can(role, 'access_manager_ui')) {
@@ -1047,6 +1047,10 @@ export async function deleteAvailabilityEmailIntakeAction(formData: FormData) {
   revalidatePath('/availability')
   redirect(buildAvailabilityUrl({ success: 'email_intake_deleted' }))
 }
+
+// Backward-compatible aliases for existing imports.
+export const reparseAvailabilityEmailIntakeAction = reparseEmailIntakeAction
+export const deleteAvailabilityEmailIntakeAction = deleteEmailIntakeAction
 
 export async function copyAvailabilityFromPreviousCycleAction(formData: FormData) {
   const { supabase, user, role } = await getAuthenticatedUserWithRole()

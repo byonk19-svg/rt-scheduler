@@ -37,6 +37,7 @@ const baseRow = {
       matchedTherapistName: null,
       matchedCycleId: null,
       matchedCycleLabel: null,
+      rawText: '03/24 Need off for appointment',
       parsedRequests: [{ date: '2026-03-24', override_type: 'force_off' as const }],
     },
   ],
@@ -53,6 +54,7 @@ const baseRow = {
       matchedTherapistName: 'Adrienne Solt',
       matchedCycleId: 'cycle-1',
       matchedCycleLabel: 'Critique Cycle (2026-03-17 to 2026-04-27)',
+      rawText: 'Please mark me off on Mar 24.',
       parsedRequests: [{ date: '2026-03-24', override_type: 'force_off' as const }],
     },
   ],
@@ -73,10 +75,10 @@ describe('EmailIntakePanel', () => {
     )
 
     expect(html).toContain('Needs review')
-    expect(html).toContain('Auto-applied recently')
+    expect(html).toContain('auto-applied - show')
     expect(html).toContain('form-1.jpg')
     expect(html).toContain('Email body')
-    expect(html).toContain('employee_match_ambiguous')
+    expect(html).toContain('Name match uncertain')
     expect(html).toContain('Reparse')
     expect(html).toContain('Delete')
     expect(html).toContain('View original email')
@@ -110,7 +112,7 @@ describe('EmailIntakePanel', () => {
       })
     )
 
-    expect(html).toContain('Apply item')
+    expect(html).toContain('Apply dates')
     expect(html).not.toContain('Save matches')
   })
 })

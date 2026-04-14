@@ -1,3 +1,7 @@
+'use client'
+
+import { useState } from 'react'
+
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,6 +19,7 @@ export type EmailIntakePanelItemRow = {
   matchedTherapistName: string | null
   matchedCycleId: string | null
   matchedCycleLabel: string | null
+  rawText?: string | null
   parsedRequests: Array<{
     date: string
     override_type: 'force_off' | 'force_on'
@@ -69,6 +74,32 @@ function formatRequestLabel(request: EmailIntakePanelItemRow['parsedRequests'][n
     ? request.date
     : parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   return `${label} ${request.override_type === 'force_off' ? 'off' : 'work'}`
+}
+
+const CONFIDENCE_REASON_LABELS: Record<string, string> = {
+  employee_name_missing: 'Name not found',
+  employee_match_ambiguous: 'Name match uncertain',
+  cycle_match_missing: 'No schedule block matched',
+  unresolved_lines_present: 'Unresolved text lines',
+  low_request_count: 'Few dates found',
+  name_match_ambiguous: 'Name match uncertain',
+}
+
+const HOW_IT_WORKS_STEPS = [
+  'Forward request emails to your intake inbox',
+  'Review items that still need matching',
+  'Apply confirmed items one source at a time',
+]
+
+function statChipClass(
+  type: 'review' | 'failed' | 'applied' | 'default',
+  count: number
+): string | null {
+  if (count === 0) return null
+  if (type === 'review') return 'border-warning-border bg-warning-subtle text-warning-text'
+  if (type === 'failed') return 'border-destructive/40 bg-destructive/10 text-destructive'
+  if (type === 'applied') return 'border-success-border bg-success-subtle text-success-text'
+  return 'border-border/70'
 }
 
 function hasOriginalEmailContent(row: EmailIntakePanelRow): boolean {
@@ -127,7 +158,7 @@ function renderItemCard(params: {
           <form action={applyEmailAvailabilityImportAction}>
             <input type="hidden" name="item_id" value={item.id} />
             <Button size="sm" type="submit">
-              Apply item
+              Apply dates
             </Button>
           </form>
         ) : null}
@@ -151,73 +182,95 @@ function renderItemCard(params: {
         </span>
       </div>
 
+      {item.parsedRequests.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {item.parsedRequests.map((request) => (
+            <Badge
+              key={`${item.id}-${request.date}-${request.override_type}`}
+              variant="outline"
+              className={
+                request.override_type === 'force_off'
+                  ? 'border-destructive/30 bg-destructive/10 text-destructive'
+                  : 'border-info-border bg-info-subtle text-info-text'
+              }
+            >
+              {formatRequestLabel(request)}
+            </Badge>
+          ))}
+        </div>
+      ) : null}
+
       {item.confidenceReasons.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {item.confidenceReasons.map((reason) => (
             <Badge key={`${item.id}-${reason}`} variant="outline">
-              {reason}
+              {CONFIDENCE_REASON_LABELS[reason] ?? reason}
             </Badge>
           ))}
         </div>
       ) : null}
 
       {(!item.matchedTherapistId || !item.matchedCycleId) && item.parseStatus !== 'auto_applied' ? (
-        <form action={updateEmailIntakeTherapistAction} className="mt-3 flex flex-wrap gap-3">
-          <input type="hidden" name="item_id" value={item.id} />
-          <div className="min-w-60 flex-1 space-y-1">
-            <Label htmlFor={`item_match_${item.id}`}>Match therapist</Label>
-            <select
-              id={`item_match_${item.id}`}
-              name="therapist_id"
-              required
-              defaultValue={item.matchedTherapistId ?? ''}
-              className="border-input bg-[var(--input-background)] focus-visible:border-ring focus-visible:ring-ring/50 h-10 w-full rounded-lg border px-3 py-2 text-sm outline-none focus-visible:ring-[3px]"
-            >
-              <option value="" disabled>
-                Select therapist
-              </option>
-              {therapistOptions.map((option) => (
-                <option key={`${item.id}-${option.id}`} value={option.id}>
-                  {option.fullName}
+        <div className="mt-3 border-l-2 border-warning pl-3">
+          <p className="mb-2 text-xs font-medium text-warning-text">Action needed</p>
+          <form action={updateEmailIntakeTherapistAction} className="flex flex-wrap gap-3">
+            <input type="hidden" name="item_id" value={item.id} />
+            <div className="min-w-60 flex-1 space-y-1">
+              <Label htmlFor={`item_match_${item.id}`}>Match therapist</Label>
+              <select
+                id={`item_match_${item.id}`}
+                name="therapist_id"
+                required
+                defaultValue={item.matchedTherapistId ?? ''}
+                className="border-input bg-[var(--input-background)] focus-visible:border-ring focus-visible:ring-ring/50 h-10 w-full rounded-lg border px-3 py-2 text-sm outline-none focus-visible:ring-[3px]"
+              >
+                <option value="" disabled>
+                  Select therapist
                 </option>
-              ))}
-            </select>
-          </div>
-          <div className="min-w-60 flex-1 space-y-1">
-            <Label htmlFor={`item_cycle_${item.id}`}>Match schedule block</Label>
-            <select
-              id={`item_cycle_${item.id}`}
-              name="cycle_id"
-              required
-              defaultValue={item.matchedCycleId ?? ''}
-              className="border-input bg-[var(--input-background)] focus-visible:border-ring focus-visible:ring-ring/50 h-10 w-full rounded-lg border px-3 py-2 text-sm outline-none focus-visible:ring-[3px]"
-            >
-              <option value="" disabled>
-                Select schedule block
-              </option>
-              {cycleOptions.map((option) => (
-                <option key={`${item.id}-${option.id}`} value={option.id}>
-                  {option.label}
+                {therapistOptions.map((option) => (
+                  <option key={`${item.id}-${option.id}`} value={option.id}>
+                    {option.fullName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="min-w-60 flex-1 space-y-1">
+              <Label htmlFor={`item_cycle_${item.id}`}>Match schedule block</Label>
+              <select
+                id={`item_cycle_${item.id}`}
+                name="cycle_id"
+                required
+                defaultValue={item.matchedCycleId ?? ''}
+                className="border-input bg-[var(--input-background)] focus-visible:border-ring focus-visible:ring-ring/50 h-10 w-full rounded-lg border px-3 py-2 text-sm outline-none focus-visible:ring-[3px]"
+              >
+                <option value="" disabled>
+                  Select schedule block
                 </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-end">
-            <Button size="sm" type="submit" variant="outline">
-              Save matches
-            </Button>
-          </div>
-        </form>
+                {cycleOptions.map((option) => (
+                  <option key={`${item.id}-${option.id}`} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-end">
+              <Button size="sm" type="submit">
+                Save matches
+              </Button>
+            </div>
+          </form>
+        </div>
       ) : null}
 
-      {item.parsedRequests.length > 0 ? (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {item.parsedRequests.map((request) => (
-            <Badge key={`${item.id}-${request.date}-${request.override_type}`} variant="outline">
-              {formatRequestLabel(request)}
-            </Badge>
-          ))}
-        </div>
+      {item.rawText?.trim() ? (
+        <details className="mt-3 rounded-md border border-border/70 bg-background/80">
+          <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-foreground">
+            Show source text
+          </summary>
+          <pre className="max-h-32 overflow-y-auto whitespace-pre-wrap border-t border-border/70 px-3 py-2 text-xs font-mono text-foreground">
+            {item.rawText}
+          </pre>
+        </details>
       ) : null}
     </div>
   )
@@ -226,6 +279,8 @@ function renderItemCard(params: {
 export function EmailIntakePanel({
   rows,
   applyEmailAvailabilityImportAction,
+  deleteEmailIntakeAction,
+  reparseEmailIntakeAction,
   deleteAvailabilityEmailIntakeAction,
   reparseAvailabilityEmailIntakeAction,
   updateEmailIntakeTherapistAction,
@@ -234,12 +289,19 @@ export function EmailIntakePanel({
 }: {
   rows: EmailIntakePanelRow[]
   applyEmailAvailabilityImportAction: (formData: FormData) => void | Promise<void>
-  deleteAvailabilityEmailIntakeAction: (formData: FormData) => void | Promise<void>
-  reparseAvailabilityEmailIntakeAction: (formData: FormData) => void | Promise<void>
+  deleteEmailIntakeAction?: (formData: FormData) => void | Promise<void>
+  reparseEmailIntakeAction?: (formData: FormData) => void | Promise<void>
+  deleteAvailabilityEmailIntakeAction?: (formData: FormData) => void | Promise<void>
+  reparseAvailabilityEmailIntakeAction?: (formData: FormData) => void | Promise<void>
   updateEmailIntakeTherapistAction: (formData: FormData) => void | Promise<void>
   therapistOptions: Array<{ id: string; fullName: string }>
   cycleOptions: Array<{ id: string; label: string }>
 }) {
+  const [showHowItWorks, setShowHowItWorks] = useState(false)
+  const runDeleteEmailIntakeAction = deleteEmailIntakeAction ?? deleteAvailabilityEmailIntakeAction
+  const runReparseEmailIntakeAction =
+    reparseEmailIntakeAction ?? reparseAvailabilityEmailIntakeAction
+
   return (
     <Card className="overflow-hidden">
       <CardHeader className="border-b border-border/70">
@@ -248,25 +310,46 @@ export function EmailIntakePanel({
           Forward staff request emails or forms into your intake inbox. Clear items can be
           auto-applied while unclear items stay in the review queue.
         </CardDescription>
-        <ol className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground">
-          {[
-            'Forward request emails to your intake inbox',
-            'Review items that still need matching',
-            'Apply confirmed items one source at a time',
-          ].map((step, i) => (
-            <li key={step} className="flex items-center gap-2">
-              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-foreground/70">
-                {i + 1}
-              </span>
-              {step}
-            </li>
-          ))}
-        </ol>
+        {rows.length > 0 ? (
+          <div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => setShowHowItWorks((current) => !current)}
+            >
+              How it works
+            </Button>
+            {showHowItWorks ? (
+              <ol className="mt-2 flex flex-col gap-1.5 text-xs text-muted-foreground">
+                {HOW_IT_WORKS_STEPS.map((step, i) => (
+                  <li key={step} className="flex items-center gap-2">
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-foreground/70">
+                      {i + 1}
+                    </span>
+                    {step}
+                  </li>
+                ))}
+              </ol>
+            ) : null}
+          </div>
+        ) : null}
       </CardHeader>
       <CardContent className="space-y-4 pt-4">
         {rows.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
-            No intake items yet. Forward request emails to the intake inbox to begin.
+            <p>No intake items yet. Forward request emails to the intake inbox to begin.</p>
+            <ol className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground">
+              {HOW_IT_WORKS_STEPS.map((step, i) => (
+                <li key={step} className="flex items-center gap-2">
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-foreground/70">
+                    {i + 1}
+                  </span>
+                  {step}
+                </li>
+              ))}
+            </ol>
           </div>
         ) : (
           rows.map((row) => (
@@ -292,42 +375,48 @@ export function EmailIntakePanel({
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <div className="flex flex-wrap justify-end gap-2 text-xs text-muted-foreground">
-                    <span className="rounded-md border border-border/70 px-2 py-1">
-                      {row.itemCount} items
-                    </span>
-                    <span className="rounded-md border border-border/70 px-2 py-1">
-                      {row.autoAppliedCount} auto-applied
-                    </span>
-                    <span className="rounded-md border border-border/70 px-2 py-1">
-                      {row.needsReviewCount} needs review
-                    </span>
-                    <span className="rounded-md border border-border/70 px-2 py-1">
-                      {row.failedCount} failed
-                    </span>
+                    {[
+                      {
+                        label: `${row.itemCount} items`,
+                        className: statChipClass('default', row.itemCount),
+                      },
+                      {
+                        label: `${row.autoAppliedCount} auto-applied`,
+                        className: statChipClass('applied', row.autoAppliedCount),
+                      },
+                      {
+                        label: `${row.needsReviewCount} needs review`,
+                        className: statChipClass('review', row.needsReviewCount),
+                      },
+                      {
+                        label: `${row.failedCount} failed`,
+                        className: statChipClass('failed', row.failedCount),
+                      },
+                    ]
+                      .filter((chip) => chip.className)
+                      .map((chip) => (
+                        <span
+                          key={`${row.id}-${chip.label}`}
+                          className={`rounded-md border px-2 py-1 ${chip.className}`}
+                        >
+                          {chip.label}
+                        </span>
+                      ))}
                   </div>
-                  {row.batchStatus !== 'applied' ? (
-                    <div className="flex flex-wrap justify-end gap-2">
-                      <form action={reparseAvailabilityEmailIntakeAction}>
-                        <input type="hidden" name="intake_id" value={row.id} />
-                        <Button size="sm" type="submit" variant="outline">
-                          Reparse
-                        </Button>
-                      </form>
-                      <form action={deleteAvailabilityEmailIntakeAction}>
-                        <input type="hidden" name="intake_id" value={row.id} />
-                        <Button size="sm" type="submit" variant="destructive">
-                          Delete
-                        </Button>
-                      </form>
-                    </div>
-                  ) : (
-                    <form action={deleteAvailabilityEmailIntakeAction}>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <form action={runReparseEmailIntakeAction}>
+                      <input type="hidden" name="intake_id" value={row.id} />
+                      <Button size="sm" type="submit" variant="outline">
+                        Reparse
+                      </Button>
+                    </form>
+                    <form action={runDeleteEmailIntakeAction}>
                       <input type="hidden" name="intake_id" value={row.id} />
                       <Button size="sm" type="submit" variant="destructive">
                         Delete
                       </Button>
                     </form>
-                  )}
+                  </div>
                 </div>
               </div>
 
@@ -404,22 +493,18 @@ export function EmailIntakePanel({
               ) : null}
 
               {row.autoAppliedItems.length > 0 ? (
-                <div className="mt-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-foreground">Auto-applied recently</h3>
-                    <span className="text-xs text-muted-foreground">
-                      {row.autoAppliedItems.length} item
-                      {row.autoAppliedItems.length === 1 ? '' : 's'}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
+                <details className="mt-4 rounded-lg border border-border/70 bg-muted/10 p-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-foreground">
+                    {row.autoAppliedItems.length} auto-applied - show
+                  </summary>
+                  <div className="mt-3 flex flex-wrap gap-2">
                     {row.autoAppliedItems.map((item) => (
                       <Badge key={item.id} variant="secondary">
                         {item.sourceLabel}
                       </Badge>
                     ))}
                   </div>
-                </div>
+                </details>
               ) : null}
             </div>
           ))
