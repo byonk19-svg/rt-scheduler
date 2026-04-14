@@ -484,4 +484,83 @@ describe('POST /api/inbound/availability-email', () => {
       }),
     ])
   })
+
+  it('stores the OCR failure reason when pdf extraction fails before parsing', async () => {
+    const admin = createAdminMock()
+    createAdminClientMock.mockReturnValue(admin)
+
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input.endsWith('/email-1/attachments')) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: [
+              {
+                id: 'attachment-1',
+                filename: 'scan.pdf',
+                content_type: 'application/pdf',
+                url: 'https://download.test/scan.pdf',
+              },
+            ],
+          }),
+        }
+      }
+
+      if (input.endsWith('/email-1')) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              id: 'email-1',
+              from: { email: 'manager@example.com', name: 'Manager' },
+              subject: null,
+              text: '',
+              created_at: '2026-03-20T12:00:00Z',
+              message_id: 'msg-1',
+            },
+          }),
+        }
+      }
+
+      if (input === 'https://download.test/scan.pdf') {
+        return {
+          ok: true,
+          arrayBuffer: async () => Uint8Array.from([1, 2, 3]).buffer,
+        }
+      }
+
+      if (input === 'https://api.openai.com/v1/responses') {
+        const body = JSON.parse(String(init?.body ?? '{}')) as {
+          input?: Array<{ content?: Array<{ type: string }> }>
+        }
+        const content = body.input?.[0]?.content ?? []
+        const isPdfRequest = content.some((part) => part.type === 'input_file')
+
+        return {
+          ok: true,
+          json: async () => ({
+            output_text: isPdfRequest ? 'NO_TEXT' : 'NO_TEXT',
+          }),
+        }
+      }
+
+      throw new Error(`Unhandled fetch: ${input}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const response = await POST(createWebhookRequest())
+    const payload = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(payload).toMatchObject({
+      ok: true,
+      parse_status: 'needs_review',
+      item_count: 1,
+    })
+    expect(admin.state.itemInserts[0]?.[0]).toMatchObject({
+      source_label: 'scan.pdf',
+      ocr_status: 'failed',
+      ocr_error: expect.stringContaining('PDF'),
+    })
+  })
 })

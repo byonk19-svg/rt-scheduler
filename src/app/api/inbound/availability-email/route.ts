@@ -46,6 +46,7 @@ type ResendAttachmentRecord = {
   ocr_status: 'not_run' | 'completed' | 'failed' | 'skipped'
   ocr_text: string | null
   ocr_model: string | null
+  ocr_error: string | null
 }
 
 type MatchableProfile = {
@@ -358,6 +359,7 @@ export async function POST(request: Request) {
         ocr_status: 'not_run',
         ocr_text: null,
         ocr_model: null,
+        ocr_error: null,
       }
       const ocrResult = await extractTextFromAttachment({
         contentBase64: attachmentRow.content_base64,
@@ -367,6 +369,7 @@ export async function POST(request: Request) {
       attachmentRow.ocr_status = ocrResult.status
       attachmentRow.ocr_text = ocrResult.text
       attachmentRow.ocr_model = ocrResult.model
+      attachmentRow.ocr_error = ocrResult.error
 
       processedAttachments.push(attachmentRow)
     }
@@ -455,7 +458,7 @@ export async function POST(request: Request) {
           raw_text: item.rawText || null,
           ocr_status: item.attachment?.ocr_status ?? 'not_run',
           ocr_model: item.attachment?.ocr_model ?? null,
-          ocr_error: item.attachment?.download_error ?? null,
+          ocr_error: item.attachment?.ocr_error ?? item.attachment?.download_error ?? null,
           parse_status: item.parseStatus,
           confidence_level: item.confidenceLevel,
           confidence_reasons: item.confidenceReasons,
