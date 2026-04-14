@@ -176,6 +176,55 @@ describe('openai OCR helpers', () => {
     expect(createOcrImageVariants).toHaveBeenCalledOnce()
   })
 
+  it('merges employee name and request table zones during image variant fallback', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+    vi.mocked(createOcrImageVariants).mockResolvedValue([
+      {
+        zoneLabel: 'employee_name',
+        label: 'original',
+        contentType: 'image/png',
+        base64: MIN_PNG_BASE64,
+      },
+      {
+        zoneLabel: 'request_table',
+        label: 'grayscale',
+        contentType: 'image/png',
+        base64: MIN_PNG_BASE64,
+      },
+    ])
+
+    let imageAttempts = 0
+    const fetchMock = vi.fn(async () => {
+      imageAttempts += 1
+      return {
+        ok: true,
+        json: async () => ({
+          output_text:
+            imageAttempts === 1
+              ? 'NO_TEXT'
+              : imageAttempts === 2
+                ? 'Brianna Brown'
+                : '03/24 Need off for appointment',
+        }),
+      }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      extractTextFromImageAttachment({
+        contentBase64: MIN_PNG_BASE64,
+        contentType: 'image/jpeg',
+        filename: 'request.jpeg',
+      })
+    ).resolves.toMatchObject({
+      status: 'completed',
+      text: 'Employee Name: Brianna Brown\n\n03/24 Need off for appointment',
+      error: null,
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
   it('extracts text from PDF attachments using input_file', async () => {
     process.env.OPENAI_API_KEY = 'test-key'
     process.env.OPENAI_OCR_MODEL = 'gpt-test-vision'
@@ -270,6 +319,48 @@ describe('openai OCR helpers', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(4)
     expect(createOcrImageVariants).toHaveBeenCalledOnce()
+  })
+
+  it('does not label request-table-only OCR text as an employee name during PDF fallback', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+    vi.mocked(renderPdfToPngPages).mockResolvedValue([Buffer.from(MIN_PNG_BASE64, 'base64')])
+    vi.mocked(createOcrImageVariants).mockResolvedValue([
+      {
+        zoneLabel: 'request_table',
+        label: 'grayscale',
+        contentType: 'image/png',
+        base64: MIN_PNG_BASE64,
+      },
+    ])
+
+    const fetchMock = vi.fn(async (_input: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as {
+        input?: Array<{ content?: Array<{ type: string }> }>
+      }
+      const content = body.input?.[0]?.content ?? []
+      const isPdfRequest = content.some((part) => part.type === 'input_file')
+
+      return {
+        ok: true,
+        json: async () => ({
+          output_text: isPdfRequest ? 'NO_TEXT' : '03/24 Need off for appointment',
+        }),
+      }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await extractTextFromPdfAttachment({
+      contentBase64: ONE_PAGE_PDF_BASE64,
+      contentType: 'application/pdf',
+      filename: 'scan.pdf',
+    })
+
+    expect(result).toMatchObject({
+      status: 'completed',
+      text: expect.stringContaining('03/24 Need off for appointment'),
+    })
+    expect(result.text).not.toContain('Employee Name:')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
   it('falls back to image OCR when PDF extraction fails without text', async () => {

@@ -27,6 +27,12 @@ export type EmailIntakePanelRow = {
   fromName: string | null
   subject: string | null
   receivedAt: string
+  originalEmailText: string | null
+  attachmentTexts: Array<{
+    filename: string
+    ocrText: string | null
+    ocrStatus: 'not_run' | 'completed' | 'failed' | 'skipped'
+  }>
   batchStatus: 'parsed' | 'needs_review' | 'failed' | 'applied'
   parseSummary: string | null
   itemCount: number
@@ -63,6 +69,13 @@ function formatRequestLabel(request: EmailIntakePanelItemRow['parsedRequests'][n
     ? request.date
     : parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   return `${label} ${request.override_type === 'force_off' ? 'off' : 'work'}`
+}
+
+function hasOriginalEmailContent(row: EmailIntakePanelRow): boolean {
+  return (
+    Boolean(row.originalEmailText?.trim()) ||
+    row.attachmentTexts.some((attachment) => Boolean(attachment.ocrText?.trim()))
+  )
 }
 
 function getItemNextStep(item: EmailIntakePanelItemRow): string {
@@ -213,12 +226,16 @@ function renderItemCard(params: {
 export function EmailIntakePanel({
   rows,
   applyEmailAvailabilityImportAction,
+  deleteAvailabilityEmailIntakeAction,
+  reparseAvailabilityEmailIntakeAction,
   updateEmailIntakeTherapistAction,
   therapistOptions,
   cycleOptions,
 }: {
   rows: EmailIntakePanelRow[]
   applyEmailAvailabilityImportAction: (formData: FormData) => void | Promise<void>
+  deleteAvailabilityEmailIntakeAction: (formData: FormData) => void | Promise<void>
+  reparseAvailabilityEmailIntakeAction: (formData: FormData) => void | Promise<void>
   updateEmailIntakeTherapistAction: (formData: FormData) => void | Promise<void>
   therapistOptions: Array<{ id: string; fullName: string }>
   cycleOptions: Array<{ id: string; label: string }>
@@ -273,25 +290,95 @@ export function EmailIntakePanel({
                     Received {formatDateTime(row.receivedAt)}
                   </p>
                 </div>
-
-                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                  <span className="rounded-md border border-border/70 px-2 py-1">
-                    {row.itemCount} items
-                  </span>
-                  <span className="rounded-md border border-border/70 px-2 py-1">
-                    {row.autoAppliedCount} auto-applied
-                  </span>
-                  <span className="rounded-md border border-border/70 px-2 py-1">
-                    {row.needsReviewCount} needs review
-                  </span>
-                  <span className="rounded-md border border-border/70 px-2 py-1">
-                    {row.failedCount} failed
-                  </span>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex flex-wrap justify-end gap-2 text-xs text-muted-foreground">
+                    <span className="rounded-md border border-border/70 px-2 py-1">
+                      {row.itemCount} items
+                    </span>
+                    <span className="rounded-md border border-border/70 px-2 py-1">
+                      {row.autoAppliedCount} auto-applied
+                    </span>
+                    <span className="rounded-md border border-border/70 px-2 py-1">
+                      {row.needsReviewCount} needs review
+                    </span>
+                    <span className="rounded-md border border-border/70 px-2 py-1">
+                      {row.failedCount} failed
+                    </span>
+                  </div>
+                  {row.batchStatus !== 'applied' ? (
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <form action={reparseAvailabilityEmailIntakeAction}>
+                        <input type="hidden" name="intake_id" value={row.id} />
+                        <Button size="sm" type="submit" variant="outline">
+                          Reparse
+                        </Button>
+                      </form>
+                      <form action={deleteAvailabilityEmailIntakeAction}>
+                        <input type="hidden" name="intake_id" value={row.id} />
+                        <Button size="sm" type="submit" variant="destructive">
+                          Delete
+                        </Button>
+                      </form>
+                    </div>
+                  ) : (
+                    <form action={deleteAvailabilityEmailIntakeAction}>
+                      <input type="hidden" name="intake_id" value={row.id} />
+                      <Button size="sm" type="submit" variant="destructive">
+                        Delete
+                      </Button>
+                    </form>
+                  )}
                 </div>
               </div>
 
               {row.parseSummary ? (
                 <p className="mt-3 text-sm text-muted-foreground">{row.parseSummary}</p>
+              ) : null}
+
+              {hasOriginalEmailContent(row) ? (
+                <details className="mt-4 rounded-lg border border-border/70 bg-muted/10">
+                  <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium text-foreground">
+                    View original email
+                  </summary>
+                  <div className="space-y-4 border-t border-border/70 px-3 py-3">
+                    {row.originalEmailText ? (
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          Email body
+                        </p>
+                        <pre className="overflow-x-auto whitespace-pre-wrap rounded-md bg-background/80 p-3 text-xs text-foreground">
+                          {row.originalEmailText}
+                        </pre>
+                      </div>
+                    ) : null}
+                    {row.attachmentTexts.length > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                          Attachment OCR
+                        </p>
+                        <div className="space-y-2">
+                          {row.attachmentTexts.map((attachment) => (
+                            <div
+                              key={`${row.id}-${attachment.filename}`}
+                              className="rounded-md border border-border/70 bg-background/70 p-3"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-sm font-medium text-foreground">
+                                  {attachment.filename}
+                                </p>
+                                <Badge variant="outline">{attachment.ocrStatus}</Badge>
+                              </div>
+                              <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs text-foreground">
+                                {attachment.ocrText?.trim() ||
+                                  'No OCR text stored for this attachment.'}
+                              </pre>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                </details>
               ) : null}
 
               {row.reviewItems.length > 0 ? (

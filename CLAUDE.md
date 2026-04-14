@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-14 (session 60)
+Updated: 2026-04-14 (session 63)
 
 ## Handoff Snapshot
 
@@ -24,6 +24,7 @@ Updated: 2026-04-14 (session 60)
 - The latest production pass adds rotated/grayscale/threshold OCR variants plus region-specific prompts for handwritten name/request areas, but the replayed HCA scan still remains unreadable. Assume future progress will require either a truly template-anchored field extractor or a manager rescue workflow.
 - Managers can now fix therapist matches inline on the intake card and then apply parsed dates from the same surface.
 - Managers must now match both the therapist and the schedule block before `Apply dates` appears on an intake card. This prevents the old dead-end `email_intake_apply_failed` redirect when a therapist was matched but no cycle was attached yet.
+- Managers can now inspect the stored original email body plus attachment OCR text directly on the intake card, reparse a stored intake after OCR/parser changes, and delete troubleshooting/replay batches from `/availability`.
 - **Schedule layout + role consistency:** `/coverage` now supports both **Grid** and **Roster** layouts. Managers can edit staffing from either layout by clicking a day cell; leads can update staffed cells to **`OC`**, **`LE`**, **`CX`**, or **`CI`** through the shared assignment-status flow. Users can save a default schedule layout (`Grid` or `Roster`) in `/profile`, and compatibility routes (`/schedule`, `/therapist/schedule`) now defer default layout selection to `/coverage` so a saved preference wins unless an explicit `view` query is present.
 - **Lead role source of truth:** product behavior now treats `profiles.role = 'lead'` as the source of truth for lead-only UI/actions. The legacy `is_lead_eligible` column is kept in sync to `role`, but Coverage, print/export, profile badges, swap partner filtering, and designated-lead actions should all be reasoned about in terms of `role`, not the legacy flag.
 - **Auth entry (`/login`, `/signup`):** `src/lib/auth/login-utils.ts` parses auth errors from top-level query params **or nested inside `redirectTo`** (e.g. `/availability?error=...`), maps friendly copy, and `router.replace` cleans error keys while preserving a sanitized `redirectTo`. Approval/allowlist copy shows as a **warning** banner with optional **Request access** link and dismiss; credential failures stay **destructive**. Successful access **request** redirects to **`/login?status=requested`** with an **info** banner (dismiss + URL strip); signup no longer auto-signs-in before that redirect. **Name roster auto-match:** managers maintain **`employee_roster`** on **`/team`** (single row, **bulk paste**, or ops script). On signup, **`handle_new_user`** matches **normalized full name** to an active roster row; the new profile gets roster **role/settings** immediately (non-pending), the roster row records **`matched_profile_id`**, and signup sends users to **`/login?status=matched`** with a ready-to-sign-in banner. Unmatched signups stay **`profiles.role = null`** pending approval. **Migration:** `20260413123000_add_employee_roster_and_name_match_signup.sql`. **Ops:** `npm run sync:roster` bulk-creates **auth + profiles** from an email list file (separate from **`employee_roster`** name pre-match). **Public homepage (`/`):** therapist-first copy, luminous background utilities (`--home-*`, `.teamwise-home-*`), header **Get started** (`/signup`) + **Sign in**, hero **Sign in** + **Create account** (`/signup`); Vitest contracts in `src/app/page.test.ts` and `src/app/globals.test.ts`. Shared **Input** focus ring uses **`--ring`**; **`:autofill`** + **`-webkit-autofill`** theming lives in `globals.css`.
@@ -83,6 +84,18 @@ Updated: 2026-04-14 (session 60)
   - Employee-name extraction now survives inline form labels on the same OCR line (for example `Employee Name: Brianna Yonkin   Kronos Number:`), and forwarded-email boilerplate in the body no longer becomes a fake availability request.
   - Table-style PTO rows with the date before the intent phrase now parse correctly.
 - **Current operational meaning of `needs_review` for photographed forms:** if OCR succeeds and the therapist matches but `matched_cycle_id` is null, treat that as a normal business-rule review item rather than a pipeline failure. The latest example stayed in review because the form dates were in `2024`, outside current schedule cycles.
+
+## Latest Updates (2026-04-14, session 63)
+
+- **Availability intake manager recovery controls** (`src/app/availability/actions.ts`, `src/app/availability/page.tsx`, `src/components/availability/EmailIntakePanel.tsx`, `src/lib/availability-email-intake.ts`, tests):
+  - `/availability` intake rows now expose **View original email** so managers can inspect the stored normalized email body plus each attachment's stored OCR text before taking action.
+  - Managers can now **Reparse** a stored intake batch from the saved body and attachment content without waiting for the sender to resend the email.
+  - Managers can now **Delete** old troubleshooting or replay batches directly from the intake queue.
+  - Shared batch parsing moved into `src/lib/availability-email-intake.ts`, so the inbound webhook path and manager-side reparse path use the same body/attachment parsing rules.
+- **OCR zone cleanup + mislabeling fix** (`src/lib/openai-ocr.ts`, `src/lib/openai-ocr.test.ts`):
+  - Removed dead OCR zones that were no longer produced by `createOcrImageVariants`.
+  - Fixed the rendered-PDF fallback so `request_table`-only OCR results are no longer mislabeled as `Employee Name: ...`.
+  - Added regressions for both the request-table-only bug and the employee-name-plus-request-table merge path.
 
 The session entries below are historical context. They may describe local-only or superseded work and should not override the snapshot above.
 

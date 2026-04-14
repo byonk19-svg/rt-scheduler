@@ -27,7 +27,7 @@ Current architecture and quality snapshot: [`docs/REPO_HEALTH.md`](docs/REPO_HEA
 - Managers can edit staffing from either schedule layout by clicking a day cell. Leads can update assignment status (`OC`, `LE`, `CX`, `CI`) from staffed cells in either layout.
 - Users can save a default schedule layout preference (`Grid` or `Roster`) in [`/profile`](./src/app/profile/page.tsx); compatibility routes defer default layout selection to `/coverage` so that saved preference wins unless an explicit `view` query is present.
 - **Availability** — therapist requests and manager **Plan staffing** for the selected cycle.
-- **Availability email intake** — managers can ingest one email with body text plus multiple form attachments; high-confidence items auto-apply while unresolved items stay in the `/availability` review queue.
+- **Availability email intake** — managers can ingest one email with body text plus multiple form attachments; high-confidence items auto-apply while unresolved items stay in the `/availability` review queue, where managers can now view the stored original email/OCR text, reparse stale items, or delete troubleshooting batches.
 - **Publish History** ([`/publish`](./src/app/publish/page.tsx)) — two parts: (1) **Schedule blocks** — all non-archived cycles; archive drafts or delete drafts; **Start over** takes a live block offline; (2) **Publish email log** — delivery rows per publish; **Delete history** removes only that log row, not the block.
 - `New 6-week block` can optionally copy staffing from the latest published cycle. `Clear draft` clears draft assignments while unpublished.
 - Published cycles stay editable on Schedule; `Archive cycle` sets `archived_at` and hides the block from pickers (see [`CLAUDE.md`](./CLAUDE.md) for data model).
@@ -245,6 +245,9 @@ What the app does:
 - parses text like `Need off Mar 24, Mar 26` or `Can work Apr 2`
 - can OCR supported image attachments through the OpenAI Responses API when configured
 - creates an intake record for manager review on [`/availability`](./src/app/availability/page.tsx)
+- lets managers inspect the stored original email body plus attachment OCR text from the intake card
+- lets managers reparse a stored intake when OCR/parser behavior changes
+- lets managers delete old troubleshooting or replay rows from the intake queue
 - applies parsed dates into `availability_overrides` as manager-entered inputs
 - renders scanned PDF pages and retries OCR using multiple page-image variants and fixed-form-like region prompts when direct PDF extraction returns no text
 - reads OCR text from the actual OpenAI Responses message payload shape, not just `output_text`
@@ -254,6 +257,7 @@ Current production behavior:
 - photographed PTO form images like `IMG_0262.jpeg` now OCR and parse into structured requests successfully
 - forwarded-email body boilerplate is ignored instead of becoming a fake availability request
 - items still land in `needs_review` when business rules require it, for example when OCR dates do not match any active schedule cycle
+- `/availability` intake cards now expose the stored original email text and attachment OCR text so managers can verify what was actually ingested before applying, reparsing, or deleting the batch
 
 Required env vars:
 

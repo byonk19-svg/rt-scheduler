@@ -12,11 +12,14 @@ import {
   toOverrideType,
 } from '@/lib/availability-planner'
 import {
+  parseAvailabilityEmailBatchSources,
   summarizeAvailabilityEmailBatch,
   sanitizeParsedRequests,
+  stripHtmlToText,
 } from '@/lib/availability-email-intake'
 import { shiftOverridesToCycle } from '@/lib/copy-cycle-availability'
 import { buildManagerOverrideInput } from '@/lib/employee-directory'
+import { extractTextFromAttachment } from '@/lib/openai-ocr'
 import { createClient } from '@/lib/supabase/server'
 
 async function upsertTherapistSubmissionAfterOfficialSave(
@@ -101,6 +104,17 @@ type AvailabilityEmailItemStatus = 'parsed' | 'auto_applied' | 'needs_review' | 
 type AvailabilityEmailItemSummaryRow = {
   parse_status: AvailabilityEmailItemStatus
   parsed_requests: unknown
+}
+
+type AvailabilityEmailAttachmentRow = {
+  id: string
+  filename: string
+  content_type: string
+  content_base64: string | null
+  ocr_status: 'not_run' | 'completed' | 'failed' | 'skipped' | null
+  ocr_text: string | null
+  ocr_model: string | null
+  ocr_error: string | null
 }
 
 function getReturnPath(value: string | null): '/availability' | '/therapist/availability' {
@@ -192,6 +206,43 @@ async function refreshAvailabilityEmailIntakeBatchState(
 
   if (updateError) {
     console.error('Failed to refresh intake batch state:', updateError)
+  }
+}
+
+async function loadAvailabilityEmailParsingContext(supabase: SupabaseClient) {
+  const todayKey = new Date().toISOString().slice(0, 10)
+  const [{ data: profileRows }, { data: cycleRows }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, full_name, is_active')
+      .in('role', ['therapist', 'lead'])
+      .eq('is_active', true)
+      .is('archived_at', null)
+      .order('full_name', { ascending: true }),
+    supabase
+      .from('schedule_cycles')
+      .select('id, label, start_date, end_date')
+      .is('archived_at', null)
+      .gte('end_date', todayKey)
+      .order('start_date', { ascending: true }),
+  ])
+
+  return {
+    profiles:
+      ((profileRows ?? []) as Array<{
+        id: string
+        full_name: string
+        is_active?: boolean | null
+      }>) ?? [],
+    cycles:
+      (
+        (cycleRows ?? []) as Array<{
+          id: string
+          label: string
+          start_date: string
+          end_date: string
+        }>
+      ).filter((cycle) => cycle.start_date && cycle.end_date) ?? [],
   }
 }
 
@@ -808,6 +859,193 @@ export async function updateEmailIntakeTherapistAction(formData: FormData) {
 
   revalidatePath('/availability')
   redirect(buildAvailabilityUrl({ success: 'email_intake_match_saved' }))
+}
+
+export async function reparseAvailabilityEmailIntakeAction(formData: FormData) {
+  const { supabase, role } = await getAuthenticatedUserWithRole()
+
+  if (!can(role, 'access_manager_ui')) {
+    redirect('/availability')
+  }
+
+  const intakeId = String(formData.get('intake_id') ?? '').trim()
+  if (!intakeId) {
+    redirect(buildAvailabilityUrl({ error: 'email_intake_reparse_failed' }))
+  }
+
+  const [
+    { data: intake, error: intakeError },
+    { data: existingItems, error: itemLoadError },
+    { data: attachmentRows, error: attachmentLoadError },
+  ] = await Promise.all([
+    supabase
+      .from('availability_email_intakes')
+      .select('id, text_content, html_content')
+      .eq('id', intakeId)
+      .maybeSingle(),
+    supabase.from('availability_email_intake_items').select('id').eq('intake_id', intakeId),
+    supabase
+      .from('availability_email_attachments')
+      .select(
+        'id, filename, content_type, content_base64, ocr_status, ocr_text, ocr_model, ocr_error'
+      )
+      .eq('intake_id', intakeId),
+  ])
+
+  if (intakeError || !intake || itemLoadError || attachmentLoadError) {
+    console.error('Failed to load stored availability email intake for reparsing:', {
+      intakeError,
+      itemLoadError,
+      attachmentLoadError,
+    })
+    redirect(buildAvailabilityUrl({ error: 'email_intake_reparse_failed' }))
+  }
+
+  const { profiles, cycles } = await loadAvailabilityEmailParsingContext(supabase)
+  const processedAttachments = [] as AvailabilityEmailAttachmentRow[]
+
+  for (const attachment of (attachmentRows ?? []) as AvailabilityEmailAttachmentRow[]) {
+    const nextOcr = attachment.content_base64
+      ? await extractTextFromAttachment({
+          contentBase64: attachment.content_base64,
+          contentType: attachment.content_type,
+          filename: attachment.filename,
+        })
+      : {
+          status: attachment.ocr_status ?? 'not_run',
+          text: attachment.ocr_text,
+          model: attachment.ocr_model,
+          error: attachment.ocr_error,
+        }
+
+    const { error: attachmentUpdateError } = await supabase
+      .from('availability_email_attachments')
+      .update({
+        ocr_status: nextOcr.status,
+        ocr_text: nextOcr.text,
+        ocr_model: nextOcr.model,
+        ocr_error: nextOcr.error,
+      })
+      .eq('id', attachment.id)
+
+    if (attachmentUpdateError) {
+      console.error('Failed to update intake attachment OCR state:', attachmentUpdateError)
+      redirect(buildAvailabilityUrl({ error: 'email_intake_reparse_failed' }))
+    }
+
+    processedAttachments.push({
+      ...attachment,
+      ocr_status: nextOcr.status,
+      ocr_text: nextOcr.text,
+      ocr_model: nextOcr.model,
+      ocr_error: nextOcr.error,
+    })
+  }
+
+  const parsedBatch = parseAvailabilityEmailBatchSources({
+    normalizedBodyText:
+      intake.text_content?.trim() || stripHtmlToText(intake.html_content ?? '') || '',
+    attachments: processedAttachments.map((attachment) => ({
+      id: attachment.id,
+      filename: attachment.filename,
+      rawText: attachment.ocr_text,
+      ocrStatus: attachment.ocr_status ?? 'not_run',
+      ocrModel: attachment.ocr_model,
+      ocrError: attachment.ocr_error,
+    })),
+    cycles,
+    profiles,
+    autoApplyHighConfidence: false,
+  })
+
+  if ((existingItems ?? []).length > 0) {
+    const { error: deleteError } = await supabase
+      .from('availability_email_intake_items')
+      .delete()
+      .eq('intake_id', intakeId)
+
+    if (deleteError) {
+      console.error('Failed to clear old intake items before reparsing:', deleteError)
+      redirect(buildAvailabilityUrl({ error: 'email_intake_reparse_failed' }))
+    }
+  }
+
+  if (parsedBatch.items.length > 0) {
+    const { error: insertError } = await supabase.from('availability_email_intake_items').insert(
+      parsedBatch.items.map((item) => ({
+        intake_id: intakeId,
+        source_type: item.sourceType,
+        source_label: item.sourceLabel,
+        attachment_id: item.attachmentId,
+        raw_text: item.rawText || null,
+        ocr_status: item.ocrStatus,
+        ocr_model: item.ocrModel,
+        ocr_error: item.ocrError,
+        parse_status: item.parseStatus,
+        confidence_level: item.confidenceLevel,
+        confidence_reasons: item.confidenceReasons,
+        extracted_employee_name: item.extractedEmployeeName,
+        employee_match_candidates: item.employeeMatchCandidates,
+        matched_therapist_id: item.matchedTherapistId,
+        matched_cycle_id: item.matchedCycleId,
+        parsed_requests: item.requests,
+        unresolved_lines: item.unresolvedLines,
+        auto_applied_at: null,
+        auto_applied_by: null,
+        apply_error: null,
+      }))
+    )
+
+    if (insertError) {
+      console.error('Failed to insert reparsed intake items:', insertError)
+      redirect(buildAvailabilityUrl({ error: 'email_intake_reparse_failed' }))
+    }
+  }
+
+  const { error: intakeUpdateError } = await supabase
+    .from('availability_email_intakes')
+    .update({
+      parse_status: parsedBatch.batchStatus,
+      batch_status: parsedBatch.batchStatus,
+      parse_summary: parsedBatch.batchSummary.summary,
+      parsed_requests: parsedBatch.items.flatMap((item) => item.requests),
+      item_count: parsedBatch.batchSummary.itemCount,
+      auto_applied_count: parsedBatch.batchSummary.autoAppliedCount,
+      needs_review_count: parsedBatch.batchSummary.needsReviewCount,
+      failed_count: parsedBatch.batchSummary.failedCount,
+    })
+    .eq('id', intakeId)
+
+  if (intakeUpdateError) {
+    console.error('Failed to update intake summary after reparsing:', intakeUpdateError)
+    redirect(buildAvailabilityUrl({ error: 'email_intake_reparse_failed' }))
+  }
+
+  revalidatePath('/availability')
+  redirect(buildAvailabilityUrl({ success: 'email_intake_reparsed' }))
+}
+
+export async function deleteAvailabilityEmailIntakeAction(formData: FormData) {
+  const { supabase, role } = await getAuthenticatedUserWithRole()
+
+  if (!can(role, 'access_manager_ui')) {
+    redirect('/availability')
+  }
+
+  const intakeId = String(formData.get('intake_id') ?? '').trim()
+  if (!intakeId) {
+    redirect(buildAvailabilityUrl({ error: 'email_intake_delete_failed' }))
+  }
+
+  const { error } = await supabase.from('availability_email_intakes').delete().eq('id', intakeId)
+
+  if (error) {
+    console.error('Failed to delete availability email intake:', error)
+    redirect(buildAvailabilityUrl({ error: 'email_intake_delete_failed' }))
+  }
+
+  revalidatePath('/availability')
+  redirect(buildAvailabilityUrl({ success: 'email_intake_deleted' }))
 }
 
 export async function copyAvailabilityFromPreviousCycleAction(formData: FormData) {

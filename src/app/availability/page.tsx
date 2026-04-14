@@ -9,8 +9,10 @@ import {
 import {
   applyEmailAvailabilityImportAction,
   copyAvailabilityFromPreviousCycleAction,
+  deleteAvailabilityEmailIntakeAction,
   deleteAvailabilityEntryAction,
   deleteManagerPlannerDateAction,
+  reparseAvailabilityEmailIntakeAction,
   saveManagerPlannerDatesAction,
   submitTherapistAvailabilityGridAction,
   updateEmailIntakeTherapistAction,
@@ -89,6 +91,7 @@ type AvailabilityEmailIntakeRow = {
   from_name: string | null
   subject: string | null
   received_at: string
+  text_content: string | null
   parse_status: 'parsed' | 'needs_review' | 'failed' | 'applied'
   batch_status: 'parsed' | 'needs_review' | 'failed' | 'applied'
   parse_summary: string | null
@@ -96,6 +99,14 @@ type AvailabilityEmailIntakeRow = {
   auto_applied_count: number
   needs_review_count: number
   failed_count: number
+}
+
+type AvailabilityEmailAttachmentRow = {
+  id: string
+  intake_id: string
+  filename: string
+  ocr_text: string | null
+  ocr_status: 'not_run' | 'completed' | 'failed' | 'skipped'
 }
 
 type AvailabilityEmailIntakeItemRow = {
@@ -136,6 +147,22 @@ type AvailabilityPageSearchParams = {
 function getSearchParam(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0]
   return value
+}
+
+function stripStoredEmailSubject(text: string | null, subject: string | null): string | null {
+  const normalizedText = text?.trim() ?? ''
+  if (!normalizedText) return null
+
+  const normalizedSubject = subject?.trim() ?? ''
+  if (
+    normalizedSubject &&
+    normalizedText.startsWith(normalizedSubject) &&
+    normalizedText.charAt(normalizedSubject.length) === '\n'
+  ) {
+    return normalizedText.slice(normalizedSubject.length).trim()
+  }
+
+  return normalizedText
 }
 
 function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
@@ -404,7 +431,7 @@ export default async function AvailabilityPage({
     ? await supabase
         .from('availability_email_intakes')
         .select(
-          'id, from_email, from_name, subject, received_at, parse_status, batch_status, parse_summary, item_count, auto_applied_count, needs_review_count, failed_count'
+          'id, from_email, from_name, subject, received_at, text_content, parse_status, batch_status, parse_summary, item_count, auto_applied_count, needs_review_count, failed_count'
         )
         .order('received_at', { ascending: false })
         .limit(12)
@@ -420,21 +447,42 @@ export default async function AvailabilityPage({
           )
           .in('intake_id', emailIntakeIds)
       : { data: [] }
+  const emailAttachmentResult =
+    canManageAvailability && emailIntakeIds.length > 0
+      ? await supabase
+          .from('availability_email_attachments')
+          .select('id, intake_id, filename, ocr_text, ocr_status')
+          .in('intake_id', emailIntakeIds)
+      : { data: [] }
   const emailItemRows = (emailItemResult.data ?? []) as AvailabilityEmailIntakeItemRow[]
+  const emailAttachmentRows = (emailAttachmentResult.data ?? []) as AvailabilityEmailAttachmentRow[]
   const itemsByIntakeId = new Map<string, AvailabilityEmailIntakeItemRow[]>()
   for (const item of emailItemRows) {
     const current = itemsByIntakeId.get(item.intake_id) ?? []
     current.push(item)
     itemsByIntakeId.set(item.intake_id, current)
   }
+  const attachmentsByIntakeId = new Map<string, AvailabilityEmailAttachmentRow[]>()
+  for (const attachment of emailAttachmentRows) {
+    const current = attachmentsByIntakeId.get(attachment.intake_id) ?? []
+    current.push(attachment)
+    attachmentsByIntakeId.set(attachment.intake_id, current)
+  }
   const emailIntakeRows: EmailIntakePanelRow[] = rawEmailIntakeRows.map((row) => {
     const childItems = itemsByIntakeId.get(row.id) ?? []
+    const attachments = attachmentsByIntakeId.get(row.id) ?? []
     return {
       id: row.id,
       fromEmail: row.from_email,
       fromName: row.from_name,
       subject: row.subject,
       receivedAt: row.received_at,
+      originalEmailText: stripStoredEmailSubject(row.text_content, row.subject),
+      attachmentTexts: attachments.map((attachment) => ({
+        filename: attachment.filename,
+        ocrText: attachment.ocr_text,
+        ocrStatus: attachment.ocr_status,
+      })),
       batchStatus: row.batch_status ?? row.parse_status,
       parseSummary: row.parse_summary,
       itemCount: row.item_count,
@@ -582,6 +630,8 @@ export default async function AvailabilityPage({
     <EmailIntakePanel
       rows={emailIntakeRows}
       applyEmailAvailabilityImportAction={applyEmailAvailabilityImportAction}
+      deleteAvailabilityEmailIntakeAction={deleteAvailabilityEmailIntakeAction}
+      reparseAvailabilityEmailIntakeAction={reparseAvailabilityEmailIntakeAction}
       updateEmailIntakeTherapistAction={updateEmailIntakeTherapistAction}
       therapistOptions={plannerTherapists.map((therapist) => ({
         id: therapist.id,

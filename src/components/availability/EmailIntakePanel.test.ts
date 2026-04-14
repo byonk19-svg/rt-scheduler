@@ -10,6 +10,14 @@ const baseRow = {
   fromName: 'Employee Example',
   subject: 'Need off Mar 24',
   receivedAt: '2026-03-20T12:00:00Z',
+  originalEmailText: 'Please mark me off on Mar 24.\nThanks.',
+  attachmentTexts: [
+    {
+      filename: 'form-1.jpg',
+      ocrText: '03/24 Need off for appointment',
+      ocrStatus: 'completed' as const,
+    },
+  ],
   batchStatus: 'needs_review' as const,
   parseSummary: '2 items | 1 parsed | 1 need review | 0 failed',
   itemCount: 2,
@@ -56,6 +64,8 @@ describe('EmailIntakePanel', () => {
       createElement(EmailIntakePanel, {
         rows: [baseRow],
         applyEmailAvailabilityImportAction: async () => {},
+        deleteAvailabilityEmailIntakeAction: async () => {},
+        reparseAvailabilityEmailIntakeAction: async () => {},
         updateEmailIntakeTherapistAction: async () => {},
         therapistOptions: [{ id: 'therapist-1', fullName: 'Adrienne Solt' }],
         cycleOptions: [{ id: 'cycle-1', label: 'Critique Cycle (2026-03-17 to 2026-04-27)' }],
@@ -67,6 +77,11 @@ describe('EmailIntakePanel', () => {
     expect(html).toContain('form-1.jpg')
     expect(html).toContain('Email body')
     expect(html).toContain('employee_match_ambiguous')
+    expect(html).toContain('Reparse')
+    expect(html).toContain('Delete')
+    expect(html).toContain('View original email')
+    expect(html).toContain('Please mark me off on Mar 24.')
+    expect(html).toContain('03/24 Need off for appointment')
   })
 
   it('shows per-item apply only when the item is matched and has parsed requests', () => {
@@ -87,6 +102,8 @@ describe('EmailIntakePanel', () => {
           },
         ],
         applyEmailAvailabilityImportAction: async () => {},
+        deleteAvailabilityEmailIntakeAction: async () => {},
+        reparseAvailabilityEmailIntakeAction: async () => {},
         updateEmailIntakeTherapistAction: async () => {},
         therapistOptions: [{ id: 'therapist-1', fullName: 'Adrienne Solt' }],
         cycleOptions: [{ id: 'cycle-1', label: 'Critique Cycle (2026-03-17 to 2026-04-27)' }],

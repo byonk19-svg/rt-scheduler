@@ -53,6 +53,30 @@ export type ParsedAvailabilityEmailBatch = {
   summary: string
 }
 
+export type AvailabilityEmailBatchStatus = 'parsed' | 'needs_review' | 'failed' | 'applied'
+
+export type AvailabilityEmailAttachmentSource = {
+  id: string | null
+  filename: string
+  rawText: string | null
+  ocrStatus: 'not_run' | 'completed' | 'failed' | 'skipped'
+  ocrModel: string | null
+  ocrError: string | null
+}
+
+export type ParsedAvailabilityEmailBatchItem = ParsedAvailabilityEmailItem & {
+  attachmentId: string | null
+  ocrStatus: 'not_run' | 'completed' | 'failed' | 'skipped'
+  ocrModel: string | null
+  ocrError: string | null
+}
+
+export type ParsedAvailabilityEmailBatchResult = {
+  items: ParsedAvailabilityEmailBatchItem[]
+  batchStatus: AvailabilityEmailBatchStatus
+  batchSummary: ParsedAvailabilityEmailBatch
+}
+
 type MatchableProfile = {
   id: string
   full_name: string
@@ -428,6 +452,110 @@ export function summarizeAvailabilityEmailBatch(
       `${needsReviewCount} need review`,
       `${failedCount} failed`,
     ].join(' | '),
+  }
+}
+
+function buildSourceCandidates(params: {
+  normalizedBodyText: string
+  attachments: AvailabilityEmailAttachmentSource[]
+}): Array<{
+  sourceType: 'body' | 'attachment'
+  sourceLabel: string
+  rawText: string
+  attachment: AvailabilityEmailAttachmentSource | null
+}> {
+  const candidates: Array<{
+    sourceType: 'body' | 'attachment'
+    sourceLabel: string
+    rawText: string
+    attachment: AvailabilityEmailAttachmentSource | null
+  }> = []
+
+  if (params.normalizedBodyText.trim().length > 0) {
+    candidates.push({
+      sourceType: 'body',
+      sourceLabel: 'Email body',
+      rawText: params.normalizedBodyText,
+      attachment: null,
+    })
+  }
+
+  for (const attachment of params.attachments) {
+    candidates.push({
+      sourceType: 'attachment',
+      sourceLabel: attachment.filename,
+      rawText: attachment.rawText ?? '',
+      attachment,
+    })
+  }
+
+  return candidates
+}
+
+function buildItemParseStatus(params: {
+  item: ParsedAvailabilityEmailItem
+  autoApplyHighConfidence: boolean
+}): ParsedAvailabilityEmailItem['parseStatus'] {
+  if (
+    params.autoApplyHighConfidence &&
+    params.item.confidenceLevel === 'high' &&
+    params.item.matchedTherapistId &&
+    params.item.matchedCycleId &&
+    params.item.requests.length > 0
+  ) {
+    return 'auto_applied'
+  }
+
+  return params.item.parseStatus
+}
+
+function getBatchStatus(items: ParsedAvailabilityEmailItem[]): AvailabilityEmailBatchStatus {
+  if (items.length === 0) return 'failed'
+  if (items.some((item) => item.parseStatus === 'needs_review' || item.parseStatus === 'failed')) {
+    return 'needs_review'
+  }
+  if (items.every((item) => item.parseStatus === 'auto_applied')) {
+    return 'applied'
+  }
+  return 'parsed'
+}
+
+export function parseAvailabilityEmailBatchSources(params: {
+  normalizedBodyText: string
+  attachments: AvailabilityEmailAttachmentSource[]
+  cycles: IntakeCycle[]
+  profiles: MatchableProfile[]
+  autoApplyHighConfidence?: boolean
+}): ParsedAvailabilityEmailBatchResult {
+  const items = buildSourceCandidates({
+    normalizedBodyText: params.normalizedBodyText,
+    attachments: params.attachments,
+  }).map((candidate) => {
+    const parsedItem = parseAvailabilityEmailItem({
+      sourceType: candidate.sourceType,
+      sourceLabel: candidate.sourceLabel,
+      rawText: candidate.rawText,
+      cycles: params.cycles,
+      profiles: params.profiles,
+    })
+
+    return {
+      ...parsedItem,
+      parseStatus: buildItemParseStatus({
+        item: parsedItem,
+        autoApplyHighConfidence: params.autoApplyHighConfidence ?? false,
+      }),
+      attachmentId: candidate.attachment?.id ?? null,
+      ocrStatus: candidate.attachment?.ocrStatus ?? 'not_run',
+      ocrModel: candidate.attachment?.ocrModel ?? null,
+      ocrError: candidate.attachment?.ocrError ?? null,
+    } satisfies ParsedAvailabilityEmailBatchItem
+  })
+
+  return {
+    items,
+    batchStatus: getBatchStatus(items),
+    batchSummary: summarizeAvailabilityEmailBatch(items),
   }
 }
 

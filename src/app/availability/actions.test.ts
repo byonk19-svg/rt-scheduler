@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { redirectMock, revalidatePathMock, createClientMock } = vi.hoisted(() => ({
-  redirectMock: vi.fn((url: string) => {
-    throw new Error(`REDIRECT:${url}`)
-  }),
-  revalidatePathMock: vi.fn(),
-  createClientMock: vi.fn(),
-}))
+const { redirectMock, revalidatePathMock, createClientMock, extractTextFromAttachmentMock } =
+  vi.hoisted(() => ({
+    redirectMock: vi.fn((url: string) => {
+      throw new Error(`REDIRECT:${url}`)
+    }),
+    revalidatePathMock: vi.fn(),
+    createClientMock: vi.fn(),
+    extractTextFromAttachmentMock: vi.fn(),
+  }))
 
 vi.mock('next/navigation', () => ({
   redirect: redirectMock,
@@ -20,11 +22,17 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: createClientMock,
 }))
 
+vi.mock('@/lib/openai-ocr', () => ({
+  extractTextFromAttachment: extractTextFromAttachmentMock,
+}))
+
 import {
   applyEmailAvailabilityImportAction,
   copyAvailabilityFromPreviousCycleAction,
   deleteAvailabilityEntryAction,
+  deleteAvailabilityEmailIntakeAction,
   deleteManagerPlannerDateAction,
+  reparseAvailabilityEmailIntakeAction,
   saveManagerPlannerDatesAction,
   submitAvailabilityEntryAction,
   submitTherapistAvailabilityGridAction,
@@ -55,6 +63,8 @@ function createSupabaseMock(context: TestContext = {}) {
     sourceOverrideRows: null as Array<Record<string, unknown>> | null,
     existingTargetRows: null as Array<Record<string, unknown>> | null,
     emailIntakeRow: null as Record<string, unknown> | null,
+    emailIntakeItemRows: null as Array<Record<string, unknown>> | null,
+    emailAttachmentRows: null as Array<Record<string, unknown>> | null,
   }
 
   return {
@@ -92,6 +102,14 @@ function createSupabaseMock(context: TestContext = {}) {
         },
         in(column: string, values: unknown[]) {
           filters.set(column, values)
+          return builder
+        },
+        is(column: string, value: unknown) {
+          filters.set(`is:${column}`, value)
+          return builder
+        },
+        gte(column: string, value: unknown) {
+          filters.set(`gte:${column}`, value)
           return builder
         },
         delete() {
@@ -184,6 +202,48 @@ function createSupabaseMock(context: TestContext = {}) {
           return { data: null, error: null }
         },
         then(resolve: (value: unknown) => unknown) {
+          if (table === 'profiles') {
+            return Promise.resolve(
+              resolve({
+                data: [
+                  { id: 'therapist-1', full_name: 'Brianna Brown', is_active: true },
+                  { id: 'therapist-2', full_name: 'Brian Brown', is_active: true },
+                ],
+                error: null,
+              })
+            )
+          }
+          if (table === 'schedule_cycles') {
+            return Promise.resolve(
+              resolve({
+                data: [
+                  {
+                    id: 'cycle-1',
+                    label: 'Block 1',
+                    start_date: '2026-03-22',
+                    end_date: '2026-05-02',
+                  },
+                ],
+                error: null,
+              })
+            )
+          }
+          if (table === 'availability_email_intake_items') {
+            return Promise.resolve(
+              resolve({
+                data: state.emailIntakeItemRows,
+                error: null,
+              })
+            )
+          }
+          if (table === 'availability_email_attachments') {
+            return Promise.resolve(
+              resolve({
+                data: state.emailAttachmentRows,
+                error: null,
+              })
+            )
+          }
           if (table === 'availability_overrides' && selected.includes('id, date')) {
             return Promise.resolve(
               resolve({
@@ -268,6 +328,12 @@ function makeTherapistGridFormData() {
 describe('availability actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    extractTextFromAttachmentMock.mockResolvedValue({
+      status: 'completed',
+      text: 'Employee Name: Brown\nNeed off Mar 25',
+      model: 'gpt-test',
+      error: null,
+    })
   })
 
   it('lets a therapist save their own availability request', async () => {
@@ -580,6 +646,100 @@ describe('availability actions', () => {
     )
 
     expect(supabase.state.updates).toEqual([])
+  })
+
+  it('reparses a stored intake from saved body and attachment content', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    supabase.state.emailIntakeRow = {
+      id: 'intake-1',
+      text_content: 'Employee Name: Brianna Brown\nNeed off Mar 24',
+      batch_status: 'failed',
+    }
+    supabase.state.emailIntakeItemRows = [{ id: 'item-stale-1' }]
+    supabase.state.emailAttachmentRows = [
+      {
+        id: 'attachment-1',
+        filename: 'form-1.jpg',
+        content_type: 'image/jpeg',
+        content_base64: 'AQID',
+      },
+    ]
+    createClientMock.mockResolvedValue(supabase)
+
+    const formData = new FormData()
+    formData.set('intake_id', 'intake-1')
+
+    await expect(reparseAvailabilityEmailIntakeAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?success=email_intake_reparsed'
+    )
+
+    expect(supabase.state.deletes).toContainEqual({
+      table: 'availability_email_intake_items',
+      filters: {
+        intake_id: 'intake-1',
+      },
+    })
+    expect(supabase.state.inserts).toContainEqual({
+      table: 'availability_email_intake_items',
+      payload: expect.arrayContaining([
+        expect.objectContaining({
+          intake_id: 'intake-1',
+          source_type: 'body',
+          source_label: 'Email body',
+          parse_status: 'parsed',
+        }),
+        expect.objectContaining({
+          intake_id: 'intake-1',
+          source_type: 'attachment',
+          source_label: 'form-1.jpg',
+          parse_status: 'needs_review',
+        }),
+      ]),
+    })
+    expect(supabase.state.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: 'availability_email_attachments',
+          filters: {
+            id: 'attachment-1',
+          },
+        }),
+        expect.objectContaining({
+          table: 'availability_email_intakes',
+          filters: {
+            id: 'intake-1',
+          },
+          payload: expect.objectContaining({
+            batch_status: 'needs_review',
+            item_count: 2,
+            auto_applied_count: 0,
+            needs_review_count: 1,
+            failed_count: 0,
+          }),
+        }),
+      ])
+    )
+    expect(revalidatePathMock).toHaveBeenCalledWith('/availability')
+  })
+
+  it('deletes a stored intake batch for manager cleanup', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    createClientMock.mockResolvedValue(supabase)
+
+    const formData = new FormData()
+    formData.set('intake_id', 'intake-1')
+
+    await expect(deleteAvailabilityEmailIntakeAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?success=email_intake_deleted'
+    )
+
+    expect(supabase.state.deletes).toContainEqual({
+      table: 'availability_email_intakes',
+      filters: {
+        id: 'intake-1',
+      },
+    })
+    expect(revalidatePathMock).toHaveBeenCalledWith('/availability')
   })
 })
 
