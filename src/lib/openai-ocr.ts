@@ -1,4 +1,4 @@
-import { renderPdfToPngPages } from '@/lib/pdf-render-pages'
+import { createOcrImageVariants, renderPdfToPngPages } from '@/lib/pdf-render-pages'
 
 const DEFAULT_OCR_MODEL = 'gpt-4.1-mini'
 
@@ -49,6 +49,25 @@ function sanitizeOcrText(value: string): string {
     .replace(/\r/g, '')
     .replace(/[ \t]+\n/g, '\n')
     .trim()
+}
+
+function scoreOcrText(value: string): number {
+  const text = sanitizeOcrText(value)
+  if (!text) return 0
+
+  let score = Math.min(text.length, 120)
+
+  if (/\b(employee\s+name|name:)\b/i.test(text)) score += 120
+  if (/\b(need off|cannot work|can work|available|vacation|pto|off)\b/i.test(text)) score += 80
+  if (
+    /\b(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i.test(
+      text
+    )
+  ) {
+    score += 100
+  }
+
+  return score
 }
 
 export async function extractTextFromImageAttachment(params: {
@@ -204,10 +223,6 @@ async function extractTextFromPdfViaInputFile(params: {
   }
 }
 
-/**
- * When `input_file` PDF extraction finds no text (typical for scanned PDFs),
- * rasterize each page and run the same image OCR path used for photo uploads.
- */
 async function extractTextFromPdfViaRenderedPages(params: {
   contentBase64: string
   contentType: string | null
@@ -248,23 +263,51 @@ async function extractTextFromPdfViaRenderedPages(params: {
   const segments: string[] = []
   let lastModel: string | null = null
   const pageErrors: string[] = []
+  const zoneOrder = ['employee_name', 'request_top', 'request_mid', 'request_bottom']
 
   for (let i = 0; i < buffers.length; i++) {
     const pageBuffer = buffers[i]!
-    const pageResult = await extractTextFromImageAttachment({
-      contentBase64: pageBuffer.toString('base64'),
-      contentType: 'image/png',
-      filename: `${params.filename}#page-${i + 1}`,
-    })
+    const variants = await createOcrImageVariants(pageBuffer)
+    const variantErrors: string[] = []
+    const bestZoneText = new Map<string, { text: string; score: number }>()
 
-    if (pageResult.model) {
-      lastModel = pageResult.model
+    for (const variant of variants) {
+      const pageResult = await extractTextFromImageAttachment({
+        contentBase64: variant.base64,
+        contentType: variant.contentType,
+        filename: `${params.filename}#page-${i + 1}:${variant.label}`,
+      })
+
+      if (pageResult.model) {
+        lastModel = pageResult.model
+      }
+
+      if (pageResult.status === 'completed' && pageResult.text) {
+        const score = scoreOcrText(pageResult.text)
+        const current = bestZoneText.get(variant.zoneLabel)
+        if (!current || score > current.score) {
+          bestZoneText.set(variant.zoneLabel, { text: pageResult.text, score })
+        }
+        if (score >= 180) {
+          continue
+        }
+      } else if (pageResult.error && pageResult.error !== NO_TEXT_SKIP_MESSAGE) {
+        variantErrors.push(`${variant.zoneLabel}/${variant.label}: ${pageResult.error}`)
+      }
     }
 
-    if (pageResult.status === 'completed' && pageResult.text) {
-      segments.push(`--- Page ${i + 1} ---\n${pageResult.text}`)
-    } else if (pageResult.error) {
-      pageErrors.push(`page ${i + 1}: ${pageResult.error}`)
+    const orderedZoneText = zoneOrder
+      .map((zoneLabel) => bestZoneText.get(zoneLabel)?.text ?? null)
+      .filter((value): value is string => Boolean(value))
+      .map((text, index) => (index === 0 ? `Employee Name: ${text}` : text))
+    const mergedPageText = orderedZoneText.join('\n\n').trim()
+
+    if (mergedPageText) {
+      segments.push(`--- Page ${i + 1} ---\n${mergedPageText}`)
+    } else if (variantErrors.length > 0) {
+      pageErrors.push(`page ${i + 1}: ${variantErrors.join('; ')}`)
+    } else {
+      pageErrors.push(`page ${i + 1}: ${NO_TEXT_SKIP_MESSAGE}`)
     }
   }
 

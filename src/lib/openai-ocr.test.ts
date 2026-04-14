@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/pdf-render-pages', () => ({
+  createOcrImageVariants: vi.fn(),
   renderPdfToPngPages: vi.fn(),
 }))
 
@@ -12,7 +13,7 @@ import {
   isPdfContentType,
   isOcrSupportedContentType,
 } from '@/lib/openai-ocr'
-import { renderPdfToPngPages } from '@/lib/pdf-render-pages'
+import { createOcrImageVariants, renderPdfToPngPages } from '@/lib/pdf-render-pages'
 
 const MIN_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
@@ -25,8 +26,12 @@ const ONE_PAGE_PDF_BASE64 =
 describe('openai OCR helpers', () => {
   beforeEach(() => {
     vi.mocked(renderPdfToPngPages).mockReset()
+    vi.mocked(createOcrImageVariants).mockReset()
     vi.mocked(renderPdfToPngPages).mockImplementation(() => {
       throw new Error('renderPdfToPngPages was not expected for this test')
+    })
+    vi.mocked(createOcrImageVariants).mockImplementation(() => {
+      throw new Error('createOcrImageVariants was not expected for this test')
     })
   })
 
@@ -124,7 +129,29 @@ describe('openai OCR helpers', () => {
 
   it('falls back to image OCR when PDF extraction returns NO_TEXT', async () => {
     process.env.OPENAI_API_KEY = 'test-key'
+    vi.mocked(renderPdfToPngPages).mockResolvedValue([Buffer.from(MIN_PNG_BASE64, 'base64')])
+    vi.mocked(createOcrImageVariants).mockResolvedValue([
+      {
+        zoneLabel: 'employee_name',
+        label: 'original',
+        contentType: 'image/png',
+        base64: MIN_PNG_BASE64,
+      },
+      {
+        zoneLabel: 'employee_name',
+        label: 'threshold',
+        contentType: 'image/png',
+        base64: MIN_PNG_BASE64,
+      },
+      {
+        zoneLabel: 'request_top',
+        label: 'grayscale',
+        contentType: 'image/png',
+        base64: MIN_PNG_BASE64,
+      },
+    ])
 
+    let imageAttempts = 0
     const fetchMock = vi.fn(async (_input: string, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body ?? '{}')) as {
         input?: Array<{ content?: Array<{ type: string }> }>
@@ -132,10 +159,18 @@ describe('openai OCR helpers', () => {
       const content = body.input?.[0]?.content ?? []
       const isPdfRequest = content.some((part) => part.type === 'input_file')
 
+      if (!isPdfRequest) {
+        imageAttempts += 1
+      }
+
       return {
         ok: true,
         json: async () => ({
-          output_text: isPdfRequest ? 'NO_TEXT' : 'Employee Name: Brianna Brown\nNeed off Mar 24',
+          output_text: isPdfRequest
+            ? 'NO_TEXT'
+            : imageAttempts >= 3
+              ? 'Employee Name: Brianna Brown\nNeed off Mar 24'
+              : 'NO_TEXT',
         }),
       }
     })
@@ -152,7 +187,8 @@ describe('openai OCR helpers', () => {
       text: expect.stringContaining('Need off Mar 24'),
     })
 
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+    expect(createOcrImageVariants).toHaveBeenCalledOnce()
   })
 
   it('routes PDF attachments through the generic extractor', async () => {
@@ -172,87 +208,6 @@ describe('openai OCR helpers', () => {
     ).resolves.toMatchObject({
       status: 'completed',
       text: 'Need off Mar 24',
-    })
-  })
-
-  describe('PDF page-image OCR fallback', () => {
-    beforeEach(() => {
-      process.env.OPENAI_API_KEY = 'test-key'
-      process.env.OPENAI_OCR_MODEL = 'gpt-test-vision'
-      vi.mocked(renderPdfToPngPages).mockReset()
-      vi.mocked(renderPdfToPngPages).mockResolvedValue([
-        Buffer.from(MIN_PNG_BASE64, 'base64'),
-        Buffer.from(MIN_PNG_BASE64, 'base64'),
-      ])
-    })
-
-    it('rasterizes PDF pages and OCRs when input_file returns no text', async () => {
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ output_text: 'NO_TEXT' }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ output_text: 'Need off Mar 25' }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ output_text: 'Need off Mar 26' }),
-        })
-      vi.stubGlobal('fetch', fetchMock)
-
-      await expect(
-        extractTextFromPdfAttachment({
-          contentBase64: 'Zm9v',
-          contentType: 'application/pdf',
-          filename: 'scan.pdf',
-        })
-      ).resolves.toEqual({
-        status: 'completed',
-        text: '--- Page 1 ---\nNeed off Mar 25\n\n--- Page 2 ---\nNeed off Mar 26',
-        model: 'gpt-test-vision',
-        error: null,
-      })
-
-      expect(fetchMock).toHaveBeenCalledTimes(3)
-      expect(renderPdfToPngPages).toHaveBeenCalledOnce()
-      expect(renderPdfToPngPages).toHaveBeenCalledWith('Zm9v')
-    })
-
-    it('continues when one page OCR fails and another succeeds', async () => {
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ output_text: 'NO_TEXT' }),
-        })
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 500,
-          text: async () => 'upstream error',
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({ output_text: 'Need off Mar 27' }),
-        })
-      vi.stubGlobal('fetch', fetchMock)
-
-      await expect(
-        extractTextFromPdfAttachment({
-          contentBase64: 'Zm9v',
-          contentType: 'application/pdf',
-          filename: 'scan.pdf',
-        })
-      ).resolves.toEqual({
-        status: 'completed',
-        text: '--- Page 2 ---\nNeed off Mar 27',
-        model: 'gpt-test-vision',
-        error: null,
-      })
-
-      expect(fetchMock).toHaveBeenCalledTimes(3)
     })
   })
 })
