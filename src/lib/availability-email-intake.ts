@@ -2,6 +2,7 @@ import {
   matchAvailabilityEmailEmployee,
   type AvailabilityEmailEmployeeCandidate,
 } from '@/lib/availability-email-item-matcher'
+import { isPtoFormText, parsePtoForm } from '@/lib/pto-form-parser'
 
 type AvailabilityOverrideType = 'force_off' | 'force_on'
 type AvailabilityShiftType = 'day' | 'night' | 'both'
@@ -595,6 +596,10 @@ export function parseAvailabilityEmail(
   sourceText: string,
   cycles: IntakeCycle[]
 ): ParsedAvailabilityEmail {
+  if (isPtoFormText(sourceText)) {
+    return parsePtoForm(sourceText, cycles)
+  }
+
   const lines = splitIntoCandidateLines(sourceText)
   const requests: ParsedAvailabilityRequest[] = []
   const unresolvedLines: string[] = []
