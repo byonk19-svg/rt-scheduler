@@ -74,6 +74,7 @@ export async function extractTextFromImageAttachment(params: {
   contentBase64: string | null
   contentType: string | null
   filename: string
+  promptOverride?: string
 }): Promise<OcrResult> {
   const config = getOpenAiOcrConfig()
   if (!config.enabled) {
@@ -95,6 +96,7 @@ export async function extractTextFromImageAttachment(params: {
   }
 
   const prompt =
+    params.promptOverride ??
     'Read this employee scheduling request form image and transcribe only the useful scheduling text. Return plain text only. Preserve dates exactly when visible. If there is no readable scheduling text, return NO_TEXT.'
 
   const response = await fetch('https://api.openai.com/v1/responses', {
@@ -264,6 +266,16 @@ async function extractTextFromPdfViaRenderedPages(params: {
   let lastModel: string | null = null
   const pageErrors: string[] = []
   const zoneOrder = ['employee_name', 'request_top', 'request_mid', 'request_bottom']
+  const zonePrompts: Record<string, string> = {
+    employee_name:
+      'Read only the handwritten employee name from this form region. Return just the name in plain text. If there is no readable name, return NO_TEXT.',
+    request_top:
+      'Read only the handwritten availability or PTO request text from this form region. Preserve dates exactly. If there is no readable request text, return NO_TEXT.',
+    request_mid:
+      'Read only the handwritten availability or PTO request text from this form region. Preserve dates exactly. If there is no readable request text, return NO_TEXT.',
+    request_bottom:
+      'Read only the handwritten availability or PTO request text from this form region. Preserve dates exactly. If there is no readable request text, return NO_TEXT.',
+  }
 
   for (let i = 0; i < buffers.length; i++) {
     const pageBuffer = buffers[i]!
@@ -276,6 +288,7 @@ async function extractTextFromPdfViaRenderedPages(params: {
         contentBase64: variant.base64,
         contentType: variant.contentType,
         filename: `${params.filename}#page-${i + 1}:${variant.label}`,
+        promptOverride: zonePrompts[variant.zoneLabel] ?? undefined,
       })
 
       if (pageResult.model) {

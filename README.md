@@ -245,6 +245,7 @@ What the app does:
 - can OCR supported image attachments through the OpenAI Responses API when configured
 - creates an intake record for manager review on [`/availability`](./src/app/availability/page.tsx)
 - applies parsed dates into `availability_overrides` as manager-entered inputs
+- renders scanned PDF pages and retries OCR using multiple page-image variants and fixed-form-like region prompts when direct PDF extraction returns no text
 
 Required env vars:
 
@@ -274,7 +275,8 @@ Current MVP limits:
 
 - automatic parsing is best when the email body is typed and structured
 - image attachments (`png`, `jpg`, `jpeg`, `webp`, `gif`) can be OCR'd when OpenAI is configured
-- PDF attachments are parsed through the OpenAI extraction flow when configured
+- PDF attachments are first attempted through direct PDF extraction, then through rendered page-image OCR when needed
+- very poor handwritten scans can still remain unreadable even after preprocessing and fixed-form-like region prompts; those items stay in the review queue with stored OCR failure reasons
 - sender matching currently uses the sender email address against `profiles.email`
 - the Resend API key must have receiving-capable permissions; a send-only key cannot fetch inbound email content
 

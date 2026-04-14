@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-13 (session 58)
+Updated: 2026-04-14 (session 60)
 
 ## Handoff Snapshot
 
@@ -14,7 +14,11 @@ Updated: 2026-04-13 (session 58)
   - inbound email webhook
   - manager-created manual intake from pasted text
   - uploaded form image/PDF on `/availability`
-- Uploaded images can OCR through the OpenAI Responses API when `OPENAI_API_KEY` is configured. PDFs are stored for review but are not OCR'd automatically yet.
+- Uploaded images can OCR through the OpenAI Responses API when `OPENAI_API_KEY` is configured. PDFs now try direct PDF extraction first, then render pages to images and retry OCR when direct extraction returns no text using stronger preprocessing and fixed-form-like region prompts.
+- The production pipeline is now instrumented enough to distinguish delivery failures, render failures, and OCR failures in `availability_email_intake_items.ocr_error`.
+- Replaying the same Resend inbound event does **not** reliably create a fresh processed intake row every time. Use `created_at` on the newest intake item rows to confirm whether a replay actually exercised the latest production code.
+- The real HCA multi-page handwritten scan used in session 60 proved that the end-to-end pipeline works, but generic OCR still fails to recover useful text from that specific document. Treat that as a document-readability ceiling, not a transport bug.
+- The latest production pass adds rotated/grayscale/threshold OCR variants plus region-specific prompts for handwritten name/request areas, but the replayed HCA scan still remains unreadable. Assume future progress will require either a truly template-anchored field extractor or a manager rescue workflow.
 - Managers can now fix therapist matches inline on the intake card and then apply parsed dates from the same surface.
 - Managers must now match both the therapist and the schedule block before `Apply dates` appears on an intake card. This prevents the old dead-end `email_intake_apply_failed` redirect when a therapist was matched but no cycle was attached yet.
 - **Schedule layout + role consistency:** `/coverage` now supports both **Grid** and **Roster** layouts. Managers can edit staffing from either layout by clicking a day cell; leads can update staffed cells to **`OC`**, **`LE`**, **`CX`**, or **`CI`** through the shared assignment-status flow. Users can save a default schedule layout (`Grid` or `Roster`) in `/profile`, and compatibility routes (`/schedule`, `/therapist/schedule`) now defer default layout selection to `/coverage` so a saved preference wins unless an explicit `view` query is present.
@@ -45,6 +49,27 @@ Updated: 2026-04-13 (session 58)
 - `npm run test:unit`
 - `npm run test:e2e` when auth/env setup is available
 - `vercel deploy --prod --yes` for production shipping
+
+## Latest Updates (2026-04-14, session 60)
+
+- **Inbound handwritten PDF troubleshooting** (`src/lib/openai-ocr.ts`, `src/lib/pdf-render-pages.ts`, `src/app/api/inbound/availability-email/route.ts`, tests):
+  - Shipped and production-tested the inbound PDF path through several runtime fixes: worker-free page rendering, `DOMMatrix`/`ImageData`/`Path2D` polyfills, explicit `pdfjs-dist` dependency, and Vercel trace hints for the inbound webhook route.
+  - Added persistence of OCR failure reasons to `availability_email_intake_items.ocr_error`, which exposed the real failure progression in production:
+    1. missing `pdf.worker.mjs`
+    2. missing `DOMMatrix`
+    3. missing `pdfjs-dist/package.json`
+    4. final state: page rendering works, OCR runs, but all pages still return `No readable scheduling text detected.`
+  - Added stronger page-image OCR retries: grayscale, threshold, inverted threshold, and rotation variants, plus candidate scoring and zone-specific prompts for name/request regions.
+  - Final live conclusion from the replayed HCA scan: the pipeline now works end-to-end, but that specific 21-page handwritten document remains unreadable to the current OCR approach. Stop debugging delivery/runtime if the latest `ocr_error` is the all-pages-`NO_TEXT` form.
+- **Approved next design direction:** move from generic page-level OCR retries to a truly template-aware handwritten zone extractor. Spec saved in `docs/superpowers/specs/2026-04-13-handwritten-pdf-zone-extraction-design.md`; implementation plan saved in `docs/superpowers/plans/2026-04-13-handwritten-pdf-zone-extraction.md`.
+
+## Latest Updates (2026-04-14, session 61)
+
+- **Scanned PDF OCR recovery pass** (`src/lib/openai-ocr.ts`, `src/lib/pdf-render-pages.ts`, tests):
+  - Shipped a stronger fallback that generates multiple page-image variants (grayscale, thresholded, inverted, rotated), scores OCR candidates, and adds region-specific prompts for handwritten name and request areas.
+  - Production replay evidence for the HCA scan still ends in the explicit all-pages-`NO_TEXT` failure, which means the pipeline is operational but that specific 21-page handwritten document remains unreadable to the current OCR approach.
+  - This is now a document-readability problem, not an email/webhook/runtime-packaging problem.
+- **Operational conclusion:** do not use repeated Resend replays as the only validation signal; a replay may not create a fresh intake item row. Always confirm a truly new run via the newest `availability_email_intake_items.created_at`.
 
 The session entries below are historical context. They may describe local-only or superseded work and should not override the snapshot above.
 
