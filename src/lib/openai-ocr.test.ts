@@ -102,6 +102,40 @@ describe('openai OCR helpers', () => {
     expect(requestBody.input?.[0]?.content?.[0]?.text).toContain('all visible text')
   })
 
+  it('parses text from the Responses API output message shape', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        output: [
+          {
+            type: 'message',
+            content: [
+              {
+                type: 'output_text',
+                text: 'Employee Name: Brianna Brown\nNeed off Mar 24',
+              },
+            ],
+          },
+        ],
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      extractTextFromImageAttachment({
+        contentBase64: MIN_PNG_BASE64,
+        contentType: 'image/jpeg',
+        filename: 'request.jpeg',
+      })
+    ).resolves.toMatchObject({
+      status: 'completed',
+      text: 'Employee Name: Brianna Brown\nNeed off Mar 24',
+      error: null,
+    })
+  })
+
   it('falls back to image variants when direct image OCR returns NO_TEXT', async () => {
     process.env.OPENAI_API_KEY = 'test-key'
     vi.mocked(createOcrImageVariants).mockResolvedValue([

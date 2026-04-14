@@ -76,6 +76,38 @@ function sanitizeOcrText(value: string): string {
     .trim()
 }
 
+function extractOutputTextFromResponsePayload(payload: unknown): string {
+  if (!payload || typeof payload !== 'object') {
+    return ''
+  }
+
+  const directOutputText =
+    'output_text' in payload && typeof payload.output_text === 'string' ? payload.output_text : ''
+
+  const nestedOutputText =
+    'output' in payload && Array.isArray(payload.output)
+      ? payload.output
+          .flatMap((item) =>
+            item && typeof item === 'object' && 'content' in item && Array.isArray(item.content)
+              ? item.content
+              : []
+          )
+          .map((contentItem) =>
+            contentItem &&
+            typeof contentItem === 'object' &&
+            'type' in contentItem &&
+            contentItem.type === 'output_text' &&
+            'text' in contentItem &&
+            typeof contentItem.text === 'string'
+              ? contentItem.text
+              : ''
+          )
+          .join('\n')
+      : ''
+
+  return sanitizeOcrText(directOutputText || nestedOutputText)
+}
+
 function scoreOcrText(value: string): number {
   const text = sanitizeOcrText(value)
   if (!text) return 0
@@ -275,8 +307,8 @@ export async function extractTextFromImageAttachment(params: {
     }
   }
 
-  const payload = (await response.json()) as { output_text?: string | null }
-  const outputText = sanitizeOcrText(payload.output_text ?? '')
+  const payload = (await response.json()) as unknown
+  const outputText = extractOutputTextFromResponsePayload(payload)
 
   if (!outputText || outputText === 'NO_TEXT') {
     if (!params.promptOverride) {
@@ -367,8 +399,8 @@ async function extractTextFromPdfViaInputFile(params: {
     }
   }
 
-  const payload = (await response.json()) as { output_text?: string | null }
-  const outputText = sanitizeOcrText(payload.output_text ?? '')
+  const payload = (await response.json()) as unknown
+  const outputText = extractOutputTextFromResponsePayload(payload)
 
   if (!outputText || outputText === 'NO_TEXT') {
     return {
