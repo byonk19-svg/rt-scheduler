@@ -35,6 +35,7 @@ import { formatHumanCycleRange } from '@/lib/calendar-utils'
 import { buildMissingAvailabilityRows } from '@/lib/employee-directory'
 import { toUiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
+import { cn } from '@/lib/utils'
 type ToastVariant = 'success' | 'error'
 type AvailabilityOverrideType = 'force_off' | 'force_on'
 type AvailabilityShiftType = 'day' | 'night' | 'both'
@@ -137,6 +138,7 @@ type AvailabilityPageSearchParams = {
   copied?: string | string[]
   error?: string | string[]
   success?: string | string[]
+  tab?: string | string[]
   search?: string | string[]
   therapist?: string | string[]
   status?: string | string[]
@@ -148,6 +150,29 @@ type AvailabilityPageSearchParams = {
 function getSearchParam(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0]
   return value
+}
+
+function buildAvailabilityTabHref(
+  params: AvailabilityPageSearchParams | undefined,
+  targetTab: 'planner' | 'intake'
+): string {
+  const searchParams = new URLSearchParams()
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (key === 'tab' || value == null) continue
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          searchParams.append(key, item)
+        }
+        continue
+      }
+      searchParams.set(key, value)
+    }
+  }
+
+  searchParams.set('tab', targetTab)
+  const query = searchParams.toString()
+  return query ? `/availability?${query}` : '/availability'
 }
 
 function stripStoredEmailSubject(text: string | null, subject: string | null): string | null {
@@ -329,6 +354,7 @@ export default async function AvailabilityPage({
   const feedback = getAvailabilityFeedback(params)
   const initialStatus = getSearchParam(params?.status)
   const initialSort = getSearchParam(params?.sort)
+  const activeTab = getSearchParam(params?.tab) === 'intake' ? 'intake' : 'planner'
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -542,6 +568,7 @@ export default async function AvailabilityPage({
         }),
     }
   })
+  const intakeNeedsReviewCount = emailIntakeRows.reduce((sum, row) => sum + row.needsReviewCount, 0)
   const selectedPlannerTherapistId =
     plannerTherapists.find((therapist) => therapist.id === selectedTherapistIdFromParams)?.id ??
     plannerTherapists[0]?.id ??
@@ -666,6 +693,8 @@ export default async function AvailabilityPage({
     canManageAvailability && activeTeamCount && activeTeamCount > 0
       ? `${uniqueRequesters}/${activeTeamCount}`
       : null
+  const plannerHref = buildAvailabilityTabHref(params, 'planner')
+  const intakeHref = buildAvailabilityTabHref(params, 'intake')
 
   return (
     <div className="availability-page-print space-y-7">
@@ -727,24 +756,61 @@ export default async function AvailabilityPage({
       />
 
       {canManageAvailability ? (
-        <AvailabilityPlannerFocusProvider
-          initialFocusedTherapistName={plannerTherapistNameForDefault}
-        >
-          {emailIntakePanel}
-          <ManagerSchedulingInputs
-            cycles={cycles}
-            therapists={plannerTherapists}
-            overrides={plannerOverrides}
-            initialCycleId={selectedCycleId}
-            initialTherapistId={selectedPlannerTherapistId}
-            submittedRows={submittedAvailabilityRows}
-            missingRows={missingAvailabilityRows}
-            saveManagerPlannerDatesAction={saveManagerPlannerDatesAction}
-            deleteManagerPlannerDateAction={deleteManagerPlannerDateAction}
-            copyAvailabilityFromPreviousCycleAction={copyAvailabilityFromPreviousCycleAction}
-            reviewRequestsPanel={entriesCard}
-          />
-        </AvailabilityPlannerFocusProvider>
+        <div className="border-b border-border">
+          <nav className="-mb-px flex gap-0" aria-label="Availability sections">
+            <a
+              href={plannerHref}
+              className={cn(
+                'px-4 py-2.5 text-sm border-b-2 transition-colors',
+                activeTab === 'planner'
+                  ? 'border-primary text-foreground font-medium'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+            >
+              Planner
+            </a>
+            <a
+              href={intakeHref}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2.5 text-sm border-b-2 transition-colors',
+                activeTab === 'intake'
+                  ? 'border-primary text-foreground font-medium'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+            >
+              Email Intake
+              {intakeNeedsReviewCount > 0 ? (
+                <span className="rounded-full border border-warning-border bg-warning-subtle px-1.5 py-0.5 text-[10px] font-semibold text-warning-text">
+                  {intakeNeedsReviewCount}
+                </span>
+              ) : null}
+            </a>
+          </nav>
+        </div>
+      ) : null}
+
+      {canManageAvailability ? (
+        activeTab === 'planner' ? (
+          <AvailabilityPlannerFocusProvider
+            initialFocusedTherapistName={plannerTherapistNameForDefault}
+          >
+            <ManagerSchedulingInputs
+              cycles={cycles}
+              therapists={plannerTherapists}
+              overrides={plannerOverrides}
+              initialCycleId={selectedCycleId}
+              initialTherapistId={selectedPlannerTherapistId}
+              submittedRows={submittedAvailabilityRows}
+              missingRows={missingAvailabilityRows}
+              saveManagerPlannerDatesAction={saveManagerPlannerDatesAction}
+              deleteManagerPlannerDateAction={deleteManagerPlannerDateAction}
+              copyAvailabilityFromPreviousCycleAction={copyAvailabilityFromPreviousCycleAction}
+              reviewRequestsPanel={entriesCard}
+            />
+          </AvailabilityPlannerFocusProvider>
+        ) : (
+          emailIntakePanel
+        )
       ) : (
         <>
           {therapistWorkspace}

@@ -4,7 +4,6 @@ import { useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 
 export type EmailIntakePanelItemRow = {
@@ -303,13 +302,13 @@ export function EmailIntakePanel({
     reparseEmailIntakeAction ?? reparseAvailabilityEmailIntakeAction
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="border-b border-border/70">
-        <CardTitle>Email Intake</CardTitle>
-        <CardDescription>
+    <div>
+      <div className="border-b border-border/70 pb-4">
+        <h2 className="app-section-title">Email Intake</h2>
+        <p className="text-sm text-muted-foreground">
           Forward staff request emails or forms into your intake inbox. Clear items can be
           auto-applied while unclear items stay in the review queue.
-        </CardDescription>
+        </p>
         {rows.length > 0 ? (
           <div>
             <Button
@@ -335,8 +334,8 @@ export function EmailIntakePanel({
             ) : null}
           </div>
         ) : null}
-      </CardHeader>
-      <CardContent className="space-y-4 pt-4">
+      </div>
+      <div className="space-y-4 pt-4">
         {rows.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
             <p>No intake items yet. Forward request emails to the intake inbox to begin.</p>
@@ -509,7 +508,7 @@ export function EmailIntakePanel({
             </div>
           ))
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
