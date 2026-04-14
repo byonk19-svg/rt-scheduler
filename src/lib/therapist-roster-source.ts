@@ -40,13 +40,14 @@ function parseTherapistSourceLine(
     return { ok: false, message: 'Expected "Last, First Phone" format.' }
   }
 
-  const match = remainder.match(/^(?<firstName>.+?)\s+(?<phone>(?=.*\d)[()\d.+\-\s]+)$/)
-  if (!match?.groups) {
+  const match = remainder.match(/^(.+?)\s+((?=.*\d)[()\d.+\-\s]+)$/)
+  if (!match) {
     return { ok: false, message: 'Missing therapist phone number.' }
   }
 
-  const firstName = match.groups.firstName.trim().replace(/\s+/g, ' ')
-  const phone = match.groups.phone.trim()
+  const [, rawFirstName, rawPhone] = match
+  const firstName = rawFirstName.trim().replace(/\s+/g, ' ')
+  const phone = rawPhone.trim()
   if (!firstName || !phone) {
     return { ok: false, message: 'Expected "Last, First Phone" format.' }
   }
