@@ -16,7 +16,7 @@ import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 export const APP_SHELL_SIDEBAR_CLASS =
   'no-print hidden shrink-0 flex-col border-r border-sidebar-border/70 bg-sidebar text-sidebar-foreground shadow-none lg:flex lg:h-screen lg:max-h-screen lg:min-h-0 lg:self-start lg:sticky lg:top-0'
 export const APP_SHELL_ACTIVE_NAV_CLASS =
-  'bg-sidebar-accent/60 text-sidebar-accent-foreground ring-1 ring-sidebar-border/60'
+  'bg-sidebar-accent/85 text-sidebar-primary shadow-tw-2xs ring-2 ring-sidebar-ring/45 ring-offset-1 ring-offset-[var(--sidebar)]'
 export const APP_SHELL_PROFILE_CARD_CLASS =
   'mt-2 rounded-xl border border-sidebar-border/70 bg-sidebar-accent/15 px-2.5 py-2'
 
@@ -193,8 +193,8 @@ function initials(name: string): string {
 function Logo() {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent">
-        <CalendarDays className="h-4 w-4 text-sidebar-accent-foreground" />
+      <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground shadow-tw-2xs ring-1 ring-sidebar-ring/35">
+        <CalendarDays className="h-4 w-4 text-[color:var(--sidebar-ring)]" aria-hidden />
       </div>
       <div className="leading-none hidden sm:block">
         <p className="font-heading text-sm font-bold tracking-[-0.02em] text-sidebar-primary">
@@ -345,7 +345,7 @@ export function AppShell({ user, children }: AppShellProps) {
       </a>
 
       {/* ── Primary top nav ─────────────────────────────────────────────── */}
-      <header className="no-print print:hidden fixed top-0 left-0 right-0 z-30 h-14 border-b border-sidebar-border/70 bg-sidebar text-sidebar-foreground shadow-[0_1px_8px_rgba(0,0,0,0.08)]">
+      <header className="no-print print:hidden app-shell-chrome-primary fixed top-0 left-0 right-0 z-30 h-14 border-b border-sidebar-border/80 text-sidebar-foreground shadow-tw-app-chrome">
         <div className="flex h-full touch-manipulation items-center gap-2 px-3 sm:gap-3 sm:px-4">
           {/* Logo */}
           <Link
@@ -430,7 +430,7 @@ export function AppShell({ user, children }: AppShellProps) {
       {/* ── Secondary nav (manager — Schedule and People sections) ─────── */}
       {hasSecondaryNav && activeSection && (
         <nav
-          className="no-print print:hidden fixed top-14 left-0 right-0 z-20 h-11 border-b border-sidebar-border/50 bg-sidebar"
+          className="no-print print:hidden app-shell-chrome-secondary fixed top-14 left-0 right-0 z-20 h-11 border-b border-sidebar-border/60 shadow-tw-app-chrome-sub"
           aria-label="Section navigation"
         >
           <div className="h-full overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
@@ -445,7 +445,7 @@ export function AppShell({ user, children }: AppShellProps) {
                       'relative flex h-full shrink-0 items-center gap-1.5 px-3 text-[13px] font-medium transition-colors duration-150',
                       active
                         ? 'text-sidebar-primary after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-t-full after:bg-[color:var(--sidebar-ring)]'
-                        : 'text-sidebar-foreground hover:text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent/30 hover:text-sidebar-accent-foreground'
                     )}
                     aria-current={active ? 'page' : undefined}
                   >
@@ -495,7 +495,7 @@ export function AppShell({ user, children }: AppShellProps) {
           />
           <aside
             id="app-shell-mobile-nav"
-            className="relative z-10 flex h-full w-[85vw] max-w-[20rem] flex-col overscroll-contain border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
+            className="app-shell-chrome-primary relative z-10 flex h-full w-[85vw] max-w-[20rem] flex-col overscroll-contain border-r border-sidebar-border text-sidebar-foreground shadow-tw-app-chrome-sub"
           >
             <h2 id="mobile-nav-heading" className="sr-only">
               Navigation menu

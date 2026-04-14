@@ -52,6 +52,7 @@ const contentSecurityPolicy = buildContentSecurityPolicy()
 
 const nextConfig: NextConfig = {
   /* config options here */
+  serverExternalPackages: ['pdf-to-img', 'pdfjs-dist'],
   reactCompiler: true,
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
   distDir: process.env.NEXT_DIST_DIR ?? '.next',

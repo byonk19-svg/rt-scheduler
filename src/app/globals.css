@@ -74,15 +74,15 @@
   --input-background: hsl(38 14% 99%);
   --ring: hsl(187 55% 28%);
 
-  --sidebar: hsl(192 24% 24%);
-  --sidebar-foreground: hsl(190 10% 78%);
-  --sidebar-primary: hsl(0 0% 100%);
-  --sidebar-primary-foreground: hsl(192 30% 20%);
-  --sidebar-accent: hsl(192 35% 28%);
-  --sidebar-accent-foreground: hsl(38 25% 96%);
-  --sidebar-border: hsl(192 20% 26%);
+  --sidebar: hsl(192 28% 20%);
+  --sidebar-foreground: hsl(190 12% 82%);
+  --sidebar-primary: hsl(38 25% 98%);
+  --sidebar-primary-foreground: hsl(192 32% 18%);
+  --sidebar-accent: hsl(192 42% 30%);
+  --sidebar-accent-foreground: hsl(38 30% 98%);
+  --sidebar-border: hsl(192 24% 34%);
   --sidebar-ring: hsl(38 90% 55%);
-  --sidebar-muted: hsl(192 14% 52%);
+  --sidebar-muted: hsl(192 16% 58%);
 
   --chart-1: hsl(187 55% 28%);
   --chart-2: hsl(192 35% 28%);
@@ -378,6 +378,42 @@
   box-shadow:
     0 1px 3px color-mix(in srgb, var(--foreground) 8%, transparent),
     0 16px 40px color-mix(in srgb, var(--foreground) 7%, transparent);
+}
+
+/* App shell fixed chrome — teal depth + warm top edge (tokens only; no raw rgba in TSX) */
+.app-shell-chrome-primary {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--primary) 20%, var(--sidebar)) 0%,
+    var(--sidebar) 38%,
+    color-mix(in srgb, var(--foreground) 12%, var(--sidebar)) 100%
+  );
+}
+
+.app-shell-chrome-secondary {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--foreground) 5%, var(--sidebar)) 0%,
+    color-mix(in srgb, var(--foreground) 11%, var(--sidebar)) 100%
+  );
+}
+
+.shadow-tw-app-chrome {
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--sidebar-ring) 22%, transparent),
+    0 12px 28px -14px color-mix(in srgb, var(--foreground) 18%, transparent);
+}
+
+.shadow-tw-app-chrome-sub {
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--primary) 16%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--sidebar-primary) 10%, transparent);
+}
+
+.shadow-tw-shell-control-hover {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--sidebar-ring) 35%, transparent),
+    0 1px 2px color-mix(in srgb, var(--foreground) 8%, transparent);
 }
 
 .shadow-tw-double-panel {

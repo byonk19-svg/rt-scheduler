@@ -339,7 +339,8 @@ export function EmailIntakePanel({
                 accept=".png,.jpg,.jpeg,.webp,.gif,.pdf"
               />
               <p className="text-xs text-muted-foreground">
-                Images can be OCR&apos;d automatically. PDFs are stored for review.
+                Images OCR automatically. Scanned PDFs use per-page image OCR when direct PDF read
+                finds no text (requires OpenAI).
               </p>
             </div>
           </div>

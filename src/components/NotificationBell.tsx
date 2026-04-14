@@ -213,9 +213,9 @@ export function NotificationBell({ variant = 'default' }: NotificationBellProps)
             }
           }
         }}
-        className={`relative inline-flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-md border ${
+        className={`relative inline-flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-md border transition-[box-shadow,background-color,border-color] duration-150 ${
           isShellVariant
-            ? 'border-sidebar-border bg-sidebar-accent/35 text-sidebar-foreground hover:bg-sidebar-accent'
+            ? 'border-sidebar-border/90 bg-sidebar-accent/55 text-sidebar-primary shadow-tw-2xs hover:border-sidebar-ring/40 hover:bg-sidebar-accent hover:shadow-tw-shell-control-hover'
             : `border-border bg-card text-foreground ${isStaffVariant ? '' : 'hover:bg-secondary'}`
         }`}
         aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
