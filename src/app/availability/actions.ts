@@ -17,7 +17,7 @@ import {
   sanitizeParsedRequests,
   stripHtmlToText,
 } from '@/lib/availability-email-intake'
-import { cycleIntakeRequest } from '@/lib/availability-intake-request-cycler'
+import { cycleIntakeRequest, markRequestsEdited } from '@/lib/availability-intake-request-cycler'
 import { shiftOverridesToCycle } from '@/lib/copy-cycle-availability'
 import { buildManagerOverrideInput } from '@/lib/employee-directory'
 import { extractTextFromAttachment } from '@/lib/openai-ocr'
@@ -885,7 +885,7 @@ export async function updateEmailIntakeItemRequestAction(formData: FormData) {
 
   const { data: item, error: loadError } = await supabase
     .from('availability_email_intake_items')
-    .select('id, intake_id, parsed_requests')
+    .select('id, intake_id, parsed_requests, original_parsed_requests')
     .eq('id', itemId)
     .maybeSingle()
 
@@ -902,11 +902,24 @@ export async function updateEmailIntakeItemRequestAction(formData: FormData) {
       shift_type: shiftType,
     },
   })
+  const manuallyEditedAtUpdate = item.original_parsed_requests
+    ? {
+        manually_edited_at: item.original_parsed_requests
+          ? markRequestsEdited({
+              originalRequests: item.original_parsed_requests,
+              currentRequests: parsedRequests,
+            })
+            ? new Date().toISOString()
+            : null
+          : null,
+      }
+    : {}
 
   const { error: updateError } = await supabase
     .from('availability_email_intake_items')
     .update({
       parsed_requests: parsedRequests,
+      ...manuallyEditedAtUpdate,
     })
     .eq('id', itemId)
 
@@ -1050,8 +1063,10 @@ export async function reparseEmailIntakeAction(formData: FormData) {
         employee_match_candidates: item.employeeMatchCandidates,
         matched_therapist_id: item.matchedTherapistId,
         matched_cycle_id: item.matchedCycleId,
+        original_parsed_requests: item.requests,
         parsed_requests: item.requests,
         unresolved_lines: item.unresolvedLines,
+        manually_edited_at: null,
         auto_applied_at: null,
         auto_applied_by: null,
         apply_error: null,
