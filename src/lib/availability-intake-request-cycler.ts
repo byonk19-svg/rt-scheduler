@@ -10,9 +10,7 @@ type IntakeRequestChipTarget = Pick<
   'date' | 'override_type' | 'shift_type'
 >
 
-function sortParsedRequests(
-  requests: ParsedAvailabilityRequest[]
-): ParsedAvailabilityRequest[] {
+function sortParsedRequests(requests: ParsedAvailabilityRequest[]): ParsedAvailabilityRequest[] {
   return [...requests].sort(
     (a, b) =>
       a.date.localeCompare(b.date) ||
@@ -34,7 +32,9 @@ function matchesChipTarget(
   )
 }
 
-function buildDefaultParsedRequest(target: IntakeRequestChipTarget): ParsedAvailabilityRequest | null {
+function buildDefaultParsedRequest(
+  target: IntakeRequestChipTarget
+): ParsedAvailabilityRequest | null {
   return (
     sanitizeParsedRequests([
       {
@@ -82,5 +82,8 @@ export function markRequestsEdited(params: {
   originalRequests: unknown
   currentRequests: unknown
 }): boolean {
-  return serializeParsedRequests(params.originalRequests) !== serializeParsedRequests(params.currentRequests)
+  return (
+    serializeParsedRequests(params.originalRequests) !==
+    serializeParsedRequests(params.currentRequests)
+  )
 }

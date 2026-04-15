@@ -75,11 +75,7 @@ function formatRequestLabel(request: EmailIntakePanelItemRow['parsedRequests'][n
     ? request.date
     : parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   const shiftSuffix =
-    request.shift_type === 'both'
-      ? ''
-      : request.shift_type === 'day'
-        ? ' (day)'
-        : ' (night)'
+    request.shift_type === 'both' ? '' : request.shift_type === 'day' ? ' (day)' : ' (night)'
   return `${label} ${request.override_type === 'force_off' ? 'off' : 'work'}${shiftSuffix}`
 }
 

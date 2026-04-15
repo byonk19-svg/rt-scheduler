@@ -1,14 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ParsedAvailabilityRequest } from '@/lib/availability-email-intake'
-import {
-  cycleIntakeRequest,
-  markRequestsEdited,
-} from '@/lib/availability-intake-request-cycler'
+import { cycleIntakeRequest, markRequestsEdited } from '@/lib/availability-intake-request-cycler'
 
-function buildRequest(
-  overrides?: Partial<ParsedAvailabilityRequest>
-): ParsedAvailabilityRequest {
+function buildRequest(overrides?: Partial<ParsedAvailabilityRequest>): ParsedAvailabilityRequest {
   return {
     date: '2026-03-24',
     override_type: 'force_off',
