@@ -22,7 +22,9 @@ export type EmailIntakePanelItemRow = {
   parsedRequests: Array<{
     date: string
     override_type: 'force_off' | 'force_on'
+    shift_type: 'day' | 'night' | 'both'
   }>
+  manuallyEdited?: boolean
 }
 
 export type EmailIntakePanelRow = {
@@ -72,7 +74,9 @@ function formatRequestLabel(request: EmailIntakePanelItemRow['parsedRequests'][n
   const label = Number.isNaN(parsed.getTime())
     ? request.date
     : parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  return `${label} ${request.override_type === 'force_off' ? 'off' : 'work'}`
+  const shiftSuffix =
+    request.shift_type === 'both' ? '' : request.shift_type === 'day' ? ' (day)' : ' (night)'
+  return `${label} ${request.override_type === 'force_off' ? 'off' : 'work'}${shiftSuffix}`
 }
 
 const CONFIDENCE_REASON_LABELS: Record<string, string> = {
@@ -124,6 +128,7 @@ function getItemNextStep(item: EmailIntakePanelItemRow): string {
 function renderItemCard(params: {
   item: EmailIntakePanelItemRow
   applyEmailAvailabilityImportAction: (formData: FormData) => void | Promise<void>
+  updateEmailIntakeItemRequestAction: (formData: FormData) => void | Promise<void>
   updateEmailIntakeTherapistAction: (formData: FormData) => void | Promise<void>
   therapistOptions: Array<{ id: string; fullName: string }>
   cycleOptions: Array<{ id: string; label: string }>
@@ -131,6 +136,7 @@ function renderItemCard(params: {
   const {
     item,
     applyEmailAvailabilityImportAction,
+    updateEmailIntakeItemRequestAction,
     updateEmailIntakeTherapistAction,
     therapistOptions,
     cycleOptions,
@@ -144,6 +150,7 @@ function renderItemCard(params: {
             <p className="text-sm font-medium text-foreground">{item.sourceLabel}</p>
             <Badge variant={formatStatusVariant(item.parseStatus)}>{item.parseStatus}</Badge>
             <Badge variant="outline">{item.confidenceLevel} confidence</Badge>
+            {item.manuallyEdited ? <Badge variant="outline">Edited</Badge> : null}
           </div>
           <p className="text-xs text-muted-foreground">
             {item.extractedEmployeeName
@@ -184,17 +191,27 @@ function renderItemCard(params: {
       {item.parsedRequests.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {item.parsedRequests.map((request) => (
-            <Badge
-              key={`${item.id}-${request.date}-${request.override_type}`}
-              variant="outline"
-              className={
-                request.override_type === 'force_off'
-                  ? 'border-destructive/30 bg-destructive/10 text-destructive'
-                  : 'border-info-border bg-info-subtle text-info-text'
-              }
+            <form
+              key={`${item.id}-${request.date}-${request.override_type}-${request.shift_type}`}
+              action={updateEmailIntakeItemRequestAction}
             >
-              {formatRequestLabel(request)}
-            </Badge>
+              <input type="hidden" name="item_id" value={item.id} />
+              <input type="hidden" name="date" value={request.date} />
+              <input type="hidden" name="override_type" value={request.override_type} />
+              <input type="hidden" name="shift_type" value={request.shift_type} />
+              <Button
+                type="submit"
+                size="sm"
+                variant="outline"
+                className={
+                  request.override_type === 'force_off'
+                    ? 'h-7 border-destructive/30 bg-destructive/10 px-2 text-xs text-destructive hover:bg-destructive/15 hover:text-destructive'
+                    : 'h-7 border-info-border bg-info-subtle px-2 text-xs text-info-text hover:bg-info-subtle/80 hover:text-info-text'
+                }
+              >
+                {formatRequestLabel(request)}
+              </Button>
+            </form>
           ))}
         </div>
       ) : null}
@@ -278,6 +295,7 @@ function renderItemCard(params: {
 export function EmailIntakePanel({
   rows,
   applyEmailAvailabilityImportAction,
+  updateEmailIntakeItemRequestAction,
   deleteEmailIntakeAction,
   reparseEmailIntakeAction,
   deleteAvailabilityEmailIntakeAction,
@@ -288,6 +306,7 @@ export function EmailIntakePanel({
 }: {
   rows: EmailIntakePanelRow[]
   applyEmailAvailabilityImportAction: (formData: FormData) => void | Promise<void>
+  updateEmailIntakeItemRequestAction: (formData: FormData) => void | Promise<void>
   deleteEmailIntakeAction?: (formData: FormData) => void | Promise<void>
   reparseEmailIntakeAction?: (formData: FormData) => void | Promise<void>
   deleteAvailabilityEmailIntakeAction?: (formData: FormData) => void | Promise<void>
@@ -482,6 +501,7 @@ export function EmailIntakePanel({
                       renderItemCard({
                         item,
                         applyEmailAvailabilityImportAction,
+                        updateEmailIntakeItemRequestAction,
                         updateEmailIntakeTherapistAction,
                         therapistOptions,
                         cycleOptions,

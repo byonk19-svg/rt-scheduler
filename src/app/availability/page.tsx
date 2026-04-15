@@ -15,6 +15,7 @@ import {
   reparseEmailIntakeAction,
   saveManagerPlannerDatesAction,
   submitTherapistAvailabilityGridAction,
+  updateEmailIntakeItemRequestAction,
   updateEmailIntakeTherapistAction,
 } from '@/app/availability/actions'
 import { AvailabilityPlannerFocusProvider } from '@/components/availability/availability-planner-focus-context'
@@ -126,7 +127,9 @@ type AvailabilityEmailIntakeItemRow = {
   parsed_requests: Array<{
     date: string
     override_type: 'force_off' | 'force_on'
+    shift_type: 'day' | 'night' | 'both'
   }> | null
+  manually_edited_at?: string | null
   profiles: { full_name: string } | { full_name: string }[] | null
   schedule_cycles:
     | { label: string; start_date: string; end_date: string }
@@ -505,7 +508,7 @@ export default async function AvailabilityPage({
       ? await supabase
           .from('availability_email_intake_items')
           .select(
-            'id, intake_id, source_type, source_label, parse_status, confidence_level, confidence_reasons, extracted_employee_name, matched_therapist_id, matched_cycle_id, raw_text, parsed_requests, profiles!availability_email_intake_items_matched_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
+            'id, intake_id, source_type, source_label, parse_status, confidence_level, confidence_reasons, extracted_employee_name, matched_therapist_id, matched_cycle_id, raw_text, parsed_requests, manually_edited_at, profiles!availability_email_intake_items_matched_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
           )
           .in('intake_id', emailIntakeIds)
       : { data: [] }
@@ -574,6 +577,7 @@ export default async function AvailabilityPage({
               : null,
             rawText: item.raw_text,
             parsedRequests: Array.isArray(item.parsed_requests) ? item.parsed_requests : [],
+            manuallyEdited: Boolean(item.manually_edited_at),
           }
         }),
       autoAppliedItems: childItems
@@ -599,6 +603,7 @@ export default async function AvailabilityPage({
               : null,
             rawText: item.raw_text,
             parsedRequests: Array.isArray(item.parsed_requests) ? item.parsed_requests : [],
+            manuallyEdited: Boolean(item.manually_edited_at),
           }
         }),
     }
@@ -711,6 +716,7 @@ export default async function AvailabilityPage({
     <EmailIntakePanel
       rows={emailIntakeRows}
       applyEmailAvailabilityImportAction={applyEmailAvailabilityImportAction}
+      updateEmailIntakeItemRequestAction={updateEmailIntakeItemRequestAction}
       deleteEmailIntakeAction={deleteEmailIntakeAction}
       reparseEmailIntakeAction={reparseEmailIntakeAction}
       updateEmailIntakeTherapistAction={updateEmailIntakeTherapistAction}

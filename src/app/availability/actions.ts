@@ -17,6 +17,7 @@ import {
   sanitizeParsedRequests,
   stripHtmlToText,
 } from '@/lib/availability-email-intake'
+import { cycleIntakeRequest, markRequestsEdited } from '@/lib/availability-intake-request-cycler'
 import { shiftOverridesToCycle } from '@/lib/copy-cycle-availability'
 import { buildManagerOverrideInput } from '@/lib/employee-directory'
 import { extractTextFromAttachment } from '@/lib/openai-ocr'
@@ -861,6 +862,89 @@ export async function updateEmailIntakeTherapistAction(formData: FormData) {
   redirect(buildAvailabilityUrl({ success: 'email_intake_match_saved' }))
 }
 
+export async function updateEmailIntakeItemRequestAction(formData: FormData) {
+  const { supabase, role } = await getAuthenticatedUserWithRole()
+
+  if (!can(role, 'access_manager_ui')) {
+    redirect('/availability')
+  }
+
+  const itemId = String(formData.get('item_id') ?? '').trim()
+  const date = String(formData.get('date') ?? '').trim()
+  const overrideType = String(formData.get('override_type') ?? '').trim()
+  const shiftType = String(formData.get('shift_type') ?? '').trim()
+
+  if (
+    !itemId ||
+    !date ||
+    (overrideType !== 'force_off' && overrideType !== 'force_on') ||
+    (shiftType !== 'day' && shiftType !== 'night' && shiftType !== 'both')
+  ) {
+    redirect(buildAvailabilityUrl({ error: 'email_intake_request_update_failed' }))
+  }
+
+  const { data: item, error: loadError } = await supabase
+    .from('availability_email_intake_items')
+    .select(
+      'id, intake_id, parsed_requests, original_parsed_requests, matched_therapist_id, matched_cycle_id'
+    )
+    .eq('id', itemId)
+    .maybeSingle()
+
+  if (loadError || !item) {
+    console.error('Failed to load intake item for request update:', loadError)
+    redirect(buildAvailabilityUrl({ error: 'email_intake_request_update_failed' }))
+  }
+
+  const parsedRequests = cycleIntakeRequest({
+    requests: item.parsed_requests,
+    target: {
+      date,
+      override_type: overrideType,
+      shift_type: shiftType,
+    },
+  })
+  const nextParseStatus: AvailabilityEmailItemStatus =
+    parsedRequests.length === 0
+      ? 'failed'
+      : item.matched_therapist_id && item.matched_cycle_id
+        ? 'parsed'
+        : 'needs_review'
+  const manuallyEditedAtUpdate = item.original_parsed_requests
+    ? {
+        manually_edited_at: item.original_parsed_requests
+          ? markRequestsEdited({
+              originalRequests: item.original_parsed_requests,
+              currentRequests: parsedRequests,
+            })
+            ? new Date().toISOString()
+            : null
+          : null,
+      }
+    : {}
+
+  const { error: updateError } = await supabase
+    .from('availability_email_intake_items')
+    .update({
+      parse_status: nextParseStatus,
+      parsed_requests: parsedRequests,
+      ...manuallyEditedAtUpdate,
+    })
+    .eq('id', itemId)
+
+  if (updateError) {
+    console.error('Failed to update intake item request:', updateError)
+    redirect(buildAvailabilityUrl({ error: 'email_intake_request_update_failed' }))
+  }
+
+  if (item.intake_id) {
+    await refreshAvailabilityEmailIntakeBatchState(supabase, String(item.intake_id))
+  }
+
+  revalidatePath('/availability')
+  redirect(buildAvailabilityUrl({ success: 'email_intake_request_updated' }))
+}
+
 export async function reparseEmailIntakeAction(formData: FormData) {
   const { supabase, role } = await getAuthenticatedUserWithRole()
 
@@ -988,8 +1072,10 @@ export async function reparseEmailIntakeAction(formData: FormData) {
         employee_match_candidates: item.employeeMatchCandidates,
         matched_therapist_id: item.matchedTherapistId,
         matched_cycle_id: item.matchedCycleId,
+        original_parsed_requests: item.requests,
         parsed_requests: item.requests,
         unresolved_lines: item.unresolvedLines,
+        manually_edited_at: null,
         auto_applied_at: null,
         auto_applied_by: null,
         apply_error: null,

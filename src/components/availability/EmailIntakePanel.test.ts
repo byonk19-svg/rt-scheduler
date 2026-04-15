@@ -38,7 +38,19 @@ const baseRow = {
       matchedCycleId: null,
       matchedCycleLabel: null,
       rawText: '03/24 Need off for appointment',
-      parsedRequests: [{ date: '2026-03-24', override_type: 'force_off' as const }],
+      manuallyEdited: true,
+      parsedRequests: [
+        {
+          date: '2026-03-24',
+          override_type: 'force_off' as const,
+          shift_type: 'both' as const,
+        },
+        {
+          date: '2026-03-25',
+          override_type: 'force_on' as const,
+          shift_type: 'day' as const,
+        },
+      ],
     },
   ],
   autoAppliedItems: [
@@ -55,7 +67,13 @@ const baseRow = {
       matchedCycleId: 'cycle-1',
       matchedCycleLabel: 'Critique Cycle (2026-03-17 to 2026-04-27)',
       rawText: 'Please mark me off on Mar 24.',
-      parsedRequests: [{ date: '2026-03-24', override_type: 'force_off' as const }],
+      parsedRequests: [
+        {
+          date: '2026-03-24',
+          override_type: 'force_off' as const,
+          shift_type: 'both' as const,
+        },
+      ],
     },
   ],
 }
@@ -66,6 +84,7 @@ describe('EmailIntakePanel', () => {
       createElement(EmailIntakePanel, {
         rows: [baseRow],
         applyEmailAvailabilityImportAction: async () => {},
+        updateEmailIntakeItemRequestAction: async () => {},
         deleteAvailabilityEmailIntakeAction: async () => {},
         reparseAvailabilityEmailIntakeAction: async () => {},
         updateEmailIntakeTherapistAction: async () => {},
@@ -104,6 +123,7 @@ describe('EmailIntakePanel', () => {
           },
         ],
         applyEmailAvailabilityImportAction: async () => {},
+        updateEmailIntakeItemRequestAction: async () => {},
         deleteAvailabilityEmailIntakeAction: async () => {},
         reparseAvailabilityEmailIntakeAction: async () => {},
         updateEmailIntakeTherapistAction: async () => {},
@@ -114,5 +134,50 @@ describe('EmailIntakePanel', () => {
 
     expect(html).toContain('Apply dates')
     expect(html).not.toContain('Save matches')
+  })
+
+  it('renders each parsed request as an editable chip form with payload and edited marker', () => {
+    const html = renderToStaticMarkup(
+      createElement(EmailIntakePanel, {
+        rows: [
+          {
+            ...baseRow,
+            reviewItems: [
+              {
+                ...baseRow.reviewItems[0],
+                matchedTherapistId: 'therapist-1',
+                matchedTherapistName: 'Adrienne Solt',
+                matchedCycleId: 'cycle-1',
+                matchedCycleLabel: 'Critique Cycle (2026-03-17 to 2026-04-27)',
+              },
+            ],
+          },
+        ],
+        applyEmailAvailabilityImportAction: async () => {},
+        updateEmailIntakeItemRequestAction: async () => {},
+        deleteAvailabilityEmailIntakeAction: async () => {},
+        reparseAvailabilityEmailIntakeAction: async () => {},
+        updateEmailIntakeTherapistAction: async () => {},
+        therapistOptions: [{ id: 'therapist-1', fullName: 'Adrienne Solt' }],
+        cycleOptions: [{ id: 'cycle-1', label: 'Critique Cycle (2026-03-17 to 2026-04-27)' }],
+      })
+    )
+
+    expect(html).toContain('Edited')
+    expect(html).toContain('Mar 24 off')
+    expect(html).toContain('Mar 25 work (day)')
+    expect(html).toContain('name="item_id" value="item-1"')
+    expect(html).toContain('name="date" value="2026-03-24"')
+    expect(html).toContain('name="override_type" value="force_off"')
+    expect(html).toContain('name="shift_type" value="both"')
+    expect(html).toContain('name="date" value="2026-03-25"')
+    expect(html).toContain('name="override_type" value="force_on"')
+    expect(html).toContain('name="shift_type" value="day"')
+    expect(html).toContain('border-destructive/30')
+    expect(html).toContain('bg-destructive/10')
+    expect(html).toContain('text-destructive')
+    expect(html).toContain('border-info-border')
+    expect(html).toContain('bg-info-subtle')
+    expect(html).toContain('text-info-text')
   })
 })
