@@ -35,6 +35,10 @@ describe('AppShell exported constants', () => {
 })
 
 describe('AppShell mobile menu', () => {
+  it('does not subscribe to useSearchParams in the shell (pathname is enough for nav active state)', () => {
+    expect(appShellSource).not.toMatch(/useSearchParams/)
+  })
+
   it('uses a real button for the mobile backdrop dismiss target', () => {
     expect(appShellSource).toMatch(/<button[\s\S]*className="absolute inset-0 bg-black\/45"/)
   })
@@ -54,7 +58,7 @@ describe('AppShell navigation structure', () => {
     const scheduleSection = buildManagerSections(0).find((section) => section.key === 'schedule')
 
     expect(scheduleSection).toBeDefined()
-    expect(scheduleSection?.isActive('/schedule', null as never)).toBe(true)
+    expect(scheduleSection?.isActive('/schedule')).toBe(true)
   })
 
   it('uses Open shifts wording in staff shell navigation', () => {

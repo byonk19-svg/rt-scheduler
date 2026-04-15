@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-14 (session 68)
+Updated: 2026-04-15 (session 69)
 
 ## Handoff Snapshot
 
@@ -60,6 +60,12 @@ Updated: 2026-04-14 (session 68)
 - Targeted availability lane: `npx vitest run src/app/availability/`
 
 ## Recent changelog
+
+**Session 69 (2026-04-15)** — App shell + layout hardening:
+
+- **`AppShell`:** removed **`useSearchParams`**; manager/staff nav active state is pathname-only, so the shell no longer needs a root **`Suspense`** boundary for the Next search-params bailout.
+- **`src/app/layout.tsx`:** renders **`MotionProvider` → `AppShell` → `children`** directly (no wrapper **`Suspense`**).
+- **Regression guard:** **`AppShell.test.ts`** asserts the shell source does not reference **`useSearchParams`**.
 
 **Session 68 (2026-04-14)** — `/team` tab wiring + test/type alignment:
 
@@ -212,7 +218,7 @@ All permission checks go through `can(role, permission)` in `src/lib/auth/can.ts
 - `src/components/availability/AvailabilityOverviewHeader.tsx` — manager-specific availability wrapper around the shared manager workspace header
 - `src/components/ui/skeleton.tsx` — `<Skeleton>`, `<SkeletonLine>`, `<SkeletonCard>`, `<SkeletonListItem>` loading states
 - `src/components/NotificationBell.tsx` — real-time bell with Supabase subscription; variants: `default` | `staff`
-- `src/components/AppShell.tsx` — nav shell; manager nav is built from `buildManagerSections()` (`Today`, `Schedule`, `People`) and staff nav still uses `STAFF_NAV_ITEMS`. Keep `/schedule` treated as a coverage alias in the manager `Schedule` section, and keep the fixed secondary nav horizontally scrollable for mobile widths.
+- `src/components/AppShell.tsx` — nav shell; manager nav is built from `buildManagerSections()` (`Today`, `Schedule`, `People`) and staff nav still uses `STAFF_NAV_ITEMS`. Active highlighting uses **`usePathname`** only (section **`isActive`** predicates never read the query string). Root **`layout`** does not wrap **`AppShell`** in **`Suspense`** for search params. Keep `/schedule` treated as a coverage alias in the manager `Schedule` section, and keep the fixed secondary nav horizontally scrollable for mobile widths.
 - `src/components/feedback-toast.tsx` — `<FeedbackToast message variant>` for success/error toasts
 - `src/lib/auth/can.ts` — `can(role, permission)` — all permission checks go through here
 - `src/lib/coverage/selectors.ts` — `buildDayItems`, `toUiStatus`

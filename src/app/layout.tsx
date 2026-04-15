@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { DM_Sans, Fraunces, Geist_Mono } from 'next/font/google'
-import { Suspense } from 'react'
 import { AppShell, type AppShellUser } from '@/components/AppShell'
 import { MotionProvider } from '@/components/motion-provider'
 import { toUiRole } from '@/lib/auth/roles'
@@ -80,16 +79,7 @@ export default async function RootLayout({
     <html lang="en" className={`${dmSans.variable} ${fraunces.variable} ${geistMono.variable}`}>
       <body className={`${dmSans.className} antialiased`}>
         <MotionProvider>
-          {/*
-            AppShell reads search params; it must sit under Suspense. Never use `children` as the
-            fallback — RSC children can be a thenable React treats like a lazy type and then crash
-            with "Element type is invalid... promise... undefined".
-          */}
-          <Suspense
-            fallback={<div className="min-h-svh bg-background text-foreground" aria-busy="true" />}
-          >
-            <AppShell user={appShellUser}>{children}</AppShell>
-          </Suspense>
+          <AppShell user={appShellUser}>{children}</AppShell>
         </MotionProvider>
       </body>
     </html>

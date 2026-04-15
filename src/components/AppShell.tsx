@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { ArrowLeftRight, CalendarDays, ChevronDown, LogOut, Menu, Settings, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
@@ -32,12 +32,10 @@ type AppShellProps = {
   children: ReactNode
 }
 
-type SearchParamsState = ReturnType<typeof useSearchParams>
-
 type SubNavItem = {
   href: string
   label: string
-  isActive: (pathname: string, searchParams: SearchParamsState) => boolean
+  isActive: (pathname: string) => boolean
   showBadge?: boolean
 }
 
@@ -45,7 +43,7 @@ type PrimarySection = {
   key: string
   label: string
   href: string
-  isActive: (pathname: string, searchParams: SearchParamsState) => boolean
+  isActive: (pathname: string) => boolean
   subItems: SubNavItem[]
 }
 
@@ -300,7 +298,6 @@ function UserDropdown({
 // ─── AppShell ──────────────────────────────────────────────────────────────
 export function AppShell({ user, children }: AppShellProps) {
   const pathname = usePathname()
-  const searchParams = useSearchParams()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const canAccessManagerUi = can(user?.role, 'access_manager_ui')
 
@@ -313,8 +310,8 @@ export function AppShell({ user, children }: AppShellProps) {
   // Which primary section is currently active (manager only)
   const activeSection = useMemo(() => {
     if (!canAccessManagerUi) return null
-    return managerSections.find((s) => s.isActive(pathname, searchParams)) ?? null
-  }, [canAccessManagerUi, managerSections, pathname, searchParams])
+    return managerSections.find((s) => s.isActive(pathname)) ?? null
+  }, [canAccessManagerUi, managerSections, pathname])
 
   const hasSecondaryNav = Boolean(activeSection && activeSection.subItems.length > 0)
 
@@ -360,7 +357,7 @@ export function AppShell({ user, children }: AppShellProps) {
           {canAccessManagerUi ? (
             <nav className="hidden md:flex items-center gap-0.5 ml-4" aria-label="Main navigation">
               {managerSections.map((section) => {
-                const active = section.isActive(pathname, searchParams)
+                const active = section.isActive(pathname)
                 return (
                   <Link
                     key={section.key}
@@ -436,7 +433,7 @@ export function AppShell({ user, children }: AppShellProps) {
           <div className="h-full overflow-x-auto">
             <div className="flex h-full min-w-max items-center gap-0.5 px-5">
               {activeSection.subItems.map((item) => {
-                const active = item.isActive(pathname, searchParams)
+                const active = item.isActive(pathname)
                 return (
                   <Link
                     key={item.href}
@@ -527,7 +524,7 @@ export function AppShell({ user, children }: AppShellProps) {
                           {section.label}
                         </p>
                         {section.subItems.map((item) => {
-                          const active = item.isActive(pathname, searchParams)
+                          const active = item.isActive(pathname)
                           return (
                             <Link
                               key={item.href}
@@ -557,11 +554,11 @@ export function AppShell({ user, children }: AppShellProps) {
                         href={section.href}
                         className={cn(
                           'flex min-h-[42px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
-                          section.isActive(pathname, searchParams)
+                          section.isActive(pathname)
                             ? APP_SHELL_ACTIVE_NAV_CLASS
                             : 'text-sidebar-foreground hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground transition-colors duration-150'
                         )}
-                        aria-current={section.isActive(pathname, searchParams) ? 'page' : undefined}
+                        aria-current={section.isActive(pathname) ? 'page' : undefined}
                         onClick={() => setMobileMenuOpen(false)}
                       >
                         {section.label}
