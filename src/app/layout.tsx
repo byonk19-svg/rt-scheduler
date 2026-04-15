@@ -80,7 +80,14 @@ export default async function RootLayout({
     <html lang="en" className={`${dmSans.variable} ${fraunces.variable} ${geistMono.variable}`}>
       <body className={`${dmSans.className} antialiased`}>
         <MotionProvider>
-          <Suspense fallback={children}>
+          {/*
+            AppShell reads search params; it must sit under Suspense. Never use `children` as the
+            fallback — RSC children can be a thenable React treats like a lazy type and then crash
+            with "Element type is invalid... promise... undefined".
+          */}
+          <Suspense
+            fallback={<div className="min-h-svh bg-background text-foreground" aria-busy="true" />}
+          >
             <AppShell user={appShellUser}>{children}</AppShell>
           </Suspense>
         </MotionProvider>
