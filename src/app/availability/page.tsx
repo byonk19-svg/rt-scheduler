@@ -802,7 +802,6 @@ export default async function AvailabilityPage({
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
       <AvailabilityOverviewHeader
-        canManageAvailability={canManageAvailability}
         title={canManageAvailability ? 'Availability Planning' : 'Availability'}
         subtitle={
           selectedCycle
