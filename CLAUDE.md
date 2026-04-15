@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-14 (session 67)
+Updated: 2026-04-14 (session 68)
 
 ## Handoff Snapshot
 
@@ -32,7 +32,7 @@ Updated: 2026-04-14 (session 67)
 - **Accessibility / theming pass (UI review branch):** root layout wraps the app in **`MotionProvider`** (`src/components/motion-provider.tsx`) with Framer **`MotionConfig reducedMotion="user"`** so motion respects **`prefers-reduced-motion`**. Prefer design tokens over raw **`text-white`** / **`bg-white`** / stray **`dark:`** on shared surfaces; destructive actions use **`text-destructive-foreground`**. **`globals.css`:** stronger **`--muted-foreground`**, **`--color-destructive-foreground`** in **`@theme`**, table row hover scoped to **`table:not(.no-row-hover)`**, marketing header + home preview shell reduce **`backdrop-filter`** under **`prefers-reduced-motion: reduce`**. **`/requests/new`** and **`/publish/[id]`** use **`ManagerWorkspaceHeader`**. **`LEAD_ELIGIBLE_BADGE_CLASS`** uses **`--info-*`** tokens (`src/lib/employee-tag-badges.ts`).
 - **Manager `/availability` planner shell:** URL tabs **`?tab=planner|intake`** under **`AvailabilityOverviewHeader`**. **Planner** = **`ManagerSchedulingInputs`** inside **`AvailabilityWorkspaceShell`**. **Saved planner dates** and primary planner actions belong in the shell **`controls`** slot (left column, muted background). Use **`lower={null}`** for that surface — **`lower`** renders **outside** the primary card. Calendar month UI: **`AvailabilityCalendarPanel`** (`src/components/availability/availability-calendar-panel.tsx`).
 - **Availability Planning polish:** `/availability` now keeps the current planner-first structure while tightening the lower half into a single **Secondary workflow** surface with **Response roster** and **Request inbox** tabs. The roster uses dense rows with initials, status, request signal, and last activity; the inbox collapses to a compact empty state instead of a large blank table shell; the disabled planner CTA now reads **`Select dates to save`**.
-- **Team workspace refactor:** `/team` now renders through workspace-style components (`TeamWorkspace`, `TeamDirectoryFilters`, `TeamDirectorySummaryChips`, `TeamPersonRow`, `EmployeeRosterTable`) so team management and roster administration read as denser operational surfaces without changing manager-side actions.
+- **Team workspace refactor:** `/team` renders through workspace-style components (`TeamWorkspace`, `TeamDirectoryFilters`, `TeamDirectorySummaryChips`, `TeamPersonRow`, `EmployeeRosterTable`) for denser directory and roster administration. **`?tab=roster`** is resolved on the server (`initialTab` from `TeamPage`) and synced in **`TeamWorkspace`** via **`router.replace`** without **`useSearchParams`**, so that subtree does not depend on a search-params **`Suspense`** boundary.
 - **Availability intake utilities:** `src/lib/availability-email-intake.ts` and related tests now cover richer request-edit parsing and manager-edit workflows more explicitly.
 - `RESEND_API_KEY` must support receiving APIs, not just sending. A send-only key fails on `/emails/receiving` with `401 restricted_api_key`.
 
@@ -60,6 +60,11 @@ Updated: 2026-04-14 (session 67)
 - Targeted availability lane: `npx vitest run src/app/availability/`
 
 ## Recent changelog
+
+**Session 68 (2026-04-14)** — `/team` tab wiring + test/type alignment:
+
+- **`/team`:** server passes **`initialTab`** from **`?tab=roster`**; client tab state and URL stay aligned without **`useSearchParams`**; removed the extra **`Suspense`** wrapper around **`TeamWorkspace`**.
+- **Vitest fixtures:** availability overview header, status summary, manager planner, and therapist workspace tests updated for current prop shapes (`responseRatio` null where summary is split across spans, **`lastUpdatedAt`** on roster rows, leaner planner entry rows, **`therapistId`** on therapist grid rows).
 
 **Session 66 (2026-04-14)** — Manager planner presentation + `CLAUDE.md` hygiene:
 
@@ -323,6 +328,7 @@ Assignment status is informational only (does not affect coverage counts or publ
 
 `/team` is now the canonical manager roster-management surface.
 
+- **Tabs:** default is the people directory; **`?tab=roster`** opens **Employee roster** signup pre-match admin. Tab selection is server-informed (`initialTab`) and URL updates use **`router.replace`** (no **`useSearchParams`** on this surface).
 - Clicking a team member card opens a quick-edit modal on the same page
 - Sections are grouped by: managers, day shift (Lead Therapists, Therapists), night shift (Lead Therapists, Therapists), inactive
 - Quick edit is meant for roster/access fields: name, app role, shift type, employment type, FMLA, FMLA return date, active/inactive, recurring **work pattern** (works/offs DOW, hard/soft works mode, weekend rotation + anchor) for therapist/lead rows

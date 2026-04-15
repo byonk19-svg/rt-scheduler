@@ -1,4 +1,3 @@
-import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 
 import {
@@ -261,6 +260,7 @@ export default async function TeamPage({
 
   const feedback = getTeamFeedback(params)
   const initialEditProfileId = getSearchParam(params?.edit_profile) ?? null
+  const initialTab = getSearchParam(params?.tab) === 'roster' ? 'roster' : 'directory'
 
   return (
     <div className="max-w-6xl space-y-6 py-6">
@@ -272,23 +272,20 @@ export default async function TeamPage({
         className="px-0"
       />
 
-      <Suspense
-        fallback={<div className="h-40 animate-pulse rounded-xl bg-muted/30" aria-hidden />}
-      >
-        <TeamWorkspace
-          summary={summary}
-          profiles={allProfiles}
-          workPatterns={workPatterns}
-          initialEditProfileId={initialEditProfileId}
-          roster={employeeRoster}
-          archiveTeamMemberAction={archiveTeamMemberAction}
-          saveTeamQuickEditAction={saveTeamQuickEditAction}
-          upsertEmployeeRosterEntryAction={upsertEmployeeRosterEntryAction}
-          bulkUpsertEmployeeRosterAction={bulkUpsertEmployeeRosterAction}
-          replaceTherapistRosterAction={replaceTherapistRosterAction}
-          deleteEmployeeRosterEntryAction={deleteEmployeeRosterEntryAction}
-        />
-      </Suspense>
+      <TeamWorkspace
+        initialTab={initialTab}
+        summary={summary}
+        profiles={allProfiles}
+        workPatterns={workPatterns}
+        initialEditProfileId={initialEditProfileId}
+        roster={employeeRoster}
+        archiveTeamMemberAction={archiveTeamMemberAction}
+        saveTeamQuickEditAction={saveTeamQuickEditAction}
+        upsertEmployeeRosterEntryAction={upsertEmployeeRosterEntryAction}
+        bulkUpsertEmployeeRosterAction={bulkUpsertEmployeeRosterAction}
+        replaceTherapistRosterAction={replaceTherapistRosterAction}
+        deleteEmployeeRosterEntryAction={deleteEmployeeRosterEntryAction}
+      />
     </div>
   )
 }

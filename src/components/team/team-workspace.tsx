@@ -1,7 +1,7 @@
 'use client'
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useCallback } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useCallback, useEffect, useState } from 'react'
 
 import { EmployeeRosterPanel } from '@/components/team/EmployeeRosterPanel'
 import {
@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils'
 export type TeamWorkspaceTab = 'directory' | 'roster'
 
 type TeamWorkspaceProps = {
+  initialTab: TeamWorkspaceTab
   summary: TeamSummaryCounts
   profiles: TeamProfileRecord[]
   workPatterns: Record<string, WorkPatternRecord>
@@ -29,11 +30,8 @@ type TeamWorkspaceProps = {
   deleteEmployeeRosterEntryAction: (formData: FormData) => void | Promise<void>
 }
 
-function tabFromSearch(searchParams: URLSearchParams): TeamWorkspaceTab {
-  return searchParams.get('tab') === 'roster' ? 'roster' : 'directory'
-}
-
 export function TeamWorkspace({
+  initialTab,
   summary,
   profiles,
   workPatterns,
@@ -48,12 +46,17 @@ export function TeamWorkspace({
 }: TeamWorkspaceProps) {
   const router = useRouter()
   const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const activeTab = tabFromSearch(searchParams)
+  const [activeTab, setActiveTab] = useState<TeamWorkspaceTab>(initialTab)
+
+  useEffect(() => {
+    setActiveTab(initialTab)
+  }, [initialTab])
 
   const setTab = useCallback(
     (next: TeamWorkspaceTab) => {
-      const nextParams = new URLSearchParams(searchParams.toString())
+      setActiveTab(next)
+      if (typeof window === 'undefined') return
+      const nextParams = new URLSearchParams(window.location.search)
       if (next === 'directory') {
         nextParams.delete('tab')
       } else {
@@ -62,7 +65,7 @@ export function TeamWorkspace({
       const qs = nextParams.toString()
       router.replace(qs.length > 0 ? `${pathname}?${qs}` : pathname, { scroll: false })
     },
-    [pathname, router, searchParams]
+    [pathname, router]
   )
 
   return (

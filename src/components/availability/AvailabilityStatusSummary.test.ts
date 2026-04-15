@@ -72,6 +72,7 @@ describe('AvailabilityStatusSummary', () => {
           therapistId: `t-${i}`,
           therapistName: `Therapist ${i}`,
           overridesCount: 1,
+          lastUpdatedAt: '2026-03-01T12:00:00.000Z',
         })),
         missingRows: [],
       })
