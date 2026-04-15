@@ -1,16 +1,17 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 
+import { useAvailabilityPlannerFocus } from '@/components/availability/availability-planner-focus-context'
 import {
   DEFAULT_TABLE_FILTERS,
   TableToolbar,
   type TableStatusOption,
   type TableToolbarFilters,
 } from '@/components/TableToolbar'
+import { FormSubmitButton } from '@/components/form-submit-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { FormSubmitButton } from '@/components/form-submit-button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -20,7 +21,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { useAvailabilityPlannerFocus } from '@/components/availability/availability-planner-focus-context'
 import { can } from '@/lib/auth/can'
 import type { UiRole } from '@/lib/auth/roles'
 import { formatDate } from '@/lib/schedule-helpers'
@@ -31,11 +31,11 @@ type Role = UiRole
 
 export type AvailabilityEntryTableRow = {
   id: string
+  therapistId: string
   cycleId: string
   date: string
   reason: string | null
   createdAt: string
-  /** Latest activity time for therapist entries (mirrors availability_overrides.updated_at). */
   updatedAt?: string
   requestedBy: string
   cycleLabel: string
@@ -53,8 +53,8 @@ type AvailabilityEntriesTableProps = {
   titleOverride?: string
   descriptionOverride?: string
   emptyMessageOverride?: string
-  /** When true, search is kept in sync with the therapist selected in Plan staffing (managers). */
   syncSearchFromPlannerFocus?: boolean
+  embedded?: boolean
 }
 
 const STATUS_OPTIONS: TableStatusOption[] = [
@@ -79,6 +79,12 @@ function formatShiftTypeLabel(shiftType: AvailabilityEntryTableRow['shiftType'])
   return 'Day shift'
 }
 
+function getCompactEmptyMessage(filtersExcludedAllRows: boolean): string {
+  return filtersExcludedAllRows
+    ? 'No availability requests match your filters.'
+    : 'No availability requests yet.'
+}
+
 export function AvailabilityEntriesTable({
   role,
   rows,
@@ -89,20 +95,24 @@ export function AvailabilityEntriesTable({
   descriptionOverride,
   emptyMessageOverride,
   syncSearchFromPlannerFocus = false,
+  embedded = false,
 }: AvailabilityEntriesTableProps) {
   const plannerFocus = useAvailabilityPlannerFocus()
   const canManageAvailability = can(role, 'access_manager_ui')
-  const [scope, setScope] = useState<'all-staff' | 'my-entries'>(
-    canManageAvailability ? 'all-staff' : 'my-entries'
+  const [scope, setScope] = useState<'all-staff' | 'my-entries' | 'focused-therapist'>(
+    canManageAvailability && syncSearchFromPlannerFocus
+      ? 'focused-therapist'
+      : canManageAvailability
+        ? 'all-staff'
+        : 'my-entries'
   )
   const [expandedEntryIds, setExpandedEntryIds] = useState<Set<string>>(new Set())
 
-  const defaultStatus = 'all'
   const allowedStatuses = new Set(STATUS_OPTIONS.map((option) => option.value))
   const initialStatus =
     initialFilters?.status && allowedStatuses.has(initialFilters.status)
       ? initialFilters.status
-      : defaultStatus
+      : 'all'
   const initialSort = initialFilters?.sort === 'oldest' ? 'oldest' : 'newest'
 
   const [filters, setFilters] = useState<TableToolbarFilters>({
@@ -115,23 +125,11 @@ export function AvailabilityEntriesTable({
     sort: initialSort,
   })
 
-  useEffect(() => {
-    if (!syncSearchFromPlannerFocus || !canManageAvailability) return
-    const next = plannerFocus?.focusedTherapistName?.trim() ?? ''
-    if (!next) return
-    // Post-hydration only — sync when Plan staffing therapist changes (avoid useLayoutEffect hydration mismatch).
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- mirrors planner selection into controlled search after mount
-    setFilters((prev) => (prev.search === next ? prev : { ...prev, search: next }))
-  }, [syncSearchFromPlannerFocus, canManageAvailability, plannerFocus?.focusedTherapistName])
-
   function toggleDetails(entryId: string) {
     setExpandedEntryIds((current) => {
       const next = new Set(current)
-      if (next.has(entryId)) {
-        next.delete(entryId)
-      } else {
-        next.add(entryId)
-      }
+      if (next.has(entryId)) next.delete(entryId)
+      else next.add(entryId)
       return next
     })
   }
@@ -155,18 +153,7 @@ export function AvailabilityEntriesTable({
     return filterAndSortRows(mappedRows, filters)
   }, [scopedRows, filters])
 
-  /** Hide shift column when every row is full-day (`both`) — typical therapist grid submissions. */
   const showShiftColumn = useMemo(() => rows.some((row) => row.shiftType !== 'both'), [rows])
-
-  const tableColumnCount = useMemo(() => {
-    let n = 1
-    if (canManageAvailability) n += 1
-    n += 1
-    if (showShiftColumn) n += 1
-    n += 1
-    n += 1
-    return n
-  }, [canManageAvailability, showShiftColumn])
 
   const entrySummary = useMemo(() => {
     const n = filteredRows.length
@@ -177,29 +164,6 @@ export function AvailabilityEntriesTable({
   }, [filteredRows])
 
   const filtersExcludedAllRows = scopedRows.length > 0 && filteredRows.length === 0
-
-  const emptyFilteredMessage = useMemo(() => {
-    if (emptyMessageOverride) return emptyMessageOverride
-    if (
-      canManageAvailability &&
-      scope === 'my-entries' &&
-      rows.length > 0 &&
-      scopedRows.length === 0
-    ) {
-      return "You don't have your own entries in this list. Switch to All staff to see the full team."
-    }
-    if (filtersExcludedAllRows) {
-      return 'No rows match your current filters. Try clearing the search, widening the date range, setting request type to All, or switching to All staff.'
-    }
-    return 'No availability requests match your filters.'
-  }, [
-    emptyMessageOverride,
-    canManageAvailability,
-    scope,
-    rows.length,
-    scopedRows.length,
-    filtersExcludedAllRows,
-  ])
 
   if (!canManageAvailability && rows.length === 0) {
     return (
@@ -214,111 +178,143 @@ export function AvailabilityEntriesTable({
     )
   }
 
-  return (
-    <Card className="overflow-hidden rounded-[1.75rem] border border-border/90 bg-card shadow-tw-md">
-      <CardHeader className="border-b border-border/80 pb-3">
-        <CardTitle>
-          {titleOverride ??
-            (canManageAvailability
-              ? scope === 'all-staff'
-                ? 'Review requests'
-                : 'Review my requests'
-              : 'My Saved Availability Requests')}
-        </CardTitle>
-        <CardDescription>
-          {descriptionOverride ??
-            (canManageAvailability
-              ? scope === 'all-staff'
-                ? 'Scan submitted requests before the cycle is published.'
-                : 'Review the requests you entered yourself.'
-              : 'Your saved requests for upcoming cycles.')}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2 px-5 py-4">
-        {canManageAvailability && (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant={scope === 'all-staff' ? 'default' : 'outline'}
-              className={
-                scope === 'all-staff'
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : 'border-border bg-card text-muted-foreground hover:bg-muted'
-              }
-              onClick={() => setScope('all-staff')}
-            >
-              All staff
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={scope === 'my-entries' ? 'default' : 'outline'}
-              className={
-                scope === 'my-entries'
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : 'border-border bg-card text-muted-foreground hover:bg-muted'
-              }
-              onClick={() => setScope('my-entries')}
-            >
-              My entries
-            </Button>
-          </div>
-        )}
+  const emptyMessage = emptyMessageOverride ?? getCompactEmptyMessage(filtersExcludedAllRows)
 
-        <TableToolbar
-          filters={filters}
-          onFiltersChange={setFilters}
-          searchPlaceholder={
-            canManageAvailability
-              ? 'Search by requester, note, cycle, or request type'
-              : 'Search by note, cycle, or request type'
-          }
-          statusOptions={STATUS_OPTIONS}
-          showDateRange={canManageAvailability}
-          compact
-        />
+  const content = (
+    <div className={cn('space-y-3', embedded ? 'px-4 py-3' : 'px-4 py-3.5')}>
+      {canManageAvailability && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {syncSearchFromPlannerFocus ? (
+            <>
+              <Button
+                type="button"
+                size="sm"
+                variant={scope === 'focused-therapist' ? 'default' : 'outline'}
+                className={
+                  scope === 'focused-therapist'
+                    ? 'h-8 bg-primary px-3 text-xs text-primary-foreground hover:bg-primary/90'
+                    : 'h-8 border-border/70 bg-card px-3 text-xs text-muted-foreground hover:bg-muted'
+                }
+                onClick={() => {
+                  setScope('focused-therapist')
+                  const next = plannerFocus?.focusedTherapistName?.trim() ?? ''
+                  setFilters((prev) => ({ ...prev, search: next }))
+                }}
+              >
+                Selected therapist
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={scope === 'all-staff' ? 'default' : 'outline'}
+                className={
+                  scope === 'all-staff'
+                    ? 'h-8 bg-primary px-3 text-xs text-primary-foreground hover:bg-primary/90'
+                    : 'h-8 border-border/70 bg-card px-3 text-xs text-muted-foreground hover:bg-muted'
+                }
+                onClick={() => {
+                  setScope('all-staff')
+                  if ((plannerFocus?.focusedTherapistName?.trim() ?? '') === filters.search) {
+                    setFilters((prev) => ({ ...prev, search: '' }))
+                  }
+                }}
+              >
+                All staff
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                type="button"
+                size="sm"
+                variant={scope === 'all-staff' ? 'default' : 'outline'}
+                className={
+                  scope === 'all-staff'
+                    ? 'h-8 bg-primary px-3 text-xs text-primary-foreground hover:bg-primary/90'
+                    : 'h-8 border-border/70 bg-card px-3 text-xs text-muted-foreground hover:bg-muted'
+                }
+                onClick={() => setScope('all-staff')}
+              >
+                All staff
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={scope === 'my-entries' ? 'default' : 'outline'}
+                className={
+                  scope === 'my-entries'
+                    ? 'h-8 bg-primary px-3 text-xs text-primary-foreground hover:bg-primary/90'
+                    : 'h-8 border-border/70 bg-card px-3 text-xs text-muted-foreground hover:bg-muted'
+                }
+                onClick={() => setScope('my-entries')}
+              >
+                My entries
+              </Button>
+            </>
+          )}
+        </div>
+      )}
 
-        {syncSearchFromPlannerFocus && plannerFocus?.focusedTherapistName ? (
-          <p className="text-xs text-muted-foreground">
-            Showing requests for{' '}
-            <span className="font-medium text-foreground">{plannerFocus.focusedTherapistName}</span>{' '}
-            — the therapist open in the planner. Edit the search box to filter further.
-          </p>
-        ) : null}
+      <TableToolbar
+        filters={filters}
+        onFiltersChange={setFilters}
+        searchPlaceholder={
+          canManageAvailability
+            ? syncSearchFromPlannerFocus
+              ? 'Search therapist'
+              : 'Search by requester, note, cycle, or request type'
+            : 'Search by note, cycle, or request type'
+        }
+        statusOptions={STATUS_OPTIONS}
+        showDateRange={canManageAvailability}
+        compact
+      />
 
-        {entrySummary && (
-          <p className="text-xs leading-relaxed text-muted-foreground/85">
-            <span>{entrySummary.n}</span>
-            {entrySummary.n === 1 ? ' entry' : ' entries'}
-            <span className="px-1 text-muted-foreground/40">·</span>
-            <span>
-              {entrySummary.needOff} Need Off
-              <span className="px-1 text-muted-foreground/40">·</span>
-              {entrySummary.requestToWork} Request to Work
-            </span>
-          </p>
-        )}
+      {syncSearchFromPlannerFocus && plannerFocus?.focusedTherapistName ? (
+        <p className="text-xs text-muted-foreground">
+          Showing requests for{' '}
+          <span className="font-medium text-foreground">{plannerFocus.focusedTherapistName}</span> -
+          the therapist open in the planner. Edit the search box to filter further.
+        </p>
+      ) : null}
 
+      {entrySummary ? (
+        <p className="text-xs leading-relaxed text-muted-foreground/85">
+          <span>{entrySummary.n}</span>
+          {entrySummary.n === 1 ? ' entry' : ' entries'}
+          <span className="px-1 text-muted-foreground/40">|</span>
+          <span>
+            {entrySummary.needOff} Need Off
+            <span className="px-1 text-muted-foreground/40">|</span>
+            {entrySummary.requestToWork} Request to Work
+          </span>
+        </p>
+      ) : null}
+
+      {filteredRows.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border/70 bg-muted/10 px-4 py-4 text-sm text-muted-foreground">
+          {emptyMessage}
+        </div>
+      ) : (
         <Table>
           <TableHeader>
-            <TableRow className="border-border bg-muted/45">
+            <TableRow className="border-border bg-muted/40">
               <TableHead className="text-xs font-semibold uppercase tracking-wide text-foreground/72">
                 Date
               </TableHead>
-              {canManageAvailability && (
+              {canManageAvailability ? (
                 <TableHead className="hidden text-xs font-semibold uppercase tracking-wide text-foreground/72 md:table-cell">
                   Therapist
                 </TableHead>
-              )}
+              ) : null}
               <TableHead className="text-xs font-semibold uppercase tracking-wide text-foreground/72">
                 Request type
               </TableHead>
-              {showShiftColumn && (
+              {showShiftColumn ? (
                 <TableHead className="hidden text-xs font-semibold uppercase tracking-wide text-foreground/72 md:table-cell">
                   Shift
                 </TableHead>
-              )}
+              ) : null}
               <TableHead className="text-xs font-semibold uppercase tracking-wide text-foreground/72">
                 Note
               </TableHead>
@@ -328,26 +324,15 @@ export function AvailabilityEntriesTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredRows.length === 0 && (
-              <TableRow>
-                <TableCell
-                  colSpan={tableColumnCount}
-                  className="py-8 text-center text-muted-foreground"
-                >
-                  {emptyFilteredMessage}
-                </TableCell>
-              </TableRow>
-            )}
-
             {filteredRows.map((row) => {
               const isExpanded = expandedEntryIds.has(row.id)
               const noteText = row.reason?.trim() ?? ''
-              const noteDisplay = noteText || <span className="text-muted-foreground">—</span>
+              const noteDisplay = noteText || <span className="text-muted-foreground">-</span>
 
               return (
                 <Fragment key={row.id}>
                   <TableRow
-                    className="cursor-pointer border-border/80 hover:bg-muted/25"
+                    className="cursor-pointer border-border/70 hover:bg-muted/20"
                     onClick={() => toggleDetails(row.id)}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter' || event.key === ' ') {
@@ -361,11 +346,11 @@ export function AvailabilityEntriesTable({
                     <TableCell className="font-medium text-foreground">
                       {formatDate(row.date)}
                     </TableCell>
-                    {canManageAvailability && (
+                    {canManageAvailability ? (
                       <TableCell className="hidden text-foreground md:table-cell">
                         {row.requestedBy}
                       </TableCell>
-                    )}
+                    ) : null}
                     <TableCell>
                       <Badge
                         variant={row.entryType === 'force_off' ? 'destructive' : 'outline'}
@@ -377,20 +362,17 @@ export function AvailabilityEntriesTable({
                         {formatEntryLabel(row.entryType)}
                       </Badge>
                     </TableCell>
-                    {showShiftColumn && (
+                    {showShiftColumn ? (
                       <TableCell className="hidden md:table-cell">
                         <span className="text-sm text-muted-foreground">
                           {formatShiftTypeLabel(row.shiftType)}
                         </span>
                       </TableCell>
-                    )}
+                    ) : null}
                     <TableCell className="max-w-[min(28rem,55vw)]">
                       <span className="line-clamp-1 text-sm text-foreground">{noteDisplay}</span>
                     </TableCell>
                     <TableCell className="w-[4.5rem] text-right">
-                      {/*
-                        Expand = read-only detail + optional delete, not inline edit → View (not Edit).
-                      */}
                       <button
                         type="button"
                         className="text-xs font-medium text-primary underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
@@ -405,9 +387,20 @@ export function AvailabilityEntriesTable({
                     </TableCell>
                   </TableRow>
 
-                  {isExpanded && (
+                  {isExpanded ? (
                     <TableRow>
-                      <TableCell colSpan={tableColumnCount} className="bg-muted/30">
+                      <TableCell
+                        colSpan={
+                          showShiftColumn
+                            ? canManageAvailability
+                              ? 6
+                              : 5
+                            : canManageAvailability
+                              ? 5
+                              : 4
+                        }
+                        className="bg-muted/25"
+                      >
                         <div className="grid grid-cols-1 gap-3 py-2 md:grid-cols-3">
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -423,7 +416,7 @@ export function AvailabilityEntriesTable({
                               {formatDateTime(row.updatedAt ?? row.createdAt)}
                             </p>
                           </div>
-                          {showShiftColumn && (
+                          {showShiftColumn ? (
                             <div>
                               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                 Shift scope
@@ -432,15 +425,15 @@ export function AvailabilityEntriesTable({
                                 {formatShiftTypeLabel(row.shiftType)}
                               </p>
                             </div>
-                          )}
-                          {canManageAvailability && (
+                          ) : null}
+                          {canManageAvailability ? (
                             <div>
                               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                 Therapist
                               </p>
                               <p className="text-sm text-foreground">{row.requestedBy}</p>
                             </div>
-                          )}
+                          ) : null}
                           <div className="md:col-span-2">
                             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                               Note
@@ -449,7 +442,7 @@ export function AvailabilityEntriesTable({
                               {noteText ? (
                                 noteText
                               ) : (
-                                <span className="text-muted-foreground">—</span>
+                                <span className="text-muted-foreground">-</span>
                               )}
                             </p>
                           </div>
@@ -480,13 +473,45 @@ export function AvailabilityEntriesTable({
                         </div>
                       </TableCell>
                     </TableRow>
-                  )}
+                  ) : null}
                 </Fragment>
               )
             })}
           </TableBody>
         </Table>
-      </CardContent>
+      )}
+    </div>
+  )
+
+  if (embedded) {
+    return content
+  }
+
+  return (
+    <Card className="overflow-hidden rounded-[1.5rem] border border-border/75 bg-card shadow-tw-sm">
+      <CardHeader className="border-b border-border/70 px-5 pb-2.5 pt-4">
+        <CardTitle>
+          {titleOverride ??
+            (canManageAvailability
+              ? syncSearchFromPlannerFocus
+                ? 'Request inbox'
+                : scope === 'all-staff'
+                  ? 'Review requests'
+                  : 'Review my requests'
+              : 'My Saved Availability Requests')}
+        </CardTitle>
+        <CardDescription>
+          {descriptionOverride ??
+            (canManageAvailability
+              ? syncSearchFromPlannerFocus
+                ? 'Review therapist requests tied to the current planning cycle.'
+                : scope === 'all-staff'
+                  ? 'Scan submitted requests before the cycle is published.'
+                  : 'Review the requests you entered yourself.'
+              : 'Your saved requests for upcoming cycles.')}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="p-0">{content}</CardContent>
     </Card>
   )
 }

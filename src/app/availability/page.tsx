@@ -19,6 +19,7 @@ import {
 } from '@/app/availability/actions'
 import { AvailabilityPlannerFocusProvider } from '@/components/availability/availability-planner-focus-context'
 import { AvailabilityOverviewHeader } from '@/components/availability/AvailabilityOverviewHeader'
+import { AvailabilitySummaryChips } from '@/components/availability/availability-summary-chips'
 import {
   EmailIntakePanel,
   type EmailIntakePanelRow,
@@ -141,6 +142,7 @@ type AvailabilityPageSearchParams = {
   tab?: string | string[]
   search?: string | string[]
   therapist?: string | string[]
+  roster?: string | string[]
   status?: string | string[]
   startDate?: string | string[]
   endDate?: string | string[]
@@ -173,6 +175,38 @@ function buildAvailabilityTabHref(
   searchParams.set('tab', targetTab)
   const query = searchParams.toString()
   return query ? `/availability?${query}` : '/availability'
+}
+
+function buildAvailabilityHref(
+  params: AvailabilityPageSearchParams | undefined,
+  updates: Record<string, string | undefined>,
+  hash?: string
+): string {
+  const searchParams = new URLSearchParams()
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (value == null) continue
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          searchParams.append(key, item)
+        }
+        continue
+      }
+      searchParams.set(key, value)
+    }
+  }
+
+  for (const [key, value] of Object.entries(updates)) {
+    if (!value) {
+      searchParams.delete(key)
+      continue
+    }
+    searchParams.set(key, value)
+  }
+
+  const query = searchParams.toString()
+  const base = query ? `/availability?${query}` : '/availability'
+  return hash ? `${base}${hash}` : base
 }
 
 function stripStoredEmailSubject(text: string | null, subject: string | null): string | null {
@@ -354,6 +388,7 @@ export default async function AvailabilityPage({
   const feedback = getAvailabilityFeedback(params)
   const initialStatus = getSearchParam(params?.status)
   const initialSort = getSearchParam(params?.sort)
+  const initialRoster = getSearchParam(params?.roster)
   const activeTab = getSearchParam(params?.tab) === 'intake' ? 'intake' : 'planner'
 
   const { data: profile } = await supabase
@@ -573,6 +608,14 @@ export default async function AvailabilityPage({
     plannerTherapists.find((therapist) => therapist.id === selectedTherapistIdFromParams)?.id ??
     plannerTherapists[0]?.id ??
     ''
+  const selectedPlannerShiftLabel =
+    plannerTherapists.find((therapist) => therapist.id === selectedPlannerTherapistId)
+      ?.shift_type === 'night'
+      ? 'Night shift'
+      : plannerTherapists.find((therapist) => therapist.id === selectedPlannerTherapistId)
+            ?.shift_type === 'day'
+        ? 'Day shift'
+        : null
 
   const { data: officialSubmissionRows } =
     canManageAvailability && selectedCycleId
@@ -616,6 +659,7 @@ export default async function AvailabilityPage({
     const requester = getOne(entry.profiles)
     return {
       id: entry.id,
+      therapistId: entry.therapist_id,
       cycleId: entry.cycle_id,
       date: entry.date,
       reason: entry.note,
@@ -646,6 +690,13 @@ export default async function AvailabilityPage({
     endDate: getSearchParam(params?.endDate) ?? '',
     sort: initialSort === 'oldest' ? 'oldest' : 'newest',
   }
+  const defaultSecondaryTab =
+    initialStatus ||
+    searchFromUrl.trim() !== '' ||
+    initialFilters.startDate ||
+    initialFilters.endDate
+      ? 'inbox'
+      : 'roster'
 
   const entriesCard = (
     <AvailabilityEntriesTable
@@ -695,23 +746,78 @@ export default async function AvailabilityPage({
       : null
   const plannerHref = buildAvailabilityTabHref(params, 'planner')
   const intakeHref = buildAvailabilityTabHref(params, 'intake')
+  const summaryChips = canManageAvailability ? (
+    <AvailabilitySummaryChips
+      chips={[
+        {
+          label: 'Not submitted',
+          count: missingAvailabilityRows.length,
+          href: buildAvailabilityHref(
+            params,
+            { tab: 'planner', roster: 'missing' },
+            '#availability-response-heading'
+          ),
+          tone: 'warning',
+          active: initialRoster === 'missing',
+        },
+        {
+          label: 'Submitted',
+          count: submittedAvailabilityRows.length,
+          href: buildAvailabilityHref(
+            params,
+            { tab: 'planner', roster: 'submitted' },
+            '#availability-response-heading'
+          ),
+          tone: 'success',
+          active: initialRoster === 'submitted',
+        },
+        {
+          label: 'Need off',
+          count: needOffRequests,
+          href: buildAvailabilityHref(
+            params,
+            { tab: 'planner', status: 'force_off' },
+            '#availability-request-inbox'
+          ),
+          tone: 'warning',
+          active: initialStatus === 'force_off',
+        },
+        {
+          label: 'Request to work',
+          count: availableToWorkRequests,
+          href: buildAvailabilityHref(
+            params,
+            { tab: 'planner', status: 'force_on' },
+            '#availability-request-inbox'
+          ),
+          tone: 'info',
+          active: initialStatus === 'force_on',
+        },
+      ]}
+    />
+  ) : undefined
 
   return (
-    <div className="availability-page-print space-y-7">
+    <div className="availability-page-print space-y-5">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
       <AvailabilityOverviewHeader
         canManageAvailability={canManageAvailability}
-        title={canManageAvailability ? 'Staff Availability Management' : 'Availability'}
+        title={canManageAvailability ? 'Availability Planning' : 'Availability'}
         subtitle={
           selectedCycle
-            ? `${selectedCycle.label} · ${formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)}`
+            ? `${formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)}${
+                canManageAvailability && selectedPlannerShiftLabel
+                  ? ` · ${selectedPlannerShiftLabel}`
+                  : ''
+              }`
             : 'No upcoming cycle selected'
         }
         totalRequests={totalRequests}
         needOffRequests={needOffRequests}
         availableToWorkRequests={availableToWorkRequests}
         responseRatio={responseRatio}
+        summaryContent={summaryChips}
         actions={
           <>
             <Button
@@ -756,12 +862,12 @@ export default async function AvailabilityPage({
       />
 
       {canManageAvailability ? (
-        <div className="border-b border-border">
+        <div className="border-b border-border/70">
           <nav className="-mb-px flex gap-0" aria-label="Availability sections">
             <a
               href={plannerHref}
               className={cn(
-                'px-4 py-2.5 text-sm border-b-2 transition-colors',
+                'px-4 py-2 text-sm border-b-2 transition-colors',
                 activeTab === 'planner'
                   ? 'border-primary text-foreground font-medium'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -772,7 +878,7 @@ export default async function AvailabilityPage({
             <a
               href={intakeHref}
               className={cn(
-                'flex items-center gap-2 px-4 py-2.5 text-sm border-b-2 transition-colors',
+                'flex items-center gap-2 px-4 py-2 text-sm border-b-2 transition-colors',
                 activeTab === 'intake'
                   ? 'border-primary text-foreground font-medium'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -798,14 +904,23 @@ export default async function AvailabilityPage({
               cycles={cycles}
               therapists={plannerTherapists}
               overrides={plannerOverrides}
+              availabilityEntries={availabilityRows}
               initialCycleId={selectedCycleId}
               initialTherapistId={selectedPlannerTherapistId}
               submittedRows={submittedAvailabilityRows}
               missingRows={missingAvailabilityRows}
+              initialRosterFilter={
+                initialRoster === 'all' ||
+                initialRoster === 'submitted' ||
+                initialRoster === 'has_requests'
+                  ? initialRoster
+                  : 'missing'
+              }
+              defaultSecondaryTab={defaultSecondaryTab}
               saveManagerPlannerDatesAction={saveManagerPlannerDatesAction}
               deleteManagerPlannerDateAction={deleteManagerPlannerDateAction}
               copyAvailabilityFromPreviousCycleAction={copyAvailabilityFromPreviousCycleAction}
-              reviewRequestsPanel={entriesCard}
+              reviewRequestsPanel={<div id="availability-request-inbox">{entriesCard}</div>}
             />
           </AvailabilityPlannerFocusProvider>
         ) : (

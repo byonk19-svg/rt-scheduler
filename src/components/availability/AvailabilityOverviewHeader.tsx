@@ -28,7 +28,7 @@ export function AvailabilityOverviewHeader({
   return (
     <ManagerWorkspaceHeader
       title={title}
-      titleClassName="app-page-title max-w-[min(100%,42rem)] text-xl sm:text-[1.65rem] md:text-[1.85rem] lg:text-[2rem]"
+      titleClassName="app-page-title max-w-[min(100%,38rem)] text-xl sm:text-[1.55rem] md:text-[1.75rem]"
       subtitle={subtitle}
       actions={actions}
       summary={

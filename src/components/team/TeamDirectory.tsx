@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { ChevronRight, Shield, User } from 'lucide-react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { ChevronDown } from 'lucide-react'
 
 import { FormSubmitButton } from '@/components/form-submit-button'
 import { Button } from '@/components/ui/button'
@@ -15,17 +15,45 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { formatEmployeeDate } from '@/lib/employee-directory'
+import {
+  TeamDirectoryFilters,
+  type TeamDirectoryFilterState,
+} from '@/components/team/team-directory-filters'
+import {
+  partitionTeamProfiles,
+  TEAM_LEAD_ROLE_LABEL,
+  TEAM_QUICK_EDIT_DIALOG_CLASS,
+  teamMemberHasAppAccess,
+  type TeamProfileRecord,
+  type TeamSummaryCounts,
+  type WorkPatternRecord,
+} from '@/components/team/team-directory-model'
+import {
+  TeamDirectorySummaryChips,
+  type DirectoryChipFilter,
+} from '@/components/team/team-directory-summary-chips'
+import { TeamPersonRow } from '@/components/team/team-person-row'
 import { getTeamRolePermissions } from '@/lib/team-role-permissions'
 import { cn } from '@/lib/utils'
 
-export type WorkPatternRecord = {
-  works_dow: number[]
-  offs_dow: number[]
-  works_dow_mode: 'hard' | 'soft'
-  weekend_rotation: 'none' | 'every_other'
-  weekend_anchor_date: string | null
+export type { TeamProfileRecord, WorkPatternRecord, TeamSummaryCounts }
+export {
+  partitionTeamProfiles,
+  TEAM_LEAD_ROLE_LABEL,
+  TEAM_QUICK_EDIT_DIALOG_CLASS,
+  teamMemberHasAppAccess,
 }
+
+type TeamDirectoryProps = {
+  summary: TeamSummaryCounts
+  profiles: TeamProfileRecord[]
+  workPatterns?: Record<string, WorkPatternRecord>
+  initialEditProfileId?: string | null
+  archiveTeamMemberAction: (formData: FormData) => void | Promise<void>
+  saveTeamQuickEditAction: (formData: FormData) => void | Promise<void>
+}
+
+type EditableRole = 'manager' | 'lead' | 'therapist'
 
 const DOW_OPTIONS = [
   { label: 'Su', value: 0 },
@@ -36,42 +64,6 @@ const DOW_OPTIONS = [
   { label: 'Fr', value: 5 },
   { label: 'Sa', value: 6 },
 ]
-
-export type TeamProfileRecord = {
-  id: string
-  full_name: string | null
-  role: 'manager' | 'therapist' | 'lead' | null
-  shift_type: 'day' | 'night' | null
-  employment_type: 'full_time' | 'part_time' | 'prn' | null
-  is_lead_eligible: boolean | null
-  is_active: boolean | null
-  on_fmla: boolean | null
-  fmla_return_date: string | null
-}
-
-type TeamDirectoryProps = {
-  profiles: TeamProfileRecord[]
-  workPatterns?: Record<string, WorkPatternRecord>
-  initialEditProfileId?: string | null
-  archiveTeamMemberAction: (formData: FormData) => void | Promise<void>
-  saveTeamQuickEditAction: (formData: FormData) => void | Promise<void>
-}
-
-type EditableRole = 'manager' | 'lead' | 'therapist'
-type ShiftBucket = 'day' | 'night'
-
-type TeamDirectorySections = {
-  managers: TeamProfileRecord[]
-  inactive: TeamProfileRecord[]
-  dayLeads: TeamProfileRecord[]
-  dayTherapists: TeamProfileRecord[]
-  nightLeads: TeamProfileRecord[]
-  nightTherapists: TeamProfileRecord[]
-}
-
-export const TEAM_QUICK_EDIT_DIALOG_CLASS =
-  'max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-[560px]'
-export const TEAM_LEAD_ROLE_LABEL = 'Lead Therapist'
 
 function initials(name: string | null): string {
   if (!name) return '??'
@@ -88,227 +80,97 @@ function employmentLabel(type: TeamProfileRecord['employment_type']): string {
   return 'Full-time'
 }
 
-function roleLabel(role: TeamProfileRecord['role']): string {
-  if (role === 'manager') return 'Manager'
-  if (role === 'lead') return TEAM_LEAD_ROLE_LABEL
-  return 'Therapist'
-}
-
-function roleBadgeClass(role: TeamProfileRecord['role']): string {
-  if (role === 'manager') return 'bg-secondary text-secondary-foreground'
-  if (role === 'lead') return 'bg-primary/10 text-primary'
-  return 'bg-muted text-muted-foreground'
-}
-
 function shiftLabel(type: TeamProfileRecord['shift_type']): string {
   return type === 'night' ? 'Night shift' : 'Day shift'
 }
 
-function shiftBucket(type: TeamProfileRecord['shift_type']): ShiftBucket {
-  return type === 'night' ? 'night' : 'day'
+function normalizeSearch(s: string): string {
+  return s.trim().toLowerCase()
 }
 
-export function teamMemberHasAppAccess(profile: Pick<TeamProfileRecord, 'is_active'>): boolean {
-  return profile.is_active !== false
-}
-
-export function partitionTeamProfiles(profiles: TeamProfileRecord[]): TeamDirectorySections {
-  const sections: TeamDirectorySections = {
-    managers: [],
-    inactive: [],
-    dayLeads: [],
-    dayTherapists: [],
-    nightLeads: [],
-    nightTherapists: [],
+function matchesChip(profile: TeamProfileRecord, chip: DirectoryChipFilter): boolean {
+  const active = teamMemberHasAppAccess(profile)
+  switch (chip) {
+    case 'all':
+      return true
+    case 'managers':
+      return active && profile.role === 'manager'
+    case 'leads':
+      return active && profile.role === 'lead'
+    case 'therapists':
+      return active && profile.role === 'therapist'
+    case 'day':
+      return active && profile.shift_type !== 'night'
+    case 'night':
+      return active && profile.shift_type === 'night'
+    case 'inactive':
+      return !active
+    case 'fmla':
+      return profile.on_fmla === true
+    default:
+      return true
   }
-
-  for (const profile of profiles) {
-    if (!teamMemberHasAppAccess(profile)) {
-      sections.inactive.push(profile)
-      continue
-    }
-
-    if (profile.role === 'manager') {
-      sections.managers.push(profile)
-      continue
-    }
-
-    const bucket = shiftBucket(profile.shift_type)
-    if (profile.role === 'lead') {
-      if (bucket === 'night') sections.nightLeads.push(profile)
-      else sections.dayLeads.push(profile)
-      continue
-    }
-
-    if (bucket === 'night') sections.nightTherapists.push(profile)
-    else sections.dayTherapists.push(profile)
-  }
-
-  return sections
 }
 
-function TeamMemberCard({ profile, onClick }: { profile: TeamProfileRecord; onClick: () => void }) {
-  const isActive = teamMemberHasAppAccess(profile)
+function matchesFormFilters(profile: TeamProfileRecord, f: TeamDirectoryFilterState): boolean {
+  if (f.search.trim()) {
+    const q = normalizeSearch(f.search)
+    const name = normalizeSearch(profile.full_name ?? '')
+    if (!name.includes(q)) return false
+  }
+  if (f.role !== 'all' && profile.role !== f.role) return false
+  if (f.shift !== 'all' && (profile.shift_type ?? 'day') !== f.shift) return false
+  if (f.employment !== 'all' && (profile.employment_type ?? 'full_time') !== f.employment)
+    return false
+  if (f.status === 'active' && !teamMemberHasAppAccess(profile)) return false
+  if (f.status === 'inactive' && teamMemberHasAppAccess(profile)) return false
+  if (f.status === 'fmla' && profile.on_fmla !== true) return false
+  return true
+}
+
+function filterProfilesForDirectory(
+  profiles: TeamProfileRecord[],
+  chip: DirectoryChipFilter,
+  form: TeamDirectoryFilterState
+): TeamProfileRecord[] {
+  return profiles.filter((p) => matchesChip(p, chip) && matchesFormFilters(p, form))
+}
+
+function CollapsibleTeamGroup({
+  title,
+  count,
+  defaultOpen = true,
+  children,
+}: {
+  title: string
+  count: number
+  defaultOpen?: boolean
+  children: ReactNode
+}) {
+  if (count === 0) return null
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'group flex w-full cursor-pointer items-start gap-4 rounded-xl border border-border/70 bg-card/85 p-5 text-left shadow-sm transition-all hover:border-primary/30 hover:bg-card hover:shadow-md active:scale-[0.99] active:shadow-sm',
-        profile.role === 'lead' &&
-          'border-primary/30 bg-primary/[0.04] hover:border-primary/50 hover:bg-primary/[0.07]',
-        !isActive && 'opacity-75'
-      )}
+    <details
+      open={defaultOpen}
+      className="group rounded-xl border border-border/60 bg-card/45 [&_summary::-webkit-details-marker]:hidden"
     >
-      <div
-        className={cn(
-          'flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-transform group-hover:scale-105',
-          profile.role === 'lead'
-            ? 'border border-primary/20 bg-primary/10 text-primary'
-            : profile.role === 'manager'
-              ? 'bg-secondary text-secondary-foreground'
-              : 'bg-muted text-muted-foreground'
-        )}
-      >
-        {initials(profile.full_name)}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="mb-2.5 flex flex-wrap items-center gap-2">
-          <h3 className="font-heading text-sm font-semibold text-foreground">
-            {profile.full_name ?? 'Unknown'}
-          </h3>
-          <span
-            className={cn(
-              'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
-              roleBadgeClass(profile.role),
-              profile.role === 'lead' && 'ring-1 ring-primary/10'
-            )}
-          >
-            {profile.role === 'lead' ? (
-              <Shield className="h-2.5 w-2.5" />
-            ) : (
-              <User className="h-2.5 w-2.5" />
-            )}
-            {roleLabel(profile.role)}
-          </span>
-          {profile.on_fmla && (
-            <span className="inline-flex items-center rounded-full bg-[var(--warning-subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--warning-text)]">
-              FMLA
-            </span>
-          )}
-          {!isActive && (
-            <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-              Inactive
-            </span>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <span
-              className={cn(
-                'h-1.5 w-1.5 shrink-0 rounded-full',
-                profile.shift_type === 'night' ? 'bg-[var(--warning)]' : 'bg-[var(--info)]'
-              )}
-            />
-            {shiftLabel(profile.shift_type)}
-          </span>
-          <span className="h-1 w-1 rounded-full bg-border" />
-          <span>{employmentLabel(profile.employment_type)}</span>
-          {profile.on_fmla && profile.fmla_return_date && (
-            <>
-              <span className="h-1 w-1 rounded-full bg-border" />
-              <span>Return {formatEmployeeDate(profile.fmla_return_date)}</span>
-            </>
-          )}
-        </div>
-      </div>
-
-      <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/30 transition-all group-hover:translate-x-0.5 group-hover:text-primary/50" />
-    </button>
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5">
+        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+        <h2 className="text-sm font-semibold tracking-tight text-foreground">{title}</h2>
+        <span className="ml-auto rounded-full border border-border/70 bg-muted/25 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
+          {count}
+        </span>
+      </summary>
+      <div className="space-y-1 border-t border-border/50 px-2 py-2">{children}</div>
+    </details>
   )
 }
 
-function TeamSection({
-  title,
-  profiles,
-  onOpen,
-}: {
-  title: string
-  profiles: TeamProfileRecord[]
-  onOpen: (profileId: string) => void
-}) {
+function renderGroupRows(profiles: TeamProfileRecord[], onOpen: (id: string) => void): ReactNode {
   if (profiles.length === 0) return null
-
-  return (
-    <section className="mb-8 last:mb-0">
-      <div className="mb-3 flex items-center gap-2.5">
-        <div className="h-3.5 w-0.5 rounded-full bg-primary/40" />
-        <h2 className="text-[0.68rem] font-bold uppercase tracking-[0.1em] text-foreground/70">
-          {title}
-        </h2>
-        <div className="h-px flex-1 bg-border/60" />
-        <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-          {profiles.length}
-        </span>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {profiles.map((profile) => (
-          <TeamMemberCard key={profile.id} profile={profile} onClick={() => onOpen(profile.id)} />
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function ShiftGroup({
-  title,
-  shiftType,
-  leads,
-  therapists,
-  onOpen,
-}: {
-  title: string
-  shiftType: 'day' | 'night'
-  leads: TeamProfileRecord[]
-  therapists: TeamProfileRecord[]
-  onOpen: (profileId: string) => void
-}) {
-  if (leads.length === 0 && therapists.length === 0) return null
-
-  return (
-    <section
-      className={cn(
-        'mb-8 rounded-2xl border p-4 last:mb-0 sm:p-5',
-        shiftType === 'night'
-          ? 'border-[var(--warning-border)]/40 bg-[var(--warning-subtle)]/20'
-          : 'border-[var(--info-border)]/40 bg-[var(--info-subtle)]/20'
-      )}
-    >
-      <div className="mb-4 flex items-center justify-between">
-        <h2
-          className={cn(
-            'flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em]',
-            shiftType === 'night' ? 'text-[var(--warning-text)]' : 'text-[var(--info-text)]'
-          )}
-        >
-          <span
-            className={cn(
-              'h-2 w-2 rounded-full',
-              shiftType === 'night' ? 'bg-[var(--warning)]' : 'bg-[var(--info)]'
-            )}
-          />
-          {title}
-        </h2>
-        <span className="rounded-full border border-border/70 bg-card px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-          {leads.length + therapists.length} total
-        </span>
-      </div>
-      <TeamSection title="Lead Therapists" profiles={leads} onOpen={onOpen} />
-      <TeamSection title="Therapists" profiles={therapists} onOpen={onOpen} />
-    </section>
-  )
+  return profiles.map((profile) => (
+    <TeamPersonRow key={profile.id} profile={profile} onOpen={onOpen} />
+  ))
 }
 
 function AccessChecklist({ role }: { role: EditableRole }) {
@@ -358,12 +220,29 @@ function InactiveAccessNotice() {
 }
 
 export function TeamDirectory({
+  summary,
   profiles,
   workPatterns = {},
   initialEditProfileId = null,
   archiveTeamMemberAction,
   saveTeamQuickEditAction,
 }: TeamDirectoryProps) {
+  const [chipFilter, setChipFilter] = useState<DirectoryChipFilter>('all')
+  const [formFilters, setFormFilters] = useState<TeamDirectoryFilterState>({
+    search: '',
+    role: 'all',
+    shift: 'all',
+    employment: 'all',
+    status: 'all',
+  })
+
+  const filteredProfiles = useMemo(
+    () => filterProfilesForDirectory(profiles, chipFilter, formFilters),
+    [profiles, chipFilter, formFilters]
+  )
+
+  const sections = useMemo(() => partitionTeamProfiles(filteredProfiles), [filteredProfiles])
+
   const initialEditProfile = profiles.find((profile) => profile.id === initialEditProfileId) ?? null
   const initialPattern = initialEditProfile ? (workPatterns[initialEditProfile.id] ?? null) : null
 
@@ -373,7 +252,6 @@ export function TeamDirectory({
   )
   const [onFmla, setOnFmla] = useState(initialEditProfile?.on_fmla === true)
 
-  // Work pattern state
   const [hasPattern, setHasPattern] = useState(
     initialPattern !== null && initialPattern.works_dow.length > 0
   )
@@ -386,7 +264,6 @@ export function TeamDirectory({
     initialPattern?.weekend_rotation ?? 'none'
   )
 
-  const sections = useMemo(() => partitionTeamProfiles(profiles), [profiles])
   const editProfile = useMemo(
     () => profiles.find((profile) => profile.id === editProfileId) ?? null,
     [profiles, editProfileId]
@@ -421,30 +298,47 @@ export function TeamDirectory({
 
   return (
     <>
-      <div className="rounded-2xl border border-border/60 bg-card/50 p-4 sm:p-5">
-        <TeamSection title="Managers" profiles={sections.managers} onOpen={openEditor} />
-      </div>
-      <ShiftGroup
-        title="Day Shift"
-        shiftType="day"
-        leads={sections.dayLeads}
-        therapists={sections.dayTherapists}
-        onOpen={openEditor}
-      />
-      <ShiftGroup
-        title="Night Shift"
-        shiftType="night"
-        leads={sections.nightLeads}
-        therapists={sections.nightTherapists}
-        onOpen={openEditor}
-      />
-      <div className="rounded-2xl border border-border/60 bg-card/50 p-4 sm:p-5">
-        <TeamSection title="Inactive" profiles={sections.inactive} onOpen={openEditor} />
+      <div className="space-y-3">
+        <TeamDirectorySummaryChips
+          summary={summary}
+          activeChip={chipFilter}
+          onChipChange={setChipFilter}
+        />
+        <TeamDirectoryFilters value={formFilters} onChange={setFormFilters} />
       </div>
 
-      {profiles.length === 0 && (
-        <div className="rounded-xl border border-border bg-card px-6 py-12 text-center">
-          <p className="text-sm text-muted-foreground">No team members found.</p>
+      <div className="space-y-3">
+        <CollapsibleTeamGroup title="Managers" count={sections.managers.length}>
+          {renderGroupRows(sections.managers, openEditor)}
+        </CollapsibleTeamGroup>
+
+        <CollapsibleTeamGroup title="Day shift leads" count={sections.dayLeads.length}>
+          {renderGroupRows(sections.dayLeads, openEditor)}
+        </CollapsibleTeamGroup>
+
+        <CollapsibleTeamGroup title="Day shift therapists" count={sections.dayTherapists.length}>
+          {renderGroupRows(sections.dayTherapists, openEditor)}
+        </CollapsibleTeamGroup>
+
+        <CollapsibleTeamGroup title="Night shift leads" count={sections.nightLeads.length}>
+          {renderGroupRows(sections.nightLeads, openEditor)}
+        </CollapsibleTeamGroup>
+
+        <CollapsibleTeamGroup
+          title="Night shift therapists"
+          count={sections.nightTherapists.length}
+        >
+          {renderGroupRows(sections.nightTherapists, openEditor)}
+        </CollapsibleTeamGroup>
+
+        <CollapsibleTeamGroup title="Inactive and off roster" count={sections.inactive.length}>
+          {renderGroupRows(sections.inactive, openEditor)}
+        </CollapsibleTeamGroup>
+      </div>
+
+      {filteredProfiles.length === 0 && (
+        <div className="rounded-xl border border-border bg-card px-4 py-8 text-center">
+          <p className="text-sm text-muted-foreground">No people match these filters.</p>
         </div>
       )}
 
@@ -474,6 +368,9 @@ export function TeamDirectory({
                       {shiftLabel(editProfile.shift_type)} ·{' '}
                       {employmentLabel(editProfile.employment_type)}
                     </p>
+                    {editProfile.phone_number ? (
+                      <p className="text-xs text-muted-foreground">{editProfile.phone_number}</p>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -571,11 +468,9 @@ export function TeamDirectory({
                 <InactiveAccessNotice />
               )}
 
-              {/* ── Scheduling Constraints ── */}
               <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-3">
                 <p className="text-sm font-semibold text-foreground">Scheduling Constraints</p>
 
-                {/* ── Days they never work (offs_dow) — always shown ── */}
                 <div className="space-y-1.5">
                   <p className="text-xs font-medium text-foreground">Days they never work</p>
                   <p className="text-xs text-muted-foreground">
@@ -605,7 +500,6 @@ export function TeamDirectory({
 
                 <div className="h-px bg-border/60" />
 
-                {/* ── Recurring weekly pattern (works_dow) — toggled ── */}
                 <div className="space-y-3">
                   <label className="flex cursor-pointer items-center gap-2.5">
                     <input
@@ -625,7 +519,6 @@ export function TeamDirectory({
 
                   {hasPattern && (
                     <div className="space-y-3 pl-1">
-                      {/* Work days */}
                       <div className="space-y-1.5">
                         <p className="text-xs font-medium text-foreground">Days they work</p>
                         <div className="flex flex-wrap gap-1.5">
@@ -650,7 +543,6 @@ export function TeamDirectory({
                         ))}
                       </div>
 
-                      {/* Strictness */}
                       {selectedDays.length > 0 && (
                         <div className="space-y-1">
                           <p className="text-xs font-medium text-foreground">How strict?</p>
@@ -691,7 +583,6 @@ export function TeamDirectory({
                         </div>
                       )}
 
-                      {/* Weekend rotation */}
                       <div className="space-y-1.5">
                         <p className="text-xs font-medium text-foreground">Weekend rotation</p>
                         <div className="space-y-1">

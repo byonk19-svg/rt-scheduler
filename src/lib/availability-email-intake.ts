@@ -1,7 +1,9 @@
 import {
+  extractAvailabilityEmployeeName,
   matchAvailabilityEmailEmployee,
   type AvailabilityEmailEmployeeCandidate,
 } from '@/lib/availability-email-item-matcher'
+import { normalizeRosterFullName } from '@/lib/employee-roster-bulk'
 
 type AvailabilityOverrideType = 'force_off' | 'force_on'
 type AvailabilityShiftType = 'day' | 'night' | 'both'
@@ -125,8 +127,58 @@ const WORK_PATTERNS = [
   /\bcan work\b/i,
   /\bavailable\b/i,
   /\bmust work\b/i,
+  /\bno pto\b/i,
+  /\bworking\b/i,
   /\bwork\b/i,
 ]
+
+const PTO_FORM_MARKERS = [
+  /\bpto request\/edit form\b/i,
+  /\bemployee name\s*:/i,
+  /\bemployee signature\b/i,
+  /\bpto hours\b/i,
+]
+
+const PTO_METADATA_PATTERNS = [
+  /^\s*-+\s*$/i,
+  /^pto request(?:\/edit form)?$/i,
+  /^employee name\s*:/i,
+  /^department\s*:/i,
+  /^kronos number\s*:/i,
+  /^employee signature\s*:/i,
+  /^signature\s*:/i,
+  /^pto type\s*:/i,
+  /^comments\s*:/i,
+  /^date\s+pto hours\b/i,
+  /^date\b[:\s-]+\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/i,
+]
+
+const WEEKDAY_MAP: Record<string, number> = {
+  sunday: 0,
+  sundays: 0,
+  sun: 0,
+  monday: 1,
+  mondays: 1,
+  mon: 1,
+  tuesday: 2,
+  tuesdays: 2,
+  tue: 2,
+  tues: 2,
+  wednesday: 3,
+  wednesdays: 3,
+  wed: 3,
+  thursday: 4,
+  thursdays: 4,
+  thu: 4,
+  thur: 4,
+  thurs: 4,
+  friday: 5,
+  fridays: 5,
+  fri: 5,
+  saturday: 6,
+  saturdays: 6,
+  sat: 6,
+}
 
 const INTENT_MATCHERS: Array<{ type: AvailabilityOverrideType; pattern: RegExp }> = [
   { type: 'force_off', pattern: /\bneed off\b/gi },
@@ -140,6 +192,7 @@ const INTENT_MATCHERS: Array<{ type: AvailabilityOverrideType; pattern: RegExp }
   { type: 'force_on', pattern: /\bcan work\b/gi },
   { type: 'force_on', pattern: /\bmust work\b/gi },
   { type: 'force_on', pattern: /\bavailable\b/gi },
+  { type: 'force_on', pattern: /\bworking\b/gi },
   { type: 'force_on', pattern: /\bwork\b/gi },
 ]
 
@@ -236,6 +289,165 @@ function inferCycleScopedDate(token: string, cycles: IntakeCycle[]): string | nu
 
 function normalizeLine(line: string): string {
   return line.replace(/\s+/g, ' ').trim()
+}
+
+function stripOrdinalSuffixes(value: string): string {
+  return value.replace(/\b(\d{1,2})(st|nd|rd|th)\b/gi, '$1')
+}
+
+function isPtoFormText(text: string): boolean {
+  return PTO_FORM_MARKERS.some((pattern) => pattern.test(text))
+}
+
+function shouldIgnorePtoMetadataLine(line: string): boolean {
+  return PTO_METADATA_PATTERNS.some((pattern) => pattern.test(line))
+}
+
+function inferDateToken(token: string, cycles: IntakeCycle[]): string | null {
+  const explicit = inferExplicitDate(token)
+  if (explicit) return explicit
+  return inferCycleScopedDate(token, cycles)
+}
+
+function expandIsoDateRange(startIso: string, endIso: string): string[] {
+  if (endIso < startIso) return []
+
+  const dates: string[] = []
+  const current = new Date(`${startIso}T00:00:00Z`)
+  const end = new Date(`${endIso}T00:00:00Z`)
+
+  while (current <= end) {
+    dates.push(current.toISOString().slice(0, 10))
+    current.setUTCDate(current.getUTCDate() + 1)
+    if (dates.length > 90) break
+  }
+
+  return dates
+}
+
+function collectRangeDates(
+  line: string,
+  cycles: IntakeCycle[]
+): { dates: string[]; stripped: string } {
+  let stripped = stripOrdinalSuffixes(line)
+  const resolved = new Set<string>()
+
+  const applyRange = (startToken: string, endToken: string) => {
+    const startIso = inferDateToken(startToken, cycles)
+    const endIso = inferDateToken(endToken, cycles)
+    if (!startIso || !endIso) return
+
+    for (const iso of expandIsoDateRange(startIso, endIso)) {
+      resolved.add(iso)
+    }
+  }
+
+  const repeatedMonthPattern =
+    /\b([A-Za-z]+\.?\s+\d{1,2}(?:,\s*\d{4})?)\s*(?:-|thru|through|to)\s*([A-Za-z]+\.?\s+\d{1,2}(?:,\s*\d{4})?)\b/gi
+  stripped = stripped.replace(repeatedMonthPattern, (...args) => {
+    const match = args[0] as string
+    applyRange(args[1] as string, args[2] as string)
+    return ' '.repeat(match.length)
+  })
+
+  const sameMonthTextPattern =
+    /\b([A-Za-z]+\.?\s+\d{1,2}(?:,\s*\d{4})?)\s*(?:-|thru|through|to)\s*(\d{1,2})\b/gi
+  stripped = stripped.replace(sameMonthTextPattern, (...args) => {
+    const match = args[0] as string
+    const first = args[1] as string
+    const second = args[2] as string
+    const firstParts = first.match(/^([A-Za-z]+\.?)\s+(\d{1,2})(?:,\s*(\d{4}))?$/i)
+    if (firstParts) {
+      const inheritedMonth = firstParts[1]
+      const inheritedYear = firstParts[3] ? `, ${firstParts[3]}` : ''
+      applyRange(first, `${inheritedMonth} ${second}${inheritedYear}`)
+    }
+    return ' '.repeat(match.length)
+  })
+
+  const slashFullPattern =
+    /\b(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\s*(?:-|thru|through|to)\s*(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\b/gi
+  stripped = stripped.replace(slashFullPattern, (...args) => {
+    const match = args[0] as string
+    applyRange(args[1] as string, args[2] as string)
+    return ' '.repeat(match.length)
+  })
+
+  const slashSameMonthPattern = /\b(\d{1,2}\/\d{1,2})\s*(?:-|thru|through|to)\s*(\d{1,2})\b/gi
+  stripped = stripped.replace(slashSameMonthPattern, (...args) => {
+    const match = args[0] as string
+    const first = args[1] as string
+    const second = args[2] as string
+    const firstParts = first.match(/^(\d{1,2})\/(\d{1,2})$/)
+    if (firstParts) {
+      applyRange(first, `${firstParts[1]}/${second}`)
+    }
+    return ' '.repeat(match.length)
+  })
+
+  return { dates: [...resolved].sort((a, b) => a.localeCompare(b)), stripped }
+}
+
+function buildPtoWindow(
+  lines: string[],
+  cycles: IntakeCycle[]
+): { start: string; end: string } | null {
+  const windowLines = lines.filter(
+    (line) =>
+      /\b(?:handwritten note|note)\s*:/i.test(line) ||
+      (!classifyOverrideType(line) && /(through|thru|-)/i.test(line))
+  )
+
+  for (const line of windowLines) {
+    const { dates } = collectRangeDates(line, cycles)
+    if (dates.length >= 2) {
+      return { start: dates[0]!, end: dates[dates.length - 1]! }
+    }
+  }
+
+  if (cycles.length === 1) {
+    return { start: cycles[0]!.start_date, end: cycles[0]!.end_date }
+  }
+
+  return null
+}
+
+function extractWeekdayDates(
+  line: string,
+  window: { start: string; end: string } | null
+): string[] {
+  if (!window) return []
+
+  const weekdayMatches = [
+    ...line
+      .toLowerCase()
+      .matchAll(
+        /\b(?:sun(?:day)?s?|mon(?:day)?s?|tue(?:s|sday)?s?|wed(?:nesday)?s?|thu(?:rs|rsday|rday)?s?|fri(?:day)?s?|sat(?:urday)?s?)\b/g
+      ),
+  ]
+  const weekdays = [
+    ...new Set(
+      weekdayMatches
+        .map((match) => WEEKDAY_MAP[match[0]])
+        .filter((value): value is number => Number.isInteger(value))
+    ),
+  ]
+
+  if (weekdays.length === 0) return []
+
+  const resolved: string[] = []
+  const current = new Date(`${window.start}T00:00:00Z`)
+  const end = new Date(`${window.end}T00:00:00Z`)
+
+  while (current <= end) {
+    if (weekdays.includes(current.getUTCDay())) {
+      resolved.push(current.toISOString().slice(0, 10))
+    }
+    current.setUTCDate(current.getUTCDate() + 1)
+    if (resolved.length > 90) break
+  }
+
+  return resolved
 }
 
 function splitIntoCandidateLines(text: string): string[] {
@@ -353,6 +565,184 @@ function summarizeRequests(
 
 function shouldIgnoreUnresolvedRequestLine(line: string): boolean {
   return /\bpto\b/i.test(line) && /\brequest\b/i.test(line) && extractDateTokens(line).length === 0
+}
+
+function parsePtoFormAvailability(
+  sourceText: string,
+  cycles: IntakeCycle[]
+): ParsedAvailabilityEmail {
+  const lines = sourceText
+    .split(/\r?\n/)
+    .map((line) => normalizeLine(line))
+    .filter((line) => line.length > 0)
+
+  const requests: ParsedAvailabilityRequest[] = []
+  const unresolvedLines: string[] = []
+  const window = buildPtoWindow(lines, cycles)
+
+  for (const line of lines) {
+    if (shouldIgnorePtoMetadataLine(line)) continue
+
+    const ignoreRestOfWeekWork = /\brest of (?:the )?week\b/i.test(line) && /\boff\b/i.test(line)
+    const explicitIntent = ignoreRestOfWeekWork ? 'force_off' : classifyOverrideType(line)
+    const normalizedLine = stripOrdinalSuffixes(line)
+    const hasWeekdays = /\b(?:sun|mon|tue|wed|thu|fri|sat)/i.test(line)
+    const defaultOff =
+      explicitIntent === null && (extractDateTokens(normalizedLine).length > 0 || hasWeekdays)
+    const overrideType = explicitIntent ?? (defaultOff ? 'force_off' : null)
+
+    if (!overrideType) continue
+
+    const { dates: rangeDates, stripped } = collectRangeDates(line, cycles)
+    const resolved = new Set<string>(rangeDates)
+    for (const date of resolveLineDates(stripped, cycles)) {
+      resolved.add(date)
+    }
+    for (const date of extractWeekdayDates(line, window)) {
+      resolved.add(date)
+    }
+
+    const dates = [...resolved].sort((a, b) => a.localeCompare(b))
+    if (dates.length === 0) {
+      unresolvedLines.push(line)
+      continue
+    }
+
+    for (const date of dates) {
+      requests.push({
+        date,
+        override_type: overrideType,
+        shift_type: 'both',
+        note: null,
+        source_line: line,
+      })
+    }
+  }
+
+  const dedupedRequests = Array.from(
+    new Map(
+      requests.map((request) => [
+        `${request.date}:${request.override_type}:${request.shift_type}`,
+        request,
+      ])
+    ).values()
+  ).sort((a, b) => a.date.localeCompare(b.date) || a.override_type.localeCompare(b.override_type))
+
+  const matchingCycleIds = new Set(
+    dedupedRequests
+      .map(
+        (request) =>
+          cycles.find((cycle) => request.date >= cycle.start_date && request.date <= cycle.end_date)
+            ?.id ?? null
+      )
+      .filter((value): value is string => Boolean(value))
+  )
+
+  const matchedCycleId = matchingCycleIds.size === 1 ? ([...matchingCycleIds][0] ?? null) : null
+  const status: ParsedAvailabilityEmail['status'] =
+    dedupedRequests.length === 0
+      ? 'failed'
+      : matchedCycleId && unresolvedLines.length === 0
+        ? 'parsed'
+        : 'needs_review'
+
+  return {
+    requests: dedupedRequests,
+    matchedCycleId,
+    summary: summarizeRequests(dedupedRequests, unresolvedLines),
+    status,
+    unresolvedLines,
+  }
+}
+
+function splitEmployeeFormBlocks(text: string): string[] {
+  const rawLines = text.split(/\r?\n/)
+  const blocks: string[][] = []
+  let current: string[] = []
+  let seenEmployeeHeader = false
+
+  for (const rawLine of rawLines) {
+    const line = rawLine.trim()
+    if (!line) continue
+
+    if (/^\s*-{3,}\s*$/.test(line)) {
+      if (current.length > 0) {
+        blocks.push(current)
+        current = []
+      }
+      continue
+    }
+
+    if (/^employee name\s*:/i.test(line)) {
+      seenEmployeeHeader = true
+      if (current.length > 0) {
+        blocks.push(current)
+        current = []
+      }
+    }
+
+    if (!seenEmployeeHeader && isPtoFormText(text)) {
+      continue
+    }
+
+    current.push(rawLine)
+  }
+
+  if (current.length > 0) {
+    blocks.push(current)
+  }
+
+  return blocks.length > 1 ? blocks.map((block) => block.join('\n').trim()) : [text]
+}
+
+function sanitizeEmployeeBlockText(block: string): string {
+  return block
+    .replace(/^---\s*Page\s+\d+\s*---$/gim, '')
+    .replace(/Employee Name:\s*Employee Name:\s*/gi, 'Employee Name: ')
+    .replace(/\n{2,}/g, '\n')
+    .trim()
+}
+
+function expandSourceCandidateIntoEmployeeBlocks(candidate: {
+  sourceType: 'body' | 'attachment'
+  sourceLabel: string
+  rawText: string
+  attachment: AvailabilityEmailAttachmentSource | null
+}): Array<{
+  sourceType: 'body' | 'attachment'
+  sourceLabel: string
+  rawText: string
+  attachment: AvailabilityEmailAttachmentSource | null
+}> {
+  const blocks = splitEmployeeFormBlocks(candidate.rawText)
+  if (blocks.length <= 1) return [candidate]
+
+  const merged = new Map<
+    string,
+    {
+      sourceType: 'body' | 'attachment'
+      sourceLabel: string
+      rawText: string
+      attachment: AvailabilityEmailAttachmentSource | null
+    }
+  >()
+
+  for (const block of blocks) {
+    const sanitizedBlock = sanitizeEmployeeBlockText(block)
+    const extractedName = extractAvailabilityEmployeeName(sanitizedBlock)
+    const key = extractedName ? normalizeRosterFullName(extractedName) : `block:${merged.size}`
+    const existing = merged.get(key)
+    if (existing) {
+      existing.rawText = `${existing.rawText}\n${sanitizedBlock}`.trim()
+      continue
+    }
+    merged.set(key, {
+      ...candidate,
+      rawText: sanitizedBlock,
+    })
+  }
+
+  return [...merged.values()]
 }
 
 function buildConfidenceReasons(params: {
@@ -489,7 +879,7 @@ function buildSourceCandidates(params: {
     })
   }
 
-  return candidates
+  return candidates.flatMap((candidate) => expandSourceCandidateIntoEmployeeBlocks(candidate))
 }
 
 function buildItemParseStatus(params: {
@@ -595,6 +985,10 @@ export function parseAvailabilityEmail(
   sourceText: string,
   cycles: IntakeCycle[]
 ): ParsedAvailabilityEmail {
+  if (isPtoFormText(sourceText)) {
+    return parsePtoFormAvailability(sourceText, cycles)
+  }
+
   const lines = splitIntoCandidateLines(sourceText)
   const requests: ParsedAvailabilityRequest[] = []
   const unresolvedLines: string[] = []

@@ -34,9 +34,25 @@ describe('availability page role-specific actions', () => {
     expect(source).toContain("entry.source === 'manager' ? 'manager' : 'therapist'")
   })
 
-  it('embeds the review table beside the roster column for managers', () => {
+  it('passes the request inbox into the lower workbench section for managers', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/app/availability/page.tsx'), 'utf8')
-    expect(source).toContain('reviewRequestsPanel={entriesCard}')
+    expect(source).toContain(
+      'reviewRequestsPanel={<div id="availability-request-inbox">{entriesCard}</div>}'
+    )
     expect(source).toContain('formatHumanCycleRange')
+  })
+
+  it('uses the tighter manager header copy and summary-chip navigation for planner filters', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/app/availability/page.tsx'), 'utf8')
+
+    expect(source).toContain(
+      "title={canManageAvailability ? 'Availability Planning' : 'Availability'}"
+    )
+    expect(source).toContain('AvailabilitySummaryChips')
+    expect(source).not.toContain('selectedCycle.label')
+    expect(source).toContain("roster: 'missing'")
+    expect(source).toContain("roster: 'submitted'")
+    expect(source).toContain("status: 'force_off'")
+    expect(source).toContain("status: 'force_on'")
   })
 })
