@@ -91,14 +91,25 @@ export function EmployeeRosterTable({
   deleteEmployeeRosterEntryAction,
 }: EmployeeRosterTableProps) {
   const [search, setSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useState<'all' | EmployeeRosterTableRow['role']>('all')
+  const [shiftFilter, setShiftFilter] = useState<'all' | EmployeeRosterTableRow['shift_type']>(
+    'all'
+  )
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'signed_up'>('all')
   const [sortKey, setSortKey] = useState<SortKey>('full_name')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return roster
-    return roster.filter((row) => row.full_name.toLowerCase().includes(q))
-  }, [roster, search])
+    return roster.filter((row) => {
+      if (q && !row.full_name.toLowerCase().includes(q)) return false
+      if (roleFilter !== 'all' && row.role !== roleFilter) return false
+      if (shiftFilter !== 'all' && row.shift_type !== shiftFilter) return false
+      if (statusFilter === 'pending' && row.matched_profile_id) return false
+      if (statusFilter === 'signed_up' && !row.matched_profile_id) return false
+      return true
+    })
+  }, [roster, search, roleFilter, shiftFilter, statusFilter])
 
   const sorted = useMemo(() => {
     const copy = [...filtered]
@@ -136,13 +147,46 @@ export function EmployeeRosterTable({
 
   return (
     <div className="space-y-3">
-      <div className="max-w-sm">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search roster by name…"
-          className="h-9"
+          className="h-8"
         />
+        <select
+          aria-label="Filter by role"
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value as 'all' | EmployeeRosterTableRow['role'])}
+          className="h-8 rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground"
+        >
+          <option value="all">All roles</option>
+          <option value="manager">Manager</option>
+          <option value="lead">Lead therapist</option>
+          <option value="therapist">Therapist</option>
+        </select>
+        <select
+          aria-label="Filter by shift"
+          value={shiftFilter}
+          onChange={(e) =>
+            setShiftFilter(e.target.value as 'all' | EmployeeRosterTableRow['shift_type'])
+          }
+          className="h-8 rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground"
+        >
+          <option value="all">All shifts</option>
+          <option value="day">Day</option>
+          <option value="night">Night</option>
+        </select>
+        <select
+          aria-label="Filter by roster status"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as 'all' | 'pending' | 'signed_up')}
+          className="h-8 rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground"
+        >
+          <option value="all">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="signed_up">Signed up</option>
+        </select>
       </div>
       <Table>
         <TableHeader>
@@ -210,7 +254,7 @@ export function EmployeeRosterTable({
                 onToggle={toggleSort}
               />
             </TableHead>
-            <TableHead className="w-[100px] text-right">Actions</TableHead>
+            <TableHead className="w-[88px] text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -236,10 +280,15 @@ export function EmployeeRosterTable({
                   {row.matched_profile_id ? 'Signed up' : 'Pending'}
                 </span>
               </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="py-2 text-right">
                 <form action={deleteEmployeeRosterEntryAction} className="inline">
                   <input type="hidden" name="roster_id" value={row.id} />
-                  <Button type="submit" variant="outline" size="sm" className="h-8 px-2 text-xs">
+                  <Button
+                    type="submit"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  >
                     Remove
                   </Button>
                 </form>

@@ -54,6 +54,13 @@ type TeamDirectoryProps = {
 }
 
 type EditableRole = 'manager' | 'lead' | 'therapist'
+type TeamDirectorySectionKey =
+  | 'managers'
+  | 'dayLeads'
+  | 'dayTherapists'
+  | 'nightLeads'
+  | 'nightTherapists'
+  | 'inactive'
 
 const DOW_OPTIONS = [
   { label: 'Su', value: 0 },
@@ -137,31 +144,36 @@ function filterProfilesForDirectory(
 }
 
 function CollapsibleTeamGroup({
+  sectionKey,
   title,
   count,
-  defaultOpen = true,
+  isOpen,
+  onToggle,
   children,
 }: {
+  sectionKey: TeamDirectorySectionKey
   title: string
   count: number
-  defaultOpen?: boolean
+  isOpen: boolean
+  onToggle: (sectionKey: TeamDirectorySectionKey, nextOpen: boolean) => void
   children: ReactNode
 }) {
   if (count === 0) return null
 
   return (
     <details
-      open={defaultOpen}
+      open={isOpen}
+      onToggle={(event) => onToggle(sectionKey, event.currentTarget.open)}
       className="group rounded-xl border border-border/60 bg-card/45 [&_summary::-webkit-details-marker]:hidden"
     >
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2">
         <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
         <h2 className="text-sm font-semibold tracking-tight text-foreground">{title}</h2>
         <span className="ml-auto rounded-full border border-border/70 bg-muted/25 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
           {count}
         </span>
       </summary>
-      <div className="space-y-1 border-t border-border/50 px-2 py-2">{children}</div>
+      <div className="space-y-1 border-t border-border/50 px-2 py-1.5">{children}</div>
     </details>
   )
 }
@@ -227,6 +239,14 @@ export function TeamDirectory({
   archiveTeamMemberAction,
   saveTeamQuickEditAction,
 }: TeamDirectoryProps) {
+  const defaultSectionOpenState = {
+    managers: true,
+    dayLeads: true,
+    dayTherapists: false,
+    nightLeads: true,
+    nightTherapists: false,
+    inactive: false,
+  }
   const [chipFilter, setChipFilter] = useState<DirectoryChipFilter>('all')
   const [formFilters, setFormFilters] = useState<TeamDirectoryFilterState>({
     search: '',
@@ -251,6 +271,7 @@ export function TeamDirectory({
     (initialEditProfile?.role as EditableRole | null) ?? 'therapist'
   )
   const [onFmla, setOnFmla] = useState(initialEditProfile?.on_fmla === true)
+  const [sectionOpenState, setSectionOpenState] = useState(defaultSectionOpenState)
 
   const [hasPattern, setHasPattern] = useState(
     initialPattern !== null && initialPattern.works_dow.length > 0
@@ -296,6 +317,10 @@ export function TeamDirectory({
     )
   }
 
+  function handleSectionToggle(sectionKey: TeamDirectorySectionKey, nextOpen: boolean) {
+    setSectionOpenState((current) => ({ ...current, [sectionKey]: nextOpen }))
+  }
+
   return (
     <>
       <div className="space-y-3">
@@ -308,30 +333,63 @@ export function TeamDirectory({
       </div>
 
       <div className="space-y-3">
-        <CollapsibleTeamGroup title="Managers" count={sections.managers.length}>
+        <CollapsibleTeamGroup
+          sectionKey="managers"
+          title="Managers"
+          count={sections.managers.length}
+          isOpen={sectionOpenState.managers}
+          onToggle={handleSectionToggle}
+        >
           {renderGroupRows(sections.managers, openEditor)}
         </CollapsibleTeamGroup>
 
-        <CollapsibleTeamGroup title="Day shift leads" count={sections.dayLeads.length}>
+        <CollapsibleTeamGroup
+          sectionKey="dayLeads"
+          title="Day shift leads"
+          count={sections.dayLeads.length}
+          isOpen={sectionOpenState.dayLeads}
+          onToggle={handleSectionToggle}
+        >
           {renderGroupRows(sections.dayLeads, openEditor)}
         </CollapsibleTeamGroup>
 
-        <CollapsibleTeamGroup title="Day shift therapists" count={sections.dayTherapists.length}>
+        <CollapsibleTeamGroup
+          sectionKey="dayTherapists"
+          title="Day shift therapists"
+          count={sections.dayTherapists.length}
+          isOpen={sectionOpenState.dayTherapists}
+          onToggle={handleSectionToggle}
+        >
           {renderGroupRows(sections.dayTherapists, openEditor)}
         </CollapsibleTeamGroup>
 
-        <CollapsibleTeamGroup title="Night shift leads" count={sections.nightLeads.length}>
+        <CollapsibleTeamGroup
+          sectionKey="nightLeads"
+          title="Night shift leads"
+          count={sections.nightLeads.length}
+          isOpen={sectionOpenState.nightLeads}
+          onToggle={handleSectionToggle}
+        >
           {renderGroupRows(sections.nightLeads, openEditor)}
         </CollapsibleTeamGroup>
 
         <CollapsibleTeamGroup
+          sectionKey="nightTherapists"
           title="Night shift therapists"
           count={sections.nightTherapists.length}
+          isOpen={sectionOpenState.nightTherapists}
+          onToggle={handleSectionToggle}
         >
           {renderGroupRows(sections.nightTherapists, openEditor)}
         </CollapsibleTeamGroup>
 
-        <CollapsibleTeamGroup title="Inactive and off roster" count={sections.inactive.length}>
+        <CollapsibleTeamGroup
+          sectionKey="inactive"
+          title="Inactive and off roster"
+          count={sections.inactive.length}
+          isOpen={sectionOpenState.inactive}
+          onToggle={handleSectionToggle}
+        >
           {renderGroupRows(sections.inactive, openEditor)}
         </CollapsibleTeamGroup>
       </div>

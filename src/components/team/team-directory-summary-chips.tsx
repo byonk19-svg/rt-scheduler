@@ -35,15 +35,18 @@ function Chip({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={selected}
       className={cn(
-        'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors',
+        'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
         selected
-          ? 'border-primary bg-primary/10 text-primary'
-          : 'border-border/70 bg-muted/20 text-muted-foreground hover:border-primary/30 hover:text-foreground'
+          ? 'border-primary/70 bg-primary/15 text-primary shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.2)]'
+          : 'border-border/70 bg-card text-muted-foreground hover:border-primary/35 hover:bg-muted/30 hover:text-foreground'
       )}
     >
       <span>{label}</span>
-      <span className="tabular-nums text-foreground/90">{value}</span>
+      <span className={cn('tabular-nums', selected ? 'text-primary' : 'text-foreground/90')}>
+        {value}
+      </span>
     </button>
   )
 }
@@ -54,7 +57,7 @@ export function TeamDirectorySummaryChips({
   onChipChange,
 }: TeamDirectorySummaryChipsProps) {
   return (
-    <div className="flex flex-wrap gap-2" aria-label="Team summary">
+    <div className="flex flex-wrap gap-1.5" aria-label="Team summary">
       <Chip
         label="Total"
         value={summary.totalStaff}

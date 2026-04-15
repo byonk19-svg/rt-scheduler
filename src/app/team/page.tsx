@@ -1,3 +1,4 @@
+import dynamic from 'next/dynamic'
 import { redirect } from 'next/navigation'
 
 import {
@@ -10,11 +11,16 @@ import {
 } from '@/app/team/actions'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
-import { TeamWorkspace } from '@/components/team/team-workspace'
 import type { WorkPatternRecord } from '@/components/team/team-directory-model'
 import { can } from '@/lib/auth/can'
 import { MANAGED_TEAM_ROLE_VALUES, parseRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
+
+const TeamWorkspaceClient = dynamic(() =>
+  import('@/components/team/TeamWorkspaceClient').then(
+    (mod) => mod.default ?? mod.TeamWorkspaceClient
+  )
+)
 
 type ProfileRow = {
   id: string
@@ -272,7 +278,7 @@ export default async function TeamPage({
         className="px-0"
       />
 
-      <TeamWorkspace
+      <TeamWorkspaceClient
         initialTab={initialTab}
         summary={summary}
         profiles={allProfiles}

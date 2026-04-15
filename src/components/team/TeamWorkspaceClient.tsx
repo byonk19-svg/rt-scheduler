@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 
 export type TeamWorkspaceTab = 'directory' | 'roster'
 
-type TeamWorkspaceProps = {
+type TeamWorkspaceClientProps = {
   initialTab: TeamWorkspaceTab
   summary: TeamSummaryCounts
   profiles: TeamProfileRecord[]
@@ -29,7 +29,7 @@ type TeamWorkspaceProps = {
   deleteEmployeeRosterEntryAction: (formData: FormData) => void | Promise<void>
 }
 
-export default function TeamWorkspace({
+function TeamWorkspaceClient({
   initialTab,
   summary,
   profiles,
@@ -42,7 +42,7 @@ export default function TeamWorkspace({
   bulkUpsertEmployeeRosterAction,
   replaceTherapistRosterAction,
   deleteEmployeeRosterEntryAction,
-}: TeamWorkspaceProps) {
+}: TeamWorkspaceClientProps) {
   const [activeTab, setActiveTab] = useState<TeamWorkspaceTab>(initialTab)
 
   useEffect(() => {
@@ -139,3 +139,6 @@ export default function TeamWorkspace({
     </div>
   )
 }
+
+export { TeamWorkspaceClient }
+export default TeamWorkspaceClient

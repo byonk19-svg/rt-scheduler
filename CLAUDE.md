@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-15 (session 69)
+Updated: 2026-04-15 (session 70)
 
 ## Handoff Snapshot
 
@@ -35,6 +35,7 @@ Updated: 2026-04-15 (session 69)
 - **Manager `/availability` planner shell:** URL tabs **`?tab=planner|intake`** under **`AvailabilityOverviewHeader`**. **Planner** = **`ManagerSchedulingInputs`** inside **`AvailabilityWorkspaceShell`**. **Saved planner dates** and primary planner actions belong in the shell **`controls`** slot (left column, muted background). Use **`lower={null}`** for that surface — **`lower`** renders **outside** the primary card. Calendar month UI: **`AvailabilityCalendarPanel`** (`src/components/availability/availability-calendar-panel.tsx`).
 - **Availability Planning polish:** `/availability` now keeps the current planner-first structure while tightening the lower half into a single **Secondary workflow** surface with **Response roster** and **Request inbox** tabs. The roster uses dense rows with initials, status, request signal, and last activity; the inbox collapses to a compact empty state instead of a large blank table shell; the disabled planner CTA now reads **`Select dates to save`**.
 - **Team workspace refactor:** `/team` renders through workspace-style components (`TeamWorkspace`, `TeamDirectoryFilters`, `TeamDirectorySummaryChips`, `TeamPersonRow`, `EmployeeRosterTable`) for denser directory and roster administration. **`?tab=roster`** is resolved on the server (`initialTab` from `TeamPage`) and synced in **`TeamWorkspace`** via **`router.replace`** without **`useSearchParams`**, so that subtree does not depend on a search-params **`Suspense`** boundary.
+- **Team page stability + polish pass:** Team directory defaults now keep managers/day leads/night leads open while therapist/inactive groups start collapsed; rows/chips/filter bars are denser; roster import/danger utilities are collapsed by default; roster table gained compact quick filters and quieter row actions. Runtime stability now uses **`TeamWorkspaceClient.tsx`** as the manager-team client boundary, imported from `src/app/team/page.tsx` via dynamic module resolution (`default ?? named`) to avoid intermittent lazy-module `undefined` errors seen in `next dev`.
 - **Availability intake utilities:** `src/lib/availability-email-intake.ts` and related tests now cover richer request-edit parsing and manager-edit workflows more explicitly.
 - `RESEND_API_KEY` must support receiving APIs, not just sending. A send-only key fails on `/emails/receiving` with `401 restricted_api_key`.
 
@@ -62,6 +63,12 @@ Updated: 2026-04-15 (session 69)
 - Targeted availability lane: `npx vitest run src/app/availability/`
 
 ## Recent changelog
+
+**Session 70 (2026-04-15)** — Team surface compaction + `/team` runtime hardening:
+
+- **Directory compaction:** adjusted default group open state (managers/day leads/night leads open; therapist/inactive groups collapsed), tightened row/filter/chip density, and removed redundant role metadata in dense rows.
+- **Roster admin compaction:** import and advanced danger tools moved to collapsed-by-default sections; roster toolbar now includes compact quick filters (role/shift/status); row remove action reduced to a quieter destructive ghost button.
+- **Runtime hardening:** `/team` now renders through `TeamWorkspaceClient.tsx` from `TeamPage` with dynamic client-module resolution fallback (`default ?? TeamWorkspaceClient`) to mitigate intermittent `Element type is invalid ... promise resolves to undefined` errors during dev-server hot reloads.
 
 **Session 69 (2026-04-15)** — App shell + layout hardening:
 

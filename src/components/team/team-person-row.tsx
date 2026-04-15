@@ -49,26 +49,21 @@ type TeamPersonRowProps = {
 
 export function TeamPersonRow({ profile, onOpen }: TeamPersonRowProps) {
   const isActive = teamMemberHasAppAccess(profile)
-  const leadEligible =
-    profile.role === 'lead' || profile.role === 'manager'
-      ? 'Lead role'
-      : profile.is_lead_eligible
-        ? 'Lead eligible'
-        : '—'
+  const showLeadEligibleTag = profile.role === 'therapist' && profile.is_lead_eligible
 
   return (
     <button
       type="button"
       onClick={() => onOpen(profile.id)}
       className={cn(
-        'group flex w-full cursor-pointer items-center gap-3 rounded-lg border border-border/60 bg-card/80 px-3 py-2 text-left text-sm transition-colors hover:border-primary/35 hover:bg-card',
+        'group flex w-full cursor-pointer items-center gap-2.5 rounded-lg border border-border/60 bg-card/80 px-2.5 py-1.5 text-left text-sm transition-colors hover:border-primary/35 hover:bg-card',
         profile.role === 'lead' && 'border-primary/25 bg-primary/[0.03]',
         !isActive && 'opacity-80'
       )}
     >
       <div
         className={cn(
-          'flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold',
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
           profile.role === 'lead'
             ? 'border border-primary/20 bg-primary/10 text-primary'
             : profile.role === 'manager'
@@ -80,7 +75,7 @@ export function TeamPersonRow({ profile, onOpen }: TeamPersonRowProps) {
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
           <span className="truncate font-medium text-foreground">
             {profile.full_name ?? 'Unknown'}
           </span>
@@ -108,7 +103,7 @@ export function TeamPersonRow({ profile, onOpen }: TeamPersonRowProps) {
             </span>
           )}
         </div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1">
             <span
               className={cn(
@@ -120,8 +115,12 @@ export function TeamPersonRow({ profile, onOpen }: TeamPersonRowProps) {
           </span>
           <span className="text-border">·</span>
           <span>{employmentLabel(profile.employment_type)}</span>
-          <span className="text-border">·</span>
-          <span className="truncate">{leadEligible}</span>
+          {showLeadEligibleTag && (
+            <>
+              <span className="text-border">·</span>
+              <span className="truncate">Lead eligible</span>
+            </>
+          )}
           {profile.on_fmla && profile.fmla_return_date && (
             <>
               <span className="text-border">·</span>

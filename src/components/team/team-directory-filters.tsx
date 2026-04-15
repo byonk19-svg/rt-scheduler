@@ -22,13 +22,13 @@ type TeamDirectoryFiltersProps = {
 }
 
 const selectClass =
-  'h-9 w-full min-w-0 rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground'
+  'h-8 w-full min-w-0 rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground'
 
 export function TeamDirectoryFilters({ value, onChange }: TeamDirectoryFiltersProps) {
   return (
-    <div className="rounded-xl border border-border/60 bg-muted/10 p-3">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-        <div className="space-y-1 sm:col-span-2 lg:col-span-2">
+    <div className="rounded-xl border border-border/60 bg-muted/10 p-2.5">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.25fr)_repeat(4,minmax(0,1fr))]">
+        <div className="space-y-1 sm:col-span-2 lg:col-span-1">
           <Label htmlFor="team-dir-search" className="text-xs">
             Search
           </Label>
@@ -37,7 +37,7 @@ export function TeamDirectoryFilters({ value, onChange }: TeamDirectoryFiltersPr
             value={value.search}
             onChange={(e) => onChange({ ...value, search: e.target.value })}
             placeholder="Name…"
-            className="h-9"
+            className="h-8"
           />
         </div>
         <div className="space-y-1">

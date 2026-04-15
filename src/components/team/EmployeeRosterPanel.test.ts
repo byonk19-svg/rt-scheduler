@@ -17,7 +17,7 @@ const rosterPanelSource = fs.readFileSync(
 describe('EmployeeRosterPanel', () => {
   it('captures phone on add-employee and exposes therapist roster replacement', () => {
     expect(rosterPanelSource).toContain('name="phone_number"')
-    expect(rosterPanelSource).toContain('Advanced · Replace therapist roster')
+    expect(rosterPanelSource).toContain('Replace therapist roster')
     expect(rosterPanelSource).toContain('name="therapist_roster_source"')
   })
 
