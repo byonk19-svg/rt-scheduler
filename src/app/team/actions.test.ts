@@ -263,7 +263,7 @@ describe('upsertEmployeeRosterEntryAction', () => {
     createClientMock.mockResolvedValue(supabase)
 
     await expect(upsertEmployeeRosterEntryAction(makeRosterEntryFormData())).rejects.toThrow(
-      'REDIRECT:/team?success=roster_saved'
+      'REDIRECT:/team?success=roster_saved&tab=roster'
     )
 
     expect(supabase.state.upserts).toEqual([
@@ -323,7 +323,7 @@ describe('replaceTherapistRosterAction', () => {
     })
 
     await expect(replaceTherapistRosterAction(makeReplaceFormData('invalid'))).rejects.toThrow(
-      'REDIRECT:/team?error=therapist_roster_invalid&bulk_line=2'
+      'REDIRECT:/team?error=therapist_roster_invalid&bulk_line=2&tab=roster'
     )
 
     expect(parseTherapistRosterSourceMock).toHaveBeenCalledWith('invalid')
@@ -344,7 +344,7 @@ describe('replaceTherapistRosterAction', () => {
     })
 
     await expect(replaceTherapistRosterAction(makeReplaceFormData('   '))).rejects.toThrow(
-      'REDIRECT:/team?error=therapist_roster_empty'
+      'REDIRECT:/team?error=therapist_roster_empty&tab=roster'
     )
 
     expect(supabase.state.upserts).toEqual([])
@@ -435,7 +435,7 @@ describe('replaceTherapistRosterAction', () => {
     })
 
     await expect(replaceTherapistRosterAction(makeReplaceFormData())).rejects.toThrow(
-      'REDIRECT:/team?success=therapist_roster_replaced&roster_bulk_count=2'
+      'REDIRECT:/team?success=therapist_roster_replaced&roster_bulk_count=2&tab=roster'
     )
 
     expect(supabase.state.upserts).toEqual([
@@ -557,7 +557,7 @@ describe('replaceTherapistRosterAction', () => {
     })
 
     await expect(replaceTherapistRosterAction(makeReplaceFormData())).rejects.toThrow(
-      'REDIRECT:/team?error=therapist_roster_replace_failed'
+      'REDIRECT:/team?error=therapist_roster_replace_failed&tab=roster'
     )
 
     expect(supabase.state.upserts).toHaveLength(1)
@@ -610,7 +610,7 @@ describe('replaceTherapistRosterAction', () => {
     })
 
     await expect(replaceTherapistRosterAction(makeReplaceFormData())).rejects.toThrow(
-      'REDIRECT:/team?error=therapist_roster_replace_failed'
+      'REDIRECT:/team?error=therapist_roster_replace_failed&tab=roster'
     )
 
     expect(supabase.state.upserts).toEqual([
@@ -721,7 +721,7 @@ describe('replaceTherapistRosterAction', () => {
     })
 
     await expect(replaceTherapistRosterAction(makeReplaceFormData())).rejects.toThrow(
-      'REDIRECT:/team?error=therapist_roster_replace_failed'
+      'REDIRECT:/team?error=therapist_roster_replace_failed&tab=roster'
     )
 
     expect(supabase.state.upserts).toEqual([

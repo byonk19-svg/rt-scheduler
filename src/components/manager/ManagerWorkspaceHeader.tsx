@@ -20,14 +20,14 @@ export function ManagerWorkspaceHeader({
 }: ManagerWorkspaceHeaderProps) {
   return (
     <div
-      className={`border-b border-border/70 bg-card/80 px-6 pb-3 pt-3 ${className ?? ''}`.trim()}
+      className={`border-b border-border/70 bg-card/80 px-6 pb-2.5 pt-2.5 ${className ?? ''}`.trim()}
     >
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+      <div className="mb-2.5 flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <h1
             className={
               titleClassName ??
-              'font-heading text-[1.4rem] font-semibold leading-tight tracking-tight text-foreground'
+              'font-heading text-[1.25rem] font-semibold leading-tight tracking-tight text-foreground'
             }
           >
             {title}
@@ -41,7 +41,7 @@ export function ManagerWorkspaceHeader({
       </div>
 
       {summary ? (
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           {summary}
         </div>
       ) : null}

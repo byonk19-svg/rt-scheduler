@@ -9,8 +9,19 @@ import { EmployeeRosterPanel } from '@/components/team/EmployeeRosterPanel'
 
 const teamPageSource = fs.readFileSync(path.join(process.cwd(), 'src/app/team/page.tsx'), 'utf8')
 
+const rosterPanelSource = fs.readFileSync(
+  path.join(process.cwd(), 'src/components/team/EmployeeRosterPanel.tsx'),
+  'utf8'
+)
+
 describe('EmployeeRosterPanel', () => {
-  it('renders phone capture and therapist roster replacement forms', () => {
+  it('captures phone on add-employee and exposes therapist roster replacement', () => {
+    expect(rosterPanelSource).toContain('name="phone_number"')
+    expect(rosterPanelSource).toContain('Advanced · Replace therapist roster')
+    expect(rosterPanelSource).toContain('name="therapist_roster_source"')
+  })
+
+  it('renders roster table, import tools, and danger zone in markup', () => {
     const html = renderToStaticMarkup(
       createElement(EmployeeRosterPanel, {
         roster: [
@@ -24,6 +35,7 @@ describe('EmployeeRosterPanel', () => {
             is_lead_eligible: false,
             matched_profile_id: null,
             matched_at: null,
+            phone_number: null,
           },
         ],
         upsertEmployeeRosterEntryAction: async () => {},
@@ -33,12 +45,12 @@ describe('EmployeeRosterPanel', () => {
       })
     )
 
-    expect(html).toContain('Phone number')
-    expect(html).toContain('name="phone_number"')
-    expect(html).toContain('Therapist roster replacement')
+    expect(html).toContain('Phone</button>')
     expect(html).toContain('name="therapist_roster_source"')
     expect(html).toContain('Replace therapist roster')
     expect(html).toContain('Brooks, Tannie 903-217-7833')
+    expect(html).toContain('Add employee')
+    expect(html).toContain('Import tools')
   })
 })
 

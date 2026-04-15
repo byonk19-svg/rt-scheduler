@@ -23,6 +23,7 @@ describe('TherapistAvailabilityWorkspace', () => {
         availabilityRows: [
           {
             id: 'entry-1',
+            therapistId: 'therapist-1',
             cycleId: 'cycle-1',
             date: '2026-03-24',
             reason: 'Vacation',

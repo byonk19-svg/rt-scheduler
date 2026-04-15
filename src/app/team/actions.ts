@@ -42,6 +42,10 @@ function buildTeamUrl(params: Record<string, string | undefined>): string {
   return query.length > 0 ? `/team?${query}` : '/team'
 }
 
+function buildRosterAdminUrl(params: Record<string, string | undefined>): string {
+  return buildTeamUrl({ ...params, tab: 'roster' })
+}
+
 async function requireManager() {
   const supabase = await createClient()
   const {
@@ -289,27 +293,27 @@ export async function upsertEmployeeRosterEntryAction(formData: FormData) {
 
   const fullName = String(formData.get('full_name') ?? '').trim()
   if (!fullName) {
-    redirect(buildTeamUrl({ error: 'roster_missing_name' }))
+    redirect(buildRosterAdminUrl({ error: 'roster_missing_name' }))
   }
 
   const role = parseManagedRole(formData.get('role'))
   if (!role) {
-    redirect(buildTeamUrl({ error: 'roster_invalid_role' }))
+    redirect(buildRosterAdminUrl({ error: 'roster_invalid_role' }))
   }
 
   const shiftType = parseShiftType(formData.get('shift_type'))
   if (!shiftType) {
-    redirect(buildTeamUrl({ error: 'roster_invalid_shift' }))
+    redirect(buildRosterAdminUrl({ error: 'roster_invalid_shift' }))
   }
 
   const employmentType = parseEmploymentType(formData.get('employment_type'))
   if (!employmentType) {
-    redirect(buildTeamUrl({ error: 'roster_invalid_employment' }))
+    redirect(buildRosterAdminUrl({ error: 'roster_invalid_employment' }))
   }
 
   const maxDays = Number(formData.get('max_work_days_per_week') ?? 3)
   if (!Number.isInteger(maxDays) || maxDays < 1 || maxDays > 7) {
-    redirect(buildTeamUrl({ error: 'roster_invalid_max_days' }))
+    redirect(buildRosterAdminUrl({ error: 'roster_invalid_max_days' }))
   }
 
   const phoneNumber = String(formData.get('phone_number') ?? '').trim()
@@ -334,11 +338,11 @@ export async function upsertEmployeeRosterEntryAction(formData: FormData) {
 
   if (error) {
     console.error('Failed to upsert employee roster entry:', error)
-    redirect(buildTeamUrl({ error: 'roster_save_failed' }))
+    redirect(buildRosterAdminUrl({ error: 'roster_save_failed' }))
   }
 
   revalidatePath('/team')
-  redirect(buildTeamUrl({ success: 'roster_saved' }))
+  redirect(buildRosterAdminUrl({ success: 'roster_saved' }))
 }
 
 export async function bulkUpsertEmployeeRosterAction(formData: FormData) {
@@ -348,14 +352,14 @@ export async function bulkUpsertEmployeeRosterAction(formData: FormData) {
   if (!parsed.ok) {
     console.error('Bulk roster parse error:', parsed.message)
     redirect(
-      buildTeamUrl({
+      buildRosterAdminUrl({
         error: 'roster_bulk_invalid',
         bulk_line: String(parsed.line),
       })
     )
   }
   if (parsed.rows.length === 0) {
-    redirect(buildTeamUrl({ error: 'roster_bulk_empty' }))
+    redirect(buildRosterAdminUrl({ error: 'roster_bulk_empty' }))
   }
 
   const payload = parsed.rows.map((row) => ({
@@ -370,12 +374,12 @@ export async function bulkUpsertEmployeeRosterAction(formData: FormData) {
 
   if (error) {
     console.error('Failed bulk upsert employee roster:', error)
-    redirect(buildTeamUrl({ error: 'roster_bulk_save_failed' }))
+    redirect(buildRosterAdminUrl({ error: 'roster_bulk_save_failed' }))
   }
 
   revalidatePath('/team')
   redirect(
-    buildTeamUrl({
+    buildRosterAdminUrl({
       success: 'roster_bulk_saved',
       roster_bulk_count: String(payload.length),
     })
@@ -390,7 +394,7 @@ export async function replaceTherapistRosterAction(formData: FormData) {
   if (!parsed.ok) {
     console.error('Therapist roster source parse error:', parsed.message)
     redirect(
-      buildTeamUrl({
+      buildRosterAdminUrl({
         error: 'therapist_roster_invalid',
         bulk_line: String(parsed.line),
       })
@@ -398,7 +402,7 @@ export async function replaceTherapistRosterAction(formData: FormData) {
   }
 
   if (parsed.rows.length === 0) {
-    redirect(buildTeamUrl({ error: 'therapist_roster_empty' }))
+    redirect(buildRosterAdminUrl({ error: 'therapist_roster_empty' }))
   }
 
   const payload = parsed.rows.map((row) => ({
@@ -416,7 +420,7 @@ export async function replaceTherapistRosterAction(formData: FormData) {
 
   if (existingTherapistLeadError) {
     console.error('Failed to load current therapist roster rows:', existingTherapistLeadError)
-    redirect(buildTeamUrl({ error: 'therapist_roster_replace_failed' }))
+    redirect(buildRosterAdminUrl({ error: 'therapist_roster_replace_failed' }))
   }
 
   const priorSnapshot = (existingTherapistLeadRows ?? []) as EmployeeRosterSnapshotRow[]
@@ -460,7 +464,7 @@ export async function replaceTherapistRosterAction(formData: FormData) {
 
   if (conflictingRosterError) {
     console.error('Failed to check therapist roster conflicts:', conflictingRosterError)
-    redirect(buildTeamUrl({ error: 'therapist_roster_replace_failed' }))
+    redirect(buildRosterAdminUrl({ error: 'therapist_roster_replace_failed' }))
   }
 
   const managerConflict = (conflictingRosterRows ?? []).some(
@@ -468,7 +472,7 @@ export async function replaceTherapistRosterAction(formData: FormData) {
   )
   if (managerConflict) {
     console.error('Therapist roster replacement conflicts with manager roster entries')
-    redirect(buildTeamUrl({ error: 'therapist_roster_replace_failed' }))
+    redirect(buildRosterAdminUrl({ error: 'therapist_roster_replace_failed' }))
   }
 
   const { error: upsertError } = await supabase.from('employee_roster').upsert(payload, {
@@ -477,7 +481,7 @@ export async function replaceTherapistRosterAction(formData: FormData) {
 
   if (upsertError) {
     console.error('Failed to stage therapist roster replacement rows:', upsertError)
-    redirect(buildTeamUrl({ error: 'therapist_roster_replace_failed' }))
+    redirect(buildRosterAdminUrl({ error: 'therapist_roster_replace_failed' }))
   }
 
   const staleRosterIds = (existingTherapistLeadRows ?? [])
@@ -526,7 +530,7 @@ export async function replaceTherapistRosterAction(formData: FormData) {
     if (deleteError) {
       console.error('Failed to clear stale therapist roster rows:', deleteError)
       await rollbackRosterSnapshot()
-      redirect(buildTeamUrl({ error: 'therapist_roster_replace_failed' }))
+      redirect(buildRosterAdminUrl({ error: 'therapist_roster_replace_failed' }))
     }
   }
 
@@ -540,7 +544,7 @@ export async function replaceTherapistRosterAction(formData: FormData) {
   if (activeProfilesError) {
     console.error('Failed to load active therapist roster profiles:', activeProfilesError)
     await rollbackRosterSnapshot()
-    redirect(buildTeamUrl({ error: 'therapist_roster_replace_failed' }))
+    redirect(buildRosterAdminUrl({ error: 'therapist_roster_replace_failed' }))
   }
 
   const staleProfileIds = (activeTherapistLeadProfiles ?? [])
@@ -571,7 +575,7 @@ export async function replaceTherapistRosterAction(formData: FormData) {
     if (archiveError) {
       console.error('Failed to archive stale therapist roster profiles:', archiveError)
       await rollbackRosterSnapshot()
-      redirect(buildTeamUrl({ error: 'therapist_roster_replace_failed' }))
+      redirect(buildRosterAdminUrl({ error: 'therapist_roster_replace_failed' }))
     }
 
     for (const profileId of staleProfileIds) {
@@ -586,7 +590,7 @@ export async function replaceTherapistRosterAction(formData: FormData) {
   revalidatePath('/availability')
 
   redirect(
-    buildTeamUrl({
+    buildRosterAdminUrl({
       success: 'therapist_roster_replaced',
       roster_bulk_count: String(payload.length),
     })
@@ -597,17 +601,17 @@ export async function deleteEmployeeRosterEntryAction(formData: FormData) {
   const { supabase } = await requireManager()
   const rosterId = String(formData.get('roster_id') ?? '').trim()
   if (!rosterId) {
-    redirect(buildTeamUrl({ error: 'roster_missing_entry' }))
+    redirect(buildRosterAdminUrl({ error: 'roster_missing_entry' }))
   }
 
   const { error } = await supabase.from('employee_roster').delete().eq('id', rosterId)
   if (error) {
     console.error('Failed to delete employee roster entry:', error)
-    redirect(buildTeamUrl({ error: 'roster_delete_failed' }))
+    redirect(buildRosterAdminUrl({ error: 'roster_delete_failed' }))
   }
 
   revalidatePath('/team')
-  redirect(buildTeamUrl({ success: 'roster_deleted' }))
+  redirect(buildRosterAdminUrl({ success: 'roster_deleted' }))
 }
 
 export async function checkNameRosterMatchAction(fullName: string): Promise<boolean> {

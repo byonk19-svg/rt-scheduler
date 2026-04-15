@@ -6,7 +6,7 @@ import {
   TEAM_QUICK_EDIT_DIALOG_CLASS,
   teamMemberHasAppAccess,
   type TeamProfileRecord,
-} from '@/components/team/TeamDirectory'
+} from '@/components/team/team-directory-model'
 
 function makeProfile(overrides: Partial<TeamProfileRecord>): TeamProfileRecord {
   return {

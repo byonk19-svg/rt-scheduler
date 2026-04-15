@@ -10,8 +10,8 @@ import {
 } from '@/app/team/actions'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
-import { EmployeeRosterPanel } from '@/components/team/EmployeeRosterPanel'
-import { TeamDirectory, type WorkPatternRecord } from '@/components/team/TeamDirectory'
+import { TeamWorkspace } from '@/components/team/team-workspace'
+import type { WorkPatternRecord } from '@/components/team/team-directory-model'
 import { can } from '@/lib/auth/can'
 import { MANAGED_TEAM_ROLE_VALUES, parseRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
@@ -26,6 +26,7 @@ type ProfileRow = {
   is_active: boolean | null
   on_fmla: boolean | null
   fmla_return_date: string | null
+  phone_number: string | null
 }
 
 type WorkPatternRow = {
@@ -42,6 +43,7 @@ type TeamSearchParams = {
   edit_profile?: string | string[]
   bulk_line?: string | string[]
   roster_bulk_count?: string | string[]
+  tab?: string | string[]
 }
 
 type EmployeeRosterRow = {
@@ -54,6 +56,7 @@ type EmployeeRosterRow = {
   is_lead_eligible: boolean
   matched_profile_id: string | null
   matched_at: string | null
+  phone_number: string | null
 }
 
 function getSearchParam(value: string | string[] | undefined): string | undefined {
@@ -204,7 +207,7 @@ export default async function TeamPage({
   const { data: profiles } = await supabase
     .from('profiles')
     .select(
-      'id, full_name, role, shift_type, employment_type, is_lead_eligible, is_active, on_fmla, fmla_return_date'
+      'id, full_name, role, shift_type, employment_type, is_lead_eligible, is_active, on_fmla, fmla_return_date, phone_number'
     )
     .in('role', [...MANAGED_TEAM_ROLE_VALUES])
     .is('archived_at', null)
@@ -232,7 +235,7 @@ export default async function TeamPage({
   const { data: rosterRows } = await supabase
     .from('employee_roster')
     .select(
-      'id, full_name, role, shift_type, employment_type, max_work_days_per_week, is_lead_eligible, matched_profile_id, matched_at'
+      'id, full_name, role, shift_type, employment_type, max_work_days_per_week, is_lead_eligible, matched_profile_id, matched_at, phone_number'
     )
     .order('full_name', { ascending: true })
   const employeeRoster = (rosterRows ?? []) as EmployeeRosterRow[]
@@ -241,44 +244,43 @@ export default async function TeamPage({
   const therapistCount = activeProfiles.filter((profile) => profile.role === 'therapist').length
   const inactiveCount = allProfiles.length - activeProfiles.length
   const onFmlaCount = allProfiles.filter((profile) => profile.on_fmla === true).length
+  const dayShiftCount = activeProfiles.filter((profile) => profile.shift_type !== 'night').length
+  const nightShiftCount = activeProfiles.filter((profile) => profile.shift_type === 'night').length
+
+  const summary = {
+    totalStaff: allProfiles.length,
+    managers: managerCount,
+    leadTherapists: leadCount,
+    therapists: therapistCount,
+    dayShift: dayShiftCount,
+    nightShift: nightShiftCount,
+    inactive: inactiveCount,
+    onFmla: onFmlaCount,
+  }
+
   const feedback = getTeamFeedback(params)
   const initialEditProfileId = getSearchParam(params?.edit_profile) ?? null
+  const initialTab = getSearchParam(params?.tab) === 'roster' ? 'roster' : 'directory'
 
   return (
-    <div className="max-w-5xl space-y-7 py-6">
+    <div className="max-w-6xl space-y-6 py-6">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
       <ManagerWorkspaceHeader
         title="Team"
-        subtitle="Manage roles, staffing access, and inactive employees in one place."
+        subtitle="Staffing, roles, team access, and the signup roster live here — switch tabs to browse vs administer."
         className="px-0"
-        summary={
-          <>
-            <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 font-medium text-foreground">
-              {allProfiles.length} team members
-            </span>
-            <span className="text-muted-foreground">{managerCount} managers</span>
-            <span className="text-border/90">/</span>
-            <span className="text-muted-foreground">{leadCount} lead therapists</span>
-            <span className="text-border/90">/</span>
-            <span className="text-muted-foreground">{therapistCount} therapists</span>
-            <span className="text-border/90">/</span>
-            <span className="text-muted-foreground">{inactiveCount} inactive</span>
-            <span className="text-border/90">/</span>
-            <span className="text-muted-foreground">{onFmlaCount} on FMLA</span>
-          </>
-        }
       />
 
-      <TeamDirectory
+      <TeamWorkspace
+        initialTab={initialTab}
+        summary={summary}
         profiles={allProfiles}
         workPatterns={workPatterns}
         initialEditProfileId={initialEditProfileId}
+        roster={employeeRoster}
         archiveTeamMemberAction={archiveTeamMemberAction}
         saveTeamQuickEditAction={saveTeamQuickEditAction}
-      />
-      <EmployeeRosterPanel
-        roster={employeeRoster}
         upsertEmployeeRosterEntryAction={upsertEmployeeRosterEntryAction}
         bulkUpsertEmployeeRosterAction={bulkUpsertEmployeeRosterAction}
         replaceTherapistRosterAction={replaceTherapistRosterAction}

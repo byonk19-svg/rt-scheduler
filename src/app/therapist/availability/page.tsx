@@ -214,6 +214,7 @@ export default async function TherapistAvailabilityPage({
     const requester = getOne(entry.profiles)
     return {
       id: entry.id,
+      therapistId: entry.therapist_id,
       cycleId: entry.cycle_id,
       date: entry.date,
       reason: entry.note,
