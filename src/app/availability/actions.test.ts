@@ -649,6 +649,8 @@ describe('availability actions', () => {
     supabase.state.emailIntakeItemRow = {
       id: 'item-1',
       intake_id: 'intake-1',
+      matched_therapist_id: 'therapist-1',
+      matched_cycle_id: 'cycle-1',
       parsed_requests: [
         {
           date: '2026-03-24',
@@ -689,6 +691,7 @@ describe('availability actions', () => {
       {
         table: 'availability_email_intake_items',
         payload: {
+          parse_status: 'parsed',
           parsed_requests: [
             {
               date: '2026-03-24',
@@ -731,6 +734,8 @@ describe('availability actions', () => {
     supabase.state.emailIntakeItemRow = {
       id: 'item-1',
       intake_id: 'intake-1',
+      matched_therapist_id: 'therapist-1',
+      matched_cycle_id: 'cycle-1',
       parsed_requests: [
         {
           date: '2026-03-24',
@@ -763,6 +768,7 @@ describe('availability actions', () => {
       {
         table: 'availability_email_intake_items',
         payload: {
+          parse_status: 'failed',
           parsed_requests: [],
         },
         filters: { id: 'item-1' },
@@ -818,6 +824,8 @@ describe('availability actions', () => {
     supabase.state.emailIntakeItemRow = {
       id: 'item-1',
       intake_id: 'intake-1',
+      matched_therapist_id: 'therapist-1',
+      matched_cycle_id: 'cycle-1',
       parsed_requests: [
         {
           date: '2026-03-24',
@@ -847,6 +855,7 @@ describe('availability actions', () => {
       {
         table: 'availability_email_intake_items',
         payload: {
+          parse_status: 'parsed',
           parsed_requests: [
             {
               date: '2026-03-24',

@@ -885,7 +885,9 @@ export async function updateEmailIntakeItemRequestAction(formData: FormData) {
 
   const { data: item, error: loadError } = await supabase
     .from('availability_email_intake_items')
-    .select('id, intake_id, parsed_requests, original_parsed_requests')
+    .select(
+      'id, intake_id, parsed_requests, original_parsed_requests, matched_therapist_id, matched_cycle_id'
+    )
     .eq('id', itemId)
     .maybeSingle()
 
@@ -902,6 +904,12 @@ export async function updateEmailIntakeItemRequestAction(formData: FormData) {
       shift_type: shiftType,
     },
   })
+  const nextParseStatus: AvailabilityEmailItemStatus =
+    parsedRequests.length === 0
+      ? 'failed'
+      : item.matched_therapist_id && item.matched_cycle_id
+        ? 'parsed'
+        : 'needs_review'
   const manuallyEditedAtUpdate = item.original_parsed_requests
     ? {
         manually_edited_at: item.original_parsed_requests
@@ -918,6 +926,7 @@ export async function updateEmailIntakeItemRequestAction(formData: FormData) {
   const { error: updateError } = await supabase
     .from('availability_email_intake_items')
     .update({
+      parse_status: nextParseStatus,
       parsed_requests: parsedRequests,
       ...manuallyEditedAtUpdate,
     })
