@@ -14,7 +14,7 @@ Web app for respiratory therapy scheduling with role-based workflows:
 - Public homepage (`/`) is therapist-first marketing: luminous background, trust-forward copy, product preview frame, and clear CTAs — **Get started** + **Sign in** in the header, **Sign in** + **Create account** in the hero (Vitest contracts in `src/app/page.test.ts`).
 - Therapists request access via `/signup` (first/last name, optional phone, email, password).
 - Managers are **not** created via public signup; they are provisioned admin-side.
-- After a successful request, users are redirected to `/login?status=requested` (no automatic session). Self-signup accounts still start with pending access (`profiles.role = null`); once approved, they sign in and the app routes them through `/pending-setup` until activation is complete.
+- After a successful request, users are redirected to `/login?status=requested` (no automatic session). The public signup flow now always uses that generic redirect rather than disclosing whether the submitted name matched an internal roster row. Server-side roster auto-match can still provision role/settings immediately for matched users; unmatched signups stay pending (`profiles.role = null`) until manager approval.
 - Pending users can authenticate but are gated away from app workflows until manager approval.
 - Manager approves pending users in `Requests -> User Access Requests` and assigns role at approval time (`therapist` or `lead`).
 - Declining an access request deletes the pending account.
@@ -125,7 +125,7 @@ Optional env overrides:
 
 ## Sync team roster from a file (ops / email list)
 
-Creates or updates **Auth** users and **`profiles`** from a text file (emails + names). This is **not** the same as the **`employee_roster`** name pre-match table on **`/team`** (used at signup to skip pending when the **name** matches).
+Creates or updates **Auth** users and **`profiles`** from a text file (emails + names). This is **not** the same as the **`employee_roster`** name pre-match table on **`/team`** (used by the server-side signup trigger to auto-provision matched users without exposing that roster match to the public signup UX).
 
 Requires **`NEXT_PUBLIC_SUPABASE_URL`** and **`SUPABASE_SERVICE_ROLE_KEY`** (e.g. via `.env.local`).
 

@@ -8,7 +8,6 @@ import { parseRole } from '@/lib/auth/roles'
 import { normalizeRosterFullName, parseBulkEmployeeRosterText } from '@/lib/employee-roster-bulk'
 import { parseTeamQuickEditFormData } from '@/lib/team-quick-edit'
 import { parseTherapistRosterSource } from '@/lib/therapist-roster-source'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 type ManagedRole = 'manager' | 'therapist' | 'lead'
@@ -612,22 +611,4 @@ export async function deleteEmployeeRosterEntryAction(formData: FormData) {
 
   revalidatePath('/team')
   redirect(buildRosterAdminUrl({ success: 'roster_deleted' }))
-}
-
-export async function checkNameRosterMatchAction(fullName: string): Promise<boolean> {
-  const normalized = normalizeRosterFullName(fullName)
-  if (!normalized) return false
-  const admin = createAdminClient()
-  const { data, error } = await admin
-    .from('employee_roster')
-    .select('id')
-    .eq('normalized_full_name', normalized)
-    .eq('is_active', true)
-    .limit(1)
-    .maybeSingle()
-  if (error) {
-    console.error('Failed to check name roster match:', error)
-    return false
-  }
-  return Boolean(data?.id)
 }

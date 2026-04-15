@@ -8,7 +8,6 @@ import { CalendarDays, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { checkNameRosterMatchAction } from '@/app/team/actions'
 import { createClient } from '@/lib/supabase/client'
 
 const AUTH_REQUEST_TIMEOUT_MS = 10000
@@ -102,8 +101,7 @@ export default function SignUpPage() {
         return
       }
 
-      const rosterMatched = await checkNameRosterMatchAction(fullName)
-      router.push(rosterMatched ? '/login?status=matched' : '/login?status=requested')
+      router.push('/login?status=requested')
       router.refresh()
     } catch (requestError) {
       const message =

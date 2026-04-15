@@ -1,5 +1,11 @@
 # Session History
 
+## Session 71 - 2026-04-15
+
+- Removed the public signup roster-match check so `/signup` no longer leaks whether a full name exists in `employee_roster`.
+- Successful signup now always redirects to `/login?status=requested`; matched users can still be auto-provisioned server-side by the signup trigger, but the public UI no longer exposes that distinction.
+- Hardened `GET /auth/signout` with the same trusted-origin gate as `POST /auth/signout` to block cross-origin logout requests without breaking same-origin cleanup redirects.
+
 ## Session 69 - 2026-04-15
 
 - Availability intake parser hardening:
