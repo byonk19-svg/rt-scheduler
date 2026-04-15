@@ -568,7 +568,7 @@ export default async function AvailabilityPage({
               : null,
             rawText: item.raw_text,
             parsedRequests: Array.isArray(item.parsed_requests) ? item.parsed_requests : [],
-            manuallyEdited: item.manually_edited ?? undefined,
+            manuallyEdited: Boolean(item.manually_edited_at),
           }
         }),
     }
