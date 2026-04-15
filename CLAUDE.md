@@ -45,7 +45,7 @@ Updated: 2026-04-14 (session 67)
 
 1. **Coverage grid redesign** — Stitch explorations in session 56 converged on a swimlane grid (therapist rows × date columns) that mirrors the physical paper schedule managers already use. Target aesthetic: mostly white grid, color only for exceptions (FMLA = soft red, missing lead = amber flag, scheduled = small teal dot or plain "1"). When a final Stitch frame is approved, implement it in `src/components/coverage/CalendarGrid.tsx` and `CoverageClientPage.tsx`.
 2. Merge `claude/review-ui-flow-7Weav` (top nav) into `main` and deploy to production.
-3. **Done (baseline):** `/availability` uses **Planner | Email Intake** URL tabs (`?tab=planner|intake`) and intake triage polish (sessions 64–65). Remaining: tighten empty states / copy if operators still miss the happy path.
+3. Add a **"Send reminders"** bulk action to the response roster on `/availability` — 24 unresponded therapists with no in-app nudge is the main operational gap.
 4. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
 5. Deploy production after significant public-surface changes (`vercel deploy --prod`) so `www.teamwise.work` matches `main`.
 6. Keep manual intake first-class even if Resend inbound is healthy. It is the practical fallback path for operations.
@@ -71,6 +71,7 @@ Updated: 2026-04-14 (session 67)
 
 - **`/availability`:** preserved the current header/workbench direction and tightened the page. The lower half is now a single **Secondary workflow** surface; **Response roster** / **Request inbox** are tabbed instead of competing side-by-side; roster rows are denser; inbox empty states are compact; disabled planner save copy now reads **`Select dates to save`**.
 - **`/team`:** reorganized the manager people surface around dedicated workspace/filter/row/table components for denser directory and roster administration.
+- **Intake parser:** PTO form parsing work is now present in the repo, alongside the existing availability intake utilities.
 - **Docs:** `docs/SESSION_HISTORY.md` is back and now carries the current session summary referenced by this file.
 
 **Sessions 60–65** (intake recovery, OCR, URL tabs, triage polish): per-session narrative removed from this file to cut noise and drift. For archaeology, use **`docs/SESSION_HISTORY.md`** and git history. **Handoff Snapshot** stays authoritative for current product behavior.
