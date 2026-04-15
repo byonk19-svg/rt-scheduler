@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { CalendarDays, ChevronRight, Printer, Send, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -35,6 +35,8 @@ import {
 } from '@/lib/coverage/mutations'
 import {
   buildDayItems,
+  countActive,
+  flatten,
   toUiStatus,
   type BuildDayRowInput,
   type DayItem,
@@ -219,7 +221,7 @@ function CoverageSurfaceBanner({
   tone?: WorkspaceMetricTone
   title: string
   description: string
-  actions?: React.ReactNode
+  actions?: ReactNode
 }) {
   const toneClasses: Record<WorkspaceMetricTone, string> = {
     neutral: 'border-border/70 bg-muted/15',
@@ -920,6 +922,42 @@ export function CoverageClientPage({
     ...(selectedDay?.staffShifts.map((shift) => shift.id) ?? []),
   ]
   const hasOperationalEntries = selectedDayShiftIds.some((id) => activeOpCodes.has(id))
+  const cycleRangeLabel = printCycle
+    ? formatHumanCycleRange(printCycle.start_date, printCycle.end_date)
+    : 'No open 6-week block'
+  const workspaceStatusTone: WorkspaceMetricTone = noCycleSelected
+    ? 'neutral'
+    : activeCyclePublished
+      ? 'success'
+      : showEmptyDraftState
+        ? 'warning'
+        : 'neutral'
+  const workspaceStatusLabel = noCycleSelected
+    ? 'No active cycle'
+    : activeCyclePublished
+      ? 'Published'
+      : showEmptyDraftState
+        ? 'Setup required'
+        : 'Draft'
+  const coverageSummary = useMemo(() => {
+    const missingLeadDays = days.filter((day) => !day.leadShift).length
+    const unassignedDays = days.filter((day) => flatten(day).length === 0).length
+    const priorityGapDays = days.filter(
+      (day) => day.constraintBlocked || !day.leadShift || countActive(day) < 3
+    ).length
+    const staffedDays = days.filter((day) => day.leadShift && countActive(day) >= 4).length
+
+    return {
+      missingLeadDays,
+      unassignedDays,
+      priorityGapDays,
+      staffedDays,
+    }
+  }, [days])
+  const hasSchedulingContent = selectedCycleHasShiftRows && days.length > 0
+  const canRunAutoDraft = Boolean(activeCycleId) && !activeCyclePublished
+  const canSendPreliminary = Boolean(activeCycleId) && !activeCyclePublished && selectedCycleHasShiftRows
+  const canPublishCycle = Boolean(activeCycleId) && selectedCycleHasShiftRows
 
   // Compute how many shifts each therapist is working in the week that contains the selected day.
   // Used in the assign dropdown so managers can avoid overscheduling within a single week.
