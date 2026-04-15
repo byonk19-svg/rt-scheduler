@@ -312,6 +312,60 @@ describe('parseAvailabilityEmailBatchSources', () => {
       expect.objectContaining({ date: '2026-05-11', override_type: 'force_on' }),
     ])
   })
+
+  it('expands weekday recurrence across the active block and leaves OCR-broken fragments for review', () => {
+    const result = parseAvailabilityEmailBatchSources({
+      normalizedBodyText: [
+        'Employee Name: Barbara Cummings',
+        '5/10 WORK',
+        '5/11 WORK',
+        '5/12',
+        '5 Sunday 5/ Back to work 25',
+        '',
+        'Employee Name: Kim Suarez',
+        'Comments= Off Tuesday + Wednesdays',
+        '',
+        'Employee Name: Kim Suarez',
+        'Comments= Off May 10th',
+      ].join('\n'),
+      attachments: [],
+      cycles: ptoCycles,
+      profiles: [
+        { id: 'therapist-1', full_name: 'Barbara Cummings', is_active: true },
+        { id: 'therapist-2', full_name: 'Kim Suarez', is_active: true },
+      ],
+      autoApplyHighConfidence: false,
+    })
+
+    expect(result.items).toHaveLength(2)
+
+    const barbaraItem = result.items.find(
+      (item) => item.extractedEmployeeName === 'Barbara Cummings'
+    )
+    const kimItem = result.items.find((item) => item.extractedEmployeeName === 'Kim Suarez')
+
+    expect(barbaraItem).toMatchObject({
+      parseStatus: 'needs_review',
+      unresolvedLines: ['5 Sunday 5/ Back to work 25'],
+      requests: [
+        expect.objectContaining({ date: '2026-05-10', override_type: 'force_on' }),
+        expect.objectContaining({ date: '2026-05-11', override_type: 'force_on' }),
+        expect.objectContaining({ date: '2026-05-12', override_type: 'force_off' }),
+      ],
+    })
+    expect(barbaraItem?.requests.some((request) => request.date === '2026-05-25')).toBe(false)
+
+    expect(kimItem?.parseStatus).toBe('parsed')
+    expect(kimItem?.requests).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ date: '2026-05-05', override_type: 'force_off' }),
+        expect.objectContaining({ date: '2026-05-06', override_type: 'force_off' }),
+        expect.objectContaining({ date: '2026-06-09', override_type: 'force_off' }),
+        expect.objectContaining({ date: '2026-06-10', override_type: 'force_off' }),
+        expect.objectContaining({ date: '2026-05-10', override_type: 'force_off' }),
+      ])
+    )
+  })
 })
 
 describe('summarizeAvailabilityEmailBatch', () => {

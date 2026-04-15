@@ -366,7 +366,7 @@ describe('parsePtoForm', () => {
     expect(result.requests.every((r) => r.override_type === 'force_off')).toBe(true)
   })
 
-  it('flags weekday recurrence lines (no calendar dates) as unresolvedLines', () => {
+  it('expands weekday recurrence lines across the active cycle window', () => {
     const text = [
       'Employee Name: Kim Suarez',
       'off Tuesday + Wednesdays',
@@ -376,9 +376,26 @@ describe('parsePtoForm', () => {
     ].join('\n')
 
     const result = parsePtoForm(text, cycles)
-    expect(result.unresolvedLines).toContain('off Tuesday + Wednesdays')
-    // The explicit date still parses
+    expect(result.unresolvedLines).toEqual([])
+    expect(result.requests.some((r) => r.date === '2026-05-05')).toBe(true)
+    expect(result.requests.some((r) => r.date === '2026-05-06')).toBe(true)
     expect(result.requests.some((r) => r.date === '2026-05-10')).toBe(true)
+  })
+
+  it('leaves malformed OCR fragments in unresolvedLines instead of inventing dates', () => {
+    const text = [
+      'Employee Name: Barbara Cummings',
+      '5/10 WORK',
+      '5/11 WORK',
+      '5/12',
+      '5 Sunday 5/ Back to work 25',
+      'Employee Signature: B. Cummings',
+      'Date: 2/18/26',
+    ].join('\n')
+
+    const result = parsePtoForm(text, cycles)
+    expect(result.unresolvedLines).toEqual(['5 Sunday 5/ Back to work 25'])
+    expect(result.requests.some((r) => r.date === '2026-05-25')).toBe(false)
   })
 
   it('ignores table header lines', () => {
@@ -395,7 +412,7 @@ describe('parsePtoForm', () => {
     expect(result.requests[0].date).toBe('2026-05-16')
   })
 
-  it('returns needs_review status when unresolved lines are present', () => {
+  it('returns parsed status when weekday recurrence expands cleanly in a single active cycle', () => {
     const text = [
       'Employee Name: Kim Suarez',
       'off Tuesday + Wednesdays',
@@ -404,7 +421,7 @@ describe('parsePtoForm', () => {
       'Date: 4/6/26',
     ].join('\n')
 
-    expect(parsePtoForm(text, cycles).status).toBe('needs_review')
+    expect(parsePtoForm(text, cycles).status).toBe('parsed')
   })
 
   it('returns parsed status for a fully-resolved single-cycle form', () => {

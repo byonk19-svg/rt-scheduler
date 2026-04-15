@@ -4,6 +4,7 @@ import {
   type AvailabilityEmailEmployeeCandidate,
 } from '@/lib/availability-email-item-matcher'
 import { normalizeRosterFullName } from '@/lib/employee-roster-bulk'
+import { isPtoFormText as isStructuredPtoFormText, parsePtoForm } from '@/lib/pto-form-parser'
 
 type AvailabilityOverrideType = 'force_off' | 'force_on'
 type AvailabilityShiftType = 'day' | 'night' | 'both'
@@ -132,13 +133,6 @@ const WORK_PATTERNS = [
   /\bwork\b/i,
 ]
 
-const PTO_FORM_MARKERS = [
-  /\bpto request\/edit form\b/i,
-  /\bemployee name\s*:/i,
-  /\bemployee signature\b/i,
-  /\bpto hours\b/i,
-]
-
 const PTO_METADATA_PATTERNS = [
   /^\s*-+\s*$/i,
   /^pto request(?:\/edit form)?$/i,
@@ -152,33 +146,6 @@ const PTO_METADATA_PATTERNS = [
   /^date\s+pto hours\b/i,
   /^date\b[:\s-]+\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/i,
 ]
-
-const WEEKDAY_MAP: Record<string, number> = {
-  sunday: 0,
-  sundays: 0,
-  sun: 0,
-  monday: 1,
-  mondays: 1,
-  mon: 1,
-  tuesday: 2,
-  tuesdays: 2,
-  tue: 2,
-  tues: 2,
-  wednesday: 3,
-  wednesdays: 3,
-  wed: 3,
-  thursday: 4,
-  thursdays: 4,
-  thu: 4,
-  thur: 4,
-  thurs: 4,
-  friday: 5,
-  fridays: 5,
-  fri: 5,
-  saturday: 6,
-  saturdays: 6,
-  sat: 6,
-}
 
 const INTENT_MATCHERS: Array<{ type: AvailabilityOverrideType; pattern: RegExp }> = [
   { type: 'force_off', pattern: /\bneed off\b/gi },
@@ -295,159 +262,40 @@ function stripOrdinalSuffixes(value: string): string {
   return value.replace(/\b(\d{1,2})(st|nd|rd|th)\b/gi, '$1')
 }
 
-function isPtoFormText(text: string): boolean {
-  return PTO_FORM_MARKERS.some((pattern) => pattern.test(text))
-}
-
 function shouldIgnorePtoMetadataLine(line: string): boolean {
   return PTO_METADATA_PATTERNS.some((pattern) => pattern.test(line))
 }
 
-function inferDateToken(token: string, cycles: IntakeCycle[]): string | null {
-  const explicit = inferExplicitDate(token)
-  if (explicit) return explicit
-  return inferCycleScopedDate(token, cycles)
-}
+function looksLikeReducedPtoEmployeeBlock(text: string): boolean {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => normalizeLine(line))
+    .filter((line) => line.length > 0)
 
-function expandIsoDateRange(startIso: string, endIso: string): string[] {
-  if (endIso < startIso) return []
+  if (!lines.some((line) => /^employee name\s*:/i.test(line))) return false
 
-  const dates: string[] = []
-  const current = new Date(`${startIso}T00:00:00Z`)
-  const end = new Date(`${endIso}T00:00:00Z`)
+  let ptoSignals = 0
+  for (const line of lines) {
+    if (/^employee name\s*:/i.test(line)) continue
 
-  while (current <= end) {
-    dates.push(current.toISOString().slice(0, 10))
-    current.setUTCDate(current.getUTCDate() + 1)
-    if (dates.length > 90) break
-  }
+    if (shouldIgnorePtoMetadataLine(line) || /^comments?\s*[:=]/i.test(line)) {
+      ptoSignals += 1
+      continue
+    }
 
-  return dates
-}
+    const normalized = stripOrdinalSuffixes(line)
+    const startsWithDateishContent =
+      /^(?:off\s+|work(?:ing)?\s+|no\s+pto\s+)?(?:\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|[A-Za-z]+\.?\s+\d{1,2})\b/i.test(
+        normalized
+      ) || /^\d{1,2}\s*[-/]\s*\d{1,2}\b/.test(normalized)
 
-function collectRangeDates(
-  line: string,
-  cycles: IntakeCycle[]
-): { dates: string[]; stripped: string } {
-  let stripped = stripOrdinalSuffixes(line)
-  const resolved = new Set<string>()
-
-  const applyRange = (startToken: string, endToken: string) => {
-    const startIso = inferDateToken(startToken, cycles)
-    const endIso = inferDateToken(endToken, cycles)
-    if (!startIso || !endIso) return
-
-    for (const iso of expandIsoDateRange(startIso, endIso)) {
-      resolved.add(iso)
+    if (startsWithDateishContent) {
+      ptoSignals += 1
+      continue
     }
   }
 
-  const repeatedMonthPattern =
-    /\b([A-Za-z]+\.?\s+\d{1,2}(?:,\s*\d{4})?)\s*(?:-|thru|through|to)\s*([A-Za-z]+\.?\s+\d{1,2}(?:,\s*\d{4})?)\b/gi
-  stripped = stripped.replace(repeatedMonthPattern, (...args) => {
-    const match = args[0] as string
-    applyRange(args[1] as string, args[2] as string)
-    return ' '.repeat(match.length)
-  })
-
-  const sameMonthTextPattern =
-    /\b([A-Za-z]+\.?\s+\d{1,2}(?:,\s*\d{4})?)\s*(?:-|thru|through|to)\s*(\d{1,2})\b/gi
-  stripped = stripped.replace(sameMonthTextPattern, (...args) => {
-    const match = args[0] as string
-    const first = args[1] as string
-    const second = args[2] as string
-    const firstParts = first.match(/^([A-Za-z]+\.?)\s+(\d{1,2})(?:,\s*(\d{4}))?$/i)
-    if (firstParts) {
-      const inheritedMonth = firstParts[1]
-      const inheritedYear = firstParts[3] ? `, ${firstParts[3]}` : ''
-      applyRange(first, `${inheritedMonth} ${second}${inheritedYear}`)
-    }
-    return ' '.repeat(match.length)
-  })
-
-  const slashFullPattern =
-    /\b(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\s*(?:-|thru|through|to)\s*(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\b/gi
-  stripped = stripped.replace(slashFullPattern, (...args) => {
-    const match = args[0] as string
-    applyRange(args[1] as string, args[2] as string)
-    return ' '.repeat(match.length)
-  })
-
-  const slashSameMonthPattern = /\b(\d{1,2}\/\d{1,2})\s*(?:-|thru|through|to)\s*(\d{1,2})\b/gi
-  stripped = stripped.replace(slashSameMonthPattern, (...args) => {
-    const match = args[0] as string
-    const first = args[1] as string
-    const second = args[2] as string
-    const firstParts = first.match(/^(\d{1,2})\/(\d{1,2})$/)
-    if (firstParts) {
-      applyRange(first, `${firstParts[1]}/${second}`)
-    }
-    return ' '.repeat(match.length)
-  })
-
-  return { dates: [...resolved].sort((a, b) => a.localeCompare(b)), stripped }
-}
-
-function buildPtoWindow(
-  lines: string[],
-  cycles: IntakeCycle[]
-): { start: string; end: string } | null {
-  const windowLines = lines.filter(
-    (line) =>
-      /\b(?:handwritten note|note)\s*:/i.test(line) ||
-      (!classifyOverrideType(line) && /(through|thru|-)/i.test(line))
-  )
-
-  for (const line of windowLines) {
-    const { dates } = collectRangeDates(line, cycles)
-    if (dates.length >= 2) {
-      return { start: dates[0]!, end: dates[dates.length - 1]! }
-    }
-  }
-
-  if (cycles.length === 1) {
-    return { start: cycles[0]!.start_date, end: cycles[0]!.end_date }
-  }
-
-  return null
-}
-
-function extractWeekdayDates(
-  line: string,
-  window: { start: string; end: string } | null
-): string[] {
-  if (!window) return []
-
-  const weekdayMatches = [
-    ...line
-      .toLowerCase()
-      .matchAll(
-        /\b(?:sun(?:day)?s?|mon(?:day)?s?|tue(?:s|sday)?s?|wed(?:nesday)?s?|thu(?:rs|rsday|rday)?s?|fri(?:day)?s?|sat(?:urday)?s?)\b/g
-      ),
-  ]
-  const weekdays = [
-    ...new Set(
-      weekdayMatches
-        .map((match) => WEEKDAY_MAP[match[0]])
-        .filter((value): value is number => Number.isInteger(value))
-    ),
-  ]
-
-  if (weekdays.length === 0) return []
-
-  const resolved: string[] = []
-  const current = new Date(`${window.start}T00:00:00Z`)
-  const end = new Date(`${window.end}T00:00:00Z`)
-
-  while (current <= end) {
-    if (weekdays.includes(current.getUTCDay())) {
-      resolved.push(current.toISOString().slice(0, 10))
-    }
-    current.setUTCDate(current.getUTCDate() + 1)
-    if (resolved.length > 90) break
-  }
-
-  return resolved
+  return ptoSignals >= 2
 }
 
 function splitIntoCandidateLines(text: string): string[] {
@@ -571,88 +419,7 @@ function parsePtoFormAvailability(
   sourceText: string,
   cycles: IntakeCycle[]
 ): ParsedAvailabilityEmail {
-  const lines = sourceText
-    .split(/\r?\n/)
-    .map((line) => normalizeLine(line))
-    .filter((line) => line.length > 0)
-
-  const requests: ParsedAvailabilityRequest[] = []
-  const unresolvedLines: string[] = []
-  const window = buildPtoWindow(lines, cycles)
-
-  for (const line of lines) {
-    if (shouldIgnorePtoMetadataLine(line)) continue
-
-    const ignoreRestOfWeekWork = /\brest of (?:the )?week\b/i.test(line) && /\boff\b/i.test(line)
-    const explicitIntent = ignoreRestOfWeekWork ? 'force_off' : classifyOverrideType(line)
-    const normalizedLine = stripOrdinalSuffixes(line)
-    const hasWeekdays = /\b(?:sun|mon|tue|wed|thu|fri|sat)/i.test(line)
-    const defaultOff =
-      explicitIntent === null && (extractDateTokens(normalizedLine).length > 0 || hasWeekdays)
-    const overrideType = explicitIntent ?? (defaultOff ? 'force_off' : null)
-
-    if (!overrideType) continue
-
-    const { dates: rangeDates, stripped } = collectRangeDates(line, cycles)
-    const resolved = new Set<string>(rangeDates)
-    for (const date of resolveLineDates(stripped, cycles)) {
-      resolved.add(date)
-    }
-    for (const date of extractWeekdayDates(line, window)) {
-      resolved.add(date)
-    }
-
-    const dates = [...resolved].sort((a, b) => a.localeCompare(b))
-    if (dates.length === 0) {
-      unresolvedLines.push(line)
-      continue
-    }
-
-    for (const date of dates) {
-      requests.push({
-        date,
-        override_type: overrideType,
-        shift_type: 'both',
-        note: null,
-        source_line: line,
-      })
-    }
-  }
-
-  const dedupedRequests = Array.from(
-    new Map(
-      requests.map((request) => [
-        `${request.date}:${request.override_type}:${request.shift_type}`,
-        request,
-      ])
-    ).values()
-  ).sort((a, b) => a.date.localeCompare(b.date) || a.override_type.localeCompare(b.override_type))
-
-  const matchingCycleIds = new Set(
-    dedupedRequests
-      .map(
-        (request) =>
-          cycles.find((cycle) => request.date >= cycle.start_date && request.date <= cycle.end_date)
-            ?.id ?? null
-      )
-      .filter((value): value is string => Boolean(value))
-  )
-
-  const matchedCycleId = matchingCycleIds.size === 1 ? ([...matchingCycleIds][0] ?? null) : null
-  const status: ParsedAvailabilityEmail['status'] =
-    dedupedRequests.length === 0
-      ? 'failed'
-      : matchedCycleId && unresolvedLines.length === 0
-        ? 'parsed'
-        : 'needs_review'
-
-  return {
-    requests: dedupedRequests,
-    matchedCycleId,
-    summary: summarizeRequests(dedupedRequests, unresolvedLines),
-    status,
-    unresolvedLines,
-  }
+  return parsePtoForm(sourceText, cycles)
 }
 
 function splitEmployeeFormBlocks(text: string): string[] {
@@ -660,6 +427,7 @@ function splitEmployeeFormBlocks(text: string): string[] {
   const blocks: string[][] = []
   let current: string[] = []
   let seenEmployeeHeader = false
+  const hasEmployeeHeader = rawLines.some((rawLine) => /^employee name\s*:/i.test(rawLine.trim()))
 
   for (const rawLine of rawLines) {
     const line = rawLine.trim()
@@ -681,7 +449,7 @@ function splitEmployeeFormBlocks(text: string): string[] {
       }
     }
 
-    if (!seenEmployeeHeader && isPtoFormText(text)) {
+    if (!seenEmployeeHeader && hasEmployeeHeader) {
       continue
     }
 
@@ -985,7 +753,7 @@ export function parseAvailabilityEmail(
   sourceText: string,
   cycles: IntakeCycle[]
 ): ParsedAvailabilityEmail {
-  if (isPtoFormText(sourceText)) {
+  if (isStructuredPtoFormText(sourceText) || looksLikeReducedPtoEmployeeBlock(sourceText)) {
     return parsePtoFormAvailability(sourceText, cycles)
   }
 

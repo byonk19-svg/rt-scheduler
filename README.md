@@ -243,6 +243,7 @@ What the app does:
 - fetches full email content plus attachments from Resend receiving
 - matches the sender email to an employee profile when possible
 - parses text like `Need off Mar 24, Mar 26` or `Can work Apr 2`
+- splits reduced PTO-form email bodies on repeated `Employee Name:` blocks so one email can yield multiple per-employee intake items
 - can OCR supported image attachments through the OpenAI Responses API when configured
 - creates an intake record for manager review on [`/availability`](./src/app/availability/page.tsx)
 - lets managers inspect the stored original email body plus attachment OCR text from the intake card
@@ -251,6 +252,7 @@ What the app does:
 - applies parsed dates into `availability_overrides` as manager-entered inputs
 - renders scanned PDF pages and retries OCR using multiple page-image variants and fixed-form-like region prompts when direct PDF extraction returns no text
 - reads OCR text from the actual OpenAI Responses message payload shape, not just `output_text`
+- expands clear PTO recurrence phrases like `Off Tuesday + Wednesdays` across the active cycle window when one active block is available, while leaving malformed OCR fragments in review instead of inventing dates
 
 Current production behavior:
 
@@ -286,6 +288,7 @@ https://your-app-domain/api/inbound/availability-email
 Current MVP limits:
 
 - automatic parsing is best when the email body is typed and structured
+- reduced PTO-style employee blocks can parse without the full form scaffold, but malformed OCR fragments still stay in the review queue by design
 - image attachments (`png`, `jpg`, `jpeg`, `webp`, `gif`) can be OCR'd when OpenAI is configured
 - PDF attachments are first attempted through direct PDF extraction, then through rendered page-image OCR when needed
 - very poor handwritten scans can still remain unreadable even after preprocessing and fixed-form-like region prompts; those items stay in the review queue with stored OCR failure reasons

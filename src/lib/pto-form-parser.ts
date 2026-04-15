@@ -290,6 +290,16 @@ const WORK_INTENT_PATTERNS = [
   /\bno\s+pto\b/i,
 ]
 
+const OFF_INTENT_PATTERNS = [
+  /\bneed\s+off\b/i,
+  /\boff\b/i,
+  /\bunavailable\b/i,
+  /\bcannot\s+work\b/i,
+  /\bcan'?t\s+work\b/i,
+  /\bpto\b/i,
+  /\bvacation\b/i,
+]
+
 /**
  * Lines that mention "working" only as a trailing "rest of week" caveat — they
  * should not generate force_on entries because we don't know the specific dates.
@@ -304,6 +314,36 @@ const TRAILING_WORK_REST_PATTERN = /(?:\d+\s+)?(?:will\s+)?work\s+rest\s+of\s+(?
 const WEEKDAY_RECURRENCE_PATTERN =
   /\b(?:every\s+)?(?:mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\s*(?:\+|and|&|,)?\s*(?:mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)?\b/i
 
+const WEEKDAY_TOKEN_PATTERN =
+  /\b(?:sun(?:day)?s?|mon(?:day)?s?|tue(?:s|sday)?s?|wed(?:nesday)?s?|thu(?:rs|rsday|rday)?s?|fri(?:day)?s?|sat(?:urday)?s?)\b/gi
+
+const WEEKDAY_MAP: Record<string, number> = {
+  sunday: 0,
+  sundays: 0,
+  sun: 0,
+  monday: 1,
+  mondays: 1,
+  mon: 1,
+  tuesday: 2,
+  tuesdays: 2,
+  tue: 2,
+  tues: 2,
+  wednesday: 3,
+  wednesdays: 3,
+  wed: 3,
+  thursday: 4,
+  thursdays: 4,
+  thu: 4,
+  thur: 4,
+  thurs: 4,
+  friday: 5,
+  fridays: 5,
+  fri: 5,
+  saturday: 6,
+  saturdays: 6,
+  sat: 6,
+}
+
 /**
  * Returns 'force_on' when the line has an explicit WORK signal, 'force_off'
  * otherwise (bare dates in a PTO form default to off).
@@ -312,6 +352,83 @@ function classifyPtoLineIntent(line: string): 'force_off' | 'force_on' {
   const stripped = line.replace(TRAILING_WORK_REST_PATTERN, '').trim()
   if (WORK_INTENT_PATTERNS.some((p) => p.test(stripped))) return 'force_on'
   return 'force_off'
+}
+
+function hasExplicitPtoLineIntent(line: string): boolean {
+  const stripped = line.replace(TRAILING_WORK_REST_PATTERN, '').trim()
+  return (
+    WORK_INTENT_PATTERNS.some((p) => p.test(stripped)) ||
+    OFF_INTENT_PATTERNS.some((p) => p.test(stripped))
+  )
+}
+
+function buildSingleCycleWindow(cycles: IntakeCycle[]): { start: string; end: string } | null {
+  if (cycles.length !== 1) return null
+  const cycle = cycles[0]
+  if (!cycle) return null
+  return { start: cycle.start_date, end: cycle.end_date }
+}
+
+function buildPtoRequestWindow(
+  rawLines: string[],
+  cycles: IntakeCycle[]
+): { start: string; end: string } | null {
+  for (const rawLine of rawLines) {
+    if (!ANNOTATION_PREFIX.test(rawLine)) continue
+    const cleanedLine = rawLine.replace(ANNOTATION_PREFIX, '').trim()
+    const dates = extractPtoRowDates(cleanedLine, cycles)
+    if (dates.length >= 2) {
+      return {
+        start: dates[0]!,
+        end: dates[dates.length - 1]!,
+      }
+    }
+  }
+
+  return buildSingleCycleWindow(cycles)
+}
+
+function looksLikeWeekdayRecurrence(line: string): boolean {
+  const weekdayTokens = [...line.toLowerCase().matchAll(WEEKDAY_TOKEN_PATTERN)].map(
+    (match) => match[0]
+  )
+  if (weekdayTokens.length === 0) return false
+
+  const uniqueWeekdays = new Set(weekdayTokens.map((token) => token.replace(/s$/, '')))
+  const hasPluralWeekday = weekdayTokens.some((token) => token.endsWith('s') && token.length > 3)
+
+  return uniqueWeekdays.size >= 2 || hasPluralWeekday || /\bevery\b/i.test(line)
+}
+
+function expandWeekdayRecurrenceAcrossWindow(
+  line: string,
+  window: { start: string; end: string } | null
+): string[] {
+  if (!window || !looksLikeWeekdayRecurrence(line)) return []
+
+  const weekdays = [
+    ...new Set(
+      [...line.toLowerCase().matchAll(WEEKDAY_TOKEN_PATTERN)]
+        .map((match) => WEEKDAY_MAP[match[0]])
+        .filter((value): value is number => Number.isInteger(value))
+    ),
+  ]
+
+  if (weekdays.length === 0) return []
+
+  const dates: string[] = []
+  const current = new Date(`${window.start}T00:00:00Z`)
+  const end = new Date(`${window.end}T00:00:00Z`)
+
+  while (current <= end) {
+    if (weekdays.includes(current.getUTCDay())) {
+      dates.push(current.toISOString().slice(0, 10))
+    }
+    current.setUTCDate(current.getUTCDate() + 1)
+    if (dates.length > 90) break
+  }
+
+  return dates
 }
 
 // ---------------------------------------------------------------------------
@@ -365,6 +482,7 @@ export function parsePtoForm(text: string, cycles: IntakeCycle[]): ParsedAvailab
 
   const requests: ParsedAvailabilityRequest[] = []
   const unresolvedLines: string[] = []
+  const activeWindow = buildPtoRequestWindow(rawLines, cycles)
 
   let afterSignature = false
 
@@ -390,14 +508,21 @@ export function parsePtoForm(text: string, cycles: IntakeCycle[]): ParsedAvailab
 
     // ── Comments: — strip prefix, parse the remainder ─────────────────────
     let line = rawLine
-    if (/^Comments?\s*:/i.test(line)) {
-      line = line.replace(/^Comments?\s*:\s*/i, '').trim()
+    if (/^Comments?\s*[:=]/i.test(line)) {
+      line = line.replace(/^Comments?\s*[:=]\s*/i, '').trim()
       if (!line) continue
     }
 
     // ── Annotation / note labels ───────────────────────────────────────────
     line = line.replace(ANNOTATION_PREFIX, '').trim()
     if (!line) continue
+    if (
+      ANNOTATION_PREFIX.test(rawLine) &&
+      !hasExplicitPtoLineIntent(line) &&
+      extractPtoRowDates(line, cycles).length >= 2
+    ) {
+      continue
+    }
 
     // ── Day-of-week prefix ("Mon: off …") ─────────────────────────────────
     line = line.replace(DOW_PREFIX, '').trim()
@@ -409,16 +534,36 @@ export function parsePtoForm(text: string, cycles: IntakeCycle[]): ParsedAvailab
       !/\d{1,2}\/\d{1,2}/.test(line) &&
       !/[A-Za-z]+\s+\d{1,2}/.test(line)
     ) {
-      unresolvedLines.push(rawLine)
+      const recurrenceDates = expandWeekdayRecurrenceAcrossWindow(line, activeWindow)
+      if (recurrenceDates.length === 0) {
+        unresolvedLines.push(rawLine)
+        continue
+      }
+
+      const overrideType = classifyPtoLineIntent(line)
+      for (const date of recurrenceDates) {
+        requests.push({
+          date,
+          override_type: overrideType,
+          shift_type: 'both',
+          note: null,
+          source_line: rawLine,
+        })
+      }
       continue
     }
 
     // ── Date extraction ────────────────────────────────────────────────────
     const dates = extractPtoRowDates(line, cycles)
 
-    if (dates.length === 0) continue // no parseable dates — silently skip metadata
+    if (dates.length === 0) {
+      if (hasExplicitPtoLineIntent(line)) {
+        unresolvedLines.push(rawLine)
+      }
+      continue
+    }
 
-    const overrideType = classifyPtoLineIntent(line)
+    const overrideType = hasExplicitPtoLineIntent(line) ? classifyPtoLineIntent(line) : 'force_off'
 
     for (const date of dates) {
       requests.push({

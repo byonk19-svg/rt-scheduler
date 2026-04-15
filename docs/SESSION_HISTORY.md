@@ -1,5 +1,13 @@
 # Session History
 
+## Session 69 - 2026-04-15
+
+- Availability intake parser hardening:
+  - reduced PTO employee-block emails now split on repeated `Employee Name:` headers
+  - repeated blocks for the same employee merge back into one intake item
+  - weekday recurrence phrases like `Off Tuesday + Wednesdays` expand across the active block when the cycle window is known
+  - malformed OCR fragments stay in `needs_review` instead of creating guessed work dates
+
 ## Session 66 - 2026-04-14
 
 - `/availability` moved to the current planner-first manager structure.
