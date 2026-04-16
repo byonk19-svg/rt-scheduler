@@ -1,5 +1,11 @@
 # Session History
 
+## Session 72 - 2026-04-15
+
+- Reworked `/coverage` into a compact scheduling workspace: tighter header, unified planning toolbar, lighter summary cards, slim setup/live-status banners, denser weekly grid, and tighter roster matrix.
+- Simplified grid day cells and tightened the shift editor: less repeated text, more visual status signaling, ranked modal candidates, and stronger selected-state treatment.
+- Fixed slow roster `+` clicks by opening the day editor immediately and reducing roster re-render cost with memoized roster sections/tables plus a deferred selected-day highlight.
+
 ## Session 71 - 2026-04-15
 
 - Removed the public signup roster-match check so `/signup` no longer leaks whether a full name exists in `employee_roster`.

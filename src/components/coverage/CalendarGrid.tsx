@@ -1,22 +1,22 @@
 'use client'
 
 import { useCallback, useMemo, useRef } from 'react'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, ArrowUpRight } from 'lucide-react'
 
 import {
   AssignmentStatusPopover,
   StatusPill,
 } from '@/components/coverage/AssignmentStatusPopover'
-import type { DayItem, UiStatus } from '@/lib/coverage/selectors'
+import type { DayItem, ShiftItem, UiStatus } from '@/lib/coverage/selectors'
 import {
   countActive,
-  flatten,
   headcountThreshold,
   shouldShowMonthTag,
 } from '@/lib/coverage/selectors'
 import { cn } from '@/lib/utils'
 
-const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const TARGET_HEADCOUNT = 4
 
 export function nextIndex(current: number, key: string, total: number): number {
   const cols = 7
@@ -39,18 +39,38 @@ type CalendarGridProps = {
   days: DayItem[]
   loading: boolean
   selectedId: string | null
-  /** When false, day cell uses a "view" aria label (no staffing edits). */
   schedulingViewOnly?: boolean
-  /** When false, assignment status chips are display-only (no status popover). */
   allowAssignmentStatusEdits?: boolean
   onSelect: (id: string) => void
   onChangeStatus: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
 }
 
+type CellTone = 'critical' | 'warning' | 'healthy' | 'empty'
+
 function formatMonthShort(value: string): string {
   const parsed = new Date(`${value}T00:00:00`)
   if (Number.isNaN(parsed.getTime())) return value
   return parsed.toLocaleDateString('en-US', { month: 'short' })
+}
+
+function formatWeekLabel(week: DayItem[]): string {
+  const start = week[0]
+  const end = week[week.length - 1]
+  if (!start || !end) return ''
+
+  const startDate = new Date(`${start.isoDate}T00:00:00`)
+  const endDate = new Date(`${end.isoDate}T00:00:00`)
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return `${start.isoDate} - ${end.isoDate}`
+  }
+
+  const startLabel = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const endLabel =
+    startDate.getMonth() === endDate.getMonth()
+      ? endDate.toLocaleDateString('en-US', { day: 'numeric' })
+      : endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+  return `${startLabel} - ${endLabel}`
 }
 
 function compactName(value: string): string {
@@ -69,15 +89,91 @@ function isUnavailableStatus(status: UiStatus): boolean {
   return status === 'cancelled' || status === 'call_in'
 }
 
-type StaffingCardTone = 'constraint' | 'missing_lead' | 'under' | 'partial' | 'full'
+function resolveCellTone(day: DayItem, activeCount: number): CellTone {
+  if (day.constraintBlocked) return 'critical'
+  if (!day.leadShift) return activeCount > 0 ? 'warning' : 'critical'
+  const threshold = headcountThreshold(activeCount)
+  if (threshold === 'green') return 'healthy'
+  if (threshold === 'yellow') return 'warning'
+  return activeCount === 0 ? 'empty' : 'critical'
+}
 
-function staffingCardTone(day: DayItem, activeCount: number): StaffingCardTone {
-  if (day.constraintBlocked) return 'constraint'
-  if (!day.leadShift) return 'missing_lead'
-  const t = headcountThreshold(activeCount)
-  if (t === 'red') return 'under'
-  if (t === 'yellow') return 'partial'
-  return 'full'
+function buildCoverageLabel(day: DayItem, activeCount: number): string {
+  if (day.constraintBlocked) return 'No eligible therapists'
+  if (!day.leadShift) return 'No lead'
+  if (activeCount === 0) return 'Untouched'
+
+  const openSlots = Math.max(TARGET_HEADCOUNT - activeCount, 0)
+  if (openSlots > 0) {
+    return `${openSlots} ${openSlots === 1 ? 'gap' : 'gaps'}`
+  }
+
+  return 'Set'
+}
+
+function cellToneClassName(tone: CellTone): string {
+  switch (tone) {
+    case 'critical':
+      return 'border-[var(--error-border)]/75 bg-[var(--error-subtle)]/40'
+    case 'warning':
+      return 'border-[var(--warning-border)]/70 bg-[var(--warning-subtle)]/28'
+    case 'healthy':
+      return 'border-[var(--success-border)]/50 bg-[var(--success-subtle)]/30'
+    case 'empty':
+    default:
+      return 'border-border/70 bg-card'
+  }
+}
+
+function badgeToneClassName(tone: CellTone): string {
+  switch (tone) {
+    case 'critical':
+      return 'bg-[var(--error-subtle)] text-[var(--error-text)]'
+    case 'warning':
+      return 'bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+    case 'healthy':
+      return 'bg-[var(--success-subtle)] text-[var(--success-text)]'
+    case 'empty':
+    default:
+      return 'bg-muted/60 text-foreground/75'
+  }
+}
+
+function renderShiftPill(
+  dayId: string,
+  shift: ShiftItem,
+  isLead: boolean,
+  allowAssignmentStatusEdits: boolean,
+  onChangeStatus: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
+) {
+  const content = (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full border border-border/70 bg-background/95 px-2 py-1 text-[10px] font-medium text-foreground/85',
+        isUnavailableStatus(shift.status) &&
+          'border-[var(--error-border)]/55 text-[var(--error-text)] line-through decoration-[var(--error-text)]/50'
+      )}
+    >
+      <span>{compactName(shift.name)}</span>
+      <StatusPill status={shift.status} />
+    </span>
+  )
+
+  if (!allowAssignmentStatusEdits) {
+    return <span className="pointer-events-auto">{content}</span>
+  }
+
+  return (
+    <AssignmentStatusPopover
+      therapistName={shift.name}
+      currentStatus={shift.status}
+      isLead={isLead}
+      triggerTestId={`coverage-assignment-trigger-${dayId}-${shift.userId}`}
+      onChangeStatus={(nextStatus) => onChangeStatus(dayId, shift.id, isLead, nextStatus)}
+    >
+      {content}
+    </AssignmentStatusPopover>
+  )
 }
 
 export function CalendarGrid({
@@ -98,12 +194,13 @@ export function CalendarGrid({
 
   return (
     <div role="grid" aria-label="Coverage calendar" className="overflow-x-auto pb-2">
-      <div className="min-w-[980px]">
-        <div className="mb-2 grid grid-cols-7 gap-3 border-y border-border bg-muted/25 py-2">
+      <div className="min-w-[1024px] space-y-2.5">
+        <div className="grid grid-cols-[96px_repeat(7,minmax(0,1fr))] gap-2">
+          <div />
           {DOW.map((day) => (
             <div
               key={day}
-              className="text-center text-[0.72rem] font-bold tracking-[0.12em] text-foreground/70"
+              className="flex h-9 items-center justify-center rounded-lg border border-border/60 bg-muted/30 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
             >
               {day}
             </div>
@@ -115,230 +212,144 @@ export function CalendarGrid({
             Loading schedule...
           </div>
         ) : (
-          <div className="space-y-4.5">
-            {weeks.map((week, weekIndex) => (
-              <section key={`week-${weekIndex}`} className="space-y-1.75">
-                <div className="flex items-center gap-2">
-                  <p className="text-[0.68rem] font-semibold uppercase tracking-[0.09em] text-muted-foreground">
-                    WEEK {weekIndex + 1}
-                  </p>
-                  <div className="h-px flex-1 bg-border/90" />
-                </div>
+          weeks.map((week, weekIndex) => (
+            <section
+              key={`week-${weekIndex}`}
+              role="row"
+              className="grid grid-cols-[88px_repeat(7,minmax(0,1fr))] gap-1.5"
+            >
+              <div className="rounded-xl border border-border/70 bg-muted/18 px-2.5 py-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  Week {weekIndex + 1}
+                </p>
+                <p className="mt-1 text-xs font-medium text-foreground">{formatWeekLabel(week)}</p>
+              </div>
 
-                <div role="row" className="grid grid-cols-7 gap-2.5">
-                  {week.map((day, dayOffset) => {
-                    const absoluteIndex = weekIndex * 7 + dayOffset
-                    const activeCount = countActive(day)
-                    const threshold = headcountThreshold(activeCount)
-                    const totalCount = flatten(day).length
-                    const showMonthTag = shouldShowMonthTag(absoluteIndex, day.isoDate)
-                    const cardTone = staffingCardTone(day, activeCount)
-                    const showAttentionBadge = day.constraintBlocked
+              {week.map((day, dayOffset) => {
+                const absoluteIndex = weekIndex * 7 + dayOffset
+                const activeCount = countActive(day)
+                const tone = resolveCellTone(day, activeCount)
+                const showMonthTag = shouldShowMonthTag(absoluteIndex, day.isoDate)
+                const visibleStaff = day.staffShifts.slice(0, 2)
+                const extraStaffCount = Math.max(day.staffShifts.length - visibleStaff.length, 0)
+                return (
+                  <article
+                    key={day.id}
+                    role="gridcell"
+                    data-testid={`coverage-day-panel-${day.id}`}
+                    className={cn(
+                      'relative min-h-[108px] rounded-xl border px-2.5 py-2.5 shadow-sm transition-[border-color,box-shadow,transform] duration-150',
+                      'hover:-translate-y-px hover:shadow-md',
+                      cellToneClassName(tone),
+                      selectedId === day.id && 'border-primary/65 ring-2 ring-primary/15'
+                    )}
+                  >
+                    <button
+                      type="button"
+                      ref={(element) => {
+                        if (element) {
+                          cellRefs.current.set(day.id, element)
+                          return
+                        }
+                        cellRefs.current.delete(day.id)
+                      }}
+                      tabIndex={absoluteIndex === 0 ? 0 : -1}
+                      data-testid={`coverage-day-cell-button-${day.id}`}
+                      aria-label={`${schedulingViewOnly ? 'View' : 'Edit'} ${day.label}`}
+                      className="absolute inset-0 z-0 rounded-xl"
+                      onClick={() => onSelect(day.id)}
+                      onKeyDown={(event) => {
+                        if (
+                          !['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(event.key)
+                        ) {
+                          return
+                        }
+                        event.preventDefault()
+                        const next = nextIndex(absoluteIndex, event.key, flatDayIds.length)
+                        focusCell(flatDayIds[next])
+                      }}
+                    />
 
-                    return (
-                      <article
-                        key={day.id}
-                        role="gridcell"
-                        data-testid={`coverage-day-panel-${day.id}`}
-                        className={cn(
-                          'relative min-h-[156px] rounded-[20px] border bg-card px-2.75 py-2.25 text-left shadow-tw-2xs transition-[border-color,box-shadow,transform] duration-200',
-                          'hover:-translate-y-px hover:border-primary/35 hover:shadow-tw-day-hover',
-                          cardTone === 'constraint' &&
-                            'border-[var(--warning-border)] bg-[var(--warning-subtle)]/55 shadow-tw-day-warning',
-                          cardTone === 'missing_lead' &&
-                            'border-[var(--warning-border)]/85 bg-[var(--warning-subtle)]/42 shadow-tw-ring-attention',
-                          cardTone === 'under' &&
-                            'border-[var(--error-border)]/80 bg-[var(--error-subtle)]/45 shadow-tw-ring-error-soft',
-                          cardTone === 'partial' &&
-                            'border-[var(--warning-border)]/55 bg-[var(--warning-subtle)]/30',
-                          cardTone === 'full' &&
-                            'border-[var(--success-border)]/45 bg-[var(--success-subtle)]/35',
-                          selectedId === day.id &&
-                            'border-primary/60 shadow-tw-day-selected'
-                        )}
-                      >
-                        <button
-                          type="button"
-                          ref={(element) => {
-                            if (element) {
-                              cellRefs.current.set(day.id, element)
-                              return
-                            }
-                            cellRefs.current.delete(day.id)
-                          }}
-                          tabIndex={absoluteIndex === 0 ? 0 : -1}
-                          data-testid={`coverage-day-cell-button-${day.id}`}
-                          aria-label={`${schedulingViewOnly ? 'View' : 'Edit'} ${day.label}`}
-                          className="absolute inset-0 z-0 rounded-[20px]"
-                          onClick={() => onSelect(day.id)}
-                          onKeyDown={(event) => {
-                            if (
-                              !['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(
-                                event.key
+                    <div className="pointer-events-none relative z-10 flex h-full flex-col gap-1.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[1.15rem] font-semibold leading-none tracking-[-0.04em] text-foreground">
+                            {day.date}
+                          </span>
+                          {showMonthTag ? (
+                            <span className="rounded-full border border-border/70 bg-background/90 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                              {formatMonthShort(day.isoDate)}
+                            </span>
+                          ) : null}
+                        </div>
+                        <span
+                          className={cn(
+                            'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                            badgeToneClassName(tone)
+                          )}
+                        >
+                          {activeCount}/{TARGET_HEADCOUNT} staffed
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                        <div className="pointer-events-auto">
+                          {day.leadShift
+                            ? renderShiftPill(
+                                day.id,
+                                day.leadShift,
+                                true,
+                                allowAssignmentStatusEdits,
+                                onChangeStatus
                               )
-                            ) {
-                              return
-                            }
-                            event.preventDefault()
-                            const next = nextIndex(absoluteIndex, event.key, flatDayIds.length)
-                            focusCell(flatDayIds[next])
-                          }}
-                        />
-
-                        <div className="pointer-events-none relative z-10">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="inline-flex items-center gap-2">
-                            <span className="text-[1.26rem] font-bold leading-none tracking-[-0.04em] text-foreground">
-                              {day.date}
-                            </span>
-                            {showMonthTag && (
-                              <span className="rounded-xl border border-border bg-muted px-1.75 py-0.5 text-[0.58rem] font-semibold text-muted-foreground">
-                                {formatMonthShort(day.isoDate)}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex flex-col items-end gap-1">
-                            <span
-                              className={cn(
-                                'min-w-[2.85rem] rounded-full px-2.5 py-1.5 text-center text-[0.7rem] font-extrabold leading-none tabular-nums shadow-tw-pill',
-                                threshold === 'red' &&
-                                  'bg-[var(--error-subtle)] text-[var(--error-text)] ring-2 ring-[var(--error-border)]/50',
-                                threshold === 'yellow' &&
-                                  'bg-[var(--warning-subtle)] text-[var(--warning-text)] ring-2 ring-[var(--warning-border)]/55',
-                                threshold === 'green' &&
-                                  'bg-[var(--success-subtle)]/95 text-[var(--success-text)] ring-2 ring-[var(--success-border)]/50'
-                              )}
-                            >
-                              {activeCount}/{totalCount}
-                            </span>
-                            {showAttentionBadge && (
-                              <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[0.54rem] font-semibold uppercase tracking-[0.08em] text-[var(--warning-text)]">
-                                Needs attention
-                              </span>
-                            )}
-                            {!day.constraintBlocked && !day.leadShift && (
-                              <span className="rounded-full border border-[var(--warning-border)]/70 bg-[var(--warning-subtle)]/50 px-2 py-0.5 text-[0.52rem] font-semibold uppercase tracking-[0.07em] text-[var(--warning-text)]">
+                            : (
+                              <span className="rounded-full border border-dashed border-[var(--warning-border)]/70 px-2 py-0.5 text-[10px] font-medium text-[var(--warning-text)]">
                                 No lead
                               </span>
                             )}
-                          </div>
                         </div>
+                        <span className="inline-flex items-center gap-1">
+                          {day.constraintBlocked ? (
+                            <AlertTriangle className="h-3.5 w-3.5 text-[var(--error-text)]" aria-hidden />
+                          ) : null}
+                          {buildCoverageLabel(day, activeCount)}
+                        </span>
+                      </div>
 
-                        <div
-                          className={cn(
-                            'mt-1.5 rounded-xl border px-1.75 py-1',
-                            day.leadShift && allowAssignmentStatusEdits && 'pointer-events-auto',
-                            day.leadShift
-                              ? 'border-[var(--info-border)]/40 bg-[var(--info-subtle)]/22 text-[var(--info-text)]'
-                              : 'border-[var(--warning-border)]/55 bg-[var(--warning-subtle)]/18 text-[var(--warning-text)]'
-                          )}
-                        >
-                          <p className="text-[0.5rem] font-semibold uppercase tracking-[0.2em] text-muted-foreground/75">
-                            LEAD
-                          </p>
-                          {day.leadShift ? (
-                            allowAssignmentStatusEdits ? (
-                              <AssignmentStatusPopover
-                                therapistName={day.leadShift.name}
-                                currentStatus={day.leadShift.status}
-                                isLead
-                                triggerTestId={`coverage-assignment-trigger-${day.id}-${day.leadShift.userId}`}
-                                onChangeStatus={(nextStatus) =>
-                                  onChangeStatus(day.id, day.leadShift!.id, true, nextStatus)
-                                }
-                              >
-                                <span
-                                  className={cn(
-                                    'mt-0.5 inline-flex items-center gap-1.25 text-[0.68rem] font-semibold leading-tight',
-                                    isUnavailableStatus(day.leadShift.status) &&
-                                      'line-through decoration-[var(--error-text)]/50'
-                                  )}
-                                >
-                                  <span>{compactName(day.leadShift.name)}</span>
-                                  <StatusPill status={day.leadShift.status} />
-                                </span>
-                              </AssignmentStatusPopover>
-                            ) : (
-                              <span
-                                className={cn(
-                                  'pointer-events-auto mt-0.5 inline-flex items-center gap-1.25 text-[0.68rem] font-semibold leading-tight',
-                                  isUnavailableStatus(day.leadShift.status) &&
-                                    'line-through decoration-[var(--error-text)]/50'
+                      <div className="mt-auto space-y-1">
+                        {visibleStaff.length > 0 ? (
+                          <div className="pointer-events-auto flex flex-wrap gap-1.5">
+                            {visibleStaff.map((shift) => (
+                              <div key={shift.id}>
+                                {renderShiftPill(
+                                  day.id,
+                                  shift,
+                                  false,
+                                  allowAssignmentStatusEdits,
+                                  onChangeStatus
                                 )}
-                              >
-                                <span>{compactName(day.leadShift.name)}</span>
-                                <StatusPill status={day.leadShift.status} />
+                              </div>
+                            ))}
+                            {extraStaffCount > 0 ? (
+                              <span className="inline-flex items-center rounded-full border border-border/70 bg-background/80 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                +{extraStaffCount} more
                               </span>
-                            )
-                          ) : (
-                            <p className="mt-0.5 text-[0.68rem] font-medium leading-tight text-[var(--warning-text)]/60">
-                              &mdash;
-                            </p>
-                          )}
-                        </div>
-
-                        {day.constraintBlocked && (
-                          <div className="mt-1.75 rounded-[16px] border border-[var(--error-border)] bg-[var(--error-subtle)] px-2.75 py-1.5 text-[0.64rem] leading-tight text-[var(--error-text)]">
-                            No eligible therapists (constraints)
+                            ) : null}
                           </div>
-                        )}
+                        ) : null}
 
-                        <div
-                          className={cn(
-                            'mt-1.5 space-y-0.5 border-t border-border/45 pt-1.5',
-                            day.staffShifts.length > 0 &&
-                              allowAssignmentStatusEdits &&
-                              'pointer-events-auto'
-                          )}
-                        >
-                          {day.staffShifts.map((shift) => (
-                            <div key={shift.id} className="flex items-center gap-1 text-[0.62rem] leading-snug">
-                              {allowAssignmentStatusEdits ? (
-                                <AssignmentStatusPopover
-                                  therapistName={shift.name}
-                                  currentStatus={shift.status}
-                                  triggerTestId={`coverage-assignment-trigger-${day.id}-${shift.userId}`}
-                                  onChangeStatus={(nextStatus) =>
-                                    onChangeStatus(day.id, shift.id, false, nextStatus)
-                                  }
-                                >
-                                  <span
-                                    className={cn(
-                                      'inline-flex items-center gap-1 text-[0.62rem] text-muted-foreground/78',
-                                      isUnavailableStatus(shift.status) &&
-                                        'line-through decoration-[var(--error-text)]/50'
-                                    )}
-                                  >
-                                    <span>{compactName(shift.name)}</span>
-                                    <StatusPill status={shift.status} />
-                                  </span>
-                                </AssignmentStatusPopover>
-                              ) : (
-                                <span
-                                  className={cn(
-                                    'pointer-events-auto inline-flex items-center gap-1 text-[0.62rem] text-muted-foreground/78',
-                                    isUnavailableStatus(shift.status) &&
-                                      'line-through decoration-[var(--error-text)]/50'
-                                  )}
-                                >
-                                  <span>{compactName(shift.name)}</span>
-                                  <StatusPill status={shift.status} />
-                                </span>
-                              )}
-                              {shift.status === 'leave_early' && (
-                                <AlertTriangle className="h-4 w-4 text-[var(--warning-text)]" aria-hidden="true" />
-                              )}
-                            </div>
-                          ))}
+                        <div className="flex items-center justify-end gap-2 text-[10px] text-muted-foreground">
+                          <span className="inline-flex items-center gap-1 font-medium text-foreground/70">
+                            <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
+                          </span>
                         </div>
-                        </div>
-                      </article>
-                    )
-                  })}
-                </div>
-              </section>
-            ))}
-          </div>
+                      </div>
+                    </div>
+                  </article>
+                )
+              })}
+            </section>
+          ))
         )}
       </div>
     </div>

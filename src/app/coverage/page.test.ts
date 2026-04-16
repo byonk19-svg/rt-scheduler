@@ -75,9 +75,7 @@ describe('coverage publish override affordance', () => {
     const source = readFileSync(filePath, 'utf8')
 
     expect(source).toContain('No staffing drafted yet.')
-    expect(source).toContain(
-      'Run Auto-draft to fill the grid based on therapist availability and constraints, or click any day to assign shifts manually.'
-    )
+    expect(source).toContain('No shifts assigned yet. Run Auto-draft or click a day to assign manually.')
   })
 
   it('calls out live operational status badges on the published schedule', () => {

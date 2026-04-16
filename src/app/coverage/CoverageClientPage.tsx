@@ -1,16 +1,24 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  type ReactNode,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { CalendarDays, ChevronRight, Printer, Send, Sparkles } from 'lucide-react'
+import { ChevronRight, Printer, Send, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 import { AutoDraftConfirmDialog } from '@/components/coverage/AutoDraftConfirmDialog'
 import { ClearDraftConfirmDialog } from '@/components/coverage/ClearDraftConfirmDialog'
 import { CycleManagementDialog } from '@/components/coverage/CycleManagementDialog'
-import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
 import { MoreActionsMenu } from '@/components/more-actions-menu'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -31,6 +39,7 @@ import { updateCoverageAssignmentStatus } from '@/lib/coverage/updateAssignmentS
 import {
   assignCoverageShiftViaApi,
   persistCoverageShiftStatus,
+  setCoverageDesignatedLeadViaApi,
   unassignCoverageShiftViaApi,
 } from '@/lib/coverage/mutations'
 import {
@@ -200,12 +209,12 @@ function CoverageMetric({
   }
 
   return (
-    <div className={cn('rounded-xl border px-3 py-3 shadow-sm', toneClasses[tone])}>
+    <div className={cn('rounded-lg border px-3 py-2.5 shadow-sm', toneClasses[tone])}>
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
         {label}
       </p>
-      <div className="mt-1 flex items-end justify-between gap-3">
-        <span className="text-2xl font-semibold tracking-[-0.04em]">{value}</span>
+      <div className="mt-0.5 flex items-end justify-between gap-3">
+        <span className="text-[1.6rem] font-semibold tracking-[-0.04em]">{value}</span>
         <span className="text-[11px] font-medium text-muted-foreground">{detail}</span>
       </div>
     </div>
@@ -231,11 +240,11 @@ function CoverageSurfaceBanner({
   }
 
   return (
-    <section className={cn('rounded-xl border px-4 py-3', toneClasses[tone])}>
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <section className={cn('rounded-lg border px-3.5 py-2.5', toneClasses[tone])}>
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-foreground">{title}</p>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
+          <p className="text-[13px] font-semibold text-foreground">{title}</p>
+          <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{description}</p>
         </div>
         {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
@@ -331,6 +340,7 @@ export function CoverageClientPage({
   const [rosterProfiles, setRosterProfiles] = useState<RosterMemberRow[]>([])
   const [activeOpCodes, setActiveOpCodes] = useState<Map<string, string>>(new Map())
   const [assigning, setAssigning] = useState(false)
+  const [coverageReloadNonce, setCoverageReloadNonce] = useState(0)
   const [unassigningShiftId, setUnassigningShiftId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -350,6 +360,7 @@ export function CoverageClientPage({
   const [actorRole, setActorRole] = useState<Role | null>(null)
   const autoDraftFormRef = useRef<HTMLFormElement>(null)
   const clearDraftFormRef = useRef<HTMLFormElement>(null)
+  const deferredSelectedId = useDeferredValue(selectedId)
   const days = shiftTab === 'Day' ? dayDays : nightDays
   const setDays = shiftTab === 'Day' ? setDayDays : setNightDays
   const scheduleFeedbackParams = useMemo<ScheduleSearchParams>(
@@ -466,56 +477,6 @@ export function CoverageClientPage({
       minute: '2-digit',
     })
   }, [activePreliminarySnapshot])
-  const scheduleSubtitle = useMemo(() => {
-    const editHint = canManageCoverage
-      ? 'View staffing and assignment status — click a day to edit.'
-      : canUpdateAssignmentStatus
-        ? 'View staffing and assignment status — click a therapist name to update status.'
-        : 'View staffing and assignment status.'
-    if (!printCycle) {
-      return canManageCoverage
-        ? 'No open 6-week block — create a new draft block to start staffing.'
-        : 'No published schedule is available right now.'
-    }
-    const range = formatHumanCycleRange(printCycle.start_date, printCycle.end_date)
-    const statusChip = activeCyclePublished ? (
-      <span className="ml-1.5 inline-flex items-center rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--success-text)]">
-        Live
-      </span>
-    ) : (
-      <span className="ml-1.5 inline-flex items-center rounded-full border border-border/70 bg-muted/20 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-        Draft
-      </span>
-    )
-    if (!selectedCycleHasShiftRows) {
-      return (
-        <>
-          <span className="block text-sm font-medium text-foreground/90">
-            {range}
-            {statusChip}
-          </span>
-          <span className="mt-1 block text-xs text-muted-foreground">
-            {canManageCoverage ? 'No staffing drafted yet.' : 'No staffing published yet.'}
-          </span>
-        </>
-      )
-    }
-    return (
-      <>
-        <span className="block text-sm font-medium text-foreground/90">
-          {range}
-          {statusChip}
-        </span>
-        <span className="mt-1 block text-xs text-muted-foreground">{editHint}</span>
-      </>
-    )
-  }, [
-    printCycle,
-    canManageCoverage,
-    canUpdateAssignmentStatus,
-    selectedCycleHasShiftRows,
-    activeCyclePublished,
-  ])
 
   const showFullPrintRoster = canManageCoverage || actorRole === 'lead'
   const rosterMembers = useMemo<RosterMemberRow[]>(
@@ -808,7 +769,7 @@ export function CoverageClientPage({
     return () => {
       active = false
     }
-  }, [cycleFromUrl, supabase, clearLoadedScheduleState])
+  }, [cycleFromUrl, supabase, clearLoadedScheduleState, coverageReloadNonce])
 
   // Fetch full therapist list once per shift type — not per day click (managers only).
   useEffect(() => {
@@ -1027,6 +988,103 @@ export function CoverageClientPage({
       const selectedTherapist = allTherapists.find((t) => t.id === userId) ?? null
       const shiftType = shiftTab === 'Day' ? 'day' : 'night'
 
+      const failAssign = (message: string) => {
+        if (options?.inline) {
+          setRosterCellError({
+            dayId,
+            memberId: userId,
+            message,
+          })
+        } else {
+          setAssignError(message)
+        }
+        setAssigning(false)
+      }
+
+      if (role === 'lead') {
+        const existingLead = targetDay.leadShift
+        const staffShift = targetDay.staffShifts.find((s) => s.userId === userId)
+
+        if (existingLead?.userId === userId) {
+          setAssigning(false)
+          return
+        }
+
+        const needsDesignatedLeadChange =
+          Boolean(staffShift) && (existingLead ? existingLead.userId !== userId : true)
+
+        if (needsDesignatedLeadChange) {
+          const { error: leadError } = await setCoverageDesignatedLeadViaApi({
+            cycleId: activeCycleId,
+            therapistId: userId,
+            isoDate: targetDay.isoDate,
+            shiftType,
+          })
+          if (leadError) {
+            console.error('Set designated lead failed:', leadError)
+            failAssign(
+              leadError.message ?? 'Could not update designated lead. Please try again.'
+            )
+            return
+          }
+          setAssignError('')
+          setRosterCellError(null)
+          setCoverageReloadNonce((n) => n + 1)
+          setAssigning(false)
+          return
+        }
+
+        if (existingLead && existingLead.userId !== userId) {
+          const { data: inserted, error: insertError } = await assignCoverageShiftViaApi({
+            cycleId: activeCycleId,
+            userId,
+            isoDate: targetDay.isoDate,
+            shiftType,
+            role: 'staff',
+          })
+
+          if (insertError || !inserted) {
+            console.error('Assign failed:', insertError)
+            const message =
+              insertError?.code === '23505'
+                ? `${selectedTherapist?.full_name ?? 'This therapist'} is already assigned on this day.`
+                : insertError?.message ?? 'Could not assign therapist. Please try again.'
+            failAssign(message)
+            return
+          }
+
+          setAssignError('')
+          setRosterCellError(null)
+          const insertedRow = inserted as {
+            id: string
+            user_id: string
+            status: ShiftStatus
+            assignment_status: AssignmentStatus | null
+          }
+          const name = selectedTherapist?.full_name ?? 'Unknown'
+          const nextShift: ShiftItem = {
+            id: insertedRow.id,
+            userId: insertedRow.user_id,
+            name,
+            status: toUiStatus(insertedRow.assignment_status, insertedRow.status),
+            log: [],
+          }
+          setDays((current) =>
+            current.map((day) => {
+              if (day.id !== targetDay.id) return day
+              return {
+                ...day,
+                staffShifts: [...day.staffShifts, nextShift].sort((a, b) =>
+                  a.name.localeCompare(b.name)
+                ),
+              }
+            })
+          )
+          setAssigning(false)
+          return
+        }
+      }
+
       const { data: inserted, error: insertError } = await assignCoverageShiftViaApi({
         cycleId: activeCycleId,
         userId,
@@ -1041,16 +1099,7 @@ export function CoverageClientPage({
           insertError?.code === '23505'
             ? `${selectedTherapist?.full_name ?? 'This therapist'} is already assigned on this day.`
             : insertError?.message ?? 'Could not assign therapist. Please try again.'
-        if (options?.inline) {
-          setRosterCellError({
-            dayId,
-            memberId: userId,
-            message,
-          })
-        } else {
-          setAssignError(message)
-        }
-        setAssigning(false)
+        failAssign(message)
         return
       }
 
@@ -1269,76 +1318,82 @@ export function CoverageClientPage({
         custom={0}
         className="no-print"
       >
-        <ManagerWorkspaceHeader
-          title="Schedule"
-          subtitle={scheduleSubtitle}
-          summary={
-            <>
-              {noCycleSelected ? (
-                <>
-                  <span className="rounded-md border border-border/60 bg-muted/25 px-2 py-0.5 text-[11px] font-medium text-foreground/85">
-                    No active cycle
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">
-                    {canManageCoverage
-                      ? 'Create a block to begin staffing.'
-                      : 'Waiting for the next published schedule.'}
-                  </span>
-                </>
-              ) : showEmptyDraftState ? (
-                <span className="text-[11px] text-muted-foreground">
-                  {canManageCoverage
-                    ? 'Auto-draft or open a day to assign the first shifts.'
-                    : 'No staffing rows in this block yet.'}
-                </span>
-              ) : (
-                <>
-                  {issueCount > 0 && (
-                    <span className="rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)]/45 px-2 py-0.5 text-[11px] font-medium text-[var(--warning-text)]">
-                      {issueCount} {issueCount === 1 ? 'day' : 'days'} missing a lead
-                    </span>
+        <form
+          ref={autoDraftFormRef}
+          action={generateDraftScheduleAction}
+          className="hidden"
+          aria-hidden="true"
+        >
+          <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+          <input type="hidden" name="view" value="week" />
+          <input type="hidden" name="show_unavailable" value="false" />
+          <input type="hidden" name="return_to" value="coverage" />
+        </form>
+        <form
+          ref={clearDraftFormRef}
+          action={resetDraftScheduleAction}
+          className="hidden"
+          aria-hidden="true"
+        >
+          <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+          <input type="hidden" name="view" value="week" />
+          <input type="hidden" name="show_unavailable" value="false" />
+          <input type="hidden" name="return_to" value="coverage" />
+        </form>
+
+        <header className="border-b border-border/70 bg-card/80 px-5 py-4 backdrop-blur">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div className="min-w-0 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="font-heading text-[1.35rem] font-semibold tracking-tight text-foreground">
+                  Schedule
+                </h1>
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]',
+                    workspaceStatusTone === 'success' &&
+                      'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]',
+                    workspaceStatusTone === 'warning' &&
+                      'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]',
+                    workspaceStatusTone === 'neutral' &&
+                      'border-border/70 bg-background text-muted-foreground'
                   )}
-                  {preliminaryLive && (
-                    <span className="text-[11px] text-muted-foreground/90">
-                      Preliminary active
-                      {preliminarySentLabel ? ` · ${preliminarySentLabel}` : ''}
-                    </span>
-                  )}
-                  {issueCount === 0 && !preliminaryLive && !activeCyclePublished && (
-                    <span className="text-[11px] text-muted-foreground/75">
-                      Draft — not visible to staff until published.
-                    </span>
-                  )}
-                </>
-              )}
-            </>
-          }
-          actions={
-            canManageCoverage ? (
-              <>
-                <form
-                  ref={autoDraftFormRef}
-                  action={generateDraftScheduleAction}
-                  className="hidden"
-                  aria-hidden="true"
                 >
-                  <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
-                  <input type="hidden" name="view" value="week" />
-                  <input type="hidden" name="show_unavailable" value="false" />
-                  <input type="hidden" name="return_to" value="coverage" />
-                </form>
-                <form
-                  ref={clearDraftFormRef}
-                  action={resetDraftScheduleAction}
-                  className="hidden"
-                  aria-hidden="true"
-                >
-                  <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
-                  <input type="hidden" name="view" value="week" />
-                  <input type="hidden" name="show_unavailable" value="false" />
-                  <input type="hidden" name="return_to" value="coverage" />
-                </form>
+                  {workspaceStatusLabel}
+                </Badge>
+                {preliminaryLive && !activeCyclePublished ? (
+                  <Badge
+                    variant="outline"
+                    className="rounded-full border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)]"
+                  >
+                    Preliminary live
+                  </Badge>
+                ) : null}
+              </div>
+              <p className="text-sm font-medium text-foreground/85">{cycleRangeLabel}</p>
+              <div className="text-xs text-muted-foreground">
                 {noCycleSelected ? (
+                  canManageCoverage
+                    ? 'No open 6-week block — create a new draft block to start staffing.'
+                    : 'No published schedule is available right now.'
+                ) : showEmptyDraftState ? (
+                  canManageCoverage
+                    ? 'No staffing drafted yet. Auto-draft or open a day to assign the first shifts.'
+                    : 'No staffing published yet.'
+                ) : canManageCoverage ? (
+                  'Compact planning workspace for staffing, lead coverage, and publish readiness.'
+                ) : canUpdateAssignmentStatus ? (
+                  'View staffing and assignment status — click a therapist token to update status.'
+                ) : (
+                  'View staffing and assignment status.'
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {canManageCoverage ? (
+                noCycleSelected ? (
                   <>
                     <Button
                       type="button"
@@ -1349,21 +1404,18 @@ export function CoverageClientPage({
                       <Sparkles className="h-3.5 w-3.5" />
                       New 6-week block
                     </Button>
-                    <Link
-                      href="/publish"
-                      className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-medium shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground"
-                    >
-                      Publish history
-                    </Link>
+                    <Button asChild variant="outline" size="sm" className="text-xs">
+                      <Link href="/publish">Publish history</Link>
+                    </Button>
                   </>
                 ) : (
                   <>
                     <Button
                       type="button"
-                      variant="outline"
+                      variant={showEmptyDraftState ? 'default' : 'outline'}
                       size="sm"
                       className="gap-1.5 text-xs"
-                      disabled={!activeCycleId || activeCyclePublished}
+                      disabled={!canRunAutoDraft}
                       onClick={() => setAutoDraftDialogOpen(true)}
                     >
                       <Sparkles className="h-3.5 w-3.5" />
@@ -1379,7 +1431,7 @@ export function CoverageClientPage({
                         variant="outline"
                         size="sm"
                         className="gap-1.5 text-xs"
-                        disabled={!activeCycleId || activeCyclePublished}
+                        disabled={!canSendPreliminary}
                       >
                         <Send className="h-3.5 w-3.5" />
                         {preliminaryLive ? 'Refresh preliminary' : 'Send preliminary'}
@@ -1401,16 +1453,17 @@ export function CoverageClientPage({
                         <input type="hidden" name="return_to" value="coverage" />
                         <Button
                           type="submit"
+                          variant={showEmptyDraftState ? 'outline' : 'default'}
                           size="sm"
                           className="gap-1.5 text-xs"
-                          disabled={!activeCycleId}
+                          disabled={!canPublishCycle}
                         >
                           <Send className="h-3.5 w-3.5" />
                           Publish
                         </Button>
                       </form>
                     )}
-                    <MoreActionsMenu>
+                    <MoreActionsMenu triggerClassName="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs text-foreground transition-colors hover:bg-secondary">
                       <button
                         type="button"
                         onClick={() => setCycleDialogOpen(true)}
@@ -1443,10 +1496,8 @@ export function CoverageClientPage({
                       </button>
                     </MoreActionsMenu>
                   </>
-                )}
-              </>
-            ) : (
-              !noCycleSelected && (
+                )
+              ) : !noCycleSelected ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -1457,87 +1508,10 @@ export function CoverageClientPage({
                   <Printer className="h-3.5 w-3.5" />
                   Print
                 </Button>
-              )
-            )
-          }
-        />
-
-        <div className="px-6 pb-2 pt-2">
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-4">
-            <div className="min-w-0 space-y-1">
-              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground/90">
-                Schedule cycle
-              </p>
-              <div className="flex flex-wrap items-center gap-1.5">
-                {availableCycles.slice(0, 4).map((cycle) => {
-                  const isActive = cycle.id === activeCycleId
-                  const rangeLabel = formatHumanCycleRange(cycle.start_date, cycle.end_date)
-                  return (
-                    <Link
-                      key={cycle.id}
-                      href={`/coverage?cycle=${cycle.id}&view=${viewMode}&${COVERAGE_SHIFT_QUERY_KEY}=${shiftTabToQueryValue(shiftTab)}`}
-                      title={cycle.label}
-                      aria-current={isActive ? 'page' : undefined}
-                      className={cn(
-                        'rounded-full border px-2.5 py-1 text-xs transition-colors',
-                        isActive
-                          ? 'border-primary bg-primary/14 font-semibold text-foreground shadow-sm ring-1 ring-primary/25'
-                          : 'border-border/70 bg-card font-medium text-muted-foreground hover:bg-muted/35 hover:text-foreground'
-                      )}
-                    >
-                      <span>{rangeLabel}</span>
-                      {cycle.published && !isActive ? (
-                        <span className="ml-1 text-[0.65rem] font-normal text-muted-foreground">
-                          · Live
-                        </span>
-                      ) : null}
-                    </Link>
-                  )
-                })}
-              </div>
+              ) : null}
             </div>
-
-            {!noCycleSelected && (
-              <div className="flex shrink-0 flex-wrap items-center gap-2">
-                <div className="inline-flex overflow-hidden rounded-lg border border-border">
-                  {VIEW_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => handleViewModeChange(option.value)}
-                      className={cn(
-                        'px-3 py-1.5 text-xs font-medium transition-colors',
-                        viewMode === option.value
-                          ? 'bg-primary/90 text-primary-foreground'
-                          : 'bg-card text-muted-foreground hover:bg-muted/30 hover:text-foreground'
-                      )}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="inline-flex overflow-hidden rounded-lg border border-border">
-                  {(['Day', 'Night'] as const).map((tab) => (
-                    <button
-                      key={tab}
-                      type="button"
-                      onClick={() => handleTabSwitch(tab)}
-                      data-testid={`coverage-shift-tab-${tab.toLowerCase()}`}
-                      className={cn(
-                        'px-3 py-1.5 text-xs font-medium transition-colors',
-                        shiftTab === tab
-                          ? 'bg-primary/90 text-primary-foreground'
-                          : 'bg-card text-muted-foreground hover:bg-muted/30 hover:text-foreground'
-                      )}
-                    >
-                      {tab} Shift
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
-        </div>
+        </header>
       </motion.div>
 
       <motion.div
@@ -1545,210 +1519,278 @@ export function CoverageClientPage({
         initial="hidden"
         animate="visible"
         custom={1}
-        className="no-print px-6 py-4"
+        className="no-print px-5 py-4"
       >
-        {/* Future: quick exception filters (understaffed, open slots, missing lead, conflicts). */}
-        {activeCyclePublished && (
-          <>
-          <div className="mb-3 flex items-center gap-3 rounded-lg border border-[var(--success-border)]/85 bg-[var(--success-subtle)]/80 px-3 py-2">
-            <span className="text-xs leading-snug text-[var(--success-text)]">
-              Live schedule — staff see updates as you save.
-            </span>
-            <Link
-              href={weekRosterHref}
-              className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold text-[var(--success-text)] underline-offset-2 ring-offset-background transition-colors hover:bg-[var(--success-subtle)]/90 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--success-border)]/60 focus-visible:ring-offset-2"
-            >
-              View published schedule
-              <ChevronRight className="h-3.5 w-3.5 opacity-90" aria-hidden />
-            </Link>
-          </div>
-          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border/80 bg-card px-3 py-2 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">
-              Operational updates visible to everyone:
-            </span>
-            <StatusPill status="oncall" />
-            <StatusPill status="leave_early" />
-            <StatusPill status="cancelled" />
-            <StatusPill status="call_in" />
-          </div>
-          </>
-        )}
-        {successParam === 'cycle_published' && (
-          <p className="mb-3 rounded-md border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-2 text-xs font-semibold text-[var(--success-text)]">
-            Published - visible to employees.
-          </p>
-        )}
-        {successParam === 'preliminary_sent' && (
-          <p className="mb-3 rounded-md border border-[var(--info-border)] bg-[var(--info-subtle)] px-3 py-2 text-xs font-semibold text-[var(--info-text)]">
-            Preliminary schedule sent. Therapists can now review it in the app.
-          </p>
-        )}
-        {successParam === 'preliminary_refreshed' && (
-          <p className="mb-3 rounded-md border border-[var(--info-border)] bg-[var(--info-subtle)] px-3 py-2 text-xs font-semibold text-[var(--info-text)]">
-            Preliminary schedule refreshed with the latest staffing draft.
-          </p>
-        )}
-        {successParam === 'cycle_unpublished' && (
-          <p className="mb-3 rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-2 text-xs font-semibold text-[var(--warning-text)]">
-            Cycle unpublished.
-          </p>
-        )}
-        {successParam === 'cycle_deleted' && (
-          <p className="mb-3 rounded-md border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-2 text-xs font-semibold text-[var(--success-text)]">
-            Cycle deleted.
-          </p>
-        )}
-        {errorParam === 'delete_cycle_published' && (
-          <p className="mb-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs font-semibold text-[var(--error-text)]">
-            Cannot delete a live cycle. Unpublish it first.
-          </p>
-        )}
-        {successParam === 'shift_added' && (
-          <p className="mb-3 rounded-md border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-2 text-xs font-semibold text-[var(--success-text)]">
-            Shift assigned.
-          </p>
-        )}
-        {autoDraftFeedback && (
-          <p
-            className={`mb-3 rounded-md px-3 py-2 text-xs font-semibold ${
-              autoDraftFeedback.variant === 'error'
-                ? 'border border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]'
-                : 'border border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
-            }`}
-          >
-            {autoDraftFeedback.message}
-          </p>
-        )}
-        {publishErrorMessage && (
-          <p className="mb-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs font-semibold text-[var(--error-text)]">
-            {publishErrorMessage}
-          </p>
-        )}
-        {canManageCoverage && publishOverrideConfig && !activeCyclePublished && (
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-4 py-3">
-            <div>
-              <p className="text-xs font-semibold text-[var(--warning-text)]">
-                Override publish block
-              </p>
-              <p className="mt-1 text-xs text-[var(--warning-text)]/85">
-                {publishOverrideConfig.description}
-              </p>
-            </div>
-            <form action={toggleCyclePublishedAction}>
-              <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
-              <input type="hidden" name="view" value="week" />
-              <input type="hidden" name="show_unavailable" value="false" />
-              <input
-                type="hidden"
-                name="currently_published"
-                value={activeCyclePublished ? 'true' : 'false'}
-              />
-              <input
-                type="hidden"
-                name="override_weekly_rules"
-                value={publishOverrideConfig.weekly}
-              />
-              <input
-                type="hidden"
-                name="override_shift_rules"
-                value={publishOverrideConfig.shift}
-              />
-              <input type="hidden" name="return_to" value="coverage" />
-              <Button type="submit" size="sm" className="gap-1.5 text-xs">
-                <Send className="h-3.5 w-3.5" />
-                {publishOverrideConfig.label}
-              </Button>
-            </form>
-          </div>
-        )}
-        {errorParam === 'preliminary_cycle_published' && (
-          <p className="mb-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs font-semibold text-[var(--error-text)]">
-            Preliminary schedules can only be sent while the cycle is still a draft.
-          </p>
-        )}
-        {errorParam === 'preliminary_send_failed' && (
-          <p className="mb-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs font-semibold text-[var(--error-text)]">
-            Could not send the preliminary schedule. Please try again.
-          </p>
-        )}
-        {error && (
-          <p className="mb-3 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs text-[var(--error-text)]">
-            {error}
-          </p>
-        )}
-        {preliminaryLive && !activeCyclePublished && (
-          <div className="mb-3 rounded-lg border border-[var(--info-border)] bg-[var(--info-subtle)] px-4 py-3">
-            <p className="text-xs font-semibold text-[var(--info-text)]">
-              Preliminary schedule is live{preliminarySentLabel ? ` as of ${preliminarySentLabel}` : ''}.
-            </p>
-            <p className="mt-1 text-xs text-[var(--info-text)]/85">
-              Therapists can review tentative shifts, claim open help-needed slots, and send change requests while you keep approval control.
-            </p>
-          </div>
-        )}
-        {noCycleSelected ? (
-          <section className="rounded-[1.75rem] border border-dashed border-border/70 bg-muted/8 px-6 py-10 text-center shadow-none">
-            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
-              <CalendarDays className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <h2 className="font-heading text-xl font-semibold tracking-[-0.03em] text-foreground">
-              {canManageCoverage ? 'Ready to build your first cycle' : 'No schedule available yet'}
-            </h2>
-            <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-              {canManageCoverage
-                  ? '6-week cycles are your scheduling windows. Create one to open the day and night staffing grids.'
-                : 'A manager has not created a schedule block yet. Check back after the next cycle is set up.'}
-            </p>
-            {canManageCoverage && (
-              <div className="mt-7">
-                <ol className="mx-auto mb-6 flex max-w-xs flex-col gap-2.5 text-left">
-                  {[
-                    'Create a 6-week cycle',
-                    'Run Auto-draft to fill shifts',
-                    'Publish to notify your team',
-                  ].map((step, i) => (
-                    <li key={step} className="flex items-center gap-2.5 text-sm text-muted-foreground">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-foreground/60">
-                        {i + 1}
-                      </span>
-                      {step}
-                    </li>
-                  ))}
-                </ol>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => setCycleDialogOpen(true)}
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  New 6-week block
-                </Button>
-              </div>
-            )}
-          </section>
-        ) : (
-          <>
-            {showEmptyDraftState && renderedViewMode !== 'roster' && (
-              <section className="mb-4 rounded-[1.75rem] border border-dashed border-border/70 bg-muted/8 px-6 py-9 text-center shadow-none">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
-                  <Sparkles className="h-5 w-5 text-muted-foreground" />
+        <div className="space-y-4">
+          {!noCycleSelected ? (
+            <section className="rounded-xl border border-border/70 bg-card/80 px-4 py-3">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+                <div className="min-w-0 space-y-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    Schedule cycle
+                  </p>
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {availableCycles.map((cycle) => {
+                      const isActive = cycle.id === activeCycleId
+                      const rangeLabel = formatHumanCycleRange(cycle.start_date, cycle.end_date)
+                      return (
+                        <Link
+                          key={cycle.id}
+                          href={`/coverage?cycle=${cycle.id}&view=${viewMode}&${COVERAGE_SHIFT_QUERY_KEY}=${shiftTabToQueryValue(shiftTab)}`}
+                          title={cycle.label}
+                          aria-current={isActive ? 'page' : undefined}
+                          className={cn(
+                            'shrink-0 rounded-full border px-3 py-1.5 text-xs transition-colors',
+                            isActive
+                              ? 'border-primary bg-primary/12 font-semibold text-foreground ring-1 ring-primary/20'
+                              : 'border-border/70 bg-background font-medium text-muted-foreground hover:bg-muted/35 hover:text-foreground'
+                          )}
+                        >
+                          <span>{rangeLabel}</span>
+                          {cycle.published && !isActive ? (
+                            <span className="ml-1 text-[10px] text-muted-foreground">• Live</span>
+                          ) : null}
+                        </Link>
+                      )
+                    })}
+                  </div>
                 </div>
-                <h2 className="font-heading text-lg font-semibold tracking-[-0.03em] text-foreground">
-                  {canManageCoverage ? 'Block ready — no shifts yet' : 'No staffing published yet'}
-                </h2>
-                <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-                  {canManageCoverage
-                    ? 'Run Auto-draft to fill the grid based on therapist availability and constraints, or click any day to assign shifts manually.'
-                    : 'This schedule block exists, but no staffing has been published yet. Check back soon or try another cycle above.'}
-                </p>
-                {canManageCoverage && (
-                  <div className="mt-5 flex justify-center gap-2">
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <CoverageSegmentedControl
+                    label="View"
+                    value={renderedViewMode}
+                    options={VIEW_OPTIONS}
+                    onChange={handleViewModeChange}
+                  />
+                  <CoverageSegmentedControl
+                    label="Shift"
+                    value={shiftTab}
+                    options={[
+                      { value: 'Day', label: 'Day shift' },
+                      { value: 'Night', label: 'Night shift' },
+                    ]}
+                    onChange={handleTabSwitch}
+                    testIdPrefix="coverage-shift-tab"
+                  />
+                </div>
+              </div>
+            </section>
+          ) : null}
+
+          {!noCycleSelected ? (
+            <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <CoverageMetric
+                label="Active staff"
+                value={String(rosterMembers.length)}
+                detail={`${shiftTab.toLowerCase()} shift roster`}
+              />
+              <CoverageMetric
+                label="Priority gaps"
+                value={String(coverageSummary.priorityGapDays)}
+                detail="critical days"
+                tone={coverageSummary.priorityGapDays > 0 ? 'critical' : 'success'}
+              />
+              <CoverageMetric
+                label="Days missing lead"
+                value={String(issueCount)}
+                detail="lead coverage"
+                tone={issueCount > 0 ? 'warning' : 'success'}
+              />
+              <CoverageMetric
+                label="Unassigned days"
+                value={String(coverageSummary.unassignedDays)}
+                detail={`${coverageSummary.staffedDays} fully staffed`}
+                tone={coverageSummary.unassignedDays > 0 ? 'warning' : 'neutral'}
+              />
+            </section>
+          ) : null}
+
+          <div className="space-y-2">
+            {activeCyclePublished ? (
+              <>
+                <CoverageSurfaceBanner
+                  tone="success"
+                  title="Live schedule"
+                  description="Staff see operational status updates as you save. Operational updates visible to everyone: on-call, leave early, cancelled, and call-in."
+                  actions={
+                    <Link
+                      href={weekRosterHref}
+                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold text-[var(--success-text)] underline-offset-2 transition-colors hover:underline"
+                    >
+                      View published schedule
+                      <ChevronRight className="h-3.5 w-3.5 opacity-90" aria-hidden />
+                    </Link>
+                  }
+                />
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-card px-3 py-2 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">
+                    Operational updates visible to everyone:
+                  </span>
+                  <StatusPill status="oncall" />
+                  <StatusPill status="leave_early" />
+                  <StatusPill status="cancelled" />
+                  <StatusPill status="call_in" />
+                </div>
+              </>
+            ) : null}
+
+            {successParam === 'cycle_published' ? (
+              <p className="rounded-md border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-2 text-xs font-semibold text-[var(--success-text)]">
+                Published - visible to employees.
+              </p>
+            ) : null}
+            {successParam === 'preliminary_sent' ? (
+              <p className="rounded-md border border-[var(--info-border)] bg-[var(--info-subtle)] px-3 py-2 text-xs font-semibold text-[var(--info-text)]">
+                Preliminary schedule sent. Therapists can now review it in the app.
+              </p>
+            ) : null}
+            {successParam === 'preliminary_refreshed' ? (
+              <p className="rounded-md border border-[var(--info-border)] bg-[var(--info-subtle)] px-3 py-2 text-xs font-semibold text-[var(--info-text)]">
+                Preliminary schedule refreshed with the latest staffing draft.
+              </p>
+            ) : null}
+            {successParam === 'cycle_unpublished' ? (
+              <p className="rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-2 text-xs font-semibold text-[var(--warning-text)]">
+                Cycle unpublished.
+              </p>
+            ) : null}
+            {successParam === 'cycle_deleted' ? (
+              <p className="rounded-md border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-2 text-xs font-semibold text-[var(--success-text)]">
+                Cycle deleted.
+              </p>
+            ) : null}
+            {errorParam === 'delete_cycle_published' ? (
+              <p className="rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs font-semibold text-[var(--error-text)]">
+                Cannot delete a live cycle. Unpublish it first.
+              </p>
+            ) : null}
+            {successParam === 'shift_added' ? (
+              <p className="rounded-md border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-2 text-xs font-semibold text-[var(--success-text)]">
+                Shift assigned.
+              </p>
+            ) : null}
+            {autoDraftFeedback ? (
+              <p
+                className={cn(
+                  'rounded-md px-3 py-2 text-xs font-semibold',
+                  autoDraftFeedback.variant === 'error'
+                    ? 'border border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]'
+                    : 'border border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
+                )}
+              >
+                {autoDraftFeedback.message}
+              </p>
+            ) : null}
+            {publishErrorMessage ? (
+              <p className="rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs font-semibold text-[var(--error-text)]">
+                {publishErrorMessage}
+              </p>
+            ) : null}
+            {canManageCoverage && publishOverrideConfig && !activeCyclePublished ? (
+              <CoverageSurfaceBanner
+                tone="warning"
+                title="Override publish block"
+                description={publishOverrideConfig.description}
+                actions={
+                  <form action={toggleCyclePublishedAction}>
+                    <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+                    <input type="hidden" name="view" value="week" />
+                    <input type="hidden" name="show_unavailable" value="false" />
+                    <input
+                      type="hidden"
+                      name="currently_published"
+                      value={activeCyclePublished ? 'true' : 'false'}
+                    />
+                    <input
+                      type="hidden"
+                      name="override_weekly_rules"
+                      value={publishOverrideConfig.weekly}
+                    />
+                    <input
+                      type="hidden"
+                      name="override_shift_rules"
+                      value={publishOverrideConfig.shift}
+                    />
+                    <input type="hidden" name="return_to" value="coverage" />
+                    <Button type="submit" size="sm" className="gap-1.5 text-xs">
+                      <Send className="h-3.5 w-3.5" />
+                      {publishOverrideConfig.label}
+                    </Button>
+                  </form>
+                }
+              />
+            ) : null}
+            {errorParam === 'preliminary_cycle_published' ? (
+              <p className="rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs font-semibold text-[var(--error-text)]">
+                Preliminary schedules can only be sent while the cycle is still a draft.
+              </p>
+            ) : null}
+            {errorParam === 'preliminary_send_failed' ? (
+              <p className="rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs font-semibold text-[var(--error-text)]">
+                Could not send the preliminary schedule. Please try again.
+              </p>
+            ) : null}
+            {error ? (
+              <p className="rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-xs text-[var(--error-text)]">
+                {error}
+              </p>
+            ) : null}
+            {preliminaryLive && !activeCyclePublished ? (
+              <CoverageSurfaceBanner
+                tone="neutral"
+                title={`Preliminary schedule is live${preliminarySentLabel ? ` as of ${preliminarySentLabel}` : ''}.`}
+                description="Therapists can review tentative shifts, claim open help-needed slots, and send change requests while you keep approval control."
+              />
+            ) : null}
+          </div>
+
+          {noCycleSelected ? (
+            <CoverageSurfaceBanner
+              title={canManageCoverage ? 'Ready to build your first cycle' : 'No schedule available yet'}
+              description={
+                canManageCoverage
+                  ? '6-week cycles are your scheduling windows. Create one to open the planning surface and start staffing.'
+                  : 'A manager has not created a schedule block yet. Check back after the next cycle is set up.'
+              }
+              actions={
+                canManageCoverage ? (
+                  <>
                     <Button
                       type="button"
                       size="sm"
                       className="gap-1.5"
-                      disabled={!activeCycleId || activeCyclePublished}
+                      onClick={() => setCycleDialogOpen(true)}
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      New 6-week block
+                    </Button>
+                    <Button asChild variant="outline" size="sm">
+                      <Link href="/publish">Publish history</Link>
+                    </Button>
+                  </>
+                ) : undefined
+              }
+            />
+          ) : showEmptyDraftState ? (
+            <CoverageSurfaceBanner
+              tone="warning"
+              title={canManageCoverage ? 'No shifts assigned yet' : 'No staffing published yet'}
+              description={
+                canManageCoverage
+                  ? renderedViewMode === 'roster'
+                    ? 'No shifts assigned yet. Run Auto-draft or open the first day to assign.'
+                    : 'No shifts assigned yet. Run Auto-draft or click a day to assign manually.'
+                  : 'This schedule block exists, but no staffing has been published yet.'
+              }
+              actions={
+                canManageCoverage ? (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="gap-1.5"
+                      disabled={!canRunAutoDraft}
                       onClick={() => setAutoDraftDialogOpen(true)}
                     >
                       <Sparkles className="h-3.5 w-3.5" />
@@ -1758,104 +1800,52 @@ export function CoverageClientPage({
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="gap-1.5 text-muted-foreground"
+                      className="gap-1.5"
                       onClick={() => {
                         const first = days[0]
                         if (first) handleSelect(first.id)
                       }}
                     >
-                      Assign manually
+                      {renderedViewMode === 'roster' ? 'Open first day' : 'Assign manually'}
                     </Button>
-                  </div>
-                )}
-              </section>
-            )}
-            {showEmptyDraftState && renderedViewMode === 'roster' && (
-              <section className="mb-4 rounded-[1.75rem] border border-dashed border-border/70 bg-muted/8 px-6 py-9 text-center shadow-none">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
-                  <CalendarDays className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <h2 className="font-heading text-lg font-semibold tracking-[-0.03em] text-foreground">
-                  {canManageCoverage ? 'Roster is ready for first assignments' : 'No staffing published yet'}
-                </h2>
-                <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-                  {canManageCoverage
-                    ? 'Use Auto-draft for a fast first pass, then click any roster date cell to fine-tune staffing and assignment status.'
-                    : 'This block exists in roster view, but staffing has not been published yet. Check back soon or switch cycles above.'}
-                </p>
-                {canManageCoverage && (
-                  <>
-                    <ol className="mx-auto mt-5 flex max-w-xs flex-col gap-2.5 text-left">
-                      {[
-                        'Run Auto-draft to populate shifts',
-                        'Click a roster cell to edit assignments',
-                        'Publish when coverage is ready',
-                      ].map((step, i) => (
-                        <li key={step} className="flex items-center gap-2.5 text-sm text-muted-foreground">
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-foreground/60">
-                            {i + 1}
-                          </span>
-                          {step}
-                        </li>
-                      ))}
-                    </ol>
-                    <div className="mt-5 flex justify-center gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="gap-1.5"
-                        disabled={!activeCycleId || activeCyclePublished}
-                        onClick={() => setAutoDraftDialogOpen(true)}
-                      >
-                        <Sparkles className="h-3.5 w-3.5" />
-                        Auto-draft
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5 text-muted-foreground"
-                        onClick={() => {
-                          const first = days[0]
-                          if (first) handleSelect(first.id)
-                        }}
-                      >
-                        Open first day
-                      </Button>
-                    </div>
                   </>
-                )}
-              </section>
-            )}
-          {renderedViewMode === 'roster' ? (
-            <RosterScheduleView
-              title={`Respiratory Therapy ${shiftTab} Shift`}
-              cycleLabel={printCycle ? formatHumanCycleRange(printCycle.start_date, printCycle.end_date) : null}
-              cycleDates={printCycleDates}
-              members={rosterMembers}
-              days={days}
-              canManageCoverage={canManageCoverage}
-              canUpdateAssignmentStatus={canUpdateAssignmentStatus && !canManageCoverage}
-              selectedDayId={selectedId}
-              cellError={rosterCellError}
-              onAssignCell={handleRosterQuickAssign}
-              onOpenEditor={handleRosterOpenEditor}
-              onChangeStatus={handleChangeStatus}
-              onUnassign={handleUnassign}
+                ) : undefined
+              }
             />
-          ) : (
-            <CalendarGrid
-              days={days}
-              loading={loading}
-              selectedId={selectedId}
-              schedulingViewOnly={!canManageCoverage}
-              allowAssignmentStatusEdits={canUpdateAssignmentStatus}
-              onSelect={handleSelect}
-              onChangeStatus={handleChangeStatus}
-            />
-          )}
-          </>
-        )}
+          ) : null}
+
+          {!noCycleSelected ? (
+            <section className="rounded-2xl border border-border/70 bg-card/70 p-3 md:p-4">
+              {renderedViewMode === 'roster' ? (
+                <RosterScheduleView
+                  title={`Respiratory Therapy ${shiftTab} Shift`}
+                  cycleLabel={hasSchedulingContent ? cycleRangeLabel : null}
+                  cycleDates={printCycleDates}
+                  members={rosterMembers}
+                  days={days}
+                  canManageCoverage={canManageCoverage}
+                  canUpdateAssignmentStatus={canUpdateAssignmentStatus && !canManageCoverage}
+                  selectedDayId={deferredSelectedId}
+                  cellError={rosterCellError}
+                  onAssignCell={handleRosterQuickAssign}
+                  onOpenEditor={handleRosterOpenEditor}
+                  onChangeStatus={handleChangeStatus}
+                  onUnassign={handleUnassign}
+                />
+              ) : (
+                <CalendarGrid
+                  days={days}
+                  loading={loading}
+                  selectedId={selectedId}
+                  schedulingViewOnly={!canManageCoverage}
+                  allowAssignmentStatusEdits={canUpdateAssignmentStatus}
+                  onSelect={handleSelect}
+                  onChangeStatus={handleChangeStatus}
+                />
+              )}
+            </section>
+          ) : null}
+        </div>
       </motion.div>
 
       <ShiftEditorDialog
@@ -1911,3 +1901,5 @@ export function CoverageClientPage({
     </div>
   )
 }
+
+
