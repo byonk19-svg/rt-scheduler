@@ -56,7 +56,7 @@ export function TeamPersonRow({ profile, onOpen }: TeamPersonRowProps) {
       type="button"
       onClick={() => onOpen(profile.id)}
       className={cn(
-        'group flex w-full cursor-pointer items-center gap-2.5 rounded-lg border border-border/60 bg-card/80 px-2.5 py-1.5 text-left text-sm transition-colors hover:border-primary/35 hover:bg-card',
+        'group flex w-full cursor-pointer items-center gap-2 rounded-lg border border-border/60 bg-card/80 px-2.5 py-1.5 text-left text-sm transition-colors hover:border-primary/45 hover:bg-card/95 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none',
         profile.role === 'lead' && 'border-primary/25 bg-primary/[0.03]',
         !isActive && 'opacity-80'
       )}
@@ -74,9 +74,9 @@ export function TeamPersonRow({ profile, onOpen }: TeamPersonRowProps) {
         {initials(profile.full_name)}
       </div>
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 space-y-0.5">
         <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
-          <span className="truncate font-medium text-foreground">
+          <span className="truncate font-semibold text-foreground">
             {profile.full_name ?? 'Unknown'}
           </span>
           <span
@@ -103,7 +103,7 @@ export function TeamPersonRow({ profile, onOpen }: TeamPersonRowProps) {
             </span>
           )}
         </div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-muted-foreground">
           <span className="inline-flex items-center gap-1">
             <span
               className={cn(
@@ -133,7 +133,7 @@ export function TeamPersonRow({ profile, onOpen }: TeamPersonRowProps) {
       </div>
 
       <ChevronRight
-        className="h-4 w-4 shrink-0 text-muted-foreground/40 group-hover:text-primary/50"
+        className="h-4 w-4 shrink-0 text-muted-foreground/40 transition-colors group-hover:text-primary/60 group-focus-visible:text-primary/70"
         aria-hidden
       />
     </button>

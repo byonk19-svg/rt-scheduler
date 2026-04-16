@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo, useState, type ReactNode } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { ChevronDown, ChevronsDownUp, ChevronsUpDown, RotateCcw } from 'lucide-react'
 
 import { FormSubmitButton } from '@/components/form-submit-button'
 import { Button } from '@/components/ui/button'
@@ -61,6 +61,28 @@ type TeamDirectorySectionKey =
   | 'nightLeads'
   | 'nightTherapists'
   | 'inactive'
+
+type TeamDirectorySectionOpenState = Record<TeamDirectorySectionKey, boolean>
+
+const TEAM_DIRECTORY_SECTION_STORAGE_KEY = 'team-directory-section-open-state-v1'
+
+const SECTION_KEYS: TeamDirectorySectionKey[] = [
+  'managers',
+  'dayLeads',
+  'dayTherapists',
+  'nightLeads',
+  'nightTherapists',
+  'inactive',
+]
+
+const DEFAULT_SECTION_OPEN_STATE: TeamDirectorySectionOpenState = {
+  managers: true,
+  dayLeads: true,
+  dayTherapists: true,
+  nightLeads: true,
+  nightTherapists: true,
+  inactive: true,
+}
 
 const DOW_OPTIONS = [
   { label: 'Su', value: 0 },
@@ -159,22 +181,41 @@ function CollapsibleTeamGroup({
   children: ReactNode
 }) {
   if (count === 0) return null
+  const summaryId = `team-directory-${sectionKey}-summary`
+  const panelId = `team-directory-${sectionKey}-panel`
 
   return (
-    <details
-      open={isOpen}
-      onToggle={(event) => onToggle(sectionKey, event.currentTarget.open)}
-      className="group rounded-xl border border-border/60 bg-card/45 [&_summary::-webkit-details-marker]:hidden"
-    >
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2">
-        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+    <section className="border-b border-border/70 pb-1 last:border-b-0">
+      <button
+        type="button"
+        id={summaryId}
+        aria-controls={panelId}
+        aria-expanded={isOpen}
+        onClick={() => onToggle(sectionKey, !isOpen)}
+        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-muted/35 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+      >
+        <ChevronDown
+          className={cn(
+            'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
+            isOpen && 'rotate-180'
+          )}
+          aria-hidden
+        />
         <h2 className="text-sm font-semibold tracking-tight text-foreground">{title}</h2>
         <span className="ml-auto rounded-full border border-border/70 bg-muted/25 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
           {count}
         </span>
-      </summary>
-      <div className="space-y-1 border-t border-border/50 px-2 py-1.5">{children}</div>
-    </details>
+      </button>
+      <div
+        id={panelId}
+        role="region"
+        aria-labelledby={summaryId}
+        hidden={!isOpen}
+        className="space-y-1 px-2 py-1"
+      >
+        {children}
+      </div>
+    </section>
   )
 }
 
@@ -239,14 +280,6 @@ export function TeamDirectory({
   archiveTeamMemberAction,
   saveTeamQuickEditAction,
 }: TeamDirectoryProps) {
-  const defaultSectionOpenState = {
-    managers: true,
-    dayLeads: true,
-    dayTherapists: false,
-    nightLeads: true,
-    nightTherapists: false,
-    inactive: false,
-  }
   const [chipFilter, setChipFilter] = useState<DirectoryChipFilter>('all')
   const [formFilters, setFormFilters] = useState<TeamDirectoryFilterState>({
     search: '',
@@ -271,7 +304,29 @@ export function TeamDirectory({
     (initialEditProfile?.role as EditableRole | null) ?? 'therapist'
   )
   const [onFmla, setOnFmla] = useState(initialEditProfile?.on_fmla === true)
-  const [sectionOpenState, setSectionOpenState] = useState(defaultSectionOpenState)
+  const [savedSectionOpenState, setSavedSectionOpenState] = useState<TeamDirectorySectionOpenState>(
+    () => {
+      if (typeof window === 'undefined') {
+        return DEFAULT_SECTION_OPEN_STATE
+      }
+
+      const raw = window.localStorage.getItem(TEAM_DIRECTORY_SECTION_STORAGE_KEY)
+      if (!raw) return DEFAULT_SECTION_OPEN_STATE
+
+      try {
+        const parsed = JSON.parse(raw) as Partial<TeamDirectorySectionOpenState>
+        const nextState: TeamDirectorySectionOpenState = { ...DEFAULT_SECTION_OPEN_STATE }
+        for (const key of SECTION_KEYS) {
+          if (typeof parsed[key] === 'boolean') {
+            nextState[key] = parsed[key] as boolean
+          }
+        }
+        return nextState
+      } catch {
+        return DEFAULT_SECTION_OPEN_STATE
+      }
+    }
+  )
 
   const [hasPattern, setHasPattern] = useState(
     initialPattern !== null && initialPattern.works_dow.length > 0
@@ -290,6 +345,36 @@ export function TeamDirectory({
     [profiles, editProfileId]
   )
   const editProfileIsActive = editProfile ? teamMemberHasAppAccess(editProfile) : false
+  const hasActiveFilters =
+    chipFilter !== 'all' ||
+    formFilters.search.trim().length > 0 ||
+    formFilters.role !== 'all' ||
+    formFilters.shift !== 'all' ||
+    formFilters.employment !== 'all' ||
+    formFilters.status !== 'all'
+
+  const effectiveSectionOpenState = useMemo(() => {
+    if (!hasActiveFilters) return savedSectionOpenState
+
+    const nextState: TeamDirectorySectionOpenState = { ...savedSectionOpenState }
+    for (const key of SECTION_KEYS) {
+      if (sections[key].length > 0) {
+        nextState[key] = true
+      }
+    }
+    return nextState
+  }, [hasActiveFilters, savedSectionOpenState, sections])
+
+  const hasExpandedSection = SECTION_KEYS.some((key) => savedSectionOpenState[key])
+  const hasCollapsedSection = SECTION_KEYS.some((key) => !savedSectionOpenState[key])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(
+      TEAM_DIRECTORY_SECTION_STORAGE_KEY,
+      JSON.stringify(savedSectionOpenState)
+    )
+  }, [savedSectionOpenState])
 
   function openEditor(profileId: string) {
     const profile = profiles.find((item) => item.id === profileId)
@@ -318,26 +403,97 @@ export function TeamDirectory({
   }
 
   function handleSectionToggle(sectionKey: TeamDirectorySectionKey, nextOpen: boolean) {
-    setSectionOpenState((current) => ({ ...current, [sectionKey]: nextOpen }))
+    setSavedSectionOpenState((current) => ({ ...current, [sectionKey]: nextOpen }))
+  }
+
+  function expandAllSections() {
+    setSavedSectionOpenState((current) => {
+      const next = { ...current }
+      for (const key of SECTION_KEYS) next[key] = true
+      return next
+    })
+  }
+
+  function collapseAllSections() {
+    setSavedSectionOpenState((current) => {
+      const next = { ...current }
+      for (const key of SECTION_KEYS) next[key] = false
+      return next
+    })
+  }
+
+  function clearFilters() {
+    setChipFilter('all')
+    setFormFilters({
+      search: '',
+      role: 'all',
+      shift: 'all',
+      employment: 'all',
+      status: 'all',
+    })
   }
 
   return (
     <>
-      <div className="space-y-3">
+      <div className="space-y-2 rounded-lg border border-border/60 bg-background p-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            Directory quick views
+          </p>
+          <p className="text-xs text-muted-foreground">{filteredProfiles.length} shown</p>
+        </div>
         <TeamDirectorySummaryChips
           summary={summary}
           activeChip={chipFilter}
           onChipChange={setChipFilter}
         />
-        <TeamDirectoryFilters value={formFilters} onChange={setFormFilters} />
+        <TeamDirectoryFilters
+          value={formFilters}
+          onChange={setFormFilters}
+          actions={
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={expandAllSections}
+                disabled={!hasCollapsedSection}
+              >
+                <ChevronsDownUp className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                Expand all
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={collapseAllSections}
+                disabled={!hasExpandedSection}
+              >
+                <ChevronsUpDown className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                Collapse all
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+                <RotateCcw className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                Clear filters
+              </Button>
+            </>
+          }
+        />
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-1.5 rounded-lg border border-border/60 bg-card/30 p-2">
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-sm font-semibold text-foreground">Grouped staff directory</h2>
+          {hasActiveFilters ? (
+            <span className="text-xs font-medium text-muted-foreground">Filtered view</span>
+          ) : null}
+        </div>
+
         <CollapsibleTeamGroup
           sectionKey="managers"
           title="Managers"
           count={sections.managers.length}
-          isOpen={sectionOpenState.managers}
+          isOpen={effectiveSectionOpenState.managers}
           onToggle={handleSectionToggle}
         >
           {renderGroupRows(sections.managers, openEditor)}
@@ -347,7 +503,7 @@ export function TeamDirectory({
           sectionKey="dayLeads"
           title="Day shift leads"
           count={sections.dayLeads.length}
-          isOpen={sectionOpenState.dayLeads}
+          isOpen={effectiveSectionOpenState.dayLeads}
           onToggle={handleSectionToggle}
         >
           {renderGroupRows(sections.dayLeads, openEditor)}
@@ -357,7 +513,7 @@ export function TeamDirectory({
           sectionKey="dayTherapists"
           title="Day shift therapists"
           count={sections.dayTherapists.length}
-          isOpen={sectionOpenState.dayTherapists}
+          isOpen={effectiveSectionOpenState.dayTherapists}
           onToggle={handleSectionToggle}
         >
           {renderGroupRows(sections.dayTherapists, openEditor)}
@@ -367,7 +523,7 @@ export function TeamDirectory({
           sectionKey="nightLeads"
           title="Night shift leads"
           count={sections.nightLeads.length}
-          isOpen={sectionOpenState.nightLeads}
+          isOpen={effectiveSectionOpenState.nightLeads}
           onToggle={handleSectionToggle}
         >
           {renderGroupRows(sections.nightLeads, openEditor)}
@@ -377,7 +533,7 @@ export function TeamDirectory({
           sectionKey="nightTherapists"
           title="Night shift therapists"
           count={sections.nightTherapists.length}
-          isOpen={sectionOpenState.nightTherapists}
+          isOpen={effectiveSectionOpenState.nightTherapists}
           onToggle={handleSectionToggle}
         >
           {renderGroupRows(sections.nightTherapists, openEditor)}
@@ -387,7 +543,7 @@ export function TeamDirectory({
           sectionKey="inactive"
           title="Inactive and off roster"
           count={sections.inactive.length}
-          isOpen={sectionOpenState.inactive}
+          isOpen={effectiveSectionOpenState.inactive}
           onToggle={handleSectionToggle}
         >
           {renderGroupRows(sections.inactive, openEditor)}

@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-16 (session 78)
+Updated: 2026-04-16 (session 79)
 
 ## Handoff Snapshot
 
@@ -42,7 +42,7 @@ Updated: 2026-04-16 (session 78)
 - **Manager `/availability` planner shell:** URL tabs **`?tab=planner|intake`** under **`AvailabilityOverviewHeader`**. **Planner** = **`ManagerSchedulingInputs`** inside **`AvailabilityWorkspaceShell`**. **Saved planner dates** and primary planner actions belong in the shell **`controls`** slot (left column, muted background). Use **`lower={null}`** for that surface — **`lower`** renders **outside** the primary card. Calendar month UI: **`AvailabilityCalendarPanel`** (`src/components/availability/availability-calendar-panel.tsx`).
 - **Availability Planning polish:** `/availability` now keeps the current planner-first structure while tightening the lower half into a single **Secondary workflow** surface with **Response roster** and **Request inbox** tabs. The roster uses dense rows with initials, status, request signal, and last activity; the inbox collapses to a compact empty state instead of a large blank table shell; the disabled planner CTA now reads **`Select dates to save`**.
 - **Team workspace refactor:** `/team` renders through workspace-style components (`TeamWorkspaceClient`, `TeamDirectoryFilters`, `TeamDirectorySummaryChips`, `TeamPersonRow`, `EmployeeRosterTable`) for denser directory and roster administration. **`?tab=roster`** is resolved on the server (`initialTab` from `TeamPage`) and synced in **`TeamWorkspaceClient`** via **`router.replace`** without **`useSearchParams`**, so that subtree does not depend on a search-params **`Suspense`** boundary. Only the active tab now mounts, and the page parallelizes the main directory/work-pattern/roster reads.
-- **Team page stability + polish pass:** Team directory defaults now keep managers/day leads/night leads open while therapist/inactive groups start collapsed; rows/chips/filter bars are denser; roster import/danger utilities are collapsed by default; roster table gained compact quick filters and quieter row actions. Runtime stability now uses **`TeamWorkspaceClient.tsx`** as the manager-team client boundary, imported from `src/app/team/page.tsx` via dynamic module resolution (`default ?? named`) to avoid intermittent lazy-module `undefined` errors seen in `next dev`.
+- **Team directory operational layout:** `/team` **Team directory** tab uses a compact non-sticky controls block (quick-view chips as filters, search + selects, **Clear filters**, **Expand all** / **Collapse all**). Grouped sections use lightweight structural headers (not accordion cards); **all groups default expanded** on first visit; manual open/closed state persists in **localStorage**; while search/filters are active, groups with matches auto-expand so results are never hidden; clearing filters restores saved section state. **`TeamPersonRow`** is a denser directory-style row with stronger focus/hover affordance. Runtime stability still uses **`TeamWorkspaceClient.tsx`** as the manager-team client boundary.
 - **Availability intake utilities:** `src/lib/availability-email-intake.ts` and related tests now cover richer request-edit parsing and manager-edit workflows more explicitly.
 - `RESEND_API_KEY` must support receiving APIs, not just sending. A send-only key fails on `/emails/receiving` with `401 restricted_api_key`.
 
@@ -76,6 +76,12 @@ Updated: 2026-04-16 (session 78)
 - Targeted coverage lane: `npm run test:unit -- src/app/coverage/page.test.ts src/components/coverage/CalendarGrid.test.ts src/components/coverage/RosterScheduleView.test.ts src/components/coverage/shift-editor-dialog-layout.test.ts`
 
 ## Recent changelog
+
+**Session 79 (2026-04-16)** — Team directory staffing UX:
+
+- Redesigned **`TeamDirectory`** for a denser operational directory: static (non-sticky) filter/quick-view rail, compact segmented tabs in **`TeamWorkspaceClient`**, grouped list as primary focus, button-based section toggles with **`aria-expanded`** / **`aria-controls`**, default-expanded groups + **localStorage** persistence + filter-time auto-expand, and **Expand all** / **Collapse all** / **Clear filters** in the filter action row.
+- Tightened **`TeamPersonRow`** hierarchy and interaction states; shortened Team page subtitle in **`TeamPage`**.
+- Verified with **`npm run lint`** and targeted Vitest (`TeamDirectory.test.ts`, `team-workspace.test.ts`).
 
 **Session 78 (2026-04-16)** - Operational-route performance trim:
 
@@ -407,7 +413,8 @@ Assignment status is informational only (does not affect coverage counts or publ
 `/team` is now the canonical manager roster-management surface.
 
 - **Tabs:** default is the people directory; **`?tab=roster`** opens **Employee roster** signup pre-match admin. Tab selection is server-informed (`initialTab`) and URL updates use **`router.replace`** (no **`useSearchParams`** on this surface).
-- Clicking a team member card opens a quick-edit modal on the same page
+- **Team directory tab:** quick-view chips (**Total**, role/shift slices, **FMLA** when relevant) act as **filters** (counts match server summary). Search + role/shift/employment/status selects unchanged; **Clear filters** resets chip + form state. Groups (managers, day/night leads and therapists, inactive) are **expanded by default**; collapse is optional; state persists locally; active filters force-open groups that have rows.
+- Clicking a team member row opens a quick-edit modal on the same page
 - Sections are grouped by: managers, day shift (Lead Therapists, Therapists), night shift (Lead Therapists, Therapists), inactive
 - Quick edit is meant for roster/access fields: name, app role, shift type, employment type, FMLA, FMLA return date, active/inactive, recurring **work pattern** (works/offs DOW, hard/soft works mode, weekend rotation + anchor) for therapist/lead rows
 - **Employee roster (signup pre-match):** below the directory, **`EmployeeRosterPanel`** (`src/components/team/EmployeeRosterPanel.tsx`) edits **`employee_roster`** — preload **full names** (and optional role/shift/employment via bulk paste) so first-time signup can auto-link by **name** (see **Auth entry** above). Do not confuse this with **`npm run sync:roster`**, which is an email-list **auth/profile** sync for ops.

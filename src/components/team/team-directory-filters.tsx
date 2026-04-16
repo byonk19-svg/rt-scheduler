@@ -1,5 +1,7 @@
 'use client'
 
+import type { ReactNode } from 'react'
+
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -19,14 +21,15 @@ export type TeamDirectoryFilterState = {
 type TeamDirectoryFiltersProps = {
   value: TeamDirectoryFilterState
   onChange: (next: TeamDirectoryFilterState) => void
+  actions?: ReactNode
 }
 
 const selectClass =
   'h-8 w-full min-w-0 rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground'
 
-export function TeamDirectoryFilters({ value, onChange }: TeamDirectoryFiltersProps) {
+export function TeamDirectoryFilters({ value, onChange, actions }: TeamDirectoryFiltersProps) {
   return (
-    <div className="rounded-xl border border-border/60 bg-muted/10 p-2.5">
+    <div className="rounded-lg border border-border/70 bg-card/95 p-2.5 shadow-sm">
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.25fr)_repeat(4,minmax(0,1fr))]">
         <div className="space-y-1 sm:col-span-2 lg:col-span-1">
           <Label htmlFor="team-dir-search" className="text-xs">
@@ -112,6 +115,11 @@ export function TeamDirectoryFilters({ value, onChange }: TeamDirectoryFiltersPr
           </select>
         </div>
       </div>
+      {actions ? (
+        <div className="mt-2 flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-2">
+          {actions}
+        </div>
+      ) : null}
     </div>
   )
 }

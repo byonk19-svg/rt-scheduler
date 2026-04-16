@@ -265,12 +265,12 @@ export default async function TeamPage({
   const initialTab = getSearchParam(params?.tab) === 'roster' ? 'roster' : 'directory'
 
   return (
-    <div className="max-w-6xl space-y-6 py-6">
+    <div className="max-w-6xl space-y-4 py-5">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
       <ManagerWorkspaceHeader
         title="Team"
-        subtitle="Staffing, roles, team access, and the signup roster live here — switch tabs to browse vs administer."
+        subtitle="Manage staffing, roles, and roster access from one workspace."
         className="px-0"
       />
 

@@ -37,7 +37,7 @@ function Chip({
       onClick={onClick}
       aria-pressed={selected}
       className={cn(
-        'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
+        'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-semibold transition-colors outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
         selected
           ? 'border-primary/70 bg-primary/15 text-primary shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.2)]'
           : 'border-border/70 bg-card text-muted-foreground hover:border-primary/35 hover:bg-muted/30 hover:text-foreground'
@@ -57,7 +57,7 @@ export function TeamDirectorySummaryChips({
   onChipChange,
 }: TeamDirectorySummaryChipsProps) {
   return (
-    <div className="flex flex-wrap gap-1.5" aria-label="Team summary">
+    <div className="flex flex-wrap gap-1.5" aria-label="Team quick filters">
       <Chip
         label="Total"
         value={summary.totalStaff}

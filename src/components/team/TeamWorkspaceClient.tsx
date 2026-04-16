@@ -67,11 +67,11 @@ function TeamWorkspaceClient({
   }, [])
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <div
         role="tablist"
         aria-label="Team workspace"
-        className="flex flex-wrap gap-1 rounded-xl border border-border/70 bg-muted/20 p-1"
+        className="inline-flex flex-wrap gap-1 rounded-lg border border-border/70 bg-muted/20 p-1"
       >
         <button
           type="button"
@@ -80,7 +80,7 @@ function TeamWorkspaceClient({
           id="team-tab-directory"
           aria-controls="team-panel-directory"
           className={cn(
-            'rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
+            'rounded-md px-3.5 py-1.5 text-sm font-semibold transition-colors',
             activeTab === 'directory'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
@@ -96,7 +96,7 @@ function TeamWorkspaceClient({
           id="team-tab-roster"
           aria-controls="team-panel-roster"
           className={cn(
-            'rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
+            'rounded-md px-3.5 py-1.5 text-sm font-semibold transition-colors',
             activeTab === 'roster'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
@@ -112,7 +112,7 @@ function TeamWorkspaceClient({
           id="team-panel-directory"
           role="tabpanel"
           aria-labelledby="team-tab-directory"
-          className="space-y-4"
+          className="space-y-3"
         >
           <TeamDirectory
             summary={summary}
@@ -128,7 +128,7 @@ function TeamWorkspaceClient({
           id="team-panel-roster"
           role="tabpanel"
           aria-labelledby="team-tab-roster"
-          className="space-y-4"
+          className="space-y-3"
         >
           <EmployeeRosterPanel
             roster={roster}
