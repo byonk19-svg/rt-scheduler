@@ -108,6 +108,45 @@ export async function assignCoverageShiftViaApi(
   }
 }
 
+export type SetCoverageDesignatedLeadParams = {
+  cycleId: string
+  therapistId: string
+  isoDate: string
+  shiftType: 'day' | 'night'
+}
+
+/** Calls drag-drop `set_lead` — promotes an existing slot or swaps designated lead. */
+export async function setCoverageDesignatedLeadViaApi(
+  params: SetCoverageDesignatedLeadParams
+): Promise<{ error: CoverageMutationError }> {
+  const response = await fetch('/api/schedule/drag-drop', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      action: 'set_lead',
+      cycleId: params.cycleId,
+      therapistId: params.therapistId,
+      date: params.isoDate,
+      shiftType: params.shiftType,
+      overrideWeeklyRules: false,
+    }),
+  })
+
+  if (response.ok) {
+    return { error: null }
+  }
+
+  const payload = (await response.json().catch(() => null)) as CoverageApiErrorResponse | null
+  return {
+    error: {
+      code: payload?.code,
+      message: payload?.error ?? 'Could not update designated lead.',
+    },
+  }
+}
+
 export async function unassignCoverageShiftViaApi(params: {
   cycleId: string
   shiftId: string
