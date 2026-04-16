@@ -45,7 +45,9 @@ export type CoveragePageSnapshot = {
   printUsers: PrintTherapist[]
   printShiftByUserDate: Record<string, ShiftStatus>
   allTherapists: TherapistOption[]
+  allTherapistsByShift: Record<'day' | 'night', TherapistOption[]>
   rosterProfiles: RosterMemberRow[]
+  rosterProfilesByShift: Record<'day' | 'night', RosterMemberRow[]>
   activeOpCodes: Record<string, string>
   dayDays: DayItem[]
   nightDays: DayItem[]

@@ -13,7 +13,6 @@ import {
 } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ChevronRight, Printer, Send, Sparkles } from 'lucide-react'
-import { motion } from 'framer-motion'
 
 import { MoreActionsMenu } from '@/components/more-actions-menu'
 import { Badge } from '@/components/ui/badge'
@@ -90,15 +89,6 @@ const VIEW_OPTIONS = [
   { value: 'week', label: 'Grid' },
   { value: 'roster', label: 'Roster' },
 ] as const
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 14 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.07, duration: 0.4 },
-  }),
-}
 
 function timestamp(): string {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -233,6 +223,8 @@ export function CoverageClientPage({
   const overrideWeeklyRulesParam = search.get('override_weekly_rules')
   const overrideShiftRulesParam = search.get('override_shift_rules')
   const supabase = useMemo(() => createClient(), [])
+  const therapistOptionsByShift = initialSnapshot.allTherapistsByShift
+  const rosterProfilesByShift = initialSnapshot.rosterProfilesByShift
   const urlShiftTab = useMemo(
     () => parseCoverageShiftSearchParam(search.get(COVERAGE_SHIFT_QUERY_KEY)),
     [search]
@@ -240,8 +232,6 @@ export function CoverageClientPage({
   const [shiftTab, setShiftTab] = useState<ShiftTab>(() => initialShiftTab)
   const [viewMode, setViewMode] = useState<CoverageViewMode>(() => initialViewMode)
   const profileDefaultAppliedRef = useRef(shiftTabLockedFromUrl)
-  const therapistOptionsHydratedRef = useRef(false)
-  const rosterProfilesHydratedRef = useRef(false)
   const [dayDays, setDayDays] = useState<DayItem[]>(() => initialSnapshot.dayDays)
   const [nightDays, setNightDays] = useState<DayItem[]>(() => initialSnapshot.nightDays)
   const [activeCycleId, setActiveCycleId] = useState<string | null>(() => initialSnapshot.activeCycleId)
@@ -380,8 +370,6 @@ export function CoverageClientPage({
 
   useEffect(() => {
     profileDefaultAppliedRef.current = shiftTabLockedFromUrl
-    therapistOptionsHydratedRef.current = false
-    rosterProfilesHydratedRef.current = false
     setShiftTab(initialShiftTab)
     setDayDays(initialSnapshot.dayDays)
     setNightDays(initialSnapshot.nightDays)
@@ -408,6 +396,12 @@ export function CoverageClientPage({
     setCanUpdateAssignmentStatus(initialSnapshot.canUpdateAssignmentStatus)
     setActorRole(initialSnapshot.actorRole)
   }, [initialShiftTab, shiftTabLockedFromUrl, initialSnapshot])
+
+  useEffect(() => {
+    const shiftType = shiftTab === 'Day' ? 'day' : 'night'
+    setAllTherapists(therapistOptionsByShift[shiftType] ?? [])
+    setRosterProfiles(rosterProfilesByShift[shiftType] ?? [])
+  }, [rosterProfilesByShift, shiftTab, therapistOptionsByShift])
 
   const weekRosterHref = useMemo(() => {
     const params = new URLSearchParams()
@@ -436,113 +430,6 @@ export function CoverageClientPage({
     () => rosterProfiles,
     [rosterProfiles]
   )
-  // Fetch full therapist list once per shift type — not per day click (managers only).
-  useEffect(() => {
-    let active = true
-    if (!therapistOptionsHydratedRef.current) {
-      therapistOptionsHydratedRef.current = true
-      return () => {
-        active = false
-      }
-    }
-    if (!canManageCoverage) {
-      setAllTherapists([])
-      return
-    }
-    const shiftType = shiftTab === 'Day' ? 'day' : 'night'
-
-    void (async () => {
-      const { data, error: loadError } = await supabase
-        .from('profiles')
-        .select('id, full_name, role, shift_type, is_lead_eligible, employment_type, max_work_days_per_week')
-        .eq('shift_type', shiftType)
-        .eq('is_active', true)
-        .eq('on_fmla', false)
-        .in('role', ['therapist', 'lead'])
-        .order('full_name', { ascending: true })
-
-      if (!active) return
-      if (loadError) {
-        console.error('Could not load available therapists for assignment:', loadError)
-        setAllTherapists([])
-        return
-      }
-      setAllTherapists(
-        (
-          (data ?? []) as Array<{
-            id: string
-            full_name: string
-            role?: 'therapist' | 'lead'
-            shift_type: 'day' | 'night'
-            is_lead_eligible: boolean | null
-            employment_type: string | null
-            max_work_days_per_week: number | null
-          }>
-        ).map((row) => ({
-          id: row.id,
-          full_name: row.full_name,
-          role: row.role,
-          shift_type: row.shift_type,
-          isLeadEligible: row.is_lead_eligible ?? false,
-          employment_type: row.employment_type ?? null,
-          max_work_days_per_week: row.max_work_days_per_week ?? null,
-        }))
-      )
-    })()
-
-    return () => {
-      active = false
-    }
-  }, [shiftTab, supabase, canManageCoverage])
-
-  useEffect(() => {
-    let active = true
-    if (!rosterProfilesHydratedRef.current) {
-      rosterProfilesHydratedRef.current = true
-      return () => {
-        active = false
-      }
-    }
-    const shiftType = shiftTab === 'Day' ? 'day' : 'night'
-
-    void (async () => {
-      const { data, error: loadError } = await supabase
-        .from('profiles')
-        .select('id, full_name, role, employment_type')
-        .eq('shift_type', shiftType)
-        .eq('is_active', true)
-        .in('role', ['therapist', 'lead'])
-        .order('full_name', { ascending: true })
-
-      if (!active) return
-      if (loadError) {
-        console.error('Could not load roster profiles for schedule view:', loadError)
-        setRosterProfiles([])
-        return
-      }
-
-      setRosterProfiles(
-        (
-          (data ?? []) as Array<{
-            id: string
-            full_name: string
-            role: 'therapist' | 'lead'
-            employment_type: 'full_time' | 'part_time' | 'prn' | null
-          }>
-        ).map((row) => ({
-          id: row.id,
-          full_name: row.full_name,
-          role: row.role,
-          employment_type: row.employment_type ?? 'full_time',
-        }))
-      )
-    })()
-
-    return () => {
-      active = false
-    }
-  }, [shiftTab, supabase])
-
   const selectedDayBase = useMemo(
     () => days.find((row) => row.id === selectedId) ?? null,
     [days, selectedId]
@@ -988,13 +875,7 @@ export function CoverageClientPage({
 
   return (
     <div className="min-h-screen bg-background">
-      <motion.div
-        variants={fadeUp}
-        initial="hidden"
-        animate="visible"
-        custom={0}
-        className="no-print"
-      >
+      <div className="no-print">
         <form
           ref={autoDraftFormRef}
           action={generateDraftScheduleAction}
@@ -1189,15 +1070,9 @@ export function CoverageClientPage({
             </div>
           </div>
         </header>
-      </motion.div>
+      </div>
 
-      <motion.div
-        variants={fadeUp}
-        initial="hidden"
-        animate="visible"
-        custom={1}
-        className="no-print px-5 py-4"
-      >
+      <div className="no-print px-5 py-4">
         <div className="space-y-4">
           {!noCycleSelected ? (
             <section className="rounded-xl border border-border/70 bg-card/80 px-4 py-3">
@@ -1523,7 +1398,7 @@ export function CoverageClientPage({
             </section>
           ) : null}
         </div>
-      </motion.div>
+      </div>
 
       {selectedDay ? (
         <ShiftEditorDialog

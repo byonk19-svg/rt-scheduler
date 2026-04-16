@@ -402,6 +402,8 @@ export default async function AvailabilityPage({
 
   const role = toUiRole(profile?.role)
   const canManageAvailability = can(role, 'access_manager_ui')
+  const shouldLoadPlannerPanel = canManageAvailability && activeTab === 'planner'
+  const shouldLoadIntakePanel = canManageAvailability && activeTab === 'intake'
   let activeTeamCount: number | null = null
   if (canManageAvailability) {
     const { count } = await supabase
@@ -479,7 +481,7 @@ export default async function AvailabilityPage({
         .order('full_name', { ascending: true })
     : { data: [] }
   const plannerOverridesResult =
-    canManageAvailability && cycles.length > 0
+    shouldLoadPlannerPanel && cycles.length > 0
       ? await supabase
           .from('availability_overrides')
           .select('id, therapist_id, cycle_id, date, shift_type, override_type, note, source')
@@ -492,7 +494,7 @@ export default async function AvailabilityPage({
       : { data: [] }
   const plannerTherapists = (plannerTherapistsResult.data ?? []) as ManagerPlannerTherapistRow[]
   const plannerOverrides = (plannerOverridesResult.data ?? []) as ManagerPlannerOverrideRow[]
-  const emailIntakesResult = canManageAvailability
+  const emailIntakesResult = shouldLoadIntakePanel
     ? await supabase
         .from('availability_email_intakes')
         .select(
@@ -504,7 +506,7 @@ export default async function AvailabilityPage({
   const rawEmailIntakeRows = (emailIntakesResult.data ?? []) as AvailabilityEmailIntakeRow[]
   const emailIntakeIds = rawEmailIntakeRows.map((row) => row.id)
   const emailItemResult =
-    canManageAvailability && emailIntakeIds.length > 0
+    shouldLoadIntakePanel && emailIntakeIds.length > 0
       ? await supabase
           .from('availability_email_intake_items')
           .select(
@@ -513,7 +515,7 @@ export default async function AvailabilityPage({
           .in('intake_id', emailIntakeIds)
       : { data: [] }
   const emailAttachmentResult =
-    canManageAvailability && emailIntakeIds.length > 0
+    shouldLoadIntakePanel && emailIntakeIds.length > 0
       ? await supabase
           .from('availability_email_attachments')
           .select('id, intake_id, filename, ocr_text, ocr_status')

@@ -1,5 +1,11 @@
 # Session History
 
+## Session 78 - 2026-04-16
+
+- `/coverage` now ships both day and night therapist/roster datasets in the initial server snapshot and swaps them locally, eliminating the old post-hydration Supabase reads when managers switch shift tabs.
+- Removed the decorative `framer-motion` wrappers from `CoverageClientPage.tsx`; the production build now reports the `/coverage` entry chunk at about `89.7 KB` instead of `91.3 KB`.
+- `/availability` now loads email-intake rows only on the intake tab and skips planner override reads there, while `shift-board` approve/deny actions stop reloading the entire board after a successful save.
+
 ## Session 77 - 2026-04-16
 
 - Removed the authenticated-layout `MotionProvider` wrapper so `framer-motion` no longer ships across the full app shell.

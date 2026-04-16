@@ -157,7 +157,9 @@ function createEmptySnapshot(): CoveragePageSnapshot {
     printUsers: [],
     printShiftByUserDate: {},
     allTherapists: [],
+    allTherapistsByShift: { day: [], night: [] },
     rosterProfiles: [],
+    rosterProfilesByShift: { day: [], night: [] },
     activeOpCodes: {},
     dayDays: [],
     nightDays: [],
@@ -272,7 +274,6 @@ export async function getCoveragePageServerData({
         .select(
           'id, full_name, role, shift_type, is_lead_eligible, employment_type, max_work_days_per_week'
         )
-        .eq('shift_type', initialShiftType)
         .eq('is_active', true)
         .eq('on_fmla', false)
         .in('role', ['therapist', 'lead'])
@@ -299,8 +300,7 @@ export async function getCoveragePageServerData({
       therapistOptionsQuery,
       supabase
         .from('profiles')
-        .select('id, full_name, role, employment_type')
-        .eq('shift_type', initialShiftType)
+        .select('id, full_name, role, shift_type, employment_type')
         .eq('is_active', true)
         .in('role', ['therapist', 'lead'])
         .order('full_name', { ascending: true }),
@@ -328,7 +328,7 @@ export async function getCoveragePageServerData({
 
   snapshot.activePreliminarySnapshot =
     (preliminaryResult.data ?? null) as PreliminarySnapshotRow | null
-  snapshot.allTherapists = (((therapistOptionsResult.data ?? []) as Array<{
+  const allTherapists = (((therapistOptionsResult.data ?? []) as Array<{
     id: string
     full_name: string
     role?: 'therapist' | 'lead'
@@ -345,17 +345,38 @@ export async function getCoveragePageServerData({
     employment_type: row.employment_type ?? null,
     max_work_days_per_week: row.max_work_days_per_week ?? null,
   }))
-  snapshot.rosterProfiles = (((rosterProfilesResult.data ?? []) as Array<{
+  snapshot.allTherapistsByShift = {
+    day: allTherapists.filter((row) => row.shift_type === 'day'),
+    night: allTherapists.filter((row) => row.shift_type === 'night'),
+  }
+  snapshot.allTherapists = snapshot.allTherapistsByShift[initialShiftType]
+
+  const rosterProfileRows = ((rosterProfilesResult.data ?? []) as Array<{
     id: string
     full_name: string
     role: 'therapist' | 'lead'
+    shift_type: 'day' | 'night'
     employment_type: 'full_time' | 'part_time' | 'prn' | null
-  }>) ?? []).map<RosterMemberRow>((row) => ({
-    id: row.id,
-    full_name: row.full_name,
-    role: row.role,
-    employment_type: row.employment_type ?? 'full_time',
-  }))
+  }>) ?? []
+  snapshot.rosterProfilesByShift = {
+    day: rosterProfileRows
+      .filter((row) => row.shift_type === 'day')
+      .map<RosterMemberRow>((row) => ({
+        id: row.id,
+        full_name: row.full_name,
+        role: row.role,
+        employment_type: row.employment_type ?? 'full_time',
+      })),
+    night: rosterProfileRows
+      .filter((row) => row.shift_type === 'night')
+      .map<RosterMemberRow>((row) => ({
+        id: row.id,
+        full_name: row.full_name,
+        role: row.role,
+        employment_type: row.employment_type ?? 'full_time',
+      })),
+  }
+  snapshot.rosterProfiles = snapshot.rosterProfilesByShift[initialShiftType]
 
   const rows = (shiftsResult.data ?? []) as ShiftRow[]
   snapshot.selectedCycleHasShiftRows = rows.length > 0

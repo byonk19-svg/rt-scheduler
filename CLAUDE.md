@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-16 (session 77)
+Updated: 2026-04-16 (session 78)
 
 ## Handoff Snapshot
 
@@ -31,6 +31,7 @@ Updated: 2026-04-16 (session 77)
 - **Coverage designated lead vs extra lead-eligible staff:** only one `shifts.role='lead'` row designates the lead for that slot. The shift editor still lists every **lead-eligible** therapist; choosing another while a lead exists adds them as **staff** coverage (`assign` with `role: 'staff'`). Someone already on the day as staff can be **designated** via **`set_lead`** (`setCoverageDesignatedLeadViaApi` in `src/lib/coverage/mutations.ts`), which now uses `router.refresh()` against the server snapshot path instead of a client reload nonce. Lead-eligible rows are **not** disabled merely because a lead is already booked.
 - **Email intake tab stability:** intake date chip toggles and **Apply dates** refresh in place (`router.refresh` / `router.replace` with `tab=intake`) so managers are not bounced back to the **Planner** tab after saves. Intake request chips cycle **`force_off` ↔ `force_on`** only; removing a date uses an explicit **Remove** path with confirmation instead of a silent third-click delete.
 - **Schedule layout + role consistency:** `/coverage` supports both **Grid** and **Roster** layouts. Managers can edit staffing from either layout by clicking a day cell; leads can update staffed cells to **`OC`**, **`LE`**, **`CX`**, or **`CI`** through the shared assignment-status flow. Users can save a default schedule layout (`Grid` or `Roster`) in `/profile`, and the therapist compatibility route (`/therapist/schedule`) still defers default layout selection to `/coverage` so a saved preference wins unless an explicit `view` query is present.
+- **Hot-path performance trim:** `/coverage` now carries both day and night therapist/roster datasets in the initial server snapshot so shift-tab changes stop re-querying Supabase after hydration, `/availability` skips hidden-tab intake/planner reads, and `shift-board` approve/deny actions no longer rerun the full board bootstrap after a successful save.
 - **Mock manager roster screen:** `/schedule` no longer redirects to `/coverage`. It is now a public mock manager roster surface that renders from `src/components/schedule-roster/*` and `src/lib/mock-coverage-roster.ts`, uses local component state for assign/unassign, and exists specifically for deterministic UI iteration.
 - **Mock roster sizing pass:** the standalone `/schedule` roster screen now fits all 6 week headers at once on standard desktop widths by tightening the sticky name column, week headers, day columns, and cell chips. The space before `PRN coverage` is reduced to a bold divider line.
 - **Lead role source of truth:** product behavior now treats `profiles.role = 'lead'` as the source of truth for lead-only UI/actions. The legacy `is_lead_eligible` column is kept in sync to `role`, but Coverage, print/export, profile badges, swap partner filtering, and designated-lead actions should all be reasoned about in terms of `role`, not the legacy flag.
@@ -51,6 +52,7 @@ Updated: 2026-04-16 (session 77)
 - `main` now also carries the compact Coverage workspace pass: denser grid/roster surfaces, tighter shift editor, ranked modal candidates, and the roster-cell performance fix where empty `+` cells open the day editor immediately instead of firing an assignment mutation.
 - `main` now also carries the route-group performance refactor: public routes live under `src/app/(public)`, authenticated routes under `src/app/(app)`, `/dashboard/manager` is server-first again, `/coverage` hydrates from a server snapshot helper, and the top-nav notification panel fetches only when opened.
 - `main` now also carries the bundle-trim follow-up: the authenticated shell defers notification interactivity behind `DeferredNotificationBell`, `/coverage` lazy-loads closed dialogs/editor overlays, and `/team` code-splits the directory vs roster-admin tab surfaces so the inactive panel no longer ships in the initial route chunk.
+- `main` now also carries the hot-route follow-up: `/coverage` swaps shift datasets locally from the initial snapshot, `/availability` only loads active-tab planner/intake data, and `shift-board` approve/deny actions stay local instead of reloading the board on success.
 - `main` also carries the standalone `/schedule` mock roster screen. That route is intentionally public and design-only; do not wire production scheduling logic into it without revisiting the proxy allowlist, route docs, and shell assumptions.
 - `claude/review-ui-flow-7Weav` has the **top nav redesign** (session 55) — sidebar replaced with a fixed horizontal top nav. Needs review and merge to `main` before deploying.
 
@@ -74,6 +76,13 @@ Updated: 2026-04-16 (session 77)
 - Targeted coverage lane: `npm run test:unit -- src/app/coverage/page.test.ts src/components/coverage/CalendarGrid.test.ts src/components/coverage/RosterScheduleView.test.ts src/components/coverage/shift-editor-dialog-layout.test.ts`
 
 ## Recent changelog
+
+**Session 78 (2026-04-16)** - Operational-route performance trim:
+
+- `/coverage` now serializes both day and night therapist/roster datasets in the server snapshot and swaps between them locally, removing the old post-hydration Supabase reads on shift-tab changes.
+- Removed the decorative `framer-motion` wrappers from `CoverageClientPage.tsx`; the production build now shows the `/coverage` route chunk at about `89.7 KB` instead of `91.3 KB`.
+- `/availability` now only loads email-intake rows on the intake tab and skips planner override reads there, while `shift-board` approve/deny actions stop reloading the full board after a successful save.
+- Verified with targeted ESLint on the touched files and `npm run build`.
 
 **Session 77 (2026-04-16)** - Bundle-size reduction pass:
 

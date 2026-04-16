@@ -520,6 +520,8 @@ export default function ShiftBoardPage() {
     async (id: string, action: 'approve' | 'deny', opts?: { override?: boolean }) => {
       if (!canReview) return
 
+      const previousRequest = requests.find((request) => request.id === id) ?? null
+
       setRequestErrors((prev) => {
         const next = { ...prev }
         delete next[id]
@@ -625,10 +627,12 @@ export default function ShiftBoardPage() {
         return
       }
 
-      await loadBoard(activeTab)
+      if (previousRequest?.status === 'pending') {
+        setPendingCount((current) => Math.max(current - 1, 0))
+      }
       setSavingState((current) => ({ ...current, [id]: false }))
     },
-    [activeTab, canReview, loadBoard, overrideReasons, requests, supabase, swapPartners, therapists]
+    [canReview, overrideReasons, requests, supabase, swapPartners, therapists]
   )
 
   const handleViewShift = useCallback(
