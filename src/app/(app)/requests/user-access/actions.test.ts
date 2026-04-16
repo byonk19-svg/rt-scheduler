@@ -116,21 +116,23 @@ function createAdminSupabaseMock(state: AdminState) {
           }
         },
         update(payload: Record<string, unknown>) {
-          return {
+          const updateBuilder = {
             eq(column: string, value: unknown) {
               void column
               void value
-              return {
-                is: async (isColumn: string, isValue: unknown) => {
-                  void isColumn
-                  void isValue
-                  state.approvedRole = (payload.role as string) ?? null
-                  state.profileRole = state.approvedRole
-                  return { error: null }
-                },
+              return updateBuilder
+            },
+            is: async (isColumn: string, isValue: unknown) => {
+              void isColumn
+              void isValue
+              if (table === 'profiles') {
+                state.approvedRole = (payload.role as string) ?? null
+                state.profileRole = state.approvedRole
               }
+              return { error: null }
             },
           }
+          return updateBuilder
         },
       }
     },

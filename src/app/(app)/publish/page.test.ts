@@ -34,7 +34,7 @@ vi.mock('@/lib/coverage/fetch-schedule-cycles', () => ({
   })),
 }))
 
-import PublishHistoryPage from '@/app/publish/page'
+import PublishHistoryPage from '@/app/(app)/publish/page'
 
 type TestContext = {
   userId?: string | null

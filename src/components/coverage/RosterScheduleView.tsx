@@ -1,6 +1,6 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, useMemo } from 'react'
 
 import { AssignmentStatusPopover } from '@/components/coverage/AssignmentStatusPopover'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -102,16 +102,30 @@ function buildDayMap(days: DayItem[]): Map<string, DayItem> {
   return new Map(days.map((day) => [day.id, day]))
 }
 
-function countAssignedMembers(date: string, rows: RosterMemberRow[], dayMap: Map<string, DayItem>): number {
-  const day = dayMap.get(date)
-  if (!day) return 0
-  let total = 0
-  for (const row of rows) {
-    if (getCellForMember(day, row.id)?.shift.status === 'active') {
-      total += 1
+function buildAssignedMemberCounts(
+  weekDates: string[],
+  rows: RosterMemberRow[],
+  dayMap: Map<string, DayItem>
+): Map<string, number> {
+  const counts = new Map<string, number>()
+
+  for (const date of weekDates) {
+    const day = dayMap.get(date)
+    if (!day) {
+      counts.set(date, 0)
+      continue
     }
+
+    let total = 0
+    for (const row of rows) {
+      if (getCellForMember(day, row.id)?.shift.status === 'active') {
+        total += 1
+      }
+    }
+    counts.set(date, total)
   }
-  return total
+
+  return counts
 }
 
 const RosterMatrixTable = memo(function RosterMatrixTable({
@@ -122,6 +136,7 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
   canUpdateAssignmentStatus,
   selectedDayId,
   cellError,
+  assignedMemberCounts,
   onAssignCell,
   onOpenEditor,
   onChangeStatus,
@@ -134,6 +149,7 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
   canUpdateAssignmentStatus: boolean
   selectedDayId: string | null
   cellError: { dayId: string; memberId: string; message: string } | null
+  assignedMemberCounts: Map<string, number>
   onAssignCell?: (dayId: string, memberId: string, role: 'lead' | 'staff') => void
   onOpenEditor?: (dayId: string) => void
   onChangeStatus?: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
@@ -328,7 +344,7 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
                 key={`tally-${date}`}
                 className="border-l border-border/35 px-1 py-2 text-center text-[10px] font-semibold text-foreground/75"
               >
-                {countAssignedMembers(date, rows, dayMap) || ''}
+                {assignedMemberCounts.get(date) || ''}
               </td>
             ))}
           </tr>
@@ -367,6 +383,11 @@ const RosterSection = memo(function RosterSection({
   onChangeStatus?: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
   onUnassign?: (dayId: string, shiftId: string, isLead: boolean) => void
 }) {
+  const assignedMemberCounts = useMemo(
+    () => buildAssignedMemberCounts(effectiveCycleDates, rows, dayMap),
+    [dayMap, effectiveCycleDates, rows]
+  )
+
   return (
     <section className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -387,6 +408,7 @@ const RosterSection = memo(function RosterSection({
         canUpdateAssignmentStatus={canUpdateAssignmentStatus}
         selectedDayId={selectedDayId}
         cellError={cellError}
+        assignedMemberCounts={assignedMemberCounts}
         onAssignCell={onAssignCell}
         onOpenEditor={onOpenEditor}
         onChangeStatus={onChangeStatus}
@@ -415,7 +437,7 @@ export const RosterScheduleView = memo(function RosterScheduleView({
   const sections = buildRosterSections(members)
   const effectiveCycleDates =
     cycleDates && cycleDates.length > 0 ? cycleDates : days.map((day) => day.id)
-  const dayMap = buildDayMap(days)
+  const dayMap = useMemo(() => buildDayMap(days), [days])
   const shiftLabel = shiftTab === 'Night' ? 'Night' : 'Day'
   const heading = title ?? `Respiratory Therapy ${shiftLabel} Shift`
 

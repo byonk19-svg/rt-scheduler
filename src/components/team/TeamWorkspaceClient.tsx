@@ -104,38 +104,38 @@ function TeamWorkspaceClient({
         </button>
       </div>
 
-      <div
-        id="team-panel-directory"
-        role="tabpanel"
-        aria-labelledby="team-tab-directory"
-        hidden={activeTab !== 'directory'}
-        className={activeTab === 'directory' ? 'space-y-4' : 'hidden'}
-      >
-        <TeamDirectory
-          summary={summary}
-          profiles={profiles}
-          workPatterns={workPatterns}
-          initialEditProfileId={initialEditProfileId}
-          archiveTeamMemberAction={archiveTeamMemberAction}
-          saveTeamQuickEditAction={saveTeamQuickEditAction}
-        />
-      </div>
-
-      <div
-        id="team-panel-roster"
-        role="tabpanel"
-        aria-labelledby="team-tab-roster"
-        hidden={activeTab !== 'roster'}
-        className={activeTab === 'roster' ? 'space-y-4' : 'hidden'}
-      >
-        <EmployeeRosterPanel
-          roster={roster}
-          upsertEmployeeRosterEntryAction={upsertEmployeeRosterEntryAction}
-          bulkUpsertEmployeeRosterAction={bulkUpsertEmployeeRosterAction}
-          replaceTherapistRosterAction={replaceTherapistRosterAction}
-          deleteEmployeeRosterEntryAction={deleteEmployeeRosterEntryAction}
-        />
-      </div>
+      {activeTab === 'directory' ? (
+        <div
+          id="team-panel-directory"
+          role="tabpanel"
+          aria-labelledby="team-tab-directory"
+          className="space-y-4"
+        >
+          <TeamDirectory
+            summary={summary}
+            profiles={profiles}
+            workPatterns={workPatterns}
+            initialEditProfileId={initialEditProfileId}
+            archiveTeamMemberAction={archiveTeamMemberAction}
+            saveTeamQuickEditAction={saveTeamQuickEditAction}
+          />
+        </div>
+      ) : (
+        <div
+          id="team-panel-roster"
+          role="tabpanel"
+          aria-labelledby="team-tab-roster"
+          className="space-y-4"
+        >
+          <EmployeeRosterPanel
+            roster={roster}
+            upsertEmployeeRosterEntryAction={upsertEmployeeRosterEntryAction}
+            bulkUpsertEmployeeRosterAction={bulkUpsertEmployeeRosterAction}
+            replaceTherapistRosterAction={replaceTherapistRosterAction}
+            deleteEmployeeRosterEntryAction={deleteEmployeeRosterEntryAction}
+          />
+        </div>
+      )}
     </div>
   )
 }

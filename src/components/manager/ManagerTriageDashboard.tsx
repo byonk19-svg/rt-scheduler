@@ -10,7 +10,6 @@ import {
   Sparkles,
   Users,
 } from 'lucide-react'
-import { motion } from 'framer-motion'
 
 import { ScheduleProgress } from '@/components/manager/ScheduleProgress'
 import { Button } from '@/components/ui/button'
@@ -88,14 +87,6 @@ export function ManagerTriageDashboard({
     pendingRequests === '--' ? LOADING_LABEL : `${pendingRequests} pending`
   const teamLoadLabel =
     upcomingShiftCount === '--' ? LOADING_LABEL : `${upcomingShiftCount} upcoming shifts`
-  const fadeUp = {
-    hidden: { opacity: 0, y: 8 },
-    show: (index: number) => ({
-      opacity: 1,
-      y: 0,
-      transition: { delay: index * 0.06, duration: 0.3 },
-    }),
-  }
   const metricCards = [
     {
       title: 'Coverage Issues',
@@ -160,16 +151,10 @@ export function ManagerTriageDashboard({
       <div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
-            {metricCards.map((card, index) => (
-              <motion.div
-                key={card.title}
-                custom={index}
-                variants={fadeUp}
-                initial="hidden"
-                animate="show"
-              >
+            {metricCards.map((card) => (
+              <div key={card.title}>
                 <MetricCard {...card} />
-              </motion.div>
+              </div>
             ))}
           </div>
 

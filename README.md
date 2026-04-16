@@ -5,8 +5,8 @@ Web app for respiratory therapy scheduling with role-based workflows:
 - Auth + role-aware dashboard with pending-access onboarding
 - Availability requests
 - 6-week schedule cycle management
-- **Canonical staff schedule:** [`/coverage`](./src/app/coverage/page.tsx) supports both `Grid` and `Roster` layouts; server entry is `page.tsx` and interactive client logic lives in [`CoverageClientPage.tsx`](./src/app/coverage/CoverageClientPage.tsx). The therapist compatibility route (`/therapist/schedule`) still redirects there and preserves explicit `view` params
-- **Mock manager roster screen:** [`/schedule`](./src/app/schedule/page.tsx) is now a public, deterministic roster-only screen backed by local mock data and local assignment state for UI iteration
+- **Canonical staff schedule:** [`/coverage`](<./src/app/(app)/coverage/page.tsx>) supports both `Grid` and `Roster` layouts; server entry is `page.tsx`, initial snapshot loading lives in [`coverage-page-data.ts`](<./src/app/(app)/coverage/coverage-page-data.ts>), and interactive client logic lives in [`CoverageClientPage.tsx`](<./src/app/(app)/coverage/CoverageClientPage.tsx>). The therapist compatibility route (`/therapist/schedule`) still redirects there and preserves explicit `view` params
+- **Mock manager roster screen:** [`/schedule`](<./src/app/(app)/schedule/page.tsx>) is now a public, deterministic roster-only screen backed by local mock data and local assignment state for UI iteration
 - **Therapist availability:** 6-week grid on `/therapist/availability` — **Available** (default: neutral day, no forced on/off), **Unavailable**, **Must work** (hard autodraft `force_on`); see [`CLAUDE.md`](./CLAUDE.md)
 - Shift board (swap/pickup posts with manager approval)
 
@@ -24,14 +24,14 @@ Current architecture and quality snapshot: [`docs/REPO_HEALTH.md`](docs/REPO_HEA
 
 ## Cycle Workflow
 
-- [`/schedule`](./src/app/schedule/page.tsx) is the standalone mock manager roster surface. It renders from local mock data, keeps assign/unassign state in the client, and is tuned to show the full 6-week matrix at once on standard desktop widths.
+- [`/schedule`](<./src/app/(app)/schedule/page.tsx>) is the standalone mock manager roster surface. It renders from local mock data, keeps assign/unassign state in the client, and is tuned to show the full 6-week matrix at once on standard desktop widths.
 
-- **Schedule** (nav label; route [`/coverage`](./src/app/coverage/page.tsx), rendered via [`CoverageClientPage.tsx`](./src/app/coverage/CoverageClientPage.tsx)) — create **New 6-week block**, staff the schedule in either **Grid** or **Roster** view, auto-draft, preliminary, **Publish**. Same cycle-selection rule everywhere: URL cycle if valid, else active window, else next upcoming, else none (empty state, not a fake grid).
+- **Schedule** (nav label; route [`/coverage`](<./src/app/(app)/coverage/page.tsx>), rendered via [`CoverageClientPage.tsx`](<./src/app/(app)/coverage/CoverageClientPage.tsx>)) — create **New 6-week block**, staff the schedule in either **Grid** or **Roster** view, auto-draft, preliminary, **Publish**. Same cycle-selection rule everywhere: URL cycle if valid, else active window, else next upcoming, else none (empty state, not a fake grid).
 - Managers can edit staffing from either schedule layout by clicking a day cell. Leads can update assignment status (`OC`, `LE`, `CX`, `CI`) from staffed cells in either layout.
-- Users can save a default schedule layout preference (`Grid` or `Roster`) in [`/profile`](./src/app/profile/page.tsx); the therapist compatibility route still defers default layout selection to `/coverage` so that saved preference wins unless an explicit `view` query is present.
+- Users can save a default schedule layout preference (`Grid` or `Roster`) in [`/profile`](<./src/app/(app)/profile/page.tsx>); the therapist compatibility route still defers default layout selection to `/coverage` so that saved preference wins unless an explicit `view` query is present.
 - **Availability** — therapist requests and manager **Plan staffing** for the selected cycle.
 - **Availability email intake** — managers can ingest one email with body text plus multiple form attachments; high-confidence items auto-apply while unresolved items stay in the `/availability` review queue, where managers can now view the stored original email/OCR text, reparse stale items, or delete troubleshooting batches.
-- **Publish History** ([`/publish`](./src/app/publish/page.tsx)) — two parts: (1) **Schedule blocks** — all non-archived cycles; archive drafts or delete drafts; **Start over** takes a live block offline; (2) **Publish email log** — delivery rows per publish; **Delete history** removes only that log row, not the block.
+- **Publish History** ([`/publish`](<./src/app/(app)/publish/page.tsx>)) — two parts: (1) **Schedule blocks** — all non-archived cycles; archive drafts or delete drafts; **Start over** takes a live block offline; (2) **Publish email log** — delivery rows per publish; **Delete history** removes only that log row, not the block.
 - `New 6-week block` can optionally copy staffing from the latest published cycle. `Clear draft` clears draft assignments while unpublished.
 - Published cycles stay editable on Schedule; `Archive cycle` sets `archived_at` and hides the block from pickers (see [`CLAUDE.md`](./CLAUDE.md) for data model).
 

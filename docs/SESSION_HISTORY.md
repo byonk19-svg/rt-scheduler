@@ -1,5 +1,11 @@
 # Session History
 
+## Session 76 - 2026-04-16
+
+- Split the App Router tree into public and authenticated route groups so the root layout stays lightweight while app-shell auth, unread counts, motion, and nav chrome live in `src/app/(app)/layout.tsx`.
+- Converted `/dashboard/manager` to server-first rendering with a route loading shell, and removed the old client bootstrapping path.
+- Refactored `/coverage` to hydrate from a server-generated snapshot (`coverage-page-data.ts` / `coverage-page-snapshot.ts`), deferred notification panel fetches until open, parallelized `/team` reads, and reduced schedule grid/roster recomputation.
+
 ## Session 74 - 2026-04-16
 
 - Replaced the old `/schedule` redirect entrypoint with a standalone mock manager roster screen built from `src/components/schedule-roster/*` and `src/lib/mock-coverage-roster.ts`.

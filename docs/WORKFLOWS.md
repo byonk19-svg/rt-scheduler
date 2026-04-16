@@ -22,7 +22,7 @@ Operational workflows as implemented in the current codebase.
    - `New 6-week block` creates a draft cycle.
    - `/schedule` is now a public mock manager roster screen with local-only assignment state and no Supabase dependency.
    - `/coverage` remains the canonical protected scheduling workspace for real cycle selection, staffing edits, publish actions, and availability-linked coverage work.
-   - Navigation contract: manager AppShell still treats `/schedule` and `/coverage` as part of the `Schedule` section, but `/schedule` now renders outside the authenticated shell so the mock surface can be reviewed without logging in.
+   - Navigation contract: manager AppShell still treats `/schedule` and `/coverage` as part of the `Schedule` section when authenticated, while `/schedule` remains reviewable without login because the app shell only renders for signed-in users.
    - The fixed manager secondary nav must stay horizontally scrollable on narrow widths rather than shrinking or clipping workflow tabs.
    - `/coverage` supports both `Grid` and `Roster` layouts. Explicit `view` params are preserved through `/therapist/schedule`, and the saved profile layout preference is resolved in `/coverage` when no explicit `view` is supplied.
 2. Build draft assignments:

@@ -5,10 +5,10 @@
 - Sentry is integrated for Next.js (client, server, and edge runtimes).
 - Error capture is wired into:
   - publish processing: `src/app/api/publish/process/route.ts`
-  - publish requeue action: `src/app/publish/actions.ts`
+  - publish requeue action: `src/app/(app)/publish/actions.ts`
   - assign/unassign API flow: `src/app/api/schedule/drag-drop/route.ts`
   - assignment status updates: `src/app/api/schedule/assignment-status/route.ts`
-  - coverage page client-side assign/unassign/status failures: `src/app/coverage/CoverageClientPage.tsx` (server entry remains `src/app/coverage/page.tsx`)
+  - coverage page client-side assign/unassign/status failures: `src/app/(app)/coverage/CoverageClientPage.tsx` (server snapshot entry remains `src/app/(app)/coverage/page.tsx`)
 - Server-side JSON structured logs are emitted with:
   - `event` (event name)
   - IDs (`user_id`, `shift_id`, `therapist_id`, `assignment_id`, `publish_event_id`)

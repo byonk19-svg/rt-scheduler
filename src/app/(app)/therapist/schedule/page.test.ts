@@ -10,7 +10,7 @@ vi.mock('next/navigation', () => ({
   redirect: redirectMock,
 }))
 
-import TherapistSchedulePage from '@/app/therapist/schedule/page'
+import TherapistSchedulePage from '@/app/(app)/therapist/schedule/page'
 
 describe('therapist schedule route', () => {
   it('preserves an explicit roster view when redirecting to coverage', async () => {

@@ -30,6 +30,7 @@ export type AppShellUser = {
 
 type AppShellProps = {
   user: AppShellUser | null
+  unreadNotificationCount?: number
   children: ReactNode
 }
 
@@ -296,7 +297,7 @@ function UserDropdown({
 }
 
 // ─── AppShell ──────────────────────────────────────────────────────────────
-export function AppShell({ user, children }: AppShellProps) {
+export function AppShell({ user, unreadNotificationCount = 0, children }: AppShellProps) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const canAccessManagerUi = can(user?.role, 'access_manager_ui')
@@ -405,7 +406,7 @@ export function AppShell({ user, children }: AppShellProps) {
 
           {/* Right side: notification bell + user dropdown */}
           <div className="ml-auto flex items-center gap-1">
-            <NotificationBell variant="shell" />
+            <NotificationBell variant="shell" initialUnreadCount={unreadNotificationCount} />
             <UserDropdown user={user} canAccessManagerUi={canAccessManagerUi} />
           </div>
 

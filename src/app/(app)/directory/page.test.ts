@@ -10,7 +10,7 @@ vi.mock('next/navigation', () => ({
   redirect: redirectMock,
 }))
 
-import DirectoryPage from '@/app/directory/page'
+import DirectoryPage from '@/app/(app)/directory/page'
 
 describe('directory redirect behavior', () => {
   it('redirects to team', async () => {

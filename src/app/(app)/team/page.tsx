@@ -1,4 +1,3 @@
-import dynamic from 'next/dynamic'
 import { redirect } from 'next/navigation'
 
 import {
@@ -11,16 +10,11 @@ import {
 } from '@/app/team/actions'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
+import TeamWorkspaceClient from '@/components/team/TeamWorkspaceClient'
 import type { WorkPatternRecord } from '@/components/team/team-directory-model'
 import { can } from '@/lib/auth/can'
 import { MANAGED_TEAM_ROLE_VALUES, parseRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
-
-const TeamWorkspaceClient = dynamic(() =>
-  import('@/components/team/TeamWorkspaceClient').then(
-    (mod) => mod.default ?? mod.TeamWorkspaceClient
-  )
-)
 
 type ProfileRow = {
   id: string
@@ -61,6 +55,7 @@ type EmployeeRosterRow = {
   max_work_days_per_week: number
   is_lead_eligible: boolean
   matched_profile_id: string | null
+  matched_email: string | null
   matched_at: string | null
   phone_number: string | null
 }
@@ -210,25 +205,32 @@ export default async function TeamPage({
     redirect('/dashboard/staff')
   }
 
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select(
-      'id, full_name, role, shift_type, employment_type, is_lead_eligible, is_active, on_fmla, fmla_return_date, phone_number'
-    )
-    .in('role', [...MANAGED_TEAM_ROLE_VALUES])
-    .is('archived_at', null)
-    .order('full_name', { ascending: true })
+  const [profilesResult, patternRowsResult, rosterRowsResult] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select(
+        'id, full_name, role, shift_type, employment_type, is_lead_eligible, is_active, on_fmla, fmla_return_date, phone_number'
+      )
+      .in('role', [...MANAGED_TEAM_ROLE_VALUES])
+      .is('archived_at', null)
+      .order('full_name', { ascending: true }),
+    supabase
+      .from('work_patterns')
+      .select(
+        'therapist_id, works_dow, offs_dow, works_dow_mode, weekend_rotation, weekend_anchor_date'
+      ),
+    supabase
+      .from('employee_roster')
+      .select(
+        'id, full_name, role, shift_type, employment_type, max_work_days_per_week, is_lead_eligible, matched_profile_id, matched_email, matched_at, phone_number'
+      )
+      .order('full_name', { ascending: true }),
+  ])
 
-  const allProfiles = (profiles ?? []) as ProfileRow[]
-
-  const { data: patternRows } = await supabase
-    .from('work_patterns')
-    .select(
-      'therapist_id, works_dow, offs_dow, works_dow_mode, weekend_rotation, weekend_anchor_date'
-    )
+  const allProfiles = ((profilesResult.data ?? []) as ProfileRow[]) ?? []
 
   const workPatterns: Record<string, WorkPatternRecord> = {}
-  for (const row of (patternRows ?? []) as WorkPatternRow[]) {
+  for (const row of (patternRowsResult.data ?? []) as WorkPatternRow[]) {
     workPatterns[row.therapist_id] = {
       works_dow: row.works_dow,
       offs_dow: (row as { offs_dow?: number[] }).offs_dow ?? [],
@@ -238,13 +240,7 @@ export default async function TeamPage({
     }
   }
   const activeProfiles = allProfiles.filter((profile) => profile.is_active !== false)
-  const { data: rosterRows } = await supabase
-    .from('employee_roster')
-    .select(
-      'id, full_name, role, shift_type, employment_type, max_work_days_per_week, is_lead_eligible, matched_profile_id, matched_at, phone_number'
-    )
-    .order('full_name', { ascending: true })
-  const employeeRoster = (rosterRows ?? []) as EmployeeRosterRow[]
+  const employeeRoster = ((rosterRowsResult.data ?? []) as EmployeeRosterRow[]) ?? []
   const managerCount = activeProfiles.filter((profile) => profile.role === 'manager').length
   const leadCount = activeProfiles.filter((profile) => profile.role === 'lead').length
   const therapistCount = activeProfiles.filter((profile) => profile.role === 'therapist').length

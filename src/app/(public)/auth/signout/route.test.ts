@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { GET, POST } from '@/app/auth/signout/route'
+import { GET, POST } from '@/app/(public)/auth/signout/route'
 import { createClient } from '@/lib/supabase/server'
 
 vi.mock('next/headers', () => ({

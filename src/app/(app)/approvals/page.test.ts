@@ -40,7 +40,7 @@ vi.mock('@/lib/notifications', () => ({
   notifyUsers: notifyUsersMock,
 }))
 
-import ApprovalsPage from '@/app/approvals/page'
+import ApprovalsPage from '@/app/(app)/approvals/page'
 import {
   approvePreliminaryRequestAction,
   denyPreliminaryRequestAction,

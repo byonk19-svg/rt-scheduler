@@ -185,7 +185,7 @@ export function CalendarGrid({
   onSelect,
   onChangeStatus,
 }: CalendarGridProps) {
-  const weeks = chunkWeeks(days)
+  const weeks = useMemo(() => chunkWeeks(days), [days])
   const cellRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
   const focusCell = useCallback((id: string) => {
     cellRefs.current.get(id)?.focus()
