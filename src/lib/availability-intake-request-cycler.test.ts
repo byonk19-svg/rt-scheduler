@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ParsedAvailabilityRequest } from '@/lib/availability-email-intake'
-import { cycleIntakeRequest, markRequestsEdited } from '@/lib/availability-intake-request-cycler'
+import {
+  cycleIntakeRequest,
+  markRequestsEdited,
+  removeIntakeRequest,
+} from '@/lib/availability-intake-request-cycler'
 
 function buildRequest(overrides?: Partial<ParsedAvailabilityRequest>): ParsedAvailabilityRequest {
   return {
@@ -15,7 +19,7 @@ function buildRequest(overrides?: Partial<ParsedAvailabilityRequest>): ParsedAva
 }
 
 describe('cycleIntakeRequest', () => {
-  it('cycles a date deterministically from force_off to force_on to removed', () => {
+  it('cycles a date between force_off and force_on without dropping the row', () => {
     const forceOn = cycleIntakeRequest({
       requests: [buildRequest()],
       target: {
@@ -31,7 +35,7 @@ describe('cycleIntakeRequest', () => {
       }),
     ])
 
-    const removed = cycleIntakeRequest({
+    const backToOff = cycleIntakeRequest({
       requests: forceOn,
       target: {
         date: '2026-03-24',
@@ -40,7 +44,7 @@ describe('cycleIntakeRequest', () => {
       },
     })
 
-    expect(removed).toEqual([])
+    expect(backToOff).toEqual([buildRequest()])
   })
 
   it('adds a missing date as a force_off request using the sanitized request shape', () => {
@@ -132,6 +136,32 @@ describe('cycleIntakeRequest', () => {
         note: null,
         source_line: 'Can work Mar 24 day',
       },
+    ])
+  })
+
+  it('removeIntakeRequest drops only the matching chip', () => {
+    expect(
+      removeIntakeRequest({
+        requests: [
+          buildRequest({ date: '2026-03-24', source_line: 'A' }),
+          buildRequest({
+            date: '2026-03-25',
+            override_type: 'force_on',
+            source_line: 'B',
+          }),
+        ],
+        target: {
+          date: '2026-03-24',
+          override_type: 'force_off',
+          shift_type: 'both',
+        },
+      })
+    ).toEqual([
+      buildRequest({
+        date: '2026-03-25',
+        override_type: 'force_on',
+        source_line: 'B',
+      }),
     ])
   })
 

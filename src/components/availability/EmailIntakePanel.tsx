@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -112,6 +113,145 @@ function hasOriginalEmailContent(row: EmailIntakePanelRow): boolean {
   )
 }
 
+function buildPostApplyAvailabilityHref(cycleId: string, therapistId: string) {
+  const search = new URLSearchParams()
+  search.set('tab', 'intake')
+  search.set('success', 'email_intake_applied')
+  search.set('cycle', cycleId)
+  search.set('therapist', therapistId)
+  search.set('roster', 'has_requests')
+  return `/availability?${search.toString()}`
+}
+
+function EmailIntakeApplyDatesButton({
+  item,
+  applyEmailAvailabilityImportAction,
+}: {
+  item: EmailIntakePanelItemRow
+  applyEmailAvailabilityImportAction: (
+    formData: FormData
+  ) => void | Promise<void> | Promise<{ ok: true; cycleId: string; therapistId: string }>
+}) {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+
+  function handleClick() {
+    if (!item.matchedCycleId || !item.matchedTherapistId) return
+    startTransition(async () => {
+      const fd = new FormData()
+      fd.set('item_id', item.id)
+      const result = await applyEmailAvailabilityImportAction(fd)
+      if (
+        result &&
+        typeof result === 'object' &&
+        'ok' in result &&
+        result.ok &&
+        'cycleId' in result &&
+        'therapistId' in result
+      ) {
+        router.replace(
+          buildPostApplyAvailabilityHref(String(result.cycleId), String(result.therapistId))
+        )
+        router.refresh()
+      }
+    })
+  }
+
+  return (
+    <Button type="button" size="sm" disabled={pending} aria-busy={pending} onClick={handleClick}>
+      Apply dates
+    </Button>
+  )
+}
+
+function EmailIntakeRequestChipRow({
+  item,
+  request,
+  updateEmailIntakeItemRequestAction,
+}: {
+  item: EmailIntakePanelItemRow
+  request: EmailIntakePanelItemRow['parsedRequests'][number]
+  updateEmailIntakeItemRequestAction: (
+    formData: FormData
+  ) => void | Promise<void> | Promise<{ ok: true }>
+}) {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+
+  function runAction(buildFormData: () => FormData) {
+    startTransition(async () => {
+      const fd = buildFormData()
+      const result = await updateEmailIntakeItemRequestAction(fd)
+      if (result && typeof result === 'object' && 'ok' in result && result.ok) {
+        router.refresh()
+      }
+    })
+  }
+
+  function handleToggle() {
+    runAction(() => {
+      const fd = new FormData()
+      fd.set('item_id', item.id)
+      fd.set('date', request.date)
+      fd.set('override_type', request.override_type)
+      fd.set('shift_type', request.shift_type)
+      return fd
+    })
+  }
+
+  function handleRemove() {
+    const label = formatRequestLabel(request)
+    if (
+      !window.confirm(
+        `Remove ${label} from this item? To rebuild all parsed dates from the original message or attachment, use Reparse on the email.`
+      )
+    ) {
+      return
+    }
+    runAction(() => {
+      const fd = new FormData()
+      fd.set('mode', 'remove')
+      fd.set('item_id', item.id)
+      fd.set('date', request.date)
+      fd.set('override_type', request.override_type)
+      fd.set('shift_type', request.shift_type)
+      return fd
+    })
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={pending}
+        aria-busy={pending}
+        title="Switch between day off and available to work"
+        onClick={handleToggle}
+        className={
+          request.override_type === 'force_off'
+            ? 'h-7 border-destructive/30 bg-destructive/10 px-2 text-xs text-destructive hover:bg-destructive/15 hover:text-destructive'
+            : 'h-7 border-info-border bg-info-subtle px-2 text-xs text-info-text hover:bg-info-subtle/80 hover:text-info-text'
+        }
+      >
+        {formatRequestLabel(request)}
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        disabled={pending}
+        className="h-7 px-2 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+        aria-label={`Remove ${formatRequestLabel(request)} from parsed list`}
+        onClick={handleRemove}
+      >
+        Remove
+      </Button>
+    </div>
+  )
+}
+
 function getItemNextStep(item: EmailIntakePanelItemRow): string {
   if (item.parseStatus === 'auto_applied') {
     return 'Already auto-applied to availability.'
@@ -127,8 +267,12 @@ function getItemNextStep(item: EmailIntakePanelItemRow): string {
 
 function renderItemCard(params: {
   item: EmailIntakePanelItemRow
-  applyEmailAvailabilityImportAction: (formData: FormData) => void | Promise<void>
-  updateEmailIntakeItemRequestAction: (formData: FormData) => void | Promise<void>
+  applyEmailAvailabilityImportAction: (
+    formData: FormData
+  ) => void | Promise<void> | Promise<{ ok: true; cycleId: string; therapistId: string }>
+  updateEmailIntakeItemRequestAction: (
+    formData: FormData
+  ) => void | Promise<void> | Promise<{ ok: true }>
   updateEmailIntakeTherapistAction: (formData: FormData) => void | Promise<void>
   therapistOptions: Array<{ id: string; fullName: string }>
   cycleOptions: Array<{ id: string; label: string }>
@@ -161,12 +305,10 @@ function renderItemCard(params: {
         </div>
 
         {item.matchedTherapistId && item.matchedCycleId && item.parsedRequests.length > 0 ? (
-          <form action={applyEmailAvailabilityImportAction}>
-            <input type="hidden" name="item_id" value={item.id} />
-            <Button size="sm" type="submit">
-              Apply dates
-            </Button>
-          </form>
+          <EmailIntakeApplyDatesButton
+            item={item}
+            applyEmailAvailabilityImportAction={applyEmailAvailabilityImportAction}
+          />
         ) : null}
       </div>
 
@@ -191,27 +333,12 @@ function renderItemCard(params: {
       {item.parsedRequests.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {item.parsedRequests.map((request) => (
-            <form
+            <EmailIntakeRequestChipRow
               key={`${item.id}-${request.date}-${request.override_type}-${request.shift_type}`}
-              action={updateEmailIntakeItemRequestAction}
-            >
-              <input type="hidden" name="item_id" value={item.id} />
-              <input type="hidden" name="date" value={request.date} />
-              <input type="hidden" name="override_type" value={request.override_type} />
-              <input type="hidden" name="shift_type" value={request.shift_type} />
-              <Button
-                type="submit"
-                size="sm"
-                variant="outline"
-                className={
-                  request.override_type === 'force_off'
-                    ? 'h-7 border-destructive/30 bg-destructive/10 px-2 text-xs text-destructive hover:bg-destructive/15 hover:text-destructive'
-                    : 'h-7 border-info-border bg-info-subtle px-2 text-xs text-info-text hover:bg-info-subtle/80 hover:text-info-text'
-                }
-              >
-                {formatRequestLabel(request)}
-              </Button>
-            </form>
+              item={item}
+              request={request}
+              updateEmailIntakeItemRequestAction={updateEmailIntakeItemRequestAction}
+            />
           ))}
         </div>
       ) : null}
@@ -305,8 +432,12 @@ export function EmailIntakePanel({
   cycleOptions,
 }: {
   rows: EmailIntakePanelRow[]
-  applyEmailAvailabilityImportAction: (formData: FormData) => void | Promise<void>
-  updateEmailIntakeItemRequestAction: (formData: FormData) => void | Promise<void>
+  applyEmailAvailabilityImportAction: (
+    formData: FormData
+  ) => void | Promise<void> | Promise<{ ok: true; cycleId: string; therapistId: string }>
+  updateEmailIntakeItemRequestAction: (
+    formData: FormData
+  ) => void | Promise<void> | Promise<{ ok: true }>
   deleteEmailIntakeAction?: (formData: FormData) => void | Promise<void>
   reparseEmailIntakeAction?: (formData: FormData) => void | Promise<void>
   deleteAvailabilityEmailIntakeAction?: (formData: FormData) => void | Promise<void>

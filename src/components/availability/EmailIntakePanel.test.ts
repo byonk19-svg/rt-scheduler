@@ -1,6 +1,12 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    refresh: vi.fn(),
+  }),
+}))
 
 import { EmailIntakePanel } from '@/components/availability/EmailIntakePanel'
 
@@ -136,7 +142,7 @@ describe('EmailIntakePanel', () => {
     expect(html).not.toContain('Save matches')
   })
 
-  it('renders each parsed request as an editable chip form with payload and edited marker', () => {
+  it('renders each parsed request as an editable chip button with payload and edited marker', () => {
     const html = renderToStaticMarkup(
       createElement(EmailIntakePanel, {
         rows: [
@@ -166,13 +172,9 @@ describe('EmailIntakePanel', () => {
     expect(html).toContain('Edited')
     expect(html).toContain('Mar 24 off')
     expect(html).toContain('Mar 25 work (day)')
-    expect(html).toContain('name="item_id" value="item-1"')
-    expect(html).toContain('name="date" value="2026-03-24"')
-    expect(html).toContain('name="override_type" value="force_off"')
-    expect(html).toContain('name="shift_type" value="both"')
-    expect(html).toContain('name="date" value="2026-03-25"')
-    expect(html).toContain('name="override_type" value="force_on"')
-    expect(html).toContain('name="shift_type" value="day"')
+    expect(html).toContain('type="button"')
+    expect(html).toContain('>Remove</button>')
+    expect(html).toContain('Switch between day off and available to work')
     expect(html).toContain('border-destructive/30')
     expect(html).toContain('bg-destructive/10')
     expect(html).toContain('text-destructive')

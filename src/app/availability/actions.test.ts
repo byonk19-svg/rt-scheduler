@@ -569,9 +569,11 @@ describe('availability actions', () => {
     const formData = new FormData()
     formData.set('intake_id', 'intake-1')
 
-    await expect(applyEmailAvailabilityImportAction(formData)).rejects.toThrow(
-      'REDIRECT:/availability?success=email_intake_applied'
-    )
+    await expect(applyEmailAvailabilityImportAction(formData)).resolves.toEqual({
+      ok: true,
+      cycleId: 'cycle-1',
+      therapistId: 'therapist-1',
+    })
 
     expect(supabase.state.upsertPayloads[0]).toEqual([
       {
@@ -628,7 +630,7 @@ describe('availability actions', () => {
     formData.set('cycle_id', 'cycle-1')
 
     await expect(updateEmailIntakeTherapistAction(formData)).rejects.toThrow(
-      'REDIRECT:/availability?success=email_intake_match_saved'
+      'REDIRECT:/availability?success=email_intake_match_saved&tab=intake'
     )
 
     expect(supabase.state.updates).toEqual([
@@ -683,9 +685,7 @@ describe('availability actions', () => {
     formData.set('override_type', 'force_off')
     formData.set('shift_type', 'both')
 
-    await expect(updateEmailIntakeItemRequestAction(formData)).rejects.toThrow(
-      'REDIRECT:/availability?success=email_intake_request_updated'
-    )
+    await expect(updateEmailIntakeItemRequestAction(formData)).resolves.toEqual({ ok: true })
 
     expect(supabase.state.updates).toEqual([
       {
@@ -729,7 +729,7 @@ describe('availability actions', () => {
     expect(revalidatePathMock).toHaveBeenCalledWith('/availability')
   })
 
-  it('removes an intake item request on the second click after force_on', async () => {
+  it('cycles force_on back to force_off when the chip is clicked again', async () => {
     const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
     supabase.state.emailIntakeItemRow = {
       id: 'item-1',
@@ -749,7 +749,15 @@ describe('availability actions', () => {
     supabase.state.emailIntakeItemRows = [
       {
         parse_status: 'parsed',
-        parsed_requests: [],
+        parsed_requests: [
+          {
+            date: '2026-03-24',
+            override_type: 'force_off',
+            shift_type: 'both',
+            note: null,
+            source_line: 'Need off Mar 24',
+          },
+        ],
       },
     ]
     createClientMock.mockResolvedValue(supabase)
@@ -760,28 +768,109 @@ describe('availability actions', () => {
     formData.set('override_type', 'force_on')
     formData.set('shift_type', 'both')
 
-    await expect(updateEmailIntakeItemRequestAction(formData)).rejects.toThrow(
-      'REDIRECT:/availability?success=email_intake_request_updated'
-    )
+    await expect(updateEmailIntakeItemRequestAction(formData)).resolves.toEqual({ ok: true })
 
     expect(supabase.state.updates).toEqual([
       {
         table: 'availability_email_intake_items',
         payload: {
-          parse_status: 'failed',
-          parsed_requests: [],
+          parse_status: 'parsed',
+          parsed_requests: [
+            {
+              date: '2026-03-24',
+              override_type: 'force_off',
+              shift_type: 'both',
+              note: null,
+              source_line: 'Need off Mar 24',
+            },
+          ],
         },
         filters: { id: 'item-1' },
       },
       {
         table: 'availability_email_intakes',
         payload: expect.objectContaining({
-          parsed_requests: [],
+          parsed_requests: [
+            {
+              date: '2026-03-24',
+              override_type: 'force_off',
+              shift_type: 'both',
+              note: null,
+              source_line: 'Need off Mar 24',
+            },
+          ],
           item_count: 1,
         }),
         filters: { id: 'intake-1' },
       },
     ])
+  })
+
+  it('removes a parsed request when mode is remove', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    supabase.state.emailIntakeItemRow = {
+      id: 'item-1',
+      intake_id: 'intake-1',
+      matched_therapist_id: 'therapist-1',
+      matched_cycle_id: 'cycle-1',
+      parsed_requests: [
+        {
+          date: '2026-03-24',
+          override_type: 'force_off',
+          shift_type: 'both',
+          note: null,
+          source_line: 'First',
+        },
+        {
+          date: '2026-03-25',
+          override_type: 'force_on',
+          shift_type: 'both',
+          note: null,
+          source_line: 'Second',
+        },
+      ],
+    }
+    supabase.state.emailIntakeItemRows = [
+      {
+        parse_status: 'parsed',
+        parsed_requests: [
+          {
+            date: '2026-03-25',
+            override_type: 'force_on',
+            shift_type: 'both',
+            note: null,
+            source_line: 'Second',
+          },
+        ],
+      },
+    ]
+    createClientMock.mockResolvedValue(supabase)
+
+    const formData = new FormData()
+    formData.set('mode', 'remove')
+    formData.set('item_id', 'item-1')
+    formData.set('date', '2026-03-24')
+    formData.set('override_type', 'force_off')
+    formData.set('shift_type', 'both')
+
+    await expect(updateEmailIntakeItemRequestAction(formData)).resolves.toEqual({ ok: true })
+
+    expect(supabase.state.updates[0]).toEqual({
+      table: 'availability_email_intake_items',
+      payload: {
+        parse_status: 'parsed',
+        parsed_requests: [
+          {
+            date: '2026-03-25',
+            override_type: 'force_on',
+            shift_type: 'both',
+            note: null,
+            source_line: 'Second',
+          },
+        ],
+      },
+      filters: { id: 'item-1' },
+    })
   })
 
   it('requires manager access before updating an intake item request', async () => {
@@ -813,7 +902,7 @@ describe('availability actions', () => {
     formData.set('shift_type', 'both')
 
     await expect(updateEmailIntakeItemRequestAction(formData)).rejects.toThrow(
-      'REDIRECT:/availability?error=email_intake_request_update_failed'
+      'REDIRECT:/availability?error=email_intake_request_update_failed&tab=intake'
     )
 
     expect(supabase.state.updates).toEqual([])
@@ -848,7 +937,7 @@ describe('availability actions', () => {
     formData.set('shift_type', 'both')
 
     await expect(updateEmailIntakeItemRequestAction(formData)).rejects.toThrow(
-      'REDIRECT:/availability?error=email_intake_request_update_failed'
+      'REDIRECT:/availability?error=email_intake_request_update_failed&tab=intake'
     )
 
     expect(supabase.state.updates).toEqual([
@@ -879,7 +968,7 @@ describe('availability actions', () => {
     formData.set('therapist_id', 'therapist-1')
 
     await expect(updateEmailIntakeTherapistAction(formData)).rejects.toThrow(
-      'REDIRECT:/availability?error=email_intake_match_failed'
+      'REDIRECT:/availability?error=email_intake_match_failed&tab=intake'
     )
 
     expect(supabase.state.updates).toEqual([])
@@ -907,7 +996,7 @@ describe('availability actions', () => {
     formData.set('intake_id', 'intake-1')
 
     await expect(reparseAvailabilityEmailIntakeAction(formData)).rejects.toThrow(
-      'REDIRECT:/availability?success=email_intake_reparsed'
+      'REDIRECT:/availability?success=email_intake_reparsed&tab=intake'
     )
 
     expect(supabase.state.deletes).toContainEqual({
@@ -967,7 +1056,7 @@ describe('availability actions', () => {
     formData.set('intake_id', 'intake-1')
 
     await expect(deleteAvailabilityEmailIntakeAction(formData)).rejects.toThrow(
-      'REDIRECT:/availability?success=email_intake_deleted'
+      'REDIRECT:/availability?success=email_intake_deleted&tab=intake'
     )
 
     expect(supabase.state.deletes).toContainEqual({

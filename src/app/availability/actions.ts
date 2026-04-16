@@ -17,7 +17,11 @@ import {
   sanitizeParsedRequests,
   stripHtmlToText,
 } from '@/lib/availability-email-intake'
-import { cycleIntakeRequest, markRequestsEdited } from '@/lib/availability-intake-request-cycler'
+import {
+  cycleIntakeRequest,
+  markRequestsEdited,
+  removeIntakeRequest,
+} from '@/lib/availability-intake-request-cycler'
 import { shiftOverridesToCycle } from '@/lib/copy-cycle-availability'
 import { buildManagerOverrideInput } from '@/lib/employee-directory'
 import { extractTextFromAttachment } from '@/lib/openai-ocr'
@@ -134,6 +138,11 @@ function buildAvailabilityUrl(
   }
   const query = search.toString()
   return query.length > 0 ? `${returnPath}?${query}` : returnPath
+}
+
+/** Email intake flows should return to the Intake tab after redirect. */
+function buildEmailIntakeAvailabilityUrl(params?: Record<string, string | undefined>) {
+  return buildAvailabilityUrl({ ...params, tab: 'intake' })
 }
 
 function summarizeAvailabilityItemRows(rows: AvailabilityEmailItemSummaryRow[]) {
@@ -665,7 +674,7 @@ export async function applyEmailAvailabilityImportAction(formData: FormData) {
   const intakeId = String(formData.get('intake_id') ?? '').trim()
 
   if (!itemId && !intakeId) {
-    redirect(buildAvailabilityUrl({ error: 'email_intake_apply_failed' }))
+    redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_apply_failed' }))
   }
 
   let effectiveIntakeId = intakeId
@@ -684,7 +693,7 @@ export async function applyEmailAvailabilityImportAction(formData: FormData) {
 
     if (itemError || !item) {
       console.error('Failed to load availability email intake item:', itemError)
-      redirect(buildAvailabilityUrl({ error: 'email_intake_apply_failed' }))
+      redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_apply_failed' }))
     }
 
     effectiveIntakeId = String(item.intake_id)
@@ -700,7 +709,7 @@ export async function applyEmailAvailabilityImportAction(formData: FormData) {
 
     if (intakeError || !intake) {
       console.error('Failed to load availability email intake:', intakeError)
-      redirect(buildAvailabilityUrl({ error: 'email_intake_apply_failed' }))
+      redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_apply_failed' }))
     }
 
     matchedTherapistId = intake.matched_therapist_id
@@ -709,11 +718,11 @@ export async function applyEmailAvailabilityImportAction(formData: FormData) {
   }
 
   if (!matchedTherapistId || !matchedCycleId) {
-    redirect(buildAvailabilityUrl({ error: 'email_intake_apply_failed' }))
+    redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_apply_failed' }))
   }
 
   if (parsedRequests.length === 0) {
-    redirect(buildAvailabilityUrl({ error: 'email_intake_apply_failed' }))
+    redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_apply_failed' }))
   }
 
   const payload = parsedRequests.map((request) =>
@@ -734,7 +743,7 @@ export async function applyEmailAvailabilityImportAction(formData: FormData) {
 
   if (upsertError) {
     console.error('Failed to apply availability email intake:', upsertError)
-    redirect(buildAvailabilityUrl({ error: 'email_intake_apply_failed' }))
+    redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_apply_failed' }))
   }
 
   if (itemId) {
@@ -753,7 +762,7 @@ export async function applyEmailAvailabilityImportAction(formData: FormData) {
         'Failed to mark availability email intake item as auto-applied:',
         itemUpdateError
       )
-      redirect(buildAvailabilityUrl({ error: 'email_intake_apply_failed' }))
+      redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_apply_failed' }))
     }
   } else {
     const { error: updateError } = await supabase
@@ -768,7 +777,7 @@ export async function applyEmailAvailabilityImportAction(formData: FormData) {
 
     if (updateError) {
       console.error('Failed to mark availability email intake as applied:', updateError)
-      redirect(buildAvailabilityUrl({ error: 'email_intake_apply_failed' }))
+      redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_apply_failed' }))
     }
   }
 
@@ -777,7 +786,11 @@ export async function applyEmailAvailabilityImportAction(formData: FormData) {
   }
 
   revalidatePath('/availability')
-  redirect(buildAvailabilityUrl({ success: 'email_intake_applied' }))
+  return {
+    ok: true as const,
+    cycleId: matchedCycleId,
+    therapistId: matchedTherapistId,
+  }
 }
 
 export async function updateEmailIntakeTherapistAction(formData: FormData) {
@@ -793,7 +806,7 @@ export async function updateEmailIntakeTherapistAction(formData: FormData) {
   const cycleId = String(formData.get('cycle_id') ?? '').trim()
 
   if ((!itemId && !intakeId) || !therapistId || !cycleId) {
-    redirect(buildAvailabilityUrl({ error: 'email_intake_match_failed' }))
+    redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_match_failed' }))
   }
 
   if (itemId) {
@@ -805,7 +818,7 @@ export async function updateEmailIntakeTherapistAction(formData: FormData) {
 
     if (loadError || !item) {
       console.error('Failed to load intake item for therapist update:', loadError)
-      redirect(buildAvailabilityUrl({ error: 'email_intake_match_failed' }))
+      redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_match_failed' }))
     }
 
     const parsedRequests = sanitizeParsedRequests(item.parsed_requests)
@@ -823,7 +836,7 @@ export async function updateEmailIntakeTherapistAction(formData: FormData) {
 
     if (itemUpdateError) {
       console.error('Failed to update intake item therapist match:', itemUpdateError)
-      redirect(buildAvailabilityUrl({ error: 'email_intake_match_failed' }))
+      redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_match_failed' }))
     }
 
     await refreshAvailabilityEmailIntakeBatchState(supabase, String(item.intake_id))
@@ -836,7 +849,7 @@ export async function updateEmailIntakeTherapistAction(formData: FormData) {
 
     if (loadError || !intake) {
       console.error('Failed to load intake for therapist update:', loadError)
-      redirect(buildAvailabilityUrl({ error: 'email_intake_match_failed' }))
+      redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_match_failed' }))
     }
 
     const parsedRequests = sanitizeParsedRequests(intake.parsed_requests)
@@ -854,12 +867,12 @@ export async function updateEmailIntakeTherapistAction(formData: FormData) {
 
     if (updateError) {
       console.error('Failed to update intake therapist match:', updateError)
-      redirect(buildAvailabilityUrl({ error: 'email_intake_match_failed' }))
+      redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_match_failed' }))
     }
   }
 
   revalidatePath('/availability')
-  redirect(buildAvailabilityUrl({ success: 'email_intake_match_saved' }))
+  redirect(buildEmailIntakeAvailabilityUrl({ success: 'email_intake_match_saved' }))
 }
 
 export async function updateEmailIntakeItemRequestAction(formData: FormData) {
@@ -873,6 +886,8 @@ export async function updateEmailIntakeItemRequestAction(formData: FormData) {
   const date = String(formData.get('date') ?? '').trim()
   const overrideType = String(formData.get('override_type') ?? '').trim()
   const shiftType = String(formData.get('shift_type') ?? '').trim()
+  const modeRaw = String(formData.get('mode') ?? '').trim()
+  const mode = modeRaw === 'remove' ? 'remove' : 'cycle'
 
   if (
     !itemId ||
@@ -880,7 +895,7 @@ export async function updateEmailIntakeItemRequestAction(formData: FormData) {
     (overrideType !== 'force_off' && overrideType !== 'force_on') ||
     (shiftType !== 'day' && shiftType !== 'night' && shiftType !== 'both')
   ) {
-    redirect(buildAvailabilityUrl({ error: 'email_intake_request_update_failed' }))
+    redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_request_update_failed' }))
   }
 
   const { data: item, error: loadError } = await supabase
@@ -893,17 +908,18 @@ export async function updateEmailIntakeItemRequestAction(formData: FormData) {
 
   if (loadError || !item) {
     console.error('Failed to load intake item for request update:', loadError)
-    redirect(buildAvailabilityUrl({ error: 'email_intake_request_update_failed' }))
+    redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_request_update_failed' }))
   }
 
-  const parsedRequests = cycleIntakeRequest({
-    requests: item.parsed_requests,
-    target: {
-      date,
-      override_type: overrideType,
-      shift_type: shiftType,
-    },
-  })
+  const chipTarget = {
+    date,
+    override_type: overrideType as 'force_off' | 'force_on',
+    shift_type: shiftType as 'day' | 'night' | 'both',
+  }
+  const parsedRequests =
+    mode === 'remove'
+      ? removeIntakeRequest({ requests: item.parsed_requests, target: chipTarget })
+      : cycleIntakeRequest({ requests: item.parsed_requests, target: chipTarget })
   const nextParseStatus: AvailabilityEmailItemStatus =
     parsedRequests.length === 0
       ? 'failed'
@@ -934,7 +950,7 @@ export async function updateEmailIntakeItemRequestAction(formData: FormData) {
 
   if (updateError) {
     console.error('Failed to update intake item request:', updateError)
-    redirect(buildAvailabilityUrl({ error: 'email_intake_request_update_failed' }))
+    redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_request_update_failed' }))
   }
 
   if (item.intake_id) {
@@ -942,7 +958,7 @@ export async function updateEmailIntakeItemRequestAction(formData: FormData) {
   }
 
   revalidatePath('/availability')
-  redirect(buildAvailabilityUrl({ success: 'email_intake_request_updated' }))
+  return { ok: true as const }
 }
 
 export async function reparseEmailIntakeAction(formData: FormData) {
@@ -954,7 +970,7 @@ export async function reparseEmailIntakeAction(formData: FormData) {
 
   const intakeId = String(formData.get('intake_id') ?? '').trim()
   if (!intakeId) {
-    redirect(buildAvailabilityUrl({ error: 'email_intake_reparse_failed' }))
+    redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_reparse_failed' }))
   }
 
   const [
@@ -982,7 +998,7 @@ export async function reparseEmailIntakeAction(formData: FormData) {
       itemLoadError,
       attachmentLoadError,
     })
-    redirect(buildAvailabilityUrl({ error: 'email_intake_reparse_failed' }))
+    redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_reparse_failed' }))
   }
 
   const { profiles, cycles } = await loadAvailabilityEmailParsingContext(supabase)
@@ -1014,7 +1030,7 @@ export async function reparseEmailIntakeAction(formData: FormData) {
 
     if (attachmentUpdateError) {
       console.error('Failed to update intake attachment OCR state:', attachmentUpdateError)
-      redirect(buildAvailabilityUrl({ error: 'email_intake_reparse_failed' }))
+      redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_reparse_failed' }))
     }
 
     processedAttachments.push({
@@ -1050,7 +1066,7 @@ export async function reparseEmailIntakeAction(formData: FormData) {
 
     if (deleteError) {
       console.error('Failed to clear old intake items before reparsing:', deleteError)
-      redirect(buildAvailabilityUrl({ error: 'email_intake_reparse_failed' }))
+      redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_reparse_failed' }))
     }
   }
 
@@ -1084,7 +1100,7 @@ export async function reparseEmailIntakeAction(formData: FormData) {
 
     if (insertError) {
       console.error('Failed to insert reparsed intake items:', insertError)
-      redirect(buildAvailabilityUrl({ error: 'email_intake_reparse_failed' }))
+      redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_reparse_failed' }))
     }
   }
 
@@ -1104,11 +1120,11 @@ export async function reparseEmailIntakeAction(formData: FormData) {
 
   if (intakeUpdateError) {
     console.error('Failed to update intake summary after reparsing:', intakeUpdateError)
-    redirect(buildAvailabilityUrl({ error: 'email_intake_reparse_failed' }))
+    redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_reparse_failed' }))
   }
 
   revalidatePath('/availability')
-  redirect(buildAvailabilityUrl({ success: 'email_intake_reparsed' }))
+  redirect(buildEmailIntakeAvailabilityUrl({ success: 'email_intake_reparsed' }))
 }
 
 export async function deleteEmailIntakeAction(formData: FormData) {
@@ -1120,18 +1136,18 @@ export async function deleteEmailIntakeAction(formData: FormData) {
 
   const intakeId = String(formData.get('intake_id') ?? '').trim()
   if (!intakeId) {
-    redirect(buildAvailabilityUrl({ error: 'email_intake_delete_failed' }))
+    redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_delete_failed' }))
   }
 
   const { error } = await supabase.from('availability_email_intakes').delete().eq('id', intakeId)
 
   if (error) {
     console.error('Failed to delete availability email intake:', error)
-    redirect(buildAvailabilityUrl({ error: 'email_intake_delete_failed' }))
+    redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_delete_failed' }))
   }
 
   revalidatePath('/availability')
-  redirect(buildAvailabilityUrl({ success: 'email_intake_deleted' }))
+  redirect(buildEmailIntakeAvailabilityUrl({ success: 'email_intake_deleted' }))
 }
 
 // Backward-compatible aliases for existing imports.

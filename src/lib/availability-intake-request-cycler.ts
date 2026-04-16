@@ -69,9 +69,28 @@ export function cycleIntakeRequest(params: {
       ...existingRequest,
       override_type: 'force_on',
     })
+    return sortParsedRequests(nextRequests)
+  }
+
+  if (existingRequest.override_type === 'force_on') {
+    nextRequests.push({
+      ...existingRequest,
+      override_type: 'force_off',
+    })
   }
 
   return sortParsedRequests(nextRequests)
+}
+
+/** Drops the request that matches the chip target (used only after explicit manager confirm). */
+export function removeIntakeRequest(params: {
+  requests: unknown
+  target: IntakeRequestChipTarget
+}): ParsedAvailabilityRequest[] {
+  const requests = sanitizeParsedRequests(params.requests)
+  return sortParsedRequests(
+    requests.filter((request) => !matchesChipTarget(request, params.target))
+  )
 }
 
 function serializeParsedRequests(requests: unknown): string {
