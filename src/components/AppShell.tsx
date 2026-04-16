@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { can } from '@/lib/auth/can'
 import type { UiRole } from '@/lib/auth/roles'
-import { NotificationBell } from '@/components/NotificationBell'
+import { DeferredNotificationBell } from '@/components/DeferredNotificationBell'
 import { WorkflowTabs } from '@/components/schedule-roster/WorkflowTabs'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -406,7 +406,10 @@ export function AppShell({ user, unreadNotificationCount = 0, children }: AppShe
 
           {/* Right side: notification bell + user dropdown */}
           <div className="ml-auto flex items-center gap-1">
-            <NotificationBell variant="shell" initialUnreadCount={unreadNotificationCount} />
+            <DeferredNotificationBell
+              variant="shell"
+              initialUnreadCount={unreadNotificationCount}
+            />
             <UserDropdown user={user} canAccessManagerUi={canAccessManagerUi} />
           </div>
 

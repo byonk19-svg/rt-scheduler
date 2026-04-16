@@ -1,16 +1,19 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useState } from 'react'
 
-import { EmployeeRosterPanel } from '@/components/team/EmployeeRosterPanel'
-import {
-  TeamDirectory,
-  type TeamProfileRecord,
-  type WorkPatternRecord,
-} from '@/components/team/TeamDirectory'
+import type { TeamProfileRecord, WorkPatternRecord } from '@/components/team/TeamDirectory'
 import type { EmployeeRosterTableRow } from '@/components/team/employee-roster-table'
 import type { TeamSummaryCounts } from '@/components/team/team-directory-model'
 import { cn } from '@/lib/utils'
+
+const TeamDirectory = dynamic(() =>
+  import('@/components/team/TeamDirectory').then((module) => module.TeamDirectory)
+)
+const EmployeeRosterPanel = dynamic(() =>
+  import('@/components/team/EmployeeRosterPanel').then((module) => module.EmployeeRosterPanel)
+)
 
 export type TeamWorkspaceTab = 'directory' | 'roster'
 

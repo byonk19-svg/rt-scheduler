@@ -1,5 +1,11 @@
 # Session History
 
+## Session 77 - 2026-04-16
+
+- Removed the authenticated-layout `MotionProvider` wrapper so `framer-motion` no longer ships across the full app shell.
+- Added `DeferredNotificationBell` to keep the unread badge in the shell while deferring the full notification dropdown client logic until after hydration.
+- Lazy-loaded closed dialogs on `/coverage` and code-split the directory vs roster-admin panels on `/team`, cutting the measured route chunks to about `91.3 KB` for `/coverage` and `7.8 KB` for the `/team` entry chunk in the production build.
+
 ## Session 76 - 2026-04-16
 
 - Split the App Router tree into public and authenticated route groups so the root layout stays lightweight while app-shell auth, unread counts, motion, and nav chrome live in `src/app/(app)/layout.tsx`.

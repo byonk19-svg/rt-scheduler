@@ -1,5 +1,6 @@
 ﻿'use client'
 
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import {
   type ReactNode,
@@ -14,9 +15,6 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ChevronRight, Printer, Send, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
 
-import { AutoDraftConfirmDialog } from '@/components/coverage/AutoDraftConfirmDialog'
-import { ClearDraftConfirmDialog } from '@/components/coverage/ClearDraftConfirmDialog'
-import { CycleManagementDialog } from '@/components/coverage/CycleManagementDialog'
 import { MoreActionsMenu } from '@/components/more-actions-menu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -33,7 +31,6 @@ import {
 import { StatusPill } from '@/components/coverage/AssignmentStatusPopover'
 import { CalendarGrid } from '@/components/coverage/CalendarGrid'
 import { RosterScheduleView, type RosterMemberRow } from '@/components/coverage/RosterScheduleView'
-import { ShiftEditorDialog } from '@/components/coverage/ShiftEditorDialog'
 import { PrintSchedule } from '@/components/print-schedule'
 import type {
   CoveragePageSnapshot,
@@ -71,6 +68,19 @@ import {
   parseCoverageShiftSearchParam,
   shiftTabToQueryValue,
 } from '@/lib/coverage/coverage-shift-tab'
+
+const AutoDraftConfirmDialog = dynamic(() =>
+  import('@/components/coverage/AutoDraftConfirmDialog').then((module) => module.AutoDraftConfirmDialog)
+)
+const ClearDraftConfirmDialog = dynamic(() =>
+  import('@/components/coverage/ClearDraftConfirmDialog').then((module) => module.ClearDraftConfirmDialog)
+)
+const CycleManagementDialog = dynamic(() =>
+  import('@/components/coverage/CycleManagementDialog').then((module) => module.CycleManagementDialog)
+)
+const ShiftEditorDialog = dynamic(() =>
+  import('@/components/coverage/ShiftEditorDialog').then((module) => module.ShiftEditorDialog)
+)
 
 type DayStatus = DayItem['dayStatus']
 
@@ -1515,47 +1525,55 @@ export function CoverageClientPage({
         </div>
       </motion.div>
 
-      <ShiftEditorDialog
-        open={Boolean(selectedDay)}
-        selectedDay={selectedDay}
-        therapists={allTherapists}
-        canEdit={Boolean(canManageCoverage && activeCycleId)}
-        coverageCycleId={activeCycleId}
-        isPastDate={isPastDate}
-        hasOperationalEntries={hasOperationalEntries}
-        assigning={assigning}
-        unassigningShiftId={unassigningShiftId}
-        weeklyTherapistCounts={weeklyTherapistCounts}
-        onOpenChange={(open) => {
-          if (!open) handleClose()
-        }}
-        onAssignTherapist={handleAssignTherapist}
-        assignError={assignError}
-        onUnassign={handleUnassign}
-      />
-      <AutoDraftConfirmDialog
-        open={autoDraftDialogOpen}
-        onOpenChange={setAutoDraftDialogOpen}
-        applyFormRef={autoDraftFormRef}
-        cycleId={activeCycleId ?? ''}
-        isPublished={activeCyclePublished}
-      />
-      <ClearDraftConfirmDialog
-        open={clearDraftDialogOpen}
-        onOpenChange={setClearDraftDialogOpen}
-        applyFormRef={clearDraftFormRef}
-        cycleId={activeCycleId ?? ''}
-        cycleLabel={printCycle?.label ?? null}
-        isPublished={activeCyclePublished}
-      />
-      <CycleManagementDialog
-        key={`cycle-dialog-${cycleDialogOpen ? 'open' : 'closed'}-${availableCycles[0]?.end_date ?? 'none'}`}
-        cycles={availableCycles}
-        open={cycleDialogOpen}
-        onOpenChange={setCycleDialogOpen}
-        createCycleAction={createCycleAction}
-        deleteCycleAction={deleteCycleAction}
-      />
+      {selectedDay ? (
+        <ShiftEditorDialog
+          open
+          selectedDay={selectedDay}
+          therapists={allTherapists}
+          canEdit={Boolean(canManageCoverage && activeCycleId)}
+          coverageCycleId={activeCycleId}
+          isPastDate={isPastDate}
+          hasOperationalEntries={hasOperationalEntries}
+          assigning={assigning}
+          unassigningShiftId={unassigningShiftId}
+          weeklyTherapistCounts={weeklyTherapistCounts}
+          onOpenChange={(open) => {
+            if (!open) handleClose()
+          }}
+          onAssignTherapist={handleAssignTherapist}
+          assignError={assignError}
+          onUnassign={handleUnassign}
+        />
+      ) : null}
+      {autoDraftDialogOpen ? (
+        <AutoDraftConfirmDialog
+          open
+          onOpenChange={setAutoDraftDialogOpen}
+          applyFormRef={autoDraftFormRef}
+          cycleId={activeCycleId ?? ''}
+          isPublished={activeCyclePublished}
+        />
+      ) : null}
+      {clearDraftDialogOpen ? (
+        <ClearDraftConfirmDialog
+          open
+          onOpenChange={setClearDraftDialogOpen}
+          applyFormRef={clearDraftFormRef}
+          cycleId={activeCycleId ?? ''}
+          cycleLabel={printCycle?.label ?? null}
+          isPublished={activeCyclePublished}
+        />
+      ) : null}
+      {cycleDialogOpen ? (
+        <CycleManagementDialog
+          key={`cycle-dialog-${cycleDialogOpen ? 'open' : 'closed'}-${availableCycles[0]?.end_date ?? 'none'}`}
+          cycles={availableCycles}
+          open
+          onOpenChange={setCycleDialogOpen}
+          createCycleAction={createCycleAction}
+          deleteCycleAction={deleteCycleAction}
+        />
+      ) : null}
       <PrintSchedule
         activeCycle={printCycle}
         cycleDates={printCycleDates}

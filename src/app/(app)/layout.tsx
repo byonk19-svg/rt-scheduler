@@ -1,5 +1,4 @@
 import { AppShell, type AppShellUser } from '@/components/AppShell'
-import { MotionProvider } from '@/components/motion-provider'
 import { toUiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 
@@ -65,10 +64,8 @@ export default async function AuthenticatedLayout({
   const { user, unreadNotificationCount } = await getAuthenticatedShellData()
 
   return (
-    <MotionProvider>
-      <AppShell user={user} unreadNotificationCount={unreadNotificationCount}>
-        {children}
-      </AppShell>
-    </MotionProvider>
+    <AppShell user={user} unreadNotificationCount={unreadNotificationCount}>
+      {children}
+    </AppShell>
   )
 }

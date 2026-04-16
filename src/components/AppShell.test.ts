@@ -39,6 +39,13 @@ describe('AppShell mobile menu', () => {
     expect(appShellSource).not.toMatch(/useSearchParams/)
   })
 
+  it('defers notification bell logic behind a lightweight shell wrapper', () => {
+    expect(appShellSource).toContain('DeferredNotificationBell')
+    expect(appShellSource).not.toContain(
+      "import { NotificationBell } from '@/components/NotificationBell'"
+    )
+  })
+
   it('uses a real button for the mobile backdrop dismiss target', () => {
     expect(appShellSource).toMatch(/<button[\s\S]*className="absolute inset-0 bg-black\/45"/)
   })
