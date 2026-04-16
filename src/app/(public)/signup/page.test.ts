@@ -3,15 +3,26 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const pageSource = fs.readFileSync(path.join(process.cwd(), 'src/app/signup/page.tsx'), 'utf8')
+const layoutSource = fs.readFileSync(
+  path.join(process.cwd(), 'src/app/(public)/layout.tsx'),
+  'utf8'
+)
+const signupPageSource = fs.readFileSync(
+  path.join(process.cwd(), 'src/app/(public)/signup/page.tsx'),
+  'utf8'
+)
 
-describe('signup security contract', () => {
+describe('public signup shell', () => {
+  it('mounts the shared public header from the public layout', () => {
+    expect(layoutSource).toContain('PublicHeader')
+  })
+
   it('does not call the team roster matching action from the public signup page', () => {
-    expect(pageSource).not.toContain('checkNameRosterMatchAction')
+    expect(signupPageSource).not.toContain('checkNameRosterMatchAction')
   })
 
   it('always redirects new signups to the generic requested status', () => {
-    expect(pageSource).toContain("router.push('/login?status=requested')")
-    expect(pageSource).not.toContain("'/login?status=matched'")
+    expect(signupPageSource).toContain("router.push('/login?status=requested')")
+    expect(signupPageSource).not.toContain("'/login?status=matched'")
   })
 })

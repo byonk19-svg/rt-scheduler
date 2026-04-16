@@ -12,7 +12,12 @@ import {
 } from '@/components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
-import { formatLongDate, type Assignment, type ShiftType } from '@/lib/mock-coverage-roster'
+import {
+  formatLongDate,
+  type Assignment,
+  type AvailabilityApprovalKind,
+  type ShiftType,
+} from '@/lib/mock-coverage-roster'
 
 type AssignShiftPopoverProps = {
   trigger: ReactElement
@@ -22,6 +27,7 @@ type AssignShiftPopoverProps = {
   isoDate: string
   shiftType: ShiftType
   assignment: Assignment | null
+  availabilityApproval: AvailabilityApprovalKind | null
   onConfirm: () => void
   onUnassign: () => void
 }
@@ -31,6 +37,7 @@ function AssignShiftContent({
   isoDate,
   shiftType,
   assignment,
+  availabilityApproval,
   onConfirm,
   onUnassign,
   onCancel,
@@ -39,15 +46,30 @@ function AssignShiftContent({
   isoDate: string
   shiftType: ShiftType
   assignment: Assignment | null
+  availabilityApproval: AvailabilityApprovalKind | null
   onConfirm: () => void
   onUnassign: () => void
   onCancel: () => void
 }) {
   const isAssigned = assignment != null
+  const approvalNote =
+    availabilityApproval === 'approved_off'
+      ? 'Approved day off (availability)'
+      : availabilityApproval === 'approved_work'
+        ? 'Approved request to work (availability)'
+        : null
 
   return (
     <div className="space-y-4">
       <div className="space-y-3 text-sm">
+        {approvalNote ? (
+          <div className="rounded-2xl border border-border/80 bg-muted/35 px-3 py-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Availability
+            </p>
+            <p className="mt-1 text-foreground">{approvalNote}</p>
+          </div>
+        ) : null}
         <div className="rounded-2xl border border-border/80 bg-muted/35 px-3 py-2">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             Staff
@@ -96,6 +118,7 @@ export function AssignShiftPopover({
   isoDate,
   shiftType,
   assignment,
+  availabilityApproval,
   onConfirm,
   onUnassign,
 }: AssignShiftPopoverProps) {
@@ -140,6 +163,7 @@ export function AssignShiftPopover({
                   isoDate={isoDate}
                   shiftType={shiftType}
                   assignment={assignment}
+                  availabilityApproval={availabilityApproval}
                   onConfirm={() => {
                     onConfirm()
                     onOpenChange(false)
@@ -176,6 +200,7 @@ export function AssignShiftPopover({
           isoDate={isoDate}
           shiftType={shiftType}
           assignment={assignment}
+          availabilityApproval={availabilityApproval}
           onConfirm={() => {
             onConfirm()
             onOpenChange(false)

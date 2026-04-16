@@ -1,5 +1,13 @@
 # Session History
 
+## Session 80 - 2026-04-16
+
+- Standardized the sitewide header system around shared shell primitives in `src/components/shell/`: one sticky authenticated `AppHeader`, route-driven `LocalSectionNav`, and shared `PageIntro` treatment for manager/page headers.
+- Added `src/components/public/PublicHeader.tsx` and mounted it from `src/app/(public)/layout.tsx`, removing repeated top-bar markup from `/`, `/login`, `/signup`, and `/reset-password`.
+- Rebased `AppShell` onto `app-shell-config.ts`, removed the old stacked dark secondary sticky bar, and kept `/schedule` inside the authenticated shell as a read-only roster surface rather than a standalone top-header screen.
+- `/schedule` is live for managers/leads: `loadScheduleRosterPageData` / `schedule-roster-live-data.ts` (cycles, shifts, therapist submissions, overrides); `schedule-roster-data.ts` maps rows to the roster store. Removed mock/demo roster paths, `EmptyStateBanner`, and public `/schedule` in `src/proxy.ts`; non-privileged users redirect away from `/schedule`.
+- Verified with targeted Vitest (`app-shell-config`, `AppShell`, `ManagerWorkspaceHeader`, public signup shell, schedule roster data) and ESLint. Repo-wide `npx tsc --noEmit` still fails on the unrelated `EmployeeRosterPanel.test.ts` fixture missing `matched_email`.
+
 ## Session 78 - 2026-04-16
 
 - `/coverage` now ships both day and night therapist/roster datasets in the initial server snapshot and swaps them locally, eliminating the old post-hydration Supabase reads when managers switch shift tabs.

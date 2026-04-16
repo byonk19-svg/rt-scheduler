@@ -15,37 +15,6 @@ const therapistSubcopy =
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-background">
-      <header className="teamwise-marketing-header relative z-20 border-b border-border/50 bg-background/90">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--attention)] shadow-tw-md-soft">
-              <CalendarDays className="h-4 w-4 text-accent-foreground" />
-            </div>
-            <div>
-              <p className="font-heading text-sm font-bold tracking-[-0.02em] text-foreground">
-                Teamwise
-              </p>
-              <p className="text-[0.72rem] font-medium text-muted-foreground">
-                Respiratory Therapy
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              asChild
-              variant="ghost"
-              size="sm"
-              className="text-foreground/80 hover:bg-card/75"
-            >
-              <Link href="/login">Sign in</Link>
-            </Button>
-            <Button asChild size="sm" className="rounded-xl px-5 shadow-tw-primary-glow">
-              <Link href="/signup">Get started</Link>
-            </Button>
-          </div>
-        </div>
-      </header>
-
       <section className="teamwise-home-luminous relative overflow-hidden">
         <div aria-hidden className="teamwise-home-grid absolute inset-0" />
         <div

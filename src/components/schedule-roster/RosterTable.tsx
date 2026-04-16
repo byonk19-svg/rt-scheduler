@@ -6,7 +6,10 @@ import { AssignShiftPopover } from '@/components/schedule-roster/AssignShiftPopo
 import {
   createAssignmentKey,
   getAssignment,
+  getAvailabilityApproval,
+  resolveMockRosterCellDisplay,
   type AssignmentStore,
+  type AvailabilityApprovalStore,
   type RosterWeek,
   type ShiftType,
   type Staff,
@@ -25,21 +28,26 @@ type RosterTableProps = {
   staff: readonly Staff[]
   weeks: readonly RosterWeek[]
   assignments: AssignmentStore
+  availabilityApprovals: AvailabilityApprovalStore
   selectedShift: ShiftType
   selectedCell: SelectedCell | null
   onSelectedCellChange: (cell: SelectedCell | null) => void
   onAssign: (cell: SelectedCell) => void
   onUnassign: (cell: SelectedCell) => void
+  /** Live data: cells are display-only (assignments and availability come from the server). */
+  readOnly?: boolean
 }
 
 function getCellLabel(
   staffName: string,
   isoDate: string,
   selectedShift: ShiftType,
-  hasAssignment: boolean
+  symbol: ReturnType<typeof resolveMockRosterCellDisplay>['symbol']
 ): string {
-  const action = hasAssignment ? 'Manage assignment for' : 'Assign'
-  return `${action} ${staffName} on ${isoDate} for the ${selectedShift} shift`
+  const ctx = `${staffName} on ${isoDate} for the ${selectedShift} shift`
+  if (symbol === 'x') return `Approved day off for ${ctx}`
+  if (symbol === '1') return `Manage roster cell for ${ctx}`
+  return `Assign ${ctx}`
 }
 
 export function RosterTable({
@@ -49,11 +57,13 @@ export function RosterTable({
   staff,
   weeks,
   assignments,
+  availabilityApprovals,
   selectedShift,
   selectedCell,
   onSelectedCellChange,
   onAssign,
   onUnassign,
+  readOnly = false,
 }: RosterTableProps) {
   const flatDays = useMemo(() => weeks.flatMap((week) => week.days), [weeks])
   const buttonRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
@@ -99,9 +109,17 @@ export function RosterTable({
     buttonRefs.current.get(nextKey)?.focus()
   }
 
-  const countAssignedForDay = (isoDate: string): number =>
+  const countFilledForDay = (isoDate: string): number =>
     staff.reduce((total, member) => {
-      return total + (getAssignment(assignments, member.id, isoDate, selectedShift) ? 1 : 0)
+      const assignment = getAssignment(assignments, member.id, isoDate, selectedShift)
+      const approval = getAvailabilityApproval(
+        availabilityApprovals,
+        member.id,
+        isoDate,
+        selectedShift
+      )
+      const { countsTowardDayTally } = resolveMockRosterCellDisplay(assignment, approval)
+      return total + (countsTowardDayTally ? 1 : 0)
     }, 0)
 
   return (
@@ -174,10 +192,28 @@ export function RosterTable({
                     day.isoDate,
                     selectedShift
                   )
+                  const approval = getAvailabilityApproval(
+                    availabilityApprovals,
+                    member.id,
+                    day.isoDate,
+                    selectedShift
+                  )
+                  const { symbol } = resolveMockRosterCellDisplay(assignment, approval)
                   const cell = { staffId: member.id, isoDate: day.isoDate }
                   const isOpen =
                     selectedCell?.staffId === member.id && selectedCell?.isoDate === day.isoDate
                   const buttonKey = createAssignmentKey(member.id, day.isoDate, selectedShift)
+
+                  const cellButtonClass = cn(
+                    'flex h-5.5 w-full items-center justify-center rounded-full border text-[9px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 xl:h-6',
+                    symbol === '1' &&
+                      'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]',
+                    symbol === 'x' &&
+                      'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]',
+                    symbol === '+' &&
+                      'border-dashed border-border/70 bg-card text-muted-foreground hover:border-primary/55 hover:text-primary',
+                    readOnly && 'pointer-events-none opacity-95'
+                  )
 
                   return (
                     <td
@@ -187,43 +223,49 @@ export function RosterTable({
                         colIndex % 7 === 0 && 'border-l border-border/80'
                       )}
                     >
-                      <AssignShiftPopover
-                        open={isOpen}
-                        onOpenChange={(open) => onSelectedCellChange(open ? cell : null)}
-                        staffName={member.name}
-                        isoDate={day.isoDate}
-                        shiftType={selectedShift}
-                        assignment={assignment}
-                        onConfirm={() => onAssign(cell)}
-                        onUnassign={() => onUnassign(cell)}
-                        trigger={
-                          <button
-                            ref={(node) => {
-                              if (node) {
-                                buttonRefs.current.set(buttonKey, node)
-                              } else {
-                                buttonRefs.current.delete(buttonKey)
-                              }
-                            }}
-                            type="button"
-                            aria-label={getCellLabel(
-                              member.name,
-                              day.isoDate,
-                              selectedShift,
-                              assignment != null
-                            )}
-                            onKeyDown={(event) => handleCellKeyDown(event, rowIndex, colIndex)}
-                            className={cn(
-                              'flex h-5.5 w-full items-center justify-center rounded-full border text-[9px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 xl:h-6',
-                              assignment
-                                ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
-                                : 'border-dashed border-border/70 bg-card text-muted-foreground hover:border-primary/55 hover:text-primary'
-                            )}
-                          >
-                            {assignment ? 'Assigned' : '+'}
-                          </button>
-                        }
-                      />
+                      {readOnly ? (
+                        <span
+                          role="img"
+                          aria-label={getCellLabel(member.name, day.isoDate, selectedShift, symbol)}
+                          className={cellButtonClass}
+                        >
+                          {symbol}
+                        </span>
+                      ) : (
+                        <AssignShiftPopover
+                          open={isOpen}
+                          onOpenChange={(open) => onSelectedCellChange(open ? cell : null)}
+                          staffName={member.name}
+                          isoDate={day.isoDate}
+                          shiftType={selectedShift}
+                          assignment={assignment}
+                          availabilityApproval={approval}
+                          onConfirm={() => onAssign(cell)}
+                          onUnassign={() => onUnassign(cell)}
+                          trigger={
+                            <button
+                              ref={(node) => {
+                                if (node) {
+                                  buttonRefs.current.set(buttonKey, node)
+                                } else {
+                                  buttonRefs.current.delete(buttonKey)
+                                }
+                              }}
+                              type="button"
+                              aria-label={getCellLabel(
+                                member.name,
+                                day.isoDate,
+                                selectedShift,
+                                symbol
+                              )}
+                              onKeyDown={(event) => handleCellKeyDown(event, rowIndex, colIndex)}
+                              className={cellButtonClass}
+                            >
+                              {symbol}
+                            </button>
+                          }
+                        />
+                      )}
                     </td>
                   )
                 })}
@@ -241,7 +283,7 @@ export function RosterTable({
                     index % 7 === 0 && 'border-l border-border/80'
                   )}
                 >
-                  {countAssignedForDay(day.isoDate) || ''}
+                  {countFilledForDay(day.isoDate) || ''}
                 </td>
               ))}
             </tr>

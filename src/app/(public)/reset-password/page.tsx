@@ -42,7 +42,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md items-center px-6 py-10">
+    <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-md items-center px-6 py-10">
       <section className="w-full rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
         <h1 className="app-page-title text-3xl">Forgot your password?</h1>
         <p className="mt-1 text-sm text-foreground/80">

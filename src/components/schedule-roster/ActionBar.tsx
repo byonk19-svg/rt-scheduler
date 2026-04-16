@@ -2,21 +2,27 @@ import { MoreActionsMenu } from '@/components/more-actions-menu'
 import { Button } from '@/components/ui/button'
 
 type ActionBarProps = {
-  onAutoDraft: () => void
+  onAutoDraft?: () => void
+  /** When false, hides draft/publish controls (read-only roster). */
+  showMockWorkflow?: boolean
 }
 
-export function ActionBar({ onAutoDraft }: ActionBarProps) {
+export function ActionBar({ onAutoDraft, showMockWorkflow = true }: ActionBarProps) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Button type="button" size="sm" onClick={onAutoDraft} className="min-w-[126px]">
-        Auto-draft
-      </Button>
-      <Button type="button" size="sm" variant="outline">
-        Send preliminary
-      </Button>
-      <Button type="button" size="sm" variant="outline">
-        Publish
-      </Button>
+      {showMockWorkflow ? (
+        <>
+          <Button type="button" size="sm" onClick={() => onAutoDraft?.()} className="min-w-[126px]">
+            Auto-draft
+          </Button>
+          <Button type="button" size="sm" variant="outline">
+            Send preliminary
+          </Button>
+          <Button type="button" size="sm" variant="outline">
+            Publish
+          </Button>
+        </>
+      ) : null}
       <MoreActionsMenu
         label="More"
         triggerClassName="inline-flex items-center gap-2 rounded-full border border-border/80 bg-card px-3 py-2 text-sm text-foreground transition-colors hover:bg-secondary/70"

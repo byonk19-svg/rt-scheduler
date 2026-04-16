@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-16 (session 79)
+Updated: 2026-04-16 (session 80)
 
 ## Handoff Snapshot
 
@@ -32,8 +32,8 @@ Updated: 2026-04-16 (session 79)
 - **Email intake tab stability:** intake date chip toggles and **Apply dates** refresh in place (`router.refresh` / `router.replace` with `tab=intake`) so managers are not bounced back to the **Planner** tab after saves. Intake request chips cycle **`force_off` ↔ `force_on`** only; removing a date uses an explicit **Remove** path with confirmation instead of a silent third-click delete.
 - **Schedule layout + role consistency:** `/coverage` supports both **Grid** and **Roster** layouts. Managers can edit staffing from either layout by clicking a day cell; leads can update staffed cells to **`OC`**, **`LE`**, **`CX`**, or **`CI`** through the shared assignment-status flow. Users can save a default schedule layout (`Grid` or `Roster`) in `/profile`, and the therapist compatibility route (`/therapist/schedule`) still defers default layout selection to `/coverage` so a saved preference wins unless an explicit `view` query is present.
 - **Hot-path performance trim:** `/coverage` now carries both day and night therapist/roster datasets in the initial server snapshot so shift-tab changes stop re-querying Supabase after hydration, `/availability` skips hidden-tab intake/planner reads, and `shift-board` approve/deny actions no longer rerun the full board bootstrap after a successful save.
-- **Mock manager roster screen:** `/schedule` no longer redirects to `/coverage`. It is now a public mock manager roster surface that renders from `src/components/schedule-roster/*` and `src/lib/mock-coverage-roster.ts`, uses local component state for assign/unassign, and exists specifically for deterministic UI iteration.
-- **Mock roster sizing pass:** the standalone `/schedule` roster screen now fits all 6 week headers at once on standard desktop widths by tightening the sticky name column, week headers, day columns, and cell chips. The space before `PRN coverage` is reduced to a bold divider line.
+- **Shared header/navigation system:** authenticated routes now use one shared sticky `AppHeader` plus surface-level `LocalSectionNav` driven by `src/components/shell/app-shell-config.ts`; page titles/actions are being standardized through `PageIntro`, and public/auth routes now share `src/components/public/PublicHeader.tsx` from `src/app/(public)/layout.tsx`. Avoid reintroducing page-specific top bars or dark secondary sticky bars.
+- **Schedule roster route:** `/schedule` no longer redirects to `/coverage`, but it is also no longer a public mock. It now loads live roster/availability data through `src/app/(app)/schedule/schedule-roster-live-data.ts`, stays auth-protected by `src/proxy.ts`, and renders a read-only roster matrix inside the shared app shell.
 - **Lead role source of truth:** product behavior now treats `profiles.role = 'lead'` as the source of truth for lead-only UI/actions. The legacy `is_lead_eligible` column is kept in sync to `role`, but Coverage, print/export, profile badges, swap partner filtering, and designated-lead actions should all be reasoned about in terms of `role`, not the legacy flag.
 - **Auth entry (`/login`, `/signup`):** `src/lib/auth/login-utils.ts` parses auth errors from top-level query params **or nested inside `redirectTo`** (e.g. `/availability?error=...`), maps friendly copy, and `router.replace` cleans error keys while preserving a sanitized `redirectTo`. Approval/allowlist copy shows as a **warning** banner with optional **Request access** link and dismiss; credential failures stay **destructive**. Successful access **request** redirects to **`/login?status=requested`** with an **info** banner (dismiss + URL strip); signup no longer auto-signs-in before that redirect, and the public signup page now always uses that same generic redirect instead of exposing roster-match state. **Name roster auto-match:** managers maintain **`employee_roster`** on **`/team`** (single row, **bulk paste**, or ops script). On signup, **`handle_new_user`** still matches **normalized full name** to an active roster row on the server; matched users can receive roster **role/settings** immediately (non-pending), and the roster row records **`matched_profile_id`**, but the public UX no longer discloses whether that match happened. Unmatched signups stay **`profiles.role = null`** pending approval. **Migration:** `20260413123000_add_employee_roster_and_name_match_signup.sql`. **Ops:** `npm run sync:roster` bulk-creates **auth + profiles** from an email list file (separate from **`employee_roster`** name pre-match). **Public homepage (`/`):** therapist-first copy, luminous background utilities (`--home-*`, `.teamwise-home-*`), header **Get started** (`/signup`) + **Sign in**, hero **Sign in** + **Create account** (`/signup`); Vitest contracts in `src/app/page.test.ts` and `src/app/globals.test.ts`. Shared **Input** focus ring uses **`--ring`**; **`:autofill`** + **`-webkit-autofill`** theming lives in `globals.css`.
 - Mixed off/work sentences are parsed more accurately than before, but parser changes should continue to be driven by real inbound examples.
@@ -53,13 +53,13 @@ Updated: 2026-04-16 (session 79)
 - `main` now also carries the route-group performance refactor: public routes live under `src/app/(public)`, authenticated routes under `src/app/(app)`, `/dashboard/manager` is server-first again, `/coverage` hydrates from a server snapshot helper, and the top-nav notification panel fetches only when opened.
 - `main` now also carries the bundle-trim follow-up: the authenticated shell defers notification interactivity behind `DeferredNotificationBell`, `/coverage` lazy-loads closed dialogs/editor overlays, and `/team` code-splits the directory vs roster-admin tab surfaces so the inactive panel no longer ships in the initial route chunk.
 - `main` now also carries the hot-route follow-up: `/coverage` swaps shift datasets locally from the initial snapshot, `/availability` only loads active-tab planner/intake data, and `shift-board` approve/deny actions stay local instead of reloading the board on success.
-- `main` also carries the standalone `/schedule` mock roster screen. That route is intentionally public and design-only; do not wire production scheduling logic into it without revisiting the proxy allowlist, route docs, and shell assumptions.
-- `claude/review-ui-flow-7Weav` has the **top nav redesign** (session 55) — sidebar replaced with a fixed horizontal top nav. Needs review and merge to `main` before deploying.
+- `main` now also carries the shared sitewide header pass: `AppShell` uses one sticky authenticated header plus surface section nav, manager/page header wrappers now sit on `PageIntro`, and public/auth routes share `PublicHeader`.
+- `/schedule` now reads live schedule-cycle data and stays inside the authenticated shell as a read-only roster matrix rather than a public mock surface.
 
 ### Where We Want To Go
 
-1. Validate the compact Coverage workspace in real manager usage, especially very large roster matrices in production-like conditions. If modal open still feels slow after the current render optimizations, investigate virtualization or further memoization before changing workflow.
-2. Merge `claude/review-ui-flow-7Weav` (top nav) into `main` and deploy to production.
+1. Run a full browser QA pass across the new shared authenticated/public headers on desktop and mobile before shipping.
+2. Validate the compact Coverage workspace in real manager usage, especially very large roster matrices in production-like conditions. If modal open still feels slow after the current render optimizations, investigate virtualization or further memoization before changing workflow.
 3. Add a **"Send reminders"** bulk action to the response roster on `/availability` — 24 unresponded therapists with no in-app nudge is the main operational gap.
 4. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
 5. Deploy production after significant public-surface changes (`vercel deploy --prod`) so `www.teamwise.work` matches `main`.
@@ -74,8 +74,18 @@ Updated: 2026-04-16 (session 79)
 - `vercel deploy --prod --yes` for production shipping
 - Targeted availability lane: `npx vitest run src/app/availability/`
 - Targeted coverage lane: `npm run test:unit -- src/app/coverage/page.test.ts src/components/coverage/CalendarGrid.test.ts src/components/coverage/RosterScheduleView.test.ts src/components/coverage/shift-editor-dialog-layout.test.ts`
+- Targeted shell/header lane: `npx vitest run src/components/shell/app-shell-config.test.ts src/components/AppShell.test.ts src/components/manager/ManagerWorkspaceHeader.test.ts src/app/(public)/signup/page.test.ts`
 
 ## Recent changelog
+
+**Session 80 (2026-04-16)** — Sitewide header standardization:
+
+- Rebuilt the authenticated shell around one sticky `AppHeader` plus route-driven `LocalSectionNav`; the old stacked dark secondary sticky bar is gone.
+- Introduced shared shell primitives in `src/components/shell/` (`app-shell-config`, `AppHeader`, `LocalSectionNav`, `PageIntro`) and rebased `ManagerWorkspaceHeader` / `PageHeader` onto the shared intro treatment.
+- Added `src/components/public/PublicHeader.tsx` and mounted it from `src/app/(public)/layout.tsx` so `/`, `/login`, `/signup`, and `/reset-password` share one public header pattern.
+- `/schedule` now renders as a read-only authenticated roster surface inside the shared shell rather than mounting its own standalone top header.
+- `/schedule` data is fully live for managers/leads: `loadScheduleRosterPageData` + `schedule-roster-live-data.ts` (cycles, `shifts`, `therapist_availability_submissions`, therapist-sourced `availability_overrides`); `schedule-roster-data.ts` maps rows to the roster store. Mock/demo roster, `EmptyStateBanner`, and `createDemoAvailabilityApprovals` are removed; `/schedule` is not a public route in `src/proxy.ts`. Therapists hitting `/schedule` redirect to `/dashboard/staff`.
+- Verified with targeted Vitest and ESLint. Repo-wide `npx tsc --noEmit` is still blocked by an unrelated fixture issue in `src/components/team/EmployeeRosterPanel.test.ts` (`matched_email` missing from a test row).
 
 **Session 79 (2026-04-16)** — Team directory staffing UX:
 
@@ -260,7 +270,7 @@ E2E specs:
 - `/dashboard/manager`, `/dashboard/staff`
   - `/dashboard/manager` is the manager **Inbox** — h1 and nav label both read "Inbox"
 - `/coverage` dedicated coverage UI (client page, full-width calendar + dialog/popover editing model)
-- `/schedule` public mock manager roster screen (local state, design validation)
+- `/schedule` manager/lead read-only roster matrix (live cycle, shifts, submitted availability; auth required)
 - `/approvals`
 - `/availability`
 - `/shift-board`
@@ -287,13 +297,14 @@ All permission checks go through `can(role, permission)` in `src/lib/auth/can.ts
 
 ## Key Shared Components
 
-- `src/components/ui/page-header.tsx` — `<PageHeader>` is DEPRECATED for new pages; only remaining on legacy pages not yet migrated
+- `src/components/ui/page-header.tsx` — `<PageHeader>` is a compatibility wrapper around `PageIntro`; use the shell primitives directly for new work
 - `src/components/motion-provider.tsx` — client root wrapper: Framer **`MotionConfig reducedMotion="user"`** (respects **`prefers-reduced-motion`**); used from `src/app/layout.tsx`
 - `src/components/manager/ManagerWorkspaceHeader.tsx` — canonical manager-style route header for `/availability`, `/coverage`, `/team`, `/approvals`, `/publish/[id]`, and staff **`/requests/new`**
 - `src/components/availability/AvailabilityOverviewHeader.tsx` — manager-specific availability wrapper around the shared manager workspace header
 - `src/components/ui/skeleton.tsx` — `<Skeleton>`, `<SkeletonLine>`, `<SkeletonCard>`, `<SkeletonListItem>` loading states
 - `src/components/NotificationBell.tsx` — on-demand bell panel; unread badge count is server-provided from the authenticated layout, and the dropdown fetch runs when the user opens it. Variants: `default` | `staff` | `shell`.
-- `src/components/AppShell.tsx` — nav shell; manager nav is built from `buildManagerSections()` (`Today`, `Schedule`, `People`) and staff nav still uses `STAFF_NAV_ITEMS`. Active highlighting uses **`usePathname`** only (section **`isActive`** predicates never read the query string). `src/app/(app)/layout.tsx` wraps `AppShell`; keep `/schedule` treated as a coverage alias in the manager `Schedule` section, and keep the fixed secondary nav horizontally scrollable for mobile widths.
+- `src/components/AppShell.tsx` — authenticated shell wrapper; compose shared nav behavior through `src/components/shell/app-shell-config.ts`, `AppHeader`, and `LocalSectionNav`. Keep one sticky top bar only; local section nav belongs on the page surface. `/schedule` remains part of the manager `Schedule` section.
+- `src/components/public/PublicHeader.tsx` — shared public/auth top bar used from `src/app/(public)/layout.tsx`
 - `src/components/feedback-toast.tsx` — `<FeedbackToast message variant>` for success/error toasts
 - `src/lib/auth/can.ts` — `can(role, permission)` — all permission checks go through here
 - `src/lib/coverage/selectors.ts` — `buildDayItems`, `toUiStatus`
@@ -327,6 +338,7 @@ Typography classes:
 
 - **`formatCycleDate` produces no year:** Uses `{ month: 'short', day: 'numeric' }` → `'Apr 13'` not `'Apr 13, 2026'`. Test fixtures asserting on date range strings must omit the year (e.g. `'Mar 17 – Apr 13'`).
 - **Browser verification on auth routes:** All app routes require login. Chrome DevTools MCP always redirects to `/login` — browser verification via screenshot is not possible without credentials. Confirm changes via `tsc`, `vitest`, and code review only.
+- **Current repo-wide typecheck is blocked by an unrelated fixture:** `src/components/team/EmployeeRosterPanel.test.ts` is currently missing `matched_email` on a test row, so `npx tsc --noEmit` fails until that fixture is updated.
 - **framer-motion `ease`:** `ease: 'easeOut'` fails `tsc` — the `Easing` type requires specific literals. Omit `ease` entirely to use framer-motion's safe default.
 - **Auto-draft algorithm lives in `src/lib/coverage/generate-draft.ts`:** `generateDraftForCycle(input: GenerateDraftInput): GenerateDraftResult` is a pure function. `generateDraftScheduleAction` in `src/app/schedule/actions/draft-actions.ts` is a thin wrapper that loads DB data, calls it, then saves results. Dry-run and preview features can call `generateDraftForCycle` directly without a server action.
 - **`src/app/schedule/actions.ts` is a barrel:** Real logic is in `src/app/schedule/actions/` sub-modules (`helpers.ts`, `cycle-actions.ts`, `publish-actions.ts`, `shift-actions.ts`, `draft-actions.ts`, `preliminary-actions.ts`). Each action file has `'use server'`; `helpers.ts` and `index.ts` do not.
@@ -425,8 +437,8 @@ Assignment status is informational only (does not affect coverage counts or publ
 ## Schedule UX
 
 `/coverage` is the shared schedule workspace for all roles; actions and edits are permission-gated.
-`/schedule` is retained as a compatibility route and redirects into `/coverage`.
-The manager shell must still show the `Schedule` primary section as active on `/schedule`, with the `Coverage` secondary tab highlighted because that route is a legacy alias into the same workflow.
+`/schedule` is a **read-only roster matrix** for managers and leads (assignments + submitted availability for the selected cycle); edits happen in `/coverage`.
+The manager shell must still show the `Schedule` primary section as active on `/schedule`, with the `Coverage` secondary tab highlighted as the adjacent workflow entry.
 
 - `/coverage` supports both `Grid` and `Roster` layouts. Explicit `view` params must survive compatibility redirects, and default layout selection belongs in `/coverage` where profile context is available.
 

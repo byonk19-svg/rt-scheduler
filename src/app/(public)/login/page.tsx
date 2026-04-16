@@ -163,7 +163,7 @@ function LoginPageClient() {
   }
 
   return (
-    <main className="flex min-h-screen">
+    <main className="flex min-h-[calc(100vh-73px)]">
       {/* Left brand panel — desktop only */}
       <aside className="relative hidden overflow-hidden bg-[var(--sidebar)] lg:flex lg:w-[400px] lg:shrink-0 lg:flex-col lg:justify-between lg:p-10">
         <div
@@ -196,13 +196,6 @@ function LoginPageClient() {
 
       {/* Right form panel */}
       <div className="flex flex-1 flex-col items-center justify-center bg-background px-6 py-10">
-        <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--attention)]">
-            <CalendarDays className="h-4 w-4 text-accent-foreground" />
-          </div>
-          <p className="font-heading text-sm font-bold text-foreground">Teamwise</p>
-        </div>
-
         <section className="w-full max-w-[380px]">
           <h1 className="app-page-title text-3xl">Sign in</h1>
           <p className="mt-1.5 text-sm text-foreground/70">

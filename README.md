@@ -6,7 +6,7 @@ Web app for respiratory therapy scheduling with role-based workflows:
 - Availability requests
 - 6-week schedule cycle management
 - **Canonical staff schedule:** [`/coverage`](<./src/app/(app)/coverage/page.tsx>) supports both `Grid` and `Roster` layouts; server entry is `page.tsx`, initial snapshot loading lives in [`coverage-page-data.ts`](<./src/app/(app)/coverage/coverage-page-data.ts>), and interactive client logic lives in [`CoverageClientPage.tsx`](<./src/app/(app)/coverage/CoverageClientPage.tsx>). The therapist compatibility route (`/therapist/schedule`) still redirects there and preserves explicit `view` params
-- **Mock manager roster screen:** [`/schedule`](<./src/app/(app)/schedule/page.tsx>) is now a public, deterministic roster-only screen backed by local mock data and local assignment state for UI iteration
+- **Roster matrix (read-only):** [`/schedule`](<./src/app/(app)/schedule/page.tsx>) — managers and leads only; shows the active cycle’s coverage assignments and officially submitted therapist availability (login required; not a public mock)
 - **Therapist availability:** 6-week grid on `/therapist/availability` — **Available** (default: neutral day, no forced on/off), **Unavailable**, **Must work** (hard autodraft `force_on`); see [`CLAUDE.md`](./CLAUDE.md)
 - Shift board (swap/pickup posts with manager approval)
 
@@ -24,7 +24,7 @@ Current architecture and quality snapshot: [`docs/REPO_HEALTH.md`](docs/REPO_HEA
 
 ## Cycle Workflow
 
-- [`/schedule`](<./src/app/(app)/schedule/page.tsx>) is the standalone mock manager roster surface. It renders from local mock data, keeps assign/unassign state in the client, and is tuned to show the full 6-week matrix at once on standard desktop widths.
+- [`/schedule`](<./src/app/(app)/schedule/page.tsx>) is a read-only roster view tied to the live cycle (assignments + submitted availability); staffing changes are made in Coverage.
 
 - **Schedule** (nav label; route [`/coverage`](<./src/app/(app)/coverage/page.tsx>), rendered via [`CoverageClientPage.tsx`](<./src/app/(app)/coverage/CoverageClientPage.tsx>)) — create **New 6-week block**, staff the schedule in either **Grid** or **Roster** view, auto-draft, preliminary, **Publish**. Same cycle-selection rule everywhere: URL cycle if valid, else active window, else next upcoming, else none (empty state, not a fake grid).
 - Managers can edit staffing from either schedule layout by clicking a day cell. Leads can update assignment status (`OC`, `LE`, `CX`, `CI`) from staffed cells in either layout.

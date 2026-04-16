@@ -8,7 +8,6 @@ import { isValidPublishWorkerRequest } from '@/lib/security/worker-auth'
 const PUBLIC_ROUTES = [
   '/',
   '/login',
-  '/schedule',
   '/signup',
   '/reset-password',
   '/auth/callback',

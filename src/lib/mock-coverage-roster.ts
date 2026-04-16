@@ -31,6 +31,11 @@ export type Assignment = {
 
 export type AssignmentStore = Record<string, Assignment>
 
+/** Manager-approved availability outcome for mock roster cells (matches /coverage override semantics). */
+export type AvailabilityApprovalKind = 'approved_off' | 'approved_work'
+
+export type AvailabilityApprovalStore = Partial<Record<string, AvailabilityApprovalKind>>
+
 export const DEMO_CYCLE = {
   startDate: '2026-05-03',
   endDate: '2026-06-13',
@@ -144,6 +149,42 @@ export function createEmptyAssignments(): AssignmentStore {
   return {}
 }
 
+export function createEmptyAvailabilityApprovals(): AvailabilityApprovalStore {
+  return {}
+}
+
+export function setAvailabilityApproval(
+  store: AvailabilityApprovalStore,
+  input: {
+    staffId: string
+    isoDate: string
+    shiftType: ShiftType
+    kind: AvailabilityApprovalKind
+  }
+): AvailabilityApprovalStore {
+  const key = createAssignmentKey(input.staffId, input.isoDate, input.shiftType)
+  return { ...store, [key]: input.kind }
+}
+
+export function clearAvailabilityApproval(
+  store: AvailabilityApprovalStore,
+  input: Pick<Assignment, 'staffId' | 'isoDate' | 'shiftType'>
+): AvailabilityApprovalStore {
+  const key = createAssignmentKey(input.staffId, input.isoDate, input.shiftType)
+  const next = { ...store }
+  delete next[key]
+  return next
+}
+
+export function getAvailabilityApproval(
+  store: AvailabilityApprovalStore,
+  staffId: string,
+  isoDate: string,
+  shiftType: ShiftType
+): AvailabilityApprovalKind | null {
+  return store[createAssignmentKey(staffId, isoDate, shiftType)] ?? null
+}
+
 export function assignShift(
   store: AssignmentStore,
   input: Pick<Assignment, 'staffId' | 'isoDate' | 'shiftType'>
@@ -176,6 +217,14 @@ export function getAssignmentsForShift(store: AssignmentStore, shiftType: ShiftT
   return Object.values(store).filter((assignment) => assignment.shiftType === shiftType)
 }
 
+export function hasAvailabilityApprovalsForShift(
+  store: AvailabilityApprovalStore,
+  shiftType: ShiftType
+): boolean {
+  const prefix = `${shiftType}:`
+  return Object.keys(store).some((key) => store[key] != null && key.startsWith(prefix))
+}
+
 export function getAssignment(
   store: AssignmentStore,
   staffId: string,
@@ -183,4 +232,19 @@ export function getAssignment(
   shiftType: ShiftType
 ): Assignment | null {
   return store[createAssignmentKey(staffId, isoDate, shiftType)] ?? null
+}
+
+export type MockRosterCellSymbol = '+' | '1' | 'x'
+
+export function resolveMockRosterCellDisplay(
+  assignment: Assignment | null,
+  approval: AvailabilityApprovalKind | null
+): { symbol: MockRosterCellSymbol; countsTowardDayTally: boolean } {
+  if (approval === 'approved_off') {
+    return { symbol: 'x', countsTowardDayTally: false }
+  }
+  if (assignment != null || approval === 'approved_work') {
+    return { symbol: '1', countsTowardDayTally: true }
+  }
+  return { symbol: '+', countsTowardDayTally: false }
 }

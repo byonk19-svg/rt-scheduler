@@ -6,7 +6,11 @@ import {
   assignShift,
   buildRosterWeeks,
   createEmptyAssignments,
+  createEmptyAvailabilityApprovals,
   getAssignmentsForShift,
+  hasAvailabilityApprovalsForShift,
+  resolveMockRosterCellDisplay,
+  setAvailabilityApproval,
   splitStaffByRoster,
   unassignShift,
 } from '@/lib/mock-coverage-roster'
@@ -65,5 +69,60 @@ describe('assignment state', () => {
     })
 
     expect(getAssignmentsForShift(cleared, 'day')).toHaveLength(0)
+  })
+})
+
+describe('resolveMockRosterCellDisplay', () => {
+  it('shows x when approved off even if a mock assignment exists', () => {
+    expect(
+      resolveMockRosterCellDisplay(
+        {
+          id: 'x',
+          staffId: 'a',
+          isoDate: '2026-05-01',
+          shiftType: 'day',
+          status: 'assigned',
+        },
+        'approved_off'
+      )
+    ).toEqual({ symbol: 'x', countsTowardDayTally: false })
+  })
+
+  it('shows 1 for approved work without an assignment', () => {
+    expect(resolveMockRosterCellDisplay(null, 'approved_work')).toEqual({
+      symbol: '1',
+      countsTowardDayTally: true,
+    })
+  })
+
+  it('shows 1 for coverage assignment only', () => {
+    expect(
+      resolveMockRosterCellDisplay(
+        {
+          id: 'y',
+          staffId: 'b',
+          isoDate: '2026-05-02',
+          shiftType: 'day',
+          status: 'assigned',
+        },
+        null
+      )
+    ).toEqual({ symbol: '1', countsTowardDayTally: true })
+  })
+})
+
+describe('hasAvailabilityApprovalsForShift', () => {
+  it('returns true only when the store contains a key for that shift', () => {
+    const empty = createEmptyAvailabilityApprovals()
+    expect(hasAvailabilityApprovalsForShift(empty, 'day')).toBe(false)
+
+    const withDay = setAvailabilityApproval(empty, {
+      staffId: 's',
+      isoDate: '2026-05-03',
+      shiftType: 'day',
+      kind: 'approved_off',
+    })
+    expect(hasAvailabilityApprovalsForShift(withDay, 'day')).toBe(true)
+    expect(hasAvailabilityApprovalsForShift(withDay, 'night')).toBe(false)
   })
 })

@@ -112,7 +112,7 @@ export default function SignUpPage() {
   }
 
   return (
-    <main className="flex min-h-screen">
+    <main className="flex min-h-[calc(100vh-73px)]">
       {/* Left brand panel — desktop only */}
       <aside className="relative hidden overflow-hidden bg-[var(--sidebar)] lg:flex lg:w-[440px] lg:shrink-0 lg:flex-col lg:justify-between lg:p-12">
         <div
@@ -145,13 +145,6 @@ export default function SignUpPage() {
 
       {/* Right form panel */}
       <div className="flex flex-1 flex-col items-center justify-center bg-background px-6 py-5 sm:py-6 lg:py-6">
-        <div className="mb-4 flex items-center gap-2.5 lg:hidden">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--attention)]">
-            <CalendarDays className="h-4 w-4 text-accent-foreground" />
-          </div>
-          <p className="font-heading text-sm font-bold text-foreground">Teamwise</p>
-        </div>
-
         <section className="w-full max-w-[420px]">
           <h1 className="app-page-title text-3xl">Request access</h1>
           <p className="mt-0.5 text-sm text-foreground/70">

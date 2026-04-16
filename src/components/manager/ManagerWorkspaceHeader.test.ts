@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
 
 describe('ManagerWorkspaceHeader', () => {
-  it('renders an editorial manager header with summary content and actions', () => {
+  it('renders through the shared page intro wrapper with summary content and actions', () => {
     const html = renderToStaticMarkup(
       createElement(ManagerWorkspaceHeader, {
         title: 'Coverage',
@@ -18,6 +18,7 @@ describe('ManagerWorkspaceHeader', () => {
     expect(html).toContain('Coverage')
     expect(html).toContain('Summary copy')
     expect(html).toContain('Actions')
-    expect(html).toContain('border-b border-border/70 bg-card/80')
+    expect(html).toContain('data-page-intro')
+    expect(html).not.toContain('border-b border-border/70 bg-card/80')
   })
 })

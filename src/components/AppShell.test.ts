@@ -7,11 +7,19 @@ import {
   APP_SHELL_ACTIVE_NAV_CLASS,
   APP_SHELL_PROFILE_CARD_CLASS,
   APP_SHELL_SIDEBAR_CLASS,
-  buildManagerSections,
 } from '@/components/AppShell'
+import { buildManagerSections } from '@/components/shell/app-shell-config'
 
 const appShellSource = fs.readFileSync(
   path.join(process.cwd(), 'src/components/AppShell.tsx'),
+  'utf8'
+)
+const shellConfigSource = fs.readFileSync(
+  path.join(process.cwd(), 'src/components/shell/app-shell-config.ts'),
+  'utf8'
+)
+const localSectionNavSource = fs.readFileSync(
+  path.join(process.cwd(), 'src/components/shell/LocalSectionNav.tsx'),
   'utf8'
 )
 
@@ -53,12 +61,21 @@ describe('AppShell mobile menu', () => {
   it('contains overscroll within the mobile drawer', () => {
     expect(appShellSource).toContain('overscroll-contain')
   })
+
+  it('renders the authenticated shell through shared header primitives', () => {
+    expect(appShellSource).toContain('<AppHeader')
+    expect(appShellSource).toContain('<LocalSectionNav')
+  })
+
+  it('does not keep a second fixed shell bar under the main header', () => {
+    expect(appShellSource).not.toContain('app-shell-chrome-secondary fixed top-14')
+  })
 })
 
 describe('AppShell navigation structure', () => {
   it('routes staff availability navigation to the therapist availability page', () => {
-    expect(appShellSource).toContain("'/therapist/availability'")
-    expect(appShellSource).toContain("label: 'Availability'")
+    expect(shellConfigSource).toContain("'/therapist/availability'")
+    expect(shellConfigSource).toContain("label: 'Availability'")
   })
 
   it('keeps the manager Schedule section active on the legacy /schedule route', () => {
@@ -78,40 +95,40 @@ describe('AppShell navigation structure', () => {
   })
 
   it('uses Open shifts wording in staff shell navigation', () => {
-    expect(appShellSource).toContain("label: 'Open shifts'")
-    expect(appShellSource).not.toContain("label: 'Shift Swaps'")
+    expect(shellConfigSource).toContain("label: 'Open shifts'")
+    expect(shellConfigSource).not.toContain("label: 'Shift Swaps'")
   })
 
   it('routes manager Today section to the manager dashboard', () => {
-    expect(appShellSource).toContain("label: 'Today'")
-    expect(appShellSource).toContain('MANAGER_WORKFLOW_LINKS.dashboard')
+    expect(shellConfigSource).toContain("label: 'Today'")
+    expect(shellConfigSource).toContain('MANAGER_WORKFLOW_LINKS.dashboard')
   })
 
   it('groups manager workflow into Today, Schedule, and People sections', () => {
-    expect(appShellSource).toContain("key: 'today'")
-    expect(appShellSource).toContain("key: 'schedule'")
-    expect(appShellSource).toContain("key: 'people'")
+    expect(shellConfigSource).toContain("key: 'today'")
+    expect(shellConfigSource).toContain("key: 'schedule'")
+    expect(shellConfigSource).toContain("key: 'people'")
   })
 
   it('puts Coverage, Availability, Publish, and Approvals under the Schedule section', () => {
-    expect(appShellSource).toContain("label: 'Coverage'")
-    expect(appShellSource).toContain("label: 'Availability'")
-    expect(appShellSource).toContain("label: 'Publish'")
-    expect(appShellSource).toContain("label: 'Approvals'")
+    expect(shellConfigSource).toContain("label: 'Coverage'")
+    expect(shellConfigSource).toContain("label: 'Availability'")
+    expect(shellConfigSource).toContain("label: 'Publish'")
+    expect(shellConfigSource).toContain("label: 'Approvals'")
   })
 
-  it('allows the fixed secondary nav to scroll horizontally on narrow screens', () => {
-    expect(appShellSource).toContain('overflow-x-auto')
+  it('allows the shared local section nav to scroll horizontally on narrow screens', () => {
+    expect(localSectionNavSource).toContain('overflow-x-auto')
   })
 
   it('merges Team and Requests under the People section', () => {
-    expect(appShellSource).toContain("label: 'Team'")
-    expect(appShellSource).toContain("label: 'Requests'")
+    expect(shellConfigSource).toContain("label: 'Team'")
+    expect(shellConfigSource).toContain("label: 'Requests'")
     // User Access Requests is no longer a separate top-level nav item
-    expect(appShellSource).not.toContain("label: 'User Access Requests'")
+    expect(shellConfigSource).not.toContain("label: 'User Access Requests'")
   })
 
   it('shows pending badge on Requests sub-item when there are pending access requests', () => {
-    expect(appShellSource).toContain('showBadge: pendingCount > 0')
+    expect(shellConfigSource).toContain('badgeCount: pendingCount > 0 ? pendingCount : undefined')
   })
 })
