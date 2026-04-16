@@ -12,4 +12,10 @@ describe('proxy public route allowlist', () => {
     )
     expect(source).toContain('[...PUBLIC_ROUTES, ...PUBLIC_API_ROUTES]')
   })
+
+  it('treats the mock schedule roster screen as a public route', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/proxy.ts'), 'utf8')
+
+    expect(source).toContain("'/schedule'")
+  })
 })

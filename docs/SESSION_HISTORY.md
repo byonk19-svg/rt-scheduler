@@ -1,5 +1,11 @@
 # Session History
 
+## Session 74 - 2026-04-16
+
+- Replaced the old `/schedule` redirect entrypoint with a standalone mock manager roster screen built from `src/components/schedule-roster/*` and `src/lib/mock-coverage-roster.ts`.
+- Made `/schedule` public in `src/proxy.ts` so the mock screen can be reviewed without auth, while leaving `/coverage` as the protected live scheduling workspace.
+- Tightened the roster matrix so all 6 weeks fit on standard desktop widths and replaced the oversized gap before `PRN coverage` with a bold divider.
+
 ## Session 72 - 2026-04-15
 
 - Reworked `/coverage` into a compact scheduling workspace: tighter header, unified planning toolbar, lighter summary cards, slim setup/live-status banners, denser weekly grid, and tighter roster matrix.

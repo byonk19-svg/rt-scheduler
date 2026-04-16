@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-16 (session 73)
+Updated: 2026-04-16 (session 74)
 
 ## Handoff Snapshot
 
@@ -30,7 +30,9 @@ Updated: 2026-04-16 (session 73)
 - **Coverage workspace compaction:** `/coverage` now uses a compact scheduling workspace instead of the old oversized setup/stat/day-card layout. The page is organized around a tighter header, unified planning toolbar, lighter health summary cards, slim setup/live-status banners, a denser weekly grid, and a tighter roster matrix. Grid day cells now prioritize date, staffing ratio, lead state, and compact gap/status chips; the shift editor uses a tighter header plus ranked candidate rows with clearer selected state.
 - **Coverage designated lead vs extra lead-eligible staff:** only one `shifts.role='lead'` row designates the lead for that slot. The shift editor still lists every **lead-eligible** therapist; choosing another while a lead exists adds them as **staff** coverage (`assign` with `role: 'staff'`). Someone already on the day as staff can be **designated** via **`set_lead`** (`setCoverageDesignatedLeadViaApi` in `src/lib/coverage/mutations.ts`), which bumps a reload nonce so coverage data refetches. Lead-eligible rows are **not** disabled merely because a lead is already booked.
 - **Email intake tab stability:** intake date chip toggles and **Apply dates** refresh in place (`router.refresh` / `router.replace` with `tab=intake`) so managers are not bounced back to the **Planner** tab after saves. Intake request chips cycle **`force_off` ↔ `force_on`** only; removing a date uses an explicit **Remove** path with confirmation instead of a silent third-click delete.
-- **Schedule layout + role consistency:** `/coverage` supports both **Grid** and **Roster** layouts. Managers can edit staffing from either layout by clicking a day cell; leads can update staffed cells to **`OC`**, **`LE`**, **`CX`**, or **`CI`** through the shared assignment-status flow. Users can save a default schedule layout (`Grid` or `Roster`) in `/profile`, and compatibility routes (`/schedule`, `/therapist/schedule`) now defer default layout selection to `/coverage` so a saved preference wins unless an explicit `view` query is present.
+- **Schedule layout + role consistency:** `/coverage` supports both **Grid** and **Roster** layouts. Managers can edit staffing from either layout by clicking a day cell; leads can update staffed cells to **`OC`**, **`LE`**, **`CX`**, or **`CI`** through the shared assignment-status flow. Users can save a default schedule layout (`Grid` or `Roster`) in `/profile`, and the therapist compatibility route (`/therapist/schedule`) still defers default layout selection to `/coverage` so a saved preference wins unless an explicit `view` query is present.
+- **Mock manager roster screen:** `/schedule` no longer redirects to `/coverage`. It is now a public mock manager roster surface that renders from `src/components/schedule-roster/*` and `src/lib/mock-coverage-roster.ts`, uses local component state for assign/unassign, and exists specifically for deterministic UI iteration.
+- **Mock roster sizing pass:** the standalone `/schedule` roster screen now fits all 6 week headers at once on standard desktop widths by tightening the sticky name column, week headers, day columns, and cell chips. The space before `PRN coverage` is reduced to a bold divider line.
 - **Lead role source of truth:** product behavior now treats `profiles.role = 'lead'` as the source of truth for lead-only UI/actions. The legacy `is_lead_eligible` column is kept in sync to `role`, but Coverage, print/export, profile badges, swap partner filtering, and designated-lead actions should all be reasoned about in terms of `role`, not the legacy flag.
 - **Auth entry (`/login`, `/signup`):** `src/lib/auth/login-utils.ts` parses auth errors from top-level query params **or nested inside `redirectTo`** (e.g. `/availability?error=...`), maps friendly copy, and `router.replace` cleans error keys while preserving a sanitized `redirectTo`. Approval/allowlist copy shows as a **warning** banner with optional **Request access** link and dismiss; credential failures stay **destructive**. Successful access **request** redirects to **`/login?status=requested`** with an **info** banner (dismiss + URL strip); signup no longer auto-signs-in before that redirect, and the public signup page now always uses that same generic redirect instead of exposing roster-match state. **Name roster auto-match:** managers maintain **`employee_roster`** on **`/team`** (single row, **bulk paste**, or ops script). On signup, **`handle_new_user`** still matches **normalized full name** to an active roster row on the server; matched users can receive roster **role/settings** immediately (non-pending), and the roster row records **`matched_profile_id`**, but the public UX no longer discloses whether that match happened. Unmatched signups stay **`profiles.role = null`** pending approval. **Migration:** `20260413123000_add_employee_roster_and_name_match_signup.sql`. **Ops:** `npm run sync:roster` bulk-creates **auth + profiles** from an email list file (separate from **`employee_roster`** name pre-match). **Public homepage (`/`):** therapist-first copy, luminous background utilities (`--home-*`, `.teamwise-home-*`), header **Get started** (`/signup`) + **Sign in**, hero **Sign in** + **Create account** (`/signup`); Vitest contracts in `src/app/page.test.ts` and `src/app/globals.test.ts`. Shared **Input** focus ring uses **`--ring`**; **`:autofill`** + **`-webkit-autofill`** theming lives in `globals.css`.
 - Mixed off/work sentences are parsed more accurately than before, but parser changes should continue to be driven by real inbound examples.
@@ -46,6 +48,7 @@ Updated: 2026-04-16 (session 73)
 
 - `main` includes the merged email-intake apply gating fix from PR `#27` and the **therapist-first luminous homepage** (replaces the older `codex/therapist-homepage-redesign` intent; that branch may be deleted when convenient).
 - `main` now also carries the compact Coverage workspace pass: denser grid/roster surfaces, tighter shift editor, ranked modal candidates, and the roster-cell performance fix where empty `+` cells open the day editor immediately instead of firing an assignment mutation.
+- `main` also carries the standalone `/schedule` mock roster screen. That route is intentionally public and design-only; do not wire production scheduling logic into it without revisiting the proxy allowlist, route docs, and shell assumptions.
 - `claude/review-ui-flow-7Weav` has the **top nav redesign** (session 55) — sidebar replaced with a fixed horizontal top nav. Needs review and merge to `main` before deploying.
 
 ### Where We Want To Go
@@ -68,6 +71,12 @@ Updated: 2026-04-16 (session 73)
 - Targeted coverage lane: `npm run test:unit -- src/app/coverage/page.test.ts src/components/coverage/CalendarGrid.test.ts src/components/coverage/RosterScheduleView.test.ts src/components/coverage/shift-editor-dialog-layout.test.ts`
 
 ## Recent changelog
+
+**Session 74 (2026-04-16)** â€” Standalone mock schedule roster screen:
+
+- Replaced the old `/schedule` compatibility redirect with a standalone mock manager roster screen composed from `src/components/schedule-roster/*`.
+- Added local mock data/state in `src/lib/mock-coverage-roster.ts`, including deterministic assign/unassign behavior and a 6-week Core + PRN roster matrix.
+- Made `/schedule` public in `src/proxy.ts` and tightened the roster layout so all 6 weeks fit on standard desktop widths with a bold divider above `PRN coverage`.
 
 **Session 73 (2026-04-16)** — Coverage lead UX + email intake tab stability:
 
@@ -212,7 +221,7 @@ E2E specs:
 - `/dashboard/manager`, `/dashboard/staff`
   - `/dashboard/manager` is the manager **Inbox** — h1 and nav label both read "Inbox"
 - `/coverage` dedicated coverage UI (client page, full-width calendar + dialog/popover editing model)
-- `/schedule` compatibility redirect entrypoint -> `/coverage` (all roles)
+- `/schedule` public mock manager roster screen (local state, design validation)
 - `/approvals`
 - `/availability`
 - `/shift-board`

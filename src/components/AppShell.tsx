@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { can } from '@/lib/auth/can'
 import type { UiRole } from '@/lib/auth/roles'
 import { NotificationBell } from '@/components/NotificationBell'
+import { WorkflowTabs } from '@/components/schedule-roster/WorkflowTabs'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
@@ -73,13 +74,13 @@ export function buildManagerSections(pendingCount: number): readonly PrimarySect
     {
       key: 'schedule',
       label: 'Schedule',
-      href: '/coverage',
+      href: '/schedule',
       isActive: (p) => isManagerScheduleRoute(p),
       subItems: [
         {
-          href: '/coverage',
+          href: '/schedule',
           label: 'Coverage',
-          // `/schedule` still redirects into the coverage workflow.
+          // `/schedule` is the mock roster workspace while `/coverage` remains the live workflow.
           isActive: (p) => p === '/coverage' || p === '/schedule',
         },
         {
@@ -148,7 +149,6 @@ const STAFF_NAV_ITEMS = [
 
 const SHELL_ROUTES = [
   '/dashboard',
-  '/schedule',
   '/coverage',
   '/availability',
   '/shift-board',
@@ -430,32 +430,17 @@ export function AppShell({ user, children }: AppShellProps) {
           className="no-print print:hidden app-shell-chrome-secondary fixed top-14 left-0 right-0 z-20 h-11 border-b border-sidebar-border/60 shadow-tw-app-chrome-sub"
           aria-label="Section navigation"
         >
-          <div className="h-full overflow-x-auto">
-            <div className="flex h-full min-w-max items-center gap-0.5 px-5">
-              {activeSection.subItems.map((item) => {
-                const active = item.isActive(pathname)
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      'relative flex h-full shrink-0 items-center gap-1.5 px-3 text-[13px] font-medium transition-colors duration-150',
-                      active
-                        ? 'text-sidebar-primary after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-t-full after:bg-[color:var(--sidebar-ring)]'
-                        : 'text-sidebar-foreground hover:bg-sidebar-accent/30 hover:text-sidebar-accent-foreground'
-                    )}
-                    aria-current={active ? 'page' : undefined}
-                  >
-                    {item.label}
-                    {item.showBadge && (
-                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--attention)] px-1.5 text-[10px] font-bold text-accent-foreground">
-                        {pendingCount}
-                      </span>
-                    )}
-                  </Link>
-                )
-              })}
-            </div>
+          <div className="h-full overflow-x-auto px-4">
+            <WorkflowTabs
+              ariaLabel={`${activeSection.label} workflow`}
+              className="h-full min-w-max items-center"
+              tabs={activeSection.subItems.map((item) => ({
+                href: item.href,
+                label: item.label,
+                active: item.isActive(pathname),
+                badgeCount: item.showBadge ? pendingCount : undefined,
+              }))}
+            />
           </div>
         </nav>
       )}

@@ -61,6 +61,15 @@ describe('AppShell navigation structure', () => {
     expect(scheduleSection?.isActive('/schedule')).toBe(true)
   })
 
+  it('sends the manager Schedule entry to the mock roster screen while leaving live coverage routable', () => {
+    const scheduleSection = buildManagerSections(0).find((section) => section.key === 'schedule')
+
+    expect(scheduleSection?.href).toBe('/schedule')
+    expect(scheduleSection?.subItems.find((item) => item.label === 'Coverage')?.href).toBe(
+      '/schedule'
+    )
+  })
+
   it('uses Open shifts wording in staff shell navigation', () => {
     expect(appShellSource).toContain("label: 'Open shifts'")
     expect(appShellSource).not.toContain("label: 'Shift Swaps'")
