@@ -24,6 +24,7 @@ export type EmployeeRosterTableRow = {
   max_work_days_per_week: number
   is_lead_eligible: boolean
   matched_profile_id: string | null
+  matched_email: string | null
   matched_at: string | null
   phone_number: string | null
 }
@@ -86,6 +87,12 @@ type EmployeeRosterTableProps = {
   deleteEmployeeRosterEntryAction: (formData: FormData) => void | Promise<void>
 }
 
+function hasRealSignupLink(row: EmployeeRosterTableRow): boolean {
+  if (!row.matched_profile_id) return false
+  const email = String(row.matched_email ?? '').toLowerCase()
+  return !email.endsWith('.roster@teamwise.local')
+}
+
 export function EmployeeRosterTable({
   roster,
   deleteEmployeeRosterEntryAction,
@@ -95,7 +102,7 @@ export function EmployeeRosterTable({
   const [shiftFilter, setShiftFilter] = useState<'all' | EmployeeRosterTableRow['shift_type']>(
     'all'
   )
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'signed_up'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'linked'>('all')
   const [sortKey, setSortKey] = useState<SortKey>('full_name')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
@@ -105,8 +112,9 @@ export function EmployeeRosterTable({
       if (q && !row.full_name.toLowerCase().includes(q)) return false
       if (roleFilter !== 'all' && row.role !== roleFilter) return false
       if (shiftFilter !== 'all' && row.shift_type !== shiftFilter) return false
-      if (statusFilter === 'pending' && row.matched_profile_id) return false
-      if (statusFilter === 'signed_up' && !row.matched_profile_id) return false
+      const linked = hasRealSignupLink(row)
+      if (statusFilter === 'pending' && linked) return false
+      if (statusFilter === 'linked' && !linked) return false
       return true
     })
   }, [roster, search, roleFilter, shiftFilter, statusFilter])
@@ -116,8 +124,8 @@ export function EmployeeRosterTable({
     copy.sort((a, b) => {
       const dir = sortDir === 'asc' ? 1 : -1
       if (sortKey === 'status') {
-        const sa = a.matched_profile_id ? 1 : 0
-        const sb = b.matched_profile_id ? 1 : 0
+        const sa = hasRealSignupLink(a) ? 1 : 0
+        const sb = hasRealSignupLink(b) ? 1 : 0
         return (sa - sb) * dir
       }
       const va = a[sortKey] ?? ''
@@ -180,12 +188,12 @@ export function EmployeeRosterTable({
         <select
           aria-label="Filter by roster status"
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as 'all' | 'pending' | 'signed_up')}
+          onChange={(e) => setStatusFilter(e.target.value as 'all' | 'pending' | 'linked')}
           className="h-8 rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground"
         >
           <option value="all">All statuses</option>
           <option value="pending">Pending</option>
-          <option value="signed_up">Signed up</option>
+          <option value="linked">Account linked</option>
         </select>
       </div>
       <Table>
@@ -272,12 +280,12 @@ export function EmployeeRosterTable({
                 <span
                   className={cn(
                     'rounded-full px-2 py-0.5 text-xs font-medium',
-                    row.matched_profile_id
+                    hasRealSignupLink(row)
                       ? 'bg-[var(--success-subtle)] text-[var(--success-text)]'
                       : 'bg-muted text-muted-foreground'
                   )}
                 >
-                  {row.matched_profile_id ? 'Signed up' : 'Pending'}
+                  {hasRealSignupLink(row) ? 'Account linked' : 'Pending'}
                 </span>
               </TableCell>
               <TableCell className="py-2 text-right">
