@@ -30,6 +30,7 @@ type TeamWorkspaceClientProps = {
   bulkUpsertEmployeeRosterAction: (formData: FormData) => void | Promise<void>
   replaceTherapistRosterAction: (formData: FormData) => void | Promise<void>
   deleteEmployeeRosterEntryAction: (formData: FormData) => void | Promise<void>
+  bulkUpdateTeamMembersAction: (formData: FormData) => void | Promise<void>
 }
 
 function TeamWorkspaceClient({
@@ -45,6 +46,7 @@ function TeamWorkspaceClient({
   bulkUpsertEmployeeRosterAction,
   replaceTherapistRosterAction,
   deleteEmployeeRosterEntryAction,
+  bulkUpdateTeamMembersAction,
 }: TeamWorkspaceClientProps) {
   const [activeTab, setActiveTab] = useState<TeamWorkspaceTab>(initialTab)
 
@@ -121,6 +123,7 @@ function TeamWorkspaceClient({
             initialEditProfileId={initialEditProfileId}
             archiveTeamMemberAction={archiveTeamMemberAction}
             saveTeamQuickEditAction={saveTeamQuickEditAction}
+            bulkUpdateTeamMembersAction={bulkUpdateTeamMembersAction}
           />
         </div>
       ) : (

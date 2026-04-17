@@ -27,6 +27,7 @@ export type ShellContext = {
 const SHELL_ROUTES = [
   '/dashboard',
   '/coverage',
+  '/analytics',
   '/availability',
   '/shift-board',
   '/publish',
@@ -54,6 +55,7 @@ function isRouteActive(pathname: string, href: string): boolean {
 function isManagerScheduleRoute(pathname: string): boolean {
   return (
     pathname === '/coverage' ||
+    pathname === '/analytics' ||
     pathname === '/schedule' ||
     pathname === '/availability' ||
     pathname === '/publish' ||
@@ -87,6 +89,11 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
           active: (pathname) => pathname === '/coverage' || pathname === '/schedule',
         },
         {
+          href: '/analytics',
+          label: 'Analytics',
+          active: (pathname) => pathname === '/analytics',
+        },
+        {
           href: '/availability',
           label: 'Availability',
           active: (pathname) => pathname === '/availability',
@@ -111,7 +118,9 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
         pathname === '/team' ||
         pathname === '/requests' ||
         pathname.startsWith('/requests/') ||
-        pathname === '/shift-board',
+        pathname === '/shift-board' ||
+        pathname === '/settings' ||
+        pathname.startsWith('/settings/'),
       subItems: [
         {
           href: '/team',
@@ -126,6 +135,11 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
             pathname.startsWith('/requests/') ||
             pathname === '/shift-board',
           badgeCount: pendingCount > 0 ? pendingCount : undefined,
+        },
+        {
+          href: '/settings/audit-log',
+          label: 'Audit log',
+          active: (pathname) => pathname === '/settings/audit-log',
         },
       ],
     },

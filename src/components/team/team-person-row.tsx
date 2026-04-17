@@ -45,20 +45,28 @@ function shiftLabel(type: TeamProfileRecord['shift_type']): string {
 type TeamPersonRowProps = {
   profile: TeamProfileRecord
   onOpen: (profileId: string) => void
+  isSelected?: boolean
+  onToggle?: () => void
 }
 
-export function TeamPersonRow({ profile, onOpen }: TeamPersonRowProps) {
+export function TeamPersonRow({
+  profile,
+  onOpen,
+  isSelected = false,
+  onToggle,
+}: TeamPersonRowProps) {
   const isActive = teamMemberHasAppAccess(profile)
   const showLeadEligibleTag = profile.role === 'therapist' && profile.is_lead_eligible
 
-  return (
+  const row = (
     <button
       type="button"
       onClick={() => onOpen(profile.id)}
       className={cn(
         'group flex w-full cursor-pointer items-center gap-2 rounded-lg border border-border/60 bg-card/80 px-2.5 py-1.5 text-left text-sm transition-colors hover:border-primary/45 hover:bg-card/95 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none',
         profile.role === 'lead' && 'border-primary/25 bg-primary/[0.03]',
-        !isActive && 'opacity-80'
+        !isActive && 'opacity-80',
+        onToggle && isSelected && 'ring-2 ring-primary/25'
       )}
     >
       <div
@@ -137,5 +145,20 @@ export function TeamPersonRow({ profile, onOpen }: TeamPersonRowProps) {
         aria-hidden
       />
     </button>
+  )
+
+  if (!onToggle) return row
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="checkbox"
+        className="h-4 w-4 shrink-0 rounded border-border text-primary focus-visible:ring-2 focus-visible:ring-ring"
+        checked={isSelected}
+        onChange={() => onToggle()}
+        aria-label={`Select ${profile.full_name ?? 'team member'}`}
+      />
+      <div className="min-w-0 flex-1">{row}</div>
+    </div>
   )
 }

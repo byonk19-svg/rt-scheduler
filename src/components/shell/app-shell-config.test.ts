@@ -11,7 +11,7 @@ describe('app-shell-config', () => {
     expect(APP_HEADER_HEIGHT).toBe(56)
   })
 
-  it('maps /team into the People section with Team and Requests local items', () => {
+  it('maps /team into the People section with Team, Requests, and Audit log local items', () => {
     const context = getShellContext({
       pathname: '/team',
       canAccessManagerUi: true,
@@ -19,7 +19,11 @@ describe('app-shell-config', () => {
     })
 
     expect(context.primaryKey).toBe('people')
-    expect(context.localNav?.items.map((item) => item.label)).toEqual(['Team', 'Requests'])
+    expect(context.localNav?.items.map((item) => item.label)).toEqual([
+      'Team',
+      'Requests',
+      'Audit log',
+    ])
     expect(context.localNav?.items.find((item) => item.label === 'Requests')?.badgeCount).toBe(3)
   })
 
@@ -37,5 +41,18 @@ describe('app-shell-config', () => {
   it('keeps the manager sections grouped into Today, Schedule, and People', () => {
     const sections = buildManagerSections(0)
     expect(sections.map((section) => section.key)).toEqual(['today', 'schedule', 'people'])
+  })
+
+  it('adds Analytics under Schedule and keeps /analytics schedule-active', () => {
+    const context = getShellContext({
+      pathname: '/analytics',
+      canAccessManagerUi: true,
+      pendingCount: 0,
+    })
+
+    expect(context.primaryKey).toBe('schedule')
+    expect(context.localNav?.items.find((item) => item.label === 'Analytics')?.href).toBe(
+      '/analytics'
+    )
   })
 })
