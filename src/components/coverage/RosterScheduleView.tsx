@@ -436,7 +436,6 @@ export const RosterScheduleView = memo(function RosterScheduleView({
           cellError={cellError}
           onOpenEditor={onOpenEditor}
           onChangeStatus={onChangeStatus}
-          onUnassign={onUnassign}
         />
       ) : null}
     </div>
