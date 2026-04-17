@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { DM_Sans, Geist_Mono } from 'next/font/google'
 import { cookies } from 'next/headers'
-import { ThemeProvider } from '@/components/ThemeProvider'
+import ThemeProvider from '@/components/ThemeProvider'
 import { getServerThemeClass, THEME_KEY } from '@/lib/theme'
 import './globals.css'
 
