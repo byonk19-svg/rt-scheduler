@@ -31,6 +31,30 @@ npm run dev
 
 4. Open `http://localhost:3000`.
 
+### Clean Windows Restart
+
+If Chrome shows `ERR_FAILED`, `localhost:3000` stops responding, or `next dev` looks stuck on old runtime errors:
+
+1. Check whether anything is actually listening on port `3000`:
+
+```powershell
+netstat -ano | Select-String ':3000'
+```
+
+2. Stop repo-local `next dev` processes.
+3. Delete `.next`.
+4. Start one fresh server:
+
+```powershell
+Remove-Item -LiteralPath .next -Recurse -Force
+npm run dev
+```
+
+Notes:
+
+- On this repo, stale `next dev` state can survive across multiple overlapping launches and make old HMR/runtime errors look current.
+- If the server is healthy but a browser tab still shows an old overlay, close the old `localhost:3000` tabs and open a brand-new one before debugging further.
+
 ## Environment Variables
 
 See `.env.example` for required values.
@@ -60,6 +84,7 @@ For publish history + async email delivery:
 - `NEXT_PUBLIC_APP_URL`
 - `RESEND_API_KEY`
 - `PUBLISH_EMAIL_FROM`
+- `CRON_SECRET` for protected cron routes
 - optional `PUBLISH_WORKER_KEY` + `PUBLISH_WORKER_SIGNING_KEY` (signed key auth for cron/webhook caller)
 
 Signed worker request headers for `POST /api/publish/process`:
@@ -87,6 +112,13 @@ If email delivery is intentionally disabled and you only want in-app publishing:
 ```bash
 npm run verify:publish -- --allow-no-email
 ```
+
+For daily shift reminders:
+
+- Vercel cron calls `GET /api/cron/shift-reminders`
+- the cron is scheduled in `vercel.json` for `0 6 * * *` (6 AM UTC)
+- the route requires `Authorization: Bearer <CRON_SECRET>`
+- reminders are queued only for next-day `scheduled` shifts
 
 ## Inbound Availability Intake
 

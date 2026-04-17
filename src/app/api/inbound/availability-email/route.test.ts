@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { createAdminClientMock, isValidResendWebhookRequestMock } = vi.hoisted(() => ({
+const { createAdminClientMock, isValidResendWebhookRequestMock, afterMock } = vi.hoisted(() => ({
   createAdminClientMock: vi.fn(),
   isValidResendWebhookRequestMock: vi.fn(async () => true),
+  afterMock: vi.fn(async (callback: () => Promise<void> | void) => {
+    await callback()
+  }),
 }))
 
 vi.mock('@/lib/supabase/admin', () => ({
@@ -13,7 +16,22 @@ vi.mock('@/lib/security/resend-webhook', () => ({
   isValidResendWebhookRequest: isValidResendWebhookRequestMock,
 }))
 
+vi.mock('next/server', async () => {
+  const actual = await vi.importActual<typeof import('next/server')>('next/server')
+  return {
+    ...actual,
+    after: afterMock,
+  }
+})
+
 import { POST } from '@/app/api/inbound/availability-email/route'
+
+const ONE_PAGE_PDF_BYTES = Uint8Array.from(
+  Buffer.from(
+    'JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAyMDAgMjAwXSA+PgplbmRvYmoKeHJlZgowIDQKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDExNSAwMDAwMCBuIAp0cmFpbGVyCjw8IC9Sb290IDEgMCBSIC9TaXplIDQgPj4Kc3RhcnR4cmVmCjE4NgolJUVPRg==',
+    'base64'
+  )
+)
 
 function createAdminMock() {
   const state = {
@@ -91,8 +109,18 @@ function createAdminMock() {
             return Promise.resolve(
               resolve({
                 data: [
-                  { id: 'therapist-1', full_name: 'Brianna Brown', is_active: true },
-                  { id: 'therapist-2', full_name: 'Brian Brown', is_active: true },
+                  {
+                    id: 'therapist-1',
+                    full_name: 'Brianna Brown',
+                    email: 'brianna@example.com',
+                    is_active: true,
+                  },
+                  {
+                    id: 'therapist-2',
+                    full_name: 'Brian Brown',
+                    email: 'brian@example.com',
+                    is_active: true,
+                  },
                 ],
                 error: null,
               })
@@ -137,11 +165,19 @@ function createWebhookRequest(emailId = 'email-1') {
   })
 }
 
+async function waitForAfterWork() {
+  const backgroundWork = afterMock.mock.results.at(-1)?.value
+  if (backgroundWork && typeof backgroundWork.then === 'function') {
+    await backgroundWork
+  }
+}
+
 describe('POST /api/inbound/availability-email', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     process.env.RESEND_API_KEY = 'resend-test'
     process.env.OPENAI_API_KEY = 'openai-test'
+    afterMock.mockClear()
   })
 
   it('creates batch items and auto-applies only high-confidence sources', async () => {
@@ -171,7 +207,7 @@ describe('POST /api/inbound/availability-email', () => {
           json: async () => ({
             data: {
               id: 'email-1',
-              from: { email: 'manager@example.com', name: 'Manager' },
+              from: { email: 'brianna@example.com', name: 'Brianna Brown' },
               subject: 'Batch request',
               text: 'Employee Name: Brianna Brown\nNeed off Mar 24',
               created_at: '2026-03-20T12:00:00Z',
@@ -214,10 +250,11 @@ describe('POST /api/inbound/availability-email', () => {
     expect(response.status).toBe(200)
     expect(payload).toMatchObject({
       ok: true,
-      intake_id: 'intake-1',
-      parse_status: 'needs_review',
-      item_count: 2,
+      queued: true,
+      email_id: 'email-1',
     })
+    expect(afterMock).toHaveBeenCalledOnce()
+    await waitForAfterWork()
     expect(admin.state.intakeUpserts[0]).toMatchObject({
       item_count: 2,
       auto_applied_count: 1,
@@ -225,6 +262,82 @@ describe('POST /api/inbound/availability-email', () => {
       failed_count: 0,
     })
     expect(admin.state.itemInserts[0]).toHaveLength(2)
+    expect(admin.state.overrideUpserts[0]).toEqual([
+      expect.objectContaining({
+        therapist_id: 'therapist-1',
+        cycle_id: 'cycle-1',
+        date: '2026-03-24',
+      }),
+    ])
+  })
+
+  it('treats generic pdf attachments as PDFs and auto-applies when confidence is high', async () => {
+    const admin = createAdminMock()
+    createAdminClientMock.mockReturnValue(admin)
+
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input.endsWith('/email-1/attachments')) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: [
+              {
+                id: 'attachment-1',
+                filename: 'request-form.pdf',
+                content_type: 'application/octet-stream',
+                url: 'https://download.test/request-form.pdf',
+              },
+            ],
+          }),
+        }
+      }
+
+      if (input.endsWith('/email-1')) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              id: 'email-1',
+              from: { email: 'brianna@example.com', name: 'Brianna Brown' },
+              subject: 'PDF request',
+              text: '',
+              created_at: '2026-03-20T12:00:00Z',
+              message_id: 'msg-1',
+            },
+          }),
+        }
+      }
+
+      if (input === 'https://download.test/request-form.pdf') {
+        return {
+          ok: true,
+          arrayBuffer: async () => Uint8Array.from([1, 2, 3]).buffer,
+        }
+      }
+
+      if (input === 'https://api.openai.com/v1/responses') {
+        return {
+          ok: true,
+          json: async () => ({
+            output_text: 'Employee Name: Brianna Brown\nNeed off Mar 24',
+          }),
+        }
+      }
+
+      throw new Error(`Unhandled fetch: ${input}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const response = await POST(createWebhookRequest())
+    const payload = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(payload).toMatchObject({
+      ok: true,
+      queued: true,
+      email_id: 'email-1',
+    })
+    await waitForAfterWork()
     expect(admin.state.overrideUpserts[0]).toEqual([
       expect.objectContaining({
         therapist_id: 'therapist-1',
@@ -267,7 +380,7 @@ describe('POST /api/inbound/availability-email', () => {
           json: async () => ({
             data: {
               id: 'email-1',
-              from: { email: 'manager@example.com', name: 'Manager' },
+              from: { email: 'brianna@example.com', name: 'Brianna Brown' },
               subject: null,
               text: '',
               created_at: '2026-03-20T12:00:00Z',
@@ -307,12 +420,235 @@ describe('POST /api/inbound/availability-email', () => {
     expect(response.status).toBe(200)
     expect(payload).toMatchObject({
       ok: true,
-      item_count: 2,
+      queued: true,
+      email_id: 'email-1',
     })
+    await waitForAfterWork()
     expect(admin.state.intakeUpserts[0]).toMatchObject({
       failed_count: 1,
       auto_applied_count: 1,
     })
     expect(admin.state.itemInserts[0]).toHaveLength(2)
+  })
+
+  it('falls back to image OCR when PDF extraction returns NO_TEXT', async () => {
+    const admin = createAdminMock()
+    createAdminClientMock.mockReturnValue(admin)
+
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input.endsWith('/email-1/attachments')) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: [
+              {
+                id: 'attachment-1',
+                filename: 'scan.pdf',
+                content_type: 'application/pdf',
+                url: 'https://download.test/scan.pdf',
+              },
+            ],
+          }),
+        }
+      }
+
+      if (input.endsWith('/email-1')) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              id: 'email-1',
+              from: { email: 'brianna@example.com', name: 'Brianna Brown' },
+              subject: null,
+              text: '',
+              created_at: '2026-03-20T12:00:00Z',
+              message_id: 'msg-1',
+            },
+          }),
+        }
+      }
+
+      if (input === 'https://download.test/scan.pdf') {
+        return {
+          ok: true,
+          arrayBuffer: async () => ONE_PAGE_PDF_BYTES.buffer.slice(0),
+        }
+      }
+
+      if (input === 'https://api.openai.com/v1/responses') {
+        const body = JSON.parse(String(init?.body ?? '{}')) as {
+          input?: Array<{ content?: Array<{ type: string }> }>
+        }
+        const content = body.input?.[0]?.content ?? []
+        const isPdfRequest = content.some((part) => part.type === 'input_file')
+
+        return {
+          ok: true,
+          json: async () => ({
+            output_text: isPdfRequest ? 'NO_TEXT' : 'Employee Name: Brianna Brown\nNeed off Mar 24',
+          }),
+        }
+      }
+
+      throw new Error(`Unhandled fetch: ${input}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const response = await POST(createWebhookRequest())
+    const payload = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(payload).toMatchObject({
+      ok: true,
+      queued: true,
+      email_id: 'email-1',
+    })
+    await waitForAfterWork()
+    expect(admin.state.intakeUpserts[0]).toMatchObject({
+      auto_applied_count: 1,
+      needs_review_count: 0,
+      failed_count: 0,
+    })
+    expect(admin.state.overrideUpserts[0]).toEqual([
+      expect.objectContaining({
+        therapist_id: 'therapist-1',
+        cycle_id: 'cycle-1',
+        date: '2026-03-24',
+      }),
+    ])
+  })
+
+  it('stores the OCR failure reason when pdf extraction fails before parsing', async () => {
+    const admin = createAdminMock()
+    createAdminClientMock.mockReturnValue(admin)
+
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+      if (input.endsWith('/email-1/attachments')) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: [
+              {
+                id: 'attachment-1',
+                filename: 'scan.pdf',
+                content_type: 'application/pdf',
+                url: 'https://download.test/scan.pdf',
+              },
+            ],
+          }),
+        }
+      }
+
+      if (input.endsWith('/email-1')) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              id: 'email-1',
+              from: { email: 'brianna@example.com', name: 'Brianna Brown' },
+              subject: null,
+              text: '',
+              created_at: '2026-03-20T12:00:00Z',
+              message_id: 'msg-1',
+            },
+          }),
+        }
+      }
+
+      if (input === 'https://download.test/scan.pdf') {
+        return {
+          ok: true,
+          arrayBuffer: async () => Uint8Array.from([1, 2, 3]).buffer,
+        }
+      }
+
+      if (input === 'https://api.openai.com/v1/responses') {
+        const body = JSON.parse(String(init?.body ?? '{}')) as {
+          input?: Array<{ content?: Array<{ type: string }> }>
+        }
+        const content = body.input?.[0]?.content ?? []
+        const isPdfRequest = content.some((part) => part.type === 'input_file')
+
+        return {
+          ok: true,
+          json: async () => ({
+            output_text: isPdfRequest ? 'NO_TEXT' : 'NO_TEXT',
+          }),
+        }
+      }
+
+      throw new Error(`Unhandled fetch: ${input}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const response = await POST(createWebhookRequest())
+    const payload = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(payload).toMatchObject({
+      ok: true,
+      queued: true,
+      email_id: 'email-1',
+    })
+    await waitForAfterWork()
+    expect(admin.state.itemInserts[0]?.[0]).toMatchObject({
+      source_label: 'scan.pdf',
+      ocr_status: 'failed',
+      ocr_error: expect.stringContaining('PDF'),
+    })
+    expect(admin.state.attachmentUpserts[0]).toMatchObject({
+      filename: 'scan.pdf',
+      ocr_status: 'failed',
+      ocr_error: expect.stringContaining('PDF'),
+    })
+  })
+
+  it('does not auto-apply parsed requests when the sender email does not match the therapist', async () => {
+    const admin = createAdminMock()
+    createAdminClientMock.mockReturnValue(admin)
+
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input.endsWith('/email-1/attachments')) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: [],
+          }),
+        }
+      }
+
+      if (input.endsWith('/email-1')) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              id: 'email-1',
+              from: { email: 'manager@example.com', name: 'Manager' },
+              subject: 'Availability',
+              text: 'Employee Name: Brianna Brown\nNeed off Mar 24',
+              created_at: '2026-03-20T12:00:00Z',
+              message_id: 'msg-1',
+            },
+          }),
+        }
+      }
+
+      throw new Error(`Unhandled fetch: ${input}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const response = await POST(createWebhookRequest())
+
+    expect(response.status).toBe(200)
+    await waitForAfterWork()
+    expect(admin.state.intakeUpserts[0]).toMatchObject({
+      auto_applied_count: 0,
+      needs_review_count: 1,
+    })
+    expect(admin.state.itemInserts[0]?.[0]).toMatchObject({
+      parse_status: 'needs_review',
+      matched_therapist_id: 'therapist-1',
+    })
+    expect(admin.state.overrideUpserts).toHaveLength(0)
   })
 })

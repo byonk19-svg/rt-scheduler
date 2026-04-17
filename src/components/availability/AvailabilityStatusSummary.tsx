@@ -1,161 +1,207 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
 export type AvailabilityStatusSummaryRow = {
   therapistId: string
   therapistName: string
-  overridesCount?: number
+  overridesCount: number
+  lastUpdatedAt: string | null
 }
+
+export type AvailabilityRosterFilter = 'all' | 'missing' | 'submitted' | 'has_requests'
 
 type AvailabilityStatusSummaryProps = {
   submittedRows: AvailabilityStatusSummaryRow[]
   missingRows: AvailabilityStatusSummaryRow[]
+  initialFilter?: AvailabilityRosterFilter
+  onPickTherapist?: (therapistId: string) => void
+  embedded?: boolean
 }
 
-function pluralizeTherapists(count: number): string {
-  return `${count} therapist${count === 1 ? '' : 's'}`
+type CombinedRosterRow = AvailabilityStatusSummaryRow & {
+  submitted: boolean
 }
 
-function TherapistRow({
-  name,
-  subtitle,
-  tone,
-}: {
-  name: string
-  subtitle: string
-  tone: 'warning' | 'success'
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 shadow-tw-sm">
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-[11px] font-bold uppercase text-muted-foreground">
-        {name
-          .split(/\s+/)
-          .filter(Boolean)
-          .slice(0, 2)
-          .map((part) => part[0])
-          .join('')}
-      </div>
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-foreground">{name}</p>
-        <div className="mt-1 flex items-center gap-1.5">
-          <span
-            className={cn(
-              'h-2 w-2 rounded-full',
-              tone === 'warning' ? 'bg-[var(--warning-text)]' : 'bg-[var(--success-text)]'
-            )}
-          />
-          <span className="text-[11px] font-medium text-muted-foreground">{subtitle}</span>
-        </div>
-      </div>
-    </div>
-  )
+function formatLastActivity(value: string | null) {
+  if (!value) return 'Awaiting submission'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function initialsForName(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('')
 }
 
 export function AvailabilityStatusSummary({
   submittedRows,
   missingRows,
+  initialFilter = 'missing',
+  onPickTherapist,
+  embedded = false,
 }: AvailabilityStatusSummaryProps) {
-  const [activeTab, setActiveTab] = useState<'missing' | 'submitted'>('missing')
+  const [activeFilter, setActiveFilter] = useState<AvailabilityRosterFilter>(initialFilter)
+
+  const allRows = useMemo<CombinedRosterRow[]>(
+    () => [
+      ...missingRows.map((row) => ({ ...row, submitted: false })),
+      ...submittedRows.map((row) => ({ ...row, submitted: true })),
+    ],
+    [missingRows, submittedRows]
+  )
+
+  const filteredRows = useMemo(() => {
+    if (activeFilter === 'all') return allRows
+    if (activeFilter === 'missing') return allRows.filter((row) => !row.submitted)
+    if (activeFilter === 'submitted') return allRows.filter((row) => row.submitted)
+    return allRows.filter((row) => row.overridesCount > 0)
+  }, [activeFilter, allRows])
+
+  const filterCounts = {
+    all: allRows.length,
+    missing: missingRows.length,
+    submitted: submittedRows.length,
+    has_requests: allRows.filter((row) => row.overridesCount > 0).length,
+  }
 
   return (
     <section className="flex h-full flex-col" aria-labelledby="availability-response-heading">
-      <div className="border-b border-border/80 px-5 py-4">
-        <h2
-          id="availability-response-heading"
-          className="text-sm font-bold tracking-[-0.01em] text-foreground"
-        >
-          Response roster
-        </h2>
+      {!embedded ? (
+        <div className="border-b border-border/70 px-4 py-3">
+          <h2
+            id="availability-response-heading"
+            className="text-sm font-bold tracking-[-0.01em] text-foreground"
+          >
+            Response roster
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Follow up on responses without leaving the planner.
+          </p>
+        </div>
+      ) : null}
+
+      <div
+        className={cn(
+          'flex flex-wrap gap-1 px-4 py-2',
+          embedded ? 'border-b border-border/60 bg-muted/[0.04]' : 'border-b border-border/70'
+        )}
+      >
+        {(
+          [
+            ['all', 'All'],
+            ['missing', 'Not submitted'],
+            ['submitted', 'Submitted'],
+            ['has_requests', 'Has requests'],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors',
+              activeFilter === value
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            )}
+            onClick={() => setActiveFilter(value)}
+          >
+            <span>{label}</span>
+            <span className="rounded-full bg-background/75 px-1.5 py-0.5 text-[10px] text-foreground">
+              {filterCounts[value]}
+            </span>
+          </button>
+        ))}
       </div>
 
-      <div className="grid grid-cols-2 border-b border-border/80 bg-muted/40">
-        <button
-          type="button"
-          className={cn(
-            'border-b-2 px-4 py-3 text-left text-xs font-bold transition-colors',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2',
-            activeTab === 'missing'
-              ? 'border-primary text-foreground'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          )}
-          onClick={() => setActiveTab('missing')}
-        >
-          Not submitted yet{' '}
-          <span className="ml-1 rounded-full bg-[var(--warning-subtle)] px-1.5 py-0.5 text-[10px] text-[var(--warning-text)]">
-            {missingRows.length}
-          </span>
-        </button>
-        <button
-          type="button"
-          className={cn(
-            'border-b-2 px-4 py-3 text-left text-xs font-bold transition-colors',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2',
-            activeTab === 'submitted'
-              ? 'border-primary text-foreground'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          )}
-          onClick={() => setActiveTab('submitted')}
-        >
-          Submitted{' '}
-          <span className="ml-1 rounded-full bg-[var(--success-subtle)] px-1.5 py-0.5 text-[10px] text-[var(--success-text)]">
-            {submittedRows.length}
-          </span>
-        </button>
-      </div>
-
-      <div className="max-h-[560px] overflow-y-auto p-4">
-        <div className={cn('space-y-3', activeTab !== 'missing' && 'hidden')}>
-          <p className="px-1 text-[11px] font-medium text-muted-foreground">
-            {missingRows.length > 0
-              ? `${pluralizeTherapists(missingRows.length)} still need to respond`
-              : 'Everyone has submitted availability for this cycle.'}
-          </p>
-
-          {missingRows.length > 0 ? (
-            missingRows.map((row) => (
-              <TherapistRow
-                key={row.therapistId}
-                name={row.therapistName}
-                subtitle="Not yet"
-                tone="warning"
-              />
-            ))
-          ) : (
-            <div className="rounded-xl border border-[var(--success-border)] bg-[var(--success-subtle)] px-4 py-4 text-sm text-[var(--success-text)]">
-              Everyone has responded. You can move forward with schedule planning.
+      <div
+        className={cn('overflow-y-auto px-3 py-2.5', embedded ? 'max-h-[320px]' : 'max-h-[420px]')}
+      >
+        {filteredRows.length > 0 ? (
+          <div className="divide-y divide-border/60 rounded-xl border border-border/60 bg-background/80">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              <span>Name</span>
+              <span>Last activity</span>
             </div>
-          )}
-        </div>
 
-        <div className={cn('space-y-3', activeTab !== 'submitted' && 'hidden')}>
-          <p className="px-1 text-[11px] font-medium text-muted-foreground">
-            {submittedRows.length > 0
-              ? `${pluralizeTherapists(submittedRows.length)} have already submitted`
-              : 'No submissions yet for this cycle.'}
+            {filteredRows.map((row) => {
+              const content = (
+                <>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold uppercase text-muted-foreground">
+                      {initialsForName(row.therapistName)}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate text-sm font-semibold text-foreground">
+                          {row.therapistName}
+                        </p>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            'h-5 px-1.5 text-[10px]',
+                            row.submitted
+                              ? 'border-[var(--success-border)] text-[var(--success-text)]'
+                              : 'border-[var(--warning-border)] text-[var(--warning-text)]'
+                          )}
+                        >
+                          {row.submitted ? 'Submitted' : 'Awaiting'}
+                        </Badge>
+                      </div>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {row.overridesCount > 0
+                          ? `${row.overridesCount} request${row.overridesCount === 1 ? '' : 's'} on file`
+                          : row.submitted
+                            ? 'No request notes saved'
+                            : 'Waiting for response'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[11px] font-medium text-foreground">Last activity</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {formatLastActivity(row.lastUpdatedAt)}
+                    </p>
+                  </div>
+                </>
+              )
+
+              if (!onPickTherapist) {
+                return (
+                  <div
+                    key={row.therapistId}
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2"
+                  >
+                    {content}
+                  </div>
+                )
+              }
+
+              return (
+                <button
+                  key={row.therapistId}
+                  type="button"
+                  className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-muted/25"
+                  onClick={() => onPickTherapist(row.therapistId)}
+                >
+                  {content}
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            No therapists match the current roster filter.
           </p>
-
-          {submittedRows.length > 0 ? (
-            submittedRows.map((row) => (
-              <TherapistRow
-                key={row.therapistId}
-                name={row.therapistName}
-                subtitle={
-                  (row.overridesCount ?? 0) > 0
-                    ? `${row.overridesCount} saved date${row.overridesCount === 1 ? '' : 's'}`
-                    : 'Submitted'
-                }
-                tone="success"
-              />
-            ))
-          ) : (
-            <div className="rounded-xl border border-border bg-muted/30 px-4 py-4 text-sm text-muted-foreground">
-              No one has submitted availability for this cycle yet.
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </section>
   )

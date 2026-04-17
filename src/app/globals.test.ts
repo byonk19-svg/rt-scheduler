@@ -20,4 +20,13 @@ describe('homepage luminous visual system', () => {
     expect(cssSource).toContain('.teamwise-home-preview-shell {')
     expect(cssSource).toContain('.teamwise-home-preview-sheen {')
   })
+
+  it('defines dark theme token overrides and forces light color-scheme in print', () => {
+    expect(cssSource).toContain('.dark {')
+    expect(cssSource).toContain('--background:')
+    expect(cssSource).toContain('--foreground:')
+    expect(cssSource).toContain('@media print')
+    expect(cssSource).toContain('.dark {')
+    expect(cssSource).toContain('color-scheme: light;')
+  })
 })

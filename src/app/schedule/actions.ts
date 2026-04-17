@@ -1,1 +1,1 @@
-export * from './actions/index'
+export * from '@/app/(app)/schedule/actions'

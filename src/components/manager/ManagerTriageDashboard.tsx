@@ -1,15 +1,16 @@
 import Link from 'next/link'
-import { useMemo, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import {
   AlertTriangle,
   ArrowRight,
   CalendarDays,
-  ChevronRight,
   FileCheck,
+  Send,
   Shield,
   Sparkles,
   Users,
 } from 'lucide-react'
+
 import { ScheduleProgress } from '@/components/manager/ScheduleProgress'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -86,58 +87,12 @@ export function ManagerTriageDashboard({
     pendingRequests === '--' ? LOADING_LABEL : `${pendingRequests} pending`
   const teamLoadLabel =
     upcomingShiftCount === '--' ? LOADING_LABEL : `${upcomingShiftCount} upcoming shifts`
-  const nextStep = useMemo(() => {
-    if (isLoading) return null
-    const risks = typeof riskCount === 'number' && riskCount > 0
-    const pending = typeof pendingRequests === 'number' && pendingRequests > 0
-    const review = typeof needsReviewCount === 'number' && needsReviewCount > 0
-    if (risks) {
-      return {
-        title: 'Address coverage risks',
-        body: 'Open the schedule and fix days that are short-staffed or missing a lead.',
-        href: scheduleHref,
-        cta: 'Open schedule',
-      } as const
-    }
-    if (pending) {
-      return {
-        title: 'Review pending approvals',
-        body: 'Shift and access requests are waiting for a decision.',
-        href: approvalsHref,
-        cta: 'Go to approvals',
-      } as const
-    }
-    if (review) {
-      return {
-        title: 'Catch up on reviews',
-        body: 'Clear items in your approvals queue so nothing blocks the next publish.',
-        href: reviewHref,
-        cta: 'Open approvals',
-      } as const
-    }
-    return {
-      title: 'Continue the active block',
-      body: 'Keep staffing day and night grids, then publish when you are ready.',
-      href: scheduleHref,
-      cta: 'Open schedule',
-    } as const
-  }, [
-    approvalsHref,
-    isLoading,
-    needsReviewCount,
-    pendingRequests,
-    reviewHref,
-    riskCount,
-    scheduleHref,
-  ])
-
   const metricCards = [
     {
       title: 'Coverage Issues',
       value: riskCount === '--' ? '--' : String(riskCount),
       detail: riskCountLabel,
       href: scheduleHref,
-      linkAriaLabel: `Coverage issues: ${riskCountLabel}. Opens schedule.`,
       icon: <Shield className="h-4 w-4 text-[var(--error-text)]" />,
       tone: 'error' as const,
     },
@@ -146,7 +101,6 @@ export function ManagerTriageDashboard({
       value: pendingRequests === '--' ? '--' : String(pendingRequests),
       detail: pendingRequestLabel,
       href: approvalsHref,
-      linkAriaLabel: `Pending approvals: ${pendingRequestLabel}. Opens approvals.`,
       icon: <FileCheck className="h-4 w-4 text-[var(--warning-text)]" />,
       tone: 'warning' as const,
     },
@@ -155,7 +109,6 @@ export function ManagerTriageDashboard({
       value: upcomingShiftCount === '--' ? '--' : String(upcomingShiftCount),
       detail: teamLoadLabel,
       href: scheduleHref,
-      linkAriaLabel: `Upcoming shifts: ${teamLoadLabel}. Opens schedule.`,
       icon: <Users className="h-4 w-4 text-primary" />,
       tone: 'info' as const,
     },
@@ -164,52 +117,44 @@ export function ManagerTriageDashboard({
   return (
     <div className="max-w-[1120px] space-y-4 px-5 py-5 xl:px-7">
       <div className="teamwise-aurora-bg relative overflow-hidden rounded-[26px] border border-border/70 bg-card p-5 shadow-tw-inbox-hero">
-        <div className="teamwise-grid-bg-subtle absolute inset-0 opacity-45" />
-        <div className="relative max-w-2xl">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-heading text-4xl font-bold tracking-[-0.04em] text-foreground sm:text-5xl">
-              Inbox
-            </h1>
-            {activeCycleDateRange && (
-              <span className="rounded-full border border-border/70 bg-muted/20 px-3 py-1 text-xs text-muted-foreground">
-                {activeCycleDateRange}
-              </span>
-            )}
+        <div className="teamwise-grid-bg-subtle absolute inset-0 opacity-70" />
+        <div className="relative flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="font-heading text-5xl font-bold tracking-[-0.05em] text-foreground">
+                Inbox
+              </h1>
+              {activeCycleDateRange && (
+                <span className="rounded-full border border-border/70 bg-muted/20 px-3 py-1 text-xs text-muted-foreground">
+                  {activeCycleDateRange}
+                </span>
+              )}
+            </div>
           </div>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            Coverage, availability, and handoffs in one workspace.
-          </p>
+          <div className="relative flex gap-2">
+            <Button variant="outline" size="sm" className="h-9 px-4" asChild>
+              <Link href={scheduleHref}>
+                <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
+                Open schedule
+              </Link>
+            </Button>
+            <Button size="sm" className="h-9 px-4" asChild>
+              <Link href={approvalsHref}>
+                <Send className="mr-1.5 h-3.5 w-3.5" />
+                Publish flow
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
         <div className="space-y-4">
-          {nextStep && (
-            <div className="rounded-2xl border border-border bg-muted/20 px-4 py-4 border-l-4 border-l-primary">
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary">
-                What to do next
-              </p>
-              <p className="mt-1.5 font-heading text-lg font-semibold tracking-[-0.03em] text-foreground">
-                {nextStep.title}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">{nextStep.body}</p>
-              <Button className="mt-3 h-9" size="sm" asChild>
-                <Link href={nextStep.href}>
-                  {nextStep.cta}
-                  <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                </Link>
-              </Button>
-            </div>
-          )}
-          <p className="text-[11px] text-muted-foreground md:hidden">
-            Tap a card to open schedule or approvals.
-          </p>
-          <p className="hidden text-[11px] text-muted-foreground md:block">
-            Click a metric card to open the schedule or approvals queue.
-          </p>
           <div className="grid gap-3 sm:grid-cols-3">
             {metricCards.map((card) => (
-              <MetricCard key={card.title} {...card} />
+              <div key={card.title}>
+                <MetricCard {...card} />
+              </div>
             ))}
           </div>
 
@@ -354,15 +299,11 @@ export function ManagerTriageDashboard({
                 detail={needsReviewDetail}
               />
               <p className="text-[11px] text-muted-foreground">
-                {approvalsWaiting === '--'
-                  ? LOADING_LABEL
-                  : typeof approvalsWaiting === 'number' && approvalsWaiting > 0
-                    ? `${approvalsWaiting} request${approvalsWaiting === 1 ? '' : 's'} pending`
-                    : 'No requests pending'}
+                {approvalsWaiting === '--' ? LOADING_LABEL : `${approvalsWaiting} waiting`}
               </p>
               <Button variant="ghost" size="sm" className="h-7 gap-1 px-0 text-xs" asChild>
                 <Link href={reviewHref}>
-                  Open approvals
+                  Review updates
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </Button>
@@ -385,7 +326,7 @@ export function ManagerTriageDashboard({
                 ))
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  {isLoading ? LOADING_LABEL : 'No upcoming days with heavier staffing right now.'}
+                  {isLoading ? LOADING_LABEL : 'No upcoming shift clusters right now.'}
                 </p>
               )}
             </CardContent>
@@ -401,7 +342,6 @@ function MetricCard({
   value,
   detail,
   href,
-  linkAriaLabel,
   icon,
   tone,
 }: {
@@ -409,7 +349,6 @@ function MetricCard({
   value: string
   detail: string
   href: string
-  linkAriaLabel: string
   icon: ReactNode
   tone: 'error' | 'warning' | 'info'
 }) {
@@ -430,7 +369,7 @@ function MetricCard({
   }[tone]
 
   return (
-    <Link href={href} className="block" aria-label={linkAriaLabel}>
+    <Link href={href} className="block">
       <Card
         className={cn(
           'relative overflow-hidden rounded-[24px] border-border/70 bg-card/95 shadow-tw-metric transition-transform duration-200 hover:-translate-y-0.5',
@@ -448,16 +387,12 @@ function MetricCard({
               'font-heading tabular-nums leading-none tracking-[-0.04em]',
               isEmpty
                 ? 'text-xl font-semibold text-muted-foreground'
-                : 'text-3xl font-bold text-foreground sm:text-4xl'
+                : 'text-4xl font-bold text-foreground'
             )}
           >
             {value}
           </p>
           <p className="text-xs text-muted-foreground">{detail}</p>
-          <p className="mt-2 flex items-center gap-0.5 text-[10px] font-medium text-primary">
-            Open
-            <ChevronRight className="h-3 w-3" aria-hidden />
-          </p>
         </CardContent>
       </Card>
     </Link>

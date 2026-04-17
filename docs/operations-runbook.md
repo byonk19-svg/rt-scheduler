@@ -68,7 +68,7 @@ Pick **one** of these patterns (your org’s IT / Supabase admin owns this):
 | Access requests (new signups)  | **`/requests/user-access`** |
 | Publish history & email status | **`/publish`**              |
 
-**Intake:** Email webhook + **manual intake** (paste / upload) on `/availability` — keep manual path documented for staff if email is delayed.
+**Intake:** Email webhook + **manual intake** (paste / upload) on `/availability` — keep manual path documented for staff if email is delayed. Managers can now open each intake row to view the stored original email body and attachment OCR text, reparse the batch after OCR/parser changes, or delete old troubleshooting rows.
 
 ---
 

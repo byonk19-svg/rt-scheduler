@@ -170,6 +170,18 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
       variant: 'error',
     }
   }
+  if (error === 'create_cycle_invalid_range') {
+    return {
+      message: 'Cycle end date must be the same as or later than the start date.',
+      variant: 'error',
+    }
+  }
+  if (error === 'create_cycle_overlap') {
+    return {
+      message: 'That cycle overlaps an existing active schedule block.',
+      variant: 'error',
+    }
+  }
   if (error === 'copy_from_last_cycle_failed') {
     return {
       message:

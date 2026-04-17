@@ -4,6 +4,7 @@ import {
   assignCoverageShift,
   assignCoverageShiftViaApi,
   persistCoverageShiftStatus,
+  setCoverageDesignatedLeadViaApi,
   unassignCoverageShift,
   unassignCoverageShiftViaApi,
 } from '@/lib/coverage/mutations'
@@ -134,6 +135,36 @@ describe('assignCoverageShiftViaApi', () => {
         date: '2026-03-01',
         shiftType: 'day',
         role: 'lead',
+        overrideWeeklyRules: false,
+      }),
+    })
+  })
+})
+
+describe('setCoverageDesignatedLeadViaApi', () => {
+  it('posts set_lead to drag-drop with therapist id and date', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ message: 'ok' }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await setCoverageDesignatedLeadViaApi({
+      cycleId: 'cycle-1',
+      therapistId: 'therapist-9',
+      isoDate: '2026-05-16',
+      shiftType: 'day',
+    })
+
+    expect(result.error).toBe(null)
+    expect(fetchMock).toHaveBeenCalledWith('/api/schedule/drag-drop', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'set_lead',
+        cycleId: 'cycle-1',
+        therapistId: 'therapist-9',
+        date: '2026-05-16',
+        shiftType: 'day',
         overrideWeeklyRules: false,
       }),
     })

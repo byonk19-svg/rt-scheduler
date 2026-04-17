@@ -55,6 +55,7 @@ shots/
 /artifacts/
 
 # local agent/tooling state
+.agents/
 .claude/
 .superpowers/
 .planning/
@@ -70,3 +71,9 @@ security_best_practices_report.md
 .tmp-prod*.log
 .omx/
 .codex/
+
+# local agent / dev scratch (may sit next to repo root during sessions)
+.tmp/
+.tmp-*
+.tmp-*.json
+.tmp-*.log

@@ -1,8 +1,18 @@
-import { renderPdfToPngPages } from '@/lib/pdf-render-pages'
+import { createOcrImageVariants, renderPdfToPngPages } from '@/lib/pdf-render-pages'
 
 const DEFAULT_OCR_MODEL = 'gpt-4.1-mini'
 
 const NO_TEXT_SKIP_MESSAGE = 'No readable scheduling text detected.'
+const FULL_PAGE_ACCEPT_SCORE = 80
+const ZONE_ORDER = ['employee_name', 'request_table'] as const
+const ZONE_PROMPTS: Record<string, string> = {
+  full_page:
+    'Read all visible text from this scheduling request page, including names, dates, handwritten notes, and request details. Return plain text only. If the page is blank or fully illegible, return NO_TEXT.',
+  employee_name:
+    'Read the employee name from this form region. Return just the name in plain text. If there is no readable name, return NO_TEXT.',
+  request_table:
+    'Read the PTO request table rows from this form region. Preserve each date and its handwritten note exactly. Return plain text only, one row per line when possible. If there is no readable table text, return NO_TEXT.',
+}
 
 const IMAGE_CONTENT_TYPES = new Set([
   'image/png',
@@ -51,10 +61,167 @@ function sanitizeOcrText(value: string): string {
     .trim()
 }
 
+function extractOutputTextFromResponsePayload(payload: unknown): string {
+  if (!payload || typeof payload !== 'object') {
+    return ''
+  }
+
+  const directOutputText =
+    'output_text' in payload && typeof payload.output_text === 'string' ? payload.output_text : ''
+
+  const nestedOutputText =
+    'output' in payload && Array.isArray(payload.output)
+      ? payload.output
+          .flatMap((item) =>
+            item && typeof item === 'object' && 'content' in item && Array.isArray(item.content)
+              ? item.content
+              : []
+          )
+          .map((contentItem) =>
+            contentItem &&
+            typeof contentItem === 'object' &&
+            'type' in contentItem &&
+            contentItem.type === 'output_text' &&
+            'text' in contentItem &&
+            typeof contentItem.text === 'string'
+              ? contentItem.text
+              : ''
+          )
+          .join('\n')
+      : ''
+
+  return sanitizeOcrText(directOutputText || nestedOutputText)
+}
+
+function scoreOcrText(value: string): number {
+  const text = sanitizeOcrText(value)
+  if (!text) return 0
+
+  let score = Math.min(text.length, 120)
+
+  if (/\b(employee\s+name|name:)\b/i.test(text)) score += 120
+  if (/\b[A-Z][a-z]+ [A-Z][a-z]+\b/.test(text)) score += 60
+  if (/\b(need off|cannot work|can work|available|vacation|pto|off)\b/i.test(text)) score += 80
+  if (
+    /\b(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i.test(
+      text
+    )
+  ) {
+    score += 100
+  }
+
+  return score
+}
+
+async function extractTextFromImageVariants(params: {
+  imageBuffer: Buffer
+  filename: string
+}): Promise<OcrResult> {
+  let variants
+  try {
+    variants = await createOcrImageVariants(params.imageBuffer)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return {
+      status: 'failed',
+      text: null,
+      model: null,
+      error: `Could not prepare OCR image variants: ${message}`,
+    }
+  }
+
+  const variantErrors: string[] = []
+  const bestZoneText = new Map<string, { text: string; score: number }>()
+  let lastModel: string | null = null
+
+  const fullPageVariants = variants.filter((variant) => variant.zoneLabel === 'full_page')
+  for (const variant of fullPageVariants) {
+    const pageResult = await extractTextFromImageAttachment({
+      contentBase64: variant.base64,
+      contentType: variant.contentType,
+      filename: `${params.filename}:${variant.label}`,
+      promptOverride: ZONE_PROMPTS.full_page,
+    })
+
+    if (pageResult.model) {
+      lastModel = pageResult.model
+    }
+
+    if (pageResult.status === 'completed' && pageResult.text) {
+      const score = scoreOcrText(pageResult.text)
+      if (score >= FULL_PAGE_ACCEPT_SCORE) {
+        return {
+          status: 'completed',
+          text: pageResult.text,
+          model: pageResult.model,
+          error: null,
+        }
+      }
+    } else if (pageResult.error && pageResult.error !== NO_TEXT_SKIP_MESSAGE) {
+      variantErrors.push(`${variant.zoneLabel}/${variant.label}: ${pageResult.error}`)
+    }
+  }
+
+  for (const variant of variants) {
+    if (variant.zoneLabel === 'full_page') {
+      continue
+    }
+
+    const pageResult = await extractTextFromImageAttachment({
+      contentBase64: variant.base64,
+      contentType: variant.contentType,
+      filename: `${params.filename}:${variant.label}`,
+      promptOverride: ZONE_PROMPTS[variant.zoneLabel] ?? undefined,
+    })
+
+    if (pageResult.model) {
+      lastModel = pageResult.model
+    }
+
+    if (pageResult.status === 'completed' && pageResult.text) {
+      const score = scoreOcrText(pageResult.text)
+      const current = bestZoneText.get(variant.zoneLabel)
+      if (!current || score > current.score) {
+        bestZoneText.set(variant.zoneLabel, { text: pageResult.text, score })
+      }
+    } else if (pageResult.error && pageResult.error !== NO_TEXT_SKIP_MESSAGE) {
+      variantErrors.push(`${variant.zoneLabel}/${variant.label}: ${pageResult.error}`)
+    }
+  }
+
+  const employeeName = bestZoneText.get('employee_name')?.text?.trim() ?? null
+  const requestTable = bestZoneText.get('request_table')?.text?.trim() ?? null
+
+  const mergedText = [employeeName ? `Employee Name: ${employeeName}` : null, requestTable ?? null]
+    .filter((value): value is string => Boolean(value))
+    .join('\n\n')
+    .trim()
+
+  if (mergedText) {
+    return {
+      status: 'completed',
+      text: mergedText,
+      model: lastModel,
+      error: null,
+    }
+  }
+
+  return {
+    status: 'failed',
+    text: null,
+    model: lastModel,
+    error:
+      variantErrors.length > 0
+        ? `All image variants failed OCR (${variantErrors.join('; ')})`
+        : 'Image OCR variants produced no readable text.',
+  }
+}
+
 export async function extractTextFromImageAttachment(params: {
   contentBase64: string | null
   contentType: string | null
   filename: string
+  promptOverride?: string
 }): Promise<OcrResult> {
   const config = getOpenAiOcrConfig()
   if (!config.enabled) {
@@ -76,7 +243,8 @@ export async function extractTextFromImageAttachment(params: {
   }
 
   const prompt =
-    'Read this employee scheduling request form image and transcribe only the useful scheduling text. Return plain text only. Preserve dates exactly when visible. If there is no readable scheduling text, return NO_TEXT.'
+    params.promptOverride ??
+    'Read all visible text from this employee scheduling request image. Include names, dates, handwritten notes, and scheduling details exactly as shown. Return plain text only. If the image is blank or fully illegible, return NO_TEXT.'
 
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
@@ -112,15 +280,35 @@ export async function extractTextFromImageAttachment(params: {
     }
   }
 
-  const payload = (await response.json()) as { output_text?: string | null }
-  const outputText = sanitizeOcrText(payload.output_text ?? '')
+  const payload = (await response.json()) as unknown
+  const outputText = extractOutputTextFromResponsePayload(payload)
 
   if (!outputText || outputText === 'NO_TEXT') {
+    if (!params.promptOverride) {
+      const fallback = await extractTextFromImageVariants({
+        imageBuffer: Buffer.from(params.contentBase64, 'base64'),
+        filename: params.filename,
+      })
+
+      if (fallback.status === 'completed' && fallback.text) {
+        return fallback
+      }
+
+      if (fallback.status === 'failed') {
+        return {
+          status: 'failed',
+          text: null,
+          model: fallback.model ?? config.model,
+          error: `Direct image OCR found nothing; variant OCR failed: ${fallback.error ?? 'unknown error'}`,
+        }
+      }
+    }
+
     return {
       status: 'skipped',
       text: null,
       model: config.model,
-      error: 'No readable scheduling text detected.',
+      error: NO_TEXT_SKIP_MESSAGE,
     }
   }
 
@@ -148,7 +336,7 @@ async function extractTextFromPdfViaInputFile(params: {
   }
 
   const prompt =
-    'Read this PDF employee scheduling request form and transcribe only the useful scheduling text. Return plain text only. Preserve dates and employee names exactly when visible. If there is no readable scheduling text, return NO_TEXT.'
+    'Read all visible text from this employee scheduling request PDF. Include employee names, dates, handwritten notes, and scheduling details exactly as shown. Return plain text only. If the document is blank or fully illegible, return NO_TEXT.'
 
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
@@ -184,8 +372,8 @@ async function extractTextFromPdfViaInputFile(params: {
     }
   }
 
-  const payload = (await response.json()) as { output_text?: string | null }
-  const outputText = sanitizeOcrText(payload.output_text ?? '')
+  const payload = (await response.json()) as unknown
+  const outputText = extractOutputTextFromResponsePayload(payload)
 
   if (!outputText || outputText === 'NO_TEXT') {
     return {
@@ -204,10 +392,6 @@ async function extractTextFromPdfViaInputFile(params: {
   }
 }
 
-/**
- * When `input_file` PDF extraction finds no text (typical for scanned PDFs),
- * rasterize each page and run the same image OCR path used for photo uploads.
- */
 async function extractTextFromPdfViaRenderedPages(params: {
   contentBase64: string
   contentType: string | null
@@ -248,21 +432,94 @@ async function extractTextFromPdfViaRenderedPages(params: {
   const segments: string[] = []
   let lastModel: string | null = null
   const pageErrors: string[] = []
+  const zoneOrder = ZONE_ORDER
+  const zonePrompts = ZONE_PROMPTS
 
   for (let i = 0; i < buffers.length; i++) {
     const pageBuffer = buffers[i]!
-    const pageResult = await extractTextFromImageAttachment({
-      contentBase64: pageBuffer.toString('base64'),
-      contentType: 'image/png',
-      filename: `${params.filename}#page-${i + 1}`,
-    })
-    if (pageResult.model) {
-      lastModel = pageResult.model
+    const variants = await createOcrImageVariants(pageBuffer)
+    const variantErrors: string[] = []
+    const bestZoneText = new Map<string, { text: string; score: number }>()
+
+    const fullPageVariants = variants.filter((variant) => variant.zoneLabel === 'full_page')
+    for (const variant of fullPageVariants) {
+      const pageResult = await extractTextFromImageAttachment({
+        contentBase64: variant.base64,
+        contentType: variant.contentType,
+        filename: `${params.filename}#page-${i + 1}:${variant.label}`,
+        promptOverride: zonePrompts.full_page,
+      })
+
+      if (pageResult.model) {
+        lastModel = pageResult.model
+      }
+
+      if (pageResult.status === 'completed' && pageResult.text) {
+        const score = scoreOcrText(pageResult.text)
+        if (score >= FULL_PAGE_ACCEPT_SCORE) {
+          segments.push(`--- Page ${i + 1} ---\n${pageResult.text}`)
+          continue
+        }
+      } else if (pageResult.error && pageResult.error !== NO_TEXT_SKIP_MESSAGE) {
+        variantErrors.push(`${variant.zoneLabel}/${variant.label}: ${pageResult.error}`)
+      }
     }
-    if (pageResult.status === 'completed' && pageResult.text) {
-      segments.push(`--- Page ${i + 1} ---\n${pageResult.text}`)
-    } else if (pageResult.error) {
-      pageErrors.push(`page ${i + 1}: ${pageResult.error}`)
+
+    if (segments.length === i + 1) {
+      continue
+    }
+
+    for (const variant of variants) {
+      if (variant.zoneLabel === 'full_page') {
+        continue
+      }
+
+      const pageResult = await extractTextFromImageAttachment({
+        contentBase64: variant.base64,
+        contentType: variant.contentType,
+        filename: `${params.filename}#page-${i + 1}:${variant.label}`,
+        promptOverride: zonePrompts[variant.zoneLabel] ?? undefined,
+      })
+
+      if (pageResult.model) {
+        lastModel = pageResult.model
+      }
+
+      if (pageResult.status === 'completed' && pageResult.text) {
+        const score = scoreOcrText(pageResult.text)
+        const current = bestZoneText.get(variant.zoneLabel)
+        if (!current || score > current.score) {
+          bestZoneText.set(variant.zoneLabel, { text: pageResult.text, score })
+        }
+        if (score >= 180) {
+          continue
+        }
+      } else if (pageResult.error && pageResult.error !== NO_TEXT_SKIP_MESSAGE) {
+        variantErrors.push(`${variant.zoneLabel}/${variant.label}: ${pageResult.error}`)
+      }
+    }
+
+    const orderedZoneText = zoneOrder
+      .map((zoneLabel) => ({ zoneLabel, text: bestZoneText.get(zoneLabel)?.text ?? null }))
+      .filter(
+        (
+          entry
+        ): entry is {
+          zoneLabel: (typeof zoneOrder)[number]
+          text: string
+        } => Boolean(entry.text)
+      )
+      .map(({ zoneLabel, text }) =>
+        zoneLabel === 'employee_name' ? `Employee Name: ${text}` : text
+      )
+    const mergedPageText = orderedZoneText.join('\n\n').trim()
+
+    if (mergedPageText) {
+      segments.push(`--- Page ${i + 1} ---\n${mergedPageText}`)
+    } else if (variantErrors.length > 0) {
+      pageErrors.push(`page ${i + 1}: ${variantErrors.join('; ')}`)
+    } else {
+      pageErrors.push(`page ${i + 1}: ${NO_TEXT_SKIP_MESSAGE}`)
     }
   }
 
@@ -307,15 +564,17 @@ export async function extractTextFromPdfAttachment(params: {
     filename: params.filename,
   })
 
-  if (primary.status === 'skipped' && primary.error === NO_TEXT_SKIP_MESSAGE) {
+  if (!primary.text) {
     const fallback = await extractTextFromPdfViaRenderedPages({
       contentBase64: params.contentBase64,
       contentType: params.contentType,
       filename: params.filename,
     })
+
     if (fallback.status === 'completed' && fallback.text) {
       return fallback
     }
+
     if (fallback.status === 'failed') {
       return {
         status: 'failed',
