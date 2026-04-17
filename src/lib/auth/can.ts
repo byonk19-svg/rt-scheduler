@@ -8,6 +8,7 @@ export type Permission =
   | 'manage_coverage'
   | 'review_shift_posts'
   | 'export_all_availability'
+  | 'view_audit_log'
   | 'update_assignment_status'
 
 type CanContext = {
@@ -35,7 +36,8 @@ export function can(roleInput: unknown, permission: Permission, context: CanCont
     permission === 'manage_directory' ||
     permission === 'manage_coverage' ||
     permission === 'review_shift_posts' ||
-    permission === 'export_all_availability'
+    permission === 'export_all_availability' ||
+    permission === 'view_audit_log'
   ) {
     return isManagerRole(role)
   }

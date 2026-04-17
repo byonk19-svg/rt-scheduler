@@ -39,4 +39,13 @@ describe('availability page role-specific actions', () => {
     expect(source).toContain('reviewRequestsPanel={entriesCard}')
     expect(source).toContain('formatHumanCycleRange')
   })
+
+  it('queries scheduled shifts for the active therapist cycle and passes conflicts into the workspace', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/app/availability/page.tsx'), 'utf8')
+
+    expect(source).toContain(".from('shifts')")
+    expect(source).toContain(".eq('status', 'scheduled')")
+    expect(source).toContain('findScheduledConflicts(entries, scheduledShifts)')
+    expect(source).toContain('conflicts={conflicts}')
+  })
 })

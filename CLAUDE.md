@@ -82,6 +82,23 @@ Updated: 2026-04-17 (docs: scheduling-data trust hardening handoff)
   - Remaining known gap: therapist grid save is still a multi-step delete/upsert/submit sequence rather than a single DB transaction, so stale concurrent tabs remain a last-write-wins risk.
 - **Verification:** `npx vitest run src/app/availability/actions.test.ts src/app/schedule/create-cycle-action.test.ts src/app/api/availability/export/route.test.ts src/lib/therapist-availability-submission.test.ts src/app/schedule/delete-cycle-action.test.ts src/app/availability/page.test.ts src/app/therapist/availability/page.test.ts`, `npx eslint` on touched trust-boundary files, `npx tsc --noEmit`.
 
+## Latest Updates (2026-04-17, session 66)
+
+- **Team directory bulk actions shipped** (`src/components/team/BulkActionBar.tsx`, `src/components/team/TeamDirectory.tsx`, `src/app/team/actions.ts`, `src/app/team/page.tsx`):
+- Managers can multi-select team members from `/team` with per-section and per-shift select-all controls.
+- Bulk actions support FMLA on/off, active/inactive, and employment type updates.
+- Bulk writes are targeted profile field updates (no full-profile upsert); recurring work patterns remain untouched.
+- Team page feedback now includes bulk success/error states.
+- **Manager audit log surface added** (`src/app/settings/audit-log/page.tsx`, `src/app/settings/audit-log/AuditLogFilters.tsx`, `src/lib/auth/can.ts`, `src/components/AppShell.tsx`):
+- New manager route `/settings/audit-log` shows paginated `audit_log` entries with action/actor filters.
+- Added `view_audit_log` permission and granted it to manager role.
+- Added `Audit log` under the manager People section secondary nav and treat `/settings/*` as a People-active route.
+- Audit log table links schedule-cycle targets to `/coverage?cycle=<id>`.
+- **Missing audit writes filled** (`src/app/team/actions.ts`, `src/app/schedule/actions/draft-actions.ts`):
+- `saveTeamQuickEditAction` now records a `team_profile_updated` audit event.
+- `generateDraftScheduleAction` now records a `draft_schedule_generated` audit event.
+- **Verification:** `npx tsc --noEmit`, `npx eslint` on touched files, `npx vitest run src/components/AppShell.test.ts src/components/team/TeamDirectory.test.ts`.
+
 ## Latest Updates (2026-04-14, session 60)
 
 - **Inbound handwritten PDF troubleshooting** (`src/lib/openai-ocr.ts`, `src/lib/pdf-render-pages.ts`, `src/app/api/inbound/availability-email/route.ts`, tests):

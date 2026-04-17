@@ -34,4 +34,14 @@ describe('therapist availability route', () => {
     expect(pageSource).not.toContain('days selected')
     expect(pageSource).toContain('therapist_availability_submissions')
   })
+
+  it('loads active-cycle scheduled shifts and passes conflict warnings into the therapist workspace', () => {
+    const filePath = resolve(process.cwd(), 'src/app/therapist/availability/page.tsx')
+    const source = readFileSync(filePath, 'utf8')
+
+    expect(source).toContain(".from('shifts')")
+    expect(source).toContain(".eq('status', 'scheduled')")
+    expect(source).toContain('findScheduledConflicts(entries, scheduledShifts)')
+    expect(source).toContain('conflicts={conflicts}')
+  })
 })

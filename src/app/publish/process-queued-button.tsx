@@ -14,10 +14,12 @@ export function ProcessQueuedButton({ publishEventId }: ProcessQueuedButtonProps
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const run = async () => {
     setLoading(true)
     setError(null)
+    setSuccessMessage(null)
 
     try {
       const response = await fetch('/api/publish/process', {
@@ -31,6 +33,7 @@ export function ProcessQueuedButton({ publishEventId }: ProcessQueuedButtonProps
         throw new Error(details || 'Failed to process queued emails.')
       }
 
+      setSuccessMessage('Re-send triggered — refreshing status...')
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to process queued emails.')
@@ -58,6 +61,11 @@ export function ProcessQueuedButton({ publishEventId }: ProcessQueuedButtonProps
           role="alert"
         >
           {error}
+        </p>
+      )}
+      {successMessage && (
+        <p className="text-right text-[11px] font-medium text-[var(--success-text)]" role="status">
+          {successMessage}
         </p>
       )}
     </div>

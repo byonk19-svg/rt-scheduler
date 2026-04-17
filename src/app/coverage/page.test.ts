@@ -96,4 +96,13 @@ describe('coverage publish override affordance', () => {
     expect(source).toContain('<StatusPill status="cancelled" />')
     expect(source).toContain('<StatusPill status="call_in" />')
   })
+
+  it('lazy-loads the pre-flight dialog and uses it before auto-draft submit', () => {
+    const filePath = resolve(process.cwd(), 'src/app/coverage/CoverageClientPage.tsx')
+    const source = readFileSync(filePath, 'utf8')
+
+    expect(source).toContain("dynamic(() => import('@/components/coverage/PreFlightDialog')")
+    expect(source).toContain('setPreFlightDialogOpen(true)')
+    expect(source).toContain('onConfirm={() => autoDraftFormRef.current?.requestSubmit()}')
+  })
 })

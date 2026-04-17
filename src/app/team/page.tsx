@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 
 import {
   archiveTeamMemberAction,
+  bulkUpdateTeamMembersAction,
   bulkUpsertEmployeeRosterAction,
   deleteEmployeeRosterEntryAction,
   saveTeamQuickEditAction,
@@ -41,6 +42,7 @@ type TeamSearchParams = {
   edit_profile?: string | string[]
   bulk_line?: string | string[]
   roster_bulk_count?: string | string[]
+  bulk_count?: string | string[]
 }
 
 type EmployeeRosterRow = {
@@ -84,6 +86,12 @@ function getTeamFeedback(params?: TeamSearchParams): {
     const count = getSearchParam(params?.roster_bulk_count) ?? ''
     const suffix = count ? ` (${count} rows)` : ''
     return { message: `Employee roster bulk import saved.${suffix}`, variant: 'success' }
+  }
+
+  if (success === 'bulk_updated') {
+    const count = getSearchParam(params?.bulk_count) ?? ''
+    const suffix = count ? ` (${count} people)` : ''
+    return { message: `Bulk team update saved.${suffix}`, variant: 'success' }
   }
 
   if (error === 'missing_profile') {
@@ -153,6 +161,25 @@ function getTeamFeedback(params?: TeamSearchParams): {
   }
   if (error === 'roster_bulk_save_failed') {
     return { message: 'Bulk import could not be saved. Try again.', variant: 'error' }
+  }
+
+  if (error === 'bulk_empty') {
+    return { message: 'Select at least one team member for a bulk update.', variant: 'error' }
+  }
+  if (error === 'bulk_invalid_profiles') {
+    return {
+      message: 'One or more selected people could not be updated. Refresh and try again.',
+      variant: 'error',
+    }
+  }
+  if (error === 'bulk_invalid_action') {
+    return { message: 'That bulk action is not supported.', variant: 'error' }
+  }
+  if (error === 'bulk_invalid_employment') {
+    return { message: 'Choose a valid employment type for bulk update.', variant: 'error' }
+  }
+  if (error === 'bulk_update_failed') {
+    return { message: 'Bulk update could not be saved. Try again.', variant: 'error' }
   }
 
   return null
@@ -230,6 +257,15 @@ export default async function TeamPage({
         title="Team"
         subtitle="Manage roles, staffing access, and inactive employees in one place."
         className="px-0"
+        actions={
+          <a
+            href="/api/team/roster/export"
+            download
+            className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground shadow-xs transition-colors hover:bg-secondary/70"
+          >
+            Export roster CSV
+          </a>
+        }
         summary={
           <>
             <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 font-medium text-foreground">
@@ -254,6 +290,7 @@ export default async function TeamPage({
         initialEditProfileId={initialEditProfileId}
         archiveTeamMemberAction={archiveTeamMemberAction}
         saveTeamQuickEditAction={saveTeamQuickEditAction}
+        bulkUpdateTeamMembersAction={bulkUpdateTeamMembersAction}
       />
       <EmployeeRosterPanel
         roster={employeeRoster}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronRight, Shield, User } from 'lucide-react'
 
 import { FormSubmitButton } from '@/components/form-submit-button'
@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { BulkActionBar } from '@/components/team/BulkActionBar'
 import { formatEmployeeDate } from '@/lib/employee-directory'
 import { getTeamRolePermissions } from '@/lib/team-role-permissions'
 import { cn } from '@/lib/utils'
@@ -55,6 +56,7 @@ type TeamDirectoryProps = {
   initialEditProfileId?: string | null
   archiveTeamMemberAction: (formData: FormData) => void | Promise<void>
   saveTeamQuickEditAction: (formData: FormData) => void | Promise<void>
+  bulkUpdateTeamMembersAction: (formData: FormData) => void | Promise<void>
 }
 
 type EditableRole = 'manager' | 'lead' | 'therapist'
@@ -98,6 +100,36 @@ function roleBadgeClass(role: TeamProfileRecord['role']): string {
   if (role === 'manager') return 'bg-secondary text-secondary-foreground'
   if (role === 'lead') return 'bg-primary/10 text-primary'
   return 'bg-muted text-muted-foreground'
+}
+
+function SectionHeaderCheckbox({
+  allSelected,
+  someSelected,
+  onChange,
+  ariaLabel,
+}: {
+  allSelected: boolean
+  someSelected: boolean
+  onChange: (selectAll: boolean) => void
+  ariaLabel: string
+}) {
+  const ref = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.indeterminate = someSelected && !allSelected
+    }
+  }, [someSelected, allSelected])
+
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      className="h-4 w-4 shrink-0 rounded border-border text-primary focus-visible:ring-2 focus-visible:ring-ring"
+      checked={allSelected}
+      onChange={(e) => onChange(e.target.checked)}
+      aria-label={ariaLabel}
+    />
+  )
 }
 
 function shiftLabel(type: TeamProfileRecord['shift_type']): string {
@@ -147,10 +179,20 @@ export function partitionTeamProfiles(profiles: TeamProfileRecord[]): TeamDirect
   return sections
 }
 
-function TeamMemberCard({ profile, onClick }: { profile: TeamProfileRecord; onClick: () => void }) {
+function TeamMemberCard({
+  profile,
+  onClick,
+  isSelected = false,
+  onToggle,
+}: {
+  profile: TeamProfileRecord
+  onClick: () => void
+  isSelected?: boolean
+  onToggle?: () => void
+}) {
   const isActive = teamMemberHasAppAccess(profile)
 
-  return (
+  const card = (
     <button
       type="button"
       onClick={onClick}
@@ -158,7 +200,8 @@ function TeamMemberCard({ profile, onClick }: { profile: TeamProfileRecord; onCl
         'group flex w-full cursor-pointer items-start gap-4 rounded-xl border border-border/70 bg-card/85 p-5 text-left shadow-sm transition-all hover:border-primary/30 hover:bg-card hover:shadow-md active:scale-[0.99] active:shadow-sm',
         profile.role === 'lead' &&
           'border-primary/30 bg-primary/[0.04] hover:border-primary/50 hover:bg-primary/[0.07]',
-        !isActive && 'opacity-75'
+        !isActive && 'opacity-75',
+        onToggle && isSelected && 'ring-2 ring-primary/25'
       )}
     >
       <div
@@ -228,22 +271,58 @@ function TeamMemberCard({ profile, onClick }: { profile: TeamProfileRecord; onCl
       <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/30 transition-all group-hover:translate-x-0.5 group-hover:text-primary/50" />
     </button>
   )
+
+  if (!onToggle) {
+    return card
+  }
+
+  return (
+    <div className="flex w-full items-stretch gap-3">
+      <label className="flex shrink-0 cursor-pointer items-start pt-5">
+        <input
+          type="checkbox"
+          className="h-4 w-4 rounded border-border text-primary focus-visible:ring-2 focus-visible:ring-ring"
+          checked={isSelected}
+          onChange={() => onToggle()}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Select ${profile.full_name ?? 'team member'}`}
+        />
+      </label>
+      <div className="min-w-0 flex-1">{card}</div>
+    </div>
+  )
 }
 
 function TeamSection({
   title,
   profiles,
   onOpen,
+  selectedIds,
+  onToggleId,
+  onToggleSectionIds,
 }: {
   title: string
   profiles: TeamProfileRecord[]
   onOpen: (profileId: string) => void
+  selectedIds: Set<string>
+  onToggleId: (id: string) => void
+  onToggleSectionIds: (ids: string[], selectAll: boolean) => void
 }) {
   if (profiles.length === 0) return null
+
+  const ids = profiles.map((p) => p.id)
+  const allSelected = profiles.length > 0 && profiles.every((p) => selectedIds.has(p.id))
+  const someSelected = profiles.some((p) => selectedIds.has(p.id))
 
   return (
     <section className="mb-8 last:mb-0">
       <div className="mb-3 flex items-center gap-2.5">
+        <SectionHeaderCheckbox
+          allSelected={allSelected}
+          someSelected={someSelected}
+          onChange={(selectAll) => onToggleSectionIds(ids, selectAll)}
+          ariaLabel={`Select all in ${title}`}
+        />
         <div className="h-3.5 w-0.5 rounded-full bg-primary/40" />
         <h2 className="text-[0.68rem] font-bold uppercase tracking-[0.1em] text-foreground/70">
           {title}
@@ -255,7 +334,13 @@ function TeamSection({
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {profiles.map((profile) => (
-          <TeamMemberCard key={profile.id} profile={profile} onClick={() => onOpen(profile.id)} />
+          <TeamMemberCard
+            key={profile.id}
+            profile={profile}
+            onClick={() => onOpen(profile.id)}
+            isSelected={selectedIds.has(profile.id)}
+            onToggle={() => onToggleId(profile.id)}
+          />
         ))}
       </div>
     </section>
@@ -268,14 +353,25 @@ function ShiftGroup({
   leads,
   therapists,
   onOpen,
+  selectedIds,
+  onToggleId,
+  onToggleSectionIds,
 }: {
   title: string
   shiftType: 'day' | 'night'
   leads: TeamProfileRecord[]
   therapists: TeamProfileRecord[]
   onOpen: (profileId: string) => void
+  selectedIds: Set<string>
+  onToggleId: (id: string) => void
+  onToggleSectionIds: (ids: string[], selectAll: boolean) => void
 }) {
   if (leads.length === 0 && therapists.length === 0) return null
+
+  const groupProfiles = [...leads, ...therapists]
+  const groupIds = groupProfiles.map((p) => p.id)
+  const allGroupSelected = groupIds.length > 0 && groupIds.every((id) => selectedIds.has(id))
+  const someGroupSelected = groupIds.some((id) => selectedIds.has(id))
 
   return (
     <section
@@ -286,27 +382,47 @@ function ShiftGroup({
           : 'border-[var(--info-border)]/40 bg-[var(--info-subtle)]/20'
       )}
     >
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <h2
           className={cn(
-            'flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em]',
+            'flex min-w-0 flex-1 items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em]',
             shiftType === 'night' ? 'text-[var(--warning-text)]' : 'text-[var(--info-text)]'
           )}
         >
+          <SectionHeaderCheckbox
+            allSelected={allGroupSelected}
+            someSelected={someGroupSelected}
+            onChange={(selectAll) => onToggleSectionIds(groupIds, selectAll)}
+            ariaLabel={`Select all in ${title}`}
+          />
           <span
             className={cn(
-              'h-2 w-2 rounded-full',
+              'h-2 w-2 shrink-0 rounded-full',
               shiftType === 'night' ? 'bg-[var(--warning)]' : 'bg-[var(--info)]'
             )}
           />
           {title}
         </h2>
-        <span className="rounded-full border border-border/70 bg-card px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+        <span className="shrink-0 rounded-full border border-border/70 bg-card px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
           {leads.length + therapists.length} total
         </span>
       </div>
-      <TeamSection title="Lead Therapists" profiles={leads} onOpen={onOpen} />
-      <TeamSection title="Therapists" profiles={therapists} onOpen={onOpen} />
+      <TeamSection
+        title="Lead Therapists"
+        profiles={leads}
+        onOpen={onOpen}
+        selectedIds={selectedIds}
+        onToggleId={onToggleId}
+        onToggleSectionIds={onToggleSectionIds}
+      />
+      <TeamSection
+        title="Therapists"
+        profiles={therapists}
+        onOpen={onOpen}
+        selectedIds={selectedIds}
+        onToggleId={onToggleId}
+        onToggleSectionIds={onToggleSectionIds}
+      />
     </section>
   )
 }
@@ -363,10 +479,12 @@ export function TeamDirectory({
   initialEditProfileId = null,
   archiveTeamMemberAction,
   saveTeamQuickEditAction,
+  bulkUpdateTeamMembersAction,
 }: TeamDirectoryProps) {
   const initialEditProfile = profiles.find((profile) => profile.id === initialEditProfileId) ?? null
   const initialPattern = initialEditProfile ? (workPatterns[initialEditProfile.id] ?? null) : null
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [editProfileId, setEditProfileId] = useState<string | null>(initialEditProfile?.id ?? null)
   const [draftRole, setDraftRole] = useState<EditableRole>(
     (initialEditProfile?.role as EditableRole | null) ?? 'therapist'
@@ -387,6 +505,44 @@ export function TeamDirectory({
   )
 
   const sections = useMemo(() => partitionTeamProfiles(profiles), [profiles])
+  const toggleSelectedId = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const toggleSectionIds = useCallback((ids: string[], selectAll: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (selectAll) {
+        for (const id of ids) next.add(id)
+      } else {
+        for (const id of ids) next.delete(id)
+      }
+      return next
+    })
+  }, [])
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
+
+  const runBulkAction = useCallback(
+    (action: string, value?: string) => {
+      if (selectedIds.size === 0) return
+      const fd = new FormData()
+      for (const id of selectedIds) {
+        fd.append('profile_ids', id)
+      }
+      fd.set('bulk_action', action)
+      if (value) fd.set('bulk_value', value)
+      setSelectedIds(new Set())
+      void bulkUpdateTeamMembersAction(fd)
+    },
+    [bulkUpdateTeamMembersAction, selectedIds]
+  )
+
   const editProfile = useMemo(
     () => profiles.find((profile) => profile.id === editProfileId) ?? null,
     [profiles, editProfileId]
@@ -421,32 +577,60 @@ export function TeamDirectory({
 
   return (
     <>
-      <div className="rounded-2xl border border-border/60 bg-card/50 p-4 sm:p-5">
-        <TeamSection title="Managers" profiles={sections.managers} onOpen={openEditor} />
-      </div>
-      <ShiftGroup
-        title="Day Shift"
-        shiftType="day"
-        leads={sections.dayLeads}
-        therapists={sections.dayTherapists}
-        onOpen={openEditor}
-      />
-      <ShiftGroup
-        title="Night Shift"
-        shiftType="night"
-        leads={sections.nightLeads}
-        therapists={sections.nightTherapists}
-        onOpen={openEditor}
-      />
-      <div className="rounded-2xl border border-border/60 bg-card/50 p-4 sm:p-5">
-        <TeamSection title="Inactive" profiles={sections.inactive} onOpen={openEditor} />
+      <div className={cn(selectedIds.size > 0 && 'pb-24')}>
+        <div className="rounded-2xl border border-border/60 bg-card/50 p-4 sm:p-5">
+          <TeamSection
+            title="Managers"
+            profiles={sections.managers}
+            onOpen={openEditor}
+            selectedIds={selectedIds}
+            onToggleId={toggleSelectedId}
+            onToggleSectionIds={toggleSectionIds}
+          />
+        </div>
+        <ShiftGroup
+          title="Day Shift"
+          shiftType="day"
+          leads={sections.dayLeads}
+          therapists={sections.dayTherapists}
+          onOpen={openEditor}
+          selectedIds={selectedIds}
+          onToggleId={toggleSelectedId}
+          onToggleSectionIds={toggleSectionIds}
+        />
+        <ShiftGroup
+          title="Night Shift"
+          shiftType="night"
+          leads={sections.nightLeads}
+          therapists={sections.nightTherapists}
+          onOpen={openEditor}
+          selectedIds={selectedIds}
+          onToggleId={toggleSelectedId}
+          onToggleSectionIds={toggleSectionIds}
+        />
+        <div className="rounded-2xl border border-border/60 bg-card/50 p-4 sm:p-5">
+          <TeamSection
+            title="Inactive"
+            profiles={sections.inactive}
+            onOpen={openEditor}
+            selectedIds={selectedIds}
+            onToggleId={toggleSelectedId}
+            onToggleSectionIds={toggleSectionIds}
+          />
+        </div>
+
+        {profiles.length === 0 && (
+          <div className="rounded-xl border border-border bg-card px-6 py-12 text-center">
+            <p className="text-sm text-muted-foreground">No team members found.</p>
+          </div>
+        )}
       </div>
 
-      {profiles.length === 0 && (
-        <div className="rounded-xl border border-border bg-card px-6 py-12 text-center">
-          <p className="text-sm text-muted-foreground">No team members found.</p>
-        </div>
-      )}
+      <BulkActionBar
+        selectedCount={selectedIds.size}
+        onClear={clearSelection}
+        onApply={runBulkAction}
+      />
 
       <Dialog open={Boolean(editProfile)} onOpenChange={(open) => !open && setEditProfileId(null)}>
         {editProfile && (

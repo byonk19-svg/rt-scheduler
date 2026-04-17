@@ -106,7 +106,12 @@ export function buildManagerSections(pendingCount: number): readonly PrimarySect
       label: 'People',
       href: '/team',
       isActive: (p) =>
-        p === '/team' || p === '/requests' || p.startsWith('/requests/') || p === '/shift-board',
+        p === '/team' ||
+        p === '/requests' ||
+        p.startsWith('/requests/') ||
+        p === '/shift-board' ||
+        p === '/settings' ||
+        p.startsWith('/settings/'),
       subItems: [
         {
           href: '/team',
@@ -118,6 +123,11 @@ export function buildManagerSections(pendingCount: number): readonly PrimarySect
           label: 'Requests',
           isActive: (p) => p === '/requests' || p.startsWith('/requests/') || p === '/shift-board',
           showBadge: pendingCount > 0,
+        },
+        {
+          href: '/settings/audit-log',
+          label: 'Audit log',
+          isActive: (p) => p === '/settings/audit-log',
         },
       ],
     },
@@ -137,6 +147,11 @@ const STAFF_NAV_ITEMS = [
     isActive: (p: string) => p === '/coverage' || p === '/schedule' || p === '/preliminary',
   },
   {
+    href: '/staff/my-schedule',
+    label: 'My Schedule',
+    isActive: (p: string) => p === '/staff/my-schedule',
+  },
+  {
     href: '/therapist/availability',
     label: 'Availability',
     isActive: (p: string) => p === '/therapist/availability' || p === '/availability',
@@ -146,6 +161,11 @@ const STAFF_NAV_ITEMS = [
     label: 'Open shifts',
     isActive: (p: string) => p === '/shift-board',
   },
+  {
+    href: '/staff/history',
+    label: 'History',
+    isActive: (p: string) => p === '/staff/history',
+  },
 ] as const
 
 const SHELL_ROUTES = [
@@ -154,6 +174,7 @@ const SHELL_ROUTES = [
   '/coverage',
   '/availability',
   '/shift-board',
+  '/staff',
   '/publish',
   '/profile',
   '/approvals',

@@ -4,8 +4,10 @@ import { Send } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { AvailabilityEntryTableRow } from '@/app/availability/availability-requests-table'
+import { ScheduledConflictBanner } from '@/components/availability/ScheduledConflictBanner'
 import { FormSubmitButton } from '@/components/form-submit-button'
 import { Label } from '@/components/ui/label'
+import type { ConflictItem } from '@/lib/availability-scheduled-conflict'
 import { addDays, formatDateLabel, formatHumanCycleRange, toIsoDate } from '@/lib/calendar-utils'
 import {
   buildTherapistSubmissionUiState,
@@ -25,6 +27,7 @@ type Cycle = {
 type Props = {
   cycles: Cycle[]
   availabilityRows: AvailabilityEntryTableRow[]
+  conflicts: ConflictItem[]
   initialCycleId: string
   /** Official submission timestamps from therapist_availability_submissions (not inferred from overrides). */
   submissionsByCycleId: Record<string, { submittedAt: string; lastEditedAt: string }>
@@ -58,6 +61,7 @@ function monthRibbonLabel(isoDate: string, previousIsoDate: string | null): stri
 export function TherapistAvailabilityWorkspace({
   cycles,
   availabilityRows,
+  conflicts,
   initialCycleId,
   submissionsByCycleId,
   submitTherapistAvailabilityGridAction,
@@ -179,6 +183,10 @@ export function TherapistAvailabilityWorkspace({
   }, [cycleDays, draftStatusByDate, selectedCycle])
 
   const requestToWorkCount = canWorkDates.length
+  const visibleConflicts = useMemo(
+    () => (selectedCycleId === initialCycleId ? conflicts : []),
+    [conflicts, initialCycleId, selectedCycleId]
+  )
 
   const serverSubmission = submissionsByCycleId[selectedCycleId]
   const submissionUi = useMemo(
@@ -442,6 +450,10 @@ export function TherapistAvailabilityWorkspace({
           ))}
         </ol>
       </header>
+
+      {visibleConflicts.length > 0 ? (
+        <ScheduledConflictBanner conflicts={visibleConflicts} onDismiss={() => {}} />
+      ) : null}
 
       <form
         action={submitTherapistAvailabilityGridAction}

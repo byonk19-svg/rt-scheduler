@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
+import { escapeCsv, getOne } from '@/lib/csv-utils'
 import { createClient } from '@/lib/supabase/server'
 
 type AvailabilityExportRow = {
@@ -24,22 +25,6 @@ type AvailabilitySubmissionExportRow = {
   therapist_id: string
   schedule_cycle_id: string
   submitted_at: string
-}
-
-function getOne<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null
-  return value ?? null
-}
-
-function escapeCsv(value: string): string {
-  const needsFormulaNeutralization =
-    /^[=+\-@]/.test(value) || /^[\t\r]/.test(value) || /^\s+[=+\-@]/.test(value)
-  const safeValue = needsFormulaNeutralization ? `'${value}` : value
-
-  if (safeValue.includes('"') || safeValue.includes(',') || safeValue.includes('\n')) {
-    return `"${safeValue.replaceAll('"', '""')}"`
-  }
-  return safeValue
 }
 
 export async function GET() {

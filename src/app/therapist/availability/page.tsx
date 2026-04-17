@@ -12,6 +12,7 @@ import { TherapistAvailabilityWorkspace } from '@/components/availability/Therap
 import type { TableToolbarFilters } from '@/components/TableToolbar'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { can } from '@/lib/auth/can'
+import { findScheduledConflicts } from '@/lib/availability-scheduled-conflict'
 import { toUiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 
@@ -177,6 +178,8 @@ export default async function TherapistAvailabilityPage({
     cycles[0] ??
     null
   const selectedCycleId = selectedCycle?.id ?? ''
+  const activeCycle =
+    cycles.find((cycle) => cycle.start_date <= todayKey && cycle.end_date >= todayKey) ?? null
 
   const { data: submissionRowsData } =
     cycles.length > 0
@@ -212,8 +215,28 @@ export default async function TherapistAvailabilityPage({
     entriesQuery = entriesQuery.eq('cycle_id', selectedCycleId)
   }
 
-  const { data: entriesData } = await entriesQuery
+  const scheduledShiftsPromise =
+    activeCycle && selectedCycleId === activeCycle.id
+      ? supabase
+          .from('shifts')
+          .select('date, shift_type')
+          .eq('user_id', user.id)
+          .eq('status', 'scheduled')
+          .gte('date', activeCycle.start_date)
+          .lte('date', activeCycle.end_date)
+      : Promise.resolve({ data: [] })
+
+  const [entriesResult, scheduledShiftsResult] = await Promise.all([
+    entriesQuery,
+    scheduledShiftsPromise,
+  ])
+  const entriesData = entriesResult.data
   const entries = (entriesData ?? []) as AvailabilityRow[]
+  const scheduledShifts = (scheduledShiftsResult.data ?? []) as Array<{
+    date: string
+    shift_type: 'day' | 'night'
+  }>
+  const conflicts = findScheduledConflicts(entries, scheduledShifts)
 
   const availabilityRows: AvailabilityEntryTableRow[] = entries.map((entry) => {
     const cycle = getOne(entry.schedule_cycles)
@@ -242,6 +265,7 @@ export default async function TherapistAvailabilityPage({
       <TherapistAvailabilityWorkspace
         cycles={cycles}
         availabilityRows={availabilityRows}
+        conflicts={conflicts}
         initialCycleId={selectedCycleId}
         submissionsByCycleId={submissionsByCycleId}
         submitTherapistAvailabilityGridAction={submitTherapistAvailabilityGridAction}

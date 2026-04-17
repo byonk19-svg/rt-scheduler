@@ -236,6 +236,17 @@ export function PrintSchedule({
           <p className="print-lottery-legend">
             {dateRangeLabel} | Legend: 1 = scheduled, * = on call, S = sick, X = called off
           </p>
+          <footer className="print-confidentiality-footer">
+            <span>{process.env.NEXT_PUBLIC_ORG_NAME ?? 'Respiratory Therapy Department'}</span>
+            <span>Internal Use Only — Confidential</span>
+            <span>
+              {new Date().toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              })}
+            </span>
+          </footer>
         </>
       ) : (
         <p>No schedule cycle selected for printing.</p>

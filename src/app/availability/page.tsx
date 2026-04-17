@@ -29,6 +29,7 @@ import { PrintMenuItem } from '@/components/print-menu-item'
 import { TherapistAvailabilityWorkspace } from '@/components/availability/TherapistAvailabilityWorkspace'
 import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
+import { findScheduledConflicts } from '@/lib/availability-scheduled-conflict'
 import { formatHumanCycleRange } from '@/lib/calendar-utils'
 import { buildMissingAvailabilityRows } from '@/lib/employee-directory'
 import { toUiRole } from '@/lib/auth/roles'
@@ -364,6 +365,8 @@ export default async function AvailabilityPage({
     cycles[0] ??
     null
   const selectedCycleId = selectedCycle?.id ?? ''
+  const activeCycle =
+    cycles.find((cycle) => cycle.start_date <= todayKey && cycle.end_date >= todayKey) ?? null
 
   let entriesQuery = supabase
     .from('availability_overrides')
@@ -381,8 +384,28 @@ export default async function AvailabilityPage({
     entriesQuery = entriesQuery.eq('therapist_id', user.id)
   }
 
-  const { data: entriesData } = await entriesQuery
+  const scheduledShiftsPromise =
+    !canManageAvailability && activeCycle && selectedCycleId === activeCycle.id
+      ? supabase
+          .from('shifts')
+          .select('date, shift_type')
+          .eq('user_id', user.id)
+          .eq('status', 'scheduled')
+          .gte('date', activeCycle.start_date)
+          .lte('date', activeCycle.end_date)
+      : Promise.resolve({ data: [] })
+
+  const [entriesResult, scheduledShiftsResult] = await Promise.all([
+    entriesQuery,
+    scheduledShiftsPromise,
+  ])
+  const entriesData = entriesResult.data
   const entries = (entriesData ?? []) as AvailabilityRow[]
+  const scheduledShifts = (scheduledShiftsResult.data ?? []) as Array<{
+    date: string
+    shift_type: 'day' | 'night'
+  }>
+  const conflicts = canManageAvailability ? [] : findScheduledConflicts(entries, scheduledShifts)
   const plannerTherapistsResult = canManageAvailability
     ? await supabase
         .from('profiles')
@@ -604,6 +627,7 @@ export default async function AvailabilityPage({
     <TherapistAvailabilityWorkspace
       cycles={cycles}
       availabilityRows={availabilityRows}
+      conflicts={conflicts}
       initialCycleId={selectedCycleId}
       submissionsByCycleId={submissionsByCycleId}
       submitTherapistAvailabilityGridAction={submitTherapistAvailabilityGridAction}

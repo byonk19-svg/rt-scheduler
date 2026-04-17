@@ -690,6 +690,11 @@ export default function ShiftBoardPage() {
             <Button asChild size="sm" variant="outline" className="text-xs">
               <Link href="/availability">Future availability</Link>
             </Button>
+            {!canReview && (
+              <Button asChild size="sm" variant="outline" className="text-xs">
+                <Link href="/staff/history">View my history</Link>
+              </Button>
+            )}
             {canReview && (
               <Button asChild size="sm" variant="outline" className="text-xs">
                 <Link href="/coverage">Open coverage</Link>

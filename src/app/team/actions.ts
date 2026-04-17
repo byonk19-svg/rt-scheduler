@@ -4,7 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/can'
-import { parseRole } from '@/lib/auth/roles'
+import { MANAGED_TEAM_ROLE_VALUES, parseRole } from '@/lib/auth/roles'
+import { writeAuditLog } from '@/lib/audit-log'
 import { normalizeRosterFullName, parseBulkEmployeeRosterText } from '@/lib/employee-roster-bulk'
 import { parseTeamQuickEditFormData } from '@/lib/team-quick-edit'
 import { createClient } from '@/lib/supabase/server'
@@ -103,7 +104,7 @@ export async function saveTeamQuickEditAction(formData: FormData) {
     )
   }
 
-  const { supabase } = await requireManager()
+  const { supabase, userId } = await requireManager()
   const input = parsed.value
 
   const { data: existingProfile, error: profileError } = await supabase
@@ -145,6 +146,13 @@ export async function saveTeamQuickEditAction(formData: FormData) {
     await realignFutureDraftShiftsForEmployee(supabase, input.profileId)
   }
 
+  await writeAuditLog(supabase, {
+    userId,
+    action: 'team_profile_updated',
+    targetType: 'profile',
+    targetId: input.profileId,
+  })
+
   // Upsert or clear the recurring work pattern
   if (input.workPattern.hasPattern) {
     const { error: patternError } = await supabase.from('work_patterns').upsert(
@@ -172,6 +180,102 @@ export async function saveTeamQuickEditAction(formData: FormData) {
   revalidatePath('/dashboard/manager')
 
   redirect(buildTeamUrl({ success: 'profile_saved' }))
+}
+
+export async function bulkUpdateTeamMembersAction(formData: FormData) {
+  const { supabase } = await requireManager()
+
+  const rawIds = formData
+    .getAll('profile_ids')
+    .map((v) => String(v ?? '').trim())
+    .filter((id) => id.length > 0)
+  const profileIds = [...new Set(rawIds)]
+
+  if (profileIds.length === 0) {
+    redirect(buildTeamUrl({ error: 'bulk_empty' }))
+  }
+
+  const action = String(formData.get('bulk_action') ?? '').trim()
+  const bulkValueRaw = formData.get('bulk_value')
+  const bulkValue = bulkValueRaw != null ? String(bulkValueRaw).trim() : ''
+
+  const { data: rows, error: loadError } = await supabase
+    .from('profiles')
+    .select('id, role, archived_at')
+    .in('id', profileIds)
+
+  if (loadError || !rows || rows.length !== profileIds.length) {
+    console.error('Bulk team update: profile lookup failed', loadError)
+    redirect(buildTeamUrl({ error: 'bulk_invalid_profiles' }))
+  }
+
+  for (const row of rows) {
+    if (row.archived_at) {
+      redirect(buildTeamUrl({ error: 'bulk_invalid_profiles' }))
+    }
+    const role = row.role as string | null
+    if (!role || !(MANAGED_TEAM_ROLE_VALUES as readonly string[]).includes(role)) {
+      redirect(buildTeamUrl({ error: 'bulk_invalid_profiles' }))
+    }
+  }
+
+  type ProfilesPatch = {
+    on_fmla?: boolean
+    is_active?: boolean
+    employment_type?: EmploymentType
+  }
+
+  let patch: ProfilesPatch | null = null
+
+  switch (action) {
+    case 'set_fmla_on':
+      patch = { on_fmla: true }
+      break
+    case 'set_fmla_off':
+      patch = { on_fmla: false }
+      break
+    case 'set_inactive':
+      patch = { is_active: false }
+      break
+    case 'set_active':
+      patch = { is_active: true }
+      break
+    case 'set_employment_type': {
+      const et = parseEmploymentType(bulkValue)
+      if (!et) {
+        redirect(buildTeamUrl({ error: 'bulk_invalid_employment' }))
+      }
+      patch = { employment_type: et }
+      break
+    }
+    default:
+      redirect(buildTeamUrl({ error: 'bulk_invalid_action' }))
+  }
+
+  const { error: updateError } = await supabase.from('profiles').update(patch).in('id', profileIds)
+
+  if (updateError) {
+    console.error('Bulk team update failed:', updateError)
+    redirect(buildTeamUrl({ error: 'bulk_update_failed' }))
+  }
+
+  if (action === 'set_inactive' || action === 'set_fmla_on') {
+    for (const id of profileIds) {
+      await realignFutureDraftShiftsForEmployee(supabase, id)
+    }
+  }
+
+  revalidatePath('/team')
+  revalidatePath('/schedule')
+  revalidatePath('/coverage')
+  revalidatePath('/dashboard/manager')
+
+  redirect(
+    buildTeamUrl({
+      success: 'bulk_updated',
+      bulk_count: String(profileIds.length),
+    })
+  )
 }
 
 export async function archiveTeamMemberAction(formData: FormData) {

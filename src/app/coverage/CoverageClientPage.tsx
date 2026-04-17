@@ -1299,6 +1299,15 @@ export function CoverageClientPage({
                         <Printer className="h-3.5 w-3.5" />
                         Print
                       </button>
+                      {activeCycleId ? (
+                        <a
+                          href={`/api/schedule/export?cycle_id=${activeCycleId}`}
+                          download
+                          className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
+                        >
+                          Export CSV
+                        </a>
+                      ) : null}
                     </MoreActionsMenu>
                   </>
                 )}
