@@ -308,6 +308,7 @@ export function TeamDirectory({
   bulkUpdateTeamMembersAction,
 }: TeamDirectoryProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [chipFilter, setChipFilter] = useState<DirectoryChipFilter>('all')
   const [formFilters, setFormFilters] = useState<TeamDirectoryFilterState>({
     search: '',
@@ -503,7 +504,16 @@ export function TeamDirectory({
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             Directory quick views
           </p>
-          <p className="text-xs text-muted-foreground">{filteredProfiles.length} shown</p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="rounded-md border border-border/70 bg-card px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+              onClick={() => setShowAdvancedFilters((current) => !current)}
+            >
+              {showAdvancedFilters ? 'Hide advanced' : 'More filters'}
+            </button>
+            <p className="text-xs text-muted-foreground">{filteredProfiles.length} shown</p>
+          </div>
         </div>
         <TeamDirectorySummaryChips
           summary={summary}
@@ -513,28 +523,33 @@ export function TeamDirectory({
         <TeamDirectoryFilters
           value={formFilters}
           onChange={setFormFilters}
+          showAdvanced={showAdvancedFilters}
           actions={
             <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={expandAllSections}
-                disabled={!hasCollapsedSection}
-              >
-                <ChevronsDownUp className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-                Expand all
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={collapseAllSections}
-                disabled={!hasExpandedSection}
-              >
-                <ChevronsUpDown className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-                Collapse all
-              </Button>
+              {showAdvancedFilters ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={expandAllSections}
+                    disabled={!hasCollapsedSection}
+                  >
+                    <ChevronsDownUp className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                    Expand all
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={collapseAllSections}
+                    disabled={!hasExpandedSection}
+                  >
+                    <ChevronsUpDown className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                    Collapse all
+                  </Button>
+                </>
+              ) : null}
               <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
                 <RotateCcw className="mr-1.5 h-3.5 w-3.5" aria-hidden />
                 Clear filters

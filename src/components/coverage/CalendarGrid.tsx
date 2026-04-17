@@ -341,6 +341,7 @@ export function CalendarGrid({
             ) : null}
 
             <div className="flex items-center justify-end gap-2 text-[10px] text-muted-foreground">
+              <span className="font-medium">Open day editor</span>
               <span className="inline-flex items-center gap-1 font-medium text-foreground/70">
                 <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
               </span>

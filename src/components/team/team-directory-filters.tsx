@@ -22,16 +22,32 @@ type TeamDirectoryFiltersProps = {
   value: TeamDirectoryFilterState
   onChange: (next: TeamDirectoryFilterState) => void
   actions?: ReactNode
+  showAdvanced?: boolean
 }
 
 const selectClass =
   'h-8 w-full min-w-0 rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground'
 
-export function TeamDirectoryFilters({ value, onChange, actions }: TeamDirectoryFiltersProps) {
+export function TeamDirectoryFilters({
+  value,
+  onChange,
+  actions,
+  showAdvanced = true,
+}: TeamDirectoryFiltersProps) {
   return (
     <div className="rounded-lg border border-border/70 bg-card/95 p-2.5 shadow-sm">
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.25fr)_repeat(4,minmax(0,1fr))]">
-        <div className="space-y-1 sm:col-span-2 lg:col-span-1">
+      <div
+        className={
+          showAdvanced
+            ? 'grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.25fr)_repeat(4,minmax(0,1fr))]'
+            : 'grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_repeat(2,minmax(0,1fr))]'
+        }
+      >
+        <div
+          className={
+            showAdvanced ? 'space-y-1 sm:col-span-2 lg:col-span-1' : 'space-y-1 sm:col-span-2'
+          }
+        >
           <Label htmlFor="team-dir-search" className="text-xs">
             Search
           </Label>
@@ -96,24 +112,26 @@ export function TeamDirectoryFilters({ value, onChange, actions }: TeamDirectory
             <option value="prn">PRN</option>
           </select>
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="team-dir-status" className="text-xs">
-            Status
-          </Label>
-          <select
-            id="team-dir-status"
-            className={selectClass}
-            value={value.status}
-            onChange={(e) =>
-              onChange({ ...value, status: e.target.value as TeamDirectoryStatusFilter })
-            }
-          >
-            <option value="all">All statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="fmla">On FMLA</option>
-          </select>
-        </div>
+        {showAdvanced ? (
+          <div className="space-y-1">
+            <Label htmlFor="team-dir-status" className="text-xs">
+              Status
+            </Label>
+            <select
+              id="team-dir-status"
+              className={selectClass}
+              value={value.status}
+              onChange={(e) =>
+                onChange({ ...value, status: e.target.value as TeamDirectoryStatusFilter })
+              }
+            >
+              <option value="all">All statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="fmla">On FMLA</option>
+            </select>
+          </div>
+        ) : null}
       </div>
       {actions ? (
         <div className="mt-2 flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-2">
