@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-16 (ship: marketing auth surfaces + trust boundaries)
+Updated: 2026-04-17 (docs: trust-boundary handoff + Next 16 proxy notes)
 
 ## Handoff Snapshot
 
@@ -32,12 +32,17 @@ Updated: 2026-04-16 (ship: marketing auth surfaces + trust boundaries)
 - Mixed off/work sentences are parsed more accurately than before, but parser changes should continue to be driven by real inbound examples.
 - **Accessibility / theming pass (UI review branch):** root layout wraps the app in **`MotionProvider`** (`src/components/motion-provider.tsx`) with Framer **`MotionConfig reducedMotion="user"`** so motion respects **`prefers-reduced-motion`**. Prefer design tokens over raw **`text-white`** / **`bg-white`** / stray **`dark:`** on shared surfaces; destructive actions use **`text-destructive-foreground`**. **`globals.css`:** stronger **`--muted-foreground`**, **`--color-destructive-foreground`** in **`@theme`**, table row hover scoped to **`table:not(.no-row-hover)`**, marketing header + home preview shell reduce **`backdrop-filter`** under **`prefers-reduced-motion: reduce`**. **`/requests/new`** and **`/publish/[id]`** use **`ManagerWorkspaceHeader`**. **`LEAD_ELIGIBLE_BADGE_CLASS`** uses **`--info-*`** tokens (`src/lib/employee-tag-badges.ts`).
 - `RESEND_API_KEY` must support receiving APIs, not just sending. A send-only key fails on `/emails/receiving` with `401 restricted_api_key`.
+- **Next.js 16 edge entry:** the active request boundary is **`src/proxy.ts`** (shown in build output as **Proxy (Middleware)**). Do **not** add **`src/middleware.ts`** alongside it — Next errors with **both middleware and proxy detected** and **`next build`** fails.
+- **`/coverage` unauthenticated access:** the server page **`redirect`**s to **`/login?redirectTo=…`** when there is no session (`src/app/coverage/page.tsx`, regression in `src/app/coverage/page.test.ts`).
+- **Server `can()` context:** hardened paths load **`profiles.is_active`** and **`profiles.archived_at`** into **`can()`** (for example publish actions, **`POST /api/publish/process`**, **`POST /api/schedule/drag-drop`**, user-access manager actions) so inactive or archived users are not authorized by stale role alone.
+- **`update_assignment_status` RPC:** migration **`20260416120000_align_update_assignment_status_with_route.sql`** allows only **`manager`** or **`lead`**, matching **`POST /api/schedule/assignment-status`** and product semantics (no legacy therapist + `is_lead_eligible` bypass in the function).
+- **`supabase db push` / migration parity:** if the remote DB reports a version **not** present under **`supabase/migrations/`** (historically **`20260414163000`**), restore that file from git history before **`db push`** — otherwise the CLI refuses to apply.
 
 ### Local In-Progress Work
 
 - `main` includes the merged email-intake apply gating fix from PR `#27` and the **therapist-first luminous homepage** (replaces the older `codex/therapist-homepage-redesign` intent; that branch may be deleted when convenient).
 - `claude/review-ui-flow-7Weav` has the **top nav redesign** (session 55) — sidebar replaced with a fixed horizontal top nav. Needs review and merge to `main` before deploying.
-- `claude/review-ocr-changes-8TM8T` has the **OCR review + availability tab split** (session 63) — see session 63 updates below. Needs final polish fixes confirmed before merging.
+- `claude/review-ocr-changes-8TM8T` has the **OCR review + availability tab split** (session 63) plus **server trust-boundary hardening** (coverage login redirect, `can()` inactive/archived context, RPC alignment above, restored **`20260414163000`** for migration parity). Needs final OCR polish and merge confirmation before landing on `main`.
 
 ### Where We Want To Go
 
@@ -56,6 +61,11 @@ Updated: 2026-04-16 (ship: marketing auth surfaces + trust boundaries)
 - `npm run test:unit`
 - `npm run test:e2e` when auth/env setup is available
 - `vercel deploy --prod --yes` for production shipping
+
+## Latest Updates (2026-04-17, session 64)
+
+- **Repo hygiene:** `.gitignore` now ignores **`.agents/`**, **`.tmp/`**, and **`.tmp-*.{json,log}`** so local agent scratch and capture files stay out of **`git status`**. Unrelated WIP on this machine was **`git stash`**-ed (see **`git stash list`**, message _WIP: availability export…_) — re-apply only if those edits were intentional.
+- **Trust boundaries (see Current Truth):** Next 16 **`proxy.ts`**-only convention; **`/coverage`** server redirect when logged out; **`can()`** includes **`is_active` / `archived_at`** on selected server paths; **`update_assignment_status`** restricted to **manager | lead**; migration **`20260414163000`** kept in-repo for **`supabase db push`** parity.
 
 ## Latest Updates (2026-04-14, session 60)
 
@@ -528,6 +538,7 @@ Shift fields: `assignment_status`, `status_note`, `left_early_time`, `status_upd
 Write path: `POST /api/schedule/assignment-status` with optimistic local update + rollback.
 
 - Allowed actors: manager or lead.
+- Postgres **`update_assignment_status`** enforces the same actor classes after **`20260416120000_align_update_assignment_status_with_route.sql`** (keep RPC and route logic aligned).
 
 ## Notifications
 
@@ -570,7 +581,7 @@ Resend: `mail.teamwise.work` is **Verified**. No test-mode restriction — email
 
 Inbound intake notes:
 
-- `POST /api/inbound/availability-email` verifies the Resend webhook signature itself and must remain publicly reachable through middleware.
+- `POST /api/inbound/availability-email` verifies the Resend webhook signature itself and must remain publicly reachable through the App Router proxy (`src/proxy.ts`).
 - If inbound email still does not appear in Resend after receiving is verified, use the manual intake form on `/availability` to keep validating the scheduling workflow.
 
 ## Data Model Snapshot
@@ -604,6 +615,9 @@ Core tables:
 - `20260412164000_sync_lead_eligibility_to_role.sql` (sync legacy `is_lead_eligible` to `role`)
 - `20260413083000_add_default_schedule_view_to_profiles.sql` (`profiles.default_schedule_view`)
 - `20260413123000_add_employee_roster_and_name_match_signup.sql` (`employee_roster`, name-match **`handle_new_user`**)
+- `20260414163000_add_employee_roster_phone_and_signup_fallback.sql` (roster phone + signup fallback; keep file present for remote/local migration history parity)
+- `20260416120000_align_update_assignment_status_with_route.sql` (`update_assignment_status`: **manager | lead** only)
+- `20260416195500_harden_signup_role_bootstrap.sql` (trigger-only role bootstrap from roster match)
 
 ## Next High-Value Priorities
 

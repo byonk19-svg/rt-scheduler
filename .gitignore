@@ -55,6 +55,7 @@ shots/
 /artifacts/
 
 # local agent/tooling state
+.agents/
 .claude/
 .superpowers/
 .planning/
@@ -70,3 +71,8 @@ security_best_practices_report.md
 .tmp-prod*.log
 .omx/
 .codex/
+
+# ephemeral local scratch (demo state, capture logs)
+.tmp/
+.tmp-*.json
+.tmp-*.log
