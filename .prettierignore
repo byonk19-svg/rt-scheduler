@@ -6,4 +6,6 @@ playwright-report
 dist
 coverage
 package-lock.json
+.tmp
 .tmp-*
+.agents

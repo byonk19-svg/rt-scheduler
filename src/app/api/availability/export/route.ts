@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server'
 
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
+import { escapeCsv, getOne } from '@/lib/csv-utils'
 import { createClient } from '@/lib/supabase/server'
 
 type AvailabilityExportRow = {
+  cycle_id: string
   date: string
   override_type: 'force_off' | 'force_on'
   shift_type: 'day' | 'night' | 'both'
@@ -19,20 +21,10 @@ type AvailabilityExportRow = {
     | null
 }
 
-function getOne<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null
-  return value ?? null
-}
-
-function escapeCsv(value: string): string {
-  const needsFormulaNeutralization =
-    /^[=+\-@]/.test(value) || /^[\t\r]/.test(value) || /^\s+[=+\-@]/.test(value)
-  const safeValue = needsFormulaNeutralization ? `'${value}` : value
-
-  if (safeValue.includes('"') || safeValue.includes(',') || safeValue.includes('\n')) {
-    return `"${safeValue.replaceAll('"', '""')}"`
-  }
-  return safeValue
+type AvailabilitySubmissionExportRow = {
+  therapist_id: string
+  schedule_cycle_id: string
+  submitted_at: string
 }
 
 export async function GET() {
@@ -56,7 +48,7 @@ export async function GET() {
   let query = supabase
     .from('availability_overrides')
     .select(
-      'date, override_type, shift_type, note, source, created_at, therapist_id, profiles!availability_overrides_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
+      'cycle_id, date, override_type, shift_type, note, source, created_at, therapist_id, profiles!availability_overrides_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
     )
     .order('date', { ascending: true })
     .order('created_at', { ascending: true })
@@ -73,6 +65,31 @@ export async function GET() {
   }
 
   const rows = (data ?? []) as AvailabilityExportRow[]
+  const cycleIds = Array.from(new Set(rows.map((row) => row.cycle_id)))
+  const submissionMap = new Map<string, string>()
+
+  if (cycleIds.length > 0) {
+    let submissionsQuery = supabase
+      .from('therapist_availability_submissions')
+      .select('therapist_id, schedule_cycle_id, submitted_at')
+      .in('schedule_cycle_id', cycleIds)
+
+    if (!isManager) {
+      submissionsQuery = submissionsQuery.eq('therapist_id', user.id)
+    }
+
+    const { data: submissionRows, error: submissionError } = await submissionsQuery
+
+    if (submissionError) {
+      console.error('Failed to export therapist availability submissions:', submissionError)
+      return NextResponse.json({ error: 'Could not export availability entries' }, { status: 500 })
+    }
+
+    for (const row of (submissionRows ?? []) as AvailabilitySubmissionExportRow[]) {
+      submissionMap.set(`${row.therapist_id}:${row.schedule_cycle_id}`, row.submitted_at)
+    }
+  }
+
   const header = [
     'date',
     'cycle_label',
@@ -89,7 +106,7 @@ export async function GET() {
   const lines = rows.map((row) => {
     const cycle = getOne(row.schedule_cycles)
     const requester = getOne(row.profiles)
-    const submittedAt = new Date(row.created_at).toISOString()
+    const submittedAt = submissionMap.get(`${row.therapist_id}:${row.cycle_id}`) ?? ''
 
     const values = [
       row.date,

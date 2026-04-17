@@ -150,6 +150,38 @@ export async function createCycleAction(formData: FormData) {
     )
   }
 
+  if (endDate < startDate) {
+    redirect(
+      buildScheduleUrl(undefined, view, {
+        ...errorViewParams,
+        error: 'create_cycle_invalid_range',
+      })
+    )
+  }
+
+  const { data: overlappingCycles, error: overlapError } = await supabase
+    .from('schedule_cycles')
+    .select('id')
+    .is('archived_at', null)
+    .lte('start_date', endDate)
+    .gte('end_date', startDate)
+
+  if (overlapError) {
+    console.error('Failed to validate schedule cycle overlap:', overlapError)
+    redirect(
+      buildScheduleUrl(undefined, view, { ...errorViewParams, error: 'create_cycle_failed' })
+    )
+  }
+
+  if ((overlappingCycles ?? []).length > 0) {
+    redirect(
+      buildScheduleUrl(undefined, view, {
+        ...errorViewParams,
+        error: 'create_cycle_overlap',
+      })
+    )
+  }
+
   const { data, error } = await supabase
     .from('schedule_cycles')
     .insert({

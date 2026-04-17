@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { ArrowLeftRight, CheckCircle2, Clock, Send } from 'lucide-react'
 
 import { FeedbackToast } from '@/components/feedback-toast'
+import { MyScheduleCard } from '@/components/schedule/MyScheduleCard'
 import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
@@ -14,6 +15,7 @@ import {
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { cn } from '@/lib/utils'
+import { fetchMyPublishedUpcomingShifts } from '@/lib/staff-my-schedule'
 import { createClient } from '@/lib/supabase/server'
 
 type StaffDashboardSearchParams = {
@@ -61,6 +63,8 @@ export default async function StaffDashboardPage({
   if (isManager) {
     redirect('/dashboard/manager')
   }
+
+  const upcomingPublishedWidget = await fetchMyPublishedUpcomingShifts(supabase, user.id, 5)
 
   const fullName = profile?.full_name ?? user.user_metadata?.full_name ?? 'Staff member'
   const firstName = fullName.split(/\s+/)[0] ?? fullName
@@ -386,6 +390,37 @@ export default async function StaffDashboardPage({
             </div>
           )}
         </div>
+      </section>
+
+      <section className="rounded-xl border border-border bg-card px-4 py-4 shadow-tw-sm">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-bold tracking-tight text-foreground">Upcoming shifts</h2>
+          <Link
+            href="/staff/my-schedule"
+            className="text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            View all
+          </Link>
+        </div>
+        {upcomingPublishedWidget.length > 0 ? (
+          <div className="space-y-2">
+            {upcomingPublishedWidget.map((row) => (
+              <MyScheduleCard
+                key={row.id}
+                date={row.date}
+                shiftType={row.shift_type === 'night' ? 'night' : 'day'}
+                role={row.role ?? 'staff'}
+                status={row.status}
+                assignmentStatus={row.assignment_status}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            No upcoming shifts on published schedules. Your draft-cycle assignments stay hidden
+            until publish.
+          </p>
+        )}
       </section>
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">

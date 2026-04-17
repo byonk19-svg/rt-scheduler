@@ -427,4 +427,137 @@ describe('openai OCR helpers', () => {
       text: 'Need off Mar 24',
     })
   })
+
+  it('extracts text from PDF attachments using input_file', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+    process.env.OPENAI_OCR_MODEL = 'gpt-test-vision'
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ output_text: 'Employee Name: Brianna Brown\nNeed off Mar 24' }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      extractTextFromPdfAttachment({
+        contentBase64: 'Zm9v',
+        contentType: 'application/pdf',
+        filename: 'request.pdf',
+      })
+    ).resolves.toEqual({
+      status: 'completed',
+      text: 'Employee Name: Brianna Brown\nNeed off Mar 24',
+      model: 'gpt-test-vision',
+      error: null,
+    })
+
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+      method: 'POST',
+      headers: expect.objectContaining({
+        Authorization: 'Bearer test-key',
+      }),
+    })
+  })
+
+  it('routes PDF attachments through the generic extractor', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ output_text: 'Need off Mar 24' }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      extractTextFromAttachment({
+        contentBase64: 'Zm9v',
+        contentType: 'application/pdf',
+        filename: 'request.pdf',
+      })
+    ).resolves.toMatchObject({
+      status: 'completed',
+      text: 'Need off Mar 24',
+    })
+  })
+
+  describe('PDF page-image OCR fallback', () => {
+    beforeEach(() => {
+      process.env.OPENAI_API_KEY = 'test-key'
+      process.env.OPENAI_OCR_MODEL = 'gpt-test-vision'
+      vi.mocked(renderPdfToPngPages).mockReset()
+      vi.mocked(renderPdfToPngPages).mockResolvedValue([
+        Buffer.from(MIN_PNG_BASE64, 'base64'),
+        Buffer.from(MIN_PNG_BASE64, 'base64'),
+      ])
+    })
+
+    it('rasterizes PDF pages and OCRs when input_file returns no text', async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ output_text: 'NO_TEXT' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ output_text: 'Need off Mar 25' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ output_text: 'Need off Mar 26' }),
+        })
+      vi.stubGlobal('fetch', fetchMock)
+
+      await expect(
+        extractTextFromPdfAttachment({
+          contentBase64: 'Zm9v',
+          contentType: 'application/pdf',
+          filename: 'scan.pdf',
+        })
+      ).resolves.toEqual({
+        status: 'completed',
+        text: '--- Page 1 ---\nNeed off Mar 25\n\n--- Page 2 ---\nNeed off Mar 26',
+        model: 'gpt-test-vision',
+        error: null,
+      })
+
+      expect(fetchMock).toHaveBeenCalledTimes(3)
+      expect(renderPdfToPngPages).toHaveBeenCalledOnce()
+      expect(renderPdfToPngPages).toHaveBeenCalledWith('Zm9v')
+    })
+
+    it('continues when one page OCR fails and another succeeds', async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ output_text: 'NO_TEXT' }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          text: async () => 'upstream error',
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ output_text: 'Need off Mar 27' }),
+        })
+      vi.stubGlobal('fetch', fetchMock)
+
+      await expect(
+        extractTextFromPdfAttachment({
+          contentBase64: 'Zm9v',
+          contentType: 'application/pdf',
+          filename: 'scan.pdf',
+        })
+      ).resolves.toEqual({
+        status: 'completed',
+        text: '--- Page 2 ---\nNeed off Mar 27',
+        model: 'gpt-test-vision',
+        error: null,
+      })
+
+      expect(fetchMock).toHaveBeenCalledTimes(3)
+    })
+  })
 })

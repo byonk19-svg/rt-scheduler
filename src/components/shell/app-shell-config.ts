@@ -160,6 +160,11 @@ export function getStaffNavItems(): readonly ShellNavItem[] {
         pathname === '/coverage' || pathname === '/schedule' || pathname === '/preliminary',
     },
     {
+      href: '/staff/my-schedule',
+      label: 'My Schedule',
+      active: (pathname) => pathname === '/staff/my-schedule',
+    },
+    {
       href: '/therapist/availability',
       label: 'Availability',
       active: (pathname) => pathname === '/therapist/availability' || pathname === '/availability',
@@ -168,6 +173,11 @@ export function getStaffNavItems(): readonly ShellNavItem[] {
       href: '/shift-board',
       label: 'Open shifts',
       active: (pathname) => pathname === '/shift-board',
+    },
+    {
+      href: '/staff/history',
+      label: 'History',
+      active: (pathname) => pathname === '/staff/history',
     },
   ]
 }

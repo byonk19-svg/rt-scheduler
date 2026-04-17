@@ -86,6 +86,12 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
       variant: 'error',
     }
   }
+  if (error === 'submission_closed') {
+    return {
+      message: 'Availability changes are closed for this cycle.',
+      variant: 'error',
+    }
+  }
   if (success === 'entry_submitted') {
     return {
       message: 'Availability submitted for this cycle.',

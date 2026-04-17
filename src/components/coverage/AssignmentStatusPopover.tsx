@@ -4,18 +4,22 @@ import type { ReactNode } from 'react'
 import { Check, CircleCheck, Clock, PhoneCall, PhoneIncoming, PhoneOff } from 'lucide-react'
 
 import {
-  COVERAGE_STATUS_OPTIONS,
-  getCoverageStatusLabel,
-  type CoverageUiStatus,
-} from '@/lib/coverage/status-ui'
-import {
   Popover,
   PopoverContent,
   PopoverHeader,
   PopoverTitle,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import {
+  COVERAGE_STATUS_OPTIONS,
+  getCoverageStatusLabel,
+  type CoverageUiStatus,
+} from '@/lib/coverage/status-ui'
+import { useMediaQuery } from '@/lib/use-media-query'
 import { cn } from '@/lib/utils'
+
+/** Tailwind `md` (768px): prefer bottom sheet–style popover so content stays in viewport. */
+const BELOW_MD_MEDIA = '(max-width: 767px)'
 
 const STATUS_ICONS: Record<CoverageUiStatus, typeof CircleCheck> = {
   active: CircleCheck,
@@ -79,6 +83,8 @@ export function AssignmentStatusPopover({
   onChangeStatus,
   children,
 }: AssignmentStatusPopoverProps) {
+  const isNarrowViewport = useMediaQuery(BELOW_MD_MEDIA)
+
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -86,16 +92,18 @@ export function AssignmentStatusPopover({
           type="button"
           disabled={disabled}
           data-testid={triggerTestId}
-          className="pointer-events-auto relative z-20 inline-flex max-w-full items-center gap-1 rounded-md text-left transition-colors hover:text-foreground"
+          className="pointer-events-auto relative z-20 inline-flex min-h-10 max-w-full touch-manipulation items-center gap-1 rounded-md px-0.5 py-1 text-left transition-colors hover:text-foreground sm:min-h-0 sm:px-0 sm:py-0"
           onClick={(event) => event.stopPropagation()}
         >
           {children}
         </button>
       </PopoverTrigger>
       <PopoverContent
-        side="right"
-        align="start"
-        className="w-64 rounded-[24px] border-border/70 p-2.5 shadow-tw-popover"
+        side={isNarrowViewport ? 'bottom' : 'right'}
+        align={isNarrowViewport ? 'center' : 'start'}
+        sideOffset={isNarrowViewport ? 8 : 4}
+        collisionPadding={12}
+        className="w-64 max-w-[min(16rem,calc(100vw-1.5rem))] rounded-[24px] border-border/70 p-2.5 shadow-tw-popover"
         data-testid="coverage-status-popover"
         onClick={(event) => event.stopPropagation()}
       >

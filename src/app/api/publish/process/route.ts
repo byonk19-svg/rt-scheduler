@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, is_active, archived_at')
       .eq('id', user.id)
       .maybeSingle()
 
@@ -45,7 +45,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Could not verify manager role.' }, { status: 500 })
     }
 
-    if (!can(parseRole(profile?.role), 'manage_publish')) {
+    if (
+      !can(parseRole(profile?.role), 'manage_publish', {
+        isActive: profile?.is_active !== false,
+        archivedAt: profile?.archived_at ?? null,
+      })
+    ) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
   }

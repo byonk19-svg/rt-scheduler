@@ -86,7 +86,7 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('Loading...')
     expect(html).toContain('border-dashed')
     expect(html).toContain('Review updates')
-    expect(html).toContain('Open schedule')
+    expect(html).toContain('Coverage Issues')
     expect(html).toContain('href="/approvals"')
     expect(html).toContain('href="/coverage?view=week"')
   })

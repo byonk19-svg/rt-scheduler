@@ -1,7 +1,5 @@
 'use client'
 
-import { motion } from 'framer-motion'
-
 import { Progress } from '@/components/ui/progress'
 
 export function computeProgress(filled: number, total: number) {
@@ -55,7 +53,7 @@ export function ScheduleProgress({
 
   return (
     <div className="relative overflow-hidden rounded-[26px] border border-border/70 bg-card shadow-tw-panel">
-      <div className="teamwise-grid-bg-subtle teamwise-aurora-bg absolute inset-x-0 top-0 h-28 opacity-80" />
+      <div className="teamwise-grid-bg-subtle teamwise-aurora-bg absolute inset-x-0 top-0 h-28 opacity-45" />
 
       <div className="relative flex items-start justify-between gap-3 border-b border-border/70 px-5 py-4">
         <div>
@@ -77,13 +75,10 @@ export function ScheduleProgress({
       </div>
 
       <div className="relative space-y-4 px-5 py-4">
-        {rows.map((row, index) => (
-          <motion.div
+        {rows.map((row) => (
+          <div
             key={row.label}
             className="rounded-[22px] border border-border/75 bg-card/95 px-4 py-3.5 shadow-tw-panel-inner"
-            initial={{ opacity: 0, x: -16 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.08, duration: 0.3 }}
           >
             <div className="mb-2 flex items-start justify-between gap-3">
               <div>
@@ -103,7 +98,7 @@ export function ScheduleProgress({
               <span className="text-[11px] text-muted-foreground">{row.pct}%</span>
               <span className="text-[11px] text-muted-foreground">{row.gaps} remaining</span>
             </div>
-          </motion.div>
+          </div>
         ))}
       </div>
 

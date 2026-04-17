@@ -67,6 +67,7 @@ type DetailSearchParams = {
   success?: string | string[]
   error?: string | string[]
   requeued?: string | string[]
+  page?: string | string[]
 }
 
 function getOne<T>(value: T | T[] | null | undefined): T | null {
@@ -77,6 +78,82 @@ function getOne<T>(value: T | T[] | null | undefined): T | null {
 function getSearchParam(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0]
   return value
+}
+
+const FAILED_PAGE_SIZE = 25
+
+function publishDetailHref(
+  id: string,
+  query: DetailSearchParams | undefined,
+  page: number
+): string {
+  const params = new URLSearchParams()
+  const success = getSearchParam(query?.success)
+  const error = getSearchParam(query?.error)
+  const requeued = getSearchParam(query?.requeued)
+  if (success) params.set('success', success)
+  if (error) params.set('error', error)
+  if (requeued) params.set('requeued', requeued)
+  if (page > 1) params.set('page', String(page))
+  const qs = params.toString()
+  return qs ? `/publish/${id}?${qs}` : `/publish/${id}`
+}
+
+function OutboxRecipientTable({ rows }: { rows: FailedRecipientRow[] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="border-b border-border bg-secondary/40 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <th className="px-4 py-3">Email</th>
+            <th className="px-4 py-3">Name</th>
+            <th className="px-4 py-3 text-right">Attempts</th>
+            <th className="px-4 py-3">Last error</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {rows.map((row) => (
+            <tr key={row.id} className="hover:bg-secondary/20">
+              <td className="px-4 py-2.5 text-sm text-foreground">{row.email}</td>
+              <td className="px-4 py-2.5 text-sm text-muted-foreground">{row.name ?? '--'}</td>
+              <td className="px-4 py-2.5 text-right text-sm tabular-nums text-foreground">
+                {row.attempt_count}
+              </td>
+              <td className="max-w-[30rem] break-words px-4 py-2.5 text-sm text-muted-foreground">
+                {row.last_error ? (
+                  <span
+                    className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+                    style={{
+                      backgroundColor: 'var(--error-subtle)',
+                      color: 'var(--error-text)',
+                    }}
+                  >
+                    {row.last_error}
+                  </span>
+                ) : (
+                  '--'
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function QueuedRecipientsEmpty() {
+  return (
+    <div className="flex flex-col items-center gap-2 px-6 py-10 text-center">
+      <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted">
+        <Mail className="h-4 w-4 text-muted-foreground" />
+      </div>
+      <p className="text-sm font-semibold text-foreground">No queued recipients</p>
+      <p className="text-xs text-muted-foreground">
+        There are no outbound emails waiting for this event.
+      </p>
+    </div>
+  )
 }
 
 function StatRow({ label, value }: { label: string; value: ReactNode }) {
@@ -131,6 +208,9 @@ export default async function PublishEventDetailPage({
   const successParam = getSearchParam(query?.success)
   const errorParam = getSearchParam(query?.error)
   const requeuedCount = parseCount(getSearchParam(query?.requeued))
+  const pageParam = getSearchParam(query?.page)
+  const parsedPage = parseInt(pageParam ?? '1', 10)
+  const currentPage = Number.isFinite(parsedPage) && parsedPage > 0 ? Math.floor(parsedPage) : 1
 
   const supabase = await createClient()
   const {
@@ -182,15 +262,38 @@ export default async function PublishEventDetailPage({
   }
 
   const event = eventData as PublishEventDetailRow
+
+  const { count: failedTotalCount, error: failedCountError } = await supabase
+    .from('notification_outbox')
+    .select('*', { count: 'exact', head: true })
+    .eq('publish_event_id', id)
+    .eq('status', 'failed')
+
+  const totalFailed = failedCountError ? 0 : (failedTotalCount ?? 0)
+  const totalFailedPages = totalFailed === 0 ? 1 : Math.ceil(totalFailed / FAILED_PAGE_SIZE)
+  const failedPage = Math.min(currentPage, totalFailedPages)
+  if (currentPage !== failedPage) {
+    redirect(publishDetailHref(id, query, failedPage))
+  }
+  const failedOffset = (failedPage - 1) * FAILED_PAGE_SIZE
+
   const { data: failedRowsData, error: failedRowsError } = await supabase
     .from('notification_outbox')
     .select('id, email, name, attempt_count, last_error, created_at')
     .eq('publish_event_id', id)
     .eq('status', 'failed')
     .order('created_at', { ascending: false })
-    .limit(100)
+    .range(failedOffset, failedOffset + FAILED_PAGE_SIZE - 1)
+
+  const { data: queuedRowsData, error: queuedRowsError } = await supabase
+    .from('notification_outbox')
+    .select('id, email, name, attempt_count, last_error, created_at')
+    .eq('publish_event_id', id)
+    .eq('status', 'queued')
+    .order('created_at', { ascending: false })
 
   const failedRows = failedRowsError ? [] : ((failedRowsData ?? []) as FailedRecipientRow[])
+  const queuedRows = queuedRowsError ? [] : ((queuedRowsData ?? []) as FailedRecipientRow[])
   const cycle = getOne(event.schedule_cycles)
   const publishedScheduleHref = buildScheduleUrl(event.cycle_id, 'week')
 
@@ -308,6 +411,22 @@ export default async function PublishEventDetailPage({
         )}
       </div>
 
+      {/* Queued recipients */}
+      <div className="rounded-xl border border-border bg-card shadow-tw-sm">
+        <details>
+          <summary className="cursor-pointer border-b border-border px-5 py-3">
+            <span className="block text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+              Queued recipients ({queuedRows.length})
+            </span>
+          </summary>
+          {queuedRows.length === 0 ? (
+            <QueuedRecipientsEmpty />
+          ) : (
+            <OutboxRecipientTable rows={queuedRows} />
+          )}
+        </details>
+      </div>
+
       {/* Failed recipients */}
       <div className="rounded-xl border border-border bg-card shadow-tw-sm">
         <div className="flex items-center justify-between gap-2 border-b border-border px-5 py-3">
@@ -322,7 +441,7 @@ export default async function PublishEventDetailPage({
           </form>
         </div>
 
-        {failedRows.length === 0 ? (
+        {totalFailed === 0 ? (
           <div className="flex flex-col items-center gap-2 px-6 py-10 text-center">
             <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted">
               <Mail className="h-4 w-4 text-muted-foreground" />
@@ -331,46 +450,44 @@ export default async function PublishEventDetailPage({
             <p className="text-xs text-muted-foreground">All emails were delivered successfully.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-border bg-secondary/40 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  <th className="px-4 py-3">Email</th>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3 text-right">Attempts</th>
-                  <th className="px-4 py-3">Last error</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {failedRows.map((row) => (
-                  <tr key={row.id} className="hover:bg-secondary/20">
-                    <td className="px-4 py-2.5 text-sm text-foreground">{row.email}</td>
-                    <td className="px-4 py-2.5 text-sm text-muted-foreground">
-                      {row.name ?? '--'}
-                    </td>
-                    <td className="px-4 py-2.5 text-right text-sm tabular-nums text-foreground">
-                      {row.attempt_count}
-                    </td>
-                    <td className="max-w-[30rem] break-words px-4 py-2.5 text-sm text-muted-foreground">
-                      {row.last_error ? (
-                        <span
-                          className="rounded px-1.5 py-0.5 text-[10px] font-medium"
-                          style={{
-                            backgroundColor: 'var(--error-subtle)',
-                            color: 'var(--error-text)',
-                          }}
-                        >
-                          {row.last_error}
-                        </span>
-                      ) : (
-                        '--'
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <OutboxRecipientTable rows={failedRows} />
+            {totalFailedPages > 1 ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
+                <p className="text-xs text-muted-foreground">
+                  Page {failedPage} of {totalFailedPages}
+                  <span className="text-muted-foreground/80">
+                    {' '}
+                    ({totalFailed} total
+                    {totalFailed > 0
+                      ? ` — showing ${failedOffset + 1}–${Math.min(failedOffset + FAILED_PAGE_SIZE, totalFailed)}`
+                      : ''}
+                    )
+                  </span>
+                </p>
+                <div className="flex items-center gap-2">
+                  {failedPage <= 1 ? (
+                    <Button size="sm" variant="outline" disabled>
+                      Previous
+                    </Button>
+                  ) : (
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={publishDetailHref(id, query, failedPage - 1)}>Previous</Link>
+                    </Button>
+                  )}
+                  {failedPage >= totalFailedPages ? (
+                    <Button size="sm" variant="outline" disabled>
+                      Next
+                    </Button>
+                  ) : (
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={publishDetailHref(id, query, failedPage + 1)}>Next</Link>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </>
         )}
       </div>
     </div>
