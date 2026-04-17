@@ -4,8 +4,6 @@ import { CalendarDays } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 
-import appPreview from '../../public/images/app-preview.png'
-
 const trustNotes = [
   'Availability stays visible before the next handoff.',
   'Coverage changes stay clear without the back-and-forth.',
@@ -127,14 +125,12 @@ export default function HomePage() {
               />
               <div className="relative min-h-[320px] overflow-hidden rounded-[1.5rem] border border-border/50 bg-card/85 sm:min-h-[420px] lg:min-h-[500px]">
                 <Image
-                  src={appPreview}
+                  src="/images/app-preview.png"
                   alt="Teamwise schedule view"
                   fill
                   className="object-cover object-top"
-                  sizes="(max-width: 640px) calc(100vw - 3rem), (max-width: 1280px) min(calc(72rem - 3rem), 100vw - 3rem), 1056px"
-                  quality={82}
-                  placeholder="blur"
                   priority
+                  unoptimized
                 />
                 <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[var(--background)] via-[rgba(245,241,234,0.84)] to-transparent" />
               </div>
