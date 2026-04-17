@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     'next-env.d.ts',
     '.tmp_lovable_import_*/**',
     '.reference/**',
+    // Local Cursor skills / tooling (not app source)
+    '.cursor/**',
   ]),
 ])
 

@@ -316,7 +316,7 @@ Broader historical baseline:
 - Full `npx vitest run` is green without real Supabase admin env: **`assignment-status`** route tests mock **`@/lib/supabase/admin`** (`createAdminClient`).
 - Auth E2E happy path requires `.env.local` (or shell env) entries for `E2E_USER_EMAIL` and `E2E_USER_PASSWORD`
 
-CI gates: format check → lint → tsc → build → Playwright E2E
+CI gates: format check → lint → tsc → build → Playwright E2E. **`.prettierignore`** includes **`.cursor`** so local Cursor skill trees do not fail **`npm run format:check`** or the **pre-push** hook.
 
 E2E specs:
 

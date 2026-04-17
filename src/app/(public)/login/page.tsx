@@ -195,8 +195,8 @@ function LoginPageClient() {
       <div className="flex flex-1 flex-col items-center justify-center bg-background px-6 py-10">
         <section className="w-full max-w-[380px]">
           <h1 className="app-page-title text-3xl">Sign in</h1>
-          <p className="mt-1.5 text-sm text-foreground/70">
-            Access your schedule, availability, and open shifts.
+          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+            Pick up where you left off — schedules, availability, and handoffs in one place.
           </p>
 
           {showPostSignupBanner && postSignupBanner && (

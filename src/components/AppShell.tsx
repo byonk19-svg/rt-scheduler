@@ -322,8 +322,8 @@ export function AppShell({ user, unreadNotificationCount = 0, children }: AppShe
               <Button
                 type="button"
                 variant="ghost"
-                size="icon-sm"
-                className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                size="icon"
+                className="min-h-11 min-w-11 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                 onClick={() => setMobileMenuOpen(false)}
                 aria-label="Close navigation menu"
               >
@@ -451,7 +451,7 @@ export function AppShell({ user, unreadNotificationCount = 0, children }: AppShe
               <form action="/auth/signout" method="post">
                 <button
                   type="submit"
-                  className="flex min-h-[38px] w-full items-center rounded-lg px-2.5 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
+                  className="flex min-h-11 w-full items-center rounded-lg px-2.5 py-2.5 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
                 >
                   Log out
                 </button>
