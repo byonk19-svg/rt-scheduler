@@ -43,7 +43,7 @@ function getHeaderActions(pathname: string) {
   }
 }
 
-export function PublicHeader({ className }: { className?: string }) {
+export default function PublicHeader({ className }: { className?: string }) {
   const pathname = usePathname()
   const actions = getHeaderActions(pathname)
 

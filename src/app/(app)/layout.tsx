@@ -1,4 +1,4 @@
-import { AppShell, type AppShellUser } from '@/components/AppShell'
+import AppShell, { type AppShellUser } from '@/components/AppShell'
 import { toUiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 

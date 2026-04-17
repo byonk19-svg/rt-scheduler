@@ -154,7 +154,7 @@ function UserDropdown({
   )
 }
 
-export function AppShell({ user, unreadNotificationCount = 0, children }: AppShellProps) {
+export default function AppShell({ user, unreadNotificationCount = 0, children }: AppShellProps) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const canAccessManagerUi = can(user?.role, 'access_manager_ui')

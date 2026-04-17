@@ -1,6 +1,6 @@
 import { Fraunces } from 'next/font/google'
 
-import { PublicHeader } from '@/components/public/PublicHeader'
+import PublicHeader from '@/components/public/PublicHeader'
 
 const fraunces = Fraunces({
   subsets: ['latin'],
