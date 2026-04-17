@@ -4,11 +4,14 @@ import { toUiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 import type { ReactNode } from 'react'
 
-const AppShell = withDynamic<{ user: AppShellUser | null; unreadNotificationCount: number; children: ReactNode }>(
-  () =>
-    import('@/components/AppShell').then(
-      (m) => m.default ?? (({ children }: { children: ReactNode }) => <>{children}</>)
-    )
+const AppShell = withDynamic<{
+  user: AppShellUser | null
+  unreadNotificationCount: number
+  children: ReactNode
+}>(() =>
+  import('@/components/AppShell').then(
+    (m) => m.default ?? (({ children }: { children: ReactNode }) => <>{children}</>)
+  )
 )
 
 export const dynamic = 'force-dynamic'
