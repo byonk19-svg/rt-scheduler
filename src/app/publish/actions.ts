@@ -21,11 +21,16 @@ async function requireManagerUser() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, is_active, archived_at')
     .eq('id', user.id)
     .maybeSingle()
 
-  if (!can(parseRole(profile?.role), 'manage_publish')) {
+  if (
+    !can(parseRole(profile?.role), 'manage_publish', {
+      isActive: profile?.is_active !== false,
+      archivedAt: profile?.archived_at ?? null,
+    })
+  ) {
     redirect('/dashboard')
   }
 

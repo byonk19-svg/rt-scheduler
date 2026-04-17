@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { redirect } from 'next/navigation'
 
 import { CoverageClientPage } from '@/app/coverage/CoverageClientPage'
 import {
@@ -12,6 +13,18 @@ import { createClient } from '@/lib/supabase/server'
 function firstSearchParam(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0]
   return value
+}
+
+function buildCoverageLoginRedirectTo(
+  sp: Record<string, string | string[] | undefined>
+): string {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(sp)) {
+    const v = Array.isArray(value) ? value[0] : value
+    if (v) params.set(key, v)
+  }
+  const qs = params.toString()
+  return qs ? `/coverage?${qs}` : '/coverage'
 }
 
 export default async function CoveragePage({
@@ -28,19 +41,21 @@ export default async function CoveragePage({
     data: { user },
   } = await supabase.auth.getUser()
 
+  if (!user) {
+    redirect(`/login?redirectTo=${encodeURIComponent(buildCoverageLoginRedirectTo(sp))}`)
+  }
+
   let profileShift: ReturnType<typeof normalizeActorShiftType> = null
   let defaultScheduleView: 'week' | 'roster' = 'week'
-  if (user) {
-    const { data: prof } = await supabase
-      .from('profiles')
-      .select('shift_type, default_schedule_view')
-      .eq('id', user.id)
-      .maybeSingle()
-    profileShift = normalizeActorShiftType(prof?.shift_type)
-    defaultScheduleView = normalizeDefaultScheduleView(
-      (prof as { default_schedule_view?: string | null } | null)?.default_schedule_view ?? undefined
-    )
-  }
+  const { data: prof } = await supabase
+    .from('profiles')
+    .select('shift_type, default_schedule_view')
+    .eq('id', user.id)
+    .maybeSingle()
+  profileShift = normalizeActorShiftType(prof?.shift_type)
+  defaultScheduleView = normalizeDefaultScheduleView(
+    (prof as { default_schedule_view?: string | null } | null)?.default_schedule_view ?? undefined
+  )
 
   const initialViewMode = viewRaw ? normalizeViewMode(viewRaw) : defaultScheduleView
   const initialShiftTab = urlShiftTab ?? defaultCoverageShiftTabFromProfileShift(profileShift)

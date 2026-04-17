@@ -44,6 +44,13 @@ describe('coverage publish override affordance', () => {
     expect(source).toContain('Publish history')
   })
 
+  it('redirects unauthenticated users to login with a coverage return path', () => {
+    const serverPath = resolve(process.cwd(), 'src/app/coverage/page.tsx')
+    const server = readFileSync(serverPath, 'utf8')
+    expect(server).toContain('buildCoverageLoginRedirectTo')
+    expect(server).toContain('redirect(`/login?redirectTo=${encodeURIComponent(buildCoverageLoginRedirectTo(sp))}`)')
+  })
+
   it('defaults schedule shift tab from profile shift_type and honors ?shift= query', () => {
     const clientPath = resolve(process.cwd(), 'src/app/coverage/CoverageClientPage.tsx')
     const client = readFileSync(clientPath, 'utf8')
