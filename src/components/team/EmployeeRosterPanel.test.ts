@@ -7,7 +7,10 @@ import { describe, expect, it } from 'vitest'
 
 import { EmployeeRosterPanel } from '@/components/team/EmployeeRosterPanel'
 
-const teamPageSource = fs.readFileSync(path.join(process.cwd(), 'src/app/team/page.tsx'), 'utf8')
+const teamPageSource = fs.readFileSync(
+  path.join(process.cwd(), 'src/app/(app)/team/page.tsx'),
+  'utf8'
+)
 
 const rosterPanelSource = fs.readFileSync(
   path.join(process.cwd(), 'src/components/team/EmployeeRosterPanel.tsx'),
@@ -34,6 +37,7 @@ describe('EmployeeRosterPanel', () => {
             max_work_days_per_week: 3,
             is_lead_eligible: false,
             matched_profile_id: null,
+            matched_email: null,
             matched_at: null,
             phone_number: null,
           },
