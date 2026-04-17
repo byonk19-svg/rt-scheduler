@@ -18,20 +18,17 @@ describe('auth signout route', () => {
     vi.resetAllMocks()
   })
 
-  it('rejects cross-origin GET signout requests', async () => {
+  it('rejects cross-site GET signout navigations', async () => {
     const response = await GET(
       new Request('http://localhost/auth/signout', {
         method: 'GET',
         headers: {
-          referer: 'https://evil.example/account',
+          'sec-fetch-site': 'cross-site',
         },
       })
     )
 
     expect(response.status).toBe(403)
-    await expect(response.json()).resolves.toMatchObject({
-      error: 'Invalid request origin.',
-    })
     expect(createClient).not.toHaveBeenCalled()
   })
 
@@ -74,7 +71,7 @@ describe('auth signout route', () => {
     expect(response.headers.get('location')).toBe('http://localhost/')
   })
 
-  it('signs out on same-origin GET requests used for internal cleanup', async () => {
+  it('allows same-origin GET signout navigations', async () => {
     const signOut = vi.fn().mockResolvedValue({ error: null })
     vi.mocked(createClient).mockResolvedValue({
       auth: {
@@ -86,7 +83,7 @@ describe('auth signout route', () => {
       new Request('http://localhost/auth/signout?next=%2Flogin%3Ferror%3Daccount_inactive', {
         method: 'GET',
         headers: {
-          referer: 'http://localhost/dashboard',
+          'sec-fetch-site': 'same-origin',
         },
       })
     )

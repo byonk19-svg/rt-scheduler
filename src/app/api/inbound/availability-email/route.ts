@@ -3,9 +3,12 @@ import { after, NextResponse } from 'next/server'
 import {
   parseAvailabilityEmailBatchSources,
   parseSender,
+  summarizeAvailabilityEmailBatch,
   stripHtmlToText,
+  type AvailabilityEmailBatchStatus,
   type IntakeCycle,
   type AvailabilityEmailAttachmentSource,
+  type ParsedAvailabilityEmailItem,
 } from '@/lib/availability-email-intake'
 import { extractTextFromAttachment } from '@/lib/openai-ocr'
 import { isValidResendWebhookRequest } from '@/lib/security/resend-webhook'
@@ -48,6 +51,13 @@ type ResendAttachmentRecord = {
   ocr_text: string | null
   ocr_model: string | null
   ocr_error: string | null
+}
+
+type MatchableProfile = {
+  id: string
+  full_name: string
+  email?: string | null
+  is_active?: boolean | null
 }
 
 function getResendApiKey(): string {
@@ -160,6 +170,37 @@ function resolveSender(rawFrom: ResendEmailContent['from']): {
   return { email, name }
 }
 
+function normalizeEmail(value: string | null | undefined): string | null {
+  if (!value) return null
+  const normalized = value.trim().toLowerCase()
+  return normalized.length > 0 ? normalized : null
+}
+
+function buildItemParseStatus(
+  item: ParsedAvailabilityEmailItem,
+  senderTrustedForMatchedTherapist: boolean
+): ParsedAvailabilityEmailItem['parseStatus'] {
+  if (
+    item.confidenceLevel === 'high' &&
+    item.matchedTherapistId &&
+    item.matchedCycleId &&
+    item.requests.length > 0
+  ) {
+    return senderTrustedForMatchedTherapist ? 'auto_applied' : 'needs_review'
+  }
+
+  return item.parseStatus
+}
+
+function isTrustedSenderForMatchedTherapist(params: {
+  senderEmail: string | null
+  matchedTherapistId: string | null
+  therapistEmailById: Map<string, string | null>
+}): boolean {
+  if (!params.senderEmail || !params.matchedTherapistId) return false
+  return params.therapistEmailById.get(params.matchedTherapistId) === params.senderEmail
+}
+
 function flattenBatchRequests(items: Array<{ requests: Array<Record<string, unknown>> }>) {
   return items.flatMap((item) => item.requests)
 }
@@ -200,6 +241,12 @@ async function processInboundAvailabilityEmail(emailId: string) {
 
   const cycles = ((cycleRows ?? []) as IntakeCycle[]).filter(
     (cycle) => cycle.start_date && cycle.end_date
+  )
+  const therapistEmailById = new Map(
+    (((activeProfiles ?? []) as MatchableProfile[]) ?? []).map((profile) => [
+      profile.id,
+      normalizeEmail(profile.email ?? null),
+    ])
   )
   const processedAttachments: ResendAttachmentRecord[] = []
 
@@ -286,17 +333,44 @@ async function processInboundAvailabilityEmail(emailId: string) {
     normalizedBodyText: normalizeEmailText(emailContent),
     attachments: attachmentSources,
     cycles,
-    profiles:
-      ((activeProfiles ?? []) as Array<{
-        id: string
-        full_name: string
-        is_active?: boolean | null
-      }>) ?? [],
+    profiles: ((activeProfiles ?? []) as MatchableProfile[]) ?? [],
     autoApplyHighConfidence: true,
   })
-  const parsedItems = parsedBatch.items
-  const batchSummary = parsedBatch.batchSummary
-  const batchStatus = parsedBatch.batchStatus
+  const parsedItems = parsedBatch.items.map((parsedItem) => {
+    const senderTrustedForMatchedTherapist = isTrustedSenderForMatchedTherapist({
+      senderEmail: sender.email,
+      matchedTherapistId: parsedItem.matchedTherapistId,
+      therapistEmailById,
+    })
+    const confidenceReasons =
+      !senderTrustedForMatchedTherapist &&
+      parsedItem.confidenceLevel === 'high' &&
+      parsedItem.matchedTherapistId &&
+      parsedItem.matchedCycleId &&
+      parsedItem.requests.length > 0
+        ? [
+            ...parsedItem.confidenceReasons,
+            'Sender email does not match the matched therapist profile.',
+          ]
+        : parsedItem.confidenceReasons
+
+    return {
+      ...parsedItem,
+      confidenceReasons,
+      parseStatus: buildItemParseStatus(parsedItem, senderTrustedForMatchedTherapist),
+    }
+  })
+  const batchSummary = summarizeAvailabilityEmailBatch(parsedItems)
+  const batchStatus: AvailabilityEmailBatchStatus =
+    parsedItems.length === 0
+      ? 'failed'
+      : parsedItems.every((item) => item.parseStatus === 'failed')
+        ? 'failed'
+        : parsedItems.some((item) => item.parseStatus === 'needs_review')
+          ? 'needs_review'
+          : parsedItems.some((item) => item.parseStatus === 'auto_applied')
+            ? 'applied'
+            : 'parsed'
   const intakeInsert = {
     provider: 'resend',
     provider_email_id: emailId,

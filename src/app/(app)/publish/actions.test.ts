@@ -89,8 +89,11 @@ function createSupabaseMock(context: TestContext) {
           return builder
         },
         maybeSingle: async () => {
-          if (table === 'profiles' && selected === 'role') {
-            return { data: { role: context.role }, error: null }
+          if (table === 'profiles' && String(selected).includes('role')) {
+            return {
+              data: { role: context.role, is_active: true, archived_at: null },
+              error: null,
+            }
           }
 
           if (table === 'schedule_cycles') {
