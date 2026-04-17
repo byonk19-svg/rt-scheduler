@@ -63,4 +63,8 @@ describe('Team page source contract', () => {
     expect(teamPageSource).toContain('replaceTherapistRosterAction')
     expect(teamPageSource).toContain('replaceTherapistRosterAction={replaceTherapistRosterAction}')
   })
+
+  it('adds an Import link from the team page', () => {
+    expect(teamPageSource).toContain('href="/team/import"')
+  })
 })

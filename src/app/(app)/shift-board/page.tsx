@@ -739,7 +739,7 @@ export default function ShiftBoardPage() {
       {/* Summary banner */}
       {canReview ? (
         <div
-          className="fade-up rounded-xl border border-[var(--warning-border)] bg-card shadow-sm [border-left-width:4px] [border-left-color:var(--warning)]"
+          className="fade-up rounded-xl border border-[var(--warning-border)] bg-[var(--warning-subtle)]/25 shadow-sm"
           style={{ animationDelay: '0.05s' }}
         >
           <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">

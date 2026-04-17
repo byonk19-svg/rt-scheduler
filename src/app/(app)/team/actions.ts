@@ -4,7 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/can'
-import { parseRole } from '@/lib/auth/roles'
+import { MANAGED_TEAM_ROLE_VALUES, parseRole } from '@/lib/auth/roles'
+import { writeAuditLog } from '@/lib/audit-log'
 import { normalizeRosterFullName, parseBulkEmployeeRosterText } from '@/lib/employee-roster-bulk'
 import { parseTeamQuickEditFormData } from '@/lib/team-quick-edit'
 import { parseTherapistRosterSource } from '@/lib/therapist-roster-source'
@@ -43,6 +44,16 @@ function buildTeamUrl(params: Record<string, string | undefined>): string {
 
 function buildRosterAdminUrl(params: Record<string, string | undefined>): string {
   return buildTeamUrl({ ...params, tab: 'roster' })
+}
+
+function buildWorkPatternsUrl(params: Record<string, string | undefined> = {}): string {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (!value) continue
+    search.set(key, value)
+  }
+  const query = search.toString()
+  return query.length > 0 ? `/team/work-patterns?${query}` : '/team/work-patterns'
 }
 
 async function requireManager() {
@@ -125,7 +136,7 @@ export async function saveTeamQuickEditAction(formData: FormData) {
     )
   }
 
-  const { supabase } = await requireManager()
+  const { supabase, userId } = await requireManager()
   const input = parsed.value
 
   const { data: existingProfile, error: profileError } = await supabase
@@ -167,6 +178,13 @@ export async function saveTeamQuickEditAction(formData: FormData) {
     await realignFutureDraftShiftsForEmployee(supabase, input.profileId)
   }
 
+  await writeAuditLog(supabase, {
+    userId,
+    action: 'team_profile_updated',
+    targetType: 'profile',
+    targetId: input.profileId,
+  })
+
   // Upsert or clear the recurring work pattern
   if (input.workPattern.hasPattern) {
     const { error: patternError } = await supabase.from('work_patterns').upsert(
@@ -194,6 +212,217 @@ export async function saveTeamQuickEditAction(formData: FormData) {
   revalidatePath('/dashboard/manager')
 
   redirect(buildTeamUrl({ success: 'profile_saved' }))
+}
+
+function parseDowValues(values: FormDataEntryValue[]): number[] {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => Number.parseInt(String(value), 10))
+        .filter((value) => Number.isInteger(value) && value >= 0 && value <= 6)
+    )
+  ).sort((a, b) => a - b)
+}
+
+function isSaturdayDate(value: string): boolean {
+  const parsed = new Date(`${value}T12:00:00`)
+  if (Number.isNaN(parsed.getTime())) return false
+  return parsed.getDay() === 6
+}
+
+export async function saveWorkPatternAction(formData: FormData) {
+  const { supabase } = await requireManager()
+
+  const therapistId = String(formData.get('therapist_id') ?? '').trim()
+  if (!therapistId) {
+    redirect(buildWorkPatternsUrl({ error: 'missing_profile' }))
+  }
+
+  const worksDow = parseDowValues(formData.getAll('works_dow'))
+  const offsDow = parseDowValues(formData.getAll('offs_dow'))
+  const worksDowModeRaw = String(formData.get('works_dow_mode') ?? 'hard').trim()
+  const worksDowMode: 'hard' | 'soft' = worksDowModeRaw === 'soft' ? 'soft' : 'hard'
+  const weekendRotationRaw = String(formData.get('weekend_rotation') ?? 'none').trim()
+  const weekendRotation: 'none' | 'every_other' =
+    weekendRotationRaw === 'every_other' ? 'every_other' : 'none'
+  const weekendAnchorDateRaw = String(formData.get('weekend_anchor_date') ?? '').trim()
+  const weekendAnchorDate =
+    weekendRotation === 'every_other' && weekendAnchorDateRaw ? weekendAnchorDateRaw : null
+
+  if (weekendAnchorDate && !isSaturdayDate(weekendAnchorDate)) {
+    redirect(
+      buildWorkPatternsUrl({
+        error: 'invalid_weekend_anchor',
+        edit_profile: therapistId,
+      })
+    )
+  }
+
+  const { data: existingProfile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, role, is_active, archived_at')
+    .eq('id', therapistId)
+    .maybeSingle()
+
+  if (
+    profileError ||
+    !existingProfile ||
+    existingProfile.archived_at ||
+    existingProfile.is_active === false ||
+    (existingProfile.role !== 'therapist' && existingProfile.role !== 'lead')
+  ) {
+    console.error('Failed to load work-pattern profile:', profileError)
+    redirect(buildWorkPatternsUrl({ error: 'missing_profile' }))
+  }
+
+  const shouldDeletePattern =
+    worksDow.length === 0 &&
+    offsDow.length === 0 &&
+    weekendRotation === 'none' &&
+    !weekendAnchorDate
+
+  if (shouldDeletePattern) {
+    const { error: deleteError } = await supabase
+      .from('work_patterns')
+      .delete()
+      .eq('therapist_id', therapistId)
+
+    if (deleteError) {
+      console.error('Failed to delete work pattern:', deleteError)
+      redirect(
+        buildWorkPatternsUrl({
+          error: 'work_pattern_save_failed',
+          edit_profile: therapistId,
+        })
+      )
+    }
+  } else {
+    const { error: patternError } = await supabase.from('work_patterns').upsert(
+      {
+        therapist_id: therapistId,
+        works_dow: worksDow,
+        offs_dow: offsDow,
+        works_dow_mode: worksDowMode,
+        weekend_rotation: weekendRotation,
+        weekend_anchor_date: weekendAnchorDate,
+        shift_preference: 'either',
+      },
+      { onConflict: 'therapist_id' }
+    )
+
+    if (patternError) {
+      console.error('Failed to save isolated work pattern:', patternError)
+      redirect(
+        buildWorkPatternsUrl({
+          error: 'work_pattern_save_failed',
+          edit_profile: therapistId,
+        })
+      )
+    }
+  }
+
+  revalidatePath('/team/work-patterns')
+  revalidatePath('/team')
+  revalidatePath('/coverage')
+  revalidatePath('/schedule')
+
+  redirect('/team/work-patterns?success=work_pattern_saved')
+}
+
+export async function bulkUpdateTeamMembersAction(formData: FormData) {
+  const { supabase } = await requireManager()
+
+  const rawIds = formData
+    .getAll('profile_ids')
+    .map((v) => String(v ?? '').trim())
+    .filter((id) => id.length > 0)
+  const profileIds = [...new Set(rawIds)]
+
+  if (profileIds.length === 0) {
+    redirect(buildTeamUrl({ error: 'bulk_empty' }))
+  }
+
+  const action = String(formData.get('bulk_action') ?? '').trim()
+  const bulkValueRaw = formData.get('bulk_value')
+  const bulkValue = bulkValueRaw != null ? String(bulkValueRaw).trim() : ''
+
+  const { data: rows, error: loadError } = await supabase
+    .from('profiles')
+    .select('id, role, archived_at')
+    .in('id', profileIds)
+
+  if (loadError || !rows || rows.length !== profileIds.length) {
+    console.error('Bulk team update: profile lookup failed', loadError)
+    redirect(buildTeamUrl({ error: 'bulk_invalid_profiles' }))
+  }
+
+  for (const row of rows) {
+    if (row.archived_at) {
+      redirect(buildTeamUrl({ error: 'bulk_invalid_profiles' }))
+    }
+    const role = row.role as string | null
+    if (!role || !(MANAGED_TEAM_ROLE_VALUES as readonly string[]).includes(role)) {
+      redirect(buildTeamUrl({ error: 'bulk_invalid_profiles' }))
+    }
+  }
+
+  type ProfilesPatch = {
+    on_fmla?: boolean
+    is_active?: boolean
+    employment_type?: EmploymentType
+  }
+
+  let patch: ProfilesPatch | null = null
+
+  switch (action) {
+    case 'set_fmla_on':
+      patch = { on_fmla: true }
+      break
+    case 'set_fmla_off':
+      patch = { on_fmla: false }
+      break
+    case 'set_inactive':
+      patch = { is_active: false }
+      break
+    case 'set_active':
+      patch = { is_active: true }
+      break
+    case 'set_employment_type': {
+      const et = parseEmploymentType(bulkValue)
+      if (!et) {
+        redirect(buildTeamUrl({ error: 'bulk_invalid_employment' }))
+      }
+      patch = { employment_type: et }
+      break
+    }
+    default:
+      redirect(buildTeamUrl({ error: 'bulk_invalid_action' }))
+  }
+
+  const { error: updateError } = await supabase.from('profiles').update(patch).in('id', profileIds)
+
+  if (updateError) {
+    console.error('Bulk team update failed:', updateError)
+    redirect(buildTeamUrl({ error: 'bulk_update_failed' }))
+  }
+
+  if (action === 'set_inactive' || action === 'set_fmla_on') {
+    for (const id of profileIds) {
+      await realignFutureDraftShiftsForEmployee(supabase, id)
+    }
+  }
+
+  revalidatePath('/team')
+  revalidatePath('/schedule')
+  revalidatePath('/coverage')
+  revalidatePath('/dashboard/manager')
+
+  redirect(
+    buildTeamUrl({
+      success: 'bulk_updated',
+      bulk_count: String(profileIds.length),
+    })
+  )
 }
 
 export async function archiveTeamMemberAction(formData: FormData) {

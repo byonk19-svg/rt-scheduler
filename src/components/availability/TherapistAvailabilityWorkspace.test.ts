@@ -36,6 +36,7 @@ describe('TherapistAvailabilityWorkspace', () => {
             canDelete: true,
           },
         ],
+        conflicts: [],
         initialCycleId: 'cycle-1',
         submissionsByCycleId: {},
         submitTherapistAvailabilityGridAction: async () => {},
@@ -60,6 +61,31 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('Week 1')
     expect(html).not.toContain('Must work')
     expect(html).not.toContain('Unavailable')
+  })
+
+  it('renders the scheduled conflict warning banner when conflicts are present', () => {
+    const html = renderToStaticMarkup(
+      createElement(TherapistAvailabilityWorkspace, {
+        cycles: [
+          {
+            id: 'cycle-1',
+            label: 'Apr 2026',
+            start_date: '2026-04-19',
+            end_date: '2026-04-25',
+            published: false,
+          },
+        ],
+        availabilityRows: [],
+        conflicts: [{ date: '2026-04-20', shiftType: 'day' }],
+        initialCycleId: 'cycle-1',
+        submissionsByCycleId: {},
+        submitTherapistAvailabilityGridAction: async () => {},
+      })
+    )
+
+    expect(html).toContain('You marked Need Off on dates that already have a scheduled shift.')
+    expect(html).toContain('Mon Apr 20')
+    expect(html).toContain('Review in Coverage')
   })
 
   it('documents that Available days do not persist notes (source)', () => {

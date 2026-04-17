@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 
 import {
   archiveTeamMemberAction,
+  bulkUpdateTeamMembersAction,
   bulkUpsertEmployeeRosterAction,
   deleteEmployeeRosterEntryAction,
   replaceTherapistRosterAction,
@@ -43,6 +44,7 @@ type TeamSearchParams = {
   edit_profile?: string | string[]
   bulk_line?: string | string[]
   roster_bulk_count?: string | string[]
+  bulk_count?: string | string[]
   tab?: string | string[]
 }
 
@@ -94,6 +96,11 @@ function getTeamFeedback(params?: TeamSearchParams): {
     const count = getSearchParam(params?.roster_bulk_count) ?? ''
     const suffix = count ? ` (${count} therapists)` : ''
     return { message: `Therapist roster replaced.${suffix}`, variant: 'success' }
+  }
+  if (success === 'bulk_updated') {
+    const count = getSearchParam(params?.bulk_count) ?? ''
+    const suffix = count ? ` (${count} people)` : ''
+    return { message: `Bulk team update saved.${suffix}`, variant: 'success' }
   }
 
   if (error === 'missing_profile') {
@@ -179,6 +186,24 @@ function getTeamFeedback(params?: TeamSearchParams): {
       message: 'Could not replace the therapist roster. Please try again.',
       variant: 'error',
     }
+  }
+  if (error === 'bulk_empty') {
+    return { message: 'Select at least one team member for a bulk update.', variant: 'error' }
+  }
+  if (error === 'bulk_invalid_profiles') {
+    return {
+      message: 'One or more selected people could not be updated. Refresh and try again.',
+      variant: 'error',
+    }
+  }
+  if (error === 'bulk_invalid_action') {
+    return { message: 'That bulk action is not supported.', variant: 'error' }
+  }
+  if (error === 'bulk_invalid_employment') {
+    return { message: 'Choose a valid employment type for bulk update.', variant: 'error' }
+  }
+  if (error === 'bulk_update_failed') {
+    return { message: 'Bulk update could not be saved. Try again.', variant: 'error' }
   }
 
   return null
@@ -272,6 +297,14 @@ export default async function TeamPage({
         title="Team"
         subtitle="Manage staffing, roles, and roster access from one workspace."
         className="px-0"
+        actions={
+          <a
+            href="/team/import"
+            className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground shadow-xs transition-colors hover:bg-secondary/70"
+          >
+            Import
+          </a>
+        }
       />
 
       <TeamWorkspaceClient
@@ -287,6 +320,7 @@ export default async function TeamPage({
         bulkUpsertEmployeeRosterAction={bulkUpsertEmployeeRosterAction}
         replaceTherapistRosterAction={replaceTherapistRosterAction}
         deleteEmployeeRosterEntryAction={deleteEmployeeRosterEntryAction}
+        bulkUpdateTeamMembersAction={bulkUpdateTeamMembersAction}
       />
     </div>
   )

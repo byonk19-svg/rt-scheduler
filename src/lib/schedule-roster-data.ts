@@ -3,6 +3,8 @@ import {
   type AssignmentStore,
   type AvailabilityApprovalKind,
   type AvailabilityApprovalStore,
+  type RosterKind,
+  type Staff,
   type ShiftType,
 } from '@/lib/mock-coverage-roster'
 
@@ -18,6 +20,10 @@ export type LiveRosterOverrideRow = {
   date: string
   shift_type: 'day' | 'night' | 'both'
   override_type: 'force_off' | 'force_on'
+}
+
+export type ScheduleRosterStaff = Staff & {
+  shiftType: ShiftType
 }
 
 export function buildAssignmentStoreFromShifts(shifts: LiveRosterShiftRow[]): AssignmentStore {
@@ -40,6 +46,25 @@ export function buildAssignmentStoreFromShifts(shifts: LiveRosterShiftRow[]): As
 function shiftTypesForOverrideRow(shiftType: LiveRosterOverrideRow['shift_type']): ShiftType[] {
   if (shiftType === 'both') return ['day', 'night']
   return [shiftType === 'night' ? 'night' : 'day']
+}
+
+function splitStaffByRosterKind(
+  staff: readonly ScheduleRosterStaff[],
+  rosterKind: RosterKind
+): ScheduleRosterStaff[] {
+  return staff.filter((member) => member.rosterKind === rosterKind)
+}
+
+export function splitStaffByRosterAndShift(
+  staff: readonly ScheduleRosterStaff[],
+  shiftType: ShiftType
+): { core: ScheduleRosterStaff[]; prn: ScheduleRosterStaff[] } {
+  const shiftStaff = staff.filter((member) => member.shiftType === shiftType)
+
+  return {
+    core: splitStaffByRosterKind(shiftStaff, 'core'),
+    prn: splitStaffByRosterKind(shiftStaff, 'prn'),
+  }
 }
 
 /** Maps therapist-submitted overrides to mock-roster approval cells; only for therapists in `submittedTherapistIds`. */

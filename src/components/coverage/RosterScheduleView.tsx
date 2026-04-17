@@ -26,10 +26,8 @@ type RosterScheduleViewProps = {
   canUpdateAssignmentStatus?: boolean
   selectedDayId?: string | null
   cellError?: { dayId: string; memberId: string; message: string } | null
-  onAssignCell?: (dayId: string, memberId: string, role: 'lead' | 'staff') => void
   onOpenEditor?: (dayId: string) => void
   onChangeStatus?: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
-  onUnassign?: (dayId: string, shiftId: string, isLead: boolean) => void
 }
 
 const STATUS_TOKEN_BY_UI_STATUS: Record<UiStatus, string> = {
@@ -137,10 +135,8 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
   selectedDayId,
   cellError,
   assignedMemberCounts,
-  onAssignCell,
   onOpenEditor,
   onChangeStatus,
-  onUnassign,
 }: {
   weekDates: string[]
   rows: RosterMemberRow[]
@@ -150,10 +146,8 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
   selectedDayId: string | null
   cellError: { dayId: string; memberId: string; message: string } | null
   assignedMemberCounts: Map<string, number>
-  onAssignCell?: (dayId: string, memberId: string, role: 'lead' | 'staff') => void
   onOpenEditor?: (dayId: string) => void
   onChangeStatus?: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
-  onUnassign?: (dayId: string, shiftId: string, isLead: boolean) => void
 }) {
   const weekGroups = chunkRosterWeeks(weekDates)
 
@@ -162,34 +156,29 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
     const cell = day ? getCellForMember(day, member.id) : null
     const intent = resolveRosterCellIntent(canManageCoverage, canUpdateAssignmentStatus, cell !== null)
     const token = statusToken(cell?.shift.status)
-    const defaultAssignRole: 'lead' | 'staff' =
-      member.role === 'lead' && day && !day.leadShift ? 'lead' : 'staff'
     const cellHasError = cellError?.dayId === date && cellError?.memberId === member.id
     const sharedClass = cn(
       'flex h-7.5 w-full cursor-pointer items-center justify-center rounded-md border text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors',
       token.length > 0
         ? 'border-border/60 bg-background text-foreground'
         : 'border-transparent bg-transparent text-transparent',
-      intent === 'quick_assign' &&
+      (intent === 'manage' || intent === 'quick_assign') &&
         !cellHasError &&
-        'border-dashed border-primary/35 bg-primary/[0.04] text-primary/80 hover:bg-primary/[0.08]',
+        'border-primary/25 bg-primary/[0.03] text-foreground hover:bg-primary/[0.08]',
       cell?.isLead && 'border-[var(--warning-border)]/65 bg-[var(--warning-subtle)]/35 text-[var(--warning-text)]',
       selectedDayId === date && 'bg-primary/10 ring-1 ring-primary/25',
       cellHasError && 'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]'
     )
 
-    if (intent === 'quick_assign') {
+    if (intent === 'manage' || intent === 'quick_assign') {
       const trigger = (
         <button
           type="button"
           onClick={() => {
-            if (onOpenEditor) {
-              onOpenEditor(date)
-              return
-            }
-            onAssignCell?.(date, member.id, defaultAssignRole)
+            onOpenEditor?.(date)
           }}
           className={sharedClass}
+          title={cell ? 'Open day editor' : 'Add from day editor'}
         >
           {token || '+'}
         </button>
@@ -217,38 +206,6 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
                 Open editor
               </button>
             ) : null}
-          </PopoverContent>
-        </Popover>
-      )
-    }
-
-    if (intent === 'manage' && day && cell) {
-      return (
-        <Popover>
-          <PopoverTrigger asChild>
-            <button type="button" className={cn(sharedClass, 'hover:bg-muted/55')}>
-              {token || '1'}
-            </button>
-          </PopoverTrigger>
-          <PopoverContent
-            side="top"
-            align="center"
-            className="w-44 rounded-xl border-border/70 p-1.5 shadow-sm"
-          >
-            <button
-              type="button"
-              className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-muted/50"
-              onClick={() => onUnassign?.(day.id, cell.shift.id, cell.isLead)}
-            >
-              Remove
-            </button>
-            <button
-              type="button"
-              className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-muted/50"
-              onClick={() => onOpenEditor?.(day.id)}
-            >
-              Open editor
-            </button>
           </PopoverContent>
         </Popover>
       )
@@ -364,10 +321,8 @@ const RosterSection = memo(function RosterSection({
   canUpdateAssignmentStatus,
   selectedDayId,
   cellError,
-  onAssignCell,
   onOpenEditor,
   onChangeStatus,
-  onUnassign,
 }: {
   label: string
   description: string
@@ -378,10 +333,8 @@ const RosterSection = memo(function RosterSection({
   canUpdateAssignmentStatus: boolean
   selectedDayId: string | null
   cellError: { dayId: string; memberId: string; message: string } | null
-  onAssignCell?: (dayId: string, memberId: string, role: 'lead' | 'staff') => void
   onOpenEditor?: (dayId: string) => void
   onChangeStatus?: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
-  onUnassign?: (dayId: string, shiftId: string, isLead: boolean) => void
 }) {
   const assignedMemberCounts = useMemo(
     () => buildAssignedMemberCounts(effectiveCycleDates, rows, dayMap),
@@ -409,10 +362,8 @@ const RosterSection = memo(function RosterSection({
         selectedDayId={selectedDayId}
         cellError={cellError}
         assignedMemberCounts={assignedMemberCounts}
-        onAssignCell={onAssignCell}
         onOpenEditor={onOpenEditor}
         onChangeStatus={onChangeStatus}
-        onUnassign={onUnassign}
       />
     </section>
   )
@@ -429,10 +380,8 @@ export const RosterScheduleView = memo(function RosterScheduleView({
   canUpdateAssignmentStatus = false,
   selectedDayId = null,
   cellError = null,
-  onAssignCell,
   onOpenEditor,
   onChangeStatus,
-  onUnassign,
 }: RosterScheduleViewProps) {
   const sections = buildRosterSections(members)
   const effectiveCycleDates =
@@ -442,7 +391,17 @@ export const RosterScheduleView = memo(function RosterScheduleView({
   const heading = title ?? `Respiratory Therapy ${shiftLabel} Shift`
 
   return (
-    <div className="space-y-4">
+    <div className="coverage-roster-scroll space-y-4 overflow-x-auto">
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-muted/15 px-3 py-2 text-[11px] text-muted-foreground">
+        <span className="font-semibold text-foreground">Roster matrix legend</span>
+        <span className="rounded border border-border/70 bg-background px-1.5 py-0.5 font-semibold text-foreground">+</span>
+        <span>Open day editor to add coverage</span>
+        <span className="rounded border border-border/70 bg-background px-1.5 py-0.5 font-semibold text-foreground">1</span>
+        <span>Scheduled</span>
+        <span className="rounded border border-border/70 bg-background px-1.5 py-0.5 font-semibold text-foreground">OC/LE/CX/CI</span>
+        <span>Operational status</span>
+      </div>
+
       {title || cycleLabel ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 bg-muted/12 px-3 py-2 text-xs">
           <span className="font-semibold text-foreground">{heading}</span>
@@ -460,10 +419,8 @@ export const RosterScheduleView = memo(function RosterScheduleView({
         canUpdateAssignmentStatus={canUpdateAssignmentStatus}
         selectedDayId={selectedDayId}
         cellError={cellError}
-        onAssignCell={onAssignCell}
         onOpenEditor={onOpenEditor}
         onChangeStatus={onChangeStatus}
-        onUnassign={onUnassign}
       />
 
       {sections.prnRows.length > 0 ? (
@@ -477,10 +434,8 @@ export const RosterScheduleView = memo(function RosterScheduleView({
           canUpdateAssignmentStatus={canUpdateAssignmentStatus}
           selectedDayId={selectedDayId}
           cellError={cellError}
-          onAssignCell={onAssignCell}
           onOpenEditor={onOpenEditor}
           onChangeStatus={onChangeStatus}
-          onUnassign={onUnassign}
         />
       ) : null}
     </div>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { nextIndex } from './CalendarGrid'
+import { getVisibleWeek, nextIndex, resolveSwipeDirection } from './CalendarGrid'
 
 describe('CalendarGrid keyboard navigation index', () => {
   it('moves right by 1', () => {
@@ -33,5 +33,25 @@ describe('CalendarGrid keyboard navigation index', () => {
 
   it('clamps ArrowUp at row 0', () => {
     expect(nextIndex(3, 'ArrowUp', 42)).toBe(0)
+  })
+})
+
+describe('CalendarGrid mobile week helpers', () => {
+  it('returns the requested visible week and clamps out-of-range offsets', () => {
+    const weeks = [
+      ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
+      ['h', 'i'],
+    ]
+
+    expect(getVisibleWeek(weeks, 0)).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'g'])
+    expect(getVisibleWeek(weeks, 1)).toEqual(['h', 'i'])
+    expect(getVisibleWeek(weeks, 99)).toEqual(['h', 'i'])
+  })
+
+  it('detects left and right swipe gestures with a 50px threshold', () => {
+    expect(resolveSwipeDirection(150, 80)).toBe('left')
+    expect(resolveSwipeDirection(80, 150)).toBe('right')
+    expect(resolveSwipeDirection(100, 70)).toBeNull()
+    expect(resolveSwipeDirection(null, 70)).toBeNull()
   })
 })
