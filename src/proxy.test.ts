@@ -17,6 +17,8 @@ describe('proxy public route allowlist', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/proxy.ts'), 'utf8')
 
     expect(source).not.toContain("'/schedule'")
-    expect(source).toContain("const STAFF_ROUTES = ['/staff', '/dashboard/staff', '/requests/new'] as const")
+    expect(source).toContain(
+      "const STAFF_ROUTES = ['/staff', '/dashboard/staff', '/requests/new'] as const"
+    )
   })
 })
