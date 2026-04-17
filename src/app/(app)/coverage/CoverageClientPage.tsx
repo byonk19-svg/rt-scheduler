@@ -69,9 +69,6 @@ import {
   shiftTabToQueryValue,
 } from '@/lib/coverage/coverage-shift-tab'
 
-const AutoDraftConfirmDialog = dynamic(() =>
-  import('@/components/coverage/AutoDraftConfirmDialog').then((module) => module.AutoDraftConfirmDialog)
-)
 const ClearDraftConfirmDialog = dynamic(() =>
   import('@/components/coverage/ClearDraftConfirmDialog').then((module) => module.ClearDraftConfirmDialog)
 )
@@ -1428,7 +1425,6 @@ export function CoverageClientPage({
                   cellError={rosterCellError}
                   onOpenEditor={handleRosterOpenEditor}
                   onChangeStatus={handleChangeStatus}
-                  onUnassign={handleUnassign}
                 />
               ) : (
                 <CalendarGrid

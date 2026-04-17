@@ -28,7 +28,6 @@ type RosterScheduleViewProps = {
   cellError?: { dayId: string; memberId: string; message: string } | null
   onOpenEditor?: (dayId: string) => void
   onChangeStatus?: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
-  onUnassign?: (dayId: string, shiftId: string, isLead: boolean) => void
 }
 
 const STATUS_TOKEN_BY_UI_STATUS: Record<UiStatus, string> = {
@@ -138,7 +137,6 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
   assignedMemberCounts,
   onOpenEditor,
   onChangeStatus,
-  onUnassign,
 }: {
   weekDates: string[]
   rows: RosterMemberRow[]
@@ -150,7 +148,6 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
   assignedMemberCounts: Map<string, number>
   onOpenEditor?: (dayId: string) => void
   onChangeStatus?: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
-  onUnassign?: (dayId: string, shiftId: string, isLead: boolean) => void
 }) {
   const weekGroups = chunkRosterWeeks(weekDates)
 
@@ -326,7 +323,6 @@ const RosterSection = memo(function RosterSection({
   cellError,
   onOpenEditor,
   onChangeStatus,
-  onUnassign,
 }: {
   label: string
   description: string
@@ -339,7 +335,6 @@ const RosterSection = memo(function RosterSection({
   cellError: { dayId: string; memberId: string; message: string } | null
   onOpenEditor?: (dayId: string) => void
   onChangeStatus?: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
-  onUnassign?: (dayId: string, shiftId: string, isLead: boolean) => void
 }) {
   const assignedMemberCounts = useMemo(
     () => buildAssignedMemberCounts(effectiveCycleDates, rows, dayMap),
@@ -369,7 +364,6 @@ const RosterSection = memo(function RosterSection({
         assignedMemberCounts={assignedMemberCounts}
         onOpenEditor={onOpenEditor}
         onChangeStatus={onChangeStatus}
-        onUnassign={onUnassign}
       />
     </section>
   )
@@ -388,7 +382,6 @@ export const RosterScheduleView = memo(function RosterScheduleView({
   cellError = null,
   onOpenEditor,
   onChangeStatus,
-  onUnassign,
 }: RosterScheduleViewProps) {
   const sections = buildRosterSections(members)
   const effectiveCycleDates =
@@ -428,7 +421,6 @@ export const RosterScheduleView = memo(function RosterScheduleView({
         cellError={cellError}
         onOpenEditor={onOpenEditor}
         onChangeStatus={onChangeStatus}
-        onUnassign={onUnassign}
       />
 
       {sections.prnRows.length > 0 ? (

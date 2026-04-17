@@ -64,9 +64,8 @@ export function PreFlightDialog({ open, onClose, cycleId, onConfirm }: Props) {
           | null
 
         if (!response.ok) {
-          throw new Error(
-            !Array.isArray(payload) && payload?.error ? payload.error : 'Could not load pre-flight report.'
-          )
+          const errPayload = payload as { error?: string } | null
+          throw new Error(errPayload?.error ?? 'Could not load pre-flight report.')
         }
 
         if (!active) return
