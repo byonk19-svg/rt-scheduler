@@ -69,16 +69,24 @@ import {
 } from '@/lib/coverage/coverage-shift-tab'
 
 const AutoDraftConfirmDialog = dynamic(() =>
-  import('@/components/coverage/AutoDraftConfirmDialog').then((module) => module.AutoDraftConfirmDialog)
+  import('@/components/coverage/AutoDraftConfirmDialog').then(
+    (module) => module.AutoDraftConfirmDialog ?? (() => null)
+  )
 )
 const ClearDraftConfirmDialog = dynamic(() =>
-  import('@/components/coverage/ClearDraftConfirmDialog').then((module) => module.ClearDraftConfirmDialog)
+  import('@/components/coverage/ClearDraftConfirmDialog').then(
+    (module) => module.ClearDraftConfirmDialog ?? (() => null)
+  )
 )
 const CycleManagementDialog = dynamic(() =>
-  import('@/components/coverage/CycleManagementDialog').then((module) => module.CycleManagementDialog)
+  import('@/components/coverage/CycleManagementDialog').then(
+    (module) => module.CycleManagementDialog ?? (() => null)
+  )
 )
 const ShiftEditorDialog = dynamic(() =>
-  import('@/components/coverage/ShiftEditorDialog').then((module) => module.ShiftEditorDialog)
+  import('@/components/coverage/ShiftEditorDialog').then(
+    (module) => module.ShiftEditorDialog ?? (() => null)
+  )
 )
 
 type DayStatus = DayItem['dayStatus']
