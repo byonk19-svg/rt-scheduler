@@ -17,6 +17,7 @@ import {
 } from '@/lib/availability-email-intake'
 import { shiftOverridesToCycle } from '@/lib/copy-cycle-availability'
 import { buildManagerOverrideInput } from '@/lib/employee-directory'
+import { resolveTherapistAvailabilityWritePermission } from '@/lib/therapist-availability-submission'
 import { createClient } from '@/lib/supabase/server'
 
 async function upsertTherapistSubmissionAfterOfficialSave(
@@ -33,8 +34,7 @@ async function upsertTherapistSubmissionAfterOfficialSave(
     .maybeSingle()
 
   if (loadError) {
-    console.error('Failed to load therapist availability submission:', loadError)
-    return
+    throw loadError
   }
 
   if (!existing) {
@@ -45,7 +45,20 @@ async function upsertTherapistSubmissionAfterOfficialSave(
       last_edited_at: now,
     })
     if (error) {
-      console.error('Failed to insert therapist availability submission:', error)
+      if (error.code === '23505') {
+        const { error: retryUpdateError } = await supabase
+          .from('therapist_availability_submissions')
+          .update({ last_edited_at: now })
+          .eq('therapist_id', therapistId)
+          .eq('schedule_cycle_id', cycleId)
+
+        if (!retryUpdateError) {
+          return
+        }
+        throw retryUpdateError
+      }
+
+      throw error
     }
     return
   }
@@ -57,7 +70,7 @@ async function upsertTherapistSubmissionAfterOfficialSave(
     .eq('schedule_cycle_id', cycleId)
 
   if (error) {
-    console.error('Failed to update therapist availability submission:', error)
+    throw error
   }
 }
 
@@ -92,6 +105,64 @@ function revalidateTherapistAvailabilitySurfaces() {
   revalidatePath('/availability')
   revalidatePath('/therapist/availability')
   revalidatePath('/dashboard/staff')
+}
+
+async function loadTherapistCycleWriteContext(
+  supabase: SupabaseClient,
+  therapistId: string,
+  cycleId: string,
+  returnPath: '/availability' | '/therapist/availability'
+) {
+  const { data: cycle, error: cycleError } = await supabase
+    .from('schedule_cycles')
+    .select('start_date, end_date, availability_due_at, archived_at')
+    .eq('id', cycleId)
+    .maybeSingle()
+
+  if (cycleError) {
+    console.error('Failed to load availability cycle for therapist write:', cycleError)
+    redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
+  }
+
+  if (!cycle || cycle.archived_at) {
+    redirect(buildAvailabilityUrl({ error: 'submission_closed', cycle: cycleId }, returnPath))
+  }
+
+  const { data: existingSubmission, error: submissionError } = await supabase
+    .from('therapist_availability_submissions')
+    .select('id')
+    .eq('therapist_id', therapistId)
+    .eq('schedule_cycle_id', cycleId)
+    .maybeSingle()
+
+  if (submissionError) {
+    console.error(
+      'Failed to load therapist availability submission state before write:',
+      submissionError
+    )
+    redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
+  }
+
+  const writePermission = resolveTherapistAvailabilityWritePermission(
+    {
+      start_date: cycle.start_date,
+      end_date: cycle.end_date,
+      availability_due_at: cycle.availability_due_at,
+    },
+    Boolean(existingSubmission)
+  )
+
+  if (!writePermission.allowed) {
+    redirect(buildAvailabilityUrl({ error: 'submission_closed', cycle: cycleId }, returnPath))
+  }
+
+  return {
+    cycle: {
+      start_date: cycle.start_date,
+      end_date: cycle.end_date,
+      availability_due_at: cycle.availability_due_at,
+    },
+  }
 }
 
 type AvailabilityOverrideType = 'force_off' | 'force_on'
@@ -239,6 +310,8 @@ export async function submitAvailabilityEntryAction(formData: FormData) {
     redirect(buildAvailabilityUrl({ error: 'submit_failed' }, returnPath))
   }
 
+  await loadTherapistCycleWriteContext(supabase, user.id, cycleId, returnPath)
+
   const { error } = await supabase.from('availability_overrides').upsert(
     {
       therapist_id: user.id,
@@ -258,7 +331,12 @@ export async function submitAvailabilityEntryAction(formData: FormData) {
     redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
   }
 
-  await upsertTherapistSubmissionAfterOfficialSave(supabase, user.id, cycleId)
+  try {
+    await upsertTherapistSubmissionAfterOfficialSave(supabase, user.id, cycleId)
+  } catch (error) {
+    console.error('Failed to persist official therapist availability submission:', error)
+    redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
+  }
 
   revalidateTherapistAvailabilitySurfaces()
   redirect(buildAvailabilityUrl({ success: 'entry_submitted', cycle: cycleId }, returnPath))
@@ -288,15 +366,7 @@ export async function submitTherapistAvailabilityGridAction(formData: FormData) 
     redirect(buildAvailabilityUrl({ error: 'submit_failed' }, returnPath))
   }
 
-  const { data: cycle } = await supabase
-    .from('schedule_cycles')
-    .select('start_date, end_date')
-    .eq('id', cycleId)
-    .maybeSingle()
-
-  if (!cycle) {
-    redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
-  }
+  const { cycle } = await loadTherapistCycleWriteContext(supabase, user.id, cycleId, returnPath)
 
   const isValidCycleDate = (date: string) => date >= cycle.start_date && date <= cycle.end_date
 
@@ -384,7 +454,12 @@ export async function submitTherapistAvailabilityGridAction(formData: FormData) 
   }
 
   if (workflow === 'submit') {
-    await upsertTherapistSubmissionAfterOfficialSave(supabase, user.id, cycleId)
+    try {
+      await upsertTherapistSubmissionAfterOfficialSave(supabase, user.id, cycleId)
+    } catch (error) {
+      console.error('Failed to persist official therapist availability submission:', error)
+      redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
+    }
   }
 
   revalidateTherapistAvailabilitySurfaces()
@@ -400,6 +475,10 @@ export async function deleteAvailabilityEntryAction(formData: FormData) {
   const cycleId = String(formData.get('cycle_id') ?? '').trim()
   if (!entryId) {
     redirect(returnPath)
+  }
+
+  if (cycleId) {
+    await loadTherapistCycleWriteContext(supabase, user.id, cycleId, returnPath)
   }
 
   const { error } = await supabase

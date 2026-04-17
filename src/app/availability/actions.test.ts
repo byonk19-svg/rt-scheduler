@@ -35,6 +35,10 @@ type TestContext = {
   userId?: string | null
   role?: string | null
   therapistSubmissionExists?: boolean
+  cycleRow?: Record<string, unknown> | null
+  submissionLoadError?: boolean
+  submissionInsertError?: boolean
+  submissionUpdateError?: boolean
 }
 
 function createSupabaseMock(context: TestContext = {}) {
@@ -118,11 +122,17 @@ function createSupabaseMock(context: TestContext = {}) {
           return Promise.resolve({ error: null })
         },
         insert(payload: Record<string, unknown> | Array<Record<string, unknown>>) {
+          if (table === 'therapist_availability_submissions' && context.submissionInsertError) {
+            return Promise.resolve({ error: { message: 'submission insert failed' } })
+          }
           state.inserts.push({ table, payload })
           return Promise.resolve({ error: null })
         },
         update(payload: Record<string, unknown>) {
           const commitUpdate = () => {
+            if (table === 'therapist_availability_submissions' && context.submissionUpdateError) {
+              return Promise.resolve({ error: { message: 'submission update failed' } })
+            }
             state.updates.push({
               table,
               payload,
@@ -152,16 +162,25 @@ function createSupabaseMock(context: TestContext = {}) {
           }
           if (table === 'schedule_cycles') {
             return {
-              data: {
-                id: 'cycle-1',
-                label: 'Block 1',
-                start_date: '2026-03-22',
-                end_date: '2026-05-02',
-              },
+              data:
+                context.cycleRow === null
+                  ? null
+                  : {
+                      id: 'cycle-1',
+                      label: 'Block 1',
+                      start_date: '2026-03-22',
+                      end_date: '2026-05-02',
+                      archived_at: null,
+                      availability_due_at: '2026-04-30T23:59:59.000Z',
+                      ...(context.cycleRow ?? {}),
+                    },
               error: null,
             }
           }
           if (table === 'therapist_availability_submissions' && selected.includes('submitted_at')) {
+            if (context.submissionLoadError) {
+              return { data: null, error: { message: 'submission load failed' } }
+            }
             return {
               data: context.therapistSubmissionExists
                 ? { submitted_at: '2026-04-01T12:00:00.000Z' }
@@ -268,6 +287,7 @@ function makeTherapistGridFormData() {
 describe('availability actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.useRealTimers()
   })
 
   it('lets a therapist save their own availability request', async () => {
@@ -420,6 +440,57 @@ describe('availability actions', () => {
     expect(supabase.state.updates).toHaveLength(0)
   })
 
+  it('blocks a first-time therapist draft after the availability deadline has passed', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-21T12:00:00.000Z'))
+
+    const supabase = createSupabaseMock({
+      userId: 'therapist-1',
+      role: 'therapist',
+      cycleRow: {
+        availability_due_at: '2026-03-20T18:00:00.000Z',
+      },
+    })
+    createClientMock.mockResolvedValue(supabase)
+    const formData = makeTherapistGridFormData()
+    formData.set('workflow', 'draft')
+
+    await expect(submitTherapistAvailabilityGridAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?error=submission_closed&cycle=cycle-1'
+    )
+
+    expect(supabase.state.upsertPayloads).toHaveLength(0)
+    expect(supabase.state.inserts).toHaveLength(0)
+  })
+
+  it('allows post-submit edits after the initial deadline while the cycle is still open', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-21T12:00:00.000Z'))
+
+    const supabase = createSupabaseMock({
+      userId: 'therapist-1',
+      role: 'therapist',
+      therapistSubmissionExists: true,
+      cycleRow: {
+        availability_due_at: '2026-03-20T18:00:00.000Z',
+      },
+    })
+    createClientMock.mockResolvedValue(supabase)
+
+    await expect(
+      submitTherapistAvailabilityGridAction(makeTherapistGridFormData())
+    ).rejects.toThrow('REDIRECT:/availability?success=entry_submitted&cycle=cycle-1')
+
+    expect(supabase.state.upsertPayloads).toHaveLength(1)
+    expect(supabase.state.updates).toEqual([
+      {
+        table: 'therapist_availability_submissions',
+        payload: expect.objectContaining({ last_edited_at: expect.any(String) }),
+        filters: { therapist_id: 'therapist-1', schedule_cycle_id: 'cycle-1' },
+      },
+    ])
+  })
+
   it('updates last_edited_at when resubmitting an existing official submission', async () => {
     const supabase = createSupabaseMock({
       userId: 'therapist-1',
@@ -440,6 +511,21 @@ describe('availability actions', () => {
         filters: { therapist_id: 'therapist-1', schedule_cycle_id: 'cycle-1' },
       },
     ])
+  })
+
+  it('does not report submission success when the official submission row cannot be written', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'therapist-1',
+      role: 'therapist',
+      submissionInsertError: true,
+    })
+    createClientMock.mockResolvedValue(supabase)
+
+    await expect(
+      submitTherapistAvailabilityGridAction(makeTherapistGridFormData())
+    ).rejects.toThrow('REDIRECT:/availability?error=submit_failed&cycle=cycle-1')
+
+    expect(supabase.state.upsertPayloads).toHaveLength(1)
   })
 
   it('lets a manager delete a manager-entered planner row', async () => {

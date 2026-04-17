@@ -15,6 +15,7 @@ export type TherapistAvailabilitySubmissionRow = {
 
 export type TherapistAvailabilityCycleDeadlineInput = {
   start_date: string
+  end_date?: string
   availability_due_at?: string | null
 }
 
@@ -76,6 +77,68 @@ function endOfLocalDay(dateKey: string): Date {
   return d
 }
 
+function resolveAvailabilityDeadline(cycle: TherapistAvailabilityCycleDeadlineInput): {
+  deadlineDateKey: string
+  deadlineInstant: Date
+} {
+  if (cycle.availability_due_at) {
+    const raw = cycle.availability_due_at
+    const parsed = new Date(raw)
+    if (!Number.isNaN(parsed.getTime())) {
+      return {
+        deadlineDateKey: localDateKey(parsed),
+        deadlineInstant: parsed,
+      }
+    }
+
+    const fallbackKey =
+      raw.length >= 10 ? raw.slice(0, 10) : toIsoDate(addDays(dateFromKey(cycle.start_date), -1))
+    const deadlineDateKey =
+      fallbackKey.length === 10 ? fallbackKey : toIsoDate(dateFromKey(cycle.start_date))
+    return {
+      deadlineDateKey,
+      deadlineInstant: endOfLocalDay(deadlineDateKey),
+    }
+  }
+
+  const deadlineDateKey = toIsoDate(addDays(dateFromKey(cycle.start_date), -1))
+  return {
+    deadlineDateKey,
+    deadlineInstant: endOfLocalDay(deadlineDateKey),
+  }
+}
+
+export type TherapistAvailabilityWritePermission =
+  | { allowed: true; reason: 'ok' }
+  | { allowed: false; reason: 'deadline_passed' | 'cycle_ended' }
+
+export function resolveTherapistAvailabilityWritePermission(
+  cycle: Pick<
+    TherapistAvailabilityCycleDeadlineInput,
+    'start_date' | 'end_date' | 'availability_due_at'
+  >,
+  hasOfficialSubmission: boolean,
+  now?: Date
+): TherapistAvailabilityWritePermission {
+  const clock = now ?? new Date()
+  const todayKey = localDateKey(clock)
+
+  if (cycle.end_date && todayKey > cycle.end_date) {
+    return { allowed: false, reason: 'cycle_ended' }
+  }
+
+  if (hasOfficialSubmission) {
+    return { allowed: true, reason: 'ok' }
+  }
+
+  const { deadlineInstant } = resolveAvailabilityDeadline(cycle)
+  if (clock.getTime() > deadlineInstant.getTime()) {
+    return { allowed: false, reason: 'deadline_passed' }
+  }
+
+  return { allowed: true, reason: 'ok' }
+}
+
 export type TherapistDeadlineEmphasis = 'neutral' | 'urgent' | 'past' | 'submitted'
 
 export type TherapistDeadlinePresentation = {
@@ -93,27 +156,7 @@ function resolveNotSubmittedHeadline(
   now: Date
 ): { headline: string; emphasis: TherapistDeadlineEmphasis } {
   const todayKey = localDateKey(now)
-
-  let deadlineDateKey: string
-  let deadlineInstant: Date
-
-  if (cycle.availability_due_at) {
-    const raw = cycle.availability_due_at
-    const parsed = new Date(raw)
-    if (!Number.isNaN(parsed.getTime())) {
-      deadlineInstant = parsed
-      deadlineDateKey = localDateKey(parsed)
-    } else {
-      const fallbackKey =
-        raw.length >= 10 ? raw.slice(0, 10) : toIsoDate(addDays(dateFromKey(cycle.start_date), -1))
-      deadlineDateKey =
-        fallbackKey.length === 10 ? fallbackKey : toIsoDate(dateFromKey(cycle.start_date))
-      deadlineInstant = endOfLocalDay(deadlineDateKey)
-    }
-  } else {
-    deadlineDateKey = toIsoDate(addDays(dateFromKey(cycle.start_date), -1))
-    deadlineInstant = endOfLocalDay(deadlineDateKey)
-  }
+  const { deadlineDateKey, deadlineInstant } = resolveAvailabilityDeadline(cycle)
 
   const isPast = now.getTime() > deadlineInstant.getTime()
 
@@ -147,15 +190,7 @@ export function resolveTherapistDeadlinePresentation(
 ): TherapistDeadlinePresentation {
   const clock = now ?? new Date()
 
-  let deadlineDateKeyForContext: string
-  if (cycle.availability_due_at) {
-    const parsed = new Date(cycle.availability_due_at)
-    deadlineDateKeyForContext = Number.isNaN(parsed.getTime())
-      ? toIsoDate(addDays(dateFromKey(cycle.start_date), -1))
-      : localDateKey(parsed)
-  } else {
-    deadlineDateKeyForContext = toIsoDate(addDays(dateFromKey(cycle.start_date), -1))
-  }
+  const { deadlineDateKey: deadlineDateKeyForContext } = resolveAvailabilityDeadline(cycle)
 
   if (!submission.isSubmitted) {
     const { headline, emphasis } = resolveNotSubmittedHeadline(cycle, clock)
