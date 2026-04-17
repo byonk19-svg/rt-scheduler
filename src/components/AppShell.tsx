@@ -1,5 +1,6 @@
 'use client'
 
+import ThemeProvider from '@/components/ThemeProvider'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ArrowLeftRight, CalendarDays, ChevronDown, LogOut, Menu, Settings, X } from 'lucide-react'
@@ -206,6 +207,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
   const isCoveragePage = pathname === '/coverage'
 
   return (
+    <ThemeProvider>
     <div className="min-h-screen bg-background">
       <a
         href="#main-content"
@@ -461,5 +463,6 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
         </div>
       ) : null}
     </div>
+    </ThemeProvider>
   )
 }

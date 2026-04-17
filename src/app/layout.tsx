@@ -1,17 +1,8 @@
 import type { Metadata } from 'next'
 import { DM_Sans, Geist_Mono } from 'next/font/google'
 import { cookies } from 'next/headers'
-import dynamic from 'next/dynamic'
 import { getServerThemeClass, THEME_KEY } from '@/lib/theme'
-import type { ReactNode } from 'react'
 import './globals.css'
-
-const ThemeProvider = dynamic(
-  () =>
-    import('@/components/ThemeProvider').then(
-      (m) => m.default ?? (({ children }: { children: ReactNode }) => <>{children}</>)
-    )
-)
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -44,9 +35,7 @@ export default async function RootLayout({
       suppressHydrationWarning
       className={[dmSans.variable, geistMono.variable, themeClass].filter(Boolean).join(' ')}
     >
-      <body className={`${dmSans.className} antialiased`}>
-        <ThemeProvider>{children}</ThemeProvider>
-      </body>
+      <body className={`${dmSans.className} antialiased`}>{children}</body>
     </html>
   )
 }
