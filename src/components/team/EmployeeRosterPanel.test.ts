@@ -38,6 +38,7 @@ describe('EmployeeRosterPanel', () => {
             is_lead_eligible: false,
             matched_profile_id: null,
             matched_at: null,
+            matched_email: null,
             phone_number: null,
           },
         ],

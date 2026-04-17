@@ -35,6 +35,13 @@ function formatDetailDate(date: string) {
   return parsed.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
+function getPayloadError(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null
+  if (!('error' in payload)) return null
+  const error = (payload as { error?: unknown }).error
+  return typeof error === 'string' && error.length > 0 ? error : null
+}
+
 export function PreFlightDialog({ open, onClose, cycleId, onConfirm }: Props) {
   const [step, setStep] = useState<Step>('loading')
   const [result, setResult] = useState<PreFlightResult | null>(null)
@@ -64,8 +71,12 @@ export function PreFlightDialog({ open, onClose, cycleId, onConfirm }: Props) {
           | null
 
         if (!response.ok) {
-          const errPayload = payload as { error?: string } | null
-          throw new Error(errPayload?.error ?? 'Could not load pre-flight report.')
+          const errorMessage = getPayloadError(payload) ?? 'Could not load pre-flight report.'
+          throw new Error(
+            typeof errorMessage === 'string' && errorMessage.length > 0
+              ? errorMessage
+              : 'Could not load pre-flight report.'
+          )
         }
 
         if (!active) return
