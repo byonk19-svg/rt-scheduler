@@ -91,7 +91,7 @@ Updated: 2026-04-14 (session 63)
 - **OCR code review** (`src/lib/openai-ocr.ts`, `src/lib/pdf-render-pages.ts`):
   - Identified two correctness bugs — not yet fixed, plan written and ready to give to Cursor:
     1. **Dead zone definitions:** `ZONE_ORDER` and `ZONE_PROMPTS` reference `header_block`, `request_top`, `request_mid`, `request_bottom` but `createOcrImageVariants` in `pdf-render-pages.ts` only generates `full_page`, `employee_name`, `request_table` variants. Those four zones are never populated. Fix: trim `ZONE_ORDER` to `['employee_name', 'request_table']`, remove dead entries from `ZONE_PROMPTS`, simplify merge assembly in `extractTextFromImageVariants`.
-    2. **"Employee Name:" prefix mislabeling bug** (`extractTextFromPdfViaRenderedPages` line ~532): uses index-based labeling (`.map((text, index) => index === 0 ? Employee Name: ...`)`) instead of zone-label-based. If `employee_name` zone produces no text, `request_table` text gets mislabeled as an employee name. Fix: preserve zone labels through the filter chain and check `zoneLabel === 'employee_name'` explicitly.
+    2. **"Employee Name:" prefix mislabeling bug** (`extractTextFromPdfViaRenderedPages` line ~532): uses index-based labeling (`.map((text, index) => index === 0 ? Employee Name: ...`)`) instead of zone-label-based. If `employee_name`zone produces no text,`request_table`text gets mislabeled as an employee name. Fix: preserve zone labels through the filter chain and check`zoneLabel === 'employee_name'` explicitly.
 
 - **`/availability` Planner | Email Intake tab split** (`src/app/availability/page.tsx`, `src/components/availability/EmailIntakePanel.tsx`):
   - Manager availability page now splits into two URL-driven tabs: `?tab=planner` (default) and `?tab=intake`.
