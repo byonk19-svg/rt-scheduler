@@ -64,8 +64,9 @@ export function extractAvailabilityEmployeeName(rawText: string): string | null 
     .filter(Boolean)
 
   for (const line of lines) {
-    const explicitMatch = line.match(
-      /\b(?:employee\s+name|name)\b[:\s-]*([A-Za-z][A-Za-z.' -]{1,80})$/i
+    const explicitSource = line.split(/\s{2,}(?=[A-Z][A-Za-z0-9 #]+:)/)[0] ?? line
+    const explicitMatch = explicitSource.match(
+      /\b(?:employee\s+name|name)\b[:\s-]*([A-Za-z][A-Za-z.'-]*(?:\s+[A-Za-z][A-Za-z.'-]*){0,3})\b/i
     )
     if (explicitMatch) {
       const extracted = sanitizeExtractedName(explicitMatch[1] ?? '')

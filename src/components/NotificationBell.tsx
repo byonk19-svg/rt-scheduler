@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Bell } from 'lucide-react'
 
-import { createClient } from '@/lib/supabase/client'
 import { Skeleton } from '@/components/ui/skeleton'
 
 type NotificationItem = {
@@ -20,6 +19,7 @@ type NotificationItem = {
 
 type NotificationBellProps = {
   variant?: 'default' | 'staff' | 'shell'
+  initialUnreadCount?: number
 }
 
 function timeAgo(iso: string): string {
@@ -44,20 +44,26 @@ function getNotificationHref(item: NotificationItem): string | null {
   return null
 }
 
-export function NotificationBell({ variant = 'default' }: NotificationBellProps) {
+export function NotificationBell({
+  variant = 'default',
+  initialUnreadCount = 0,
+}: NotificationBellProps) {
   const router = useRouter()
-  const supabase = useMemo(() => createClient(), [])
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const [open, setOpen] = useState(false)
   const [dropdownSide, setDropdownSide] = useState<'left' | 'right'>('right')
-  const [loading, setLoading] = useState(true)
-  const [unreadCount, setUnreadCount] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(initialUnreadCount)
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [hasLoaded, setHasLoaded] = useState(false)
 
   const loadNotifications = useCallback(async () => {
+    setLoading(true)
     const response = await fetch('/api/notifications', { cache: 'no-store' })
-    if (!response.ok) return
+    if (!response.ok) {
+      setLoading(false)
+      return
+    }
     const data = (await response.json()) as {
       unreadCount: number
       notifications: NotificationItem[]
@@ -65,49 +71,12 @@ export function NotificationBell({ variant = 'default' }: NotificationBellProps)
     setUnreadCount(data.unreadCount)
     setNotifications(data.notifications)
     setLoading(false)
+    setHasLoaded(true)
   }, [])
 
   useEffect(() => {
-    let active = true
-    async function loadUserAndNotifications() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!active) return
-      setCurrentUserId(user?.id ?? null)
-      void loadNotifications()
-    }
-
-    void loadUserAndNotifications()
-
-    return () => {
-      active = false
-    }
-  }, [loadNotifications, supabase])
-
-  useEffect(() => {
-    if (!currentUserId) return
-
-    const channel = supabase
-      .channel(`notifications_${currentUserId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${currentUserId}`,
-        },
-        () => {
-          void loadNotifications()
-        }
-      )
-      .subscribe()
-
-    return () => {
-      void supabase.removeChannel(channel)
-    }
-  }, [currentUserId, loadNotifications, supabase])
+    setUnreadCount(initialUnreadCount)
+  }, [initialUnreadCount])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -204,7 +173,7 @@ export function NotificationBell({ variant = 'default' }: NotificationBellProps)
         onClick={() => {
           const nextOpen = !open
           setOpen(nextOpen)
-          if (nextOpen) {
+          if (nextOpen && !hasLoaded) {
             void loadNotifications()
             if (typeof window !== 'undefined') {
               window.requestAnimationFrame(() => {
@@ -213,9 +182,9 @@ export function NotificationBell({ variant = 'default' }: NotificationBellProps)
             }
           }
         }}
-        className={`relative inline-flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-md border ${
+        className={`relative inline-flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-md border transition-[box-shadow,background-color,border-color] duration-150 ${
           isShellVariant
-            ? 'border-sidebar-border bg-sidebar-accent/35 text-sidebar-foreground hover:bg-sidebar-accent'
+            ? 'border-sidebar-border/90 bg-sidebar-accent/55 text-sidebar-primary shadow-tw-2xs hover:border-sidebar-ring/40 hover:bg-sidebar-accent hover:shadow-tw-shell-control-hover'
             : `border-border bg-card text-foreground ${isStaffVariant ? '' : 'hover:bg-secondary'}`
         }`}
         aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}

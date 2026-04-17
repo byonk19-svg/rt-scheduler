@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 
+import { PageIntro } from '@/components/shell/PageIntro'
 import { cn } from '@/lib/utils'
 
 type PageHeaderProps = {
@@ -27,7 +28,7 @@ export function PageHeader({ title, subtitle, badge, actions, className }: PageH
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-2xl border border-border/90 px-6 py-5',
+        'relative overflow-hidden rounded-2xl border border-border/90 px-5 py-4',
         'bg-[color-mix(in_oklch,var(--card)_92%,var(--secondary))]',
         'shadow-tw-header',
         className
@@ -50,16 +51,15 @@ export function PageHeader({ title, subtitle, badge, actions, className }: PageH
         aria-hidden="true"
       />
 
-      <div className="relative flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <h1 className="app-page-title">{title}</h1>
-          {subtitle && (
-            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{subtitle}</p>
-          )}
-          {badge && <div className="mt-3 flex flex-wrap items-center gap-2">{badge}</div>}
-        </div>
-        {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
-      </div>
+      <PageIntro
+        title={title}
+        subtitle={subtitle}
+        summary={
+          badge ? <div className="flex flex-wrap items-center gap-2">{badge}</div> : undefined
+        }
+        actions={actions}
+        className="relative"
+      />
     </div>
   )
 }

@@ -139,20 +139,19 @@ test.describe.serial('/availability manager planner', () => {
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}`, {
-      waitUntil: 'domcontentloaded',
+      waitUntil: 'networkidle',
     })
 
     const planner = page.locator('#staff-scheduling-inputs')
-    await expect(page.getByRole('heading', { name: 'Plan staffing' }).first()).toBeVisible({
+    await expect(page.getByRole('heading', { name: 'Planner controls' }).first()).toBeVisible({
       timeout: 20_000,
     })
     const calendarDay = (root: Locator, isoDate: string) =>
       root.getByRole('button', { name: formatCalendarLabel(isoDate) })
 
-    await planner.locator('#planner_therapist_id').selectOption(ctx!.therapist.id)
     await calendarDay(planner, ctx!.therapistWillWorkDate).click()
     await calendarDay(planner, ctx!.therapistCannotWorkDate).click()
-    await planner.getByRole('button', { name: 'Save Will work' }).click()
+    await planner.getByRole('button', { name: 'Save 2 will-work dates' }).click()
 
     await expect
       .poll(
@@ -173,12 +172,16 @@ test.describe.serial('/availability manager planner', () => {
       )
       .toBe([ctx!.therapistWillWorkDate, ctx!.therapistCannotWorkDate].sort().join(','))
 
-    await page.goto(`/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}`)
+    await page.goto(`/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}`, {
+      waitUntil: 'networkidle',
+    })
     const refreshedPlanner = page.locator('#staff-scheduling-inputs')
     await refreshedPlanner.getByRole('button', { name: /^Cannot work$/ }).click()
-    await expect(refreshedPlanner.getByRole('button', { name: 'Save Cannot work' })).toBeVisible()
+    await expect(
+      refreshedPlanner.getByRole('button', { name: 'Save 1 blocked date' })
+    ).toBeVisible()
     await calendarDay(refreshedPlanner, ctx!.therapistCannotWorkDate).click()
-    await refreshedPlanner.getByRole('button', { name: 'Save Cannot work' }).click()
+    await refreshedPlanner.getByRole('button', { name: 'Save 1 blocked date' }).click()
 
     await expect
       .poll(
@@ -197,11 +200,12 @@ test.describe.serial('/availability manager planner', () => {
       )
       .toBe(1)
 
-    await page.goto(`/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.prnTherapist.id}`)
+    await page.goto(`/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.prnTherapist.id}`, {
+      waitUntil: 'networkidle',
+    })
     const prnPlanner = page.locator('#staff-scheduling-inputs')
-    await prnPlanner.locator('#planner_therapist_id').selectOption(ctx!.prnTherapist.id)
     await calendarDay(prnPlanner, ctx!.prnWillWorkDate).click()
-    await prnPlanner.getByRole('button', { name: 'Save Will work' }).click()
+    await prnPlanner.getByRole('button', { name: 'Save 1 will-work date' }).click()
 
     await expect
       .poll(

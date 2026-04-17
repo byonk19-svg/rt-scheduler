@@ -1,16 +1,20 @@
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
 
 import {
-  parseAvailabilityEmailItem,
+  parseAvailabilityEmailBatchSources,
   parseSender,
-  stripHtmlToText,
   summarizeAvailabilityEmailBatch,
-  type ParsedAvailabilityEmailItem,
+  stripHtmlToText,
+  type AvailabilityEmailBatchStatus,
   type IntakeCycle,
+  type AvailabilityEmailAttachmentSource,
+  type ParsedAvailabilityEmailItem,
 } from '@/lib/availability-email-intake'
 import { extractTextFromAttachment } from '@/lib/openai-ocr'
 import { isValidResendWebhookRequest } from '@/lib/security/resend-webhook'
 import { createAdminClient } from '@/lib/supabase/admin'
+
+export const maxDuration = 60
 
 const RESEND_RECEIVING_API_URL = 'https://api.resend.com/emails/receiving'
 const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024
@@ -46,11 +50,13 @@ type ResendAttachmentRecord = {
   ocr_status: 'not_run' | 'completed' | 'failed' | 'skipped'
   ocr_text: string | null
   ocr_model: string | null
+  ocr_error: string | null
 }
 
 type MatchableProfile = {
   id: string
   full_name: string
+  email?: string | null
   is_active?: boolean | null
 }
 
@@ -164,62 +170,15 @@ function resolveSender(rawFrom: ResendEmailContent['from']): {
   return { email, name }
 }
 
-function flattenBatchRequests(items: ParsedAvailabilityEmailItem[]) {
-  return items.flatMap((item) => item.requests)
-}
-
-function getBatchStatus(
-  items: ParsedAvailabilityEmailItem[]
-): 'parsed' | 'needs_review' | 'failed' | 'applied' {
-  if (items.length === 0) return 'failed'
-  if (items.some((item) => item.parseStatus === 'needs_review' || item.parseStatus === 'failed')) {
-    return 'needs_review'
-  }
-  if (items.every((item) => item.parseStatus === 'auto_applied')) {
-    return 'applied'
-  }
-  return 'parsed'
-}
-
-function buildSourceCandidates(params: {
-  normalizedBodyText: string
-  attachments: ResendAttachmentRecord[]
-}): Array<{
-  sourceType: 'body' | 'attachment'
-  sourceLabel: string
-  rawText: string
-  attachment: ResendAttachmentRecord | null
-}> {
-  const candidates: Array<{
-    sourceType: 'body' | 'attachment'
-    sourceLabel: string
-    rawText: string
-    attachment: ResendAttachmentRecord | null
-  }> = []
-
-  if (params.normalizedBodyText.trim().length > 0) {
-    candidates.push({
-      sourceType: 'body',
-      sourceLabel: 'Email body',
-      rawText: params.normalizedBodyText,
-      attachment: null,
-    })
-  }
-
-  for (const attachment of params.attachments) {
-    candidates.push({
-      sourceType: 'attachment',
-      sourceLabel: attachment.filename,
-      rawText: attachment.ocr_text ?? '',
-      attachment,
-    })
-  }
-
-  return candidates
+function normalizeEmail(value: string | null | undefined): string | null {
+  if (!value) return null
+  const normalized = value.trim().toLowerCase()
+  return normalized.length > 0 ? normalized : null
 }
 
 function buildItemParseStatus(
-  item: ParsedAvailabilityEmailItem
+  item: ParsedAvailabilityEmailItem,
+  senderTrustedForMatchedTherapist: boolean
 ): ParsedAvailabilityEmailItem['parseStatus'] {
   if (
     item.confidenceLevel === 'high' &&
@@ -227,10 +186,314 @@ function buildItemParseStatus(
     item.matchedCycleId &&
     item.requests.length > 0
   ) {
-    return 'auto_applied'
+    return senderTrustedForMatchedTherapist ? 'auto_applied' : 'needs_review'
   }
 
   return item.parseStatus
+}
+
+function isTrustedSenderForMatchedTherapist(params: {
+  senderEmail: string | null
+  matchedTherapistId: string | null
+  therapistEmailById: Map<string, string | null>
+}): boolean {
+  if (!params.senderEmail || !params.matchedTherapistId) return false
+  return params.therapistEmailById.get(params.matchedTherapistId) === params.senderEmail
+}
+
+function flattenBatchRequests(items: Array<{ requests: Array<Record<string, unknown>> }>) {
+  return items.flatMap((item) => item.requests)
+}
+
+function inferAttachmentContentType(params: { filename: string; contentType: string }): string {
+  const normalized = params.contentType.toLowerCase()
+  if (normalized !== 'application/octet-stream' && normalized !== 'binary/octet-stream') {
+    return params.contentType
+  }
+  const lowerName = params.filename.toLowerCase()
+  if (lowerName.endsWith('.pdf')) return 'application/pdf'
+  return params.contentType
+}
+
+async function processInboundAvailabilityEmail(emailId: string) {
+  const admin = createAdminClient()
+  const [emailContent, attachmentRecords] = await Promise.all([
+    fetchReceivedEmail(emailId),
+    listReceivedEmailAttachments(emailId),
+  ])
+  const sender = resolveSender(emailContent.from)
+
+  const { data: activeProfiles } = await admin
+    .from('profiles')
+    .select('id, full_name, is_active')
+    .in('role', ['therapist', 'lead'])
+    .eq('is_active', true)
+    .is('archived_at', null)
+    .order('full_name', { ascending: true })
+
+  const todayKey = new Date().toISOString().slice(0, 10)
+  const { data: cycleRows } = await admin
+    .from('schedule_cycles')
+    .select('id, label, start_date, end_date')
+    .is('archived_at', null)
+    .gte('end_date', todayKey)
+    .order('start_date', { ascending: true })
+
+  const cycles = ((cycleRows ?? []) as IntakeCycle[]).filter(
+    (cycle) => cycle.start_date && cycle.end_date
+  )
+  const therapistEmailById = new Map(
+    (((activeProfiles ?? []) as MatchableProfile[]) ?? []).map((profile) => [
+      profile.id,
+      normalizeEmail(profile.email ?? null),
+    ])
+  )
+  const processedAttachments: ResendAttachmentRecord[] = []
+
+  for (const [index, attachment] of attachmentRecords.entries()) {
+    const attachmentId =
+      typeof attachment.id === 'string' ? attachment.id.trim() : `generated-${emailId}-${index + 1}`
+    const filename =
+      typeof attachment.filename === 'string'
+        ? attachment.filename.trim()
+        : typeof attachment.name === 'string'
+          ? String(attachment.name).trim()
+          : 'attachment'
+    const rawContentType =
+      typeof attachment.content_type === 'string'
+        ? attachment.content_type
+        : typeof attachment.type === 'string'
+          ? attachment.type
+          : 'application/octet-stream'
+    const contentType = inferAttachmentContentType({
+      filename,
+      contentType: rawContentType,
+    })
+    const downloadUrl =
+      typeof attachment.url === 'string'
+        ? attachment.url
+        : typeof attachment.download_url === 'string'
+          ? attachment.download_url
+          : null
+
+    const downloaded = downloadUrl
+      ? await downloadAttachment(downloadUrl)
+      : {
+          contentBase64: null,
+          status: 'failed' as const,
+          error: 'Attachment download URL missing.',
+          sizeBytes: null,
+        }
+
+    const attachmentRow: ResendAttachmentRecord = {
+      id: attachmentId,
+      filename,
+      content_type: contentType,
+      content_disposition:
+        typeof attachment.content_disposition === 'string' ? attachment.content_disposition : null,
+      size_bytes:
+        typeof attachment.size === 'number'
+          ? attachment.size
+          : typeof attachment.size_bytes === 'number'
+            ? attachment.size_bytes
+            : downloaded.sizeBytes,
+      content_base64: downloaded.contentBase64,
+      download_status: downloaded.status,
+      download_error: downloaded.error,
+      ocr_status: 'not_run',
+      ocr_text: null,
+      ocr_model: null,
+      ocr_error: null,
+    }
+    const ocrResult = await extractTextFromAttachment({
+      contentBase64: attachmentRow.content_base64,
+      contentType: attachmentRow.content_type,
+      filename: attachmentRow.filename,
+    })
+    attachmentRow.ocr_status = ocrResult.status
+    attachmentRow.ocr_text = ocrResult.text
+    attachmentRow.ocr_model = ocrResult.model
+    attachmentRow.ocr_error = ocrResult.error
+
+    processedAttachments.push(attachmentRow)
+  }
+
+  const attachmentSources: AvailabilityEmailAttachmentSource[] = processedAttachments.map(
+    (attachment) => ({
+      id: attachment.id,
+      filename: attachment.filename,
+      rawText: attachment.ocr_text,
+      ocrStatus: attachment.ocr_status,
+      ocrModel: attachment.ocr_model,
+      ocrError: attachment.ocr_error ?? attachment.download_error,
+    })
+  )
+
+  const parsedBatch = parseAvailabilityEmailBatchSources({
+    normalizedBodyText: normalizeEmailText(emailContent),
+    attachments: attachmentSources,
+    cycles,
+    profiles: ((activeProfiles ?? []) as MatchableProfile[]) ?? [],
+    autoApplyHighConfidence: true,
+  })
+  const parsedItems = parsedBatch.items.map((parsedItem) => {
+    const senderTrustedForMatchedTherapist = isTrustedSenderForMatchedTherapist({
+      senderEmail: sender.email,
+      matchedTherapistId: parsedItem.matchedTherapistId,
+      therapistEmailById,
+    })
+    const confidenceReasons =
+      !senderTrustedForMatchedTherapist &&
+      parsedItem.confidenceLevel === 'high' &&
+      parsedItem.matchedTherapistId &&
+      parsedItem.matchedCycleId &&
+      parsedItem.requests.length > 0
+        ? [
+            ...parsedItem.confidenceReasons,
+            'Sender email does not match the matched therapist profile.',
+          ]
+        : parsedItem.confidenceReasons
+
+    return {
+      ...parsedItem,
+      confidenceReasons,
+      parseStatus: buildItemParseStatus(parsedItem, senderTrustedForMatchedTherapist),
+    }
+  })
+  const batchSummary = summarizeAvailabilityEmailBatch(parsedItems)
+  const batchStatus: AvailabilityEmailBatchStatus =
+    parsedItems.length === 0
+      ? 'failed'
+      : parsedItems.every((item) => item.parseStatus === 'failed')
+        ? 'failed'
+        : parsedItems.some((item) => item.parseStatus === 'needs_review')
+          ? 'needs_review'
+          : parsedItems.some((item) => item.parseStatus === 'auto_applied')
+            ? 'applied'
+            : 'parsed'
+  const intakeInsert = {
+    provider: 'resend',
+    provider_email_id: emailId,
+    provider_message_id: emailContent.message_id ?? null,
+    from_email: sender.email ?? 'unknown@unknown.invalid',
+    from_name: sender.name,
+    subject: emailContent.subject ?? null,
+    text_content: normalizeEmailText(emailContent) || null,
+    html_content: emailContent.html ?? emailContent.html_content ?? null,
+    received_at: emailContent.created_at ?? new Date().toISOString(),
+    matched_therapist_id: null,
+    matched_cycle_id: null,
+    parse_status: batchStatus,
+    batch_status: batchStatus,
+    parse_summary: batchSummary.summary,
+    parsed_requests: flattenBatchRequests(parsedItems),
+    item_count: batchSummary.itemCount,
+    auto_applied_count: batchSummary.autoAppliedCount,
+    needs_review_count: batchSummary.needsReviewCount,
+    failed_count: batchSummary.failedCount,
+    raw_payload: {
+      type: 'email.received',
+      data: { email_id: emailId },
+    },
+  }
+
+  const { data: savedIntake, error: intakeError } = await admin
+    .from('availability_email_intakes')
+    .upsert(intakeInsert, { onConflict: 'provider_email_id' })
+    .select('id')
+    .single()
+
+  if (intakeError || !savedIntake) {
+    throw new Error(`Could not store intake: ${intakeError?.message ?? 'unknown error'}`)
+  }
+
+  for (const attachmentRow of processedAttachments) {
+    await admin.from('availability_email_attachments').upsert(
+      {
+        intake_id: savedIntake.id,
+        provider_attachment_id: attachmentRow.id,
+        filename: attachmentRow.filename,
+        content_type: attachmentRow.content_type,
+        content_disposition: attachmentRow.content_disposition,
+        size_bytes: attachmentRow.size_bytes,
+        content_base64: attachmentRow.content_base64,
+        download_status: attachmentRow.download_status,
+        download_error: attachmentRow.download_error,
+        ocr_status: attachmentRow.ocr_status,
+        ocr_text: attachmentRow.ocr_text,
+        ocr_model: attachmentRow.ocr_model,
+        ocr_error: attachmentRow.ocr_error,
+      },
+      { onConflict: 'provider_attachment_id' }
+    )
+  }
+
+  if (parsedItems.length > 0) {
+    await admin.from('availability_email_intake_items').insert(
+      parsedItems.map((item) => ({
+        intake_id: savedIntake.id,
+        source_type: item.sourceType,
+        source_label: item.sourceLabel,
+        attachment_id: item.attachmentId,
+        raw_text: item.rawText || null,
+        ocr_status: item.ocrStatus,
+        ocr_model: item.ocrModel,
+        ocr_error: item.ocrError,
+        parse_status: item.parseStatus,
+        confidence_level: item.confidenceLevel,
+        confidence_reasons: item.confidenceReasons,
+        extracted_employee_name: item.extractedEmployeeName,
+        employee_match_candidates: item.employeeMatchCandidates,
+        matched_therapist_id: item.matchedTherapistId,
+        matched_cycle_id: item.matchedCycleId,
+        original_parsed_requests: item.requests,
+        parsed_requests: item.requests,
+        unresolved_lines: item.unresolvedLines,
+        manually_edited_at: null,
+        auto_applied_at: item.parseStatus === 'auto_applied' ? new Date().toISOString() : null,
+        auto_applied_by: null,
+        apply_error: null,
+      }))
+    )
+  }
+
+  const autoApplyPayload = parsedItems
+    .filter(
+      (item) =>
+        item.parseStatus === 'auto_applied' &&
+        item.matchedTherapistId &&
+        item.matchedCycleId &&
+        item.requests.length > 0
+    )
+    .flatMap((item) =>
+      item.requests.map((request) => ({
+        cycle_id: item.matchedCycleId!,
+        therapist_id: item.matchedTherapistId!,
+        date: request.date,
+        shift_type: request.shift_type,
+        override_type: request.override_type,
+        note: request.note ?? `Imported from ${item.sourceLabel}: ${request.source_line}`,
+        created_by: null,
+        source: 'manager' as const,
+      }))
+    )
+
+  if (autoApplyPayload.length > 0) {
+    const { error: applyError } = await admin
+      .from('availability_overrides')
+      .upsert(autoApplyPayload, { onConflict: 'cycle_id,therapist_id,date,shift_type' })
+
+    if (applyError) {
+      console.error('Failed to auto-apply inbound availability items:', applyError)
+    }
+  }
+
+  return {
+    intakeId: savedIntake.id,
+    batchStatus,
+    batchSummary,
+    parsedItems,
+  }
 }
 
 export async function POST(request: Request) {
@@ -256,248 +519,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing email id.' }, { status: 400 })
   }
 
-  let admin
-  try {
-    admin = createAdminClient()
-  } catch (error) {
-    console.error('Failed to initialize admin client for inbound availability email:', error)
-    return NextResponse.json({ error: 'Could not initialize intake processing.' }, { status: 500 })
-  }
-
-  try {
-    const [emailContent, attachmentRecords] = await Promise.all([
-      fetchReceivedEmail(emailId),
-      listReceivedEmailAttachments(emailId),
-    ])
-    const sender = resolveSender(emailContent.from)
-
-    const { data: activeProfiles } = await admin
-      .from('profiles')
-      .select('id, full_name, is_active')
-      .in('role', ['therapist', 'lead'])
-      .eq('is_active', true)
-      .is('archived_at', null)
-      .order('full_name', { ascending: true })
-
-    const todayKey = new Date().toISOString().slice(0, 10)
-    const { data: cycleRows } = await admin
-      .from('schedule_cycles')
-      .select('id, label, start_date, end_date')
-      .is('archived_at', null)
-      .gte('end_date', todayKey)
-      .order('start_date', { ascending: true })
-
-    const cycles = ((cycleRows ?? []) as IntakeCycle[]).filter(
-      (cycle) => cycle.start_date && cycle.end_date
-    )
-    const processedAttachments: ResendAttachmentRecord[] = []
-    for (const [index, attachment] of attachmentRecords.entries()) {
-      const attachmentId =
-        typeof attachment.id === 'string'
-          ? attachment.id.trim()
-          : `generated-${emailId}-${index + 1}`
-      const filename =
-        typeof attachment.filename === 'string'
-          ? attachment.filename.trim()
-          : typeof attachment.name === 'string'
-            ? String(attachment.name).trim()
-            : 'attachment'
-      const contentType =
-        typeof attachment.content_type === 'string'
-          ? attachment.content_type
-          : typeof attachment.type === 'string'
-            ? attachment.type
-            : 'application/octet-stream'
-      const downloadUrl =
-        typeof attachment.url === 'string'
-          ? attachment.url
-          : typeof attachment.download_url === 'string'
-            ? attachment.download_url
-            : null
-
-      const downloaded = downloadUrl
-        ? await downloadAttachment(downloadUrl)
-        : {
-            contentBase64: null,
-            status: 'failed' as const,
-            error: 'Attachment download URL missing.',
-            sizeBytes: null,
-          }
-
-      const attachmentRow: ResendAttachmentRecord = {
-        id: attachmentId,
-        filename,
-        content_type: contentType,
-        content_disposition:
-          typeof attachment.content_disposition === 'string'
-            ? attachment.content_disposition
-            : null,
-        size_bytes:
-          typeof attachment.size === 'number'
-            ? attachment.size
-            : typeof attachment.size_bytes === 'number'
-              ? attachment.size_bytes
-              : downloaded.sizeBytes,
-        content_base64: downloaded.contentBase64,
-        download_status: downloaded.status,
-        download_error: downloaded.error,
-        ocr_status: 'not_run',
-        ocr_text: null,
-        ocr_model: null,
-      }
-      const ocrResult = await extractTextFromAttachment({
-        contentBase64: attachmentRow.content_base64,
-        contentType: attachmentRow.content_type,
-        filename: attachmentRow.filename,
-      })
-      attachmentRow.ocr_status = ocrResult.status
-      attachmentRow.ocr_text = ocrResult.text
-      attachmentRow.ocr_model = ocrResult.model
-
-      processedAttachments.push(attachmentRow)
+  after(async () => {
+    try {
+      await processInboundAvailabilityEmail(emailId)
+    } catch (error) {
+      console.error('Failed to process inbound availability email:', error)
     }
-    const parsedItems = buildSourceCandidates({
-      normalizedBodyText: normalizeEmailText(emailContent),
-      attachments: processedAttachments,
-    }).map((candidate) => {
-      const parsedItem = parseAvailabilityEmailItem({
-        sourceType: candidate.sourceType,
-        sourceLabel: candidate.sourceLabel,
-        rawText: candidate.rawText,
-        cycles,
-        profiles: ((activeProfiles ?? []) as MatchableProfile[]) ?? [],
-      })
+  })
 
-      return {
-        ...parsedItem,
-        parseStatus: buildItemParseStatus(parsedItem),
-        attachment: candidate.attachment,
-      }
-    })
-    const batchSummary = summarizeAvailabilityEmailBatch(parsedItems)
-    const batchStatus = getBatchStatus(parsedItems)
-
-    const intakeInsert = {
-      provider: 'resend',
-      provider_email_id: emailId,
-      provider_message_id: emailContent.message_id ?? null,
-      from_email: sender.email ?? 'unknown@unknown.invalid',
-      from_name: sender.name,
-      subject: emailContent.subject ?? null,
-      text_content: normalizeEmailText(emailContent) || null,
-      html_content: emailContent.html ?? emailContent.html_content ?? null,
-      received_at: emailContent.created_at ?? new Date().toISOString(),
-      matched_therapist_id: null,
-      matched_cycle_id: null,
-      parse_status: batchStatus,
-      batch_status: batchStatus,
-      parse_summary: batchSummary.summary,
-      parsed_requests: flattenBatchRequests(parsedItems),
-      item_count: batchSummary.itemCount,
-      auto_applied_count: batchSummary.autoAppliedCount,
-      needs_review_count: batchSummary.needsReviewCount,
-      failed_count: batchSummary.failedCount,
-      raw_payload: payload,
-    }
-
-    const { data: savedIntake, error: intakeError } = await admin
-      .from('availability_email_intakes')
-      .upsert(intakeInsert, { onConflict: 'provider_email_id' })
-      .select('id')
-      .single()
-
-    if (intakeError || !savedIntake) {
-      console.error('Failed to store availability email intake:', intakeError)
-      return NextResponse.json({ error: 'Could not store intake.' }, { status: 500 })
-    }
-
-    for (const attachmentRow of processedAttachments) {
-      await admin.from('availability_email_attachments').upsert(
-        {
-          intake_id: savedIntake.id,
-          provider_attachment_id: attachmentRow.id,
-          filename: attachmentRow.filename,
-          content_type: attachmentRow.content_type,
-          content_disposition: attachmentRow.content_disposition,
-          size_bytes: attachmentRow.size_bytes,
-          content_base64: attachmentRow.content_base64,
-          download_status: attachmentRow.download_status,
-          download_error: attachmentRow.download_error,
-          ocr_status: attachmentRow.ocr_status,
-          ocr_text: attachmentRow.ocr_text,
-          ocr_model: attachmentRow.ocr_model,
-        },
-        { onConflict: 'provider_attachment_id' }
-      )
-    }
-
-    if (parsedItems.length > 0) {
-      await admin.from('availability_email_intake_items').insert(
-        parsedItems.map((item) => ({
-          intake_id: savedIntake.id,
-          source_type: item.sourceType,
-          source_label: item.sourceLabel,
-          attachment_id: null,
-          raw_text: item.rawText || null,
-          ocr_status: item.attachment?.ocr_status ?? 'not_run',
-          ocr_model: item.attachment?.ocr_model ?? null,
-          ocr_error: item.attachment?.download_error ?? null,
-          parse_status: item.parseStatus,
-          confidence_level: item.confidenceLevel,
-          confidence_reasons: item.confidenceReasons,
-          extracted_employee_name: item.extractedEmployeeName,
-          employee_match_candidates: item.employeeMatchCandidates,
-          matched_therapist_id: item.matchedTherapistId,
-          matched_cycle_id: item.matchedCycleId,
-          parsed_requests: item.requests,
-          unresolved_lines: item.unresolvedLines,
-          auto_applied_at: item.parseStatus === 'auto_applied' ? new Date().toISOString() : null,
-          auto_applied_by: null,
-          apply_error: null,
-        }))
-      )
-    }
-
-    const autoApplyPayload = parsedItems
-      .filter(
-        (item) =>
-          item.parseStatus === 'auto_applied' &&
-          item.matchedTherapistId &&
-          item.matchedCycleId &&
-          item.requests.length > 0
-      )
-      .flatMap((item) =>
-        item.requests.map((request) => ({
-          cycle_id: item.matchedCycleId!,
-          therapist_id: item.matchedTherapistId!,
-          date: request.date,
-          shift_type: request.shift_type,
-          override_type: request.override_type,
-          note: request.note ?? `Imported from ${item.sourceLabel}: ${request.source_line}`,
-          created_by: null,
-          source: 'manager' as const,
-        }))
-      )
-
-    if (autoApplyPayload.length > 0) {
-      const { error: applyError } = await admin
-        .from('availability_overrides')
-        .upsert(autoApplyPayload, { onConflict: 'cycle_id,therapist_id,date,shift_type' })
-
-      if (applyError) {
-        console.error('Failed to auto-apply inbound availability items:', applyError)
-      }
-    }
-
-    return NextResponse.json({
-      ok: true,
-      intake_id: savedIntake.id,
-      parse_status: batchStatus,
-      parsed_count: flattenBatchRequests(parsedItems).length,
-      item_count: parsedItems.length,
-    })
-  } catch (error) {
-    console.error('Failed to process inbound availability email:', error)
-    return NextResponse.json({ error: 'Could not process inbound email.' }, { status: 500 })
-  }
+  return NextResponse.json({ ok: true, queued: true, email_id: emailId })
 }

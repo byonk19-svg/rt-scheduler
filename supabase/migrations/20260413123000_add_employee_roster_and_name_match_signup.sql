@@ -58,16 +58,12 @@ security definer
 set search_path = public
 as $$
 declare
-  requested_role text;
-  requested_shift text;
   first_name text;
   last_name text;
   computed_full_name text;
   normalized_name text;
   roster_match public.employee_roster%rowtype;
 begin
-  requested_role := lower(coalesce(new.raw_user_meta_data->>'role', ''));
-  requested_shift := lower(coalesce(new.raw_user_meta_data->>'shift_type', ''));
   first_name := nullif(new.raw_user_meta_data->>'first_name', '');
   last_name := nullif(new.raw_user_meta_data->>'last_name', '');
   computed_full_name := nullif(trim(concat_ws(' ', first_name, last_name)), '');
@@ -102,12 +98,10 @@ begin
     nullif(new.raw_user_meta_data->>'phone_number', ''),
     case
       when roster_match.id is not null then roster_match.role
-      when requested_role in ('manager', 'therapist', 'lead') then requested_role
       else null
     end,
     case
       when roster_match.id is not null then roster_match.shift_type
-      when requested_shift in ('day', 'night') then requested_shift
       else 'day'
     end,
     coalesce(roster_match.employment_type, 'full_time'),

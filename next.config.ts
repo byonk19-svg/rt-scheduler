@@ -55,7 +55,13 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
   distDir: process.env.NEXT_DIST_DIR ?? '.next',
-  serverExternalPackages: ['@napi-rs/canvas', 'pdfjs-dist'],
+  serverExternalPackages: ['@napi-rs/canvas', 'pdf-to-img', 'pdfjs-dist'],
+  outputFileTracingIncludes: {
+    '/api/inbound/availability-email': [
+      './node_modules/pdf-to-img/**/*',
+      './node_modules/pdfjs-dist/**/*',
+    ],
+  },
   async headers() {
     return [
       {

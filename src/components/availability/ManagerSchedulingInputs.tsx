@@ -4,25 +4,23 @@ import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { useAvailabilityPlannerFocus } from '@/components/availability/availability-planner-focus-context'
-
 import {
   AvailabilityStatusSummary,
+  type AvailabilityRosterFilter,
   type AvailabilityStatusSummaryRow,
 } from '@/components/availability/AvailabilityStatusSummary'
 import { AvailabilityCalendarPanel } from '@/components/availability/availability-calendar-panel'
+import { AvailabilitySecondaryPanel } from '@/components/availability/availability-secondary-panel'
+import { PlannerControlRail } from '@/components/availability/planner-control-rail'
+import { TherapistContextPanel } from '@/components/availability/therapist-context-panel'
 import { AvailabilityWorkspaceShell } from '@/components/availability/availability-workspace-shell'
-import { FormSubmitButton } from '@/components/form-submit-button'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
 import {
   splitPlannerDatesByMode,
   type PlannerMode,
   type PlannerOverrideRow,
 } from '@/lib/availability-planner'
-import { formatDateLabel, shiftMonthKey, toMonthStartKey } from '@/lib/calendar-utils'
-import { formatEmployeeDate, isDateWithinCycle } from '@/lib/employee-directory'
-import { cn } from '@/lib/utils'
+import { formatHumanCycleRange, shiftMonthKey, toMonthStartKey } from '@/lib/calendar-utils'
+import { isDateWithinCycle } from '@/lib/employee-directory'
 
 type Cycle = {
   id: string
@@ -44,32 +42,33 @@ type PlannerOverrideRecord = PlannerOverrideRow & {
   cycle_id: string
 }
 
+type AvailabilityEntryRow = {
+  id: string
+  therapistId: string
+  cycleId: string
+  date: string
+  reason: string | null
+  createdAt: string
+  updatedAt?: string
+  requestedBy: string
+  entryType: 'force_off' | 'force_on'
+}
+
 type Props = {
   cycles: Cycle[]
   therapists: TherapistOption[]
   overrides: PlannerOverrideRecord[]
+  availabilityEntries: AvailabilityEntryRow[]
   initialCycleId: string
   initialTherapistId: string
   submittedRows: AvailabilityStatusSummaryRow[]
   missingRows: AvailabilityStatusSummaryRow[]
+  initialRosterFilter?: AvailabilityRosterFilter
+  defaultSecondaryTab?: 'roster' | 'inbox'
   saveManagerPlannerDatesAction: (formData: FormData) => void | Promise<void>
   deleteManagerPlannerDateAction: (formData: FormData) => void | Promise<void>
   copyAvailabilityFromPreviousCycleAction: (formData: FormData) => void | Promise<void>
-  /** Renders beside the roster column on xl+ (e.g. Review requests table). */
   reviewRequestsPanel?: ReactNode
-}
-
-function employmentLabel(value: TherapistOption['employment_type']) {
-  if (value === 'part_time') return 'Part-time'
-  if (value === 'prn') return 'PRN'
-  return 'Full-time'
-}
-
-function getModeCopy(mode: PlannerMode) {
-  if (mode === 'will_work') {
-    return 'Mark required dates first, then save the selected pattern for this therapist.'
-  }
-  return 'Blocked dates remain unavailable and should never be drafted into the schedule.'
 }
 
 function getSavedBucketsForSelection(
@@ -87,10 +86,13 @@ export function ManagerSchedulingInputs({
   cycles,
   therapists,
   overrides,
+  availabilityEntries,
   initialCycleId,
   initialTherapistId,
   submittedRows,
   missingRows,
+  initialRosterFilter = 'missing',
+  defaultSecondaryTab = 'roster',
   saveManagerPlannerDatesAction,
   deleteManagerPlannerDateAction,
   copyAvailabilityFromPreviousCycleAction,
@@ -128,9 +130,11 @@ export function ManagerSchedulingInputs({
 
   const savedOverrides = useMemo(
     () =>
-      overrides.filter(
-        (row) => row.cycle_id === selectedCycleId && row.therapist_id === selectedTherapistId
-      ),
+      overrides
+        .filter(
+          (row) => row.cycle_id === selectedCycleId && row.therapist_id === selectedTherapistId
+        )
+        .sort((a, b) => a.date.localeCompare(b.date)),
     [overrides, selectedCycleId, selectedTherapistId]
   )
 
@@ -139,9 +143,42 @@ export function ManagerSchedulingInputs({
     [savedOverrides]
   )
 
+  const therapistRequestRows = useMemo(
+    () =>
+      availabilityEntries.filter(
+        (row) => row.cycleId === selectedCycleId && row.therapistId === selectedTherapistId
+      ),
+    [availabilityEntries, selectedCycleId, selectedTherapistId]
+  )
+
+  const rosterRow =
+    submittedRows.find((row) => row.therapistId === selectedTherapistId) ??
+    missingRows.find((row) => row.therapistId === selectedTherapistId) ??
+    null
+
+  const submissionStatus = rosterRow
+    ? {
+        submitted: submittedRows.some((row) => row.therapistId === selectedTherapistId),
+        overridesCount: rosterRow.overridesCount,
+        lastUpdatedAt: rosterRow.lastUpdatedAt,
+      }
+    : null
+
   function syncSelection(nextMode: PlannerMode, cycleId: string, therapistId: string) {
     const nextBuckets = getSavedBucketsForSelection(overrides, cycleId, therapistId)
     setSelectedDates(nextMode === 'will_work' ? nextBuckets.willWork : nextBuckets.cannotWork)
+  }
+
+  function replacePlannerQuery(nextCycleId: string, nextTherapistId: string) {
+    if (typeof window === 'undefined') return
+    const currentUrl = new URL(window.location.href)
+    const params = new URLSearchParams(currentUrl.search)
+    params.set('tab', 'planner')
+    if (nextCycleId) params.set('cycle', nextCycleId)
+    if (nextTherapistId) params.set('therapist', nextTherapistId)
+    params.delete('search')
+    const query = params.toString()
+    window.location.assign(query ? `${currentUrl.pathname}?${query}` : currentUrl.pathname)
   }
 
   function handleCycleChange(nextCycleId: string) {
@@ -151,13 +188,15 @@ export function ManagerSchedulingInputs({
       setMonthStart(toMonthStartKey(nextCycle.start_date))
     }
     syncSelection(mode, nextCycleId, selectedTherapistId)
+    replacePlannerQuery(nextCycleId, selectedTherapistId)
   }
 
   function handleTherapistChange(nextTherapistId: string) {
     setSelectedTherapistId(nextTherapistId)
-    const nextTherapist = therapists.find((t) => t.id === nextTherapistId) ?? null
+    const nextTherapist = therapists.find((therapist) => therapist.id === nextTherapistId) ?? null
     plannerFocus?.setFocusedTherapistName(nextTherapist?.full_name ?? null)
     syncSelection(mode, selectedCycleId, nextTherapistId)
+    replacePlannerQuery(selectedCycleId, nextTherapistId)
   }
 
   function handleModeChange(nextMode: PlannerMode) {
@@ -174,13 +213,36 @@ export function ManagerSchedulingInputs({
     )
   }
 
-  const statusByDate = useMemo(() => {
-    const next: Record<string, 'selected' | 'saved' | 'blocked'> = {}
-    for (const date of savedBuckets.willWork) next[date] = 'saved'
-    for (const date of savedBuckets.cannotWork) next[date] = 'blocked'
-    for (const date of selectedDates) next[date] = 'selected'
+  const dayStates = useMemo(() => {
+    const next: Record<
+      string,
+      {
+        draftSelection?: 'will_work' | 'cannot_work'
+        savedPlanner?: 'will_work' | 'cannot_work'
+        requestTypes?: Array<'need_off' | 'request_to_work'>
+      }
+    > = {}
+
+    for (const date of savedBuckets.willWork) {
+      next[date] = { ...(next[date] ?? {}), savedPlanner: 'will_work' }
+    }
+    for (const date of savedBuckets.cannotWork) {
+      next[date] = { ...(next[date] ?? {}), savedPlanner: 'cannot_work' }
+    }
+    for (const date of selectedDates) {
+      next[date] = { ...(next[date] ?? {}), draftSelection: mode }
+    }
+    for (const row of therapistRequestRows) {
+      const current = next[row.date] ?? {}
+      const requestType = row.entryType === 'force_off' ? 'need_off' : 'request_to_work'
+      next[row.date] = {
+        ...current,
+        requestTypes: [...(current.requestTypes ?? []), requestType],
+      }
+    }
+
     return next
-  }, [savedBuckets.cannotWork, savedBuckets.willWork, selectedDates])
+  }, [mode, savedBuckets.cannotWork, savedBuckets.willWork, selectedDates, therapistRequestRows])
 
   if (cycles.length === 0) {
     return (
@@ -205,298 +267,88 @@ export function ManagerSchedulingInputs({
   }
 
   return (
-    <section id="staff-scheduling-inputs" className="space-y-6">
+    <section id="staff-scheduling-inputs" className="space-y-3">
       <AvailabilityWorkspaceShell
-        controls={
-          <div className="space-y-5">
-            <div className="space-y-1">
-              <h2 className="app-section-title text-foreground">Plan staffing</h2>
-              <p className="text-sm text-muted-foreground">{getModeCopy(mode)}</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label
-                htmlFor="planner_cycle_id"
-                className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground"
-              >
-                Schedule cycle
-              </Label>
-              <select
-                id="planner_cycle_id"
-                className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                value={selectedCycleId}
-                onChange={(event) => handleCycleChange(event.target.value)}
-              >
-                {cycles.map((cycle) => (
-                  <option key={cycle.id} value={cycle.id}>
-                    {cycle.label} ({cycle.start_date} to {cycle.end_date})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label
-                htmlFor="planner_therapist_id"
-                className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground"
-              >
-                Therapist
-              </Label>
-              <select
-                id="planner_therapist_id"
-                className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                value={selectedTherapistId}
-                onChange={(event) => handleTherapistChange(event.target.value)}
-              >
-                {(['day', 'night'] as const).map((shiftType) => {
-                  const group = therapists.filter((therapist) => therapist.shift_type === shiftType)
-                  if (group.length === 0) return null
-
-                  return (
-                    <optgroup
-                      key={shiftType}
-                      label={shiftType === 'day' ? 'Day Shift' : 'Night Shift'}
-                    >
-                      {group.map((therapist) => (
-                        <option key={therapist.id} value={therapist.id}>
-                          {therapist.full_name}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )
-                })}
-              </select>
-            </div>
-
-            {selectedTherapist ? (
-              <div
-                className="space-y-3 rounded-xl border border-border bg-card px-3.5 py-3.5"
-                role="group"
-                aria-label="Therapist shift and employment (read-only)"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className="font-medium">
-                    {selectedTherapist.shift_type === 'night' ? 'Night shift' : 'Day shift'}
-                  </Badge>
-                  <Badge variant="outline" className="font-medium text-muted-foreground">
-                    {employmentLabel(selectedTherapist.employment_type)}
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Planner inputs apply to {selectedTherapist.full_name}&apos;s normal shift
-                  assignments.
-                </p>
-              </div>
-            ) : null}
-
-            {selectedCycleId && selectedTherapistId ? (
-              <form action={copyAvailabilityFromPreviousCycleAction}>
-                <input type="hidden" name="cycle_id" value={selectedCycleId} />
-                <input type="hidden" name="therapist_id" value={selectedTherapistId} />
-                <button
-                  type="submit"
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-3.5 w-3.5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-                  </svg>
-                  Copy from last block
-                </button>
-              </form>
-            ) : null}
-
-            <div className="space-y-2">
+        primaryHeader={
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
               <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-                Planner mode
+                Planning workspace
               </p>
-              <div className="inline-flex rounded-lg border border-border bg-card p-1">
-                <button
-                  type="button"
-                  className={cn(
-                    'rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
-                    mode === 'will_work'
-                      ? 'bg-[var(--success-subtle)] text-[var(--success-text)]'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                  onClick={() => handleModeChange('will_work')}
-                >
-                  Will work
-                </button>
-                <button
-                  type="button"
-                  className={cn(
-                    'rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
-                    mode === 'cannot_work'
-                      ? 'bg-[var(--error-subtle)] text-[var(--error-text)]'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                  onClick={() => handleModeChange('cannot_work')}
-                >
-                  Cannot work
-                </button>
-              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Plan staffing for the selected therapist inside the current schedule cycle.
+              </p>
             </div>
-
-            <form action={saveManagerPlannerDatesAction} className="space-y-3">
-              <input type="hidden" name="cycle_id" value={selectedCycleId} />
-              <input type="hidden" name="therapist_id" value={selectedTherapistId} />
-              <input
-                type="hidden"
-                name="shift_type"
-                value={selectedTherapist?.shift_type ?? 'day'}
-              />
-              <input type="hidden" name="mode" value={mode} />
-              {selectedDates.map((date) => (
-                <input key={`selected-date-${date}`} type="hidden" name="dates" value={date} />
-              ))}
-
-              <div className="space-y-3">
-                <div className="min-h-16 rounded-xl border border-dashed border-border bg-muted/40 px-3 py-3">
-                  {selectedDates.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {selectedDates.map((date) => (
-                        <button
-                          key={date}
-                          type="button"
-                          className="rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
-                          onClick={() =>
-                            setSelectedDates((current) => current.filter((value) => value !== date))
-                          }
-                        >
-                          {formatEmployeeDate(date)} x
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Select dates on the calendar, then save this mode.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="border-border bg-card text-muted-foreground hover:bg-muted"
-                  onClick={() => setSelectedDates([])}
-                  disabled={selectedDates.length === 0}
-                >
-                  Clear selected
-                </Button>
-                <FormSubmitButton
-                  type="submit"
-                  pendingText="Saving..."
-                  disabled={!selectedCycleId || !selectedTherapistId || selectedDates.length === 0}
-                  className="bg-primary text-primary-foreground hover:bg-primary/90"
-                >
-                  Save {mode === 'will_work' ? 'Will work' : 'Cannot work'}
-                </FormSubmitButton>
-              </div>
-            </form>
           </div>
+        }
+        controls={
+          <PlannerControlRail
+            cycles={cycles}
+            therapists={therapists}
+            selectedCycleId={selectedCycleId}
+            selectedTherapistId={selectedTherapistId}
+            selectedTherapist={selectedTherapist}
+            mode={mode}
+            selectedDates={selectedDates}
+            onCycleChange={handleCycleChange}
+            onTherapistChange={handleTherapistChange}
+            onModeChange={handleModeChange}
+            onClearSelectedDates={() => setSelectedDates([])}
+            onRemoveSelectedDate={(date) =>
+              setSelectedDates((current) => current.filter((value) => value !== date))
+            }
+            copyAction={copyAvailabilityFromPreviousCycleAction}
+            saveAction={saveManagerPlannerDatesAction}
+          />
         }
         calendar={
-          <div className="space-y-5">
-            <AvailabilityCalendarPanel
-              monthStart={monthStart}
-              cycleStart={selectedCycle?.start_date ?? monthStart}
-              cycleEnd={selectedCycle?.end_date ?? monthStart}
-              selectedDates={selectedDates}
-              statusByDate={statusByDate}
-              onPreviousMonth={() => setMonthStart((current) => shiftMonthKey(current, -1))}
-              onNextMonth={() => setMonthStart((current) => shiftMonthKey(current, 1))}
-              onToggleDate={toggleDate}
-            />
-
-            <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-muted/40 px-4 py-3">
-              <Badge className="border-[var(--success-border)] bg-[var(--success-subtle)] font-medium text-[var(--success-text)]">
-                Will work
-              </Badge>
-              <span className="text-sm text-muted-foreground">
-                Required dates the draft should place when legal.
-              </span>
-              <Badge className="border-[var(--error-border)] bg-[var(--error-subtle)] font-medium text-[var(--error-text)]">
-                Cannot work
-              </Badge>
-              <span className="text-sm text-muted-foreground">
-                Blocked dates the draft must avoid.
-              </span>
-            </div>
-          </div>
+          <AvailabilityCalendarPanel
+            monthStart={monthStart}
+            cycleStart={selectedCycle?.start_date ?? monthStart}
+            cycleEnd={selectedCycle?.end_date ?? monthStart}
+            selectedTherapistName={selectedTherapist?.full_name ?? 'Select a therapist'}
+            cycleLabel={
+              selectedCycle
+                ? formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)
+                : ''
+            }
+            dayStates={dayStates}
+            onPreviousMonth={() => setMonthStart((current) => shiftMonthKey(current, -1))}
+            onNextMonth={() => setMonthStart((current) => shiftMonthKey(current, 1))}
+            onToggleDate={toggleDate}
+          />
         }
-        aside={
-          <AvailabilityStatusSummary submittedRows={submittedRows} missingRows={missingRows} />
+        context={
+          <TherapistContextPanel
+            therapist={selectedTherapist}
+            cycleLabel={
+              selectedCycle
+                ? formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)
+                : 'No cycle selected'
+            }
+            requestRows={therapistRequestRows}
+            savedPlannerRows={savedOverrides}
+            submissionStatus={submissionStatus}
+            deleteManagerPlannerDateAction={deleteManagerPlannerDateAction}
+            selectedCycleId={selectedCycleId}
+            selectedTherapistId={selectedTherapistId}
+          />
         }
-        lower={
-          <div className="rounded-[1.75rem] border border-border bg-card px-5 py-5 shadow-tw-md-strong">
-            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-              Saved planner dates
-            </p>
-            {savedOverrides.length === 0 ? (
-              <p className="mt-2 text-sm text-muted-foreground">
-                Saved manager planning dates for this therapist and cycle will appear here.
-              </p>
-            ) : (
-              <div className="mt-4 max-h-[min(22rem,50vh)] overflow-y-auto overflow-x-hidden pr-1 [scrollbar-gutter:stable]">
-                <div className="grid gap-3 lg:grid-cols-2">
-                  {savedOverrides
-                    .slice()
-                    .sort((a, b) => a.date.localeCompare(b.date))
-                    .map((row) => (
-                      <div
-                        key={row.id}
-                        className="flex flex-col gap-2 rounded-xl border border-border bg-muted/30 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              row.override_type === 'force_on'
-                                ? 'border-[var(--success-border)] text-[var(--success-text)]'
-                                : 'border-[var(--error-border)] text-[var(--error-text)]'
-                            )}
-                          >
-                            {row.override_type === 'force_on' ? 'Will work' : 'Cannot work'}
-                          </Badge>
-                          <span className="text-sm font-medium text-foreground">
-                            {formatDateLabel(row.date)}
-                          </span>
-                        </div>
-                        <form action={deleteManagerPlannerDateAction}>
-                          <input type="hidden" name="override_id" value={row.id} />
-                          <input type="hidden" name="cycle_id" value={selectedCycleId} />
-                          <input type="hidden" name="therapist_id" value={selectedTherapistId} />
-                          <FormSubmitButton
-                            type="submit"
-                            variant="ghost"
-                            size="sm"
-                            pendingText="Removing..."
-                            className="text-muted-foreground hover:bg-muted hover:text-foreground"
-                          >
-                            Remove
-                          </FormSubmitButton>
-                        </form>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-          </div>
+        secondaryContent={
+          <AvailabilitySecondaryPanel
+            defaultTab={defaultSecondaryTab}
+            roster={
+              <AvailabilityStatusSummary
+                submittedRows={submittedRows}
+                missingRows={missingRows}
+                initialFilter={initialRosterFilter}
+                onPickTherapist={handleTherapistChange}
+                embedded
+              />
+            }
+            inbox={reviewRequestsPanel}
+          />
         }
-        trailing={reviewRequestsPanel}
       />
     </section>
   )

@@ -14,6 +14,14 @@ describe('extractAvailabilityEmployeeName', () => {
     ).toBe('Brianna Brown')
   })
 
+  it('extracts the employee name when other labels appear on the same line', () => {
+    expect(
+      extractAvailabilityEmployeeName(
+        'Employee Name: Brianna Yonkin   Kronos Number: _____________'
+      )
+    ).toBe('Brianna Yonkin')
+  })
+
   it('falls back to a plain name line when no label is present', () => {
     expect(extractAvailabilityEmployeeName('Brianna Brown\nNeed off Apr 14 and Apr 16')).toBe(
       'Brianna Brown'
