@@ -1,5 +1,32 @@
 # Session History
 
+## Session 84 - 2026-04-17
+
+- Fixed the live `/schedule` roster so the Day and Night segments now filter therapists by `profiles.shift_type` before splitting into Core vs PRN sections.
+- The read-only roster badges now reflect the filtered shift-specific staff counts instead of counting the full active therapist pool on both tabs.
+- Verified with the targeted schedule-roster unit test plus focused lint/type diagnostics on the touched files; full repo `tsc --noEmit` is still blocked by the unrelated `matched_email` fixture issue in `src/components/team/EmployeeRosterPanel.test.ts`.
+
+## Session 83 - 2026-04-17
+
+- Restored the missing therapist scheduled-conflict warning on `/therapist/availability`, including active-cycle scheduled shift lookup and a dismissible warning banner for `force_off` dates that already have a scheduled shift.
+- Restored the Coverage auto-draft pre-flight flow: `/coverage` now opens a pre-flight dialog that runs the pure draft generator against the real current shifts and summarizes unfilled slots, missing leads, and forced must-work misses before generation.
+- Restored daily shift reminders via `shift_reminder_outbox`, `/api/cron/shift-reminders`, and the `vercel.json` cron entry for next-day scheduled shifts, including both email delivery and in-app notifications.
+- Restored the manager `/analytics` page and query helpers for cycle fill rates, therapist submission compliance, and force-on miss reporting.
+- Restored the dedicated `/team/work-patterns` manager page and isolated work-pattern save action while keeping the original quick-edit modal section intact.
+
+## Session 82 - 2026-04-17
+
+- Replaced the old inline theme bootstrap approach with cookie-backed server theme resolution in `src/app/layout.tsx`; the root layout now reads `tw-theme` through `next/headers` and applies the initial `dark` class without rendering any inline script.
+- `src/lib/theme.ts` now keeps `localStorage` and the `tw-theme` cookie synchronized so explicit light/dark selections survive reloads while the server can render the correct initial class.
+- Documented the Windows clean-restart workflow for repo-local `next dev` issues: stop stale dev processes, remove `.next`, launch one fresh `npm run dev`, and use a brand-new browser tab if old HMR overlays persist.
+
+## Session 81 - 2026-04-17
+
+- Added mobile week-by-week Coverage navigation on small screens while preserving the full multi-week desktop/print layout.
+- Added dark mode with system preference support, a root-level theme provider, cookie-backed server theme resolution in the root layout, `/profile` appearance controls, and print-time light-mode token fallback.
+- Added cycle templates: shift-only serialization/application helpers, manager template API, schedule apply action, and Coverage dialogs for saving/applying templates.
+- Added the `/team/import` CSV roster import wizard with generic header mapping, row-level validation, and valid-row-only import into `employee_roster`.
+
 ## Session 80 - 2026-04-16
 
 - Standardized the sitewide header system around shared shell primitives in `src/components/shell/`: one sticky authenticated `AppHeader`, route-driven `LocalSectionNav`, and shared `PageIntro` treatment for manager/page headers.

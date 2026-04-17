@@ -4,6 +4,7 @@ import { AlertCircle } from 'lucide-react'
 
 import { FeedbackToast } from '@/components/feedback-toast'
 import { FormSubmitButton } from '@/components/form-submit-button'
+import { ThemePreferenceControl } from '@/components/ThemeProvider'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -342,6 +343,18 @@ export default async function ProfilePage({
               Save preferences
             </FormSubmitButton>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/90">
+        <CardHeader>
+          <CardTitle>Appearance</CardTitle>
+          <CardDescription>
+            Choose your preferred theme or follow the system setting.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ThemePreferenceControl />
         </CardContent>
       </Card>
 

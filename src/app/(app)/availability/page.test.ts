@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 describe('availability page role-specific actions', () => {
   it('uses the therapist workspace anchor instead of the removed submit-entry target', () => {
-    const filePath = resolve(process.cwd(), 'src/app/availability/page.tsx')
+    const filePath = resolve(process.cwd(), 'src/app/(app)/availability/page.tsx')
     const source = readFileSync(filePath, 'utf8')
 
     expect(source).toContain('#therapist-availability-workspace')
@@ -13,14 +13,14 @@ describe('availability page role-specific actions', () => {
   })
 
   it('uses the therapist relationship when reading availability overrides', () => {
-    const filePath = resolve(process.cwd(), 'src/app/availability/page.tsx')
+    const filePath = resolve(process.cwd(), 'src/app/(app)/availability/page.tsx')
     const source = readFileSync(filePath, 'utf8')
 
     expect(source).toContain('profiles!availability_overrides_therapist_id_fkey(full_name)')
   })
 
   it('loads official therapist submissions for manager response roster metrics', () => {
-    const filePath = resolve(process.cwd(), 'src/app/availability/page.tsx')
+    const filePath = resolve(process.cwd(), 'src/app/(app)/availability/page.tsx')
     const source = readFileSync(filePath, 'utf8')
 
     expect(source).toContain('therapist_availability_submissions')
@@ -28,14 +28,20 @@ describe('availability page role-specific actions', () => {
   })
 
   it('loads override source and updated_at for roster metrics and review table', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/app/availability/page.tsx'), 'utf8')
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/(app)/availability/page.tsx'),
+      'utf8'
+    )
     expect(source).toContain('updated_at')
     expect(source).toContain('source')
     expect(source).toContain("entry.source === 'manager' ? 'manager' : 'therapist'")
   })
 
   it('passes the request inbox into the lower workbench section for managers', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/app/availability/page.tsx'), 'utf8')
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/(app)/availability/page.tsx'),
+      'utf8'
+    )
     expect(source).toContain(
       'reviewRequestsPanel={<div id="availability-request-inbox">{entriesCard}</div>}'
     )
@@ -43,7 +49,10 @@ describe('availability page role-specific actions', () => {
   })
 
   it('uses the tighter manager header copy and summary-chip navigation for planner filters', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/app/availability/page.tsx'), 'utf8')
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/(app)/availability/page.tsx'),
+      'utf8'
+    )
 
     expect(source).toContain(
       "title={canManageAvailability ? 'Availability Planning' : 'Availability'}"
@@ -54,5 +63,15 @@ describe('availability page role-specific actions', () => {
     expect(source).toContain("roster: 'submitted'")
     expect(source).toContain("status: 'force_off'")
     expect(source).toContain("status: 'force_on'")
+  })
+
+  it('does not load therapist scheduled-shift conflict warnings in the manager availability path', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/(app)/availability/page.tsx'),
+      'utf8'
+    )
+
+    expect(source).not.toContain('findScheduledConflicts')
+    expect(source).not.toContain('conflicts={conflicts}')
   })
 })

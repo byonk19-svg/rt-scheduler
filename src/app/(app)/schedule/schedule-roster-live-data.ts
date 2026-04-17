@@ -6,10 +6,11 @@ import { formatHumanCycleRange } from '@/lib/calendar-utils'
 import {
   buildAssignmentStoreFromShifts,
   buildAvailabilityApprovalStoreFromSubmittedOverrides,
+  type ScheduleRosterStaff,
   type LiveRosterOverrideRow,
   type LiveRosterShiftRow,
 } from '@/lib/schedule-roster-data'
-import type { AssignmentStore, AvailabilityApprovalStore, Staff } from '@/lib/mock-coverage-roster'
+import type { AssignmentStore, AvailabilityApprovalStore } from '@/lib/mock-coverage-roster'
 
 export type ScheduleRosterLivePayload = {
   cycleId: string
@@ -18,7 +19,7 @@ export type ScheduleRosterLivePayload = {
   endDate: string
   shortLabel: string
   availableCycles: Array<{ id: string; label: string }>
-  staff: Staff[]
+  staff: ScheduleRosterStaff[]
   assignments: AssignmentStore
   availabilityApprovals: AvailabilityApprovalStore
 }
@@ -40,6 +41,7 @@ type ProfileRosterRow = {
   id: string
   full_name: string | null
   employment_type: 'full_time' | 'part_time' | 'prn' | null
+  shift_type: 'day' | 'night' | null
 }
 
 function firstParam(value: string | string[] | undefined): string | undefined {
@@ -47,12 +49,13 @@ function firstParam(value: string | string[] | undefined): string | undefined {
   return value
 }
 
-function toStaff(row: ProfileRosterRow): Staff {
+function toStaff(row: ProfileRosterRow): ScheduleRosterStaff {
   return {
     id: row.id,
     name: row.full_name?.trim() || 'Unknown',
     roleLabel: 'Therapist',
     rosterKind: row.employment_type === 'prn' ? 'prn' : 'core',
+    shiftType: row.shift_type === 'night' ? 'night' : 'day',
   }
 }
 
@@ -109,7 +112,7 @@ export async function loadScheduleRosterPageData(
   ] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id, full_name, employment_type')
+      .select('id, full_name, employment_type, shift_type')
       .in('role', ['therapist', 'lead'])
       .eq('is_active', true)
       .is('archived_at', null)
