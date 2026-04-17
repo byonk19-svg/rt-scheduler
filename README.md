@@ -6,6 +6,7 @@ Web app for respiratory therapy scheduling with role-based workflows:
 - Availability requests
 - 6-week schedule cycle management
 - **Canonical staff schedule:** [`/coverage`](<./src/app/(app)/coverage/page.tsx>) supports both `Grid` and `Roster` layouts; server entry is `page.tsx`, initial snapshot loading lives in [`coverage-page-data.ts`](<./src/app/(app)/coverage/coverage-page-data.ts>), and interactive client logic lives in [`CoverageClientPage.tsx`](<./src/app/(app)/coverage/CoverageClientPage.tsx>). The therapist compatibility route (`/therapist/schedule`) still redirects there and preserves explicit `view` params
+- **Mobile coverage:** on small screens, `/coverage` now shows one week at a time with previous/next controls and swipe navigation; print still renders the full desktop grid
 - **Roster matrix (read-only):** [`/schedule`](<./src/app/(app)/schedule/page.tsx>) — managers and leads only; shows the active cycle’s coverage assignments and officially submitted therapist availability (login required; not a public mock)
 - **Therapist availability:** 6-week grid on `/therapist/availability` — **Available** (default: neutral day, no forced on/off), **Unavailable**, **Must work** (hard autodraft `force_on`); see [`CLAUDE.md`](./CLAUDE.md)
 - Shift board (swap/pickup posts with manager approval)
@@ -29,11 +30,16 @@ Current architecture and quality snapshot: [`docs/REPO_HEALTH.md`](docs/REPO_HEA
 - **Schedule** (nav label; route [`/coverage`](<./src/app/(app)/coverage/page.tsx>), rendered via [`CoverageClientPage.tsx`](<./src/app/(app)/coverage/CoverageClientPage.tsx>)) — create **New 6-week block**, staff the schedule in either **Grid** or **Roster** view, auto-draft, preliminary, **Publish**. Same cycle-selection rule everywhere: URL cycle if valid, else active window, else next upcoming, else none (empty state, not a fake grid).
 - Managers can edit staffing from either schedule layout by clicking a day cell. Leads can update assignment status (`OC`, `LE`, `CX`, `CI`) from staffed cells in either layout.
 - Users can save a default schedule layout preference (`Grid` or `Roster`) in [`/profile`](<./src/app/(app)/profile/page.tsx>); the therapist compatibility route still defers default layout selection to `/coverage` so that saved preference wins unless an explicit `view` query is present.
+- `/coverage` now also supports cycle templates:
+  - **Save as template** from a published cycle
+  - **Start from template** for draft cycles
+  - templates serialize staffing only; availability settings are intentionally not included
 - **Availability** — therapist requests and manager **Plan staffing** for the selected cycle.
 - **Availability email intake** — managers can ingest one email with body text plus multiple form attachments; high-confidence items auto-apply while unresolved items stay in the `/availability` review queue, where managers can now view the stored original email/OCR text, reparse stale items, or delete troubleshooting batches.
 - **Publish History** ([`/publish`](<./src/app/(app)/publish/page.tsx>)) — two parts: (1) **Schedule blocks** — all non-archived cycles; archive drafts or delete drafts; **Start over** takes a live block offline; (2) **Publish email log** — delivery rows per publish; **Delete history** removes only that log row, not the block.
 - `New 6-week block` can optionally copy staffing from the latest published cycle. `Clear draft` clears draft assignments while unpublished.
 - Published cycles stay editable on Schedule; `Archive cycle` sets `archived_at` and hides the block from pickers (see [`CLAUDE.md`](./CLAUDE.md) for data model).
+- Managers can bulk-import roster rows from a generic CSV at [`/team/import`](<./src/app/(app)/team/import/page.tsx>) before reviewing them in the roster admin tab on `/team`.
 
 ## Tech Stack
 
@@ -138,6 +144,22 @@ npm run sync:roster -- --file ./roster.txt
 ```
 
 See comments at the top of `scripts/sync-team-roster.mjs` for line formats and options.
+
+## Team CSV Import Wizard
+
+Managers can also import roster rows from a generic CSV through [`/team/import`](<./src/app/(app)/team/import/page.tsx>).
+
+The wizard:
+
+- reads `.csv` or `.txt`
+- maps source headers to Teamwise roster fields
+- validates each row
+- allows importing valid rows while skipping invalid ones
+
+This is separate from:
+
+- the fixed-format bulk paste tool inside **Employee roster**
+- `npm run sync:roster`, which creates auth users and `profiles`
 
 ## Cleanup Seeded Demo Users
 
@@ -343,3 +365,10 @@ npm run seed:users
 npm run cleanup:seed-users
 npm run test:e2e
 ```
+
+## Appearance
+
+- Theme preference is managed in [`/profile`](<./src/app/(app)/profile/page.tsx>) under **Appearance**.
+- Options: **Light**, **System**, **Dark**
+- Root theme state is applied by [`ThemeProvider.tsx`](./src/components/ThemeProvider.tsx) using `tw-theme` in localStorage.
+- Print forces light token values even if the app is currently in dark mode.

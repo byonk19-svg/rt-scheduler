@@ -29,6 +29,7 @@ Operational workflows as implemented in the current codebase.
    - Manual add/move/remove/set lead, or
    - Auto-generate (`generateDraftScheduleAction`) using recurring patterns + cycle overrides.
    - `Clear draft` removes all draft assignments for the active unpublished cycle.
+   - Managers can save a published cycle as a staffing template and apply a saved template to a draft cycle. Template data is shift-only (`day_of_cycle`) and intentionally excludes availability overrides.
 3. Resolve blockers in coverage:
    - under/over coverage
    - missing/multiple/ineligible lead
@@ -57,6 +58,7 @@ Operational workflows as implemented in the current codebase.
 - Returns conflict payload when override confirmation is required.
 - Shift editor surfaces compact in-dialog staffing guidance: `X / 5 covered` progress (3-5 target), non-FT employment badges (`[PRN]`, `[PT]`), and a persistent lead-required warning when editable shifts have no assigned lead.
 - Managers can open staffing edits from the roster layout by clicking a day cell. The roster view reuses the same assignment editor and schedule mutations as the grid view.
+- On small screens, Coverage shows one week at a time with previous/next controls and swipe navigation; desktop and print keep the full multi-week layout.
 
 ## 3) Therapist/Manager: Availability Input
 
@@ -130,3 +132,17 @@ Current operational guidance:
 - `Delete history` removes a `publish_events` record only.
 - `Archive cycle` sets the cycle aside at the `schedule_cycles` level so it no longer appears in Coverage, Availability, or dashboard cycle pickers.
 - Archival is limited to non-live cycles. Live cycles must be restarted as drafts before they can be archived.
+
+## 8) Manager: Team CSV Import
+
+1. Manager opens `/team/import`.
+2. Uploads a `.csv` or `.txt` file.
+3. Maps source headers to Teamwise roster fields.
+4. Reviews the preview and row-level validation errors.
+5. Imports valid rows only; invalid rows can be skipped.
+6. Imported rows upsert into `employee_roster`, then redirect back to `/team?tab=roster`.
+
+This flow is intentionally separate from:
+
+- the fixed-format bulk paste field inside `EmployeeRosterPanel`
+- `npm run sync:roster` auth/profile sync

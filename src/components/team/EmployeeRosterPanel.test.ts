@@ -7,7 +7,10 @@ import { describe, expect, it } from 'vitest'
 
 import { EmployeeRosterPanel } from '@/components/team/EmployeeRosterPanel'
 
-const teamPageSource = fs.readFileSync(path.join(process.cwd(), 'src/app/team/page.tsx'), 'utf8')
+const teamPageSource = fs.readFileSync(
+  path.join(process.cwd(), 'src/app/(app)/team/page.tsx'),
+  'utf8'
+)
 
 const rosterPanelSource = fs.readFileSync(
   path.join(process.cwd(), 'src/components/team/EmployeeRosterPanel.tsx'),
@@ -58,5 +61,9 @@ describe('Team page source contract', () => {
   it('wires the therapist roster replacement action through the employee roster panel', () => {
     expect(teamPageSource).toContain('replaceTherapistRosterAction')
     expect(teamPageSource).toContain('replaceTherapistRosterAction={replaceTherapistRosterAction}')
+  })
+
+  it('adds an Import link from the team page', () => {
+    expect(teamPageSource).toContain('href="/team/import"')
   })
 })

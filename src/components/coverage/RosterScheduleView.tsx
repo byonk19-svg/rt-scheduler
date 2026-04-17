@@ -442,7 +442,7 @@ export const RosterScheduleView = memo(function RosterScheduleView({
   const heading = title ?? `Respiratory Therapy ${shiftLabel} Shift`
 
   return (
-    <div className="space-y-4">
+    <div className="coverage-roster-scroll space-y-4 overflow-x-auto">
       {title || cycleLabel ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 bg-muted/12 px-3 py-2 text-xs">
           <span className="font-semibold text-foreground">{heading}</span>

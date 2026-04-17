@@ -297,6 +297,14 @@ export default async function TeamPage({
         title="Team"
         subtitle="Manage staffing, roles, and roster access from one workspace."
         className="px-0"
+        actions={
+          <a
+            href="/team/import"
+            className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground shadow-xs transition-colors hover:bg-secondary/70"
+          >
+            Import
+          </a>
+        }
       />
 
       <TeamWorkspaceClient

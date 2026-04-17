@@ -1,5 +1,12 @@
 # Session History
 
+## Session 81 - 2026-04-17
+
+- Added mobile week-by-week Coverage navigation on small screens while preserving the full multi-week desktop/print layout.
+- Added dark mode with system preference support, a root-level theme provider, flash-prevention script, `/profile` appearance controls, and print-time light-mode token fallback.
+- Added cycle templates: shift-only serialization/application helpers, manager template API, schedule apply action, and Coverage dialogs for saving/applying templates.
+- Added the `/team/import` CSV roster import wizard with generic header mapping, row-level validation, and valid-row-only import into `employee_roster`.
+
 ## Session 80 - 2026-04-16
 
 - Standardized the sitewide header system around shared shell primitives in `src/components/shell/`: one sticky authenticated `AppHeader`, route-driven `LocalSectionNav`, and shared `PageIntro` treatment for manager/page headers.

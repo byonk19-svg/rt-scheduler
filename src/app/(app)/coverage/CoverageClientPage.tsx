@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 import {
+  applyTemplateAction,
   createCycleAction,
   deleteCycleAction,
   generateDraftScheduleAction,
@@ -73,6 +74,14 @@ const AutoDraftConfirmDialog = dynamic(() =>
 )
 const ClearDraftConfirmDialog = dynamic(() =>
   import('@/components/coverage/ClearDraftConfirmDialog').then((module) => module.ClearDraftConfirmDialog)
+)
+const SaveAsTemplateDialog = dynamic(() =>
+  import('@/components/coverage/SaveAsTemplateDialog').then((module) => module.SaveAsTemplateDialog)
+)
+const StartFromTemplateDialog = dynamic(() =>
+  import('@/components/coverage/StartFromTemplateDialog').then(
+    (module) => module.StartFromTemplateDialog
+  )
 )
 const CycleManagementDialog = dynamic(() =>
   import('@/components/coverage/CycleManagementDialog').then((module) => module.CycleManagementDialog)
@@ -260,11 +269,16 @@ export function CoverageClientPage({
   const [unassigningShiftId, setUnassigningShiftId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [weekOffset, setWeekOffset] = useState<number>(0)
   const [selectedCycleHasShiftRows, setSelectedCycleHasShiftRows] = useState(
     () => initialSnapshot.selectedCycleHasShiftRows
   )
   const [autoDraftDialogOpen, setAutoDraftDialogOpen] = useState(false)
   const [clearDraftDialogOpen, setClearDraftDialogOpen] = useState(false)
+  const [saveAsTemplateDialogOpen, setSaveAsTemplateDialogOpen] = useState(false)
+  const [templateTarget, setTemplateTarget] = useState<{ cycleId: string; startDate: string } | null>(
+    null
+  )
   const [cycleDialogOpen, setCycleDialogOpen] = useState(false)
   const [error, setError] = useState<string>(() => initialSnapshot.error)
   const [assignError, setAssignError] = useState<string>('')
@@ -283,6 +297,7 @@ export function CoverageClientPage({
   const deferredSelectedId = useDeferredValue(selectedId)
   const days = shiftTab === 'Day' ? dayDays : nightDays
   const setDays = shiftTab === 'Day' ? setDayDays : setNightDays
+  const totalWeeks = Math.max(Math.ceil(days.length / 7), 1)
   const scheduleFeedbackParams = useMemo<ScheduleSearchParams>(
     () => ({
       success: successParam ?? undefined,
@@ -388,6 +403,7 @@ export function CoverageClientPage({
     setActiveOpCodes(new Map(Object.entries(initialSnapshot.activeOpCodes)))
     setLoading(false)
     setSelectedId(null)
+    setWeekOffset(0)
     setSelectedCycleHasShiftRows(initialSnapshot.selectedCycleHasShiftRows)
     setError(initialSnapshot.error)
     setAssignError('')
@@ -396,6 +412,14 @@ export function CoverageClientPage({
     setCanUpdateAssignmentStatus(initialSnapshot.canUpdateAssignmentStatus)
     setActorRole(initialSnapshot.actorRole)
   }, [initialShiftTab, shiftTabLockedFromUrl, initialSnapshot])
+
+  useEffect(() => {
+    setWeekOffset(0)
+  }, [activeCycleId])
+
+  useEffect(() => {
+    setWeekOffset((current) => Math.min(current, Math.max(totalWeeks - 1, 0)))
+  }, [totalWeeks])
 
   useEffect(() => {
     const shiftType = shiftTab === 'Day' ? 'day' : 'night'
@@ -1038,6 +1062,15 @@ export function CoverageClientPage({
                       >
                         Clear draft
                       </button>
+                      {activeCyclePublished && activeCycleId ? (
+                        <button
+                          type="button"
+                          onClick={() => setSaveAsTemplateDialogOpen(true)}
+                          className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
+                        >
+                          Save as template
+                        </button>
+                      ) : null}
                       <Link
                         href="/publish"
                         className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
@@ -1360,6 +1393,22 @@ export function CoverageClientPage({
                     >
                       {renderedViewMode === 'roster' ? 'Open first day' : 'Assign manually'}
                     </Button>
+                    {activeCycleId && printCycle ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() =>
+                          setTemplateTarget({
+                            cycleId: activeCycleId,
+                            startDate: printCycle.start_date,
+                          })
+                        }
+                      >
+                        Start from template
+                      </Button>
+                    ) : null}
                   </>
                 ) : undefined
               }
@@ -1389,8 +1438,11 @@ export function CoverageClientPage({
                   days={days}
                   loading={loading}
                   selectedId={selectedId}
+                  weekOffset={weekOffset}
                   schedulingViewOnly={!canManageCoverage}
                   allowAssignmentStatusEdits={canUpdateAssignmentStatus}
+                  onSwipeLeft={() => setWeekOffset((w) => Math.min(w + 1, totalWeeks - 1))}
+                  onSwipeRight={() => setWeekOffset((w) => Math.max(w - 1, 0))}
                   onSelect={handleSelect}
                   onChangeStatus={handleChangeStatus}
                 />
@@ -1439,6 +1491,22 @@ export function CoverageClientPage({
           isPublished={activeCyclePublished}
         />
       ) : null}
+      {saveAsTemplateDialogOpen && activeCycleId ? (
+        <SaveAsTemplateDialog
+          open
+          onClose={() => setSaveAsTemplateDialogOpen(false)}
+          cycleId={activeCycleId}
+        />
+      ) : null}
+      {templateTarget ? (
+        <StartFromTemplateDialog
+          open
+          onClose={() => setTemplateTarget(null)}
+          newCycleId={templateTarget.cycleId}
+          newCycleStartDate={templateTarget.startDate}
+          applyTemplateAction={applyTemplateAction}
+        />
+      ) : null}
       {cycleDialogOpen ? (
         <CycleManagementDialog
           key={`cycle-dialog-${cycleDialogOpen ? 'open' : 'closed'}-${availableCycles[0]?.end_date ?? 'none'}`}
@@ -1447,6 +1515,9 @@ export function CoverageClientPage({
           onOpenChange={setCycleDialogOpen}
           createCycleAction={createCycleAction}
           deleteCycleAction={deleteCycleAction}
+          onStartFromTemplate={(cycleId, startDate) =>
+            setTemplateTarget({ cycleId, startDate })
+          }
         />
       ) : null}
       <PrintSchedule
@@ -1461,5 +1532,3 @@ export function CoverageClientPage({
     </div>
   )
 }
-
-

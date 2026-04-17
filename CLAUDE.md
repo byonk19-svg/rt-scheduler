@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-16 (session 80)
+Updated: 2026-04-17 (session 81)
 
 ## Handoff Snapshot
 
@@ -28,9 +28,11 @@ Updated: 2026-04-16 (session 80)
 - Reduced PTO-form-style email bodies that repeat `Employee Name:` blocks are now split into per-employee intake items even without the full `PTO REQUEST/EDIT FORM` scaffold, and repeated blocks for the same employee merge back into a single item.
 - PTO recurrence lines like `Off Tuesday + Wednesdays` now expand across the active cycle window when a single active block is available; malformed OCR fragments like `5 Sunday 5/ Back to work 25` stay in `needs_review` instead of generating fake work dates.
 - **Coverage workspace compaction:** `/coverage` now uses a compact scheduling workspace instead of the old oversized setup/stat/day-card layout. The page is organized around a tighter header, unified planning toolbar, lighter health summary cards, slim setup/live-status banners, a denser weekly grid, and a tighter roster matrix. Grid day cells now prioritize date, staffing ratio, lead state, and compact gap/status chips; the shift editor uses a tighter header plus ranked candidate rows with clearer selected state.
+- **Coverage mobile responsiveness:** below `md`, `/coverage` now renders one week at a time with explicit previous/next week controls and touch swipe navigation. Desktop keeps the full multi-week grid; print forces the desktop/full-grid path and hides the mobile-only week wrapper.
 - **Coverage designated lead vs extra lead-eligible staff:** only one `shifts.role='lead'` row designates the lead for that slot. The shift editor still lists every **lead-eligible** therapist; choosing another while a lead exists adds them as **staff** coverage (`assign` with `role: 'staff'`). Someone already on the day as staff can be **designated** via **`set_lead`** (`setCoverageDesignatedLeadViaApi` in `src/lib/coverage/mutations.ts`), which now uses `router.refresh()` against the server snapshot path instead of a client reload nonce. Lead-eligible rows are **not** disabled merely because a lead is already booked.
 - **Email intake tab stability:** intake date chip toggles and **Apply dates** refresh in place (`router.refresh` / `router.replace` with `tab=intake`) so managers are not bounced back to the **Planner** tab after saves. Intake request chips cycle **`force_off` ↔ `force_on`** only; removing a date uses an explicit **Remove** path with confirmation instead of a silent third-click delete.
 - **Schedule layout + role consistency:** `/coverage` supports both **Grid** and **Roster** layouts. Managers can edit staffing from either layout by clicking a day cell; leads can update staffed cells to **`OC`**, **`LE`**, **`CX`**, or **`CI`** through the shared assignment-status flow. Users can save a default schedule layout (`Grid` or `Roster`) in `/profile`, and the therapist compatibility route (`/therapist/schedule`) still defers default layout selection to `/coverage` so a saved preference wins unless an explicit `view` query is present.
+- **Theme support:** the root layout now injects a flash-prevention theme script and wraps the app in `ThemeProvider`; `/profile` includes an **Appearance** section with **Light / System / Dark** controls. `.dark` token overrides live in `src/app/globals.css`, and print explicitly forces light token values.
 - **Hot-path performance trim:** `/coverage` now carries both day and night therapist/roster datasets in the initial server snapshot so shift-tab changes stop re-querying Supabase after hydration, `/availability` skips hidden-tab intake/planner reads, and `shift-board` approve/deny actions no longer rerun the full board bootstrap after a successful save.
 - **Shared header/navigation system:** authenticated routes now use one shared sticky `AppHeader` plus surface-level `LocalSectionNav` driven by `src/components/shell/app-shell-config.ts`; page titles/actions are being standardized through `PageIntro`, and public/auth routes now share `src/components/public/PublicHeader.tsx` from `src/app/(public)/layout.tsx`. Avoid reintroducing page-specific top bars or dark secondary sticky bars.
 - **Schedule roster route:** `/schedule` no longer redirects to `/coverage`, but it is also no longer a public mock. It now loads live roster/availability data through `src/app/(app)/schedule/schedule-roster-live-data.ts`, stays auth-protected by `src/proxy.ts`, and renders a read-only roster matrix inside the shared app shell.
@@ -43,6 +45,8 @@ Updated: 2026-04-16 (session 80)
 - **Availability Planning polish:** `/availability` now keeps the current planner-first structure while tightening the lower half into a single **Secondary workflow** surface with **Response roster** and **Request inbox** tabs. The roster uses dense rows with initials, status, request signal, and last activity; the inbox collapses to a compact empty state instead of a large blank table shell; the disabled planner CTA now reads **`Select dates to save`**.
 - **Team workspace refactor:** `/team` renders through workspace-style components (`TeamWorkspaceClient`, `TeamDirectoryFilters`, `TeamDirectorySummaryChips`, `TeamPersonRow`, `EmployeeRosterTable`) for denser directory and roster administration. **`?tab=roster`** is resolved on the server (`initialTab` from `TeamPage`) and synced in **`TeamWorkspaceClient`** via **`router.replace`** without **`useSearchParams`**, so that subtree does not depend on a search-params **`Suspense`** boundary. Only the active tab now mounts, and the page parallelizes the main directory/work-pattern/roster reads.
 - **Team directory operational layout:** `/team` **Team directory** tab uses a compact non-sticky controls block (quick-view chips as filters, search + selects, **Clear filters**, **Expand all** / **Collapse all**). Grouped sections use lightweight structural headers (not accordion cards); **all groups default expanded** on first visit; manual open/closed state persists in **localStorage**; while search/filters are active, groups with matches auto-expand so results are never hidden; clearing filters restores saved section state. **`TeamPersonRow`** is a denser directory-style row with stronger focus/hover affordance. Runtime stability still uses **`TeamWorkspaceClient.tsx`** as the manager-team client boundary.
+- **Cycle templates:** managers can now save a published cycle as a reusable staffing template and apply a template into a draft cycle from Coverage. Templates serialize shifts as `day_of_cycle` rows only; they intentionally do **not** include availability overrides.
+- **Roster CSV import wizard:** managers now have a generic `/team/import` flow for legacy roster CSVs. The wizard maps CSV headers to Teamwise fields, validates rows, and lets managers import valid rows while skipping errors.
 - **Availability intake utilities:** `src/lib/availability-email-intake.ts` and related tests now cover richer request-edit parsing and manager-edit workflows more explicitly.
 - `RESEND_API_KEY` must support receiving APIs, not just sending. A send-only key fails on `/emails/receiving` with `401 restricted_api_key`.
 
@@ -55,6 +59,11 @@ Updated: 2026-04-16 (session 80)
 - `main` now also carries the hot-route follow-up: `/coverage` swaps shift datasets locally from the initial snapshot, `/availability` only loads active-tab planner/intake data, and `shift-board` approve/deny actions stay local instead of reloading the board on success.
 - `main` now also carries the shared sitewide header pass: `AppShell` uses one sticky authenticated header plus surface section nav, manager/page header wrappers now sit on `PageIntro`, and public/auth routes share `PublicHeader`.
 - `/schedule` now reads live schedule-cycle data and stays inside the authenticated shell as a read-only roster matrix rather than a public mock surface.
+- Current branch work now adds four manager-facing capabilities on top of that baseline:
+  - mobile week-by-week `/coverage` navigation below `md`
+  - root-level dark mode with `/profile` appearance controls
+  - cycle templates (save published cycles, apply to draft cycles)
+  - `/team/import` generic CSV roster import wizard
 
 ### Where We Want To Go
 
@@ -75,8 +84,18 @@ Updated: 2026-04-16 (session 80)
 - Targeted availability lane: `npx vitest run src/app/availability/`
 - Targeted coverage lane: `npm run test:unit -- src/app/coverage/page.test.ts src/components/coverage/CalendarGrid.test.ts src/components/coverage/RosterScheduleView.test.ts src/components/coverage/shift-editor-dialog-layout.test.ts`
 - Targeted shell/header lane: `npx vitest run src/components/shell/app-shell-config.test.ts src/components/AppShell.test.ts src/components/manager/ManagerWorkspaceHeader.test.ts src/app/(public)/signup/page.test.ts`
+- Targeted theme lane: `npm run test:unit -- src/lib/theme.test.ts src/app/layout.theme.test.ts src/app/profile/theme-controls.test.ts src/app/globals.test.ts`
+- Targeted template lane: `npm run test:unit -- src/lib/cycle-template.test.ts src/app/api/schedule/templates/route.test.ts src/app/coverage/template-wiring.test.ts src/components/coverage/CycleManagementDialog.test.ts`
+- Targeted team import lane: `npm run test:unit -- src/lib/csv-import-parser.test.ts src/app/team/import/page.test.ts src/app/team/import/actions.source.test.ts src/components/team/EmployeeRosterPanel.test.ts`
 
 ## Recent changelog
+
+**Session 81 (2026-04-17)** — Coverage mobile, dark mode, templates, and roster CSV import:
+
+- `/coverage` now has a mobile-only week navigator with swipe support while desktop keeps the full multi-week grid; print hides the mobile wrapper and forces the desktop/full-grid layout.
+- `src/lib/theme.ts`, `src/components/ThemeProvider.tsx`, `src/app/layout.tsx`, and `src/app/(app)/profile/page.tsx` now provide light/system/dark theme support with a synchronous flash-prevention script and print-time light token fallback.
+- Added cycle template support: `supabase/migrations/20260417100000_add_cycle_templates.sql`, `src/lib/cycle-template.ts`, `src/app/api/schedule/templates/*`, `src/app/(app)/schedule/actions/template-actions.ts`, plus Coverage dialogs for **Save as template** and **Start from template**. Templates intentionally exclude availability overrides.
+- Added `/team/import` with a generic CSV mapping/import wizard backed by `src/lib/csv-import-parser.ts` and `src/app/(app)/team/import/actions.ts`. The existing fixed-format roster paste flow remains unchanged.
 
 **Session 80 (2026-04-16)** — Sitewide header standardization:
 
