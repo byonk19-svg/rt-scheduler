@@ -69,11 +69,11 @@ import {
   shiftTabToQueryValue,
 } from '@/lib/coverage/coverage-shift-tab'
 
-const AutoDraftConfirmDialog = dynamic(() =>
-  import('@/components/coverage/AutoDraftConfirmDialog').then((module) => module.AutoDraftConfirmDialog)
-)
 const ClearDraftConfirmDialog = dynamic(() =>
   import('@/components/coverage/ClearDraftConfirmDialog').then((module) => module.ClearDraftConfirmDialog)
+)
+const PreFlightDialog = dynamic(() =>
+  import('@/components/coverage/PreFlightDialog').then((module) => module.PreFlightDialog)
 )
 const SaveAsTemplateDialog = dynamic(() =>
   import('@/components/coverage/SaveAsTemplateDialog').then((module) => module.SaveAsTemplateDialog)
@@ -273,7 +273,7 @@ export function CoverageClientPage({
   const [selectedCycleHasShiftRows, setSelectedCycleHasShiftRows] = useState(
     () => initialSnapshot.selectedCycleHasShiftRows
   )
-  const [autoDraftDialogOpen, setAutoDraftDialogOpen] = useState(false)
+  const [preFlightDialogOpen, setPreFlightDialogOpen] = useState(false)
   const [clearDraftDialogOpen, setClearDraftDialogOpen] = useState(false)
   const [saveAsTemplateDialogOpen, setSaveAsTemplateDialogOpen] = useState(false)
   const [templateTarget, setTemplateTarget] = useState<{ cycleId: string; startDate: string } | null>(
@@ -1029,7 +1029,7 @@ export function CoverageClientPage({
                       size="sm"
                       className="gap-1.5 text-xs"
                       disabled={!canRunAutoDraft}
-                      onClick={() => setAutoDraftDialogOpen(true)}
+                      onClick={() => setPreFlightDialogOpen(true)}
                     >
                       <Sparkles className="h-3.5 w-3.5" />
                       Auto-draft
@@ -1371,7 +1371,7 @@ export function CoverageClientPage({
                       size="sm"
                       className="gap-1.5"
                       disabled={!canRunAutoDraft}
-                      onClick={() => setAutoDraftDialogOpen(true)}
+                      onClick={() => setPreFlightDialogOpen(true)}
                     >
                       <Sparkles className="h-3.5 w-3.5" />
                       Auto-draft
@@ -1425,7 +1425,6 @@ export function CoverageClientPage({
                   cellError={rosterCellError}
                   onOpenEditor={handleRosterOpenEditor}
                   onChangeStatus={handleChangeStatus}
-                  onUnassign={handleUnassign}
                 />
               ) : (
                 <CalendarGrid
@@ -1466,13 +1465,12 @@ export function CoverageClientPage({
           onUnassign={handleUnassign}
         />
       ) : null}
-      {autoDraftDialogOpen ? (
-        <AutoDraftConfirmDialog
+      {preFlightDialogOpen ? (
+        <PreFlightDialog
           open
-          onOpenChange={setAutoDraftDialogOpen}
-          applyFormRef={autoDraftFormRef}
+          onClose={() => setPreFlightDialogOpen(false)}
           cycleId={activeCycleId ?? ''}
-          isPublished={activeCyclePublished}
+          onConfirm={() => autoDraftFormRef.current?.requestSubmit()}
         />
       ) : null}
       {clearDraftDialogOpen ? (

@@ -10,7 +10,8 @@ import { ScheduleCycleSelect } from '@/components/schedule-roster/ScheduleCycleS
 import { ScheduleHeader } from '@/components/schedule-roster/ScheduleHeader'
 import { SegmentedControl } from '@/components/schedule-roster/SegmentedControl'
 import { Badge } from '@/components/ui/badge'
-import { buildRosterWeeks, splitStaffByRoster, type ShiftType } from '@/lib/mock-coverage-roster'
+import { buildRosterWeeks, type ShiftType } from '@/lib/mock-coverage-roster'
+import { splitStaffByRosterAndShift } from '@/lib/schedule-roster-data'
 
 type ViewMode = 'grid' | 'roster'
 
@@ -35,7 +36,10 @@ export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
 
   const weeks = useMemo(() => buildRosterWeeks(live.startDate, live.endDate), [live])
 
-  const sections = useMemo(() => splitStaffByRoster(live.staff), [live.staff])
+  const sections = useMemo(
+    () => splitStaffByRosterAndShift(live.staff, selectedShift),
+    [live.staff, selectedShift]
+  )
 
   const helperText =
     'Read-only roster for the selected cycle: coverage assignments and therapist availability that has been officially submitted. x = submitted need off; 1 = submitted request to work and/or a coverage assignment. Edit staffing in Coverage.'

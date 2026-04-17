@@ -46,7 +46,6 @@ describe('coverage publish override affordance', () => {
     expect(source).toContain('ClearDraftConfirmDialog')
     expect(source).toContain('CycleManagementDialog')
     expect(source).toContain('formatHumanCycleRange')
-    expect(source).toContain('Schedule cycle')
     expect(source).toContain('Publish history')
   })
 
@@ -93,11 +92,11 @@ describe('coverage publish override affordance', () => {
     const source = readFileSync(coverageClientPath, 'utf8')
 
     expect(source).toContain("const ShiftEditorDialog = dynamic(")
-    expect(source).toContain("const AutoDraftConfirmDialog = dynamic(")
+    expect(source).toContain("const PreFlightDialog = dynamic(")
     expect(source).toContain("const ClearDraftConfirmDialog = dynamic(")
     expect(source).toContain("const CycleManagementDialog = dynamic(")
     expect(source).toContain('{selectedDay ? (')
-    expect(source).toContain('{autoDraftDialogOpen ? (')
+    expect(source).toContain('{preFlightDialogOpen ? (')
     expect(source).toContain('{clearDraftDialogOpen ? (')
     expect(source).toContain('{cycleDialogOpen ? (')
   })

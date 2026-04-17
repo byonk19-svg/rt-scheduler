@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { DM_Sans, Geist_Mono } from 'next/font/google'
+import { cookies } from 'next/headers'
 import { ThemeProvider } from '@/components/ThemeProvider'
+import { getServerThemeClass, THEME_KEY } from '@/lib/theme'
 import './globals.css'
 
 const dmSans = DM_Sans({
@@ -20,28 +22,20 @@ export const metadata: Metadata = {
   description: 'Team scheduling, availability, and coverage together.',
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const cookieStore = await cookies()
+  const themeClass = getServerThemeClass(cookieStore.get(THEME_KEY)?.value)
+
   return (
-    <html lang="en" suppressHydrationWarning className={`${dmSans.variable} ${geistMono.variable}`}>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              try {
-                var t = localStorage.getItem('tw-theme');
-                var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                if (t === 'dark' || (t === 'system' && prefersDark) || (!t && prefersDark)) {
-                  document.documentElement.classList.add('dark');
-                }
-              } catch (e) {}
-            `,
-          }}
-        />
-      </head>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={[dmSans.variable, geistMono.variable, themeClass].filter(Boolean).join(' ')}
+    >
       <body className={`${dmSans.className} antialiased`}>
         <ThemeProvider>{children}</ThemeProvider>
       </body>

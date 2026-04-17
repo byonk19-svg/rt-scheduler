@@ -7,8 +7,8 @@ Web app for respiratory therapy scheduling with role-based workflows:
 - 6-week schedule cycle management
 - **Canonical staff schedule:** [`/coverage`](<./src/app/(app)/coverage/page.tsx>) supports both `Grid` and `Roster` layouts; server entry is `page.tsx`, initial snapshot loading lives in [`coverage-page-data.ts`](<./src/app/(app)/coverage/coverage-page-data.ts>), and interactive client logic lives in [`CoverageClientPage.tsx`](<./src/app/(app)/coverage/CoverageClientPage.tsx>). The therapist compatibility route (`/therapist/schedule`) still redirects there and preserves explicit `view` params
 - **Mobile coverage:** on small screens, `/coverage` now shows one week at a time with previous/next controls and swipe navigation; print still renders the full desktop grid
-- **Roster matrix (read-only):** [`/schedule`](<./src/app/(app)/schedule/page.tsx>) — managers and leads only; shows the active cycle’s coverage assignments and officially submitted therapist availability (login required; not a public mock)
-- **Therapist availability:** 6-week grid on `/therapist/availability` — **Available** (default: neutral day, no forced on/off), **Unavailable**, **Must work** (hard autodraft `force_on`); see [`CLAUDE.md`](./CLAUDE.md)
+- **Roster matrix (read-only):** [`/schedule`](<./src/app/(app)/schedule/page.tsx>) — managers and leads only; shows the active cycle’s coverage assignments and officially submitted therapist availability, and the Day/Night toggle now filters therapists by their configured `profiles.shift_type` so opposite-shift staff do not appear in the wrong roster (login required; not a public mock)
+- **Therapist availability:** 6-week grid on `/therapist/availability` — **Available** (default: neutral day, no forced on/off), **Unavailable**, **Must work** (hard autodraft `force_on`). When a therapist marks **Need Off** on a date that already has an active-cycle scheduled shift, the page shows a warning banner but still allows saving; see [`CLAUDE.md`](./CLAUDE.md)
 - Shift board (swap/pickup posts with manager approval)
 
 ## Auth + Access Model
@@ -25,9 +25,10 @@ Current architecture and quality snapshot: [`docs/REPO_HEALTH.md`](docs/REPO_HEA
 
 ## Cycle Workflow
 
-- [`/schedule`](<./src/app/(app)/schedule/page.tsx>) is a read-only roster view tied to the live cycle (assignments + submitted availability); staffing changes are made in Coverage.
+- [`/schedule`](<./src/app/(app)/schedule/page.tsx>) is a read-only roster view tied to the live cycle (assignments + submitted availability); its Day/Night toggle now filters therapists by `profiles.shift_type`, and staffing changes are still made in Coverage.
 
 - **Schedule** (nav label; route [`/coverage`](<./src/app/(app)/coverage/page.tsx>), rendered via [`CoverageClientPage.tsx`](<./src/app/(app)/coverage/CoverageClientPage.tsx>)) — create **New 6-week block**, staff the schedule in either **Grid** or **Roster** view, auto-draft, preliminary, **Publish**. Same cycle-selection rule everywhere: URL cycle if valid, else active window, else next upcoming, else none (empty state, not a fake grid).
+- Auto-draft now opens a pre-flight report first, summarizing likely unfilled slots, missing leads, and forced must-work misses using the real current shift set for that cycle.
 - Managers can edit staffing from either schedule layout by clicking a day cell. Leads can update assignment status (`OC`, `LE`, `CX`, `CI`) from staffed cells in either layout.
 - Users can save a default schedule layout preference (`Grid` or `Roster`) in [`/profile`](<./src/app/(app)/profile/page.tsx>); the therapist compatibility route still defers default layout selection to `/coverage` so that saved preference wins unless an explicit `view` query is present.
 - `/coverage` now also supports cycle templates:
@@ -37,9 +38,21 @@ Current architecture and quality snapshot: [`docs/REPO_HEALTH.md`](docs/REPO_HEA
 - **Availability** — therapist requests and manager **Plan staffing** for the selected cycle.
 - **Availability email intake** — managers can ingest one email with body text plus multiple form attachments; high-confidence items auto-apply while unresolved items stay in the `/availability` review queue, where managers can now view the stored original email/OCR text, reparse stale items, or delete troubleshooting batches.
 - **Publish History** ([`/publish`](<./src/app/(app)/publish/page.tsx>)) — two parts: (1) **Schedule blocks** — all non-archived cycles; archive drafts or delete drafts; **Start over** takes a live block offline; (2) **Publish email log** — delivery rows per publish; **Delete history** removes only that log row, not the block.
+- **Analytics** ([`/analytics`](<./src/app/(app)/analytics/page.tsx>)) — manager view for recent cycle fill rates, therapist submission compliance, and force-on miss patterns.
 - `New 6-week block` can optionally copy staffing from the latest published cycle. `Clear draft` clears draft assignments while unpublished.
 - Published cycles stay editable on Schedule; `Archive cycle` sets `archived_at` and hides the block from pickers (see [`CLAUDE.md`](./CLAUDE.md) for data model).
 - Managers can bulk-import roster rows from a generic CSV at [`/team/import`](<./src/app/(app)/team/import/page.tsx>) before reviewing them in the roster admin tab on `/team`.
+
+## Team Work Patterns
+
+Managers can review and edit recurring day-of-week staffing rules in one place at [`/team/work-patterns`](<./src/app/(app)/team/work-patterns/page.tsx>).
+
+The page:
+
+- groups therapists by day vs night shift
+- shows current work/off day chips plus weekend rotation
+- opens a dedicated edit dialog for the selected therapist
+- keeps the older quick-edit modal section intact for additive access
 
 ## Tech Stack
 
@@ -160,6 +173,15 @@ This is separate from:
 
 - the fixed-format bulk paste tool inside **Employee roster**
 - `npm run sync:roster`, which creates auth users and `profiles`
+
+## Shift Reminders
+
+- Daily 24-hour reminder processing runs through [`/api/cron/shift-reminders`](./src/app/api/cron/shift-reminders/route.ts).
+- The cron schedules reminder delivery for next-day `scheduled` shifts only.
+- Each reminder is deduplicated through the `shift_reminder_outbox` unique `(shift_id, remind_type)` constraint.
+- Successful reminders send both:
+  - email via Resend
+  - an in-app notification row in `notifications`
 
 ## Cleanup Seeded Demo Users
 
