@@ -2,6 +2,7 @@
 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
 
 export type TableSortOption = 'newest' | 'oldest'
 
@@ -56,13 +57,16 @@ export function TableToolbar({
   }
 
   const sortSelect = (
-    <div className="flex min-w-0 items-center gap-2">
+    <div className="flex min-w-0 items-center gap-1.5">
       <Label htmlFor="table-sort" className="shrink-0 text-xs text-muted-foreground">
         Sort
       </Label>
       <select
         id="table-sort"
-        className="h-9 min-w-0 flex-1 rounded-md border border-border bg-card px-2 text-sm md:max-w-[10rem] md:flex-none"
+        className={cn(
+          'min-w-0 flex-1 rounded-md border border-border bg-card text-sm md:flex-none',
+          compact ? 'h-8.5 px-2 md:max-w-[9rem]' : 'h-9 px-2 md:max-w-[10rem]'
+        )}
         value={filters.sort}
         onChange={(event) => updateFilters({ sort: event.target.value as TableSortOption })}
       >
@@ -76,7 +80,7 @@ export function TableToolbar({
     <div
       className={
         compact
-          ? 'rounded-lg border border-border/60 bg-muted/12 px-2 py-1.5'
+          ? 'rounded-lg border border-border/50 bg-muted/10 px-2 py-1'
           : 'rounded-md border border-border bg-card p-3'
       }
     >
@@ -84,10 +88,10 @@ export function TableToolbar({
         className={
           showDateRange
             ? compact
-              ? 'grid grid-cols-1 gap-1.5 md:grid-cols-5'
+              ? 'grid grid-cols-1 gap-1 md:grid-cols-[minmax(0,1.7fr)_minmax(0,0.85fr)_minmax(0,0.8fr)_minmax(0,0.8fr)]'
               : 'grid grid-cols-1 gap-3 md:grid-cols-5'
             : compact
-              ? 'grid grid-cols-1 items-end gap-1.5 md:grid-cols-12'
+              ? 'grid grid-cols-1 items-end gap-1 md:grid-cols-12'
               : 'grid grid-cols-1 items-end gap-3 md:grid-cols-12'
         }
       >
@@ -104,11 +108,11 @@ export function TableToolbar({
         </label>
         <select
           id="toolbar-status-filter"
-          className={
-            showDateRange
-              ? 'h-9 w-full rounded-md border border-border bg-card px-3 text-sm'
-              : 'h-9 w-full rounded-md border border-border bg-card px-3 text-sm md:col-span-4'
-          }
+          className={cn(
+            'w-full rounded-md border border-border bg-card text-sm',
+            compact ? 'h-8.5 px-2.5' : 'h-9 px-3',
+            !showDateRange && 'md:col-span-4'
+          )}
           value={filters.status}
           onChange={(event) => updateFilters({ status: event.target.value })}
         >
@@ -138,7 +142,7 @@ export function TableToolbar({
       </div>
 
       {showDateRange ? (
-        <div className={compact ? 'mt-1.5 flex justify-end' : 'mt-3 flex justify-end'}>
+        <div className={compact ? 'mt-1 flex justify-end' : 'mt-3 flex justify-end'}>
           {sortSelect}
         </div>
       ) : null}

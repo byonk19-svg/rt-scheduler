@@ -23,6 +23,7 @@ describe('TherapistAvailabilityWorkspace', () => {
         availabilityRows: [
           {
             id: 'entry-1',
+            therapistId: 'therapist-1',
             cycleId: 'cycle-1',
             date: '2026-03-24',
             reason: 'Vacation',
@@ -56,14 +57,13 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('Apr')
     expect(html).toContain('Request to Work')
     expect(html).toContain('Need Off')
-    expect(html).not.toContain('You marked Need Off on')
     expect(html).toContain('request to work')
     expect(html).toContain('Week 1')
     expect(html).not.toContain('Must work')
     expect(html).not.toContain('Unavailable')
   })
 
-  it('renders the scheduled conflict warning banner when selected-cycle conflicts are present', () => {
+  it('renders the scheduled conflict warning banner when conflicts are present', () => {
     const html = renderToStaticMarkup(
       createElement(TherapistAvailabilityWorkspace, {
         cycles: [
@@ -83,7 +83,7 @@ describe('TherapistAvailabilityWorkspace', () => {
       })
     )
 
-    expect(html).toContain('You marked Need Off on')
+    expect(html).toContain('You marked Need Off on dates that already have a scheduled shift.')
     expect(html).toContain('Mon Apr 20')
     expect(html).toContain('Review in Coverage')
   })

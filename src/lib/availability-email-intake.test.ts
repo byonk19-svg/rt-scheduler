@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   parseAvailabilityEmail,
+  parseAvailabilityEmailBatchSources,
   parseAvailabilityEmailItem,
   parseSender,
   sanitizeParsedRequests,
@@ -15,6 +16,15 @@ const cycles = [
     label: 'Block 1',
     start_date: '2026-03-22',
     end_date: '2026-05-02',
+  },
+]
+
+const ptoCycles = [
+  {
+    id: 'cycle-pto',
+    label: 'May Block',
+    start_date: '2026-05-03',
+    end_date: '2026-06-13',
   },
 ]
 
@@ -161,6 +171,200 @@ describe('parseAvailabilityEmailItem', () => {
       requests: [],
       extractedEmployeeName: null,
     })
+  })
+
+  it('treats bare PTO-form dates as off requests and ignores the signed-date footer', () => {
+    const profiles = [{ id: 'therapist-1', full_name: 'Brianna Yonkin', is_active: true }]
+
+    expect(
+      parseAvailabilityEmailItem({
+        sourceType: 'attachment',
+        sourceLabel: 'pto-form.txt',
+        rawText: [
+          'Employee Name: Brianna Yonkin',
+          'Department: Resp.',
+          'Date PTO Hours LT Sick Hours Jury Hours Bereavement Hours',
+          '5/10',
+          '5/16',
+          '6/6',
+          '5/24',
+          'Employee Signature: Brianna Yonkin',
+          'Date: 4/8/26',
+        ].join('\n'),
+        cycles: ptoCycles,
+        profiles,
+      })
+    ).toMatchObject({
+      extractedEmployeeName: 'Brianna Yonkin',
+      matchedTherapistId: 'therapist-1',
+      matchedCycleId: 'cycle-pto',
+      requests: [
+        expect.objectContaining({ date: '2026-05-10', override_type: 'force_off' }),
+        expect.objectContaining({ date: '2026-05-16', override_type: 'force_off' }),
+        expect.objectContaining({ date: '2026-05-24', override_type: 'force_off' }),
+        expect.objectContaining({ date: '2026-06-06', override_type: 'force_off' }),
+      ],
+    })
+  })
+
+  it('expands PTO-form date ranges and keeps explicit work rows as work', () => {
+    const profiles = [{ id: 'therapist-1', full_name: 'Ruth Guandique', is_active: true }]
+
+    const parsed = parseAvailabilityEmailItem({
+      sourceType: 'attachment',
+      sourceLabel: 'pto-form.txt',
+      rawText: [
+        'Employee Name: Ruth Guandique',
+        'Date PTO Hours LT Sick Hours Jury Hours Bereavement Hours',
+        '5/3 - 5/5 off will work rest of week',
+        '5/9 - 5/10 off',
+        '5/14 working memorial',
+        'Employee Signature: Ruth Guandique',
+        'Date: 3/25/26',
+      ].join('\n'),
+      cycles: ptoCycles,
+      profiles,
+    })
+
+    expect(parsed.requests).toEqual([
+      expect.objectContaining({ date: '2026-05-03', override_type: 'force_off' }),
+      expect.objectContaining({ date: '2026-05-04', override_type: 'force_off' }),
+      expect.objectContaining({ date: '2026-05-05', override_type: 'force_off' }),
+      expect.objectContaining({ date: '2026-05-09', override_type: 'force_off' }),
+      expect.objectContaining({ date: '2026-05-10', override_type: 'force_off' }),
+      expect.objectContaining({ date: '2026-05-14', override_type: 'force_on' }),
+    ])
+  })
+
+  it('expands weekday recurrence within a handwritten PTO form window', () => {
+    const profiles = [{ id: 'therapist-1', full_name: 'Kim Suarez', is_active: true }]
+
+    const parsed = parseAvailabilityEmailItem({
+      sourceType: 'attachment',
+      sourceLabel: 'pto-form.txt',
+      rawText: [
+        'Employee Name: Kim Suarez',
+        'Date PTO Hours LT Sick Hours Jury Hours Bereavement Hours',
+        '(off Tuesday + Wednesdays written in pink ink)',
+        'Handwritten note: May 3rd - June 13',
+        'Signature: KSL',
+        'Date: 4/6/26',
+      ].join('\n'),
+      cycles: ptoCycles,
+      profiles,
+    })
+
+    expect(parsed.requests).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ date: '2026-05-05', override_type: 'force_off' }),
+        expect.objectContaining({ date: '2026-05-06', override_type: 'force_off' }),
+        expect.objectContaining({ date: '2026-06-09', override_type: 'force_off' }),
+        expect.objectContaining({ date: '2026-06-10', override_type: 'force_off' }),
+      ])
+    )
+  })
+})
+
+describe('parseAvailabilityEmailBatchSources', () => {
+  it('splits one PTO-form email into separate employee items', () => {
+    const result = parseAvailabilityEmailBatchSources({
+      normalizedBodyText: [
+        'PTO REQUEST/EDIT FORM',
+        '',
+        'Employee Name: Lynn Snow',
+        'Date PTO Hours LT Sick Hours Jury Hours Bereavement Hours',
+        'May 4th Dr. appointment',
+        'Employee Signature: Lynn Snow',
+        'Date: 2/10/26',
+        '',
+        '---',
+        '',
+        'Employee Name: Barbara Cummings',
+        'Date PTO Hours LT Sick Hours Jury Hours Bereavement Hours',
+        '5/10 WORK',
+        '5/11 Work',
+        'Employee Signature: B. Cummings',
+        'Date: 2/18/26',
+      ].join('\n'),
+      attachments: [],
+      cycles: ptoCycles,
+      profiles: [
+        { id: 'therapist-1', full_name: 'Lynn Snow', is_active: true },
+        { id: 'therapist-2', full_name: 'Barbara Cummings', is_active: true },
+      ],
+      autoApplyHighConfidence: false,
+    })
+
+    expect(result.items).toHaveLength(2)
+    expect(result.items.map((item) => item.extractedEmployeeName)).toEqual([
+      'Lynn Snow',
+      'Barbara Cummings',
+    ])
+    const lynnItem = result.items.find((item) => item.extractedEmployeeName === 'Lynn Snow')
+    const barbaraItem = result.items.find(
+      (item) => item.extractedEmployeeName === 'Barbara Cummings'
+    )
+    expect(lynnItem?.requests).toEqual([
+      expect.objectContaining({ date: '2026-05-04', override_type: 'force_off' }),
+    ])
+    expect(barbaraItem?.requests).toEqual([
+      expect.objectContaining({ date: '2026-05-10', override_type: 'force_on' }),
+      expect.objectContaining({ date: '2026-05-11', override_type: 'force_on' }),
+    ])
+  })
+
+  it('expands weekday recurrence across the active block and leaves OCR-broken fragments for review', () => {
+    const result = parseAvailabilityEmailBatchSources({
+      normalizedBodyText: [
+        'Employee Name: Barbara Cummings',
+        '5/10 WORK',
+        '5/11 WORK',
+        '5/12',
+        '5 Sunday 5/ Back to work 25',
+        '',
+        'Employee Name: Kim Suarez',
+        'Comments= Off Tuesday + Wednesdays',
+        '',
+        'Employee Name: Kim Suarez',
+        'Comments= Off May 10th',
+      ].join('\n'),
+      attachments: [],
+      cycles: ptoCycles,
+      profiles: [
+        { id: 'therapist-1', full_name: 'Barbara Cummings', is_active: true },
+        { id: 'therapist-2', full_name: 'Kim Suarez', is_active: true },
+      ],
+      autoApplyHighConfidence: false,
+    })
+
+    expect(result.items).toHaveLength(2)
+
+    const barbaraItem = result.items.find(
+      (item) => item.extractedEmployeeName === 'Barbara Cummings'
+    )
+    const kimItem = result.items.find((item) => item.extractedEmployeeName === 'Kim Suarez')
+
+    expect(barbaraItem).toMatchObject({
+      parseStatus: 'needs_review',
+      unresolvedLines: ['5 Sunday 5/ Back to work 25'],
+      requests: [
+        expect.objectContaining({ date: '2026-05-10', override_type: 'force_on' }),
+        expect.objectContaining({ date: '2026-05-11', override_type: 'force_on' }),
+        expect.objectContaining({ date: '2026-05-12', override_type: 'force_off' }),
+      ],
+    })
+    expect(barbaraItem?.requests.some((request) => request.date === '2026-05-25')).toBe(false)
+
+    expect(kimItem?.parseStatus).toBe('parsed')
+    expect(kimItem?.requests).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ date: '2026-05-05', override_type: 'force_off' }),
+        expect.objectContaining({ date: '2026-05-06', override_type: 'force_off' }),
+        expect.objectContaining({ date: '2026-06-09', override_type: 'force_off' }),
+        expect.objectContaining({ date: '2026-06-10', override_type: 'force_off' }),
+        expect.objectContaining({ date: '2026-05-10', override_type: 'force_off' }),
+      ])
+    )
   })
 })
 

@@ -14,12 +14,12 @@ const { redirectMock, createClientMock, getRoleForUserMock, getPanelParamMock } 
 vi.mock('next/navigation', () => ({ redirect: redirectMock }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: createClientMock }))
-vi.mock('@/app/schedule/actions/helpers', () => ({
+vi.mock('@/app/(app)/schedule/actions/helpers', () => ({
   getRoleForUser: getRoleForUserMock,
   getPanelParam: getPanelParamMock,
 }))
 
-import { createCycleAction } from '@/app/schedule/actions/cycle-actions'
+import { createCycleAction } from '@/app/(app)/schedule/actions/cycle-actions'
 
 type TestContext = {
   userId?: string | null

@@ -50,6 +50,7 @@ type CycleManagementDialogProps = {
   onOpenChange: (open: boolean) => void
   createCycleAction: (formData: FormData) => void | Promise<void>
   deleteCycleAction: (formData: FormData) => void | Promise<void>
+  onStartFromTemplate?: (cycleId: string, startDate: string) => void
 }
 
 export function CycleManagementDialog({
@@ -58,6 +59,7 @@ export function CycleManagementDialog({
   onOpenChange,
   createCycleAction,
   deleteCycleAction,
+  onStartFromTemplate,
 }: CycleManagementDialogProps) {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const latestCycle = [...cycles].sort((a, b) => b.end_date.localeCompare(a.end_date))[0] ?? null
@@ -205,16 +207,29 @@ export function CycleManagementDialog({
                       </Button>
                     </form>
                   ) : (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                      onClick={() => setConfirmDeleteId(cycle.id)}
-                      aria-label={`Delete ${cycle.label}`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      {onStartFromTemplate ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-[10px]"
+                          onClick={() => onStartFromTemplate(cycle.id, cycle.start_date)}
+                        >
+                          Start from template
+                        </Button>
+                      ) : null}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => setConfirmDeleteId(cycle.id)}
+                        aria-label={`Delete ${cycle.label}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   )}
                 </li>
               ))}

@@ -1,12 +1,14 @@
 import { after, NextResponse } from 'next/server'
 
 import {
-  parseAvailabilityEmailItem,
+  parseAvailabilityEmailBatchSources,
   parseSender,
-  stripHtmlToText,
   summarizeAvailabilityEmailBatch,
-  type ParsedAvailabilityEmailItem,
+  stripHtmlToText,
+  type AvailabilityEmailBatchStatus,
   type IntakeCycle,
+  type AvailabilityEmailAttachmentSource,
+  type ParsedAvailabilityEmailItem,
 } from '@/lib/availability-email-intake'
 import { extractTextFromAttachment } from '@/lib/openai-ocr'
 import { isValidResendWebhookRequest } from '@/lib/security/resend-webhook'
@@ -174,60 +176,6 @@ function normalizeEmail(value: string | null | undefined): string | null {
   return normalized.length > 0 ? normalized : null
 }
 
-function flattenBatchRequests(items: ParsedAvailabilityEmailItem[]) {
-  return items.flatMap((item) => item.requests)
-}
-
-function getBatchStatus(
-  items: ParsedAvailabilityEmailItem[]
-): 'parsed' | 'needs_review' | 'failed' | 'applied' {
-  if (items.length === 0) return 'failed'
-  if (items.some((item) => item.parseStatus === 'needs_review' || item.parseStatus === 'failed')) {
-    return 'needs_review'
-  }
-  if (items.every((item) => item.parseStatus === 'auto_applied')) {
-    return 'applied'
-  }
-  return 'parsed'
-}
-
-function buildSourceCandidates(params: {
-  normalizedBodyText: string
-  attachments: ResendAttachmentRecord[]
-}): Array<{
-  sourceType: 'body' | 'attachment'
-  sourceLabel: string
-  rawText: string
-  attachment: ResendAttachmentRecord | null
-}> {
-  const candidates: Array<{
-    sourceType: 'body' | 'attachment'
-    sourceLabel: string
-    rawText: string
-    attachment: ResendAttachmentRecord | null
-  }> = []
-
-  if (params.normalizedBodyText.trim().length > 0) {
-    candidates.push({
-      sourceType: 'body',
-      sourceLabel: 'Email body',
-      rawText: params.normalizedBodyText,
-      attachment: null,
-    })
-  }
-
-  for (const attachment of params.attachments) {
-    candidates.push({
-      sourceType: 'attachment',
-      sourceLabel: attachment.filename,
-      rawText: attachment.ocr_text ?? '',
-      attachment,
-    })
-  }
-
-  return candidates
-}
-
 function buildItemParseStatus(
   item: ParsedAvailabilityEmailItem,
   senderTrustedForMatchedTherapist: boolean
@@ -253,6 +201,10 @@ function isTrustedSenderForMatchedTherapist(params: {
   return params.therapistEmailById.get(params.matchedTherapistId) === params.senderEmail
 }
 
+function flattenBatchRequests(items: Array<{ requests: Array<Record<string, unknown>> }>) {
+  return items.flatMap((item) => item.requests)
+}
+
 function inferAttachmentContentType(params: { filename: string; contentType: string }): string {
   const normalized = params.contentType.toLowerCase()
   if (normalized !== 'application/octet-stream' && normalized !== 'binary/octet-stream') {
@@ -273,7 +225,7 @@ async function processInboundAvailabilityEmail(emailId: string) {
 
   const { data: activeProfiles } = await admin
     .from('profiles')
-    .select('id, full_name, email, is_active')
+    .select('id, full_name, is_active')
     .in('role', ['therapist', 'lead'])
     .eq('is_active', true)
     .is('archived_at', null)
@@ -366,17 +318,25 @@ async function processInboundAvailabilityEmail(emailId: string) {
     processedAttachments.push(attachmentRow)
   }
 
-  const parsedItems = buildSourceCandidates({
-    normalizedBodyText: normalizeEmailText(emailContent),
-    attachments: processedAttachments,
-  }).map((candidate) => {
-    const parsedItem = parseAvailabilityEmailItem({
-      sourceType: candidate.sourceType,
-      sourceLabel: candidate.sourceLabel,
-      rawText: candidate.rawText,
-      cycles,
-      profiles: ((activeProfiles ?? []) as MatchableProfile[]) ?? [],
+  const attachmentSources: AvailabilityEmailAttachmentSource[] = processedAttachments.map(
+    (attachment) => ({
+      id: attachment.id,
+      filename: attachment.filename,
+      rawText: attachment.ocr_text,
+      ocrStatus: attachment.ocr_status,
+      ocrModel: attachment.ocr_model,
+      ocrError: attachment.ocr_error ?? attachment.download_error,
     })
+  )
+
+  const parsedBatch = parseAvailabilityEmailBatchSources({
+    normalizedBodyText: normalizeEmailText(emailContent),
+    attachments: attachmentSources,
+    cycles,
+    profiles: ((activeProfiles ?? []) as MatchableProfile[]) ?? [],
+    autoApplyHighConfidence: true,
+  })
+  const parsedItems = parsedBatch.items.map((parsedItem) => {
     const senderTrustedForMatchedTherapist = isTrustedSenderForMatchedTherapist({
       senderEmail: sender.email,
       matchedTherapistId: parsedItem.matchedTherapistId,
@@ -398,12 +358,19 @@ async function processInboundAvailabilityEmail(emailId: string) {
       ...parsedItem,
       confidenceReasons,
       parseStatus: buildItemParseStatus(parsedItem, senderTrustedForMatchedTherapist),
-      attachment: candidate.attachment,
     }
   })
-
   const batchSummary = summarizeAvailabilityEmailBatch(parsedItems)
-  const batchStatus = getBatchStatus(parsedItems)
+  const batchStatus: AvailabilityEmailBatchStatus =
+    parsedItems.length === 0
+      ? 'failed'
+      : parsedItems.every((item) => item.parseStatus === 'failed')
+        ? 'failed'
+        : parsedItems.some((item) => item.parseStatus === 'needs_review')
+          ? 'needs_review'
+          : parsedItems.some((item) => item.parseStatus === 'auto_applied')
+            ? 'applied'
+            : 'parsed'
   const intakeInsert = {
     provider: 'resend',
     provider_email_id: emailId,
@@ -467,11 +434,11 @@ async function processInboundAvailabilityEmail(emailId: string) {
         intake_id: savedIntake.id,
         source_type: item.sourceType,
         source_label: item.sourceLabel,
-        attachment_id: null,
+        attachment_id: item.attachmentId,
         raw_text: item.rawText || null,
-        ocr_status: item.attachment?.ocr_status ?? 'not_run',
-        ocr_model: item.attachment?.ocr_model ?? null,
-        ocr_error: item.attachment?.ocr_error ?? item.attachment?.download_error ?? null,
+        ocr_status: item.ocrStatus,
+        ocr_model: item.ocrModel,
+        ocr_error: item.ocrError,
         parse_status: item.parseStatus,
         confidence_level: item.confidenceLevel,
         confidence_reasons: item.confidenceReasons,
@@ -479,8 +446,10 @@ async function processInboundAvailabilityEmail(emailId: string) {
         employee_match_candidates: item.employeeMatchCandidates,
         matched_therapist_id: item.matchedTherapistId,
         matched_cycle_id: item.matchedCycleId,
+        original_parsed_requests: item.requests,
         parsed_requests: item.requests,
         unresolved_lines: item.unresolvedLines,
+        manually_edited_at: null,
         auto_applied_at: item.parseStatus === 'auto_applied' ? new Date().toISOString() : null,
         auto_applied_by: null,
         apply_error: null,

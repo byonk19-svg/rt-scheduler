@@ -15,7 +15,7 @@ const BASE_INPUT = {
 }
 
 describe('coverage pre-flight', () => {
-  it('reuses the pure draft generator without mutating inputs', () => {
+  it('reuses the pure draft generator', () => {
     expect(runPreFlight(BASE_INPUT)).toEqual(generateDraftForCycle(BASE_INPUT))
   })
 

@@ -81,9 +81,9 @@ test.describe.serial('/team quick edit modal', () => {
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto('/team', { waitUntil: 'domcontentloaded' })
 
+    await expect(page.getByRole('tab', { name: 'Team directory' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Managers' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Day Shift' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Night Shift' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Day shift therapists' })).toBeVisible()
 
     await page.goto(`/team?edit_profile=${ctx!.therapist.id}`, { waitUntil: 'domcontentloaded' })
 

@@ -27,7 +27,7 @@ type Cycle = {
 type Props = {
   cycles: Cycle[]
   availabilityRows: AvailabilityEntryTableRow[]
-  conflicts: ConflictItem[]
+  conflicts?: ConflictItem[]
   initialCycleId: string
   /** Official submission timestamps from therapist_availability_submissions (not inferred from overrides). */
   submissionsByCycleId: Record<string, { submittedAt: string; lastEditedAt: string }>
@@ -61,7 +61,7 @@ function monthRibbonLabel(isoDate: string, previousIsoDate: string | null): stri
 export function TherapistAvailabilityWorkspace({
   cycles,
   availabilityRows,
-  conflicts,
+  conflicts = [],
   initialCycleId,
   submissionsByCycleId,
   submitTherapistAvailabilityGridAction,
@@ -183,10 +183,6 @@ export function TherapistAvailabilityWorkspace({
   }, [cycleDays, draftStatusByDate, selectedCycle])
 
   const requestToWorkCount = canWorkDates.length
-  const visibleConflicts = useMemo(
-    () => (selectedCycleId === initialCycleId ? conflicts : []),
-    [conflicts, initialCycleId, selectedCycleId]
-  )
 
   const serverSubmission = submissionsByCycleId[selectedCycleId]
   const submissionUi = useMemo(
@@ -451,8 +447,8 @@ export function TherapistAvailabilityWorkspace({
         </ol>
       </header>
 
-      {visibleConflicts.length > 0 ? (
-        <ScheduledConflictBanner conflicts={visibleConflicts} onDismiss={() => {}} />
+      {conflicts.length > 0 ? (
+        <ScheduledConflictBanner conflicts={conflicts} onDismiss={() => {}} />
       ) : null}
 
       <form

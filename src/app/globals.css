@@ -122,6 +122,73 @@
    Do not add a .dark {} block with identical light-mode values.
    UI primitives omit `dark:` Tailwind variants until a real dark palette ships. */
 
+.dark {
+  color-scheme: dark;
+
+  --background: hsl(220 15% 10%);
+  --foreground: hsl(220 10% 92%);
+  --card: hsl(220 15% 14%);
+  --card-foreground: hsl(220 10% 92%);
+  --popover: hsl(220 15% 14%);
+  --popover-foreground: hsl(220 10% 92%);
+  --primary: hsl(203 93% 35%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(220 15% 18%);
+  --secondary-foreground: hsl(220 10% 92%);
+  --muted: hsl(220 15% 18%);
+  --muted-foreground: hsl(220 10% 72%);
+  --accent: hsl(38 75% 52%);
+  --accent-foreground: hsl(220 25% 12%);
+  --destructive: hsl(0 55% 50%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(220 15% 22%);
+  --input: hsl(220 15% 22%);
+  --input-background: hsl(220 15% 14%);
+  --ring: hsl(203 93% 35%);
+
+  --sidebar: hsl(220 18% 12%);
+  --sidebar-foreground: hsl(220 10% 86%);
+  --sidebar-primary: hsl(220 10% 92%);
+  --sidebar-primary-foreground: hsl(220 18% 12%);
+  --sidebar-accent: hsl(220 15% 20%);
+  --sidebar-accent-foreground: hsl(220 10% 92%);
+  --sidebar-border: hsl(220 15% 24%);
+  --sidebar-ring: hsl(38 75% 52%);
+  --sidebar-muted: hsl(220 10% 68%);
+
+  --chart-1: hsl(203 80% 44%);
+  --chart-2: hsl(192 30% 42%);
+  --chart-3: hsl(38 75% 52%);
+  --chart-4: hsl(220 10% 92%);
+  --chart-5: hsl(220 15% 18%);
+
+  --success: hsl(152 42% 34%);
+  --success-subtle: hsl(152 24% 18%);
+  --success-border: hsl(152 22% 28%);
+  --success-text: hsl(152 42% 74%);
+  --warning: hsl(38 75% 52%);
+  --warning-subtle: hsl(38 34% 18%);
+  --warning-border: hsl(38 28% 28%);
+  --warning-text: hsl(38 80% 76%);
+  --error: hsl(0 52% 48%);
+  --error-subtle: hsl(0 28% 18%);
+  --error-border: hsl(0 24% 28%);
+  --error-text: hsl(0 60% 78%);
+  --info: hsl(187 42% 34%);
+  --info-subtle: hsl(187 24% 18%);
+  --info-border: hsl(187 22% 28%);
+  --info-text: hsl(187 48% 76%);
+
+  --highlight: hsl(203 93% 35%);
+  --attention: hsl(38 75% 52%);
+
+  --home-glow-warm: rgba(233, 164, 58, 0.18);
+  --home-glow-cool: rgba(6, 103, 169, 0.14);
+  --home-panel: rgba(23, 29, 40, 0.78);
+  --home-panel-border: rgba(255, 255, 255, 0.08);
+  --home-shadow: rgba(0, 0, 0, 0.38);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -221,8 +288,8 @@
 
 .teamwise-home-grid {
   background-image:
-    linear-gradient(rgba(106, 165, 200, 0.075) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(106, 165, 200, 0.075) 1px, transparent 1px);
+    linear-gradient(rgba(106, 165, 200, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(106, 165, 200, 0.05) 1px, transparent 1px);
   background-size: 28px 28px;
   mask-image: linear-gradient(
     180deg,
@@ -245,14 +312,6 @@
   .teamwise-home-preview-shell {
     backdrop-filter: none;
   }
-}
-
-/* Auth pages — dark sidebar grid (replaces inline backgroundImage on login/signup) */
-.teamwise-auth-brand-grid {
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.09) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.09) 1px, transparent 1px);
-  background-size: 28px 28px;
 }
 
 /* Public marketing header — blur disabled when user prefers reduced motion */
@@ -470,6 +529,26 @@
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--card) 45%, white 55%);
 }
 
+@media (max-width: 767px) {
+  .coverage-calendar-mobile {
+    display: block;
+  }
+
+  .coverage-calendar-mobile-list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+
+  .coverage-calendar-mobile-day {
+    min-height: 120px;
+  }
+
+  .coverage-roster-scroll {
+    overflow-x: auto;
+  }
+}
+
 /* ─── Print ───────────────────────────────────────────────────────────────── */
 
 .print-only {
@@ -480,6 +559,57 @@
   @page {
     size: landscape;
     margin: 0.35in;
+  }
+
+  .dark {
+    color-scheme: light;
+    --background: hsl(38 18% 96%);
+    --foreground: hsl(220 25% 12%);
+    --card: hsl(38 14% 99%);
+    --card-foreground: hsl(220 25% 12%);
+    --popover: hsl(0 0% 100%);
+    --popover-foreground: hsl(220 25% 12%);
+    --primary: hsl(187 55% 28%);
+    --primary-foreground: hsl(0 0% 100%);
+    --secondary: hsl(32 18% 91%);
+    --secondary-foreground: hsl(220 25% 12%);
+    --muted: hsl(32 12% 93%);
+    --muted-foreground: hsl(220 12% 38%);
+    --accent: hsl(38 90% 55%);
+    --accent-foreground: hsl(220 25% 12%);
+    --destructive: hsl(0 65% 55%);
+    --destructive-foreground: hsl(0 0% 100%);
+    --border: hsl(32 14% 86%);
+    --input: hsl(32 14% 86%);
+    --input-background: hsl(38 14% 99%);
+    --ring: hsl(187 55% 28%);
+    --sidebar: hsl(192 28% 20%);
+    --sidebar-foreground: hsl(190 12% 82%);
+    --sidebar-primary: hsl(38 25% 98%);
+    --sidebar-primary-foreground: hsl(192 32% 18%);
+    --sidebar-accent: hsl(192 42% 30%);
+    --sidebar-accent-foreground: hsl(38 30% 98%);
+    --sidebar-border: hsl(192 24% 34%);
+    --sidebar-ring: hsl(38 90% 55%);
+    --sidebar-muted: hsl(192 16% 58%);
+    --success: hsl(152 50% 38%);
+    --success-subtle: hsl(150 45% 93%);
+    --success-border: hsl(150 30% 82%);
+    --success-text: hsl(152 50% 30%);
+    --warning: hsl(38 90% 55%);
+    --warning-subtle: hsl(45 95% 90%);
+    --warning-border: hsl(40 85% 76%);
+    --warning-text: hsl(35 70% 35%);
+    --error: hsl(0 65% 55%);
+    --error-subtle: hsl(0 70% 94%);
+    --error-border: hsl(0 60% 83%);
+    --error-text: hsl(0 55% 38%);
+    --info: hsl(187 55% 35%);
+    --info-subtle: hsl(187 50% 92%);
+    --info-border: hsl(187 35% 80%);
+    --info-text: hsl(187 60% 30%);
+    --highlight: hsl(187 55% 28%);
+    --attention: hsl(38 90% 55%);
   }
 
   .no-print {
@@ -602,14 +732,16 @@
     color: #374151;
   }
 
-  .print-confidentiality-footer {
-    display: flex;
-    justify-content: space-between;
-    font-size: 8pt;
-    border-top: 1px solid #ccc;
-    margin-top: 1rem;
-    padding-top: 0.25rem;
-    color: #666;
+  .coverage-calendar-mobile {
+    display: none !important;
+  }
+
+  .coverage-calendar-desktop {
+    display: block !important;
+  }
+
+  .coverage-calendar-desktop-grid {
+    min-width: 0 !important;
   }
 }
 

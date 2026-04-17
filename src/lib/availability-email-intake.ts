@@ -1,7 +1,10 @@
 import {
+  extractAvailabilityEmployeeName,
   matchAvailabilityEmailEmployee,
   type AvailabilityEmailEmployeeCandidate,
 } from '@/lib/availability-email-item-matcher'
+import { normalizeRosterFullName } from '@/lib/employee-roster-bulk'
+import { isPtoFormText as isStructuredPtoFormText, parsePtoForm } from '@/lib/pto-form-parser'
 
 type AvailabilityOverrideType = 'force_off' | 'force_on'
 type AvailabilityShiftType = 'day' | 'night' | 'both'
@@ -53,6 +56,30 @@ export type ParsedAvailabilityEmailBatch = {
   summary: string
 }
 
+export type AvailabilityEmailBatchStatus = 'parsed' | 'needs_review' | 'failed' | 'applied'
+
+export type AvailabilityEmailAttachmentSource = {
+  id: string | null
+  filename: string
+  rawText: string | null
+  ocrStatus: 'not_run' | 'completed' | 'failed' | 'skipped'
+  ocrModel: string | null
+  ocrError: string | null
+}
+
+export type ParsedAvailabilityEmailBatchItem = ParsedAvailabilityEmailItem & {
+  attachmentId: string | null
+  ocrStatus: 'not_run' | 'completed' | 'failed' | 'skipped'
+  ocrModel: string | null
+  ocrError: string | null
+}
+
+export type ParsedAvailabilityEmailBatchResult = {
+  items: ParsedAvailabilityEmailBatchItem[]
+  batchStatus: AvailabilityEmailBatchStatus
+  batchSummary: ParsedAvailabilityEmailBatch
+}
+
 type MatchableProfile = {
   id: string
   full_name: string
@@ -101,7 +128,23 @@ const WORK_PATTERNS = [
   /\bcan work\b/i,
   /\bavailable\b/i,
   /\bmust work\b/i,
+  /\bno pto\b/i,
+  /\bworking\b/i,
   /\bwork\b/i,
+]
+
+const PTO_METADATA_PATTERNS = [
+  /^\s*-+\s*$/i,
+  /^pto request(?:\/edit form)?$/i,
+  /^employee name\s*:/i,
+  /^department\s*:/i,
+  /^kronos number\s*:/i,
+  /^employee signature\s*:/i,
+  /^signature\s*:/i,
+  /^pto type\s*:/i,
+  /^comments\s*:/i,
+  /^date\s+pto hours\b/i,
+  /^date\b[:\s-]+\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/i,
 ]
 
 const INTENT_MATCHERS: Array<{ type: AvailabilityOverrideType; pattern: RegExp }> = [
@@ -116,6 +159,7 @@ const INTENT_MATCHERS: Array<{ type: AvailabilityOverrideType; pattern: RegExp }
   { type: 'force_on', pattern: /\bcan work\b/gi },
   { type: 'force_on', pattern: /\bmust work\b/gi },
   { type: 'force_on', pattern: /\bavailable\b/gi },
+  { type: 'force_on', pattern: /\bworking\b/gi },
   { type: 'force_on', pattern: /\bwork\b/gi },
 ]
 
@@ -212,6 +256,46 @@ function inferCycleScopedDate(token: string, cycles: IntakeCycle[]): string | nu
 
 function normalizeLine(line: string): string {
   return line.replace(/\s+/g, ' ').trim()
+}
+
+function stripOrdinalSuffixes(value: string): string {
+  return value.replace(/\b(\d{1,2})(st|nd|rd|th)\b/gi, '$1')
+}
+
+function shouldIgnorePtoMetadataLine(line: string): boolean {
+  return PTO_METADATA_PATTERNS.some((pattern) => pattern.test(line))
+}
+
+function looksLikeReducedPtoEmployeeBlock(text: string): boolean {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => normalizeLine(line))
+    .filter((line) => line.length > 0)
+
+  if (!lines.some((line) => /^employee name\s*:/i.test(line))) return false
+
+  let ptoSignals = 0
+  for (const line of lines) {
+    if (/^employee name\s*:/i.test(line)) continue
+
+    if (shouldIgnorePtoMetadataLine(line) || /^comments?\s*[:=]/i.test(line)) {
+      ptoSignals += 1
+      continue
+    }
+
+    const normalized = stripOrdinalSuffixes(line)
+    const startsWithDateishContent =
+      /^(?:off\s+|work(?:ing)?\s+|no\s+pto\s+)?(?:\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|[A-Za-z]+\.?\s+\d{1,2})\b/i.test(
+        normalized
+      ) || /^\d{1,2}\s*[-/]\s*\d{1,2}\b/.test(normalized)
+
+    if (startsWithDateishContent) {
+      ptoSignals += 1
+      continue
+    }
+  }
+
+  return ptoSignals >= 2
 }
 
 function splitIntoCandidateLines(text: string): string[] {
@@ -331,6 +415,104 @@ function shouldIgnoreUnresolvedRequestLine(line: string): boolean {
   return /\bpto\b/i.test(line) && /\brequest\b/i.test(line) && extractDateTokens(line).length === 0
 }
 
+function parsePtoFormAvailability(
+  sourceText: string,
+  cycles: IntakeCycle[]
+): ParsedAvailabilityEmail {
+  return parsePtoForm(sourceText, cycles)
+}
+
+function splitEmployeeFormBlocks(text: string): string[] {
+  const rawLines = text.split(/\r?\n/)
+  const blocks: string[][] = []
+  let current: string[] = []
+  let seenEmployeeHeader = false
+  const hasEmployeeHeader = rawLines.some((rawLine) => /^employee name\s*:/i.test(rawLine.trim()))
+
+  for (const rawLine of rawLines) {
+    const line = rawLine.trim()
+    if (!line) continue
+
+    if (/^\s*-{3,}\s*$/.test(line)) {
+      if (current.length > 0) {
+        blocks.push(current)
+        current = []
+      }
+      continue
+    }
+
+    if (/^employee name\s*:/i.test(line)) {
+      seenEmployeeHeader = true
+      if (current.length > 0) {
+        blocks.push(current)
+        current = []
+      }
+    }
+
+    if (!seenEmployeeHeader && hasEmployeeHeader) {
+      continue
+    }
+
+    current.push(rawLine)
+  }
+
+  if (current.length > 0) {
+    blocks.push(current)
+  }
+
+  return blocks.length > 1 ? blocks.map((block) => block.join('\n').trim()) : [text]
+}
+
+function sanitizeEmployeeBlockText(block: string): string {
+  return block
+    .replace(/^---\s*Page\s+\d+\s*---$/gim, '')
+    .replace(/Employee Name:\s*Employee Name:\s*/gi, 'Employee Name: ')
+    .replace(/\n{2,}/g, '\n')
+    .trim()
+}
+
+function expandSourceCandidateIntoEmployeeBlocks(candidate: {
+  sourceType: 'body' | 'attachment'
+  sourceLabel: string
+  rawText: string
+  attachment: AvailabilityEmailAttachmentSource | null
+}): Array<{
+  sourceType: 'body' | 'attachment'
+  sourceLabel: string
+  rawText: string
+  attachment: AvailabilityEmailAttachmentSource | null
+}> {
+  const blocks = splitEmployeeFormBlocks(candidate.rawText)
+  if (blocks.length <= 1) return [candidate]
+
+  const merged = new Map<
+    string,
+    {
+      sourceType: 'body' | 'attachment'
+      sourceLabel: string
+      rawText: string
+      attachment: AvailabilityEmailAttachmentSource | null
+    }
+  >()
+
+  for (const block of blocks) {
+    const sanitizedBlock = sanitizeEmployeeBlockText(block)
+    const extractedName = extractAvailabilityEmployeeName(sanitizedBlock)
+    const key = extractedName ? normalizeRosterFullName(extractedName) : `block:${merged.size}`
+    const existing = merged.get(key)
+    if (existing) {
+      existing.rawText = `${existing.rawText}\n${sanitizedBlock}`.trim()
+      continue
+    }
+    merged.set(key, {
+      ...candidate,
+      rawText: sanitizedBlock,
+    })
+  }
+
+  return [...merged.values()]
+}
+
 function buildConfidenceReasons(params: {
   therapistMatch: ReturnType<typeof matchAvailabilityEmailEmployee>
   parsed: ParsedAvailabilityEmail
@@ -431,6 +613,110 @@ export function summarizeAvailabilityEmailBatch(
   }
 }
 
+function buildSourceCandidates(params: {
+  normalizedBodyText: string
+  attachments: AvailabilityEmailAttachmentSource[]
+}): Array<{
+  sourceType: 'body' | 'attachment'
+  sourceLabel: string
+  rawText: string
+  attachment: AvailabilityEmailAttachmentSource | null
+}> {
+  const candidates: Array<{
+    sourceType: 'body' | 'attachment'
+    sourceLabel: string
+    rawText: string
+    attachment: AvailabilityEmailAttachmentSource | null
+  }> = []
+
+  if (params.normalizedBodyText.trim().length > 0) {
+    candidates.push({
+      sourceType: 'body',
+      sourceLabel: 'Email body',
+      rawText: params.normalizedBodyText,
+      attachment: null,
+    })
+  }
+
+  for (const attachment of params.attachments) {
+    candidates.push({
+      sourceType: 'attachment',
+      sourceLabel: attachment.filename,
+      rawText: attachment.rawText ?? '',
+      attachment,
+    })
+  }
+
+  return candidates.flatMap((candidate) => expandSourceCandidateIntoEmployeeBlocks(candidate))
+}
+
+function buildItemParseStatus(params: {
+  item: ParsedAvailabilityEmailItem
+  autoApplyHighConfidence: boolean
+}): ParsedAvailabilityEmailItem['parseStatus'] {
+  if (
+    params.autoApplyHighConfidence &&
+    params.item.confidenceLevel === 'high' &&
+    params.item.matchedTherapistId &&
+    params.item.matchedCycleId &&
+    params.item.requests.length > 0
+  ) {
+    return 'auto_applied'
+  }
+
+  return params.item.parseStatus
+}
+
+function getBatchStatus(items: ParsedAvailabilityEmailItem[]): AvailabilityEmailBatchStatus {
+  if (items.length === 0) return 'failed'
+  if (items.some((item) => item.parseStatus === 'needs_review' || item.parseStatus === 'failed')) {
+    return 'needs_review'
+  }
+  if (items.every((item) => item.parseStatus === 'auto_applied')) {
+    return 'applied'
+  }
+  return 'parsed'
+}
+
+export function parseAvailabilityEmailBatchSources(params: {
+  normalizedBodyText: string
+  attachments: AvailabilityEmailAttachmentSource[]
+  cycles: IntakeCycle[]
+  profiles: MatchableProfile[]
+  autoApplyHighConfidence?: boolean
+}): ParsedAvailabilityEmailBatchResult {
+  const items = buildSourceCandidates({
+    normalizedBodyText: params.normalizedBodyText,
+    attachments: params.attachments,
+  }).map((candidate) => {
+    const parsedItem = parseAvailabilityEmailItem({
+      sourceType: candidate.sourceType,
+      sourceLabel: candidate.sourceLabel,
+      rawText: candidate.rawText,
+      cycles: params.cycles,
+      profiles: params.profiles,
+    })
+
+    return {
+      ...parsedItem,
+      parseStatus: buildItemParseStatus({
+        item: parsedItem,
+        autoApplyHighConfidence: params.autoApplyHighConfidence ?? false,
+      }),
+      attachmentId: candidate.attachment?.id ?? null,
+      ocrStatus: candidate.attachment?.ocrStatus ?? 'not_run',
+      ocrModel: candidate.attachment?.ocrModel ?? null,
+      ocrError: candidate.attachment?.ocrError ?? null,
+    } satisfies ParsedAvailabilityEmailBatchItem
+  })
+
+  return {
+    items,
+    batchStatus: getBatchStatus(items),
+    batchSummary: summarizeAvailabilityEmailBatch(items),
+  }
+}
+
 export function stripHtmlToText(html: string | null | undefined): string {
   if (!html) return ''
   return html
@@ -467,6 +753,10 @@ export function parseAvailabilityEmail(
   sourceText: string,
   cycles: IntakeCycle[]
 ): ParsedAvailabilityEmail {
+  if (isStructuredPtoFormText(sourceText) || looksLikeReducedPtoEmployeeBlock(sourceText)) {
+    return parsePtoFormAvailability(sourceText, cycles)
+  }
+
   const lines = splitIntoCandidateLines(sourceText)
   const requests: ParsedAvailabilityRequest[] = []
   const unresolvedLines: string[] = []

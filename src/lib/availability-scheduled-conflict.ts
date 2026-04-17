@@ -1,35 +1,21 @@
-export type ConflictItem = {
-  date: string
-  shiftType: 'day' | 'night' | 'both'
-}
-
-type AvailabilityOverride = {
-  date: string
-  shift_type: string
-  override_type: string
-}
-
-type ScheduledShift = {
-  date: string
-  shift_type: string
-}
+export type ConflictItem = { date: string; shiftType: 'day' | 'night' | 'both' }
 
 export function findScheduledConflicts(
-  overrides: AvailabilityOverride[],
-  scheduledShifts: ScheduledShift[]
+  overrides: Array<{ date: string; shift_type: string; override_type: string }>,
+  scheduledShifts: Array<{ date: string; shift_type: string }>
 ): ConflictItem[] {
   return overrides.flatMap((override) => {
     if (override.override_type !== 'force_off') return []
 
-    const hasMatchingShift = scheduledShifts.some((scheduledShift) => {
-      if (scheduledShift.date !== override.date) return false
+    const hasConflict = scheduledShifts.some((shift) => {
+      if (shift.date !== override.date) return false
       if (override.shift_type === 'both') return true
-      return scheduledShift.shift_type === override.shift_type
+      return shift.shift_type === override.shift_type
     })
 
-    if (!hasMatchingShift) return []
+    if (!hasConflict) return []
 
-    const shiftType =
+    const shiftType: ConflictItem['shiftType'] =
       override.shift_type === 'day' || override.shift_type === 'night'
         ? override.shift_type
         : 'both'
