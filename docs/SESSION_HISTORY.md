@@ -1,5 +1,11 @@
 # Session History
 
+## Session 84 - 2026-04-17
+
+- Fixed the live `/schedule` roster so the Day and Night segments now filter therapists by `profiles.shift_type` before splitting into Core vs PRN sections.
+- The read-only roster badges now reflect the filtered shift-specific staff counts instead of counting the full active therapist pool on both tabs.
+- Verified with the targeted schedule-roster unit test plus focused lint/type diagnostics on the touched files; full repo `tsc --noEmit` is still blocked by the unrelated `matched_email` fixture issue in `src/components/team/EmployeeRosterPanel.test.ts`.
+
 ## Session 83 - 2026-04-17
 
 - Restored the missing therapist scheduled-conflict warning on `/therapist/availability`, including active-cycle scheduled shift lookup and a dismissible warning banner for `force_off` dates that already have a scheduled shift.

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildAssignmentStoreFromShifts,
   buildAvailabilityApprovalStoreFromSubmittedOverrides,
+  splitStaffByRosterAndShift,
 } from '@/lib/schedule-roster-data'
 import { createAssignmentKey } from '@/lib/mock-coverage-roster'
 
@@ -50,5 +51,45 @@ describe('buildAvailabilityApprovalStoreFromSubmittedOverrides', () => {
       new Set()
     )
     expect(Object.keys(store)).toHaveLength(0)
+  })
+})
+
+describe('splitStaffByRosterAndShift', () => {
+  const staff = [
+    {
+      id: 'day-core',
+      name: 'Day Core',
+      roleLabel: 'Therapist' as const,
+      rosterKind: 'core' as const,
+      shiftType: 'day' as const,
+    },
+    {
+      id: 'night-core',
+      name: 'Night Core',
+      roleLabel: 'Therapist' as const,
+      rosterKind: 'core' as const,
+      shiftType: 'night' as const,
+    },
+    {
+      id: 'day-prn',
+      name: 'Day PRN',
+      roleLabel: 'Therapist' as const,
+      rosterKind: 'prn' as const,
+      shiftType: 'day' as const,
+    },
+  ]
+
+  it('returns only staff assigned to the selected day shift', () => {
+    const sections = splitStaffByRosterAndShift(staff, 'day')
+
+    expect(sections.core.map((member) => member.id)).toEqual(['day-core'])
+    expect(sections.prn.map((member) => member.id)).toEqual(['day-prn'])
+  })
+
+  it('returns only staff assigned to the selected night shift', () => {
+    const sections = splitStaffByRosterAndShift(staff, 'night')
+
+    expect(sections.core.map((member) => member.id)).toEqual(['night-core'])
+    expect(sections.prn).toEqual([])
   })
 })

@@ -7,7 +7,7 @@ Web app for respiratory therapy scheduling with role-based workflows:
 - 6-week schedule cycle management
 - **Canonical staff schedule:** [`/coverage`](<./src/app/(app)/coverage/page.tsx>) supports both `Grid` and `Roster` layouts; server entry is `page.tsx`, initial snapshot loading lives in [`coverage-page-data.ts`](<./src/app/(app)/coverage/coverage-page-data.ts>), and interactive client logic lives in [`CoverageClientPage.tsx`](<./src/app/(app)/coverage/CoverageClientPage.tsx>). The therapist compatibility route (`/therapist/schedule`) still redirects there and preserves explicit `view` params
 - **Mobile coverage:** on small screens, `/coverage` now shows one week at a time with previous/next controls and swipe navigation; print still renders the full desktop grid
-- **Roster matrix (read-only):** [`/schedule`](<./src/app/(app)/schedule/page.tsx>) — managers and leads only; shows the active cycle’s coverage assignments and officially submitted therapist availability (login required; not a public mock)
+- **Roster matrix (read-only):** [`/schedule`](<./src/app/(app)/schedule/page.tsx>) — managers and leads only; shows the active cycle’s coverage assignments and officially submitted therapist availability, and the Day/Night toggle now filters therapists by their configured `profiles.shift_type` so opposite-shift staff do not appear in the wrong roster (login required; not a public mock)
 - **Therapist availability:** 6-week grid on `/therapist/availability` — **Available** (default: neutral day, no forced on/off), **Unavailable**, **Must work** (hard autodraft `force_on`). When a therapist marks **Need Off** on a date that already has an active-cycle scheduled shift, the page shows a warning banner but still allows saving; see [`CLAUDE.md`](./CLAUDE.md)
 - Shift board (swap/pickup posts with manager approval)
 
@@ -25,7 +25,7 @@ Current architecture and quality snapshot: [`docs/REPO_HEALTH.md`](docs/REPO_HEA
 
 ## Cycle Workflow
 
-- [`/schedule`](<./src/app/(app)/schedule/page.tsx>) is a read-only roster view tied to the live cycle (assignments + submitted availability); staffing changes are made in Coverage.
+- [`/schedule`](<./src/app/(app)/schedule/page.tsx>) is a read-only roster view tied to the live cycle (assignments + submitted availability); its Day/Night toggle now filters therapists by `profiles.shift_type`, and staffing changes are still made in Coverage.
 
 - **Schedule** (nav label; route [`/coverage`](<./src/app/(app)/coverage/page.tsx>), rendered via [`CoverageClientPage.tsx`](<./src/app/(app)/coverage/CoverageClientPage.tsx>)) — create **New 6-week block**, staff the schedule in either **Grid** or **Roster** view, auto-draft, preliminary, **Publish**. Same cycle-selection rule everywhere: URL cycle if valid, else active window, else next upcoming, else none (empty state, not a fake grid).
 - Auto-draft now opens a pre-flight report first, summarizing likely unfilled slots, missing leads, and forced must-work misses using the real current shift set for that cycle.

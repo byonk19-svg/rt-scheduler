@@ -23,6 +23,7 @@ On `/team`, use Employee roster (single add or bulk paste) so names match what s
 1. Create or select a cycle in `/coverage`.
    - `New 6-week block` creates a draft cycle.
    - `/schedule` is a read-only authenticated roster matrix for managers and leads, backed by live cycle, shift, and submission data.
+   - The `/schedule` Day/Night toggle filters therapists by `profiles.shift_type` before splitting Core vs PRN sections, so opposite-shift therapists do not appear on the wrong roster.
    - `/coverage` remains the canonical protected scheduling workspace for staffing edits, publish actions, and availability-linked coverage work.
    - The manager AppShell treats both `/schedule` and `/coverage` as part of the `Schedule` section.
    - The fixed manager secondary nav must stay horizontally scrollable on narrow widths rather than shrinking or clipping workflow tabs.
