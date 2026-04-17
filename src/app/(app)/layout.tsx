@@ -1,6 +1,15 @@
-import AppShell, { type AppShellUser } from '@/components/AppShell'
+import dynamic from 'next/dynamic'
+import type { AppShellUser } from '@/components/AppShell'
 import { toUiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
+import type { ReactNode } from 'react'
+
+const AppShell = dynamic<{ user: AppShellUser | null; unreadNotificationCount: number; children: ReactNode }>(
+  () =>
+    import('@/components/AppShell').then(
+      (m) => m.default ?? (({ children }: { children: ReactNode }) => <>{children}</>)
+    )
+)
 
 export const dynamic = 'force-dynamic'
 
