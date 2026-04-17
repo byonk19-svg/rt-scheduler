@@ -254,7 +254,7 @@ export function TherapistAvailabilityWorkspace({
             variant="outline"
             size="sm"
             pendingText="Saving…"
-            className="h-10 shrink-0 px-4 font-semibold sm:min-w-[8.5rem]"
+            className="min-h-11 shrink-0 px-4 font-semibold sm:min-w-[8.5rem]"
           >
             Save progress
           </FormSubmitButton>
@@ -264,7 +264,7 @@ export function TherapistAvailabilityWorkspace({
             value="submit"
             size="sm"
             pendingText="Saving…"
-            className="h-10 shrink-0 gap-2 px-5 font-semibold shadow-sm sm:min-w-[10.5rem]"
+            className="min-h-11 shrink-0 gap-2 px-5 font-semibold shadow-sm sm:min-w-[10.5rem]"
           >
             <Send className="h-3.5 w-3.5" aria-hidden />
             Submit availability
@@ -277,7 +277,7 @@ export function TherapistAvailabilityWorkspace({
           value="submit"
           size="sm"
           pendingText="Saving…"
-          className="h-10 shrink-0 gap-2 px-5 font-semibold shadow-sm"
+          className="min-h-11 shrink-0 gap-2 px-5 font-semibold shadow-sm"
         >
           <Send className="h-3.5 w-3.5" aria-hidden />
           Save changes

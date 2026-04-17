@@ -116,8 +116,7 @@ export function ManagerTriageDashboard({
 
   return (
     <div className="max-w-[1120px] space-y-4 px-5 py-5 xl:px-7">
-      <div className="teamwise-aurora-bg relative overflow-hidden rounded-[26px] border border-border/70 bg-card p-5 shadow-tw-inbox-hero">
-        <div className="teamwise-grid-bg-subtle absolute inset-0 opacity-70" />
+      <div className="relative overflow-hidden rounded-[26px] border border-border/70 bg-card p-5 shadow-tw-inbox-hero">
         <div className="relative flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-3">
@@ -132,13 +131,13 @@ export function ManagerTriageDashboard({
             </div>
           </div>
           <div className="relative flex gap-2">
-            <Button variant="outline" size="sm" className="h-9 px-4" asChild>
+            <Button variant="outline" size="sm" className="min-h-11 px-4" asChild>
               <Link href={scheduleHref}>
                 <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
                 Open schedule
               </Link>
             </Button>
-            <Button size="sm" className="h-9 px-4" asChild>
+            <Button size="sm" className="min-h-11 px-4" asChild>
               <Link href={approvalsHref}>
                 <Send className="mr-1.5 h-3.5 w-3.5" />
                 Publish flow
@@ -182,7 +181,7 @@ export function ManagerTriageDashboard({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="mt-3 h-7 gap-1.5 text-xs"
+                      className="mt-3 min-h-11 gap-1.5 px-3 text-xs"
                       asChild
                     >
                       <Link href={scheduleHref}>
@@ -233,7 +232,7 @@ export function ManagerTriageDashboard({
                 </p>
               )}
               {todayActiveShifts.length > 0 && (
-                <Button variant="ghost" size="sm" className="h-7 gap-1 px-0 text-xs" asChild>
+                <Button variant="ghost" size="sm" className="min-h-11 gap-1 px-0 text-xs" asChild>
                   <Link href={scheduleHref}>
                     Fix coverage
                     <ArrowRight className="h-3.5 w-3.5" />
@@ -301,7 +300,7 @@ export function ManagerTriageDashboard({
               <p className="text-[11px] text-muted-foreground">
                 {approvalsWaiting === '--' ? LOADING_LABEL : `${approvalsWaiting} waiting`}
               </p>
-              <Button variant="ghost" size="sm" className="h-7 gap-1 px-0 text-xs" asChild>
+              <Button variant="ghost" size="sm" className="min-h-11 gap-1 px-0 text-xs" asChild>
                 <Link href={reviewHref}>
                   Review updates
                   <ArrowRight className="h-3.5 w-3.5" />
@@ -355,15 +354,12 @@ function MetricCard({
   const isEmpty = value === '0' || value === '0%' || value === '--'
   const toneClasses = {
     error: {
-      stripe: 'bg-[var(--error)]',
       badge: 'bg-[var(--error-subtle)] text-[var(--error-text)]',
     },
     warning: {
-      stripe: 'bg-[var(--warning)]',
       badge: 'bg-[var(--warning-subtle)] text-[var(--warning-text)]',
     },
     info: {
-      stripe: 'bg-primary',
       badge: 'bg-[var(--info-subtle)] text-[var(--info-text)]',
     },
   }[tone]
@@ -376,7 +372,6 @@ function MetricCard({
           isEmpty && 'border-dashed bg-muted/20 shadow-none'
         )}
       >
-        <div className={cn('absolute inset-x-0 top-0 h-1', toneClasses.stripe)} />
         <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4">
           <CardTitle className="text-sm font-medium text-foreground">{title}</CardTitle>
           <div className={cn('rounded-full p-2', toneClasses.badge)}>{icon}</div>
@@ -423,7 +418,7 @@ function InboxRow({
         <Button
           variant="ghost"
           size="sm"
-          className="mt-1 h-6 gap-1 px-0 text-xs text-primary"
+          className="mt-1 min-h-11 gap-1 px-0 text-xs text-primary"
           asChild
         >
           <Link href={ctaHref}>

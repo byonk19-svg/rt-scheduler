@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 import {
   AvailabilityEntriesTable,
   type AvailabilityEntryTableRow,
-} from '@/app/availability/availability-requests-table'
+} from '@/app/(app)/availability/availability-requests-table'
 
 const MANAGER_ROWS: AvailabilityEntryTableRow[] = [
   {
@@ -146,7 +146,7 @@ describe('AvailabilityEntriesTable', () => {
 
   it('uses Entry saved + last activity timestamp in expanded row detail (source)', () => {
     const src = readFileSync(
-      resolve(process.cwd(), 'src/app/availability/availability-requests-table.tsx'),
+      resolve(process.cwd(), 'src/app/(app)/availability/availability-requests-table.tsx'),
       'utf8'
     )
     expect(src).toContain('Entry saved')

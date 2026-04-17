@@ -4,7 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const staffDashboardSource = fs.readFileSync(
-  path.join(process.cwd(), 'src/app/dashboard/staff/page.tsx'),
+  path.join(process.cwd(), 'src/app/(app)/dashboard/staff/page.tsx'),
   'utf8'
 )
 

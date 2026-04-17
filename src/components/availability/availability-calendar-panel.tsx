@@ -72,7 +72,7 @@ export function AvailabilityCalendarPanel({
               size="sm"
               onClick={onPreviousMonth}
               aria-label="Previous month"
-              className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="h-11 w-11 rounded-full p-0 text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -85,7 +85,7 @@ export function AvailabilityCalendarPanel({
               size="sm"
               onClick={onNextMonth}
               aria-label="Next month"
-              className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="h-11 w-11 rounded-full p-0 text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -162,9 +162,9 @@ export function AvailabilityCalendarPanel({
                     state.savedPlanner === 'cannot_work' &&
                       'border-[var(--error-border)]/80 bg-[var(--error-subtle)]/45 text-[var(--error-text)]',
                     state.draftSelection === 'will_work' &&
-                      'border-primary bg-primary text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]',
+                      'border-primary bg-primary text-primary-foreground shadow-tw-inset-highlight-soft',
                     state.draftSelection === 'cannot_work' &&
-                      'border-[var(--error-text)] bg-[var(--error-text)] text-primary-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]',
+                      'border-[var(--error-text)] bg-[var(--error-text)] text-primary-foreground shadow-tw-inset-highlight-soft',
                     hasSavedPlanner && !state.draftSelection && 'ring-1 ring-primary/8'
                   )}
                 >

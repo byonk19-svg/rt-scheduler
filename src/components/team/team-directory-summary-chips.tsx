@@ -57,7 +57,7 @@ export function TeamDirectorySummaryChips({
   onChipChange,
 }: TeamDirectorySummaryChipsProps) {
   return (
-    <div className="flex flex-wrap gap-1.5" aria-label="Team quick filters">
+    <div role="group" className="flex flex-wrap gap-1.5" aria-label="Team quick filters">
       <Chip
         label="Total"
         value={summary.totalStaff}

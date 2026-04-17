@@ -37,8 +37,8 @@ export function AuditLogFilters({ action, actor }: AuditLogFiltersProps) {
   }
 
   return (
-    <div className="flex flex-wrap items-end gap-3">
-      <label className="flex min-w-[16rem] flex-1 flex-col gap-1">
+    <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end">
+      <label className="flex w-full flex-col gap-1 md:min-w-[14rem] md:flex-1">
         <span className="text-xs font-medium text-muted-foreground">Action contains</span>
         <input
           type="text"
@@ -49,7 +49,7 @@ export function AuditLogFilters({ action, actor }: AuditLogFiltersProps) {
           className="h-10 rounded-md border border-border bg-card px-3 text-sm text-foreground"
         />
       </label>
-      <label className="flex min-w-[16rem] flex-1 flex-col gap-1">
+      <label className="flex w-full flex-col gap-1 md:min-w-[14rem] md:flex-1">
         <span className="text-xs font-medium text-muted-foreground">Actor profile ID</span>
         <input
           type="text"
@@ -60,7 +60,7 @@ export function AuditLogFilters({ action, actor }: AuditLogFiltersProps) {
           className="h-10 rounded-md border border-border bg-card px-3 text-sm text-foreground"
         />
       </label>
-      <Button type="button" size="sm" onClick={pushFilters}>
+      <Button type="button" size="sm" className="min-h-11 self-start px-4" onClick={pushFilters}>
         Apply filters
       </Button>
     </div>

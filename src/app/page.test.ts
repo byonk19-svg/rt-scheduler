@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const pageSource = fs.readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+const pageSource = fs.readFileSync(path.join(process.cwd(), 'src/app/(public)/page.tsx'), 'utf8')
 
 describe('public homepage redesign contract', () => {
   it('uses therapist-first trust-forward copy', () => {
@@ -13,11 +13,8 @@ describe('public homepage redesign contract', () => {
     )
   })
 
-  it('keeps the header and hero CTA roles aligned', () => {
-    const signInMatches = pageSource.match(/>Sign in</g) ?? []
-    expect(signInMatches.length).toBeGreaterThanOrEqual(2)
-
-    expect(pageSource).toContain('<Link href="/signup">Get started</Link>')
+  it('keeps the hero CTAs aligned with the public auth flow', () => {
+    expect(pageSource).toContain('<Link href="/login">Sign in</Link>')
     expect(pageSource).toContain('<Link href="/signup">Create account</Link>')
   })
 

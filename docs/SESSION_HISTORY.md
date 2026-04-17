@@ -1,5 +1,11 @@
 # Session History
 
+## Session 86 - 2026-04-17
+
+- Completed the audit-driven cleanup pass on `claude/audit-log-bulk-team-clean`: removed the remaining accent-stripe/header chrome, reduced decorative public-shell halos, tokenized the logo plus lingering public/print values, and tightened a few shared semantics.
+- Finished the responsive follow-up by keeping compact schedule views active until `xl`, adding better small-screen behavior to `/team/import` preview and `/settings/audit-log` filters, and raising the remaining compact therapist/manager action controls toward touch-friendly sizes.
+- Reset the branch verification baseline: `npm run lint`, `npm run test:unit`, `npx tsc --noEmit`, and `npm run build` all pass after repairing stale route-group source tests and scoping lint away from generated artifact noise.
+
 ## Session 85 - 2026-04-17
 
 - Fixed the lingering dark-mode HMR crash by moving `ThemeProvider` ownership out of `src/app/layout.tsx` and into `src/components/AppShell.tsx`, keeping the root layout server-only while preserving cookie-backed initial theme resolution.

@@ -3,7 +3,10 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const src = fs.readFileSync(path.join(process.cwd(), 'src/app/pending-setup/page.tsx'), 'utf8')
+const src = fs.readFileSync(
+  path.join(process.cwd(), 'src/app/(app)/pending-setup/page.tsx'),
+  'utf8'
+)
 
 describe('pending-setup page copy', () => {
   it('uses the calm sit-tight waiting copy', () => {

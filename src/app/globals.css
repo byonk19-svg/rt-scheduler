@@ -111,11 +111,19 @@
   --attention: hsl(38 90% 55%);
 
   /* Homepage luminous marketing shell */
-  --home-glow-warm: rgba(241, 190, 105, 0.22);
-  --home-glow-cool: rgba(32, 122, 128, 0.16);
-  --home-panel: rgba(255, 251, 245, 0.78);
-  --home-panel-border: rgba(255, 255, 255, 0.72);
-  --home-shadow: rgba(15, 23, 42, 0.18);
+  --home-glow-warm: color-mix(in srgb, var(--attention) 22%, transparent);
+  --home-glow-cool: color-mix(in srgb, var(--primary) 16%, transparent);
+  --home-panel: color-mix(in srgb, var(--card) 82%, transparent);
+  --home-panel-border: color-mix(in srgb, white 72%, var(--card) 28%);
+  --home-shadow: color-mix(in srgb, var(--foreground) 18%, transparent);
+  --logo-mark-background: hsl(220 24% 14%);
+  --logo-mark-primary: hsl(38 90% 55%);
+  --logo-mark-secondary: hsl(35 84% 48%);
+  --print-paper: hsl(0 0% 100%);
+  --print-ink: hsl(220 25% 12%);
+  --print-ink-muted: hsl(220 18% 32%);
+  --print-surface-muted: hsl(220 14% 91%);
+  --print-surface-soft: hsl(220 16% 97%);
 }
 
 /* Dark mode is not yet implemented — tokens are intentionally absent.
@@ -182,11 +190,14 @@
   --highlight: hsl(203 93% 35%);
   --attention: hsl(38 75% 52%);
 
-  --home-glow-warm: rgba(233, 164, 58, 0.18);
-  --home-glow-cool: rgba(6, 103, 169, 0.14);
-  --home-panel: rgba(23, 29, 40, 0.78);
-  --home-panel-border: rgba(255, 255, 255, 0.08);
-  --home-shadow: rgba(0, 0, 0, 0.38);
+  --home-glow-warm: color-mix(in srgb, var(--attention) 18%, transparent);
+  --home-glow-cool: color-mix(in srgb, var(--highlight) 14%, transparent);
+  --home-panel: color-mix(in srgb, var(--card) 78%, transparent);
+  --home-panel-border: color-mix(in srgb, var(--sidebar-primary) 12%, transparent);
+  --home-shadow: color-mix(in srgb, var(--foreground) 38%, transparent);
+  --logo-mark-background: hsl(220 12% 92%);
+  --logo-mark-primary: hsl(38 75% 52%);
+  --logo-mark-secondary: hsl(35 72% 46%);
 }
 
 @layer base {
@@ -280,53 +291,43 @@
     radial-gradient(circle at 82% 16%, var(--home-glow-cool), transparent 34%),
     linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.62) 0%,
-      rgba(248, 244, 236, 0.16) 42%,
+      color-mix(in srgb, white 62%, transparent) 0%,
+      color-mix(in srgb, var(--background) 16%, transparent) 42%,
       transparent 100%
     );
 }
 
 .teamwise-home-grid {
   background-image:
-    linear-gradient(rgba(106, 165, 200, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(106, 165, 200, 0.05) 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--primary) 8%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--primary) 8%, transparent) 1px, transparent 1px);
   background-size: 28px 28px;
   mask-image: linear-gradient(
     180deg,
-    rgba(0, 0, 0, 0.7) 0%,
-    rgba(0, 0, 0, 0.18) 62%,
+    color-mix(in srgb, var(--foreground) 70%, transparent) 0%,
+    color-mix(in srgb, var(--foreground) 18%, transparent) 62%,
     transparent 100%
   );
 }
 
 .teamwise-home-preview-shell {
-  background: linear-gradient(180deg, var(--home-panel) 0%, rgba(250, 247, 241, 0.92) 100%);
+  background: linear-gradient(
+    180deg,
+    var(--home-panel) 0%,
+    color-mix(in srgb, var(--card) 92%, transparent) 100%
+  );
   border: 1px solid var(--home-panel-border);
   box-shadow:
     0 32px 72px -28px var(--home-shadow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.74);
-  backdrop-filter: blur(14px);
+    inset 0 1px 0 color-mix(in srgb, white 74%, transparent);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .teamwise-home-preview-shell {
-    backdrop-filter: none;
-  }
-}
-
-/* Public marketing header — blur disabled when user prefers reduced motion */
 .teamwise-marketing-header {
-  backdrop-filter: blur(20px);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .teamwise-marketing-header {
-    backdrop-filter: none;
-  }
+  background: color-mix(in srgb, var(--card) 92%, transparent);
 }
 
 .teamwise-home-preview-sheen {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.45), transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, white 45%, transparent), transparent);
 }
 
 /* ─── Typography ──────────────────────────────────────────────────────────── */
@@ -529,6 +530,10 @@
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--card) 45%, white 55%);
 }
 
+.shadow-tw-inset-highlight-soft {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 18%, transparent);
+}
+
 @media (max-width: 767px) {
   .coverage-calendar-mobile {
     display: block;
@@ -621,8 +626,8 @@
   }
 
   body {
-    background: #fff !important;
-    color: #000 !important;
+    background: var(--print-paper) !important;
+    color: var(--print-ink) !important;
   }
 
   .print-page {
@@ -631,7 +636,7 @@
   }
 
   .print-lottery-page {
-    color: #111827;
+    color: var(--print-ink);
     font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   }
 
@@ -671,14 +676,14 @@
   .print-lottery-table {
     width: 100%;
     border-collapse: collapse;
-    border: 2px solid #111827;
+    border: 2px solid var(--print-ink);
     font-size: 9px;
     table-layout: fixed;
   }
 
   .print-lottery-table th,
   .print-lottery-table td {
-    border: 1px solid #111827;
+    border: 1px solid var(--print-ink);
     height: 18px;
     padding: 1px 2px;
     text-align: center;
@@ -692,7 +697,7 @@
   }
 
   .print-lottery-header-row th {
-    background: #e5e7eb;
+    background: var(--print-surface-muted);
     font-weight: 700;
   }
 
@@ -708,7 +713,7 @@
 
   .print-prn-divider-row td {
     border-top-width: 3px !important;
-    background: #f9fafb;
+    background: var(--print-surface-soft);
   }
 
   .print-prn-divider-label {
@@ -717,7 +722,7 @@
   }
 
   .print-lottery-total-row td {
-    background: #f3f4f6;
+    background: var(--print-surface-muted);
     font-weight: 700;
   }
 
@@ -729,7 +734,7 @@
     margin-top: 4px;
     text-align: right;
     font-size: 9px;
-    color: #374151;
+    color: var(--print-ink-muted);
   }
 
   .coverage-calendar-mobile {

@@ -19,11 +19,11 @@ export default function HomePage() {
         <div aria-hidden className="teamwise-home-grid absolute inset-0" />
         <div
           aria-hidden
-          className="absolute left-[4%] top-24 h-40 w-40 rounded-full bg-[var(--home-glow-warm)] blur-3xl"
+          className="absolute left-[4%] top-24 h-40 w-40 rounded-full bg-[var(--home-glow-warm)] blur-2xl"
         />
         <div
           aria-hidden
-          className="absolute right-[8%] top-16 h-56 w-56 rounded-full bg-[var(--home-glow-cool)] blur-3xl"
+          className="absolute right-[8%] top-16 h-56 w-56 rounded-full bg-[var(--home-glow-cool)] blur-2xl"
         />
 
         <div className="relative mx-auto w-full max-w-6xl px-6 pb-16 pt-16 lg:pb-24 lg:pt-24">
@@ -92,7 +92,7 @@ export default function HomePage() {
             >
               <div
                 aria-hidden
-                className="absolute inset-x-6 -bottom-8 h-20 rounded-full bg-[var(--home-glow-cool)]/55 blur-3xl lg:inset-x-2"
+                className="absolute inset-x-6 -bottom-8 h-20 rounded-full bg-[var(--home-glow-cool)]/55 blur-2xl lg:inset-x-2"
               />
               <div className="teamwise-home-preview-shell relative overflow-hidden rounded-[2rem] p-3 ring-1 ring-primary/15 md:p-4">
                 <div
@@ -106,9 +106,9 @@ export default function HomePage() {
                     fill
                     className="object-cover object-top"
                     priority
-                    unoptimized
+                    sizes="(min-width: 1024px) 960px, (min-width: 640px) 92vw, 100vw"
                   />
-                  <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-[var(--background)] via-[rgba(245,241,234,0.88)] to-transparent" />
+                  <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-[var(--background)] via-[color-mix(in_srgb,var(--card)_84%,transparent)] to-transparent" />
                 </div>
               </div>
             </div>

@@ -3,12 +3,13 @@ import { resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const source = readFileSync(resolve(process.cwd(), 'src/app/schedule/page.tsx'), 'utf8')
+const source = readFileSync(resolve(process.cwd(), 'src/app/(app)/schedule/page.tsx'), 'utf8')
 
 describe('schedule route', () => {
-  it('renders the mock roster screen instead of redirecting back to live coverage', () => {
+  it('renders the roster screen and only redirects staff on forbidden access', () => {
     expect(source).toContain('ScheduleRosterScreen')
-    expect(source).not.toContain('redirect(')
+    expect(source).toContain("redirect('/dashboard/staff')")
+    expect(source).not.toContain("redirect('/coverage')")
   })
 
   it('keeps the screen deterministic by using the mock roster data layer', () => {

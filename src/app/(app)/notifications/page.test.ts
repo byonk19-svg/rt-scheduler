@@ -4,7 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const notificationsPageSource = fs.readFileSync(
-  path.join(process.cwd(), 'src/app/notifications/page.tsx'),
+  path.join(process.cwd(), 'src/app/(app)/notifications/page.tsx'),
   'utf8'
 )
 

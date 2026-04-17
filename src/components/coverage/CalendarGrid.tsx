@@ -355,13 +355,13 @@ export function CalendarGrid({
 
   return (
     <>
-      <div className="coverage-calendar-mobile md:hidden">
+      <div className="coverage-calendar-mobile xl:hidden">
         <div className="coverage-calendar-mobile-header mb-3 flex items-center justify-between">
           <button
             type="button"
             onClick={onSwipeRight}
             disabled={weekOffset <= 0}
-            className="rounded-md border border-border/70 bg-card px-3 py-1.5 text-sm font-medium text-foreground disabled:opacity-40"
+            className="min-h-11 rounded-md border border-border/70 bg-card px-3 py-1.5 text-sm font-medium text-foreground disabled:opacity-40"
           >
             ← Prev week
           </button>
@@ -372,7 +372,7 @@ export function CalendarGrid({
             type="button"
             onClick={onSwipeLeft}
             disabled={totalWeeks === 0 || weekOffset >= totalWeeks - 1}
-            className="rounded-md border border-border/70 bg-card px-3 py-1.5 text-sm font-medium text-foreground disabled:opacity-40"
+            className="min-h-11 rounded-md border border-border/70 bg-card px-3 py-1.5 text-sm font-medium text-foreground disabled:opacity-40"
           >
             Next week →
           </button>
@@ -402,10 +402,10 @@ export function CalendarGrid({
         )}
       </div>
 
-      <div className="coverage-calendar-desktop hidden md:block">
-        <div role="grid" aria-label="Coverage calendar" className="overflow-x-auto pb-2">
-          <div className="coverage-calendar-desktop-grid min-w-[1024px] space-y-2.5">
-            <div className="grid grid-cols-[96px_repeat(7,minmax(0,1fr))] gap-2">
+      <div className="coverage-calendar-desktop hidden xl:block">
+        <div role="grid" aria-label="Coverage calendar" className="pb-2">
+          <div className="coverage-calendar-desktop-grid space-y-2.5">
+            <div className="grid grid-cols-[80px_repeat(7,minmax(0,1fr))] gap-2">
               <div />
               {DOW.map((day) => (
                 <div
@@ -426,7 +426,7 @@ export function CalendarGrid({
                 <section
                   key={`week-${weekIndex}`}
                   role="row"
-                  className="grid grid-cols-[88px_repeat(7,minmax(0,1fr))] gap-1.5"
+                  className="grid grid-cols-[80px_repeat(7,minmax(0,1fr))] gap-1.5"
                 >
                   <div className="rounded-xl border border-border/70 bg-muted/18 px-2.5 py-2.5">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">

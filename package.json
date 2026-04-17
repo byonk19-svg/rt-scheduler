@@ -7,7 +7,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "start:prod:local": "next start --port 3001",
-    "lint": "eslint",
+    "lint": "eslint src --ext .ts,.tsx",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky",

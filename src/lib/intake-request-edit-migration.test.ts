@@ -19,7 +19,14 @@ const inboundRoutePath = path.join(
   'availability-email',
   'route.ts'
 )
-const availabilityActionsPath = path.join(repoRoot, 'src', 'app', 'availability', 'actions.ts')
+const availabilityActionsPath = path.join(
+  repoRoot,
+  'src',
+  'app',
+  '(app)',
+  'availability',
+  'actions.ts'
+)
 
 describe('intake request edit tracking contract', () => {
   it('adds the intake item edit-tracking columns in the task migration', () => {

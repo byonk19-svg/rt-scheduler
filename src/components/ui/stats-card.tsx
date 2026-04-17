@@ -26,6 +26,7 @@ export function StatsCard({
 
   return (
     <Component
+      type={clickable ? 'button' : undefined}
       onClick={onClick}
       className={cn(
         'rounded-xl border border-border bg-card px-5 py-4 text-left shadow-tw-md-soft',

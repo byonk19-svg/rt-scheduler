@@ -94,8 +94,39 @@ export function ImportWizard({ bulkImportRosterAction }: Props) {
             {validRows.length} valid rows, {errors.length} errors
           </p>
 
-          <div className="overflow-x-auto rounded-xl border border-border bg-card/70">
-            <table className="w-full min-w-[640px] text-sm">
+          <div className="space-y-3 md:hidden">
+            {validRows.slice(0, 20).map((row, index) => (
+              <article
+                key={`${row.full_name}-${index}`}
+                className="rounded-xl border border-border/70 bg-card/70 px-3 py-3 text-sm"
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Row {index + 1}
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
+                  <div>
+                    <p className="text-[11px] font-medium text-muted-foreground">Full name</p>
+                    <p className="text-foreground">{row.full_name ?? ''}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium text-muted-foreground">Shift</p>
+                    <p className="text-foreground">{row.shift_type ?? ''}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium text-muted-foreground">Role</p>
+                    <p className="text-foreground">{row.role ?? ''}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium text-muted-foreground">Employment</p>
+                    <p className="text-foreground">{row.employment_type ?? ''}</p>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto rounded-xl border border-border bg-card/70 md:block">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border/70 text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-3 py-2">Row</th>
@@ -140,7 +171,7 @@ export function ImportWizard({ bulkImportRosterAction }: Props) {
             <button
               type="button"
               disabled={validRows.length === 0}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40"
+              className="min-h-11 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40"
               onClick={() => setStep(4)}
             >
               {errors.length > 0
@@ -161,7 +192,7 @@ export function ImportWizard({ bulkImportRosterAction }: Props) {
             <input type="hidden" name="rows_json" value={JSON.stringify(validRows)} />
             <button
               type="submit"
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+              className="min-h-11 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
             >
               Import roster rows
             </button>

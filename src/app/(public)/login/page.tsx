@@ -166,7 +166,15 @@ function LoginPageClient() {
     <main className="flex min-h-[calc(100vh-73px)]">
       {/* Left brand panel — desktop only */}
       <aside className="relative hidden overflow-hidden bg-[var(--sidebar)] lg:flex lg:w-[440px] lg:shrink-0 lg:flex-col lg:justify-between lg:p-12">
-        <div aria-hidden className="teamwise-auth-brand-grid absolute inset-0" />
+        <div
+          aria-hidden
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              'linear-gradient(color-mix(in srgb, var(--sidebar-primary) 7%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--sidebar-primary) 7%, transparent) 1px, transparent 1px)',
+            backgroundSize: '28px 28px',
+          }}
+        />
         <div className="relative flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--attention)] shadow-tw-md-soft">
             <CalendarDays className="h-5 w-5 text-accent-foreground" />

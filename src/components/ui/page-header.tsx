@@ -35,19 +35,8 @@ export function PageHeader({ title, subtitle, badge, actions, className }: PageH
       )}
     >
       <div
-        className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full blur-2xl"
-        style={{ backgroundColor: 'color-mix(in oklch, var(--accent) 24%, transparent)' }}
-        aria-hidden="true"
-      />
-      <div
-        className="pointer-events-none absolute -left-10 -bottom-16 h-36 w-36 rounded-full blur-2xl"
-        style={{ backgroundColor: 'color-mix(in oklch, var(--info-subtle) 55%, transparent)' }}
-        aria-hidden="true"
-      />
-
-      <div
-        className="absolute inset-y-0 left-0 w-1 rounded-l-2xl"
-        style={{ background: 'var(--primary)' }}
+        className="pointer-events-none absolute inset-x-0 top-0 h-px"
+        style={{ backgroundColor: 'color-mix(in oklch, var(--primary) 24%, transparent)' }}
         aria-hidden="true"
       />
 

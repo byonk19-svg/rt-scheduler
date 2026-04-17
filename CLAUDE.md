@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-17 (session 85)
+Updated: 2026-04-17 (session 86)
 
 ## Handoff Snapshot
 
@@ -28,11 +28,13 @@ Updated: 2026-04-17 (session 85)
 - Reduced PTO-form-style email bodies that repeat `Employee Name:` blocks are now split into per-employee intake items even without the full `PTO REQUEST/EDIT FORM` scaffold, and repeated blocks for the same employee merge back into a single item.
 - PTO recurrence lines like `Off Tuesday + Wednesdays` now expand across the active cycle window when a single active block is available; malformed OCR fragments like `5 Sunday 5/ Back to work 25` stay in `needs_review` instead of generating fake work dates.
 - **Coverage workspace compaction:** `/coverage` now uses a compact scheduling workspace instead of the old oversized setup/stat/day-card layout. The page is organized around a tighter header, unified planning toolbar, lighter health summary cards, slim setup/live-status banners, a denser weekly grid, and a tighter roster matrix. Grid day cells now prioritize date, staffing ratio, lead state, and compact gap/status chips; the shift editor uses a tighter header plus ranked candidate rows with clearer selected state.
-- **Coverage mobile responsiveness:** below `md`, `/coverage` now renders one week at a time with explicit previous/next week controls and touch swipe navigation. Desktop keeps the full multi-week grid; print forces the desktop/full-grid path and hides the mobile-only week wrapper.
+- **Coverage responsive breakpoints:** `/coverage` now keeps its compact week-by-week/card treatment until `xl`, with explicit previous/next week controls and touch swipe navigation on narrower breakpoints. Larger screens keep the full multi-week grid; print forces the desktop/full-grid path.
 - **Coverage designated lead vs extra lead-eligible staff:** only one `shifts.role='lead'` row designates the lead for that slot. The shift editor still lists every **lead-eligible** therapist; choosing another while a lead exists adds them as **staff** coverage (`assign` with `role: 'staff'`). Someone already on the day as staff can be **designated** via **`set_lead`** (`setCoverageDesignatedLeadViaApi` in `src/lib/coverage/mutations.ts`), which now uses `router.refresh()` against the server snapshot path instead of a client reload nonce. Lead-eligible rows are **not** disabled merely because a lead is already booked.
 - **Email intake tab stability:** intake date chip toggles and **Apply dates** refresh in place (`router.refresh` / `router.replace` with `tab=intake`) so managers are not bounced back to the **Planner** tab after saves. Intake request chips cycle **`force_off` ↔ `force_on`** only; removing a date uses an explicit **Remove** path with confirmation instead of a silent third-click delete.
 - **Schedule layout + role consistency:** `/coverage` supports both **Grid** and **Roster** layouts. Managers can edit staffing from either layout by clicking a day cell; leads can update staffed cells to **`OC`**, **`LE`**, **`CX`**, or **`CI`** through the shared assignment-status flow. Users can save a default schedule layout (`Grid` or `Roster`) in `/profile`, and the therapist compatibility route (`/therapist/schedule`) still defers default layout selection to `/coverage` so a saved preference wins unless an explicit `view` query is present.
 - **Theme support:** the root layout now reads the `tw-theme` cookie on the server, applies the initial `dark` class without any inline script, and renders a plain `<body>` without importing `ThemeProvider`. `ThemeProvider` now lives in `src/components/AppShell.tsx` so the theme boundary stays client-to-client and avoids the webpack HMR lazy-element crash path; `/profile` still includes an **Appearance** section with **Light / System / Dark** controls. Client-side theme changes keep `localStorage` and the `tw-theme` cookie in sync through `src/lib/theme.ts`, `.dark` token overrides live in `src/app/globals.css`, and print explicitly forces light token values.
+- **Audit cleanup + shared-surface polish:** the branch now removes the remaining accent-stripe/header chrome and most decorative halo treatment, tokenizes the brand mark plus lingering public/print visual values, and brings the last compact therapist/manager actions closer to the touch-target bar.
+- **Responsive follow-up:** `/coverage` and the read-only `/schedule` roster now hold their compact week/card treatments until `xl`, while narrower admin tools like `/team/import` preview and `/settings/audit-log` filters stack instead of forcing immediate wide horizontal layouts.
 - **Hot-path performance trim:** `/coverage` now carries both day and night therapist/roster datasets in the initial server snapshot so shift-tab changes stop re-querying Supabase after hydration, `/availability` skips hidden-tab intake/planner reads, and `shift-board` approve/deny actions no longer rerun the full board bootstrap after a successful save.
 - **Shared header/navigation system:** authenticated routes now use one shared sticky `AppHeader` plus surface-level `LocalSectionNav` driven by `src/components/shell/app-shell-config.ts`; page titles/actions are being standardized through `PageIntro`, and public/auth routes now share `src/components/public/PublicHeader.tsx` from `src/app/(public)/layout.tsx`. Avoid reintroducing page-specific top bars or dark secondary sticky bars.
 - **Schedule roster route:** `/schedule` no longer redirects to `/coverage`, but it is also no longer a public mock. It now loads live roster/availability data through `src/app/(app)/schedule/schedule-roster-live-data.ts`, stays auth-protected by `src/proxy.ts`, and renders a read-only roster matrix inside the shared app shell.
@@ -68,7 +70,7 @@ Updated: 2026-04-17 (session 85)
 - `main` now also carries the shared sitewide header pass: `AppShell` uses one sticky authenticated header plus surface section nav, manager/page header wrappers now sit on `PageIntro`, and public/auth routes share `PublicHeader`.
 - `/schedule` now reads live schedule-cycle data and stays inside the authenticated shell as a read-only roster matrix rather than a public mock surface.
 - Current branch (`claude/audit-log-bulk-team-clean`) adds the following on top of that baseline — all implemented, tested, and CI-green:
-  - mobile week-by-week `/coverage` navigation below `md` with touch swipe
+  - compact `/coverage` navigation and day-card layouts through sub-`xl` breakpoints with touch swipe on narrower screens
   - root-level dark mode with `/profile` appearance controls (`src/lib/theme.ts`, `ThemeProvider`), with the provider mounted in `AppShell` while `src/app/layout.tsx` stays server-only for initial theme-class resolution
   - cycle templates: save published cycles, apply to draft cycles (`src/lib/cycle-template.ts`, `SaveAsTemplateDialog`, `StartFromTemplateDialog`, `/api/schedule/templates`)
   - `/team/import` generic CSV mapping/import wizard (`src/lib/csv-import-parser.ts`, `ImportWizard`, `ImportFieldMapper`)
@@ -80,22 +82,23 @@ Updated: 2026-04-17 (session 85)
   - manager analytics at `/analytics`: fill rates, submission compliance, force-on misses
   - dedicated work-patterns page at `/team/work-patterns`
 - Current branch work also fixes the live `/schedule` roster segmentation so day and night tabs no longer mix therapists from the opposite shift.
+- Current branch also includes the audit-driven cleanup pass: `npm run lint` now scopes to `src`, stale route-group source tests have been repaired, shared header/dashboard/public shells are less templated, and the remaining compact scheduling actions use larger hit areas.
 
 ### Where We Want To Go
 
-1. **Merge `claude/audit-log-bulk-team-clean` to `main`** — the branch is CI-green and carries 11 new manager/therapist features. QA the following before merging: bulk status actions on a real team, audit log filtering, pre-flight report on a large roster, and the analytics page with real cycle data.
-2. **Fix the 9 pre-existing test path failures** — tests in `src/app/(app)/therapist/availability/page.test.ts`, `publish-actions.source.test.ts`, etc. look for files at old `src/app/schedule/` and `src/app/therapist/` paths instead of the `(app)` route-group paths. Update the `resolve(process.cwd(), 'src/app/...')` calls in those tests.
-3. **Add "Send reminders" bulk action** to the response roster on `/availability` — bulk email nudge for non-respondents is still the top operational gap.
-4. **Swap history and My Schedule quick view** — `src/app/(app)/staff/history` and `src/app/(app)/staff/my-schedule` are still not implemented.
-5. **Schedule/roster CSV export** — `/api/schedule/export` and `/api/team/roster/export` are still not implemented; `csv-utils.ts` still needs to be extracted from the availability export route.
-6. **Print confidentiality footer** — `print-schedule.tsx` still lacks the "Internal Use Only" footer.
-7. Run a full browser QA pass across the new shared authenticated/public headers on desktop and mobile before shipping.
-8. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
-9. Deploy production after significant public-surface changes (`vercel deploy --prod`) so `www.teamwise.work` matches `main`.
-10. Keep manual intake first-class even if Resend inbound is healthy. It is the practical fallback path for operations.
+1. **Merge `claude/audit-log-bulk-team-clean` to `main`** - the branch is CI-green and now includes the audit remediation pass on top of the manager/therapist feature work.
+2. Run a full browser QA pass across shared headers, `/coverage`, `/schedule`, `/team/import`, and `/settings/audit-log` on desktop, tablet, and mobile before shipping.
+3. **Add "Send reminders" bulk action** to the response roster on `/availability` - bulk email nudge for non-respondents is still the top operational gap.
+4. **Swap history and My Schedule quick view** - `src/app/(app)/staff/history` and `src/app/(app)/staff/my-schedule` are still not implemented.
+5. **Schedule/roster CSV export** - `/api/schedule/export` and `/api/team/roster/export` are still not implemented; `csv-utils.ts` still needs to be extracted from the availability export route.
+6. **Print confidentiality footer** - `print-schedule.tsx` still lacks the "Internal Use Only" footer.
+7. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
+8. Deploy production after significant public-surface changes (`vercel deploy --prod`) so `www.teamwise.work` matches `main`.
+9. Keep manual intake first-class even if Resend inbound is healthy. It is the practical fallback path for operations.
 
 ### Verification Baseline
 
+- As of session 86 on `claude/audit-log-bulk-team-clean`, `npm run lint`, `npm run test:unit`, `npm run build`, and `npx tsc --noEmit` all pass.
 - `npm run lint`
 - `npm run build`
 - `npm run test:unit`
@@ -115,6 +118,13 @@ Updated: 2026-04-17 (session 85)
 - Targeted schedule-roster lane: `npm run test:unit -- src/lib/schedule-roster-data.test.ts`
 
 ## Recent changelog
+
+**Session 86 (2026-04-17)** - Audit-driven cleanup, responsive follow-up, and verification reset on `claude/audit-log-bulk-team-clean`:
+
+- `npm run lint` now intentionally targets `src` so local quality checks stop drowning in `.next` / `.next-dev` artifact noise, and the stale route-group source tests now point at the real `(app)` / `(public)` files.
+- Shared/public surfaces were cleaned up: removed the remaining accent-stripe/header chrome, reduced decorative halo treatment, tokenized the logo plus lingering public/print values, and tightened shared semantic details like grouped quick filters and safe button defaults.
+- `/coverage`, `/schedule`, `/team/import`, and `/settings/audit-log` received the final responsive/touch-target pass: compact scheduling views now hold until `xl`, admin previews/filters stack better on narrow widths, and therapist/manager action controls were raised where they still lagged.
+- Full verification is green again on this branch: lint, unit tests (`127` files / `729` tests), TypeScript, and production build all pass.
 
 **Session 85 (2026-04-17)** — ThemeProvider HMR boundary fix on `claude/audit-log-bulk-team-clean`:
 
@@ -408,9 +418,9 @@ Typography classes:
 
 ## Tooling Gotchas
 
+- **`npm run lint` is intentionally source-scoped:** it runs `eslint src --ext .ts,.tsx` to avoid `.next` / `.next-dev` artifact noise. If you need to lint scripts or docs, run `npx eslint <paths>` explicitly.
 - **`formatCycleDate` produces no year:** Uses `{ month: 'short', day: 'numeric' }` → `'Apr 13'` not `'Apr 13, 2026'`. Test fixtures asserting on date range strings must omit the year (e.g. `'Mar 17 – Apr 13'`).
 - **Browser verification on auth routes:** All app routes require login. Chrome DevTools MCP always redirects to `/login` — browser verification via screenshot is not possible without credentials. Confirm changes via `tsc`, `vitest`, and code review only.
-- **Current repo-wide typecheck is blocked by an unrelated fixture:** `src/components/team/EmployeeRosterPanel.test.ts` is currently missing `matched_email` on a test row, so `npx tsc --noEmit` fails until that fixture is updated.
 - **framer-motion `ease`:** `ease: 'easeOut'` fails `tsc` — the `Easing` type requires specific literals. Omit `ease` entirely to use framer-motion's safe default.
 - **Auto-draft algorithm lives in `src/lib/coverage/generate-draft.ts`:** `generateDraftForCycle(input: GenerateDraftInput): GenerateDraftResult` is a pure function. `generateDraftScheduleAction` in `src/app/schedule/actions/draft-actions.ts` is a thin wrapper that loads DB data, calls it, then saves results. Dry-run and preview features can call `generateDraftForCycle` directly without a server action.
 - **`src/app/schedule/actions.ts` is a barrel:** Real logic is in `src/app/schedule/actions/` sub-modules (`helpers.ts`, `cycle-actions.ts`, `publish-actions.ts`, `shift-actions.ts`, `draft-actions.ts`, `preliminary-actions.ts`). Each action file has `'use server'`; `helpers.ts` and `index.ts` do not.
@@ -423,6 +433,7 @@ Typography classes:
 - **Preview MCP on Windows:** `preview_start` server tracking doesn't persist between tool calls. Chrome MCP also returns "Permission denied" on localhost. For local visual verification, use saved screenshots in `artifacts/screen-capture/latest/`. To confirm server health use `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000`.
 - **Zombie dev server on Windows:** Stale `next dev` processes can hold port 3000 silently (visible as ~994MB node.exe in tasklist). Find the PID with `netstat -ano | grep ":3000" | grep LISTENING` then kill with `taskkill //PID <pid> //F`. Follow with `rm -rf .next` before rebuilding.
 - **Clean Windows dev restart:** if localhost returns `ERR_FAILED`, first confirm whether anything is actually listening on `3000` (`netstat -ano | Select-String ':3000'`). For a clean restart, stop repo-local `next dev` processes, delete `.next`, then launch exactly one fresh `npm run dev`. Old Chrome tabs can keep stale HMR/runtime overlays alive even after the code is fixed, so prefer a brand-new `localhost:3000` tab before treating an old overlay as current truth.
+- **Stale Next build lock on Windows:** if `npm run build` says another build is already running but no real build process exists, delete `.next/lock` and retry before assuming the source tree is broken.
 - **Do not re-mount `ThemeProvider` in `src/app/layout.tsx`:** the root layout must stay server-only. Putting `ThemeProvider` back there reintroduces a server-to-client import boundary that can surface as a webpack HMR `lazy element type must resolve to a class or function` crash. Keep the provider mounted in `src/components/AppShell.tsx` unless the boundary design changes deliberately.
 - **"Supabase lookup failed" in build output is not an error:** During `npm run build`, Next.js tries to statically pre-render all routes; auth routes that call `cookies()` bail out and log this message. All routes correctly render as `ƒ` (dynamic). Safe to ignore.
 - **Responsive stat grids:** Always `grid-cols-2 lg:grid-cols-4` — never bare `grid-cols-4` which clips on narrower viewports.

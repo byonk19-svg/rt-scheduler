@@ -21,11 +21,11 @@ export function TeamwiseMark({ size = 'default', className = '' }: TeamwiseLogoP
       aria-hidden="true"
       className={className}
     >
-      <rect width="28" height="28" rx="6" fill="#1c1917" />
-      <circle cx="9" cy="10" r="3" fill="#fbbf24" />
-      <path d="M4 23 Q4 17 9 17 Q14 17 14 23" fill="#fbbf24" />
-      <circle cx="20" cy="10" r="3" fill="#f59e0b" />
-      <path d="M15 23 Q15 17 20 17 Q25 17 25 23" fill="#f59e0b" />
+      <rect width="28" height="28" rx="6" fill="var(--logo-mark-background)" />
+      <circle cx="9" cy="10" r="3" fill="var(--logo-mark-primary)" />
+      <path d="M4 23 Q4 17 9 17 Q14 17 14 23" fill="var(--logo-mark-primary)" />
+      <circle cx="20" cy="10" r="3" fill="var(--logo-mark-secondary)" />
+      <path d="M15 23 Q15 17 20 17 Q25 17 25 23" fill="var(--logo-mark-secondary)" />
     </svg>
   )
 }
