@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-17 (session 81)
+Updated: 2026-04-17 (session 83)
 
 ## Handoff Snapshot
 
@@ -32,7 +32,7 @@ Updated: 2026-04-17 (session 81)
 - **Coverage designated lead vs extra lead-eligible staff:** only one `shifts.role='lead'` row designates the lead for that slot. The shift editor still lists every **lead-eligible** therapist; choosing another while a lead exists adds them as **staff** coverage (`assign` with `role: 'staff'`). Someone already on the day as staff can be **designated** via **`set_lead`** (`setCoverageDesignatedLeadViaApi` in `src/lib/coverage/mutations.ts`), which now uses `router.refresh()` against the server snapshot path instead of a client reload nonce. Lead-eligible rows are **not** disabled merely because a lead is already booked.
 - **Email intake tab stability:** intake date chip toggles and **Apply dates** refresh in place (`router.refresh` / `router.replace` with `tab=intake`) so managers are not bounced back to the **Planner** tab after saves. Intake request chips cycle **`force_off` ↔ `force_on`** only; removing a date uses an explicit **Remove** path with confirmation instead of a silent third-click delete.
 - **Schedule layout + role consistency:** `/coverage` supports both **Grid** and **Roster** layouts. Managers can edit staffing from either layout by clicking a day cell; leads can update staffed cells to **`OC`**, **`LE`**, **`CX`**, or **`CI`** through the shared assignment-status flow. Users can save a default schedule layout (`Grid` or `Roster`) in `/profile`, and the therapist compatibility route (`/therapist/schedule`) still defers default layout selection to `/coverage` so a saved preference wins unless an explicit `view` query is present.
-- **Theme support:** the root layout now injects a flash-prevention theme script and wraps the app in `ThemeProvider`; `/profile` includes an **Appearance** section with **Light / System / Dark** controls. `.dark` token overrides live in `src/app/globals.css`, and print explicitly forces light token values.
+- **Theme support:** the root layout now reads the `tw-theme` cookie on the server, applies the initial `dark` class without any inline script, and wraps the app in `ThemeProvider`; `/profile` includes an **Appearance** section with **Light / System / Dark** controls. Client-side theme changes keep `localStorage` and the `tw-theme` cookie in sync through `src/lib/theme.ts`, `.dark` token overrides live in `src/app/globals.css`, and print explicitly forces light token values.
 - **Hot-path performance trim:** `/coverage` now carries both day and night therapist/roster datasets in the initial server snapshot so shift-tab changes stop re-querying Supabase after hydration, `/availability` skips hidden-tab intake/planner reads, and `shift-board` approve/deny actions no longer rerun the full board bootstrap after a successful save.
 - **Shared header/navigation system:** authenticated routes now use one shared sticky `AppHeader` plus surface-level `LocalSectionNav` driven by `src/components/shell/app-shell-config.ts`; page titles/actions are being standardized through `PageIntro`, and public/auth routes now share `src/components/public/PublicHeader.tsx` from `src/app/(public)/layout.tsx`. Avoid reintroducing page-specific top bars or dark secondary sticky bars.
 - **Schedule roster route:** `/schedule` no longer redirects to `/coverage`, but it is also no longer a public mock. It now loads live roster/availability data through `src/app/(app)/schedule/schedule-roster-live-data.ts`, stays auth-protected by `src/proxy.ts`, and renders a read-only roster matrix inside the shared app shell.
@@ -47,6 +47,11 @@ Updated: 2026-04-17 (session 81)
 - **Team directory operational layout:** `/team` **Team directory** tab uses a compact non-sticky controls block (quick-view chips as filters, search + selects, **Clear filters**, **Expand all** / **Collapse all**). Grouped sections use lightweight structural headers (not accordion cards); **all groups default expanded** on first visit; manual open/closed state persists in **localStorage**; while search/filters are active, groups with matches auto-expand so results are never hidden; clearing filters restores saved section state. **`TeamPersonRow`** is a denser directory-style row with stronger focus/hover affordance. Runtime stability still uses **`TeamWorkspaceClient.tsx`** as the manager-team client boundary.
 - **Cycle templates:** managers can now save a published cycle as a reusable staffing template and apply a template into a draft cycle from Coverage. Templates serialize shifts as `day_of_cycle` rows only; they intentionally do **not** include availability overrides.
 - **Roster CSV import wizard:** managers now have a generic `/team/import` flow for legacy roster CSVs. The wizard maps CSV headers to Teamwise fields, validates rows, and lets managers import valid rows while skipping errors.
+- **Therapist scheduled conflict warning:** `/therapist/availability` now warns when a therapist marks a date as **Need Off** (`force_off`) while they already have a `scheduled` shift on that same active-cycle date. This is a dismissible warning banner only; it does not block saving.
+- **Coverage pre-flight check:** the auto-draft flow on `/coverage` now opens a pre-flight report before running draft generation. The report uses the same pure draft engine as generation, includes real existing shifts, and summarizes unfilled slots, missing leads, and forced must-work misses.
+- **Shift reminders:** `vercel.json` now schedules `/api/cron/shift-reminders` at `0 6 * * *`. The cron route requires `CRON_SECRET`, queues rows in `shift_reminder_outbox`, sends 24h reminder emails for next-day `scheduled` shifts only, and writes matching in-app notifications.
+- **Manager analytics:** `/analytics` now provides cycle fill rates, therapist submission compliance, and force-on miss reporting using server-side Supabase queries plus simple CSS-based summary components.
+- **Dedicated work-pattern page:** managers now have `/team/work-patterns` for day/night grouped recurring pattern review and editing outside the quick-edit modal. The quick-edit modal still retains its work-pattern section.
 - **Availability intake utilities:** `src/lib/availability-email-intake.ts` and related tests now cover richer request-edit parsing and manager-edit workflows more explicitly.
 - `RESEND_API_KEY` must support receiving APIs, not just sending. A send-only key fails on `/emails/receiving` with `401 restricted_api_key`.
 
@@ -64,6 +69,12 @@ Updated: 2026-04-17 (session 81)
   - root-level dark mode with `/profile` appearance controls
   - cycle templates (save published cycles, apply to draft cycles)
   - `/team/import` generic CSV roster import wizard
+- This branch also now carries the restored scheduling workflow set that was missing from the earlier branch snapshot:
+  - therapist active-cycle scheduled-conflict warnings on `/therapist/availability`
+  - coverage auto-draft pre-flight reporting
+  - daily shift reminder cron + outbox delivery path
+  - manager `/analytics`
+  - manager `/team/work-patterns`
 
 ### Where We Want To Go
 
@@ -87,13 +98,26 @@ Updated: 2026-04-17 (session 81)
 - Targeted theme lane: `npm run test:unit -- src/lib/theme.test.ts src/app/layout.theme.test.ts src/app/profile/theme-controls.test.ts src/app/globals.test.ts`
 - Targeted template lane: `npm run test:unit -- src/lib/cycle-template.test.ts src/app/api/schedule/templates/route.test.ts src/app/coverage/template-wiring.test.ts src/components/coverage/CycleManagementDialog.test.ts`
 - Targeted team import lane: `npm run test:unit -- src/lib/csv-import-parser.test.ts src/app/team/import/page.test.ts src/app/team/import/actions.source.test.ts src/components/team/EmployeeRosterPanel.test.ts`
+- Targeted therapist conflict lane: `npm run test:unit -- src/lib/availability-scheduled-conflict.test.ts src/components/availability/TherapistAvailabilityWorkspace.test.ts src/app/(app)/availability/page.test.ts src/app/(app)/therapist/availability/page.test.ts`
+- Targeted pre-flight lane: `npm run test:unit -- src/lib/coverage/pre-flight.test.ts src/app/api/schedule/pre-flight/route.test.ts src/app/(app)/coverage/preflight-wiring.test.ts`
+- Targeted shift reminder lane: `npm run test:unit -- src/lib/shift-reminders.test.ts src/app/api/cron/shift-reminders/route.test.ts`
+- Targeted analytics lane: `npm run test:unit -- src/lib/analytics-queries.test.ts src/app/analytics/page.test.ts src/components/shell/app-shell-config.test.ts`
+- Targeted work-pattern lane: `npm run test:unit -- src/components/team/WorkPatternCard.test.ts src/components/team/WorkPatternEditDialog.test.ts src/app/team/work-patterns/page.test.ts`
 
 ## Recent changelog
 
-**Session 81 (2026-04-17)** — Coverage mobile, dark mode, templates, and roster CSV import:
+**Session 83 (2026-04-17)** - Restore the missing scheduling workflow surfaces on this branch:
+
+- `/therapist/availability` now computes active-cycle scheduled-shift conflicts and shows a dismissible warning banner when a `force_off` selection collides with an already scheduled shift on that date.
+- `/coverage` now runs a pre-flight report before auto-draft, using the real current shift set instead of an empty schedule snapshot so managers can see likely unfilled slots and missing-lead pressure before generation.
+- Added `shift_reminder_outbox`, the `/api/cron/shift-reminders` route, and the daily Vercel cron entry so therapists receive 24h reminder emails plus matching in-app notifications for next-day scheduled shifts.
+- Added `/analytics` for manager fill-rate, submission-compliance, and force-on miss reporting.
+- Added `/team/work-patterns` plus dedicated card/edit-dialog surfaces so managers can review and update recurring patterns outside the team quick-edit modal.
+
+**Session 81 (2026-04-17)** - Coverage mobile, dark mode, templates, and roster CSV import:
 
 - `/coverage` now has a mobile-only week navigator with swipe support while desktop keeps the full multi-week grid; print hides the mobile wrapper and forces the desktop/full-grid layout.
-- `src/lib/theme.ts`, `src/components/ThemeProvider.tsx`, `src/app/layout.tsx`, and `src/app/(app)/profile/page.tsx` now provide light/system/dark theme support with a synchronous flash-prevention script and print-time light token fallback.
+- `src/lib/theme.ts`, `src/components/ThemeProvider.tsx`, `src/app/layout.tsx`, and `src/app/(app)/profile/page.tsx` now provide light/system/dark theme support with cookie-backed server theme resolution, client-side `tw-theme` persistence, and print-time light token fallback.
 - Added cycle template support: `supabase/migrations/20260417100000_add_cycle_templates.sql`, `src/lib/cycle-template.ts`, `src/app/api/schedule/templates/*`, `src/app/(app)/schedule/actions/template-actions.ts`, plus Coverage dialogs for **Save as template** and **Start from template**. Templates intentionally exclude availability overrides.
 - Added `/team/import` with a generic CSV mapping/import wizard backed by `src/lib/csv-import-parser.ts` and `src/app/(app)/team/import/actions.ts`. The existing fixed-format roster paste flow remains unchanged.
 
@@ -369,6 +393,7 @@ Typography classes:
 - **`@/components/ui/progress` not installed by default:** Run `npx shadcn@latest add progress` before importing the Progress primitive. Not in the original shadcn set for this repo (added session 21).
 - **Preview MCP on Windows:** `preview_start` server tracking doesn't persist between tool calls. Chrome MCP also returns "Permission denied" on localhost. For local visual verification, use saved screenshots in `artifacts/screen-capture/latest/`. To confirm server health use `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000`.
 - **Zombie dev server on Windows:** Stale `next dev` processes can hold port 3000 silently (visible as ~994MB node.exe in tasklist). Find the PID with `netstat -ano | grep ":3000" | grep LISTENING` then kill with `taskkill //PID <pid> //F`. Follow with `rm -rf .next` before rebuilding.
+- **Clean Windows dev restart:** if localhost returns `ERR_FAILED`, first confirm whether anything is actually listening on `3000` (`netstat -ano | Select-String ':3000'`). For a clean restart, stop repo-local `next dev` processes, delete `.next`, then launch exactly one fresh `npm run dev`. Old Chrome tabs can keep stale HMR/runtime overlays alive even after the code is fixed, so prefer a brand-new `localhost:3000` tab before treating an old overlay as current truth.
 - **"Supabase lookup failed" in build output is not an error:** During `npm run build`, Next.js tries to statically pre-render all routes; auth routes that call `cookies()` bail out and log this message. All routes correctly render as `ƒ` (dynamic). Safe to ignore.
 - **Responsive stat grids:** Always `grid-cols-2 lg:grid-cols-4` — never bare `grid-cols-4` which clips on narrower viewports.
 - **Repo-local Next build lock on Windows:** if `npm run build` throws `EPERM` under `.next`, check for a running `next dev` process from this repo and stop it before rebuilding.
