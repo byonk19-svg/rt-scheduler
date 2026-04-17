@@ -37,6 +37,7 @@ describe('EmployeeRosterPanel', () => {
             max_work_days_per_week: 3,
             is_lead_eligible: false,
             matched_profile_id: null,
+            matched_email: null,
             matched_at: null,
             phone_number: null,
           },
