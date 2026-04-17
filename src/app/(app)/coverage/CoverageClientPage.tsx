@@ -70,24 +70,30 @@ import {
 } from '@/lib/coverage/coverage-shift-tab'
 
 const ClearDraftConfirmDialog = dynamic(() =>
-  import('@/components/coverage/ClearDraftConfirmDialog').then((module) => module.ClearDraftConfirmDialog)
+  import('@/components/coverage/ClearDraftConfirmDialog').then(
+    (module) => module.ClearDraftConfirmDialog ?? (() => null)
+  )
 )
 const PreFlightDialog = dynamic(() =>
-  import('@/components/coverage/PreFlightDialog').then((module) => module.PreFlightDialog)
+  import('@/components/coverage/PreFlightDialog').then((module) => module.PreFlightDialog ?? (() => null))
 )
 const SaveAsTemplateDialog = dynamic(() =>
-  import('@/components/coverage/SaveAsTemplateDialog').then((module) => module.SaveAsTemplateDialog)
+  import('@/components/coverage/SaveAsTemplateDialog').then((module) => module.SaveAsTemplateDialog ?? (() => null))
 )
 const StartFromTemplateDialog = dynamic(() =>
   import('@/components/coverage/StartFromTemplateDialog').then(
-    (module) => module.StartFromTemplateDialog
+    (module) => module.StartFromTemplateDialog ?? (() => null)
   )
 )
 const CycleManagementDialog = dynamic(() =>
-  import('@/components/coverage/CycleManagementDialog').then((module) => module.CycleManagementDialog)
+  import('@/components/coverage/CycleManagementDialog').then(
+    (module) => module.CycleManagementDialog ?? (() => null)
+  )
 )
 const ShiftEditorDialog = dynamic(() =>
-  import('@/components/coverage/ShiftEditorDialog').then((module) => module.ShiftEditorDialog)
+  import('@/components/coverage/ShiftEditorDialog').then(
+    (module) => module.ShiftEditorDialog ?? (() => null)
+  )
 )
 
 type DayStatus = DayItem['dayStatus']
