@@ -54,6 +54,7 @@ type ResendAttachmentRecord = {
 type MatchableProfile = {
   id: string
   full_name: string
+  email?: string | null
   is_active?: boolean | null
 }
 
@@ -167,6 +168,12 @@ function resolveSender(rawFrom: ResendEmailContent['from']): {
   return { email, name }
 }
 
+function normalizeEmail(value: string | null | undefined): string | null {
+  if (!value) return null
+  const normalized = value.trim().toLowerCase()
+  return normalized.length > 0 ? normalized : null
+}
+
 function flattenBatchRequests(items: ParsedAvailabilityEmailItem[]) {
   return items.flatMap((item) => item.requests)
 }
@@ -222,7 +229,8 @@ function buildSourceCandidates(params: {
 }
 
 function buildItemParseStatus(
-  item: ParsedAvailabilityEmailItem
+  item: ParsedAvailabilityEmailItem,
+  senderTrustedForMatchedTherapist: boolean
 ): ParsedAvailabilityEmailItem['parseStatus'] {
   if (
     item.confidenceLevel === 'high' &&
@@ -230,10 +238,19 @@ function buildItemParseStatus(
     item.matchedCycleId &&
     item.requests.length > 0
   ) {
-    return 'auto_applied'
+    return senderTrustedForMatchedTherapist ? 'auto_applied' : 'needs_review'
   }
 
   return item.parseStatus
+}
+
+function isTrustedSenderForMatchedTherapist(params: {
+  senderEmail: string | null
+  matchedTherapistId: string | null
+  therapistEmailById: Map<string, string | null>
+}): boolean {
+  if (!params.senderEmail || !params.matchedTherapistId) return false
+  return params.therapistEmailById.get(params.matchedTherapistId) === params.senderEmail
 }
 
 function inferAttachmentContentType(params: { filename: string; contentType: string }): string {
@@ -256,7 +273,7 @@ async function processInboundAvailabilityEmail(emailId: string) {
 
   const { data: activeProfiles } = await admin
     .from('profiles')
-    .select('id, full_name, is_active')
+    .select('id, full_name, email, is_active')
     .in('role', ['therapist', 'lead'])
     .eq('is_active', true)
     .is('archived_at', null)
@@ -272,6 +289,12 @@ async function processInboundAvailabilityEmail(emailId: string) {
 
   const cycles = ((cycleRows ?? []) as IntakeCycle[]).filter(
     (cycle) => cycle.start_date && cycle.end_date
+  )
+  const therapistEmailById = new Map(
+    (((activeProfiles ?? []) as MatchableProfile[]) ?? []).map((profile) => [
+      profile.id,
+      normalizeEmail(profile.email ?? null),
+    ])
   )
   const processedAttachments: ResendAttachmentRecord[] = []
 
@@ -354,10 +377,27 @@ async function processInboundAvailabilityEmail(emailId: string) {
       cycles,
       profiles: ((activeProfiles ?? []) as MatchableProfile[]) ?? [],
     })
+    const senderTrustedForMatchedTherapist = isTrustedSenderForMatchedTherapist({
+      senderEmail: sender.email,
+      matchedTherapistId: parsedItem.matchedTherapistId,
+      therapistEmailById,
+    })
+    const confidenceReasons =
+      !senderTrustedForMatchedTherapist &&
+      parsedItem.confidenceLevel === 'high' &&
+      parsedItem.matchedTherapistId &&
+      parsedItem.matchedCycleId &&
+      parsedItem.requests.length > 0
+        ? [
+            ...parsedItem.confidenceReasons,
+            'Sender email does not match the matched therapist profile.',
+          ]
+        : parsedItem.confidenceReasons
 
     return {
       ...parsedItem,
-      parseStatus: buildItemParseStatus(parsedItem),
+      confidenceReasons,
+      parseStatus: buildItemParseStatus(parsedItem, senderTrustedForMatchedTherapist),
       attachment: candidate.attachment,
     }
   })

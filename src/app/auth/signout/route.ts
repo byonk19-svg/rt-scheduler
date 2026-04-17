@@ -23,7 +23,27 @@ async function clearSupabaseAuthCookies(response: NextResponse) {
   }
 }
 
+function isAllowedGetSignoutNavigation(request: Request): boolean {
+  const fetchSite = request.headers.get('sec-fetch-site')
+  if (fetchSite) {
+    return fetchSite === 'same-origin' || fetchSite === 'same-site' || fetchSite === 'none'
+  }
+
+  const referer = request.headers.get('referer')
+  if (!referer) return false
+
+  try {
+    return new URL(referer).origin === new URL(request.url).origin
+  } catch {
+    return false
+  }
+}
+
 export async function GET(request: Request) {
+  if (!isAllowedGetSignoutNavigation(request)) {
+    return NextResponse.json({ error: 'Invalid signout navigation.' }, { status: 403 })
+  }
+
   const supabase = await createClient()
   await supabase.auth.signOut()
 

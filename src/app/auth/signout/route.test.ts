@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { POST } from '@/app/auth/signout/route'
+import { GET, POST } from '@/app/auth/signout/route'
 import { createClient } from '@/lib/supabase/server'
 
 vi.mock('next/headers', () => ({
@@ -33,6 +33,42 @@ describe('auth signout route', () => {
       error: 'Invalid request origin.',
     })
     expect(createClient).not.toHaveBeenCalled()
+  })
+
+  it('rejects cross-site GET signout navigations', async () => {
+    const response = await GET(
+      new Request('http://localhost/auth/signout', {
+        method: 'GET',
+        headers: {
+          'sec-fetch-site': 'cross-site',
+        },
+      })
+    )
+
+    expect(response.status).toBe(403)
+    expect(createClient).not.toHaveBeenCalled()
+  })
+
+  it('allows same-origin GET signout navigations', async () => {
+    const signOut = vi.fn().mockResolvedValue({ error: null })
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        signOut,
+      },
+    } as unknown as Awaited<ReturnType<typeof createClient>>)
+
+    const response = await GET(
+      new Request('http://localhost/auth/signout?next=%2Flogin', {
+        method: 'GET',
+        headers: {
+          'sec-fetch-site': 'same-origin',
+        },
+      })
+    )
+
+    expect(signOut).toHaveBeenCalledOnce()
+    expect(response.status).toBe(303)
+    expect(response.headers.get('location')).toBe('http://localhost/login')
   })
 
   it('signs out and redirects for trusted origins', async () => {

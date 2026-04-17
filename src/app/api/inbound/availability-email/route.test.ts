@@ -109,8 +109,18 @@ function createAdminMock() {
             return Promise.resolve(
               resolve({
                 data: [
-                  { id: 'therapist-1', full_name: 'Brianna Brown', is_active: true },
-                  { id: 'therapist-2', full_name: 'Brian Brown', is_active: true },
+                  {
+                    id: 'therapist-1',
+                    full_name: 'Brianna Brown',
+                    email: 'brianna@example.com',
+                    is_active: true,
+                  },
+                  {
+                    id: 'therapist-2',
+                    full_name: 'Brian Brown',
+                    email: 'brian@example.com',
+                    is_active: true,
+                  },
                 ],
                 error: null,
               })
@@ -197,7 +207,7 @@ describe('POST /api/inbound/availability-email', () => {
           json: async () => ({
             data: {
               id: 'email-1',
-              from: { email: 'manager@example.com', name: 'Manager' },
+              from: { email: 'brianna@example.com', name: 'Brianna Brown' },
               subject: 'Batch request',
               text: 'Employee Name: Brianna Brown\nNeed off Mar 24',
               created_at: '2026-03-20T12:00:00Z',
@@ -288,7 +298,7 @@ describe('POST /api/inbound/availability-email', () => {
           json: async () => ({
             data: {
               id: 'email-1',
-              from: { email: 'manager@example.com', name: 'Manager' },
+              from: { email: 'brianna@example.com', name: 'Brianna Brown' },
               subject: 'PDF request',
               text: '',
               created_at: '2026-03-20T12:00:00Z',
@@ -370,7 +380,7 @@ describe('POST /api/inbound/availability-email', () => {
           json: async () => ({
             data: {
               id: 'email-1',
-              from: { email: 'manager@example.com', name: 'Manager' },
+              from: { email: 'brianna@example.com', name: 'Brianna Brown' },
               subject: null,
               text: '',
               created_at: '2026-03-20T12:00:00Z',
@@ -448,7 +458,7 @@ describe('POST /api/inbound/availability-email', () => {
           json: async () => ({
             data: {
               id: 'email-1',
-              from: { email: 'manager@example.com', name: 'Manager' },
+              from: { email: 'brianna@example.com', name: 'Brianna Brown' },
               subject: null,
               text: '',
               created_at: '2026-03-20T12:00:00Z',
@@ -535,7 +545,7 @@ describe('POST /api/inbound/availability-email', () => {
           json: async () => ({
             data: {
               id: 'email-1',
-              from: { email: 'manager@example.com', name: 'Manager' },
+              from: { email: 'brianna@example.com', name: 'Brianna Brown' },
               subject: null,
               text: '',
               created_at: '2026-03-20T12:00:00Z',
@@ -591,5 +601,54 @@ describe('POST /api/inbound/availability-email', () => {
       ocr_status: 'failed',
       ocr_error: expect.stringContaining('PDF'),
     })
+  })
+
+  it('does not auto-apply parsed requests when the sender email does not match the therapist', async () => {
+    const admin = createAdminMock()
+    createAdminClientMock.mockReturnValue(admin)
+
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input.endsWith('/email-1/attachments')) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: [],
+          }),
+        }
+      }
+
+      if (input.endsWith('/email-1')) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              id: 'email-1',
+              from: { email: 'manager@example.com', name: 'Manager' },
+              subject: 'Availability',
+              text: 'Employee Name: Brianna Brown\nNeed off Mar 24',
+              created_at: '2026-03-20T12:00:00Z',
+              message_id: 'msg-1',
+            },
+          }),
+        }
+      }
+
+      throw new Error(`Unhandled fetch: ${input}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const response = await POST(createWebhookRequest())
+
+    expect(response.status).toBe(200)
+    await waitForAfterWork()
+    expect(admin.state.intakeUpserts[0]).toMatchObject({
+      auto_applied_count: 0,
+      needs_review_count: 1,
+    })
+    expect(admin.state.itemInserts[0]?.[0]).toMatchObject({
+      parse_status: 'needs_review',
+      matched_therapist_id: 'therapist-1',
+    })
+    expect(admin.state.overrideUpserts).toHaveLength(0)
   })
 })

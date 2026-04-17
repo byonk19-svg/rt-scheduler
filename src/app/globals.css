@@ -221,8 +221,8 @@
 
 .teamwise-home-grid {
   background-image:
-    linear-gradient(rgba(106, 165, 200, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(106, 165, 200, 0.05) 1px, transparent 1px);
+    linear-gradient(rgba(106, 165, 200, 0.075) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(106, 165, 200, 0.075) 1px, transparent 1px);
   background-size: 28px 28px;
   mask-image: linear-gradient(
     180deg,
@@ -245,6 +245,14 @@
   .teamwise-home-preview-shell {
     backdrop-filter: none;
   }
+}
+
+/* Auth pages — dark sidebar grid (replaces inline backgroundImage on login/signup) */
+.teamwise-auth-brand-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.09) 1px, transparent 1px);
+  background-size: 28px 28px;
 }
 
 /* Public marketing header — blur disabled when user prefers reduced motion */

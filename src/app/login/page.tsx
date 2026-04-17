@@ -165,18 +165,10 @@ function LoginPageClient() {
   return (
     <main className="flex min-h-screen">
       {/* Left brand panel — desktop only */}
-      <aside className="relative hidden overflow-hidden bg-[var(--sidebar)] lg:flex lg:w-[400px] lg:shrink-0 lg:flex-col lg:justify-between lg:p-10">
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px)',
-            backgroundSize: '28px 28px',
-          }}
-        />
+      <aside className="relative hidden overflow-hidden bg-[var(--sidebar)] lg:flex lg:w-[440px] lg:shrink-0 lg:flex-col lg:justify-between lg:p-12">
+        <div aria-hidden className="teamwise-auth-brand-grid absolute inset-0" />
         <div className="relative flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--attention)]">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--attention)] shadow-tw-md-soft">
             <CalendarDays className="h-5 w-5 text-accent-foreground" />
           </div>
           <div>
@@ -184,13 +176,18 @@ function LoginPageClient() {
             <p className="text-[0.7rem] text-[var(--sidebar-foreground)]">Respiratory Therapy</p>
           </div>
         </div>
-        <div className="relative">
-          <p className="font-display text-2xl font-bold leading-snug tracking-tight text-sidebar-primary">
-            Scheduling that keeps care moving.
+        <div className="relative space-y-5 border-l-[4px] border-[var(--attention)]/45 pl-6">
+          <p className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-sidebar-primary/85">
+            Scheduling for RT teams
           </p>
-          <p className="mt-3 text-sm leading-relaxed text-[var(--sidebar-foreground)]">
-            Coverage planning, availability, and shift management — built for RT departments.
-          </p>
+          <div className="space-y-3">
+            <p className="font-display text-[1.95rem] font-bold leading-[1.06] tracking-[-0.035em] text-sidebar-primary xl:text-[2.35rem]">
+              Scheduling that keeps care moving.
+            </p>
+            <p className="text-sm font-medium leading-relaxed text-[var(--sidebar-foreground)]">
+              Coverage planning, availability, and shift management — built for RT departments.
+            </p>
+          </div>
         </div>
       </aside>
 
