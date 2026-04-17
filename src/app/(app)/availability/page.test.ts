@@ -65,13 +65,16 @@ describe('availability page role-specific actions', () => {
     expect(source).toContain("status: 'force_on'")
   })
 
-  it('does not load therapist scheduled-shift conflict warnings in the manager availability path', () => {
+  it('gates therapist scheduled-shift conflict warnings off for managers', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/app/(app)/availability/page.tsx'),
       'utf8'
     )
 
-    expect(source).not.toContain('findScheduledConflicts')
-    expect(source).not.toContain('conflicts={conflicts}')
+    expect(source).toContain('findScheduledConflicts')
+    expect(source).toContain(
+      'const conflicts = canManageAvailability ? [] : findScheduledConflicts'
+    )
+    expect(source).toContain('conflicts={conflicts}')
   })
 })

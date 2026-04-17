@@ -485,9 +485,18 @@ describe('openai OCR helpers', () => {
       process.env.OPENAI_API_KEY = 'test-key'
       process.env.OPENAI_OCR_MODEL = 'gpt-test-vision'
       vi.mocked(renderPdfToPngPages).mockReset()
+      vi.mocked(createOcrImageVariants).mockReset()
       vi.mocked(renderPdfToPngPages).mockResolvedValue([
         Buffer.from(MIN_PNG_BASE64, 'base64'),
         Buffer.from(MIN_PNG_BASE64, 'base64'),
+      ])
+      vi.mocked(createOcrImageVariants).mockResolvedValue([
+        {
+          zoneLabel: 'full_page',
+          label: 'grayscale',
+          contentType: 'image/png',
+          base64: MIN_PNG_BASE64,
+        },
       ])
     })
 

@@ -13,7 +13,6 @@ import {
   headcountThreshold,
   shouldShowMonthTag,
 } from '@/lib/coverage/selectors'
-import { useMediaQuery } from '@/lib/use-media-query'
 import { cn } from '@/lib/utils'
 
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']

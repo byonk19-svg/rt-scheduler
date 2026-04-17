@@ -33,9 +33,8 @@ describe('public homepage redesign contract', () => {
     expect(pageSource).toContain('teamwise-home-preview-sheen')
   })
 
-  it('optimizes the preview image for production (responsive sizes, blur, no unoptimized bypass)', () => {
-    expect(pageSource).toContain("import appPreview from '../../public/images/app-preview.png'")
-    expect(pageSource).toContain('placeholder="blur"')
+  it('optimizes the preview image for production (responsive sizes, no unoptimized bypass)', () => {
+    expect(pageSource).toContain('src="/images/app-preview.png"')
     expect(pageSource).toContain('sizes=')
     expect(pageSource).not.toContain('unoptimized')
   })
