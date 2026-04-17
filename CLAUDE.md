@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-16 (session 80)
+Updated: 2026-04-17 (session 81)
 
 ## Handoff Snapshot
 
@@ -77,6 +77,13 @@ Updated: 2026-04-16 (session 80)
 - Targeted shell/header lane: `npx vitest run src/components/shell/app-shell-config.test.ts src/components/AppShell.test.ts src/components/manager/ManagerWorkspaceHeader.test.ts src/app/(public)/signup/page.test.ts`
 
 ## Recent changelog
+
+**Session 81 (2026-04-17)** — HMR lazy-element crash fix:
+
+- All six `next/dynamic` named-export loaders now fall back to `() => null` when the named export resolves to `undefined`, preventing the `"Lazy element type must resolve to a class or function"` crash that fires when webpack HMR briefly invalidates a module mid-render.
+- Affected files: `src/components/team/TeamWorkspaceClient.tsx` (`TeamDirectory`, `EmployeeRosterPanel`) and `src/app/(app)/coverage/CoverageClientPage.tsx` (`AutoDraftConfirmDialog`, `ClearDraftConfirmDialog`, `CycleManagementDialog`, `ShiftEditorDialog`).
+- Pattern: `.then((m) => m.Export ?? (() => null))` — safe fallback renders nothing during the HMR transition window, then the correct component loads on the next cycle.
+- Verified with `npm run lint`, `npm run build`, and targeted Vitest (`team-workspace.test.ts`, `coverage/page.test.ts`).
 
 **Session 80 (2026-04-16)** — Sitewide header standardization:
 
@@ -339,6 +346,7 @@ Typography classes:
 - **`formatCycleDate` produces no year:** Uses `{ month: 'short', day: 'numeric' }` → `'Apr 13'` not `'Apr 13, 2026'`. Test fixtures asserting on date range strings must omit the year (e.g. `'Mar 17 – Apr 13'`).
 - **Browser verification on auth routes:** All app routes require login. Chrome DevTools MCP always redirects to `/login` — browser verification via screenshot is not possible without credentials. Confirm changes via `tsc`, `vitest`, and code review only.
 - **Current repo-wide typecheck is blocked by an unrelated fixture:** `src/components/team/EmployeeRosterPanel.test.ts` is currently missing `matched_email` on a test row, so `npx tsc --noEmit` fails until that fixture is updated.
+- **`next/dynamic` named-export HMR crash:** `.then((m) => m.NamedExport)` returns `undefined` during webpack HMR when the module is briefly re-evaluating. Guard every named-export dynamic loader with `?? (() => null)`: `.then((m) => m.NamedExport ?? (() => null))`. This prevents the `"Lazy element type must resolve to a class or function"` crash that surfaces as a runtime error pointing at the nearest layout or parent component.
 - **framer-motion `ease`:** `ease: 'easeOut'` fails `tsc` — the `Easing` type requires specific literals. Omit `ease` entirely to use framer-motion's safe default.
 - **Auto-draft algorithm lives in `src/lib/coverage/generate-draft.ts`:** `generateDraftForCycle(input: GenerateDraftInput): GenerateDraftResult` is a pure function. `generateDraftScheduleAction` in `src/app/schedule/actions/draft-actions.ts` is a thin wrapper that loads DB data, calls it, then saves results. Dry-run and preview features can call `generateDraftForCycle` directly without a server action.
 - **`src/app/schedule/actions.ts` is a barrel:** Real logic is in `src/app/schedule/actions/` sub-modules (`helpers.ts`, `cycle-actions.ts`, `publish-actions.ts`, `shift-actions.ts`, `draft-actions.ts`, `preliminary-actions.ts`). Each action file has `'use server'`; `helpers.ts` and `index.ts` do not.
