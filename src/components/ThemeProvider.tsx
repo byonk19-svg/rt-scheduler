@@ -24,6 +24,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   )
 
   useEffect(() => {
+    setStoredTheme(theme)
+  }, [theme])
+
+  useEffect(() => {
     applyTheme(resolvedTheme)
 
     const mediaQuery =
