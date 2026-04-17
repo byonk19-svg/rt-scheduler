@@ -67,8 +67,8 @@ export function resolveRosterCellIntent(
   canManageCoverage: boolean,
   canUpdateAssignmentStatus: boolean,
   hasShift: boolean
-): 'manage' | 'status' | 'none' {
-  if (canManageCoverage) return 'manage'
+): 'quick_assign' | 'manage' | 'status' | 'none' {
+  if (canManageCoverage) return hasShift ? 'manage' : 'quick_assign'
   if (canUpdateAssignmentStatus && hasShift) return 'status'
   return 'none'
 }
@@ -165,7 +165,7 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
       token.length > 0
         ? 'border-border/60 bg-background text-foreground'
         : 'border-transparent bg-transparent text-transparent',
-      intent === 'manage' &&
+      (intent === 'manage' || intent === 'quick_assign') &&
         !cellHasError &&
         'border-primary/25 bg-primary/[0.03] text-foreground hover:bg-primary/[0.08]',
       cell?.isLead && 'border-[var(--warning-border)]/65 bg-[var(--warning-subtle)]/35 text-[var(--warning-text)]',
@@ -173,7 +173,7 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
       cellHasError && 'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]'
     )
 
-    if (intent === 'manage') {
+    if (intent === 'manage' || intent === 'quick_assign') {
       const trigger = (
         <button
           type="button"
