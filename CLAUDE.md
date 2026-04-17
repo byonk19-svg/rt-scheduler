@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-17 (session 83)
+Updated: 2026-04-17 (session 84)
 
 ## Handoff Snapshot
 
@@ -52,6 +52,8 @@ Updated: 2026-04-17 (session 83)
 - **Shift reminders:** `vercel.json` now schedules `/api/cron/shift-reminders` at `0 6 * * *`. The cron route requires `CRON_SECRET`, queues rows in `shift_reminder_outbox`, sends 24h reminder emails for next-day `scheduled` shifts only, and writes matching in-app notifications.
 - **Manager analytics:** `/analytics` now provides cycle fill rates, therapist submission compliance, and force-on miss reporting using server-side Supabase queries plus simple CSS-based summary components.
 - **Dedicated work-pattern page:** managers now have `/team/work-patterns` for day/night grouped recurring pattern review and editing outside the quick-edit modal. The quick-edit modal still retains its work-pattern section.
+- **`resolveRosterCellIntent` intent split:** the function now returns `'quick_assign'` for manager + empty roster cell and `'manage'` for manager + filled cell. Both intents render the same editor-open button in `RosterMatrixTable`; the distinction exists for test assertions and future intent-specific styling. Do not collapse them back into a single `'manage'` return.
+- **Dead `onUnassign` prop removed from roster matrix:** `onUnassign` no longer exists on `RosterScheduleViewProps`, `RosterSection`, or `RosterMatrixTable`. `handleUnassign` in `CoverageClientPage` is still wired exclusively to `ShiftEditorDialog` where it is actually called.
 - **Availability intake utilities:** `src/lib/availability-email-intake.ts` and related tests now cover richer request-edit parsing and manager-edit workflows more explicitly.
 - `RESEND_API_KEY` must support receiving APIs, not just sending. A send-only key fails on `/emails/receiving` with `401 restricted_api_key`.
 
@@ -64,26 +66,31 @@ Updated: 2026-04-17 (session 83)
 - `main` now also carries the hot-route follow-up: `/coverage` swaps shift datasets locally from the initial snapshot, `/availability` only loads active-tab planner/intake data, and `shift-board` approve/deny actions stay local instead of reloading the board on success.
 - `main` now also carries the shared sitewide header pass: `AppShell` uses one sticky authenticated header plus surface section nav, manager/page header wrappers now sit on `PageIntro`, and public/auth routes share `PublicHeader`.
 - `/schedule` now reads live schedule-cycle data and stays inside the authenticated shell as a read-only roster matrix rather than a public mock surface.
-- Current branch work now adds four manager-facing capabilities on top of that baseline:
-  - mobile week-by-week `/coverage` navigation below `md`
-  - root-level dark mode with `/profile` appearance controls
-  - cycle templates (save published cycles, apply to draft cycles)
-  - `/team/import` generic CSV roster import wizard
-- This branch also now carries the restored scheduling workflow set that was missing from the earlier branch snapshot:
-  - therapist active-cycle scheduled-conflict warnings on `/therapist/availability`
-  - coverage auto-draft pre-flight reporting
-  - daily shift reminder cron + outbox delivery path
-  - manager `/analytics`
-  - manager `/team/work-patterns`
+- Current branch (`claude/audit-log-bulk-team-clean`) adds the following on top of that baseline — all implemented, tested, and CI-green:
+  - mobile week-by-week `/coverage` navigation below `md` with touch swipe
+  - root-level dark mode with `/profile` appearance controls (`src/lib/theme.ts`, `ThemeProvider`)
+  - cycle templates: save published cycles, apply to draft cycles (`src/lib/cycle-template.ts`, `SaveAsTemplateDialog`, `StartFromTemplateDialog`, `/api/schedule/templates`)
+  - `/team/import` generic CSV mapping/import wizard (`src/lib/csv-import-parser.ts`, `ImportWizard`, `ImportFieldMapper`)
+  - bulk therapist status actions: FMLA, active/inactive, employment type via `BulkActionBar` + `bulkUpdateTeamMembersAction`
+  - audit log UI at `/settings/audit-log` with pagination, action/actor filters, and `view_audit_log` permission
+  - therapist scheduled-conflict warning banner on `/therapist/availability`
+  - coverage auto-draft pre-flight report before generation (`src/lib/coverage/pre-flight.ts`, `PreFlightDialog`, `/api/schedule/pre-flight`)
+  - daily shift reminders: `shift_reminder_outbox` migration, `src/lib/shift-reminders.ts`, `/api/cron/shift-reminders`, Vercel cron at `0 6 * * *`
+  - manager analytics at `/analytics`: fill rates, submission compliance, force-on misses
+  - dedicated work-patterns page at `/team/work-patterns`
 
 ### Where We Want To Go
 
-1. Run a full browser QA pass across the new shared authenticated/public headers on desktop and mobile before shipping.
-2. Validate the compact Coverage workspace in real manager usage, especially very large roster matrices in production-like conditions. If modal open still feels slow after the current render optimizations, investigate virtualization or further memoization before changing workflow.
-3. Add a **"Send reminders"** bulk action to the response roster on `/availability` — 24 unresponded therapists with no in-app nudge is the main operational gap.
-4. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
-5. Deploy production after significant public-surface changes (`vercel deploy --prod`) so `www.teamwise.work` matches `main`.
-6. Keep manual intake first-class even if Resend inbound is healthy. It is the practical fallback path for operations.
+1. **Merge `claude/audit-log-bulk-team-clean` to `main`** — the branch is CI-green and carries 11 new manager/therapist features. QA the following before merging: bulk status actions on a real team, audit log filtering, pre-flight report on a large roster, and the analytics page with real cycle data.
+2. **Fix the 9 pre-existing test path failures** — tests in `src/app/(app)/therapist/availability/page.test.ts`, `publish-actions.source.test.ts`, etc. look for files at old `src/app/schedule/` and `src/app/therapist/` paths instead of the `(app)` route-group paths. Update the `resolve(process.cwd(), 'src/app/...')` calls in those tests.
+3. **Add "Send reminders" bulk action** to the response roster on `/availability` — bulk email nudge for non-respondents is still the top operational gap.
+4. **Swap history and My Schedule quick view** — `src/app/(app)/staff/history` and `src/app/(app)/staff/my-schedule` are still not implemented.
+5. **Schedule/roster CSV export** — `/api/schedule/export` and `/api/team/roster/export` are still not implemented; `csv-utils.ts` still needs to be extracted from the availability export route.
+6. **Print confidentiality footer** — `print-schedule.tsx` still lacks the "Internal Use Only" footer.
+7. Run a full browser QA pass across the new shared authenticated/public headers on desktop and mobile before shipping.
+8. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
+9. Deploy production after significant public-surface changes (`vercel deploy --prod`) so `www.teamwise.work` matches `main`.
+10. Keep manual intake first-class even if Resend inbound is healthy. It is the practical fallback path for operations.
 
 ### Verification Baseline
 
@@ -105,6 +112,18 @@ Updated: 2026-04-17 (session 83)
 - Targeted work-pattern lane: `npm run test:unit -- src/components/team/WorkPatternCard.test.ts src/components/team/WorkPatternEditDialog.test.ts src/app/team/work-patterns/page.test.ts`
 
 ## Recent changelog
+
+**Session 84 (2026-04-17)** — Feature gap analysis, Cursor prompt library, branch review, and CI fixes on `claude/audit-log-bulk-team-clean`:
+
+- Produced a 16-feature gap analysis covering manager operational gaps, reporting/observability, therapist UX, mobile/accessibility, and strategic features. Priorities and effort estimates are documented in session conversation history.
+- Produced a detailed implementation plan for all 16 features including exact file paths, step-by-step instructions, DB schemas, gotchas, and a phased delivery order. Each feature was also formatted as a ready-to-paste Cursor prompt.
+- Reviewed `claude/audit-log-bulk-team-clean` and confirmed the following features are fully implemented and tested: **bulk therapist status actions** (`BulkActionBar`, `bulkUpdateTeamMembersAction` with batch `.update().in()`), **audit log UI** (`/settings/audit-log`, `AuditLogFilters`, `view_audit_log` permission, nav wiring), **cycle templates**, **CSV import wizard**, **theme utilities**, **availability conflict warning**, **coverage pre-flight**, **shift reminders**, **analytics**, and **work patterns page**.
+- Fixed `resolveRosterCellIntent` in `RosterScheduleView.tsx`: now returns `'quick_assign'` for manager + empty cell and `'manage'` for manager + filled cell. The old code returned `'manage'` for all manager cells regardless. Both intents open the day editor; the distinction matters for tests and future intent-specific styling.
+- Updated `coverage/page.test.ts` to match the current implementation: `PreFlightDialog` replaced `AutoDraftConfirmDialog` as the auto-draft entry point, so the test now checks `preFlightDialogOpen` and `const PreFlightDialog = dynamic(` instead of the old `autoDraftDialogOpen` pattern. Removed the `'Schedule cycle'` assertion which no longer appears in the source.
+- Fixed `PreFlightDialog.tsx` TypeScript error: error payload extraction now casts to `{ error?: string } | null` before reading `.error` rather than relying on union narrowing that TypeScript couldn't prove.
+- Removed dead `onUnassign` prop chain: `onUnassign` was threaded from `RosterScheduleViewProps` → `RosterSection` → `RosterMatrixTable` but never called inside `RosterMatrixTable`. All pass-throughs and prop declarations removed. `handleUnassign` in `CoverageClientPage` remains wired to `ShiftEditorDialog` where it is actually used.
+- Removed stale `AutoDraftConfirmDialog` dynamic import from `CoverageClientPage.tsx` (pre-flight replaced it; import was unused).
+- All fixes pushed to `claude/audit-log-bulk-team-clean`; CI (format + lint + build + tsc) passes. 700 tests passing; 9 remaining failures are all pre-existing path-mismatch issues from the route-group refactor (`src/app/schedule/` vs `src/app/(app)/schedule/`), not caused by new code.
 
 **Session 83 (2026-04-17)** - Restore the missing scheduling workflow surfaces on this branch:
 
