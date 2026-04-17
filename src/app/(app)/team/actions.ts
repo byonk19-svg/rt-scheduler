@@ -328,6 +328,7 @@ export async function saveWorkPatternAction(formData: FormData) {
 
   redirect('/team/work-patterns?success=work_pattern_saved')
 }
+
 export async function bulkUpdateTeamMembersAction(formData: FormData) {
   const { supabase } = await requireManager()
 

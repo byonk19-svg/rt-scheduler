@@ -1,6 +1,9 @@
 import { Fraunces } from 'next/font/google'
+import dynamic from 'next/dynamic'
 
-import { PublicHeader } from '@/components/public/PublicHeader'
+const PublicHeader = dynamic(() =>
+  import('@/components/public/PublicHeader').then((m) => m.default ?? (() => null))
+)
 
 const fraunces = Fraunces({
   subsets: ['latin'],
