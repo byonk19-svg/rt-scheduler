@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-17 (session 84)
+Updated: 2026-04-17 (session 85)
 
 ## Handoff Snapshot
 
@@ -32,7 +32,7 @@ Updated: 2026-04-17 (session 84)
 - **Coverage designated lead vs extra lead-eligible staff:** only one `shifts.role='lead'` row designates the lead for that slot. The shift editor still lists every **lead-eligible** therapist; choosing another while a lead exists adds them as **staff** coverage (`assign` with `role: 'staff'`). Someone already on the day as staff can be **designated** via **`set_lead`** (`setCoverageDesignatedLeadViaApi` in `src/lib/coverage/mutations.ts`), which now uses `router.refresh()` against the server snapshot path instead of a client reload nonce. Lead-eligible rows are **not** disabled merely because a lead is already booked.
 - **Email intake tab stability:** intake date chip toggles and **Apply dates** refresh in place (`router.refresh` / `router.replace` with `tab=intake`) so managers are not bounced back to the **Planner** tab after saves. Intake request chips cycle **`force_off` ↔ `force_on`** only; removing a date uses an explicit **Remove** path with confirmation instead of a silent third-click delete.
 - **Schedule layout + role consistency:** `/coverage` supports both **Grid** and **Roster** layouts. Managers can edit staffing from either layout by clicking a day cell; leads can update staffed cells to **`OC`**, **`LE`**, **`CX`**, or **`CI`** through the shared assignment-status flow. Users can save a default schedule layout (`Grid` or `Roster`) in `/profile`, and the therapist compatibility route (`/therapist/schedule`) still defers default layout selection to `/coverage` so a saved preference wins unless an explicit `view` query is present.
-- **Theme support:** the root layout now reads the `tw-theme` cookie on the server, applies the initial `dark` class without any inline script, and wraps the app in `ThemeProvider`; `/profile` includes an **Appearance** section with **Light / System / Dark** controls. Client-side theme changes keep `localStorage` and the `tw-theme` cookie in sync through `src/lib/theme.ts`, `.dark` token overrides live in `src/app/globals.css`, and print explicitly forces light token values.
+- **Theme support:** the root layout now reads the `tw-theme` cookie on the server, applies the initial `dark` class without any inline script, and renders a plain `<body>` without importing `ThemeProvider`. `ThemeProvider` now lives in `src/components/AppShell.tsx` so the theme boundary stays client-to-client and avoids the webpack HMR lazy-element crash path; `/profile` still includes an **Appearance** section with **Light / System / Dark** controls. Client-side theme changes keep `localStorage` and the `tw-theme` cookie in sync through `src/lib/theme.ts`, `.dark` token overrides live in `src/app/globals.css`, and print explicitly forces light token values.
 - **Hot-path performance trim:** `/coverage` now carries both day and night therapist/roster datasets in the initial server snapshot so shift-tab changes stop re-querying Supabase after hydration, `/availability` skips hidden-tab intake/planner reads, and `shift-board` approve/deny actions no longer rerun the full board bootstrap after a successful save.
 - **Shared header/navigation system:** authenticated routes now use one shared sticky `AppHeader` plus surface-level `LocalSectionNav` driven by `src/components/shell/app-shell-config.ts`; page titles/actions are being standardized through `PageIntro`, and public/auth routes now share `src/components/public/PublicHeader.tsx` from `src/app/(public)/layout.tsx`. Avoid reintroducing page-specific top bars or dark secondary sticky bars.
 - **Schedule roster route:** `/schedule` no longer redirects to `/coverage`, but it is also no longer a public mock. It now loads live roster/availability data through `src/app/(app)/schedule/schedule-roster-live-data.ts`, stays auth-protected by `src/proxy.ts`, and renders a read-only roster matrix inside the shared app shell.
@@ -69,7 +69,7 @@ Updated: 2026-04-17 (session 84)
 - `/schedule` now reads live schedule-cycle data and stays inside the authenticated shell as a read-only roster matrix rather than a public mock surface.
 - Current branch (`claude/audit-log-bulk-team-clean`) adds the following on top of that baseline — all implemented, tested, and CI-green:
   - mobile week-by-week `/coverage` navigation below `md` with touch swipe
-  - root-level dark mode with `/profile` appearance controls (`src/lib/theme.ts`, `ThemeProvider`)
+  - root-level dark mode with `/profile` appearance controls (`src/lib/theme.ts`, `ThemeProvider`), with the provider mounted in `AppShell` while `src/app/layout.tsx` stays server-only for initial theme-class resolution
   - cycle templates: save published cycles, apply to draft cycles (`src/lib/cycle-template.ts`, `SaveAsTemplateDialog`, `StartFromTemplateDialog`, `/api/schedule/templates`)
   - `/team/import` generic CSV mapping/import wizard (`src/lib/csv-import-parser.ts`, `ImportWizard`, `ImportFieldMapper`)
   - bulk therapist status actions: FMLA, active/inactive, employment type via `BulkActionBar` + `bulkUpdateTeamMembersAction`
@@ -115,6 +115,12 @@ Updated: 2026-04-17 (session 84)
 - Targeted schedule-roster lane: `npm run test:unit -- src/lib/schedule-roster-data.test.ts`
 
 ## Recent changelog
+
+**Session 85 (2026-04-17)** — ThemeProvider HMR boundary fix on `claude/audit-log-bulk-team-clean`:
+
+- Fixed the lingering webpack HMR `lazy element type must resolve to a class or function` crash by removing `ThemeProvider` from `src/app/layout.tsx` and mounting it inside `src/components/AppShell.tsx` instead.
+- `src/components/ThemeProvider.tsx` now also exports `ThemeProvider` as the default export so `AppShell` can import it over a pure client-to-client boundary.
+- Updated `src/app/layout.theme.test.ts` to assert the new ownership boundary: server theme resolution remains in the root layout, while `ThemeProvider` now lives in `AppShell`.
 
 **Session 84 (2026-04-17)** — Feature gap analysis, Cursor prompt library, branch review, and CI fixes on `claude/audit-log-bulk-team-clean`:
 
@@ -417,6 +423,7 @@ Typography classes:
 - **Preview MCP on Windows:** `preview_start` server tracking doesn't persist between tool calls. Chrome MCP also returns "Permission denied" on localhost. For local visual verification, use saved screenshots in `artifacts/screen-capture/latest/`. To confirm server health use `curl -s -o /dev/null -w "%{http_code}" http://localhost:3000`.
 - **Zombie dev server on Windows:** Stale `next dev` processes can hold port 3000 silently (visible as ~994MB node.exe in tasklist). Find the PID with `netstat -ano | grep ":3000" | grep LISTENING` then kill with `taskkill //PID <pid> //F`. Follow with `rm -rf .next` before rebuilding.
 - **Clean Windows dev restart:** if localhost returns `ERR_FAILED`, first confirm whether anything is actually listening on `3000` (`netstat -ano | Select-String ':3000'`). For a clean restart, stop repo-local `next dev` processes, delete `.next`, then launch exactly one fresh `npm run dev`. Old Chrome tabs can keep stale HMR/runtime overlays alive even after the code is fixed, so prefer a brand-new `localhost:3000` tab before treating an old overlay as current truth.
+- **Do not re-mount `ThemeProvider` in `src/app/layout.tsx`:** the root layout must stay server-only. Putting `ThemeProvider` back there reintroduces a server-to-client import boundary that can surface as a webpack HMR `lazy element type must resolve to a class or function` crash. Keep the provider mounted in `src/components/AppShell.tsx` unless the boundary design changes deliberately.
 - **"Supabase lookup failed" in build output is not an error:** During `npm run build`, Next.js tries to statically pre-render all routes; auth routes that call `cookies()` bail out and log this message. All routes correctly render as `ƒ` (dynamic). Safe to ignore.
 - **Responsive stat grids:** Always `grid-cols-2 lg:grid-cols-4` — never bare `grid-cols-4` which clips on narrower viewports.
 - **Repo-local Next build lock on Windows:** if `npm run build` throws `EPERM` under `.next`, check for a running `next dev` process from this repo and stop it before rebuilding.

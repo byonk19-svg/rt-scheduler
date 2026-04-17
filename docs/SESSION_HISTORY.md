@@ -1,5 +1,11 @@
 # Session History
 
+## Session 85 - 2026-04-17
+
+- Fixed the lingering dark-mode HMR crash by moving `ThemeProvider` ownership out of `src/app/layout.tsx` and into `src/components/AppShell.tsx`, keeping the root layout server-only while preserving cookie-backed initial theme resolution.
+- Added a default export to `src/components/ThemeProvider.tsx` so the shell imports it over a pure client-to-client boundary.
+- Updated the root-layout theme regression test to assert the new boundary: server theme resolution in the root layout, `ThemeProvider` in `AppShell`.
+
 ## Session 84 - 2026-04-17
 
 - Fixed the live `/schedule` roster so the Day and Night segments now filter therapists by `profiles.shift_type` before splitting into Core vs PRN sections.
