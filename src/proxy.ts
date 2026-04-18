@@ -12,6 +12,8 @@ const PUBLIC_ROUTES = [
   '/reset-password',
   '/auth/callback',
   '/auth/signout',
+  '/sitemap.xml',
+  '/robots.txt',
 ] as const
 
 const PUBLIC_API_ROUTES = ['/api/inbound/availability-email'] as const

@@ -1,8 +1,15 @@
+import type { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
 import { CalendarDays } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+
+export const metadata: Metadata = {
+  title: 'Scheduling for respiratory therapy teams',
+  description:
+    'Keep schedules, availability, and coverage in one calm view. Built for RT teams who need shift clarity and fewer back-and-forth messages.',
+}
 
 const trustNotes = [
   'Availability stays visible before the next handoff.',
@@ -14,7 +21,7 @@ const therapistSubcopy =
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background">
       <section className="teamwise-home-luminous relative overflow-hidden">
         <div aria-hidden className="teamwise-home-grid absolute inset-0" />
         <div
@@ -115,6 +122,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-    </main>
+    </div>
   )
 }

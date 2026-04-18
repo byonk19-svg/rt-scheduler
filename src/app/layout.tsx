@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { DM_Sans, Geist_Mono } from 'next/font/google'
 import { cookies } from 'next/headers'
 import { getServerThemeClass, THEME_KEY } from '@/lib/theme'
+import { getSiteUrl, getSupabaseOrigin } from '@/lib/site-url'
 import './globals.css'
 
 const dmSans = DM_Sans({
@@ -16,9 +17,42 @@ const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
 })
 
+const siteUrl = getSiteUrl()
+
 export const metadata: Metadata = {
-  title: 'Teamwise',
+  metadataBase: siteUrl,
+  title: {
+    default: 'Teamwise',
+    template: '%s · Teamwise',
+  },
   description: 'Team scheduling, availability, and coverage together.',
+  applicationName: 'Teamwise',
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: siteUrl.href,
+    siteName: 'Teamwise',
+    title: 'Teamwise',
+    description: 'Team scheduling, availability, and coverage together.',
+    images: [
+      {
+        url: '/images/app-preview.png',
+        width: 1200,
+        height: 630,
+        alt: 'Teamwise schedule view',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Teamwise',
+    description: 'Team scheduling, availability, and coverage together.',
+    images: ['/images/app-preview.png'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 }
 
 export default async function RootLayout({
@@ -28,6 +62,7 @@ export default async function RootLayout({
 }>) {
   const cookieStore = await cookies()
   const themeClass = getServerThemeClass(cookieStore.get(THEME_KEY)?.value)
+  const supabaseOrigin = getSupabaseOrigin()
 
   return (
     <html
@@ -35,6 +70,11 @@ export default async function RootLayout({
       suppressHydrationWarning
       className={[dmSans.variable, geistMono.variable, themeClass].filter(Boolean).join(' ')}
     >
+      <head>
+        {supabaseOrigin ? (
+          <link rel="preconnect" href={supabaseOrigin} crossOrigin="anonymous" />
+        ) : null}
+      </head>
       <body className={`${dmSans.className} antialiased`}>{children}</body>
     </html>
   )

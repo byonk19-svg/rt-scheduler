@@ -1,8 +1,13 @@
+import type { Metadata } from 'next'
 import withDynamic from 'next/dynamic'
 import type { AppShellUser } from '@/components/AppShell'
 import { toUiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 import type { ReactNode } from 'react'
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+}
 
 const AppShell = withDynamic<{
   user: AppShellUser | null

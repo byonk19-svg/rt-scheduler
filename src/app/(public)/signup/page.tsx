@@ -112,7 +112,7 @@ export default function SignUpPage() {
   }
 
   return (
-    <main className="flex min-h-[calc(100vh-73px)]">
+    <div className="flex min-h-[calc(100vh-73px)]">
       {/* Left brand panel — desktop only */}
       <aside className="relative hidden overflow-hidden bg-[var(--sidebar)] lg:flex lg:w-[440px] lg:shrink-0 lg:flex-col lg:justify-between lg:p-12">
         <div
@@ -275,7 +275,7 @@ export default function SignUpPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((value) => !value)}
-                  className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-muted-foreground hover:text-foreground"
+                  className="absolute inset-y-0 right-0 inline-flex min-h-11 min-w-11 items-center justify-center px-3 text-muted-foreground hover:text-foreground"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -306,6 +306,6 @@ export default function SignUpPage() {
           </p>
         </section>
       </div>
-    </main>
+    </div>
   )
 }
