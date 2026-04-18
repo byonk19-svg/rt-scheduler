@@ -11,11 +11,14 @@ import type {
 } from '@/components/availability/AvailabilityStatusSummary'
 import { AvailabilityWorkspaceShell } from '@/components/availability/availability-workspace-shell'
 import {
-  splitPlannerDatesByMode,
-  type PlannerMode,
-  type PlannerOverrideRow,
-} from '@/lib/availability-planner'
-import { formatHumanCycleRange, shiftMonthKey, toMonthStartKey } from '@/lib/calendar-utils'
+  buildDayStates,
+  getCycleLabel,
+  getSavedBucketsForSelection,
+  type ManagerAvailabilityEntryRow,
+  type ManagerPlannerOverrideRecord,
+} from '@/components/availability/manager-scheduling-helpers'
+import { type PlannerMode, splitPlannerDatesByMode } from '@/lib/availability-planner'
+import { shiftMonthKey, toMonthStartKey } from '@/lib/calendar-utils'
 import { isDateWithinCycle } from '@/lib/employee-directory'
 
 const AvailabilityStatusSummary = dynamic(() =>
@@ -59,28 +62,11 @@ type TherapistOption = {
   employment_type: 'full_time' | 'part_time' | 'prn'
 }
 
-type PlannerOverrideRecord = PlannerOverrideRow & {
-  therapist_id: string
-  cycle_id: string
-}
-
-type AvailabilityEntryRow = {
-  id: string
-  therapistId: string
-  cycleId: string
-  date: string
-  reason: string | null
-  createdAt: string
-  updatedAt?: string
-  requestedBy: string
-  entryType: 'force_off' | 'force_on'
-}
-
 type Props = {
   cycles: Cycle[]
   therapists: TherapistOption[]
-  overrides: PlannerOverrideRecord[]
-  availabilityEntries: AvailabilityEntryRow[]
+  overrides: ManagerPlannerOverrideRecord[]
+  availabilityEntries: ManagerAvailabilityEntryRow[]
   initialCycleId: string
   initialTherapistId: string
   submittedRows: AvailabilityStatusSummaryRow[]
@@ -91,17 +77,6 @@ type Props = {
   deleteManagerPlannerDateAction: (formData: FormData) => void | Promise<void>
   copyAvailabilityFromPreviousCycleAction: (formData: FormData) => void | Promise<void>
   reviewRequestsPanel?: ReactNode
-}
-
-function getSavedBucketsForSelection(
-  overrides: PlannerOverrideRecord[],
-  cycleId: string,
-  therapistId: string
-) {
-  return splitPlannerDatesByMode(
-    overrides.filter((row) => row.cycle_id === cycleId && row.therapist_id === therapistId),
-    { source: 'manager' }
-  )
 }
 
 export function ManagerSchedulingInputs({
@@ -235,36 +210,17 @@ export function ManagerSchedulingInputs({
     )
   }
 
-  const dayStates = useMemo(() => {
-    const next: Record<
-      string,
-      {
-        draftSelection?: 'will_work' | 'cannot_work'
-        savedPlanner?: 'will_work' | 'cannot_work'
-        requestTypes?: Array<'need_off' | 'request_to_work'>
-      }
-    > = {}
-
-    for (const date of savedBuckets.willWork) {
-      next[date] = { ...(next[date] ?? {}), savedPlanner: 'will_work' }
-    }
-    for (const date of savedBuckets.cannotWork) {
-      next[date] = { ...(next[date] ?? {}), savedPlanner: 'cannot_work' }
-    }
-    for (const date of selectedDates) {
-      next[date] = { ...(next[date] ?? {}), draftSelection: mode }
-    }
-    for (const row of therapistRequestRows) {
-      const current = next[row.date] ?? {}
-      const requestType = row.entryType === 'force_off' ? 'need_off' : 'request_to_work'
-      next[row.date] = {
-        ...current,
-        requestTypes: [...(current.requestTypes ?? []), requestType],
-      }
-    }
-
-    return next
-  }, [mode, savedBuckets.cannotWork, savedBuckets.willWork, selectedDates, therapistRequestRows])
+  const dayStates = useMemo(
+    () =>
+      buildDayStates({
+        savedBuckets,
+        selectedDates,
+        mode,
+        therapistRequestRows,
+      }),
+    [mode, savedBuckets, selectedDates, therapistRequestRows]
+  )
+  const selectedCycleLabel = getCycleLabel(selectedCycle)
 
   if (cycles.length === 0) {
     return (
@@ -329,11 +285,7 @@ export function ManagerSchedulingInputs({
             cycleStart={selectedCycle?.start_date ?? monthStart}
             cycleEnd={selectedCycle?.end_date ?? monthStart}
             selectedTherapistName={selectedTherapist?.full_name ?? 'Select a therapist'}
-            cycleLabel={
-              selectedCycle
-                ? formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)
-                : ''
-            }
+            cycleLabel={selectedCycleLabel}
             dayStates={dayStates}
             onPreviousMonth={() => setMonthStart((current) => shiftMonthKey(current, -1))}
             onNextMonth={() => setMonthStart((current) => shiftMonthKey(current, 1))}
@@ -343,11 +295,7 @@ export function ManagerSchedulingInputs({
         context={
           <TherapistContextPanel
             therapist={selectedTherapist}
-            cycleLabel={
-              selectedCycle
-                ? formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)
-                : 'No cycle selected'
-            }
+            cycleLabel={getCycleLabel(selectedCycle, 'No cycle selected')}
             requestRows={therapistRequestRows}
             savedPlannerRows={savedOverrides}
             submissionStatus={submissionStatus}
