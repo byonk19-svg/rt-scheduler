@@ -61,9 +61,9 @@ async function withAuthTimeout<T>(promise: Promise<T>, actionLabel: string): Pro
 
 function LoginPageFallback() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background">
+    <div className="flex min-h-screen items-center justify-center bg-background">
       <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" aria-hidden />
-    </main>
+    </div>
   )
 }
 
@@ -211,7 +211,7 @@ function LoginPageClient() {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 shrink-0 text-foreground/70 hover:bg-transparent hover:text-foreground"
+                className="shrink-0 text-foreground/70 hover:bg-transparent hover:text-foreground"
                 aria-label="Dismiss alert"
                 onClick={() => setDismissedPostSignupKey(postSignupBanner)}
               >
@@ -242,7 +242,7 @@ function LoginPageClient() {
                   <p>
                     <Link
                       href="/signup"
-                      className="text-sm font-semibold text-primary underline decoration-primary/60 underline-offset-2 hover:decoration-primary"
+                      className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline decoration-primary/60 underline-offset-2 hover:decoration-primary"
                     >
                       Request access
                     </Link>
@@ -253,7 +253,7 @@ function LoginPageClient() {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 shrink-0 text-foreground/70 hover:bg-transparent hover:text-foreground"
+                className="shrink-0 text-foreground/70 hover:bg-transparent hover:text-foreground"
                 aria-label="Dismiss alert"
                 onClick={() => setDismissedMessageKey(displayError ?? '')}
               >
@@ -284,7 +284,7 @@ function LoginPageClient() {
                 <Label htmlFor="password">Password</Label>
                 <Link
                   href="/reset-password"
-                  className="text-xs font-medium text-primary hover:underline"
+                  className="inline-flex min-h-11 items-center text-xs font-medium text-primary hover:underline"
                 >
                   Forgot password?
                 </Link>
@@ -313,7 +313,7 @@ function LoginPageClient() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((value) => !value)}
-                  className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-muted-foreground hover:text-foreground"
+                  className="absolute inset-y-0 right-0 inline-flex min-h-11 min-w-11 items-center justify-center px-3 text-muted-foreground hover:text-foreground"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -341,7 +341,10 @@ function LoginPageClient() {
           <div className="mt-6 text-center text-sm text-muted-foreground">
             <p>
               Need access?{' '}
-              <Link href="/signup" className="font-semibold text-primary hover:underline">
+              <Link
+                href="/signup"
+                className="inline-flex min-h-11 items-center font-semibold text-primary hover:underline"
+              >
                 Request access
               </Link>
             </p>
