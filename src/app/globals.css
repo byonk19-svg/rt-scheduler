@@ -110,9 +110,9 @@
   --highlight: hsl(187 55% 28%);
   --attention: hsl(38 90% 55%);
 
-  /* Homepage luminous marketing shell */
-  --home-glow-warm: color-mix(in srgb, var(--attention) 22%, transparent);
-  --home-glow-cool: color-mix(in srgb, var(--primary) 16%, transparent);
+  /* Homepage marketing shell — kept subtle vs app chrome */
+  --home-glow-warm: color-mix(in srgb, var(--attention) 14%, transparent);
+  --home-glow-cool: color-mix(in srgb, var(--primary) 10%, transparent);
   --home-panel: color-mix(in srgb, var(--card) 82%, transparent);
   --home-panel-border: color-mix(in srgb, white 72%, var(--card) 28%);
   --home-shadow: color-mix(in srgb, var(--foreground) 18%, transparent);
@@ -190,8 +190,8 @@
   --highlight: hsl(203 93% 35%);
   --attention: hsl(38 75% 52%);
 
-  --home-glow-warm: color-mix(in srgb, var(--attention) 18%, transparent);
-  --home-glow-cool: color-mix(in srgb, var(--highlight) 14%, transparent);
+  --home-glow-warm: color-mix(in srgb, var(--attention) 12%, transparent);
+  --home-glow-cool: color-mix(in srgb, var(--highlight) 9%, transparent);
   --home-panel: color-mix(in srgb, var(--card) 78%, transparent);
   --home-panel-border: color-mix(in srgb, var(--sidebar-primary) 12%, transparent);
   --home-shadow: color-mix(in srgb, var(--foreground) 38%, transparent);
@@ -287,25 +287,25 @@
 
 .teamwise-home-luminous {
   background-image:
-    radial-gradient(circle at 12% 18%, var(--home-glow-warm), transparent 28%),
-    radial-gradient(circle at 82% 16%, var(--home-glow-cool), transparent 34%),
+    radial-gradient(circle at 14% 22%, var(--home-glow-warm), transparent 46%),
+    radial-gradient(circle at 88% 12%, var(--home-glow-cool), transparent 52%),
     linear-gradient(
       180deg,
-      color-mix(in srgb, white 62%, transparent) 0%,
-      color-mix(in srgb, var(--background) 16%, transparent) 42%,
-      transparent 100%
+      color-mix(in srgb, var(--card) 35%, var(--background)) 0%,
+      var(--background) 48%,
+      var(--background) 100%
     );
 }
 
 .teamwise-home-grid {
   background-image:
-    linear-gradient(color-mix(in srgb, var(--primary) 8%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--primary) 8%, transparent) 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--primary) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--primary) 5%, transparent) 1px, transparent 1px);
   background-size: 28px 28px;
   mask-image: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--foreground) 70%, transparent) 0%,
-    color-mix(in srgb, var(--foreground) 18%, transparent) 62%,
+    color-mix(in srgb, var(--foreground) 52%, transparent) 0%,
+    color-mix(in srgb, var(--foreground) 12%, transparent) 58%,
     transparent 100%
   );
 }
@@ -318,8 +318,8 @@
   );
   border: 1px solid var(--home-panel-border);
   box-shadow:
-    0 32px 72px -28px var(--home-shadow),
-    inset 0 1px 0 color-mix(in srgb, white 74%, transparent);
+    0 24px 56px -32px var(--home-shadow),
+    inset 0 1px 0 color-mix(in srgb, white 60%, transparent);
 }
 
 .teamwise-marketing-header {
@@ -327,7 +327,7 @@
 }
 
 .teamwise-home-preview-sheen {
-  background: linear-gradient(180deg, color-mix(in srgb, white 45%, transparent), transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, white 22%, transparent), transparent);
 }
 
 /* ─── Typography ──────────────────────────────────────────────────────────── */

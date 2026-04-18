@@ -9,7 +9,7 @@ describe('public homepage redesign contract', () => {
   it('uses therapist-first trust-forward copy', () => {
     expect(pageSource).toContain('Keep your schedule, availability, and coverage in one calm view.')
     expect(pageSource).toContain(
-      'Built for respiratory therapists who need quick shift clarity, fewer back-and-forth messages, and a workspace they can trust before the next handoff.'
+      'Fewer chasing threads and clearer handoffs—built for RTs who need the next block to feel settled before they step onto the floor.'
     )
   })
 
@@ -24,6 +24,7 @@ describe('public homepage redesign contract', () => {
     )
     expect(pageSource).toContain('Availability stays visible before the next handoff.')
     expect(pageSource).toContain('Coverage changes stay clear without the back-and-forth.')
+    expect(pageSource).toContain("Sign-in and roster access stay under your manager's control.")
   })
 
   it('uses the luminous clinical wrapper classes', () => {
