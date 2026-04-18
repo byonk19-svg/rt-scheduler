@@ -1,9 +1,11 @@
-import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Download, Plus } from 'lucide-react'
 
-import type { AvailabilityEntryTableRow } from '@/app/availability/availability-requests-table'
+import {
+  AvailabilityEntriesTable,
+  type AvailabilityEntryTableRow,
+} from '@/app/availability/availability-requests-table'
 import {
   copyAvailabilityFromPreviousCycleAction,
   deleteAvailabilityEntryAction,
@@ -12,6 +14,7 @@ import {
 } from '@/app/availability/actions'
 import { AvailabilityPlannerFocusProvider } from '@/components/availability/availability-planner-focus-context'
 import { AvailabilityOverviewHeader } from '@/components/availability/AvailabilityOverviewHeader'
+import { ManagerSchedulingInputs } from '@/components/availability/ManagerSchedulingInputs'
 import { AvailabilitySummaryChips } from '@/components/availability/availability-summary-chips'
 import type { TableToolbarFilters } from '@/components/TableToolbar'
 import { FeedbackToast } from '@/components/feedback-toast'
@@ -24,17 +27,6 @@ import { buildMissingAvailabilityRows } from '@/lib/employee-directory'
 import { toUiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 import { cn } from '@/lib/utils'
-
-const AvailabilityEntriesTable = dynamic(() =>
-  import('@/app/availability/availability-requests-table').then(
-    (module) => module.AvailabilityEntriesTable ?? (() => null)
-  )
-)
-const ManagerSchedulingInputs = dynamic(() =>
-  import('@/components/availability/ManagerSchedulingInputs').then(
-    (module) => module.ManagerSchedulingInputs ?? (() => null)
-  )
-)
 
 type ToastVariant = 'success' | 'error'
 type AvailabilityOverrideType = 'force_off' | 'force_on'

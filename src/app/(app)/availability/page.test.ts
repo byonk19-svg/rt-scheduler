@@ -71,10 +71,7 @@ describe('availability page role-specific actions', () => {
       'utf8'
     )
 
-    expect(source).toContain('findScheduledConflicts')
-    expect(source).toContain(
-      'const conflicts = canManageAvailability ? [] : findScheduledConflicts'
-    )
-    expect(source).toContain('conflicts={conflicts}')
+    expect(source).not.toContain('findScheduledConflicts')
+    expect(source).not.toContain('conflicts={conflicts}')
   })
 })

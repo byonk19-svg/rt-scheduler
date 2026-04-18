@@ -20,27 +20,27 @@ import { isDateWithinCycle } from '@/lib/employee-directory'
 
 const AvailabilityStatusSummary = dynamic(() =>
   import('@/components/availability/AvailabilityStatusSummary').then(
-    (module) => module.AvailabilityStatusSummary ?? (() => null)
+    (module) => module.AvailabilityStatusSummary
   )
 )
 const AvailabilityCalendarPanel = dynamic(() =>
   import('@/components/availability/availability-calendar-panel').then(
-    (module) => module.AvailabilityCalendarPanel ?? (() => null)
+    (module) => module.AvailabilityCalendarPanel
   )
 )
 const AvailabilitySecondaryPanel = dynamic(() =>
   import('@/components/availability/availability-secondary-panel').then(
-    (module) => module.AvailabilitySecondaryPanel ?? (() => null)
+    (module) => module.AvailabilitySecondaryPanel
   )
 )
 const PlannerControlRail = dynamic(() =>
   import('@/components/availability/planner-control-rail').then(
-    (module) => module.PlannerControlRail ?? (() => null)
+    (module) => module.PlannerControlRail
   )
 )
 const TherapistContextPanel = dynamic(() =>
   import('@/components/availability/therapist-context-panel').then(
-    (module) => module.TherapistContextPanel ?? (() => null)
+    (module) => module.TherapistContextPanel
   )
 )
 

@@ -37,18 +37,18 @@ describe('coverage client performance contract', () => {
 })
 
 describe('availability route performance contract', () => {
-  it('lazy-loads the major availability client workspaces instead of statically bundling them together', () => {
-    expect(availabilityPageSource).not.toContain(
+  it('imports the main availability workspaces directly to avoid fragile next/dynamic default resolution on the server page', () => {
+    expect(availabilityPageSource).toContain(
       "import {\n  AvailabilityEntriesTable,\n  type AvailabilityEntryTableRow,\n} from '@/app/availability/availability-requests-table'"
     )
-    expect(availabilityPageSource).not.toContain(
+    expect(availabilityPageSource).toContain(
       "import { ManagerSchedulingInputs } from '@/components/availability/ManagerSchedulingInputs'"
     )
     expect(availabilityPageSource).not.toContain(
       "import {\n  EmailIntakePanel,\n  type EmailIntakePanelRow,\n} from '@/components/availability/EmailIntakePanel'"
     )
-    expect(availabilityPageSource).toContain('const AvailabilityEntriesTable = dynamic(() =>')
-    expect(availabilityPageSource).toContain('const ManagerSchedulingInputs = dynamic(() =>')
+    expect(availabilityPageSource).not.toContain('const AvailabilityEntriesTable = dynamic(() =>')
+    expect(availabilityPageSource).not.toContain('const ManagerSchedulingInputs = dynamic(() =>')
     expect(availabilityPageSource).not.toContain('const EmailIntakePanel = dynamic(() =>')
     expect(availabilityPageSource).toContain('redirect(`/therapist/availability')
     expect(availabilityPageSource).toContain('redirect(`/availability/intake')

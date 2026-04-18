@@ -9,12 +9,10 @@ import type { TeamSummaryCounts } from '@/components/team/team-directory-model'
 import { cn } from '@/lib/utils'
 
 const TeamDirectory = dynamic(() =>
-  import('@/components/team/TeamDirectory').then((module) => module.TeamDirectory ?? (() => null))
+  import('@/components/team/TeamDirectory').then((module) => module.TeamDirectory)
 )
 const EmployeeRosterPanel = dynamic(() =>
-  import('@/components/team/EmployeeRosterPanel').then(
-    (module) => module.EmployeeRosterPanel ?? (() => null)
-  )
+  import('@/components/team/EmployeeRosterPanel').then((module) => module.EmployeeRosterPanel)
 )
 
 export type TeamWorkspaceTab = 'directory' | 'roster'
