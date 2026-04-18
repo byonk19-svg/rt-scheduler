@@ -85,12 +85,12 @@ describe('AppShell navigation structure', () => {
     expect(scheduleSection?.isActive('/schedule')).toBe(true)
   })
 
-  it('sends the manager Schedule entry to the mock roster screen while leaving live coverage routable', () => {
+  it('routes the manager Coverage sub-item to the editable coverage workspace', () => {
     const scheduleSection = buildManagerSections(0).find((section) => section.key === 'schedule')
 
     expect(scheduleSection?.href).toBe('/schedule')
     expect(scheduleSection?.subItems.find((item) => item.label === 'Coverage')?.href).toBe(
-      '/schedule'
+      '/coverage'
     )
   })
 

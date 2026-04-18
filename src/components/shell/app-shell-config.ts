@@ -84,7 +84,7 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
       isActive: (pathname) => isManagerScheduleRoute(pathname),
       subItems: [
         {
-          href: '/schedule',
+          href: '/coverage',
           label: 'Coverage',
           active: (pathname) => pathname === '/coverage' || pathname === '/schedule',
         },
