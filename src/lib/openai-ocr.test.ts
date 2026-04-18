@@ -490,10 +490,10 @@ describe('openai OCR helpers', () => {
         Buffer.from(MIN_PNG_BASE64, 'base64'),
         Buffer.from(MIN_PNG_BASE64, 'base64'),
       ])
-      vi.mocked(createOcrImageVariants).mockResolvedValue([
+      vi.mocked(createOcrImageVariants).mockImplementation(async () => [
         {
+          label: 'original',
           zoneLabel: 'full_page',
-          label: 'grayscale',
           contentType: 'image/png',
           base64: MIN_PNG_BASE64,
         },
@@ -533,6 +533,7 @@ describe('openai OCR helpers', () => {
       expect(fetchMock).toHaveBeenCalledTimes(3)
       expect(renderPdfToPngPages).toHaveBeenCalledOnce()
       expect(renderPdfToPngPages).toHaveBeenCalledWith('Zm9v')
+      expect(createOcrImageVariants).toHaveBeenCalledTimes(2)
     })
 
     it('continues when one page OCR fails and another succeeds', async () => {
@@ -567,6 +568,7 @@ describe('openai OCR helpers', () => {
       })
 
       expect(fetchMock).toHaveBeenCalledTimes(3)
+      expect(createOcrImageVariants).toHaveBeenCalledTimes(2)
     })
   })
 })

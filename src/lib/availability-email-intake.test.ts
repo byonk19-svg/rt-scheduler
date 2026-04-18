@@ -486,6 +486,87 @@ describe('summarizeAvailabilityEmailBatch', () => {
   })
 })
 
+describe('parseAvailabilityEmailItem', () => {
+  const profiles = [
+    { id: 'therapist-1', full_name: 'Brianna Brown', is_active: true },
+    { id: 'therapist-2', full_name: 'Brian Brown', is_active: true },
+  ]
+
+  it('parses a PTO-style item and marks it parsed when employee and cycle match cleanly', () => {
+    expect(
+      parseAvailabilityEmailItem({
+        sourceType: 'attachment',
+        sourceLabel: 'form-1.jpg',
+        rawText: 'Employee Name: Brianna Brown\nPTO request\nNeed off Mar 24 and Mar 26',
+        cycles,
+        profiles,
+      })
+    ).toMatchObject({
+      sourceType: 'attachment',
+      sourceLabel: 'form-1.jpg',
+      extractedEmployeeName: 'Brianna Brown',
+      matchedTherapistId: 'therapist-1',
+      matchedCycleId: 'cycle-1',
+      parseStatus: 'parsed',
+      confidenceLevel: 'high',
+      confidenceReasons: [],
+    })
+  })
+
+  it('marks an item needs_review when dates parse but the employee match is ambiguous', () => {
+    expect(
+      parseAvailabilityEmailItem({
+        sourceType: 'body',
+        sourceLabel: 'Email body',
+        rawText: 'Employee Name: Brown\nNeed off Mar 24',
+        cycles,
+        profiles,
+      })
+    ).toMatchObject({
+      parseStatus: 'needs_review',
+      confidenceLevel: 'medium',
+      confidenceReasons: expect.arrayContaining(['employee_match_ambiguous']),
+    })
+  })
+})
+
+describe('summarizeAvailabilityEmailBatch', () => {
+  it('summarizes parsed and review items by count', () => {
+    expect(
+      summarizeAvailabilityEmailBatch([
+        {
+          sourceType: 'body',
+          sourceLabel: 'Email body',
+          extractedEmployeeName: 'Brianna Brown',
+          employeeMatchCandidates: [{ id: 'therapist-1', fullName: 'Brianna Brown' }],
+          matchedTherapistId: 'therapist-1',
+          matchedCycleId: 'cycle-1',
+          parseStatus: 'parsed',
+          confidenceLevel: 'high',
+          confidenceReasons: [],
+          requests: [],
+          unresolvedLines: [],
+          rawText: 'Need off Mar 24',
+        },
+        {
+          sourceType: 'attachment',
+          sourceLabel: 'form-1.jpg',
+          extractedEmployeeName: null,
+          employeeMatchCandidates: [],
+          matchedTherapistId: null,
+          matchedCycleId: null,
+          parseStatus: 'needs_review',
+          confidenceLevel: 'medium',
+          confidenceReasons: ['employee_match_ambiguous'],
+          requests: [],
+          unresolvedLines: [],
+          rawText: '',
+        },
+      ]).summary
+    ).toBe('2 items | 1 parsed | 1 need review | 0 failed')
+  })
+})
+
 describe('availability email helpers', () => {
   it('extracts sender name and email', () => {
     expect(parseSender('Ava Brown <ava@example.com>')).toEqual({
