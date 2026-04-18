@@ -71,7 +71,10 @@ security_best_practices_report.md
 .tmp-dev*.log
 .tmp-prod*.log
 .omx/
-.codex/
+# Codex CLI: ignore local/session files; keep shared repo skills
+.codex/**
+!.codex/skills/
+!.codex/skills/**
 
 # local agent / dev scratch (may sit next to repo root during sessions)
 .tmp/
