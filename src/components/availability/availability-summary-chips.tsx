@@ -31,7 +31,7 @@ export function AvailabilitySummaryChips({ chips }: AvailabilitySummaryChipsProp
             key={`${chip.label}-${chip.href}`}
             href={chip.href}
             className={cn(
-              'group inline-flex min-w-[8.5rem] items-center justify-between gap-3 rounded-full border px-3.5 py-2 text-sm transition-colors',
+              'group inline-flex h-11 min-w-[8.5rem] items-center justify-between gap-3 rounded-full border px-3.5 py-2 text-sm transition-colors',
               toneClasses[tone],
               chip.active && 'ring-2 ring-primary/15'
             )}

@@ -153,7 +153,7 @@ export function TeamPersonRow({
     <div className="flex items-center gap-2">
       <input
         type="checkbox"
-        className="h-4 w-4 shrink-0 rounded border-border text-primary focus-visible:ring-2 focus-visible:ring-ring"
+        className="h-11 w-11 shrink-0 rounded border-border text-primary focus-visible:ring-2 focus-visible:ring-ring sm:h-6 sm:w-6"
         checked={isSelected}
         onChange={() => onToggle()}
         aria-label={`Select ${profile.full_name ?? 'team member'}`}

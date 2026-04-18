@@ -300,7 +300,7 @@ export default async function TeamPage({
         actions={
           <a
             href="/team/import"
-            className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground shadow-xs transition-colors hover:bg-secondary/70"
+            className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground shadow-xs transition-colors hover:bg-secondary/70"
           >
             Import
           </a>

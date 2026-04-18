@@ -51,6 +51,43 @@ async function assertManagerAccess() {
   return { ok: true as const }
 }
 
+export async function GET(request: Request) {
+  const access = await assertManagerAccess()
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status })
+  }
+
+  const requestUrl = new URL(request.url)
+  const summaryOnly = requestUrl.searchParams.get('summary') === '1'
+
+  const admin = createAdminClient()
+  const pendingQuery = admin
+    .from('profiles')
+    .select('id', { count: 'exact', head: summaryOnly })
+    .is('role', null)
+
+  const pendingResult = await pendingQuery
+  if (pendingResult.error) {
+    return NextResponse.json({ error: 'request_load_failed' }, { status: 500 })
+  }
+
+  if (summaryOnly) {
+    return NextResponse.json({ pendingCount: pendingResult.count ?? 0 })
+  }
+
+  const { data: pendingRows, count } = await admin
+    .from('profiles')
+    .select('id, full_name, email, phone_number, created_at', { count: 'exact' })
+    .is('role', null)
+    .order('created_at', { ascending: false })
+
+  if (!pendingRows) {
+    return NextResponse.json({ error: 'request_load_failed' }, { status: 500 })
+  }
+
+  return NextResponse.json({ pendingCount: count ?? 0, requests: pendingRows })
+}
+
 async function sendApprovalEmail(email: string, fullName: string | null) {
   const resendApiKey = process.env.RESEND_API_KEY
   const fromEmail = process.env.PUBLISH_EMAIL_FROM

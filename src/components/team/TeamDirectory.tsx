@@ -195,7 +195,7 @@ function CollapsibleTeamGroup({
       <div className="flex items-center gap-2 px-2 py-1.5">
         <input
           type="checkbox"
-          className="h-4 w-4 rounded border-border text-primary focus-visible:ring-2 focus-visible:ring-ring"
+          className="h-11 w-11 rounded border-border text-primary focus-visible:ring-2 focus-visible:ring-ring sm:h-6 sm:w-6"
           checked={allSelected}
           onChange={(event) => onToggleSelectAll(event.target.checked)}
           aria-label={`Select all in ${title}`}
@@ -206,7 +206,7 @@ function CollapsibleTeamGroup({
           aria-controls={panelId}
           aria-expanded={isOpen}
           onClick={() => onToggle(sectionKey, !isOpen)}
-          className="flex min-w-0 flex-1 items-center gap-2 rounded-md text-left hover:bg-muted/35 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+          className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-md text-left hover:bg-muted/35 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
         >
           <ChevronDown
             className={cn(
@@ -507,7 +507,7 @@ export function TeamDirectory({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="rounded-md border border-border/70 bg-card px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+              className="min-h-10 rounded-md border border-border/70 bg-card px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground sm:min-h-9 sm:px-2.5 sm:py-1.5 sm:text-[11px]"
               onClick={() => setShowAdvancedFilters((current) => !current)}
             >
               {showAdvancedFilters ? 'Hide advanced' : 'More filters'}

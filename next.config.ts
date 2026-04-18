@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next'
+import { resolveNextDistDir } from './src/lib/next-dist-dir'
 
 function toOrigin(value: string | undefined): string | null {
   if (!value) return null
@@ -54,7 +55,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
-  distDir: process.env.NEXT_DIST_DIR ?? '.next',
+  distDir: resolveNextDistDir(),
   serverExternalPackages: ['@napi-rs/canvas', 'pdf-to-img', 'pdfjs-dist'],
   outputFileTracingIncludes: {
     '/api/inbound/availability-email': [

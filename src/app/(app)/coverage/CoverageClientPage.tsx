@@ -29,9 +29,6 @@ import {
   toggleCyclePublishedAction,
 } from '@/app/schedule/actions'
 import { StatusPill } from '@/components/coverage/AssignmentStatusPopover'
-import { CalendarGrid } from '@/components/coverage/CalendarGrid'
-import { RosterScheduleView, type RosterMemberRow } from '@/components/coverage/RosterScheduleView'
-import { PrintSchedule } from '@/components/print-schedule'
 import type {
   CoveragePageSnapshot,
   CycleRow,
@@ -39,6 +36,7 @@ import type {
   PrintTherapist,
   TherapistOption,
 } from '@/app/(app)/coverage/coverage-page-snapshot'
+import type { RosterMemberRow } from '@/components/coverage/RosterScheduleView'
 import { updateCoverageAssignmentStatus } from '@/lib/coverage/updateAssignmentStatus'
 import {
   assignCoverageShiftViaApi,
@@ -74,8 +72,19 @@ const ClearDraftConfirmDialog = dynamic(() =>
     (module) => module.ClearDraftConfirmDialog ?? (() => null)
   )
 )
+const CalendarGrid = dynamic(() =>
+  import('@/components/coverage/CalendarGrid').then((module) => module.CalendarGrid ?? (() => null))
+)
+const RosterScheduleView = dynamic(() =>
+  import('@/components/coverage/RosterScheduleView').then(
+    (module) => module.RosterScheduleView ?? (() => null)
+  )
+)
 const PreFlightDialog = dynamic(() =>
   import('@/components/coverage/PreFlightDialog').then((module) => module.PreFlightDialog ?? (() => null))
+)
+const PrintSchedule = dynamic(() =>
+  import('@/components/print-schedule').then((module) => module.PrintSchedule ?? (() => null))
 )
 const SaveAsTemplateDialog = dynamic(() =>
   import('@/components/coverage/SaveAsTemplateDialog').then((module) => module.SaveAsTemplateDialog ?? (() => null))

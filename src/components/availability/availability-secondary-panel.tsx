@@ -32,7 +32,7 @@ export function AvailabilitySecondaryPanel({
           <button
             type="button"
             className={cn(
-              'rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors',
+              'min-h-11 rounded-full px-3 py-2 text-sm font-semibold transition-colors sm:min-h-10 sm:px-2.5 sm:py-1 sm:text-[11px]',
               activeTab === 'roster'
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground'
@@ -44,7 +44,7 @@ export function AvailabilitySecondaryPanel({
           <button
             type="button"
             className={cn(
-              'rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors',
+              'min-h-11 rounded-full px-3 py-2 text-sm font-semibold transition-colors sm:min-h-10 sm:px-2.5 sm:py-1 sm:text-[11px]',
               activeTab === 'inbox'
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground'

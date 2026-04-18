@@ -26,7 +26,7 @@ export function MoreActionsMenu({
         </span>
       </summary>
       <div
-        role="menu"
+        aria-label={`${label} actions`}
         className="absolute right-0 z-30 mt-2 w-52 rounded-md border border-border bg-card p-1 shadow-lg"
       >
         {children}

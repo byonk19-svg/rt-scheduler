@@ -107,7 +107,7 @@ export function AvailabilityStatusSummary({
             key={value}
             type="button"
             className={cn(
-              'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors',
+              'inline-flex min-h-11 items-center gap-1 rounded-full px-3 py-2 text-sm font-semibold transition-colors sm:min-h-10 sm:px-2.5 sm:py-1 sm:text-[11px]',
               activeFilter === value
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:bg-muted hover:text-foreground'

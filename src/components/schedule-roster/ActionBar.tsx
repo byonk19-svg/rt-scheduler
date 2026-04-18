@@ -25,17 +25,17 @@ export function ActionBar({ onAutoDraft, showMockWorkflow = true }: ActionBarPro
       ) : null}
       <MoreActionsMenu
         label="More"
-        triggerClassName="inline-flex items-center gap-2 rounded-full border border-border/80 bg-card px-3 py-2 text-sm text-foreground transition-colors hover:bg-secondary/70"
+        triggerClassName="inline-flex min-h-11 items-center gap-2 rounded-full border border-border/80 bg-card px-3 py-2 text-sm text-foreground transition-colors hover:bg-secondary/70"
       >
         <button
           type="button"
-          className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-muted/60"
+          className="flex min-h-11 w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-muted/60"
         >
           Duplicate cycle
         </button>
         <a
           href="/coverage?view=week"
-          className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-muted/60 hover:no-underline"
+          className="flex min-h-11 w-full items-center rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-muted/60 hover:no-underline"
         >
           Open live coverage
         </a>

@@ -26,7 +26,7 @@ type TeamDirectoryFiltersProps = {
 }
 
 const selectClass =
-  'h-8 w-full min-w-0 rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground'
+  'min-h-11 w-full min-w-0 rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground sm:min-h-10 sm:px-2.5 sm:text-xs'
 
 export function TeamDirectoryFilters({
   value,
@@ -56,7 +56,7 @@ export function TeamDirectoryFilters({
             value={value.search}
             onChange={(e) => onChange({ ...value, search: e.target.value })}
             placeholder="Name…"
-            className="h-8"
+            className="min-h-11 text-sm sm:min-h-10 sm:text-xs"
           />
         </div>
         <div className="space-y-1">

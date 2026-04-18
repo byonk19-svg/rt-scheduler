@@ -18,14 +18,14 @@ type LocalSectionNavProps = {
 export function LocalSectionNav({ ariaLabel, items, className }: LocalSectionNavProps) {
   return (
     <nav aria-label={ariaLabel} className={className}>
-      <div className="inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-border/70 bg-muted/20 p-1">
+      <div className="inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-auto rounded-xl border border-border/70 bg-muted/20 p-1 sm:flex-wrap sm:overflow-visible">
         {items.map((item) => (
           <Link
             key={`${item.href}-${item.label}`}
             href={item.href}
             aria-current={item.current ? 'page' : undefined}
             className={cn(
-              'inline-flex min-h-9 items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+              'inline-flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:min-h-10 sm:py-1.5',
               item.current
                 ? 'bg-card text-foreground shadow-sm ring-1 ring-border/80'
                 : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'

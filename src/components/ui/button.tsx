@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
-import { Slot } from 'radix-ui'
+import { Slot } from '@radix-ui/react-slot'
 
 import { cn } from '@/lib/utils'
 
@@ -21,13 +21,13 @@ const buttonVariants = cva(
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {
-        default: 'h-10 px-5 py-2.5 has-[>svg]:px-4',
-        xs: "h-7 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: 'h-9 rounded-md gap-1.5 px-4 has-[>svg]:px-3',
+        default: 'h-11 px-5 py-2.5 has-[>svg]:px-4',
+        xs: "h-9 gap-1 rounded-md px-2.5 text-xs has-[>svg]:px-2 [&_svg:not([class*='size-'])]:size-3",
+        sm: 'h-11 rounded-md gap-1.5 px-4 has-[>svg]:px-3',
         lg: 'h-11 rounded-md px-7 has-[>svg]:px-5',
-        icon: 'size-10',
-        'icon-xs': "size-7 rounded-md [&_svg:not([class*='size-'])]:size-3",
-        'icon-sm': 'size-9',
+        icon: 'size-11',
+        'icon-xs': "size-9 rounded-md [&_svg:not([class*='size-'])]:size-3",
+        'icon-sm': 'size-11',
         'icon-lg': 'size-11',
       },
     },
@@ -48,7 +48,7 @@ function Button({
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
   }) {
-  const Comp = asChild ? Slot.Root : 'button'
+  const Comp = asChild ? Slot : 'button'
 
   return (
     <Comp

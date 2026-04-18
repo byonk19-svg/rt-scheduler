@@ -1,44 +1,41 @@
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Download, Plus } from 'lucide-react'
 
+import type { AvailabilityEntryTableRow } from '@/app/availability/availability-requests-table'
 import {
-  AvailabilityEntriesTable,
-  type AvailabilityEntryTableRow,
-} from '@/app/availability/availability-requests-table'
-import {
-  applyEmailAvailabilityImportAction,
   copyAvailabilityFromPreviousCycleAction,
-  deleteEmailIntakeAction,
   deleteAvailabilityEntryAction,
   deleteManagerPlannerDateAction,
-  reparseEmailIntakeAction,
   saveManagerPlannerDatesAction,
-  submitTherapistAvailabilityGridAction,
-  updateEmailIntakeItemRequestAction,
-  updateEmailIntakeTherapistAction,
 } from '@/app/availability/actions'
 import { AvailabilityPlannerFocusProvider } from '@/components/availability/availability-planner-focus-context'
 import { AvailabilityOverviewHeader } from '@/components/availability/AvailabilityOverviewHeader'
 import { AvailabilitySummaryChips } from '@/components/availability/availability-summary-chips'
-import {
-  EmailIntakePanel,
-  type EmailIntakePanelRow,
-} from '@/components/availability/EmailIntakePanel'
-import { ManagerSchedulingInputs } from '@/components/availability/ManagerSchedulingInputs'
 import type { TableToolbarFilters } from '@/components/TableToolbar'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { MoreActionsMenu } from '@/components/more-actions-menu'
 import { PrintMenuItem } from '@/components/print-menu-item'
-import { TherapistAvailabilityWorkspace } from '@/components/availability/TherapistAvailabilityWorkspace'
 import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
-import { findScheduledConflicts } from '@/lib/availability-scheduled-conflict'
 import { formatHumanCycleRange } from '@/lib/calendar-utils'
 import { buildMissingAvailabilityRows } from '@/lib/employee-directory'
 import { toUiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 import { cn } from '@/lib/utils'
+
+const AvailabilityEntriesTable = dynamic(() =>
+  import('@/app/availability/availability-requests-table').then(
+    (module) => module.AvailabilityEntriesTable ?? (() => null)
+  )
+)
+const ManagerSchedulingInputs = dynamic(() =>
+  import('@/components/availability/ManagerSchedulingInputs').then(
+    (module) => module.ManagerSchedulingInputs ?? (() => null)
+  )
+)
+
 type ToastVariant = 'success' | 'error'
 type AvailabilityOverrideType = 'force_off' | 'force_on'
 type AvailabilityShiftType = 'day' | 'night' | 'both'
@@ -89,55 +86,6 @@ type ManagerPlannerOverrideRow = {
   source: 'manager' | 'therapist'
 }
 
-type AvailabilityEmailIntakeRow = {
-  id: string
-  from_email: string
-  from_name: string | null
-  subject: string | null
-  received_at: string
-  text_content: string | null
-  parse_status: 'parsed' | 'needs_review' | 'failed' | 'applied'
-  batch_status: 'parsed' | 'needs_review' | 'failed' | 'applied'
-  parse_summary: string | null
-  item_count: number
-  auto_applied_count: number
-  needs_review_count: number
-  failed_count: number
-}
-
-type AvailabilityEmailAttachmentRow = {
-  id: string
-  intake_id: string
-  filename: string
-  ocr_text: string | null
-  ocr_status: 'not_run' | 'completed' | 'failed' | 'skipped'
-}
-
-type AvailabilityEmailIntakeItemRow = {
-  id: string
-  intake_id: string
-  source_type: 'body' | 'attachment'
-  source_label: string
-  parse_status: 'parsed' | 'auto_applied' | 'needs_review' | 'failed'
-  confidence_level: 'high' | 'medium' | 'low'
-  confidence_reasons: string[] | null
-  extracted_employee_name: string | null
-  matched_therapist_id: string | null
-  matched_cycle_id: string | null
-  raw_text: string | null
-  parsed_requests: Array<{
-    date: string
-    override_type: 'force_off' | 'force_on'
-    shift_type: 'day' | 'night' | 'both'
-  }> | null
-  manually_edited_at?: string | null
-  profiles: { full_name: string } | { full_name: string }[] | null
-  schedule_cycles:
-    | { label: string; start_date: string; end_date: string }
-    | { label: string; start_date: string; end_date: string }[]
-    | null
-}
-
 type AvailabilityPageSearchParams = {
   cycle?: string | string[]
   copied?: string | string[]
@@ -156,6 +104,25 @@ type AvailabilityPageSearchParams = {
 function getSearchParam(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0]
   return value
+}
+
+function toSearchString(params?: AvailabilityPageSearchParams): string {
+  if (!params) return ''
+
+  const searchParams = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value == null) continue
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        searchParams.append(key, item)
+      }
+      continue
+    }
+    searchParams.set(key, value)
+  }
+
+  const query = searchParams.toString()
+  return query ? `?${query}` : ''
 }
 
 function buildAvailabilityTabHref(
@@ -211,22 +178,6 @@ function buildAvailabilityHref(
   const query = searchParams.toString()
   const base = query ? `/availability?${query}` : '/availability'
   return hash ? `${base}${hash}` : base
-}
-
-function stripStoredEmailSubject(text: string | null, subject: string | null): string | null {
-  const normalizedText = text?.trim() ?? ''
-  if (!normalizedText) return null
-
-  const normalizedSubject = subject?.trim() ?? ''
-  if (
-    normalizedSubject &&
-    normalizedText.startsWith(normalizedSubject) &&
-    normalizedText.charAt(normalizedSubject.length) === '\n'
-  ) {
-    return normalizedText.slice(normalizedSubject.length).trim()
-  }
-
-  return normalizedText
 }
 
 function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
@@ -399,7 +350,9 @@ export default async function AvailabilityPage({
   const initialStatus = getSearchParam(params?.status)
   const initialSort = getSearchParam(params?.sort)
   const initialRoster = getSearchParam(params?.roster)
-  const activeTab = getSearchParam(params?.tab) === 'intake' ? 'intake' : 'planner'
+  if (getSearchParam(params?.tab) === 'intake') {
+    redirect(`/availability/intake${toSearchString(params)}`)
+  }
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -409,17 +362,22 @@ export default async function AvailabilityPage({
 
   const role = toUiRole(profile?.role)
   const canManageAvailability = can(role, 'access_manager_ui')
-  const shouldLoadPlannerPanel = canManageAvailability && activeTab === 'planner'
-  const shouldLoadIntakePanel = canManageAvailability && activeTab === 'intake'
+  if (!canManageAvailability) {
+    redirect(`/therapist/availability${toSearchString(params)}`)
+  }
   let activeTeamCount: number | null = null
-  if (canManageAvailability) {
-    const { count } = await supabase
+  const [{ count: teamCount }, { count: intakeReviewCount }] = await Promise.all([
+    supabase
       .from('profiles')
       .select('id', { count: 'exact', head: true })
       .in('role', ['therapist', 'lead'])
-      .eq('is_active', true)
-    activeTeamCount = count ?? null
-  }
+      .eq('is_active', true),
+    supabase
+      .from('availability_email_intake_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('parse_status', 'needs_review'),
+  ])
+  activeTeamCount = teamCount ?? null
 
   const today = new Date()
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -433,24 +391,6 @@ export default async function AvailabilityPage({
 
   const cycles = (cyclesData ?? []) as Cycle[]
 
-  const submissionsByCycleId: Record<string, { submittedAt: string; lastEditedAt: string }> = {}
-  if (!canManageAvailability && cycles.length > 0) {
-    const { data: submissionRowsData } = await supabase
-      .from('therapist_availability_submissions')
-      .select('schedule_cycle_id, submitted_at, last_edited_at')
-      .eq('therapist_id', user.id)
-      .in(
-        'schedule_cycle_id',
-        cycles.map((c) => c.id)
-      )
-    for (const row of submissionRowsData ?? []) {
-      const r = row as { schedule_cycle_id: string; submitted_at: string; last_edited_at: string }
-      submissionsByCycleId[r.schedule_cycle_id] = {
-        submittedAt: r.submitted_at,
-        lastEditedAt: r.last_edited_at,
-      }
-    }
-  }
   const selectedCycleIdFromParams = getSearchParam(params?.cycle)
   const selectedTherapistIdFromParams = getSearchParam(params?.therapist)
   const selectedCycle =
@@ -459,8 +399,6 @@ export default async function AvailabilityPage({
     cycles[0] ??
     null
   const selectedCycleId = selectedCycle?.id ?? ''
-  const activeCycle =
-    cycles.find((cycle) => cycle.start_date <= todayKey && cycle.end_date >= todayKey) ?? null
 
   let entriesQuery = supabase
     .from('availability_overrides')
@@ -474,32 +412,9 @@ export default async function AvailabilityPage({
     entriesQuery = entriesQuery.eq('cycle_id', selectedCycleId)
   }
 
-  if (!canManageAvailability) {
-    entriesQuery = entriesQuery.eq('therapist_id', user.id)
-  }
-
-  const scheduledShiftsPromise =
-    !canManageAvailability && activeCycle && selectedCycleId === activeCycle.id
-      ? supabase
-          .from('shifts')
-          .select('date, shift_type')
-          .eq('user_id', user.id)
-          .eq('status', 'scheduled')
-          .gte('date', activeCycle.start_date)
-          .lte('date', activeCycle.end_date)
-      : Promise.resolve({ data: [] })
-
-  const [entriesResult, scheduledShiftsResult] = await Promise.all([
-    entriesQuery,
-    scheduledShiftsPromise,
-  ])
+  const [entriesResult] = await Promise.all([entriesQuery])
   const entriesData = entriesResult.data
   const entries = (entriesData ?? []) as AvailabilityRow[]
-  const scheduledShifts = (scheduledShiftsResult.data ?? []) as Array<{
-    date: string
-    shift_type: 'day' | 'night'
-  }>
-  const conflicts = canManageAvailability ? [] : findScheduledConflicts(entries, scheduledShifts)
   const plannerTherapistsResult = canManageAvailability
     ? await supabase
         .from('profiles')
@@ -510,7 +425,7 @@ export default async function AvailabilityPage({
         .order('full_name', { ascending: true })
     : { data: [] }
   const plannerOverridesResult =
-    shouldLoadPlannerPanel && cycles.length > 0
+    cycles.length > 0
       ? await supabase
           .from('availability_overrides')
           .select('id, therapist_id, cycle_id, date, shift_type, override_type, note, source')
@@ -523,123 +438,7 @@ export default async function AvailabilityPage({
       : { data: [] }
   const plannerTherapists = (plannerTherapistsResult.data ?? []) as ManagerPlannerTherapistRow[]
   const plannerOverrides = (plannerOverridesResult.data ?? []) as ManagerPlannerOverrideRow[]
-  const emailIntakesResult = shouldLoadIntakePanel
-    ? await supabase
-        .from('availability_email_intakes')
-        .select(
-          'id, from_email, from_name, subject, received_at, text_content, parse_status, batch_status, parse_summary, item_count, auto_applied_count, needs_review_count, failed_count'
-        )
-        .order('received_at', { ascending: false })
-        .limit(12)
-    : { data: [] }
-  const rawEmailIntakeRows = (emailIntakesResult.data ?? []) as AvailabilityEmailIntakeRow[]
-  const emailIntakeIds = rawEmailIntakeRows.map((row) => row.id)
-  const emailItemResult =
-    shouldLoadIntakePanel && emailIntakeIds.length > 0
-      ? await supabase
-          .from('availability_email_intake_items')
-          .select(
-            'id, intake_id, source_type, source_label, parse_status, confidence_level, confidence_reasons, extracted_employee_name, matched_therapist_id, matched_cycle_id, raw_text, parsed_requests, manually_edited_at, profiles!availability_email_intake_items_matched_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
-          )
-          .in('intake_id', emailIntakeIds)
-      : { data: [] }
-  const emailAttachmentResult =
-    shouldLoadIntakePanel && emailIntakeIds.length > 0
-      ? await supabase
-          .from('availability_email_attachments')
-          .select('id, intake_id, filename, ocr_text, ocr_status')
-          .in('intake_id', emailIntakeIds)
-      : { data: [] }
-  const emailItemRows = (emailItemResult.data ?? []) as AvailabilityEmailIntakeItemRow[]
-  const emailAttachmentRows = (emailAttachmentResult.data ?? []) as AvailabilityEmailAttachmentRow[]
-  const itemsByIntakeId = new Map<string, AvailabilityEmailIntakeItemRow[]>()
-  for (const item of emailItemRows) {
-    const current = itemsByIntakeId.get(item.intake_id) ?? []
-    current.push(item)
-    itemsByIntakeId.set(item.intake_id, current)
-  }
-  const attachmentsByIntakeId = new Map<string, AvailabilityEmailAttachmentRow[]>()
-  for (const attachment of emailAttachmentRows) {
-    const current = attachmentsByIntakeId.get(attachment.intake_id) ?? []
-    current.push(attachment)
-    attachmentsByIntakeId.set(attachment.intake_id, current)
-  }
-  const emailIntakeRows: EmailIntakePanelRow[] = rawEmailIntakeRows.map((row) => {
-    const childItems = itemsByIntakeId.get(row.id) ?? []
-    const attachments = attachmentsByIntakeId.get(row.id) ?? []
-    return {
-      id: row.id,
-      fromEmail: row.from_email,
-      fromName: row.from_name,
-      subject: row.subject,
-      receivedAt: row.received_at,
-      originalEmailText: stripStoredEmailSubject(row.text_content, row.subject),
-      attachmentTexts: attachments.map((attachment) => ({
-        filename: attachment.filename,
-        ocrText: attachment.ocr_text,
-        ocrStatus: attachment.ocr_status,
-      })),
-      batchStatus: row.batch_status ?? row.parse_status,
-      parseSummary: row.parse_summary,
-      itemCount: row.item_count,
-      autoAppliedCount: row.auto_applied_count,
-      needsReviewCount: row.needs_review_count,
-      failedCount: row.failed_count,
-      reviewItems: childItems
-        .filter((item) => item.parse_status !== 'auto_applied')
-        .map((item) => {
-          const matchedTherapist = getOne(item.profiles)
-          const matchedCycle = getOne(item.schedule_cycles)
-          return {
-            id: item.id,
-            sourceType: item.source_type,
-            sourceLabel: item.source_label,
-            parseStatus: item.parse_status,
-            confidenceLevel: item.confidence_level,
-            confidenceReasons: Array.isArray(item.confidence_reasons)
-              ? item.confidence_reasons
-              : [],
-            extractedEmployeeName: item.extracted_employee_name,
-            matchedTherapistId: item.matched_therapist_id,
-            matchedTherapistName: matchedTherapist?.full_name ?? null,
-            matchedCycleId: item.matched_cycle_id,
-            matchedCycleLabel: matchedCycle
-              ? `${matchedCycle.label} (${matchedCycle.start_date} to ${matchedCycle.end_date})`
-              : null,
-            rawText: item.raw_text,
-            parsedRequests: Array.isArray(item.parsed_requests) ? item.parsed_requests : [],
-            manuallyEdited: Boolean(item.manually_edited_at),
-          }
-        }),
-      autoAppliedItems: childItems
-        .filter((item) => item.parse_status === 'auto_applied')
-        .map((item) => {
-          const matchedTherapist = getOne(item.profiles)
-          const matchedCycle = getOne(item.schedule_cycles)
-          return {
-            id: item.id,
-            sourceType: item.source_type,
-            sourceLabel: item.source_label,
-            parseStatus: item.parse_status,
-            confidenceLevel: item.confidence_level,
-            confidenceReasons: Array.isArray(item.confidence_reasons)
-              ? item.confidence_reasons
-              : [],
-            extractedEmployeeName: item.extracted_employee_name,
-            matchedTherapistId: item.matched_therapist_id,
-            matchedTherapistName: matchedTherapist?.full_name ?? null,
-            matchedCycleId: item.matched_cycle_id,
-            matchedCycleLabel: matchedCycle
-              ? `${matchedCycle.label} (${matchedCycle.start_date} to ${matchedCycle.end_date})`
-              : null,
-            rawText: item.raw_text,
-            parsedRequests: Array.isArray(item.parsed_requests) ? item.parsed_requests : [],
-            manuallyEdited: Boolean(item.manually_edited_at),
-          }
-        }),
-    }
-  })
-  const intakeNeedsReviewCount = emailIntakeRows.reduce((sum, row) => sum + row.needsReviewCount, 0)
+  const intakeNeedsReviewCount = intakeReviewCount ?? 0
   const selectedPlannerTherapistId =
     plannerTherapists.find((therapist) => therapist.id === selectedTherapistIdFromParams)?.id ??
     plannerTherapists[0]?.id ??
@@ -743,35 +542,6 @@ export default async function AvailabilityPage({
       syncSearchFromPlannerFocus={canManageAvailability}
     />
   )
-  const emailIntakePanel = canManageAvailability ? (
-    <EmailIntakePanel
-      rows={emailIntakeRows}
-      applyEmailAvailabilityImportAction={applyEmailAvailabilityImportAction}
-      updateEmailIntakeItemRequestAction={updateEmailIntakeItemRequestAction}
-      deleteEmailIntakeAction={deleteEmailIntakeAction}
-      reparseEmailIntakeAction={reparseEmailIntakeAction}
-      updateEmailIntakeTherapistAction={updateEmailIntakeTherapistAction}
-      therapistOptions={plannerTherapists.map((therapist) => ({
-        id: therapist.id,
-        fullName: therapist.full_name,
-      }))}
-      cycleOptions={cycles.map((cycle) => ({
-        id: cycle.id,
-        label: `${cycle.label} (${cycle.start_date} to ${cycle.end_date})`,
-      }))}
-    />
-  ) : null
-
-  const therapistWorkspace = (
-    <TherapistAvailabilityWorkspace
-      cycles={cycles}
-      availabilityRows={availabilityRows}
-      conflicts={conflicts}
-      initialCycleId={selectedCycleId}
-      submissionsByCycleId={submissionsByCycleId}
-      submitTherapistAvailabilityGridAction={submitTherapistAvailabilityGridAction}
-    />
-  )
   const totalRequests = availabilityRows.length
   const needOffRequests = availabilityRows.filter((row) => row.entryType === 'force_off').length
   const availableToWorkRequests = availabilityRows.filter(
@@ -783,7 +553,7 @@ export default async function AvailabilityPage({
       ? `${uniqueRequesters}/${activeTeamCount}`
       : null
   const plannerHref = buildAvailabilityTabHref(params, 'planner')
-  const intakeHref = buildAvailabilityTabHref(params, 'intake')
+  const intakeHref = `/availability/intake${toSearchString(params)}`
   const summaryChips = canManageAvailability ? (
     <AvailabilitySummaryChips
       chips={[
@@ -883,11 +653,11 @@ export default async function AvailabilityPage({
             </Button>
             <MoreActionsMenu
               label="Utilities"
-              triggerClassName="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-border/80 bg-transparent px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
+              triggerClassName="inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-border/80 bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
             >
               <a
                 href="/api/availability/export"
-                className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-secondary"
+                className="flex h-11 items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-secondary"
               >
                 <Download className="h-3.5 w-3.5" />
                 Export CSV
@@ -904,10 +674,7 @@ export default async function AvailabilityPage({
             <a
               href={plannerHref}
               className={cn(
-                'px-4 py-2 text-sm border-b-2 transition-colors',
-                activeTab === 'planner'
-                  ? 'border-primary text-foreground font-medium'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
+                'inline-flex h-11 items-center px-4 py-2 text-sm border-b-2 transition-colors border-primary text-foreground font-medium'
               )}
             >
               Planner
@@ -915,10 +682,7 @@ export default async function AvailabilityPage({
             <a
               href={intakeHref}
               className={cn(
-                'flex items-center gap-2 px-4 py-2 text-sm border-b-2 transition-colors',
-                activeTab === 'intake'
-                  ? 'border-primary text-foreground font-medium'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
+                'flex h-11 items-center gap-2 px-4 py-2 text-sm border-b-2 transition-colors border-transparent text-muted-foreground hover:text-foreground'
               )}
             >
               Email Intake
@@ -932,43 +696,32 @@ export default async function AvailabilityPage({
         </div>
       ) : null}
 
-      {canManageAvailability ? (
-        activeTab === 'planner' ? (
-          <AvailabilityPlannerFocusProvider
-            initialFocusedTherapistName={plannerTherapistNameForDefault}
-          >
-            <ManagerSchedulingInputs
-              cycles={cycles}
-              therapists={plannerTherapists}
-              overrides={plannerOverrides}
-              availabilityEntries={availabilityRows}
-              initialCycleId={selectedCycleId}
-              initialTherapistId={selectedPlannerTherapistId}
-              submittedRows={submittedAvailabilityRows}
-              missingRows={missingAvailabilityRows}
-              initialRosterFilter={
-                initialRoster === 'all' ||
-                initialRoster === 'submitted' ||
-                initialRoster === 'has_requests'
-                  ? initialRoster
-                  : 'missing'
-              }
-              defaultSecondaryTab={defaultSecondaryTab}
-              saveManagerPlannerDatesAction={saveManagerPlannerDatesAction}
-              deleteManagerPlannerDateAction={deleteManagerPlannerDateAction}
-              copyAvailabilityFromPreviousCycleAction={copyAvailabilityFromPreviousCycleAction}
-              reviewRequestsPanel={<div id="availability-request-inbox">{entriesCard}</div>}
-            />
-          </AvailabilityPlannerFocusProvider>
-        ) : (
-          emailIntakePanel
-        )
-      ) : (
-        <>
-          {therapistWorkspace}
-          {entriesCard}
-        </>
-      )}
+      <AvailabilityPlannerFocusProvider
+        initialFocusedTherapistName={plannerTherapistNameForDefault}
+      >
+        <ManagerSchedulingInputs
+          cycles={cycles}
+          therapists={plannerTherapists}
+          overrides={plannerOverrides}
+          availabilityEntries={availabilityRows}
+          initialCycleId={selectedCycleId}
+          initialTherapistId={selectedPlannerTherapistId}
+          submittedRows={submittedAvailabilityRows}
+          missingRows={missingAvailabilityRows}
+          initialRosterFilter={
+            initialRoster === 'all' ||
+            initialRoster === 'submitted' ||
+            initialRoster === 'has_requests'
+              ? initialRoster
+              : 'missing'
+          }
+          defaultSecondaryTab={defaultSecondaryTab}
+          saveManagerPlannerDatesAction={saveManagerPlannerDatesAction}
+          deleteManagerPlannerDateAction={deleteManagerPlannerDateAction}
+          copyAvailabilityFromPreviousCycleAction={copyAvailabilityFromPreviousCycleAction}
+          reviewRequestsPanel={<div id="availability-request-inbox">{entriesCard}</div>}
+        />
+      </AvailabilityPlannerFocusProvider>
     </div>
   )
 }

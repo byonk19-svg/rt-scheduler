@@ -94,7 +94,7 @@ function UserDropdown({
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-label="User menu"
-        className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 transition-colors duration-150 hover:bg-sidebar-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+        className="flex min-h-11 items-center gap-1.5 rounded-lg px-3 py-2 transition-colors duration-150 hover:bg-sidebar-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring sm:min-h-10 sm:px-2 sm:py-1.5"
       >
         <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--attention)] text-[10px] font-bold text-accent-foreground select-none">
           {initials(user?.fullName ?? 'TM')}
@@ -121,7 +121,7 @@ function UserDropdown({
           <div className="p-1">
             <Link
               href="/settings"
-              className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-foreground no-underline transition-colors hover:bg-muted hover:no-underline"
+              className="flex min-h-11 items-center gap-2 rounded-md px-2.5 py-2 text-sm text-foreground no-underline transition-colors hover:bg-muted hover:no-underline sm:min-h-10 sm:py-1.5"
               onClick={() => setOpen(false)}
             >
               <Settings className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
@@ -130,7 +130,7 @@ function UserDropdown({
             {canAccessManagerUi ? (
               <Link
                 href="/therapist"
-                className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-foreground no-underline transition-colors hover:bg-muted hover:no-underline"
+                className="flex min-h-11 items-center gap-2 rounded-md px-2.5 py-2 text-sm text-foreground no-underline transition-colors hover:bg-muted hover:no-underline sm:min-h-10 sm:py-1.5"
                 onClick={() => setOpen(false)}
               >
                 <ArrowLeftRight className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
@@ -142,7 +142,7 @@ function UserDropdown({
             <form action="/auth/signout" method="post">
               <button
                 type="submit"
-                className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
+                className="flex min-h-11 w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-foreground transition-colors hover:bg-muted sm:min-h-10 sm:py-1.5"
               >
                 <LogOut className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
                 Log out
@@ -159,11 +159,12 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const canAccessManagerUi = can(user?.role, 'access_manager_ui')
+  const [fetchedPendingCount, setFetchedPendingCount] = useState<number | null>(null)
 
   const shouldRenderShell = useMemo(() => Boolean(user) && usesAppShell(pathname), [pathname, user])
 
   const dashboardHref = canAccessManagerUi ? MANAGER_WORKFLOW_LINKS.dashboard : '/dashboard/staff'
-  const pendingCount = user?.pendingAccessRequests ?? 0
+  const pendingCount = user?.pendingAccessRequests ?? fetchedPendingCount ?? 0
   const managerSections = useMemo(() => buildManagerSections(pendingCount), [pendingCount])
   const shellContext = useMemo(
     () => getShellContext({ pathname, canAccessManagerUi, pendingCount }),
@@ -200,6 +201,27 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
     return () => document.removeEventListener('keydown', handleEsc)
   }, [])
 
+  useEffect(() => {
+    if (!canAccessManagerUi) return
+    if (user?.pendingAccessRequests !== undefined) return
+
+    let cancelled = false
+
+    async function loadPendingSummary() {
+      const response = await fetch('/api/requests/user-access?summary=1', { cache: 'no-store' })
+      if (!response.ok || cancelled) return
+      const data = (await response.json()) as { pendingCount?: number }
+      if (cancelled) return
+      setFetchedPendingCount(data.pendingCount ?? 0)
+    }
+
+    void loadPendingSummary()
+
+    return () => {
+      cancelled = true
+    }
+  }, [canAccessManagerUi, user?.pendingAccessRequests])
+
   if (!shouldRenderShell) {
     return <>{children}</>
   }
@@ -221,7 +243,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
             <Link
               href={dashboardHref}
               aria-label="Teamwise - go to dashboard"
-              className="shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
             >
               <Logo />
             </Link>

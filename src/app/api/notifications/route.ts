@@ -13,7 +13,7 @@ type NotificationRow = {
   read_at: string | null
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -21,6 +21,23 @@ export async function GET() {
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const requestUrl = new URL(request.url)
+  const summaryOnly = requestUrl.searchParams.get('summary') === '1'
+
+  if (summaryOnly) {
+    const unreadCountResult = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .is('read_at', null)
+
+    if (unreadCountResult.error) {
+      return NextResponse.json({ error: 'Could not load notifications' }, { status: 500 })
+    }
+
+    return NextResponse.json({ unreadCount: unreadCountResult.count ?? 0 })
   }
 
   const [notificationsResult, unreadCountResult] = await Promise.all([

@@ -90,7 +90,7 @@ export function PlannerControlRail({
           </Label>
           <select
             id="planner_cycle_id"
-            className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            className="min-h-11 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
             value={selectedCycleId}
             onChange={(event) => onCycleChange(event.target.value)}
           >
@@ -111,7 +111,7 @@ export function PlannerControlRail({
           </Label>
           <select
             id="planner_therapist_id"
-            className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            className="min-h-11 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
             value={selectedTherapistId}
             onChange={(event) => onTherapistChange(event.target.value)}
           >
@@ -160,7 +160,7 @@ export function PlannerControlRail({
           <Button
             type="submit"
             variant="outline"
-            className="h-9 w-full justify-center border-border/70 bg-background/80 text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="min-h-11 w-full justify-center border-border/70 bg-background/80 text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             Copy from last block
           </Button>
@@ -175,7 +175,7 @@ export function PlannerControlRail({
           <button
             type="button"
             className={cn(
-              'rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
+              'h-11 rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
               mode === 'will_work'
                 ? 'bg-[var(--success-subtle)] text-[var(--success-text)]'
                 : 'text-muted-foreground hover:text-foreground'
@@ -187,7 +187,7 @@ export function PlannerControlRail({
           <button
             type="button"
             className={cn(
-              'rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
+              'h-11 rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
               mode === 'cannot_work'
                 ? 'bg-[var(--error-subtle)] text-[var(--error-text)]'
                 : 'text-muted-foreground hover:text-foreground'
@@ -222,7 +222,7 @@ export function PlannerControlRail({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-8 px-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="px-3 text-muted-foreground hover:bg-muted hover:text-foreground"
               onClick={onClearSelectedDates}
               disabled={selectedDates.length === 0}
             >
@@ -236,7 +236,7 @@ export function PlannerControlRail({
                 <button
                   key={date}
                   type="button"
-                  className="rounded-full border border-border/70 bg-muted/25 px-2.5 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-muted"
+                  className="inline-flex min-h-11 items-center rounded-full border border-border/70 bg-muted/25 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted sm:min-h-10 sm:px-2.5 sm:py-1 sm:text-[11px]"
                   onClick={() => onRemoveSelectedDate(date)}
                 >
                   {formatEmployeeDate(date)} x
@@ -254,7 +254,7 @@ export function PlannerControlRail({
           type="submit"
           pendingText="Saving..."
           disabled={!selectedCycleId || !selectedTherapistId || selectedDates.length === 0}
-          className="h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90"
+          className="min-h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90"
         >
           {buildSaveLabel(mode, selectedDates.length)}
         </FormSubmitButton>

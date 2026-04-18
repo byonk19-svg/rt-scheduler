@@ -38,7 +38,7 @@ export function SegmentedControl<T extends string>({
             tabIndex={isActive ? 0 : -1}
             onClick={() => onChange(option.value)}
             className={cn(
-              'rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
+              'min-h-11 rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
               isActive
                 ? 'bg-primary text-primary-foreground shadow-sm'
                 : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'

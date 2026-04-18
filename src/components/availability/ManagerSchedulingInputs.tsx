@@ -1,18 +1,14 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { useAvailabilityPlannerFocus } from '@/components/availability/availability-planner-focus-context'
-import {
-  AvailabilityStatusSummary,
-  type AvailabilityRosterFilter,
-  type AvailabilityStatusSummaryRow,
+import type {
+  AvailabilityRosterFilter,
+  AvailabilityStatusSummaryRow,
 } from '@/components/availability/AvailabilityStatusSummary'
-import { AvailabilityCalendarPanel } from '@/components/availability/availability-calendar-panel'
-import { AvailabilitySecondaryPanel } from '@/components/availability/availability-secondary-panel'
-import { PlannerControlRail } from '@/components/availability/planner-control-rail'
-import { TherapistContextPanel } from '@/components/availability/therapist-context-panel'
 import { AvailabilityWorkspaceShell } from '@/components/availability/availability-workspace-shell'
 import {
   splitPlannerDatesByMode,
@@ -21,6 +17,32 @@ import {
 } from '@/lib/availability-planner'
 import { formatHumanCycleRange, shiftMonthKey, toMonthStartKey } from '@/lib/calendar-utils'
 import { isDateWithinCycle } from '@/lib/employee-directory'
+
+const AvailabilityStatusSummary = dynamic(() =>
+  import('@/components/availability/AvailabilityStatusSummary').then(
+    (module) => module.AvailabilityStatusSummary ?? (() => null)
+  )
+)
+const AvailabilityCalendarPanel = dynamic(() =>
+  import('@/components/availability/availability-calendar-panel').then(
+    (module) => module.AvailabilityCalendarPanel ?? (() => null)
+  )
+)
+const AvailabilitySecondaryPanel = dynamic(() =>
+  import('@/components/availability/availability-secondary-panel').then(
+    (module) => module.AvailabilitySecondaryPanel ?? (() => null)
+  )
+)
+const PlannerControlRail = dynamic(() =>
+  import('@/components/availability/planner-control-rail').then(
+    (module) => module.PlannerControlRail ?? (() => null)
+  )
+)
+const TherapistContextPanel = dynamic(() =>
+  import('@/components/availability/therapist-context-panel').then(
+    (module) => module.TherapistContextPanel ?? (() => null)
+  )
+)
 
 type Cycle = {
   id: string

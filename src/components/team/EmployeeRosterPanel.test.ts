@@ -39,7 +39,6 @@ describe('EmployeeRosterPanel', () => {
             matched_profile_id: null,
             matched_email: null,
             matched_at: null,
-            matched_email: null,
             phone_number: null,
           },
         ],

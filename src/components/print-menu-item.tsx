@@ -9,7 +9,7 @@ export function PrintMenuItem({ label = 'Print' }: PrintMenuItemProps) {
     <button
       type="button"
       onClick={() => window.print()}
-      className="block w-full rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
+      className="block h-11 w-full rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
     >
       {label}
     </button>

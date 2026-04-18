@@ -187,7 +187,7 @@ export function TherapistContextPanel({
         <button
           type="button"
           className={cn(
-            'rounded-full px-3 py-1.5 text-xs font-semibold transition-colors',
+            'h-11 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors',
             tab === 'context'
               ? 'bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -199,7 +199,7 @@ export function TherapistContextPanel({
         <button
           type="button"
           className={cn(
-            'rounded-full px-3 py-1.5 text-xs font-semibold transition-colors',
+            'h-11 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors',
             tab === 'saved'
               ? 'bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:bg-muted hover:text-foreground'

@@ -22,6 +22,10 @@ type NotificationBellProps = {
   initialUnreadCount?: number
 }
 
+type NotificationSummaryResponse = {
+  unreadCount: number
+}
+
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime()
   if (!Number.isFinite(diffMs)) return iso
@@ -46,16 +50,18 @@ function getNotificationHref(item: NotificationItem): string | null {
 
 export function NotificationBell({
   variant = 'default',
-  initialUnreadCount = 0,
+  initialUnreadCount,
 }: NotificationBellProps) {
   const router = useRouter()
   const wrapperRef = useRef<HTMLDivElement | null>(null)
+  const startingUnreadCount = initialUnreadCount ?? 0
   const [open, setOpen] = useState(false)
   const [dropdownSide, setDropdownSide] = useState<'left' | 'right'>('right')
   const [loading, setLoading] = useState(false)
-  const [unreadCount, setUnreadCount] = useState(initialUnreadCount)
+  const [unreadCount, setUnreadCount] = useState(startingUnreadCount)
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [hasLoaded, setHasLoaded] = useState(false)
+  const [hasLoadedSummary, setHasLoadedSummary] = useState(initialUnreadCount !== undefined)
 
   const loadNotifications = useCallback(async () => {
     setLoading(true)
@@ -74,9 +80,37 @@ export function NotificationBell({
     setHasLoaded(true)
   }, [])
 
+  const loadUnreadSummary = useCallback(async () => {
+    const response = await fetch('/api/notifications?summary=1', { cache: 'no-store' })
+    if (!response.ok) return
+    const data = (await response.json()) as NotificationSummaryResponse
+    setUnreadCount(data.unreadCount)
+    setHasLoadedSummary(true)
+  }, [])
+
   useEffect(() => {
-    setUnreadCount(initialUnreadCount)
-  }, [initialUnreadCount])
+    if (hasLoadedSummary) return
+
+    let cancelled = false
+    const run = () => {
+      if (cancelled) return
+      void loadUnreadSummary()
+    }
+
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(run)
+      return () => {
+        cancelled = true
+        window.cancelIdleCallback(idleId)
+      }
+    }
+
+    const timeoutId = setTimeout(run, 250)
+    return () => {
+      cancelled = true
+      clearTimeout(timeoutId)
+    }
+  }, [hasLoadedSummary, loadUnreadSummary])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {

@@ -50,7 +50,7 @@ export default function PublicHeader({ className }: { className?: string }) {
   return (
     <header className={cn('border-b border-border/50 bg-background/90', className)}>
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
-        <Link href="/" className="flex items-center gap-3 hover:no-underline">
+        <Link href="/" className="flex min-h-11 items-center gap-3 hover:no-underline">
           <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--attention)] shadow-tw-md-soft">
             <CalendarDays className="h-4 w-4 text-accent-foreground" />
           </span>
