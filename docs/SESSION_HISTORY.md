@@ -1,5 +1,15 @@
 # Session History
 
+## Session 87 - 2026-04-19
+
+- Split manager availability semantics so the top chips still reflect **official submissions** while the **Response roster** now counts any received cycle availability, including applied email-intake imports and manager-entered overrides.
+- Added intake provenance to `availability_overrides` so reapplying an edited intake item removes stale imported planner dates instead of leaving old dates behind.
+- Fixed the planner lower tab switcher so **Response roster** and **Request inbox** reliably toggle.
+- Team quick edit now preserves `offs_dow` even when **Has a fixed weekly pattern** is off, and team/work-pattern saves revalidate `/availability`.
+- Manager planner now derives default `Will work` / `Cannot work` dates from `work_patterns`, while keeping per-date overrides stronger than the defaults.
+- `/schedule` live roster now merges applied availability with weekly blocked days so recurring `never work` dates render as `X`.
+- Weekly-default calendar days on `/availability` now render with stronger styling and small `Never` / `Work` badges so managers can visually distinguish defaults from explicit saved planner dates.
+
 ## Session 86 - 2026-04-17
 
 - Completed the audit-driven cleanup pass on `claude/audit-log-bulk-team-clean`: removed the remaining accent-stripe/header chrome, reduced decorative public-shell halos, tokenized the logo plus lingering public/print values, and tightened a few shared semantics.
