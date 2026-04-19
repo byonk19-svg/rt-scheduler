@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-17 (session 86)
+Updated: 2026-04-19 (therapist UX clarity + accurate-commits handoff)
 
 ## Handoff Snapshot
 
@@ -62,6 +62,7 @@ Updated: 2026-04-17 (session 86)
 - **`resolveRosterCellIntent` intent split:** the function now returns `'quick_assign'` for manager + empty roster cell and `'manage'` for manager + filled cell. Both intents render the same editor-open button in `RosterMatrixTable`; the distinction exists for test assertions and future intent-specific styling. Do not collapse them back into a single `'manage'` return.
 - **Dead `onUnassign` prop removed from roster matrix:** `onUnassign` no longer exists on `RosterScheduleViewProps`, `RosterSection`, or `RosterMatrixTable`. `handleUnassign` in `CoverageClientPage` is still wired exclusively to `ShiftEditorDialog` where it is actually called.
 - **Availability intake utilities:** `src/lib/availability-email-intake.ts` and related tests now cover richer request-edit parsing and manager-edit workflows more explicitly.
+- **Therapist UX clarity (staff surfaces):** Flat staff nav from `getStaffNavItems()` in `src/components/shell/app-shell-config.ts` uses **Team schedule** → `/coverage` (shared calendar; same active highlight for `/schedule` and `/preliminary`) and **My shifts** → `/staff/my-schedule` (published upcoming shifts). Tighter empty-state copy and CTAs on `/dashboard/staff`, `/therapist/availability` (no cycle open), `/coverage` when no block exists for non-managers (reassurance + link to **My shifts**), and empty **My shifts** (primary **Browse open shifts**, secondary availability link). **`/shift-board`:** when staff have **zero posts**, KPIs/tabs/filters collapse behind **More filters & history** (`ShiftBoardClientPage`). **`/profile`:** one-line helper text under default calendar view, schedule layout, and landing page. **`/therapist/schedule`** still redirects to `/coverage` with query preserved; `src/app/(app)/therapist/schedule/page.tsx` documents why bookmarks stay on the team calendar.
 - `RESEND_API_KEY` must support receiving APIs, not just sending. A send-only key fails on `/emails/receiving` with `401 restricted_api_key`.
 
 ### Local In-Progress Work
@@ -93,7 +94,7 @@ Updated: 2026-04-17 (session 86)
 1. **Merge `claude/audit-log-bulk-team-clean` to `main`** - the branch is CI-green and now includes the audit remediation pass on top of the manager/therapist feature work.
 2. Run a full browser QA pass across shared headers, `/coverage`, `/schedule`, `/team/import`, and `/settings/audit-log` on desktop, tablet, and mobile before shipping.
 3. **Add "Send reminders" bulk action** to the response roster on `/availability` - bulk email nudge for non-respondents is still the top operational gap.
-4. **Swap history and My Schedule quick view** - `src/app/(app)/staff/history` and `src/app/(app)/staff/my-schedule` are still not implemented.
+4. **Staff history / swap UX** — **`/staff/my-schedule`** ships as **My shifts** (published-only list). Deeper swap/history workflows on **`/staff/history`** may still warrant polish beyond the current page.
 5. **Schedule/roster CSV export** - `/api/schedule/export` and `/api/team/roster/export` are still not implemented; `csv-utils.ts` still needs to be extracted from the availability export route.
 6. **Print confidentiality footer** - `print-schedule.tsx` still lacks the "Internal Use Only" footer.
 7. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
@@ -122,6 +123,11 @@ Updated: 2026-04-17 (session 86)
 - Targeted schedule-roster lane: `npm run test:unit -- src/lib/schedule-roster-data.test.ts`
 
 ## Recent changelog
+
+**Session 87 (2026-04-19)** — Therapist UX clarity + docs handoff (branch `codex/clarify-manager-workflow-labels`):
+
+- Staff nav: **Team schedule** / **My shifts** (`getStaffNavItems` in `app-shell-config.ts`); tighter empty states on staff dashboard, therapist availability (no cycle), coverage (no block, non-manager), and **My shifts**; staff **shift-board** progressive disclosure when there are no posts; **Profile** preference helpers; `/therapist/schedule` redirect documented in source. Playwright coverage specs use `:visible` locators and `assignDate` where grids duplicate hidden nodes; OneDrive dev wrapper junctions `node_modules` into external `.next-dev` target.
+- Commits: `9ad6eaa` (therapist UX), `6174552` (E2E stability), `a64c77f` (dev-wrapper). This `CLAUDE.md` update records the Handoff Snapshot.
 
 **Session 86 (2026-04-17)** - Audit-driven cleanup, responsive follow-up, and verification reset on `claude/audit-log-bulk-team-clean`:
 
@@ -287,7 +293,7 @@ Core domains: coverage planning, cycles, availability requests, shift board, app
 
 From audit: workflow/usability issues being addressed one at a time.
 
-- [x] **#1** Rename staff nav "My Schedule" → "Schedule" (`AppShell.tsx`)
+- [x] **#1** Staff nav labels disambiguate **Team schedule** (`/coverage`) vs **My shifts** (`/staff/my-schedule`) — `getStaffNavItems()` in `app-shell-config.ts` (see Handoff **Therapist UX clarity**).
 - [x] **#2** Manager Inbox: add "New 6-week block" CTA when no active cycle (`ManagerTriageDashboard`, `dashboard/manager/page.tsx`)
 - [x] **#3** Publish History: info callout + "Open to publish" label for draft cycles (`publish/page.tsx`)
 - [ ] **#4** After preliminary claim submit, add link to see pending request status
@@ -356,9 +362,9 @@ E2E specs:
 - `/dashboard` role redirect
 - `/dashboard/manager`, `/dashboard/staff`
   - `/dashboard/manager` is the manager **Inbox** — h1 and nav label both read "Inbox"
-- `/coverage` dedicated coverage UI (client page, full-width calendar + dialog/popover editing model)
-- `/schedule` manager/lead read-only roster matrix (live cycle, shifts, submitted availability; auth required)
-- `/schedule` manager/lead read-only roster matrix (live cycle, applied availability, weekly blocked days, and assignments; auth required)
+- `/coverage` dedicated coverage UI (client page, full-width calendar + dialog/popover editing model); staff nav label **Team schedule**
+- `/schedule` manager/lead read-only roster matrix (live cycle, applied availability, weekly blocked days, assignments; auth required)
+- `/staff/my-schedule` therapist **My shifts** — upcoming shifts from **published** schedules only (nav label **My shifts**)
 - `/approvals`
 - `/availability`
 - `/shift-board`
@@ -553,6 +559,7 @@ The manager shell must still show the `Schedule` primary section as active on `/
 - `Schedule` secondary nav items are `Coverage`, `Availability`, `Publish`, and `Approvals`
 - `People` secondary nav items are `Team` and `Requests`
 - The fixed secondary nav must preserve `overflow-x-auto` with non-shrinking items so narrow mobile widths scroll instead of clipping tabs
+- **Staff (therapist/lead) flat nav** (`getStaffNavItems`): Dashboard → **Team schedule** (`/coverage`) → **My shifts** (`/staff/my-schedule`) → Availability (`/therapist/availability`) → **Open shifts** (`/shift-board`) → History (`/staff/history`). Avoid duplicating old **Schedule** vs **My Schedule** wording in new copy.
 
 ## Assignment Status
 
