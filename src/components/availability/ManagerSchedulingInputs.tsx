@@ -13,12 +13,14 @@ import { AvailabilityWorkspaceShell } from '@/components/availability/availabili
 import {
   buildDayStates,
   getCycleLabel,
+  getPlannerRowsForSelection,
   getSavedBucketsForSelection,
   type ManagerAvailabilityEntryRow,
   type ManagerPlannerOverrideRecord,
 } from '@/components/availability/manager-scheduling-helpers'
-import { type PlannerMode, splitPlannerDatesByMode } from '@/lib/availability-planner'
+import { type PlannerMode } from '@/lib/availability-planner'
 import { shiftMonthKey, toMonthStartKey } from '@/lib/calendar-utils'
+import type { WorkPattern } from '@/lib/coverage/work-patterns'
 import { isDateWithinCycle } from '@/lib/employee-directory'
 
 const AvailabilityStatusSummary = dynamic(() =>
@@ -66,6 +68,7 @@ type Props = {
   cycles: Cycle[]
   therapists: TherapistOption[]
   overrides: ManagerPlannerOverrideRecord[]
+  workPatternsByTherapist: Record<string, WorkPattern | null | undefined>
   availabilityEntries: ManagerAvailabilityEntryRow[]
   initialCycleId: string
   initialTherapistId: string
@@ -83,6 +86,7 @@ export function ManagerSchedulingInputs({
   cycles,
   therapists,
   overrides,
+  workPatternsByTherapist,
   availabilityEntries,
   initialCycleId,
   initialTherapistId,
@@ -104,10 +108,15 @@ export function ManagerSchedulingInputs({
   const [selectedTherapistId, setSelectedTherapistId] = useState(initialSelectedTherapistId)
   const [mode, setMode] = useState<PlannerMode>('will_work')
   const [selectedDates, setSelectedDates] = useState<string[]>(() => {
+    const initialCycle = cycles.find((item) => item.id === initialSelectedCycleId) ?? null
     const initialBuckets = getSavedBucketsForSelection(
       overrides,
       initialSelectedCycleId,
-      initialSelectedTherapistId
+      initialSelectedTherapistId,
+      {
+        cycle: initialCycle,
+        workPattern: workPatternsByTherapist[initialSelectedTherapistId] ?? null,
+      }
     )
     return initialBuckets.willWork
   })
@@ -124,20 +133,27 @@ export function ManagerSchedulingInputs({
     () => therapists.find((therapist) => therapist.id === selectedTherapistId) ?? null,
     [selectedTherapistId, therapists]
   )
+  const selectedWorkPattern = useMemo(
+    () => workPatternsByTherapist[selectedTherapistId] ?? null,
+    [selectedTherapistId, workPatternsByTherapist]
+  )
 
   const savedOverrides = useMemo(
     () =>
-      overrides
-        .filter(
-          (row) => row.cycle_id === selectedCycleId && row.therapist_id === selectedTherapistId
-        )
-        .sort((a, b) => a.date.localeCompare(b.date)),
-    [overrides, selectedCycleId, selectedTherapistId]
+      getPlannerRowsForSelection(overrides, selectedCycleId, selectedTherapistId, {
+        cycle: selectedCycle,
+        workPattern: selectedWorkPattern,
+      }),
+    [overrides, selectedCycle, selectedCycleId, selectedTherapistId, selectedWorkPattern]
   )
 
   const savedBuckets = useMemo(
-    () => splitPlannerDatesByMode(savedOverrides, { source: 'manager' }),
-    [savedOverrides]
+    () =>
+      getSavedBucketsForSelection(overrides, selectedCycleId, selectedTherapistId, {
+        cycle: selectedCycle,
+        workPattern: selectedWorkPattern,
+      }),
+    [overrides, selectedCycle, selectedCycleId, selectedTherapistId, selectedWorkPattern]
   )
 
   const therapistRequestRows = useMemo(
@@ -162,7 +178,11 @@ export function ManagerSchedulingInputs({
     : null
 
   function syncSelection(nextMode: PlannerMode, cycleId: string, therapistId: string) {
-    const nextBuckets = getSavedBucketsForSelection(overrides, cycleId, therapistId)
+    const nextCycle = cycles.find((cycle) => cycle.id === cycleId) ?? null
+    const nextBuckets = getSavedBucketsForSelection(overrides, cycleId, therapistId, {
+      cycle: nextCycle,
+      workPattern: workPatternsByTherapist[therapistId] ?? null,
+    })
     setSelectedDates(nextMode === 'will_work' ? nextBuckets.willWork : nextBuckets.cannotWork)
   }
 

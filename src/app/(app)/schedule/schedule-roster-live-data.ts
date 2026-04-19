@@ -5,10 +5,12 @@ import { parseRole } from '@/lib/auth/roles'
 import { formatHumanCycleRange } from '@/lib/calendar-utils'
 import {
   buildAssignmentStoreFromShifts,
+  buildAvailabilityApprovalStoreFromWorkPatterns,
   buildAvailabilityApprovalStoreFromSubmittedOverrides,
   type ScheduleRosterStaff,
   type LiveRosterOverrideRow,
   type LiveRosterShiftRow,
+  type LiveRosterWorkPatternRow,
 } from '@/lib/schedule-roster-data'
 import type { AssignmentStore, AvailabilityApprovalStore } from '@/lib/mock-coverage-roster'
 
@@ -106,9 +108,9 @@ export async function loadScheduleRosterPageData(
 
   const [
     { data: profilesData },
-    { data: submissionsData },
     { data: overridesData },
     { data: shiftsData },
+    { data: workPatternsData },
   ] = await Promise.all([
     supabase
       .from('profiles')
@@ -118,32 +120,38 @@ export async function loadScheduleRosterPageData(
       .is('archived_at', null)
       .order('full_name', { ascending: true }),
     supabase
-      .from('therapist_availability_submissions')
-      .select('therapist_id')
-      .eq('schedule_cycle_id', selectedCycle.id),
-    supabase
       .from('availability_overrides')
       .select('therapist_id, date, shift_type, override_type')
       .eq('cycle_id', selectedCycle.id)
-      .eq('source', 'therapist'),
+      .in('source', ['therapist', 'manager']),
     supabase
       .from('shifts')
       .select('id, user_id, date, shift_type')
       .eq('cycle_id', selectedCycle.id)
       .not('user_id', 'is', null),
+    supabase
+      .from('work_patterns')
+      .select(
+        'therapist_id, works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode, shift_preference'
+      ),
   ])
-
-  const submittedTherapistIds = new Set(
-    (submissionsData ?? []).map((r) => String((r as { therapist_id: string }).therapist_id))
-  )
 
   const staff = ((profilesData ?? []) as ProfileRosterRow[]).map(toStaff)
 
   const overrideRows = (overridesData ?? []) as LiveRosterOverrideRow[]
-  const availabilityApprovals = buildAvailabilityApprovalStoreFromSubmittedOverrides(
-    overrideRows,
-    submittedTherapistIds
+  const patternApprovals = buildAvailabilityApprovalStoreFromWorkPatterns(
+    (workPatternsData ?? []) as LiveRosterWorkPatternRow[],
+    selectedCycle.start_date,
+    selectedCycle.end_date
   )
+  const explicitAvailabilityApprovals = buildAvailabilityApprovalStoreFromSubmittedOverrides(
+    overrideRows,
+    new Set(overrideRows.map((row) => row.therapist_id).filter(Boolean))
+  )
+  const availabilityApprovals = {
+    ...patternApprovals,
+    ...explicitAvailabilityApprovals,
+  }
 
   const shiftRows = (shiftsData ?? []) as LiveRosterShiftRow[]
   const assignments = buildAssignmentStoreFromShifts(shiftRows)

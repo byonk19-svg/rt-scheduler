@@ -475,6 +475,8 @@ async function processInboundAvailabilityEmail(emailId: string) {
         note: request.note ?? `Imported from ${item.sourceLabel}: ${request.source_line}`,
         created_by: null,
         source: 'manager' as const,
+        source_intake_id: savedIntake.id,
+        source_intake_item_id: null,
       }))
     )
 

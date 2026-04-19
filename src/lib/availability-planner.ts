@@ -3,6 +3,7 @@ import {
   isDateWithinCycle,
   type AvailabilityOverrideSource,
 } from '@/lib/employee-directory'
+import { isAllowedByPattern, type WorkPattern } from '@/lib/coverage/work-patterns'
 
 export type PlannerOverrideType = 'force_on' | 'force_off'
 export type PlannerMode = 'will_work' | 'cannot_work'
@@ -17,6 +18,11 @@ export type PlannerOverrideRow = {
   source: AvailabilityOverrideSource
 }
 
+export type PlannerDisplayRow = PlannerOverrideRow & {
+  removable?: boolean
+  derivedFromPattern?: boolean
+}
+
 export type ManagerPlannerDateBuckets = {
   willWork: string[]
   cannotWork: string[]
@@ -28,6 +34,8 @@ export type ManagerPlannerDateBuckets = {
       shiftType: PlannerShiftType
       note: string | null
       source: AvailabilityOverrideSource
+      removable?: boolean
+      derivedFromPattern?: boolean
     }>
   >
 }
@@ -41,7 +49,7 @@ export function toOverrideType(mode: PlannerMode): PlannerOverrideType {
 }
 
 export function splitPlannerDatesByMode(
-  overrides: PlannerOverrideRow[],
+  overrides: PlannerDisplayRow[],
   options?: { source?: AvailabilityOverrideSource }
 ): ManagerPlannerDateBuckets {
   const willWork = new Set<string>()
@@ -54,6 +62,8 @@ export function splitPlannerDatesByMode(
       shiftType: PlannerShiftType
       note: string | null
       source: AvailabilityOverrideSource
+      removable?: boolean
+      derivedFromPattern?: boolean
     }>
   >()
 
@@ -74,6 +84,8 @@ export function splitPlannerDatesByMode(
       shiftType: row.shift_type,
       note: row.note,
       source: row.source,
+      removable: row.removable,
+      derivedFromPattern: row.derivedFromPattern,
     })
     byDate.set(row.date, existing)
   }
@@ -130,5 +142,77 @@ export function buildPlannerSavePayload(params: {
       note: params.note ?? null,
       managerId: params.managerId,
     })
+  )
+}
+
+function addUtcDay(isoDate: string): string {
+  const parsed = new Date(`${isoDate}T12:00:00`)
+  parsed.setDate(parsed.getDate() + 1)
+  return parsed.toISOString().slice(0, 10)
+}
+
+function getWeekdayIndex(isoDate: string): number | null {
+  const parsed = new Date(`${isoDate}T12:00:00`)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.getDay()
+}
+
+export function buildPlannerDefaultRowsForCycle(params: {
+  therapistId: string
+  cycle: { start_date: string; end_date: string } | null
+  pattern: WorkPattern | null
+}): PlannerDisplayRow[] {
+  if (!params.cycle || !params.pattern) return []
+
+  const rows: PlannerDisplayRow[] = []
+  let cursor = params.cycle.start_date
+
+  while (cursor <= params.cycle.end_date) {
+    const weekday = getWeekdayIndex(cursor)
+    const decision = isAllowedByPattern(params.pattern, cursor)
+
+    if (
+      decision.reason === 'blocked_offs_dow' ||
+      decision.reason === 'blocked_every_other_weekend'
+    ) {
+      rows.push({
+        id: `pattern-off:${params.therapistId}:${cursor}`,
+        date: cursor,
+        shift_type: 'both',
+        override_type: 'force_off',
+        note:
+          decision.reason === 'blocked_every_other_weekend'
+            ? 'Weekly pattern default: off weekend'
+            : 'Weekly pattern default: never works this weekday',
+        source: 'manager',
+        removable: false,
+        derivedFromPattern: true,
+      })
+    } else if (weekday !== null && params.pattern.works_dow.includes(weekday)) {
+      rows.push({
+        id: `pattern-on:${params.therapistId}:${cursor}`,
+        date: cursor,
+        shift_type: 'both',
+        override_type: 'force_on',
+        note: 'Weekly pattern default: usually works this weekday',
+        source: 'manager',
+        removable: false,
+        derivedFromPattern: true,
+      })
+    }
+
+    cursor = addUtcDay(cursor)
+  }
+
+  return rows
+}
+
+export function mergePlannerRowsWithDefaults(
+  explicitRows: PlannerDisplayRow[],
+  defaultRows: PlannerDisplayRow[]
+): PlannerDisplayRow[] {
+  const explicitDates = new Set(explicitRows.map((row) => row.date))
+  return [...explicitRows, ...defaultRows.filter((row) => !explicitDates.has(row.date))].sort(
+    (a, b) => a.date.localeCompare(b.date)
   )
 }

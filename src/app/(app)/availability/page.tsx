@@ -23,6 +23,7 @@ import { PrintMenuItem } from '@/components/print-menu-item'
 import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
 import { formatHumanCycleRange } from '@/lib/calendar-utils'
+import { normalizeWorkPattern, type WorkPattern } from '@/lib/coverage/work-patterns'
 import { buildMissingAvailabilityRows } from '@/lib/employee-directory'
 import { toUiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
@@ -76,6 +77,16 @@ type ManagerPlannerOverrideRow = {
   override_type: AvailabilityOverrideType
   note: string | null
   source: 'manager' | 'therapist'
+}
+
+type WorkPatternRow = {
+  therapist_id: string
+  works_dow: number[] | null
+  offs_dow: number[] | null
+  weekend_rotation: 'none' | 'every_other' | null
+  weekend_anchor_date: string | null
+  works_dow_mode: 'hard' | 'soft' | null
+  shift_preference?: 'day' | 'night' | 'either' | null
 }
 
 type AvailabilityPageSearchParams = {
@@ -430,20 +441,38 @@ export default async function AvailabilityPage({
       : { data: [] }
   const plannerTherapists = (plannerTherapistsResult.data ?? []) as ManagerPlannerTherapistRow[]
   const plannerOverrides = (plannerOverridesResult.data ?? []) as ManagerPlannerOverrideRow[]
+  const plannerWorkPatternsResult =
+    canManageAvailability && plannerTherapists.length > 0
+      ? await supabase
+          .from('work_patterns')
+          .select(
+            'therapist_id, works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode, shift_preference'
+          )
+          .in(
+            'therapist_id',
+            plannerTherapists.map((therapist) => therapist.id)
+          )
+      : { data: [] }
+  const plannerWorkPatterns = new Map<string, WorkPattern>()
+  for (const row of (plannerWorkPatternsResult.data ?? []) as WorkPatternRow[]) {
+    plannerWorkPatterns.set(
+      row.therapist_id,
+      normalizeWorkPattern({
+        therapist_id: row.therapist_id,
+        works_dow: row.works_dow ?? undefined,
+        offs_dow: row.offs_dow ?? undefined,
+        weekend_rotation: row.weekend_rotation ?? undefined,
+        weekend_anchor_date: row.weekend_anchor_date,
+        works_dow_mode: row.works_dow_mode ?? undefined,
+        shift_preference: row.shift_preference,
+      })
+    )
+  }
   const intakeNeedsReviewCount = intakeReviewCount ?? 0
   const selectedPlannerTherapistId =
     plannerTherapists.find((therapist) => therapist.id === selectedTherapistIdFromParams)?.id ??
     plannerTherapists[0]?.id ??
     ''
-  const selectedPlannerShiftLabel =
-    plannerTherapists.find((therapist) => therapist.id === selectedPlannerTherapistId)
-      ?.shift_type === 'night'
-      ? 'Night shift'
-      : plannerTherapists.find((therapist) => therapist.id === selectedPlannerTherapistId)
-            ?.shift_type === 'day'
-        ? 'Day shift'
-        : null
-
   const { data: officialSubmissionRows } =
     canManageAvailability && selectedCycleId
       ? await supabase
@@ -456,7 +485,7 @@ export default async function AvailabilityPage({
     (officialSubmissionRows ?? []).map((row) => (row as { therapist_id: string }).therapist_id)
   )
 
-  const availabilityStatusRows = canManageAvailability
+  const officialAvailabilityStatusRows = canManageAvailability
     ? buildMissingAvailabilityRows(
         plannerTherapists.map((therapist) => ({
           id: therapist.id,
@@ -478,8 +507,36 @@ export default async function AvailabilityPage({
         { officialSubmissionTherapistIds }
       )
     : []
-  const submittedAvailabilityRows = availabilityStatusRows.filter((row) => row.submitted)
-  const missingAvailabilityRows = availabilityStatusRows.filter((row) => !row.submitted)
+  const responseRosterStatusRows = canManageAvailability
+    ? buildMissingAvailabilityRows(
+        plannerTherapists.map((therapist) => ({
+          id: therapist.id,
+          full_name: therapist.full_name,
+          is_active: true,
+        })),
+        entries.map((entry) => ({
+          id: entry.id,
+          therapist_id: entry.therapist_id,
+          cycle_id: entry.cycle_id,
+          date: entry.date,
+          shift_type: entry.shift_type,
+          override_type: entry.override_type,
+          note: entry.note,
+          created_at: entry.created_at,
+          source: entry.source === 'manager' ? 'manager' : 'therapist',
+        })),
+        selectedCycleId,
+        { officialSubmissionTherapistIds, countAnyOverrideAsSubmitted: true }
+      )
+    : []
+  const officiallySubmittedAvailabilityRows = officialAvailabilityStatusRows.filter(
+    (row) => row.submitted
+  )
+  const awaitingOfficialSubmissionRows = officialAvailabilityStatusRows.filter(
+    (row) => !row.submitted
+  )
+  const responseRosterSubmittedRows = responseRosterStatusRows.filter((row) => row.submitted)
+  const responseRosterMissingRows = responseRosterStatusRows.filter((row) => !row.submitted)
 
   const availabilityRows: AvailabilityEntryTableRow[] = entries.map((entry) => {
     const cycle = getOne(entry.schedule_cycles)
@@ -547,54 +604,59 @@ export default async function AvailabilityPage({
   const plannerHref = buildAvailabilityTabHref(params, 'planner')
   const intakeHref = `/availability/intake${toSearchString(params)}`
   const summaryChips = canManageAvailability ? (
-    <AvailabilitySummaryChips
-      chips={[
-        {
-          label: 'Not submitted',
-          count: missingAvailabilityRows.length,
-          href: buildAvailabilityHref(
-            params,
-            { tab: 'planner', roster: 'missing' },
-            '#availability-response-heading'
-          ),
-          tone: 'warning',
-          active: initialRoster === 'missing',
-        },
-        {
-          label: 'Submitted',
-          count: submittedAvailabilityRows.length,
-          href: buildAvailabilityHref(
-            params,
-            { tab: 'planner', roster: 'submitted' },
-            '#availability-response-heading'
-          ),
-          tone: 'success',
-          active: initialRoster === 'submitted',
-        },
-        {
-          label: 'Need off',
-          count: needOffRequests,
-          href: buildAvailabilityHref(
-            params,
-            { tab: 'planner', status: 'force_off' },
-            '#availability-request-inbox'
-          ),
-          tone: 'warning',
-          active: initialStatus === 'force_off',
-        },
-        {
-          label: 'Request to work',
-          count: availableToWorkRequests,
-          href: buildAvailabilityHref(
-            params,
-            { tab: 'planner', status: 'force_on' },
-            '#availability-request-inbox'
-          ),
-          tone: 'info',
-          active: initialStatus === 'force_on',
-        },
-      ]}
-    />
+    <div className="space-y-2">
+      <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
+        Team totals for this cycle
+      </p>
+      <AvailabilitySummaryChips
+        chips={[
+          {
+            label: 'Awaiting therapist submission',
+            count: awaitingOfficialSubmissionRows.length,
+            href: buildAvailabilityHref(
+              params,
+              { tab: 'planner', roster: 'missing' },
+              '#availability-response-heading'
+            ),
+            tone: 'warning',
+            active: initialRoster === 'missing',
+          },
+          {
+            label: 'Officially submitted',
+            count: officiallySubmittedAvailabilityRows.length,
+            href: buildAvailabilityHref(
+              params,
+              { tab: 'planner', roster: 'submitted' },
+              '#availability-response-heading'
+            ),
+            tone: 'success',
+            active: initialRoster === 'submitted',
+          },
+          {
+            label: 'Dates marked off',
+            count: needOffRequests,
+            href: buildAvailabilityHref(
+              params,
+              { tab: 'planner', status: 'force_off' },
+              '#availability-request-inbox'
+            ),
+            tone: 'warning',
+            active: initialStatus === 'force_off',
+          },
+          {
+            label: 'Dates marked available',
+            count: availableToWorkRequests,
+            href: buildAvailabilityHref(
+              params,
+              { tab: 'planner', status: 'force_on' },
+              '#availability-request-inbox'
+            ),
+            tone: 'info',
+            active: initialStatus === 'force_on',
+          },
+        ]}
+      />
+    </div>
   ) : undefined
 
   return (
@@ -605,11 +667,7 @@ export default async function AvailabilityPage({
         title={canManageAvailability ? 'Availability Planning' : 'Availability'}
         subtitle={
           selectedCycle
-            ? `${formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)}${
-                canManageAvailability && selectedPlannerShiftLabel
-                  ? ` · ${selectedPlannerShiftLabel}`
-                  : ''
-              }`
+            ? formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)
             : 'No upcoming cycle selected'
         }
         totalRequests={totalRequests}
@@ -695,11 +753,12 @@ export default async function AvailabilityPage({
           cycles={cycles}
           therapists={plannerTherapists}
           overrides={plannerOverrides}
+          workPatternsByTherapist={Object.fromEntries(plannerWorkPatterns.entries())}
           availabilityEntries={availabilityRows}
           initialCycleId={selectedCycleId}
           initialTherapistId={selectedPlannerTherapistId}
-          submittedRows={submittedAvailabilityRows}
-          missingRows={missingAvailabilityRows}
+          submittedRows={responseRosterSubmittedRows}
+          missingRows={responseRosterMissingRows}
           initialRosterFilter={
             initialRoster === 'all' ||
             initialRoster === 'submitted' ||

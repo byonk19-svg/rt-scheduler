@@ -47,6 +47,7 @@ describe('ManagerSchedulingInputs', () => {
             source: 'manager',
           },
         ],
+        workPatternsByTherapist: {},
         availabilityEntries: [
           {
             id: 'entry-1',
@@ -99,6 +100,7 @@ describe('ManagerSchedulingInputs', () => {
         cycles: [],
         therapists: [],
         overrides: [],
+        workPatternsByTherapist: {},
         availabilityEntries: [],
         initialCycleId: '',
         initialTherapistId: '',

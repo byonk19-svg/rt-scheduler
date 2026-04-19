@@ -31,8 +31,8 @@ export type Assignment = {
 
 export type AssignmentStore = Record<string, Assignment>
 
-/** Manager-approved availability outcome for mock roster cells (matches /coverage override semantics). */
-export type AvailabilityApprovalKind = 'approved_off' | 'approved_work'
+/** Availability or weekly-constraint outcome for roster cells. */
+export type AvailabilityApprovalKind = 'approved_off' | 'approved_work' | 'pattern_blocked_off'
 
 export type AvailabilityApprovalStore = Partial<Record<string, AvailabilityApprovalKind>>
 
@@ -240,7 +240,7 @@ export function resolveMockRosterCellDisplay(
   assignment: Assignment | null,
   approval: AvailabilityApprovalKind | null
 ): { symbol: MockRosterCellSymbol; countsTowardDayTally: boolean } {
-  if (approval === 'approved_off') {
+  if (approval === 'approved_off' || approval === 'pattern_blocked_off') {
     return { symbol: 'x', countsTowardDayTally: false }
   }
   if (assignment != null || approval === 'approved_work') {

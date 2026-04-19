@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils'
 type CalendarDayState = {
   draftSelection?: 'will_work' | 'cannot_work'
   savedPlanner?: 'will_work' | 'cannot_work'
+  savedPlannerKind?: 'explicit' | 'weekly_default'
+  savedPlannerBadge?: 'Work' | 'Never'
   requestTypes?: Array<'need_off' | 'request_to_work'>
 }
 
@@ -112,6 +114,12 @@ export function AvailabilityCalendarPanel({
               <span className="h-2 w-2 rounded-full bg-primary" />
               Saved plan
             </span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[11px] font-semibold text-[var(--warning-text)]">
+              <span className="rounded-full bg-[var(--warning-text)] px-1 py-[1px] text-[9px] leading-none text-white">
+                X
+              </span>
+              Weekly default
+            </span>
           </div>
         </div>
       </div>
@@ -136,6 +144,7 @@ export function AvailabilityCalendarPanel({
                   const state = dayStates[dayKey] ?? {}
                   const requestTypes = state.requestTypes ?? []
                   const hasSavedPlanner = Boolean(state.savedPlanner)
+                  const isWeeklyDefault = state.savedPlannerKind === 'weekly_default'
 
                   return (
                     <button
@@ -143,6 +152,7 @@ export function AvailabilityCalendarPanel({
                       type="button"
                       aria-label={formatDateLabel(dayKey)}
                       data-in-cycle={isInCycle}
+                      data-saved-kind={state.savedPlannerKind ?? 'none'}
                       data-status={
                         state.draftSelection ??
                         state.savedPlanner ??
@@ -160,9 +170,13 @@ export function AvailabilityCalendarPanel({
                           !state.savedPlanner &&
                           'bg-background/75 text-foreground hover:border-border/60 hover:bg-muted/30',
                         state.savedPlanner === 'will_work' &&
-                          'border-[var(--success-border)]/80 bg-[var(--success-subtle)]/45 text-[var(--success-text)]',
+                          (isWeeklyDefault
+                            ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--success-text)_20%,transparent)]'
+                            : 'border-[var(--success-border)]/80 bg-[var(--success-subtle)]/45 text-[var(--success-text)]'),
                         state.savedPlanner === 'cannot_work' &&
-                          'border-[var(--error-border)]/80 bg-[var(--error-subtle)]/45 text-[var(--error-text)]',
+                          (isWeeklyDefault
+                            ? 'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--error-text)_18%,transparent)]'
+                            : 'border-[var(--error-border)]/80 bg-[var(--error-subtle)]/45 text-[var(--error-text)]'),
                         state.draftSelection === 'will_work' &&
                           'border-primary bg-primary text-primary-foreground shadow-tw-inset-highlight-soft',
                         state.draftSelection === 'cannot_work' &&
@@ -170,6 +184,18 @@ export function AvailabilityCalendarPanel({
                         hasSavedPlanner && !state.draftSelection && 'ring-1 ring-primary/8'
                       )}
                     >
+                      {isWeeklyDefault && state.savedPlannerBadge ? (
+                        <span
+                          className={cn(
+                            'absolute left-1 top-1 rounded-full px-1.5 py-[1px] text-[8px] font-bold leading-none',
+                            state.savedPlanner === 'cannot_work'
+                              ? 'bg-[var(--error-text)] text-white'
+                              : 'bg-[var(--success-text)] text-white'
+                          )}
+                        >
+                          {state.savedPlannerBadge}
+                        </span>
+                      ) : null}
                       <span className="font-medium">{day.getDate()}</span>
                       {requestTypes.length > 0 ? (
                         <span className="absolute bottom-1.5 flex items-center gap-1">

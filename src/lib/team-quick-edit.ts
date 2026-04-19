@@ -82,7 +82,6 @@ export function parseTeamQuickEditFormData(formData: FormData): TeamQuickEditRes
 
   const onFmla = formData.get('on_fmla') === 'on'
 
-  const hasPattern = formData.get('has_recurring_schedule') === 'on'
   const worksDow = formData
     .getAll('works_dow')
     .map((v) => parseInt(String(v), 10))
@@ -99,6 +98,11 @@ export function parseTeamQuickEditFormData(formData: FormData): TeamQuickEditRes
   const weekendAnchorDateRaw = String(formData.get('weekend_anchor_date') ?? '').trim()
   const weekendAnchorDate =
     weekendRotation === 'every_other' && weekendAnchorDateRaw ? weekendAnchorDateRaw : null
+  const hasPattern =
+    formData.get('has_recurring_schedule') === 'on' ||
+    worksDow.length > 0 ||
+    offsDow.length > 0 ||
+    weekendRotation === 'every_other'
 
   return {
     ok: true,

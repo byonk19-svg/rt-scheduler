@@ -7,6 +7,7 @@ import {
   type ManagerAvailabilityEntryRow,
   type ManagerPlannerOverrideRecord,
 } from '@/components/availability/manager-scheduling-helpers'
+import { normalizeWorkPattern } from '@/lib/coverage/work-patterns'
 
 describe('manager scheduling helpers', () => {
   it('filters saved overrides to the selected therapist and cycle using only manager-authored rows', () => {
@@ -59,6 +60,38 @@ describe('manager scheduling helpers', () => {
     })
   })
 
+  it('adds weekly pattern defaults when no explicit override exists for that date', () => {
+    const overrides: ManagerPlannerOverrideRecord[] = [
+      {
+        id: 'override-1',
+        cycle_id: 'cycle-a',
+        therapist_id: 'therapist-a',
+        date: '2026-04-24',
+        shift_type: 'day',
+        override_type: 'force_off',
+        note: null,
+        source: 'manager',
+      },
+    ]
+
+    expect(
+      getSavedBucketsForSelection(overrides, 'cycle-a', 'therapist-a', {
+        cycle: { start_date: '2026-04-20', end_date: '2026-04-26' },
+        workPattern: normalizeWorkPattern({
+          therapist_id: 'therapist-a',
+          works_dow: [1, 3],
+          offs_dow: [4],
+          weekend_rotation: 'none',
+          weekend_anchor_date: null,
+          works_dow_mode: 'hard',
+        }),
+      })
+    ).toMatchObject({
+      willWork: ['2026-04-20', '2026-04-22'],
+      cannotWork: ['2026-04-23', '2026-04-24'],
+    })
+  })
+
   it('builds day states from saved planner data, current draft selections, and inbox requests', () => {
     const therapistRequestRows: ManagerAvailabilityEntryRow[] = [
       {
@@ -88,6 +121,32 @@ describe('manager scheduling helpers', () => {
         savedBuckets: {
           willWork: ['2026-04-20'],
           cannotWork: ['2026-04-22'],
+          byDate: new Map([
+            [
+              '2026-04-20',
+              [
+                {
+                  id: 'saved-1',
+                  mode: 'will_work',
+                  shiftType: 'day',
+                  note: null,
+                  source: 'manager',
+                },
+              ],
+            ],
+            [
+              '2026-04-22',
+              [
+                {
+                  id: 'saved-2',
+                  mode: 'cannot_work',
+                  shiftType: 'day',
+                  note: null,
+                  source: 'manager',
+                },
+              ],
+            ],
+          ]),
         },
         selectedDates: ['2026-04-20', '2026-04-21'],
         mode: 'cannot_work',
@@ -96,6 +155,8 @@ describe('manager scheduling helpers', () => {
     ).toEqual({
       '2026-04-20': {
         savedPlanner: 'will_work',
+        savedPlannerKind: 'explicit',
+        savedPlannerBadge: undefined,
         draftSelection: 'cannot_work',
         requestTypes: ['need_off', 'request_to_work'],
       },
@@ -104,6 +165,8 @@ describe('manager scheduling helpers', () => {
       },
       '2026-04-22': {
         savedPlanner: 'cannot_work',
+        savedPlannerKind: 'explicit',
+        savedPlannerBadge: undefined,
       },
     })
   })

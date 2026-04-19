@@ -54,6 +54,8 @@ export type MissingAvailabilityRow = {
 /** When provided, `submitted` reflects official per-cycle submissions, not override rows alone. */
 export type BuildMissingAvailabilityOptions = {
   officialSubmissionTherapistIds: ReadonlySet<string>
+  /** When true, any override in the cycle counts as a received response for roster workflows. */
+  countAnyOverrideAsSubmitted?: boolean
 }
 
 export function filterEmployeeDirectoryRecords(
@@ -118,18 +120,24 @@ export function buildMissingAvailabilityRows(
   }
 
   const officialIds = options?.officialSubmissionTherapistIds
+  const countAnyOverrideAsSubmitted = options?.countAnyOverrideAsSubmitted ?? false
 
   return therapists
     .filter((therapist) => therapist.is_active)
     .map((therapist) => {
       const rows = byTherapist.get(therapist.id) ?? []
       const metricsRows =
-        officialIds !== undefined ? rows.filter((row) => row.source === 'therapist') : rows
+        officialIds !== undefined && !countAnyOverrideAsSubmitted
+          ? rows.filter((row) => row.source === 'therapist')
+          : rows
       const lastUpdatedAt =
         metricsRows.length === 0
           ? null
           : (metricsRows.map((row) => row.created_at).sort((a, b) => b.localeCompare(a))[0] ?? null)
-      const submitted = officialIds !== undefined ? officialIds.has(therapist.id) : rows.length > 0
+      const submitted =
+        officialIds !== undefined
+          ? officialIds.has(therapist.id) || (countAnyOverrideAsSubmitted && rows.length > 0)
+          : rows.length > 0
       return {
         therapistId: therapist.id,
         therapistName: therapist.full_name,

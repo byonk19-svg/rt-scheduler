@@ -17,6 +17,9 @@ type PlannerOverrideRecord = {
   id: string
   date: string
   override_type: 'force_off' | 'force_on'
+  note?: string | null
+  removable?: boolean
+  derivedFromPattern?: boolean
 }
 
 type AvailabilityEntryRow = {
@@ -261,22 +264,27 @@ export function TherapistContextPanel({
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {row.override_type === 'force_on' ? 'Will work' : 'Cannot work'}
+                    {row.derivedFromPattern ? ' · Weekly default' : ''}
                   </p>
                 </div>
-                <form action={deleteManagerPlannerDateAction}>
-                  <input type="hidden" name="override_id" value={row.id} />
-                  <input type="hidden" name="cycle_id" value={selectedCycleId} />
-                  <input type="hidden" name="therapist_id" value={selectedTherapistId} />
-                  <FormSubmitButton
-                    type="submit"
-                    variant="ghost"
-                    size="sm"
-                    pendingText="Removing..."
-                    className="text-muted-foreground hover:bg-muted hover:text-foreground"
-                  >
-                    Remove
-                  </FormSubmitButton>
-                </form>
+                {row.removable === false ? (
+                  <span className="text-xs text-muted-foreground">Default</span>
+                ) : (
+                  <form action={deleteManagerPlannerDateAction}>
+                    <input type="hidden" name="override_id" value={row.id} />
+                    <input type="hidden" name="cycle_id" value={selectedCycleId} />
+                    <input type="hidden" name="therapist_id" value={selectedTherapistId} />
+                    <FormSubmitButton
+                      type="submit"
+                      variant="ghost"
+                      size="sm"
+                      pendingText="Removing..."
+                      className="text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                      Remove
+                    </FormSubmitButton>
+                  </form>
+                )}
               </div>
             ))}
           </div>

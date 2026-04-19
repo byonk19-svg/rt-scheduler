@@ -207,6 +207,7 @@ export async function saveTeamQuickEditAction(formData: FormData) {
   }
 
   revalidatePath('/team')
+  revalidatePath('/availability')
   revalidatePath('/schedule')
   revalidatePath('/coverage')
   revalidatePath('/dashboard/manager')
@@ -323,6 +324,7 @@ export async function saveWorkPatternAction(formData: FormData) {
 
   revalidatePath('/team/work-patterns')
   revalidatePath('/team')
+  revalidatePath('/availability')
   revalidatePath('/coverage')
   revalidatePath('/schedule')
 

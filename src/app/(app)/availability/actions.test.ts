@@ -60,6 +60,7 @@ function createSupabaseMock(context: TestContext = {}) {
     }>,
     deletes: [] as Array<{ table: string; filters: Record<string, unknown> }>,
     selectRows: [] as Array<Record<string, unknown>>,
+    existingImportedOverrideRows: null as Array<Record<string, unknown>> | null,
     sourceCycleRows: null as Array<Record<string, unknown>> | null,
     sourceOverrideRows: null as Array<Record<string, unknown>> | null,
     existingTargetRows: null as Array<Record<string, unknown>> | null,
@@ -250,6 +251,25 @@ function createSupabaseMock(context: TestContext = {}) {
             return Promise.resolve(
               resolve({
                 data: state.emailAttachmentRows,
+                error: null,
+              })
+            )
+          }
+          if (table === 'availability_overrides' && selected.includes('source_intake_item_id')) {
+            const sourceIntakeItemId = filters.get('source_intake_item_id')
+            const sourceIntakeId = filters.get('source_intake_id')
+            return Promise.resolve(
+              resolve({
+                data:
+                  state.existingImportedOverrideRows?.filter((row) => {
+                    if (sourceIntakeItemId !== undefined) {
+                      return row.source_intake_item_id === sourceIntakeItemId
+                    }
+                    if (sourceIntakeId !== undefined) {
+                      return row.source_intake_id === sourceIntakeId
+                    }
+                    return true
+                  }) ?? null,
                 error: null,
               })
             )
@@ -585,6 +605,8 @@ describe('availability actions', () => {
         note: 'Imported from email: Off Mar 24',
         created_by: 'manager-1',
         source: 'manager',
+        source_intake_id: 'intake-1',
+        source_intake_item_id: null,
       },
       {
         cycle_id: 'cycle-1',
@@ -595,6 +617,8 @@ describe('availability actions', () => {
         note: 'Imported from email: Work Mar 26',
         created_by: 'manager-1',
         source: 'manager',
+        source_intake_id: 'intake-1',
+        source_intake_item_id: null,
       },
     ])
     expect(supabase.state.updates).toEqual([
@@ -606,6 +630,81 @@ describe('availability actions', () => {
           applied_at: expect.any(String),
         }),
         filters: { id: 'intake-1' },
+      },
+    ])
+  })
+
+  it('reapplying an edited intake item removes stale overrides for that same intake item', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    supabase.state.emailIntakeItemRow = {
+      id: 'item-1',
+      intake_id: 'intake-1',
+      matched_therapist_id: 'therapist-1',
+      matched_cycle_id: 'cycle-1',
+      parsed_requests: [
+        {
+          date: '2026-03-24',
+          override_type: 'force_off',
+          shift_type: 'both',
+          note: null,
+          source_line: 'Off Mar 24',
+        },
+      ],
+    }
+    supabase.state.existingImportedOverrideRows = [
+      {
+        id: 'override-stale',
+        cycle_id: 'cycle-1',
+        therapist_id: 'therapist-1',
+        date: '2026-03-26',
+        shift_type: 'both',
+        source_intake_item_id: 'item-1',
+      },
+      {
+        id: 'override-keep',
+        cycle_id: 'cycle-1',
+        therapist_id: 'therapist-1',
+        date: '2026-03-24',
+        shift_type: 'both',
+        source_intake_item_id: 'item-1',
+      },
+      {
+        id: 'manual-manager-date',
+        cycle_id: 'cycle-1',
+        therapist_id: 'therapist-1',
+        date: '2026-03-28',
+        shift_type: 'both',
+        source_intake_item_id: null,
+      },
+    ]
+    createClientMock.mockResolvedValue(supabase)
+    const formData = new FormData()
+    formData.set('item_id', 'item-1')
+
+    await expect(applyEmailAvailabilityImportAction(formData)).resolves.toEqual({
+      ok: true,
+      cycleId: 'cycle-1',
+      therapistId: 'therapist-1',
+    })
+
+    expect(supabase.state.deletes).toContainEqual({
+      table: 'availability_overrides',
+      filters: {
+        id: ['override-stale'],
+      },
+    })
+    expect(supabase.state.upsertPayloads[0]).toEqual([
+      {
+        cycle_id: 'cycle-1',
+        therapist_id: 'therapist-1',
+        date: '2026-03-24',
+        shift_type: 'both',
+        override_type: 'force_off',
+        note: 'Imported from email: Off Mar 24',
+        created_by: 'manager-1',
+        source: 'manager',
+        source_intake_id: 'intake-1',
+        source_intake_item_id: 'item-1',
       },
     ])
   })

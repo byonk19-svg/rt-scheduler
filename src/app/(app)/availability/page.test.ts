@@ -25,6 +25,7 @@ describe('availability page role-specific actions', () => {
 
     expect(source).toContain('therapist_availability_submissions')
     expect(source).toContain('officialSubmissionTherapistIds')
+    expect(source).toContain('countAnyOverrideAsSubmitted: true')
   })
 
   it('loads override source and updated_at for roster metrics and review table', () => {
@@ -58,7 +59,13 @@ describe('availability page role-specific actions', () => {
       "title={canManageAvailability ? 'Availability Planning' : 'Availability'}"
     )
     expect(source).toContain('AvailabilitySummaryChips')
+    expect(source).toContain('Team totals for this cycle')
+    expect(source).toContain("label: 'Awaiting therapist submission'")
+    expect(source).toContain("label: 'Officially submitted'")
+    expect(source).toContain("label: 'Dates marked off'")
+    expect(source).toContain("label: 'Dates marked available'")
     expect(source).not.toContain('selectedCycle.label')
+    expect(source).not.toContain('selectedPlannerShiftLabel')
     expect(source).toContain("roster: 'missing'")
     expect(source).toContain("roster: 'submitted'")
     expect(source).toContain("status: 'force_off'")

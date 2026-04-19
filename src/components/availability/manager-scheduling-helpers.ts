@@ -1,12 +1,15 @@
 import { formatHumanCycleRange } from '@/lib/calendar-utils'
 import {
+  buildPlannerDefaultRowsForCycle,
+  mergePlannerRowsWithDefaults,
   splitPlannerDatesByMode,
   type ManagerPlannerDateBuckets,
   type PlannerMode,
-  type PlannerOverrideRow,
+  type PlannerDisplayRow,
 } from '@/lib/availability-planner'
+import type { WorkPattern } from '@/lib/coverage/work-patterns'
 
-export type ManagerPlannerOverrideRecord = PlannerOverrideRow & {
+export type ManagerPlannerOverrideRecord = PlannerDisplayRow & {
   therapist_id: string
   cycle_id: string
 }
@@ -26,22 +29,51 @@ export type ManagerAvailabilityEntryRow = {
 type DayState = {
   draftSelection?: PlannerMode
   savedPlanner?: PlannerMode
+  savedPlannerKind?: 'explicit' | 'weekly_default'
+  savedPlannerBadge?: 'Work' | 'Never'
   requestTypes?: Array<'need_off' | 'request_to_work'>
 }
 
 export function getSavedBucketsForSelection(
   overrides: ManagerPlannerOverrideRecord[],
   cycleId: string,
-  therapistId: string
+  therapistId: string,
+  options?: {
+    cycle?: { start_date: string; end_date: string } | null
+    workPattern?: WorkPattern | null
+  }
 ) {
   return splitPlannerDatesByMode(
-    overrides.filter((row) => row.cycle_id === cycleId && row.therapist_id === therapistId),
-    { source: 'manager' }
+    getPlannerRowsForSelection(overrides, cycleId, therapistId, options),
+    {
+      source: 'manager',
+    }
   )
 }
 
+export function getPlannerRowsForSelection(
+  overrides: ManagerPlannerOverrideRecord[],
+  cycleId: string,
+  therapistId: string,
+  options?: {
+    cycle?: { start_date: string; end_date: string } | null
+    workPattern?: WorkPattern | null
+  }
+) {
+  const explicitRows = overrides.filter(
+    (row) => row.cycle_id === cycleId && row.therapist_id === therapistId
+  )
+  const defaultRows = buildPlannerDefaultRowsForCycle({
+    therapistId,
+    cycle: options?.cycle ?? null,
+    pattern: options?.workPattern ?? null,
+  })
+
+  return mergePlannerRowsWithDefaults(explicitRows, defaultRows)
+}
+
 export function buildDayStates(params: {
-  savedBuckets: Pick<ManagerPlannerDateBuckets, 'willWork' | 'cannotWork'>
+  savedBuckets: Pick<ManagerPlannerDateBuckets, 'willWork' | 'cannotWork' | 'byDate'>
   selectedDates: string[]
   mode: PlannerMode
   therapistRequestRows: ManagerAvailabilityEntryRow[]
@@ -49,11 +81,25 @@ export function buildDayStates(params: {
   const next: Record<string, DayState> = {}
 
   for (const date of params.savedBuckets.willWork) {
-    next[date] = { ...(next[date] ?? {}), savedPlanner: 'will_work' }
+    const rows = params.savedBuckets.byDate.get(date) ?? []
+    const derived = rows.some((row) => row.derivedFromPattern)
+    next[date] = {
+      ...(next[date] ?? {}),
+      savedPlanner: 'will_work',
+      savedPlannerKind: derived ? 'weekly_default' : 'explicit',
+      savedPlannerBadge: derived ? 'Work' : undefined,
+    }
   }
 
   for (const date of params.savedBuckets.cannotWork) {
-    next[date] = { ...(next[date] ?? {}), savedPlanner: 'cannot_work' }
+    const rows = params.savedBuckets.byDate.get(date) ?? []
+    const derived = rows.some((row) => row.derivedFromPattern)
+    next[date] = {
+      ...(next[date] ?? {}),
+      savedPlanner: 'cannot_work',
+      savedPlannerKind: derived ? 'weekly_default' : 'explicit',
+      savedPlannerBadge: derived ? 'Never' : undefined,
+    }
   }
 
   for (const date of params.selectedDates) {
