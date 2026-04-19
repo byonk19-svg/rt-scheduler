@@ -8,6 +8,24 @@ import { describe, expect, it } from 'vitest'
 import { TherapistAvailabilityWorkspace } from '@/components/availability/TherapistAvailabilityWorkspace'
 
 describe('TherapistAvailabilityWorkspace', () => {
+  it('renders CTAs when no cycle exists yet', () => {
+    const html = renderToStaticMarkup(
+      createElement(TherapistAvailabilityWorkspace, {
+        cycles: [],
+        availabilityRows: [],
+        conflicts: [],
+        initialCycleId: '',
+        submissionsByCycleId: {},
+        submitTherapistAvailabilityGridAction: async () => {},
+      })
+    )
+
+    expect(html).toContain('id="therapist-availability-workspace"')
+    expect(html).toContain('href="/dashboard/staff"')
+    expect(html).toContain('href="/shift-board"')
+    expect(html).toContain('href="/staff/my-schedule"')
+  })
+
   it('renders therapist-only controls, summary, and full-availability status copy', () => {
     const html = renderToStaticMarkup(
       createElement(TherapistAvailabilityWorkspace, {

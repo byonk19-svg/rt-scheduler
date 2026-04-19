@@ -1,11 +1,13 @@
 'use client'
 
+import Link from 'next/link'
 import { Send } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { AvailabilityEntryTableRow } from '@/app/availability/availability-requests-table'
 import { ScheduledConflictBanner } from '@/components/availability/ScheduledConflictBanner'
 import { FormSubmitButton } from '@/components/form-submit-button'
+import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import type { ConflictItem } from '@/lib/availability-scheduled-conflict'
 import { addDays, formatDateLabel, formatHumanCycleRange, toIsoDate } from '@/lib/calendar-utils'
@@ -359,15 +361,33 @@ export function TherapistAvailabilityWorkspace({
 
   if (cycles.length === 0) {
     return (
-      <section id="therapist-availability-workspace" className="space-y-3">
+      <section id="therapist-availability-workspace" className="space-y-4">
         <header className="border-b border-border/70 pb-4">
           <h1 className="font-heading text-[1.4rem] font-semibold leading-tight tracking-tight text-foreground">
             Availability for This Cycle
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            No upcoming cycle is open for availability yet.
+            No scheduling block is open for availability yet. Your account is fine — managers create
+            cycles; when one opens, you can submit your availability here.
           </p>
         </header>
+        <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-5">
+          <p className="text-sm text-muted-foreground">
+            Until then, use the dashboard for a quick overview, check your published shifts, or
+            browse open swap and pickup posts.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button asChild size="sm">
+              <Link href="/dashboard/staff">Dashboard</Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/shift-board">Open shifts</Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/staff/my-schedule">My shifts</Link>
+            </Button>
+          </div>
+        </div>
       </section>
     )
   }

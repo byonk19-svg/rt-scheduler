@@ -160,13 +160,13 @@ export function getStaffNavItems(): readonly ShellNavItem[] {
     },
     {
       href: '/coverage',
-      label: 'Schedule',
+      label: 'Team schedule',
       active: (pathname) =>
         pathname === '/coverage' || pathname === '/schedule' || pathname === '/preliminary',
     },
     {
       href: '/staff/my-schedule',
-      label: 'My Schedule',
+      label: 'My shifts',
       active: (pathname) => pathname === '/staff/my-schedule',
     },
     {

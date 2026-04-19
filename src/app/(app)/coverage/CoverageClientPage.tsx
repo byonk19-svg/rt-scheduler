@@ -1403,11 +1403,11 @@ export function CoverageClientPage({
 
           {noCycleSelected ? (
             <CoverageSurfaceBanner
-              title={canManageCoverage ? 'Ready to build your first cycle' : 'No schedule available yet'}
+              title={canManageCoverage ? 'Ready to build your first cycle' : 'No team schedule yet'}
               description={
                 canManageCoverage
                   ? '6-week cycles are your scheduling windows. Create one to open the planning surface and start staffing.'
-                  : 'A manager has not created a schedule block yet. Check back after the next cycle is set up.'
+                  : 'Nothing is wrong with your account. A manager has not created a schedule block yet — the team calendar will appear here when they do. Your published shifts are always available under My shifts.'
               }
               actions={
                 canManageCoverage ? (
@@ -1425,7 +1425,11 @@ export function CoverageClientPage({
                       <Link href="/publish">Publish history</Link>
                     </Button>
                   </>
-                ) : undefined
+                ) : (
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/staff/my-schedule">My shifts</Link>
+                  </Button>
+                )
               }
             />
           ) : showEmptyDraftState ? (

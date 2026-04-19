@@ -303,6 +303,10 @@ export default async function ProfilePage({
                   <option value="day">Day</option>
                   <option value="night">Night</option>
                 </select>
+                <p className="text-xs text-muted-foreground">
+                  Default Day/Night tab when you open Coverage. Does not change your profile shift
+                  assignment.
+                </p>
               </div>
               <div className="space-y-1">
                 <label
@@ -320,6 +324,10 @@ export default async function ProfilePage({
                   <option value="week">Grid</option>
                   <option value="roster">Roster</option>
                 </select>
+                <p className="text-xs text-muted-foreground">
+                  Grid vs roster view on Coverage only. Other pages (for example My shifts) are
+                  unchanged.
+                </p>
               </div>
               <div className="space-y-1">
                 <label
@@ -337,6 +345,10 @@ export default async function ProfilePage({
                   <option value="dashboard">Dashboard</option>
                   <option value="coverage">Coverage</option>
                 </select>
+                <p className="text-xs text-muted-foreground">
+                  First screen after sign-in. Managers and therapists both use this; it does not
+                  grant extra permissions.
+                </p>
               </div>
             </div>
             <FormSubmitButton type="submit" pendingText="Saving...">

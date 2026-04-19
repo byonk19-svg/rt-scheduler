@@ -207,6 +207,17 @@ export default function ShiftBoardClientPage({
   const canReview = can(role, 'review_shift_posts')
   const isStaffRole = !canReview
 
+  const [staffBoardToolsOpen, setStaffBoardToolsOpen] = useState(
+    initialSnapshot.requests.length > 0
+  )
+  useEffect(() => {
+    if (requests.length > 0) {
+      setStaffBoardToolsOpen(true)
+    }
+  }, [requests.length])
+
+  const showFullShiftBoardChrome = canReview || staffBoardToolsOpen
+
   useEffect(() => {
     setScope(isStaffRole ? 'mine' : 'all')
   }, [isStaffRole])
@@ -451,250 +462,283 @@ export default function ShiftBoardClientPage({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 px-6 lg:grid-cols-4">
-        <KpiTile
-          label="Open posts"
-          value={loading ? '--' : openPostCount}
-          detail="Pending swap or pickup requests"
-          icon={<Clock3 className="h-3.5 w-3.5" />}
-        />
-        <KpiTile
-          label="Pending approvals"
-          value={loading ? '--' : pending}
-          detail="Requests awaiting manager decision"
-          icon={<CalendarDays className="h-3.5 w-3.5" />}
-        />
-        <KpiTile
-          label="Approved / denied"
-          value={loading ? '--' : `${approvedCount}/${deniedCount}`}
-          detail="Resolution history in this view"
-          icon={<CheckCircle2 className="h-3.5 w-3.5" />}
-        />
-        <KpiTile
-          label="Coverage risk"
-          value={loading ? '--' : `${metrics.unfilled + metrics.missingLead}`}
-          detail={needsCoverageAttention ? 'Coverage needs attention' : 'Coverage stable'}
-          icon={<ShieldAlert className="h-3.5 w-3.5" />}
-        />
-      </div>
-
-      {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 py-3 text-sm font-medium text-[var(--error-text)]">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          {error}
-        </div>
-      )}
-      {/* Summary banner */}
-      {canReview ? (
-        <div
-          className="fade-up rounded-xl border border-[var(--warning-border)] bg-[var(--warning-subtle)]/25 shadow-sm"
-          style={{ animationDelay: '0.05s' }}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
-            <div className="flex flex-wrap items-center gap-6">
-              <SummaryItem
-                label="Pending approvals"
-                value={loading ? '--' : pending}
-                variant={!loading && pending > 0 ? 'warning' : 'success'}
-              />
-              <div className="hidden h-8 w-px self-center bg-border lg:block" />
-              <SummaryItem
-                label="Unfilled shifts"
-                value={loading ? '--' : metrics.unfilled}
-                variant={!loading && metrics.unfilled > 0 ? 'error' : 'success'}
-              />
-              <div className="hidden h-8 w-px self-center bg-border lg:block" />
-              <SummaryItem
-                label="Missing lead"
-                value={loading ? '--' : metrics.missingLead}
-                variant={!loading && metrics.missingLead > 0 ? 'error' : 'success'}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" onClick={() => setStatusFilter('pending')}>
-                Review approvals
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => router.push('/requests/new')}>
-                New request
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div
-          className="fade-up rounded-xl border border-border bg-card px-5 py-4 shadow-sm"
-          style={{ animationDelay: '0.05s' }}
-        >
-          <p className="text-sm font-semibold text-foreground">Published schedule changes only</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            This board is not for future-cycle planning. For the next schedule cycle, open Future
-            Availability.
-          </p>
-        </div>
-      )}
-      {/* Tabs */}
-      <div className="fade-up flex gap-1" style={{ animationDelay: '0.08s' }}>
-        {(
-          [
-            { id: 'open' as const, label: 'Open Posts' },
-            { id: 'history' as const, label: 'History' },
-          ] as const
-        ).map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              'h-9 rounded-lg border px-4 text-sm font-semibold transition-colors',
-              activeTab === tab.id
-                ? 'border-primary bg-primary/5 text-primary'
-                : 'border-border bg-card text-muted-foreground hover:bg-secondary'
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Filter bar */}
-      <div
-        className="fade-up flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm"
-        style={{ animationDelay: '0.1s' }}
-      >
-        {isStaffRole && (
-          <div className="flex gap-1">
-            <FilterPill
-              label="My Requests"
-              active={scope === 'mine'}
-              onClick={() => setScope('mine')}
-            />
-            <FilterPill
-              label="All Posts"
-              active={scope === 'all'}
-              onClick={() => setScope('all')}
-            />
-          </div>
-        )}
-        <div className="relative min-w-[200px] flex-1">
-          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search by name, message, or shift..."
-            className="h-9 w-full rounded-md border border-border bg-[var(--input-background)] pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          />
-        </div>
-        <div className="flex gap-1">
-          {(['all', 'pending', 'approved', 'denied'] as const).map((status) => (
-            <FilterPill
-              key={status}
-              label={status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
-              active={statusFilter === status}
-              onClick={() => setStatusFilter(status)}
-            />
-          ))}
-        </div>
-        <div className="flex gap-1">
-          {(['all', 'swap', 'pickup'] as const).map((type) => (
-            <FilterPill
-              key={type}
-              label={type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}
-              active={typeFilter === type}
-              onClick={() => setTypeFilter(type)}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Cards */}
-      <div className="fade-up flex flex-col gap-3" style={{ animationDelay: '0.15s' }}>
-        {canReview && multiCandidateSlots.length > 0 && (
-          <section className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              PRN Interest - Multiple Candidates
+      {!showFullShiftBoardChrome && isStaffRole ? (
+        <div className="px-6">
+          <div className="rounded-xl border border-border bg-card px-5 py-6 text-center shadow-sm">
+            <p className="text-sm text-muted-foreground">
+              No open swap or pickup posts right now. Use{' '}
+              <span className="font-medium text-foreground">Post request</span> above to list one,
+              or open tools to search, filter, and view history.
             </p>
-            {multiCandidateSlots.map((group) => (
-              <div key={group.shiftId} className="rounded-xl border border-border bg-card p-4">
-                <p className="mb-3 text-sm font-semibold text-foreground">
-                  {group.shiftLabel}
-                  <span className="ml-2 text-xs font-normal text-muted-foreground">
-                    {group.candidates.length} interested
-                  </span>
-                </p>
-                <div className="space-y-2">
-                  {group.candidates.map((candidate, index) => (
-                    <div
-                      key={candidate.id}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                          #{index + 1}
-                        </span>
-                        <span className="text-sm font-medium text-foreground">
-                          {candidate.poster}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(candidate.postedAt).toLocaleString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: 'numeric',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        disabled={savingState[candidate.id]}
-                        onClick={() => void handleAction(candidate.id, 'approve')}
-                        className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                      >
-                        {savingState[candidate.id] ? 'Selecting...' : 'Select'}
-                      </button>
-                    </div>
-                  ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={() => setStaffBoardToolsOpen(true)}
+            >
+              More filters &amp; history
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {showFullShiftBoardChrome ? (
+        <>
+          <div className="grid grid-cols-2 gap-4 px-6 lg:grid-cols-4">
+            <KpiTile
+              label="Open posts"
+              value={loading ? '--' : openPostCount}
+              detail="Pending swap or pickup requests"
+              icon={<Clock3 className="h-3.5 w-3.5" />}
+            />
+            <KpiTile
+              label="Pending approvals"
+              value={loading ? '--' : pending}
+              detail="Requests awaiting manager decision"
+              icon={<CalendarDays className="h-3.5 w-3.5" />}
+            />
+            <KpiTile
+              label="Approved / denied"
+              value={loading ? '--' : `${approvedCount}/${deniedCount}`}
+              detail="Resolution history in this view"
+              icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+            />
+            <KpiTile
+              label="Coverage risk"
+              value={loading ? '--' : `${metrics.unfilled + metrics.missingLead}`}
+              detail={needsCoverageAttention ? 'Coverage needs attention' : 'Coverage stable'}
+              icon={<ShieldAlert className="h-3.5 w-3.5" />}
+            />
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 rounded-lg border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 py-3 text-sm font-medium text-[var(--error-text)]">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {error}
+            </div>
+          )}
+          {/* Summary banner */}
+          {canReview ? (
+            <div
+              className="fade-up rounded-xl border border-[var(--warning-border)] bg-[var(--warning-subtle)]/25 shadow-sm"
+              style={{ animationDelay: '0.05s' }}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+                <div className="flex flex-wrap items-center gap-6">
+                  <SummaryItem
+                    label="Pending approvals"
+                    value={loading ? '--' : pending}
+                    variant={!loading && pending > 0 ? 'warning' : 'success'}
+                  />
+                  <div className="hidden h-8 w-px self-center bg-border lg:block" />
+                  <SummaryItem
+                    label="Unfilled shifts"
+                    value={loading ? '--' : metrics.unfilled}
+                    variant={!loading && metrics.unfilled > 0 ? 'error' : 'success'}
+                  />
+                  <div className="hidden h-8 w-px self-center bg-border lg:block" />
+                  <SummaryItem
+                    label="Missing lead"
+                    value={loading ? '--' : metrics.missingLead}
+                    variant={!loading && metrics.missingLead > 0 ? 'error' : 'success'}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => setStatusFilter('pending')}>
+                    Review approvals
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => router.push('/requests/new')}>
+                    New request
+                  </Button>
                 </div>
               </div>
+            </div>
+          ) : (
+            <div
+              className="fade-up rounded-xl border border-border bg-card px-5 py-4 shadow-sm"
+              style={{ animationDelay: '0.05s' }}
+            >
+              <p className="text-sm font-semibold text-foreground">
+                Published schedule changes only
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                This board is not for future-cycle planning. For the next schedule cycle, open
+                Future Availability.
+              </p>
+            </div>
+          )}
+          {/* Tabs */}
+          <div className="fade-up flex gap-1" style={{ animationDelay: '0.08s' }}>
+            {(
+              [
+                { id: 'open' as const, label: 'Open Posts' },
+                { id: 'history' as const, label: 'History' },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  'h-9 rounded-lg border px-4 text-sm font-semibold transition-colors',
+                  activeTab === tab.id
+                    ? 'border-primary bg-primary/5 text-primary'
+                    : 'border-border bg-card text-muted-foreground hover:bg-secondary'
+                )}
+              >
+                {tab.label}
+              </button>
             ))}
-          </section>
-        )}
+          </div>
 
-        {!loading && filtered.length === 0 ? (
-          <EmptyState
-            statusFilter={statusFilter}
-            onClear={() => {
-              setSearch('')
-              setStatusFilter('all')
-              setTypeFilter('all')
-            }}
-          />
-        ) : (
-          filtered.map((request, index) => (
-            <RequestCard
-              key={request.id}
-              req={request}
-              canReview={canReview}
-              saving={Boolean(savingState[request.id])}
-              error={requestErrors[request.id]}
-              therapists={therapists}
-              scheduledOnDate={scheduledByDate.get(request.shiftDate ?? '') ?? new Map()}
-              shiftRole={request.shiftRole}
-              swapPartnerId={swapPartners[request.id] ?? ''}
-              onSwapPartnerChange={(partnerId) =>
-                setSwapPartners((prev) => ({ ...prev, [request.id]: partnerId }))
-              }
-              overrideReason={overrideReasons[request.id] ?? ''}
-              onOverrideReasonChange={(reason) =>
-                setOverrideReasons((prev) => ({ ...prev, [request.id]: reason }))
-              }
-              onForceApprove={() => void handleAction(request.id, 'approve', { override: true })}
-              onAction={(action) => void handleAction(request.id, action)}
-              onViewShift={() => handleViewShift(request.shiftDate)}
-              delay={index * 0.04}
-            />
-          ))
-        )}
-      </div>
+          {/* Filter bar */}
+          <div
+            className="fade-up flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm"
+            style={{ animationDelay: '0.1s' }}
+          >
+            {isStaffRole && (
+              <div className="flex gap-1">
+                <FilterPill
+                  label="My Requests"
+                  active={scope === 'mine'}
+                  onClick={() => setScope('mine')}
+                />
+                <FilterPill
+                  label="All Posts"
+                  active={scope === 'all'}
+                  onClick={() => setScope('all')}
+                />
+              </div>
+            )}
+            <div className="relative min-w-[200px] flex-1">
+              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search by name, message, or shift..."
+                className="h-9 w-full rounded-md border border-border bg-[var(--input-background)] pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              />
+            </div>
+            <div className="flex gap-1">
+              {(['all', 'pending', 'approved', 'denied'] as const).map((status) => (
+                <FilterPill
+                  key={status}
+                  label={
+                    status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)
+                  }
+                  active={statusFilter === status}
+                  onClick={() => setStatusFilter(status)}
+                />
+              ))}
+            </div>
+            <div className="flex gap-1">
+              {(['all', 'swap', 'pickup'] as const).map((type) => (
+                <FilterPill
+                  key={type}
+                  label={
+                    type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)
+                  }
+                  active={typeFilter === type}
+                  onClick={() => setTypeFilter(type)}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Cards */}
+          <div className="fade-up flex flex-col gap-3" style={{ animationDelay: '0.15s' }}>
+            {canReview && multiCandidateSlots.length > 0 && (
+              <section className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  PRN Interest - Multiple Candidates
+                </p>
+                {multiCandidateSlots.map((group) => (
+                  <div key={group.shiftId} className="rounded-xl border border-border bg-card p-4">
+                    <p className="mb-3 text-sm font-semibold text-foreground">
+                      {group.shiftLabel}
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        {group.candidates.length} interested
+                      </span>
+                    </p>
+                    <div className="space-y-2">
+                      {group.candidates.map((candidate, index) => (
+                        <div
+                          key={candidate.id}
+                          className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                              #{index + 1}
+                            </span>
+                            <span className="text-sm font-medium text-foreground">
+                              {candidate.poster}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(candidate.postedAt).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={savingState[candidate.id]}
+                            onClick={() => void handleAction(candidate.id, 'approve')}
+                            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                          >
+                            {savingState[candidate.id] ? 'Selecting...' : 'Select'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </section>
+            )}
+
+            {!loading && filtered.length === 0 ? (
+              <EmptyState
+                statusFilter={statusFilter}
+                onClear={() => {
+                  setSearch('')
+                  setStatusFilter('all')
+                  setTypeFilter('all')
+                }}
+              />
+            ) : (
+              filtered.map((request, index) => (
+                <RequestCard
+                  key={request.id}
+                  req={request}
+                  canReview={canReview}
+                  saving={Boolean(savingState[request.id])}
+                  error={requestErrors[request.id]}
+                  therapists={therapists}
+                  scheduledOnDate={scheduledByDate.get(request.shiftDate ?? '') ?? new Map()}
+                  shiftRole={request.shiftRole}
+                  swapPartnerId={swapPartners[request.id] ?? ''}
+                  onSwapPartnerChange={(partnerId) =>
+                    setSwapPartners((prev) => ({ ...prev, [request.id]: partnerId }))
+                  }
+                  overrideReason={overrideReasons[request.id] ?? ''}
+                  onOverrideReasonChange={(reason) =>
+                    setOverrideReasons((prev) => ({ ...prev, [request.id]: reason }))
+                  }
+                  onForceApprove={() =>
+                    void handleAction(request.id, 'approve', { override: true })
+                  }
+                  onAction={(action) => void handleAction(request.id, action)}
+                  onViewShift={() => handleViewShift(request.shiftDate)}
+                  delay={index * 0.04}
+                />
+              ))
+            )}
+          </div>
+        </>
+      ) : null}
     </div>
   )
 }

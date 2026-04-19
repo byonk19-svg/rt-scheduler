@@ -109,9 +109,12 @@ describe('AppShell navigation structure', () => {
 
   it('includes personal schedule in the flat staff nav', () => {
     expect(shellConfigSource).toContain("href: '/staff/my-schedule'")
-    expect(shellConfigSource).toContain("label: 'My Schedule'")
+    expect(shellConfigSource).toContain("label: 'My shifts'")
   })
 
+  it('labels team coverage separately from personal shifts in staff nav', () => {
+    expect(shellConfigSource).toContain("label: 'Team schedule'")
+  })
   it('routes manager Today section to the manager dashboard', () => {
     expect(shellConfigSource).toContain("label: 'Today'")
     expect(shellConfigSource).toContain('MANAGER_WORKFLOW_LINKS.dashboard')

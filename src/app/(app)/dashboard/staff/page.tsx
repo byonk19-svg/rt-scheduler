@@ -376,17 +376,19 @@ export default async function StaffDashboardPage({
           ) : (
             <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-6 text-center">
               <p className="text-sm font-medium text-foreground">
-                No shifts scheduled yet for this cycle
+                No draft assignments on this cycle yet
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                The schedule is still being filled. You can browse open shifts now, and submit
-                availability if you have not done so yet.
+                The team schedule is still being filled. Use the buttons above for your next step,
+                or see published shifts on{' '}
+                <Link
+                  href="/staff/my-schedule"
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  My shifts
+                </Link>
+                .
               </p>
-              <div className="mt-3 flex justify-center">
-                <Button asChild size="sm">
-                  <Link href="/shift-board">Browse open shifts</Link>
-                </Button>
-              </div>
             </div>
           )}
         </div>
@@ -417,8 +419,13 @@ export default async function StaffDashboardPage({
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            No upcoming shifts on published schedules. Your draft-cycle assignments stay hidden
-            until publish.
+            No published shifts in this window yet.{' '}
+            <Link
+              href="/shift-board"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Browse open shifts
+            </Link>
           </p>
         )}
       </section>
@@ -447,7 +454,13 @@ export default async function StaffDashboardPage({
             <>
               <p className="mt-1.5 text-sm font-medium text-foreground">No shift scheduled yet</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Your next scheduled shift will appear here once you are on the roster.
+                <Link
+                  href="/staff/my-schedule"
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  My shifts
+                </Link>{' '}
+                lists published assignments.
               </p>
             </>
           )}

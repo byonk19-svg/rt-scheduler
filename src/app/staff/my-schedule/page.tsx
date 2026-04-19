@@ -68,7 +68,7 @@ export default async function StaffMySchedulePage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
-              My schedule
+              My shifts
             </h1>
             <p className="mt-0.5 text-xs text-muted-foreground">
               Upcoming shifts from published schedules only ({shifts.length} shown, next 30 max).
@@ -86,9 +86,18 @@ export default async function StaffMySchedulePage() {
           <p className="mt-1 text-xs text-muted-foreground">
             When your manager publishes a schedule that includes you, your shifts will appear here.
           </p>
-          <Button asChild size="sm" variant="outline" className="mt-4 text-xs">
-            <Link href="/therapist/availability">Availability</Link>
+          <Button asChild size="sm" className="mt-4 text-xs">
+            <Link href="/shift-board">Browse open shifts</Link>
           </Button>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Need to submit availability for the next block?{' '}
+            <Link
+              href="/therapist/availability"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Open availability
+            </Link>
+          </p>
         </div>
       ) : (
         <div className="space-y-8">
