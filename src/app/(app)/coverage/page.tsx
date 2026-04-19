@@ -1,4 +1,4 @@
-import { CoverageClientPage } from '@/app/coverage/CoverageClientPage'
+import { CoverageClientPage } from '@/app/(app)/coverage/CoverageClientPage'
 import { getCoveragePageServerData } from '@/app/(app)/coverage/coverage-page-data'
 
 export default async function CoveragePage({

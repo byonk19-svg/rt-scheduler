@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const coverageClientPath = resolve(process.cwd(), 'src/app/(app)/coverage/CoverageClientPage.tsx')
+const coveragePagePath = resolve(process.cwd(), 'src/app/(app)/coverage/page.tsx')
 const coverageServerDataPath = resolve(
   process.cwd(),
   'src/app/(app)/coverage/coverage-page-data.ts'
@@ -99,5 +100,12 @@ describe('coverage publish override affordance', () => {
     expect(source).toContain('{preFlightDialogOpen ? (')
     expect(source).toContain('{clearDraftDialogOpen ? (')
     expect(source).toContain('{cycleDialogOpen ? (')
+  })
+
+  it('imports the live coverage client page directly from the route-group entry', () => {
+    const source = readFileSync(coveragePagePath, 'utf8')
+
+    expect(source).toContain("import { CoverageClientPage } from '@/app/(app)/coverage/CoverageClientPage'")
+    expect(source).not.toContain("import { CoverageClientPage } from '@/app/coverage/CoverageClientPage'")
   })
 })
