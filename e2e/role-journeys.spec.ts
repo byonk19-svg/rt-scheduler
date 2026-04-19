@@ -728,9 +728,12 @@ test.describe.serial('role journeys', () => {
       response.url().includes('/api/schedule/assignment-status')
     )
     await assignmentTrigger.click()
-    await expect(page.getByTestId('coverage-status-popover')).toBeVisible()
+    await expect(
+      page.locator('[data-testid="coverage-status-popover"]:visible').first()
+    ).toBeVisible()
     await page
-      .getByTestId('coverage-status-popover')
+      .locator('[data-testid="coverage-status-popover"]:visible')
+      .first()
       .getByRole('button', { name: 'Call In' })
       .click()
     const response = await assignmentStatusResponse

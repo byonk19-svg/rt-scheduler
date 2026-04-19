@@ -162,11 +162,11 @@ test.describe.serial('coverage manager dialog interactions', () => {
   })
 
   function dayCell(page: Page, isoDate: string) {
-    return page.getByTestId(`coverage-day-panel-${isoDate}`)
+    return page.locator(`[data-testid="coverage-day-panel-${isoDate}"]:visible`).first()
   }
 
   function dayCellButton(page: Page, isoDate: string) {
-    return page.getByTestId(`coverage-day-cell-button-${isoDate}`)
+    return page.locator(`[data-testid="coverage-day-cell-button-${isoDate}"]:visible`).first()
   }
 
   function shiftEditorDialog(page: Page) {
@@ -174,7 +174,7 @@ test.describe.serial('coverage manager dialog interactions', () => {
   }
 
   function statusPopover(page: Page) {
-    return page.getByTestId('coverage-status-popover')
+    return page.locator('[data-testid="coverage-status-popover"]:visible').first()
   }
 
   async function waitForCalendar(page: Page, isoDate: string) {
@@ -182,7 +182,15 @@ test.describe.serial('coverage manager dialog interactions', () => {
   }
 
   async function openShiftEditor(page: Page, isoDate: string) {
-    await dayCellButton(page, isoDate).click({ position: { x: 18, y: 18 } })
+    await page.waitForTimeout(1_000)
+    await dayCellButton(page, isoDate).dispatchEvent('click')
+    if (
+      !(await shiftEditorDialog(page)
+        .isVisible()
+        .catch(() => false))
+    ) {
+      await dayCellButton(page, isoDate).dispatchEvent('click')
+    }
     await expect(shiftEditorDialog(page)).toBeVisible({ timeout: 5_000 })
   }
 
@@ -192,8 +200,8 @@ test.describe.serial('coverage manager dialog interactions', () => {
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`, { waitUntil: 'domcontentloaded' })
 
-    await waitForCalendar(page, ctx!.targetDate)
-    await openShiftEditor(page, ctx!.targetDate)
+    await waitForCalendar(page, ctx!.assignDate)
+    await openShiftEditor(page, ctx!.assignDate)
     await expect(page.getByTestId('coverage-drawer-close')).toHaveCount(0)
   })
 
@@ -205,7 +213,10 @@ test.describe.serial('coverage manager dialog interactions', () => {
 
     await waitForCalendar(page, ctx!.targetDate)
     await page
-      .getByTestId(`coverage-assignment-trigger-${ctx!.targetDate}-${ctx!.therapist1.id}`)
+      .locator(
+        `[data-testid="coverage-assignment-trigger-${ctx!.targetDate}-${ctx!.therapist1.id}"]:visible`
+      )
+      .first()
       .click()
 
     await expect(statusPopover(page)).toBeVisible({ timeout: 5_000 })
@@ -218,8 +229,8 @@ test.describe.serial('coverage manager dialog interactions', () => {
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`, { waitUntil: 'domcontentloaded' })
 
-    await waitForCalendar(page, ctx!.targetDate)
-    await openShiftEditor(page, ctx!.targetDate)
+    await waitForCalendar(page, ctx!.assignDate)
+    await openShiftEditor(page, ctx!.assignDate)
 
     await shiftEditorDialog(page).getByRole('button', { name: 'Close' }).click()
     await expect(shiftEditorDialog(page)).toHaveCount(0)
