@@ -5,7 +5,7 @@ import type {
   ShiftLimitRow,
   Therapist,
 } from '@/app/schedule/types'
-import { shiftTypeMatches } from '@/lib/coverage/work-patterns'
+import { isWeekendOn, normalizeWorkPattern, shiftTypeMatches } from '@/lib/coverage/work-patterns'
 import { fillCoverageSlot, NO_ELIGIBLE_CANDIDATES_REASON } from '@/lib/coverage/generator-slot'
 import { getAutoDraftCoveragePolicy } from '@/lib/coverage/auto-draft-policy'
 import {
@@ -53,6 +53,54 @@ export type GenerateDraftResult = {
   forcedMustWorkMisses: number
 }
 
+function buildDerivedPatternMustWorkOverrides(params: {
+  cycleId: string
+  cycleDates: string[]
+  therapists: Therapist[]
+  explicitOverrides: AvailabilityOverrideRow[]
+}): AvailabilityOverrideRow[] {
+  const explicitDates = new Set(
+    params.explicitOverrides.map((override) => `${override.therapist_id}:${override.date}`)
+  )
+  const derivedOverrides: AvailabilityOverrideRow[] = []
+
+  for (const therapist of params.therapists) {
+    if (therapist.weekend_rotation !== 'every_other' || !therapist.weekend_anchor_date) continue
+
+    const pattern = normalizeWorkPattern({
+      therapist_id: therapist.id,
+      works_dow: therapist.works_dow,
+      offs_dow: therapist.offs_dow,
+      weekend_rotation: therapist.weekend_rotation,
+      weekend_anchor_date: therapist.weekend_anchor_date,
+      works_dow_mode: therapist.works_dow_mode,
+      shift_preference: therapist.shift_preference,
+    })
+
+    for (const date of params.cycleDates) {
+      const explicitKey = `${therapist.id}:${date}`
+      if (explicitDates.has(explicitKey)) continue
+
+      const parsed = new Date(`${date}T00:00:00`)
+      if (Number.isNaN(parsed.getTime())) continue
+      const weekday = parsed.getDay()
+      if ((weekday !== 0 && weekday !== 6) || !isWeekendOn(pattern, date)) continue
+
+      derivedOverrides.push({
+        therapist_id: therapist.id,
+        cycle_id: params.cycleId,
+        date,
+        shift_type: 'both',
+        override_type: 'force_on',
+        source: 'manager',
+        note: 'Weekly pattern default: alternating weekend on',
+      })
+    }
+  }
+
+  return derivedOverrides
+}
+
 export function generateDraftForCycle(input: GenerateDraftInput): GenerateDraftResult {
   const {
     cycleId,
@@ -84,9 +132,16 @@ export function generateDraftForCycle(input: GenerateDraftInput): GenerateDraftR
   )
 
   const cycleDates = buildDateRange(cycleStartDate, cycleEndDate)
+  const derivedPatternOverrides = buildDerivedPatternMustWorkOverrides({
+    cycleId,
+    cycleDates,
+    therapists,
+    explicitOverrides: allAvailabilityOverrides,
+  })
+  const effectiveAvailabilityOverrides = [...allAvailabilityOverrides, ...derivedPatternOverrides]
 
   const availabilityOverridesByTherapist = new Map<string, AvailabilityOverrideRow[]>()
-  for (const row of allAvailabilityOverrides) {
+  for (const row of effectiveAvailabilityOverrides) {
     const therapistId = row.therapist_id
     const rows = availabilityOverridesByTherapist.get(therapistId) ?? []
     rows.push(row)
@@ -370,7 +425,7 @@ export function generateDraftForCycle(input: GenerateDraftInput): GenerateDraftR
   }
 
   const finalAssignedShifts = [...existingShifts, ...draftShiftsToInsert]
-  const forcedMustWorkMisses = allAvailabilityOverrides.filter((override) => {
+  const forcedMustWorkMisses = effectiveAvailabilityOverrides.filter((override) => {
     if (override.override_type !== 'force_on') return false
     if (override.source !== 'manager' && override.source !== 'therapist') return false
 

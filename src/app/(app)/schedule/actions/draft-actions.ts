@@ -147,11 +147,11 @@ export async function generateDraftScheduleAction(formData: FormData) {
       })
     return {
       ...therapist,
-      works_dow: [0, 1, 2, 3, 4, 5, 6],
-      offs_dow: [],
-      weekend_rotation: 'none',
-      weekend_anchor_date: null,
-      works_dow_mode: 'hard',
+      works_dow: pattern.works_dow,
+      offs_dow: pattern.offs_dow,
+      weekend_rotation: pattern.weekend_rotation,
+      weekend_anchor_date: pattern.weekend_anchor_date,
+      works_dow_mode: pattern.works_dow_mode,
       shift_preference: pattern.shift_preference,
     }
   })

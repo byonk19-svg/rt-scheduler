@@ -156,6 +156,40 @@ describe('availability planner helpers', () => {
     ])
   })
 
+  it('marks alternating on-weekends as will-work defaults instead of blocking off-weekends', () => {
+    const defaults = buildPlannerDefaultRowsForCycle({
+      therapistId: 'therapist-1',
+      cycle: { start_date: '2026-03-07', end_date: '2026-03-15' },
+      pattern: normalizeWorkPattern({
+        therapist_id: 'therapist-1',
+        works_dow: [],
+        offs_dow: [],
+        weekend_rotation: 'every_other',
+        weekend_anchor_date: '2026-03-07',
+        works_dow_mode: 'hard',
+      }),
+    })
+
+    expect(defaults).toEqual([
+      expect.objectContaining({
+        id: 'pattern-on:therapist-1:2026-03-07',
+        date: '2026-03-07',
+        override_type: 'force_on',
+        note: 'Weekly pattern default: alternating weekend on',
+        removable: false,
+        derivedFromPattern: true,
+      }),
+      expect.objectContaining({
+        id: 'pattern-on:therapist-1:2026-03-08',
+        date: '2026-03-08',
+        override_type: 'force_on',
+        note: 'Weekly pattern default: alternating weekend on',
+        removable: false,
+        derivedFromPattern: true,
+      }),
+    ])
+  })
+
   it('lets explicit planner overrides replace same-date weekly defaults', () => {
     const explicit = [
       buildOverride({

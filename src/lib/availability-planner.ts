@@ -3,7 +3,7 @@ import {
   isDateWithinCycle,
   type AvailabilityOverrideSource,
 } from '@/lib/employee-directory'
-import { isAllowedByPattern, type WorkPattern } from '@/lib/coverage/work-patterns'
+import { isAllowedByPattern, isWeekendOn, type WorkPattern } from '@/lib/coverage/work-patterns'
 
 export type PlannerOverrideType = 'force_on' | 'force_off'
 export type PlannerMode = 'will_work' | 'cannot_work'
@@ -170,20 +170,29 @@ export function buildPlannerDefaultRowsForCycle(params: {
   while (cursor <= params.cycle.end_date) {
     const weekday = getWeekdayIndex(cursor)
     const decision = isAllowedByPattern(params.pattern, cursor)
+    const isAlternatingOnWeekend =
+      (weekday === 0 || weekday === 6) &&
+      params.pattern.weekend_rotation === 'every_other' &&
+      isWeekendOn(params.pattern, cursor)
 
-    if (
-      decision.reason === 'blocked_offs_dow' ||
-      decision.reason === 'blocked_every_other_weekend'
-    ) {
+    if (decision.reason === 'blocked_offs_dow') {
       rows.push({
         id: `pattern-off:${params.therapistId}:${cursor}`,
         date: cursor,
         shift_type: 'both',
         override_type: 'force_off',
-        note:
-          decision.reason === 'blocked_every_other_weekend'
-            ? 'Weekly pattern default: off weekend'
-            : 'Weekly pattern default: never works this weekday',
+        note: 'Weekly pattern default: never works this weekday',
+        source: 'manager',
+        removable: false,
+        derivedFromPattern: true,
+      })
+    } else if (isAlternatingOnWeekend) {
+      rows.push({
+        id: `pattern-on:${params.therapistId}:${cursor}`,
+        date: cursor,
+        shift_type: 'both',
+        override_type: 'force_on',
+        note: 'Weekly pattern default: alternating weekend on',
         source: 'manager',
         removable: false,
         derivedFromPattern: true,
