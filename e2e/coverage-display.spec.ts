@@ -198,7 +198,9 @@ test.describe.serial('coverage display regressions', () => {
     await loginAs(page, ctx!.staffViewer.email, ctx!.staffViewer.password)
     await page.goto(`/coverage?cycle=${ctx!.publishedCycle.id}`)
 
-    const dayPanel = page.getByTestId(`coverage-day-panel-${ctx!.publishedCycle.targetDate}`)
+    const dayPanel = page
+      .locator(`[data-testid="coverage-day-panel-${ctx!.publishedCycle.targetDate}"]:visible`)
+      .first()
     await expect(dayPanel).toBeVisible({ timeout: 15_000 })
     for (const name of ctx!.expectedNames) {
       await expect(dayPanel.getByText(name, { exact: false })).toBeVisible()
@@ -214,16 +216,14 @@ test.describe.serial('coverage display regressions', () => {
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.emptyDraftCycle.id}`)
 
-    await expect(page.getByRole('heading', { name: 'Block ready — no shifts yet' })).toBeVisible()
+    await expect(page.getByText('No shifts assigned yet').first()).toBeVisible()
     await expect(
-      page.getByText(
-        'Run Auto-draft to fill the grid based on therapist availability and constraints, or click any day to assign shifts manually.'
-      )
+      page.getByText('No shifts assigned yet. Run Auto-draft or click a day to assign manually.')
     ).toBeVisible()
 
-    const dayCellButton = page.getByTestId(
-      `coverage-day-cell-button-${ctx!.emptyDraftCycle.startDate}`
-    )
+    const dayCellButton = page
+      .locator(`[data-testid="coverage-day-cell-button-${ctx!.emptyDraftCycle.startDate}"]:visible`)
+      .first()
     await expect(dayCellButton).toBeVisible()
     await dayCellButton.click({ position: { x: 18, y: 18 } })
     await expect(page.getByTestId('coverage-shift-editor-dialog')).toBeVisible()

@@ -592,9 +592,7 @@ export function CoverageClientPage({
   }
 
   const handleSelect = useCallback((id: string) => {
-    window.requestAnimationFrame(() => {
-      setSelectedId((prev) => (prev === id ? null : id))
-    })
+    setSelectedId((prev) => (prev === id ? null : id))
     setAssignError('')
     setRosterCellError(null)
   }, [])

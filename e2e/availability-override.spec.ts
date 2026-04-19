@@ -139,7 +139,10 @@ test.describe.serial('availability override scheduling', () => {
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
 
-    await page.getByTestId(`coverage-day-cell-button-${ctx!.targetDate}`).click()
+    await page
+      .locator(`[data-testid="coverage-day-cell-button-${ctx!.targetDate}"]:visible`)
+      .first()
+      .click()
     const shiftDialog = page.getByTestId('coverage-shift-editor-dialog')
     await expect(shiftDialog).toBeVisible()
 
@@ -231,7 +234,10 @@ test.describe.serial('availability override scheduling', () => {
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
 
-    await page.getByTestId(`coverage-day-cell-button-${ctx!.targetDate}`).click()
+    await page
+      .locator(`[data-testid="coverage-day-cell-button-${ctx!.targetDate}"]:visible`)
+      .first()
+      .click()
     const shiftDialog = page.getByTestId('coverage-shift-editor-dialog')
     await expect(shiftDialog).toBeVisible()
 

@@ -231,6 +231,7 @@ Recommended lane:
 
 Focused workflow suites:
 
+- `e2e/coverage-manager-live-smoke.spec.ts` - signed-in demo manager smoke on the current live `/coverage` cycle (assign, operational status, unassign)
 - `e2e/coverage-publish-flow.spec.ts` - direct Coverage publish and override flow
 - `e2e/coverage-cycle-controls.spec.ts` - cycle create/delete plus auto-draft / clear-draft controls
 - `e2e/manager-specialized-controls.spec.ts` - swap partner approval and draft-cycle archive lifecycle
@@ -242,6 +243,8 @@ Optional auth flow test uses:
 
 - `E2E_USER_EMAIL`
 - `E2E_USER_PASSWORD`
+
+The live coverage smoke also expects those same manager creds and an active non-archived schedule block in the connected Supabase project.
 
 ## Publish Email Rollout
 

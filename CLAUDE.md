@@ -340,6 +340,7 @@ CI gates: format check → lint → tsc → build → Playwright E2E
 
 E2E specs:
 
+- `e2e/coverage-manager-live-smoke.spec.ts` (signed-in live `/coverage` manager assign/status/unassign smoke)
 - `e2e/coverage-overlay.spec.ts` (14 tests)
 - `e2e/directory-date-override.spec.ts` (12 tests)
 - `e2e/availability-override.spec.ts` (2 tests)
