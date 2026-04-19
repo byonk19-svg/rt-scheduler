@@ -1039,7 +1039,7 @@ export function CoverageClientPage({
                     ? 'No staffing drafted yet. Auto-draft or open a day to assign the first shifts.'
                     : 'No staffing published yet.'
                 ) : canManageCoverage ? (
-                  'Compact planning workspace for staffing, lead coverage, and publish readiness.'
+                  'Execution workspace for staffing, lead coverage, and publish readiness.'
                 ) : canUpdateAssignmentStatus ? (
                   'View staffing and assignment status — click a therapist token to update status.'
                 ) : (

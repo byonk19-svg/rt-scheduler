@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { ManagerTriageDashboard } from '@/components/manager/ManagerTriageDashboard'
 
 describe('ManagerTriageDashboard', () => {
-  it('renders feature cards, schedule overview, and manager inbox sections', () => {
+  it('renders feature cards, inbox sections, and the schedule-home entry point', () => {
     const html = renderToStaticMarkup(
       createElement(ManagerTriageDashboard, {
         todayCoverageCovered: 15,
@@ -24,10 +24,6 @@ describe('ManagerTriageDashboard', () => {
         ],
         pendingRequests: 5,
         approvalsWaiting: 3,
-        currentCycleStatus: 'Draft cycle',
-        currentCycleDetail: 'Publish by Apr 27',
-        nextCycleLabel: 'Collect availability Mar 17',
-        nextCycleDetail: 'Publish by Apr 27',
         needsReviewCount: 2,
         needsReviewDetail: 'Preliminary request waiting',
         dayShiftsFilled: 18,
@@ -35,9 +31,10 @@ describe('ManagerTriageDashboard', () => {
         nightShiftsFilled: 15,
         nightShiftsTotal: 21,
         approvalsHref: '/approvals',
+        scheduleHomeHref: '/dashboard/manager/schedule',
         scheduleHref: '/coverage?view=week',
         reviewHref: '/approvals',
-        activeCycleDateRange: 'Mar 17 – Apr 13',
+        activeCycleDateRange: 'Mar 17 â€“ Apr 13',
       })
     )
 
@@ -46,13 +43,13 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('Coverage Issues')
     expect(html).toContain('Pending Approvals')
     expect(html).toContain('Upcoming Shifts')
-    expect(html).toContain('Mar 26')
-    expect(html).toContain('4 shifts')
     expect(html).toContain('Adrienne S.')
     expect(html).toContain('Manager Inbox')
     expect(html).toContain('Recent Activity')
     expect(html).toContain('Brianna approved a shift swap')
-    expect(html).toContain('Publish by Apr 27')
+    expect(html).toContain('Open schedule home')
+    expect(html).not.toContain('Current cycle')
+    expect(html).not.toContain('Next 6-week cycle')
   })
 
   it('renders loading state placeholders and action links', () => {
@@ -66,10 +63,6 @@ describe('ManagerTriageDashboard', () => {
         recentActivity: [],
         pendingRequests: '--',
         approvalsWaiting: '--',
-        currentCycleStatus: 'Loading',
-        currentCycleDetail: 'Loading',
-        nextCycleLabel: 'Loading',
-        nextCycleDetail: 'Loading',
         needsReviewCount: '--',
         needsReviewDetail: 'Loading',
         dayShiftsFilled: '--',
@@ -77,6 +70,7 @@ describe('ManagerTriageDashboard', () => {
         nightShiftsFilled: '--',
         nightShiftsTotal: '--',
         approvalsHref: '/approvals',
+        scheduleHomeHref: '/dashboard/manager/schedule',
         scheduleHref: '/coverage?view=week',
         reviewHref: '/approvals',
         activeCycleDateRange: undefined,
@@ -89,6 +83,7 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('Coverage Issues')
     expect(html).toContain('href="/approvals"')
     expect(html).toContain('href="/coverage?view=week"')
+    expect(html).toContain('href="/dashboard/manager/schedule"')
   })
 
   it('shows actionable prompts when loaded metrics are empty', () => {
@@ -102,10 +97,6 @@ describe('ManagerTriageDashboard', () => {
         recentActivity: [],
         pendingRequests: 0,
         approvalsWaiting: 0,
-        currentCycleStatus: 'Draft cycle',
-        currentCycleDetail: 'Publish by Apr 27',
-        nextCycleLabel: 'Collect availability Mar 17',
-        nextCycleDetail: 'Publish by Apr 27',
         needsReviewCount: 0,
         needsReviewDetail: 'You are caught up.',
         dayShiftsFilled: 0,
@@ -113,19 +104,19 @@ describe('ManagerTriageDashboard', () => {
         nightShiftsFilled: 0,
         nightShiftsTotal: 0,
         approvalsHref: '/approvals',
+        scheduleHomeHref: '/dashboard/manager/schedule',
         scheduleHref: '/coverage?view=week',
         reviewHref: '/approvals',
-        activeCycleDateRange: 'Mar 17 – Apr 13',
+        activeCycleDateRange: 'Mar 17 â€“ Apr 13',
       })
     )
 
-    expect(html).not.toContain('Publish Readiness')
     expect(html).toContain('No draft started yet')
     expect(html).toContain('Open schedule to auto-draft')
     expect(html).toContain('Open coverage review')
     expect(html).toContain('Open schedule activity')
     expect(html).toContain('See the full schedule')
-    expect(html).toContain('Open coverage workflow')
+    expect(html).toContain('Open schedule home')
   })
 
   it('renders Schedule Completion before Recent Activity', () => {
@@ -139,10 +130,6 @@ describe('ManagerTriageDashboard', () => {
         recentActivity: [{ title: 'Some activity', timeLabel: '1 hour ago', href: '/coverage' }],
         pendingRequests: 0,
         approvalsWaiting: 0,
-        currentCycleStatus: 'Draft cycle',
-        currentCycleDetail: 'Publish by Apr 27',
-        nextCycleLabel: 'Collect availability Apr 1',
-        nextCycleDetail: 'Publish by Apr 27',
         needsReviewCount: 0,
         needsReviewDetail: 'You are caught up.',
         dayShiftsFilled: 18,
@@ -150,9 +137,10 @@ describe('ManagerTriageDashboard', () => {
         nightShiftsFilled: 15,
         nightShiftsTotal: 21,
         approvalsHref: '/approvals',
+        scheduleHomeHref: '/dashboard/manager/schedule',
         scheduleHref: '/coverage?view=week',
         reviewHref: '/approvals',
-        activeCycleDateRange: 'Mar 17 – Apr 13',
+        activeCycleDateRange: 'Mar 17 â€“ Apr 13',
       })
     )
 
@@ -175,10 +163,6 @@ describe('ManagerTriageDashboard', () => {
         recentActivity: [],
         pendingRequests: 0,
         approvalsWaiting: 0,
-        currentCycleStatus: 'Published',
-        currentCycleDetail: 'Live',
-        nextCycleLabel: 'Collect availability Apr 1',
-        nextCycleDetail: 'Publish by May 11',
         needsReviewCount: 0,
         needsReviewDetail: 'You are caught up.',
         dayShiftsFilled: 18,
@@ -186,12 +170,13 @@ describe('ManagerTriageDashboard', () => {
         nightShiftsFilled: 15,
         nightShiftsTotal: 21,
         approvalsHref: '/approvals',
+        scheduleHomeHref: '/dashboard/manager/schedule',
         scheduleHref: '/coverage',
         reviewHref: '/approvals',
-        activeCycleDateRange: 'Mar 17 – Apr 13',
+        activeCycleDateRange: 'Mar 17 â€“ Apr 13',
       })
     )
 
-    expect(html).toContain('Mar 17 – Apr 13')
+    expect(html).toContain('Mar 17 â€“ Apr 13')
   })
 })

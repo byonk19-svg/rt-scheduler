@@ -17,6 +17,7 @@ import {
 import { can } from '@/lib/auth/can'
 import type { UiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/client'
+import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { loadShiftBoardSnapshot } from '@/lib/shift-board-snapshot'
@@ -437,14 +438,25 @@ export default function ShiftBoardClientPage({
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              className="gap-1.5 text-xs"
-              onClick={() => router.push('/requests/new')}
-            >
-              <ArrowRightLeft className="h-3.5 w-3.5" />
-              {!canReview && employmentType === 'prn' ? 'Express interest' : 'Post request'}
-            </Button>
+            {canReview ? (
+              <Button
+                size="sm"
+                className="gap-1.5 text-xs"
+                onClick={() => router.push(MANAGER_WORKFLOW_LINKS.scheduleHome)}
+              >
+                <CalendarDays className="h-3.5 w-3.5" />
+                Open schedule home
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                className="gap-1.5 text-xs"
+                onClick={() => router.push('/requests/new')}
+              >
+                <ArrowRightLeft className="h-3.5 w-3.5" />
+                {employmentType === 'prn' ? 'Express interest' : 'Post request'}
+              </Button>
+            )}
             <Button asChild size="sm" variant="outline" className="text-xs">
               <Link href="/availability">Future availability</Link>
             </Button>
@@ -548,8 +560,12 @@ export default function ShiftBoardClientPage({
                   <Button size="sm" onClick={() => setStatusFilter('pending')}>
                     Review approvals
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => router.push('/requests/new')}>
-                    New request
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => router.push(MANAGER_WORKFLOW_LINKS.scheduleHome)}
+                  >
+                    Open schedule home
                   </Button>
                 </div>
               </div>

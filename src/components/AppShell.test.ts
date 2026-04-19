@@ -85,16 +85,35 @@ describe('AppShell navigation structure', () => {
     expect(scheduleSection?.isActive('/schedule')).toBe(true)
   })
 
+  it('routes the manager primary Schedule section to the schedule home', () => {
+    const scheduleSection = buildManagerSections(0).find((section) => section.key === 'schedule')
+
+    expect(scheduleSection?.href).toBe('/dashboard/manager/schedule')
+  })
+
   it('routes the manager Coverage sub-item to the editable coverage workspace and keeps a separate read-only Roster item', () => {
     const scheduleSection = buildManagerSections(0).find((section) => section.key === 'schedule')
 
-    expect(scheduleSection?.href).toBe('/schedule')
     expect(scheduleSection?.subItems.find((item) => item.label === 'Coverage')?.href).toBe(
       '/coverage'
     )
     expect(scheduleSection?.subItems.find((item) => item.label === 'Roster')?.href).toBe(
       '/schedule'
     )
+  })
+
+  it('adds a schedule home local-nav item ahead of the detailed workflow pages', () => {
+    const scheduleSection = buildManagerSections(0).find((section) => section.key === 'schedule')
+
+    expect(scheduleSection?.subItems.map((item) => item.label)).toEqual([
+      'Home',
+      'Coverage',
+      'Approvals',
+      'Publish',
+      'Availability',
+      'Roster',
+      'Analytics',
+    ])
   })
 
   it('uses Open shifts wording in staff shell navigation', () => {
@@ -115,23 +134,25 @@ describe('AppShell navigation structure', () => {
   it('labels team coverage separately from personal shifts in staff nav', () => {
     expect(shellConfigSource).toContain("label: 'Team schedule'")
   })
-  it('routes manager Today section to the manager dashboard', () => {
-    expect(shellConfigSource).toContain("label: 'Today'")
+  it('routes manager Inbox section to the manager dashboard', () => {
+    expect(shellConfigSource).toContain("label: 'Inbox'")
     expect(shellConfigSource).toContain('MANAGER_WORKFLOW_LINKS.dashboard')
   })
 
-  it('groups manager workflow into Today, Schedule, and People sections', () => {
-    expect(shellConfigSource).toContain("key: 'today'")
+  it('groups manager workflow into Inbox, Schedule, and People sections', () => {
+    expect(shellConfigSource).toContain("key: 'inbox'")
     expect(shellConfigSource).toContain("key: 'schedule'")
     expect(shellConfigSource).toContain("key: 'people'")
   })
 
-  it('puts Coverage, Roster, Availability, Publish, and Approvals under the Schedule section', () => {
+  it('puts Home, Coverage, Approvals, Publish, Availability, Roster, and Analytics under the Schedule section', () => {
+    expect(shellConfigSource).toContain("label: 'Home'")
     expect(shellConfigSource).toContain("label: 'Coverage'")
-    expect(shellConfigSource).toContain("label: 'Roster'")
-    expect(shellConfigSource).toContain("label: 'Availability'")
-    expect(shellConfigSource).toContain("label: 'Publish'")
     expect(shellConfigSource).toContain("label: 'Approvals'")
+    expect(shellConfigSource).toContain("label: 'Publish'")
+    expect(shellConfigSource).toContain("label: 'Availability'")
+    expect(shellConfigSource).toContain("label: 'Roster'")
+    expect(shellConfigSource).toContain("label: 'Analytics'")
   })
 
   it('allows the shared local section nav to scroll horizontally on narrow screens', () => {

@@ -612,6 +612,9 @@ export default async function AvailabilityPage({
   const intakeHref = `/availability/intake${toSearchString(params)}`
   const summaryChips = canManageAvailability ? (
     <div className="space-y-2">
+      <p className="max-w-2xl text-sm text-muted-foreground">
+        Use therapist responses and manager inputs to shape staffing before coverage is finalized.
+      </p>
       <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
         Team totals for this cycle
       </p>
@@ -671,7 +674,7 @@ export default async function AvailabilityPage({
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
       <AvailabilityOverviewHeader
-        title={canManageAvailability ? 'Availability Planning' : 'Availability'}
+        title={canManageAvailability ? 'Staffing inputs' : 'Availability'}
         subtitle={
           selectedCycle
             ? formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)

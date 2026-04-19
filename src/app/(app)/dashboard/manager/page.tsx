@@ -5,7 +5,7 @@ import { ManagerTriageDashboard } from '@/components/manager/ManagerTriageDashbo
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { buildCycleRoute } from '@/lib/cycle-route'
-import { getNextCyclePlanningWindow } from '@/lib/manager-inbox'
+import { getManagerAttentionSnapshot } from '@/lib/manager-workflow'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import { createClient } from '@/lib/supabase/server'
 import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
@@ -126,54 +126,32 @@ export default async function ManagerDashboardPage() {
   const today = new Date()
   const todayKey = toIsoDate(today)
 
-  const [
-    profileResult,
-    cyclesResult,
-    pendingApprovalsResult,
-    unreadReviewCountResult,
-    latestUnreadResult,
-    recentActivityResult,
-  ] = await Promise.all([
-    supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
-    supabase
-      .from('schedule_cycles')
-      .select('id, label, start_date, end_date, published, archived_at')
-      .is('archived_at', null)
-      .gte('end_date', todayKey)
-      .order('start_date', { ascending: true }),
-    supabase
-      .from('preliminary_requests')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'pending'),
-    supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .is('read_at', null),
-    supabase
-      .from('notifications')
-      .select('event_type, title, target_type')
-      .eq('user_id', user.id)
-      .is('read_at', null)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from('notifications')
-      .select('event_type, title, target_type, created_at')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(5),
-  ])
+  const [profileResult, unreadReviewCountResult, latestUnreadResult, recentActivityResult] =
+    await Promise.all([
+      supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+      supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .is('read_at', null),
+      supabase
+        .from('notifications')
+        .select('event_type, title, target_type')
+        .eq('user_id', user.id)
+        .is('read_at', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('notifications')
+        .select('event_type, title, target_type, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(5),
+    ])
 
   if (profileResult.error) {
     console.error('Failed to load manager profile for dashboard:', profileResult.error)
-  }
-  if (cyclesResult.error) {
-    console.error('Failed to load cycles for manager dashboard:', cyclesResult.error)
-  }
-  if (pendingApprovalsResult.error) {
-    console.error('Failed to load pending preliminary approvals:', pendingApprovalsResult.error)
   }
   if (unreadReviewCountResult.error) {
     console.error('Failed to load unread review count:', unreadReviewCountResult.error)
@@ -190,12 +168,8 @@ export default async function ManagerDashboardPage() {
     redirect('/dashboard/staff')
   }
 
-  const cycles = (cyclesResult.data ?? []) as Cycle[]
-  const activeCycle =
-    cycles.find((cycle) => cycle.start_date <= todayKey && cycle.end_date >= todayKey) ?? null
-  const nextCycle = activeCycle
-    ? (cycles.find((cycle) => cycle.start_date > activeCycle.end_date) ?? null)
-    : (cycles.find((cycle) => cycle.start_date > todayKey) ?? null)
+  const managerAttention = await getManagerAttentionSnapshot(supabase)
+  const activeCycle = managerAttention.activeCycle as Cycle | null
   const activeCycleDateRange = activeCycle
     ? `${formatCycleDate(activeCycle.start_date)} - ${formatCycleDate(activeCycle.end_date)}`
     : null
@@ -294,32 +268,6 @@ export default async function ManagerDashboardPage() {
   }))
 
   const scheduleHref = buildCycleRoute('/coverage', activeCycle?.id ?? null)
-  const nextCyclePlanning = getNextCyclePlanningWindow(nextCycle?.start_date ?? null)
-  const activeCycleHasNoShifts =
-    Boolean(activeCycle) && dayRows.length === 0 && nightRows.length === 0
-
-  const currentCycleStatus = activeCycle
-    ? activeCycle.published
-      ? 'Published'
-      : activeCycleHasNoShifts
-        ? 'Draft not started'
-        : 'Draft cycle'
-    : 'No active cycle'
-
-  const currentCycleDetail = activeCycle
-    ? activeCycleHasNoShifts
-      ? 'No staffing drafted yet. Auto-draft or add the first shifts.'
-      : `Publish by ${formatCycleDate(activeCycle.end_date)}`
-    : 'No current cycle is scheduled.'
-
-  const nextCycleLabel = nextCyclePlanning.collectAvailabilityOn
-    ? `Collect availability ${formatCycleDate(nextCyclePlanning.collectAvailabilityOn)}`
-    : 'No next cycle'
-
-  const nextCycleDetail = nextCyclePlanning.publishBy
-    ? `Publish by ${formatCycleDate(nextCyclePlanning.publishBy)}`
-    : 'Create the next 6-week cycle to plan ahead.'
-
   const needsReviewCount = unreadReviewCountResult.count ?? 0
   const needsReviewDetail =
     needsReviewCount > 0
@@ -337,12 +285,8 @@ export default async function ManagerDashboardPage() {
       upcomingShiftDays={upcomingShiftDays}
       todayActiveShifts={todayActiveShifts}
       recentActivity={recentActivity}
-      pendingRequests={pendingApprovalsResult.count ?? 0}
-      approvalsWaiting={pendingApprovalsResult.count ?? 0}
-      currentCycleStatus={currentCycleStatus}
-      currentCycleDetail={currentCycleDetail}
-      nextCycleLabel={nextCycleLabel}
-      nextCycleDetail={nextCycleDetail}
+      pendingRequests={managerAttention.pendingApprovals}
+      approvalsWaiting={managerAttention.pendingApprovals}
       needsReviewCount={needsReviewCount}
       needsReviewDetail={needsReviewDetail}
       dayShiftsFilled={dayRows.filter((row) => row.user_id !== null).length}
@@ -350,11 +294,12 @@ export default async function ManagerDashboardPage() {
       nightShiftsFilled={nightRows.filter((row) => row.user_id !== null).length}
       nightShiftsTotal={nightRows.length}
       approvalsHref={MANAGER_WORKFLOW_LINKS.approvals}
+      scheduleHomeHref={MANAGER_WORKFLOW_LINKS.scheduleHome}
       scheduleHref={scheduleHref}
-      reviewHref={latestUnread ? getNotificationHref(latestUnread) : '/coverage?view=week'}
+      reviewHref={
+        latestUnread ? getNotificationHref(latestUnread) : managerAttention.resolveBlockersLink
+      }
       activeCycleDateRange={activeCycleDateRange ?? undefined}
-      currentCycleCtaHref={!activeCycle ? '/coverage' : undefined}
-      nextCycleCtaHref={!nextCycle ? '/coverage' : undefined}
     />
   )
 }

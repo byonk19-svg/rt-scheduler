@@ -54,6 +54,7 @@ function isRouteActive(pathname: string, href: string): boolean {
 
 function isManagerScheduleRoute(pathname: string): boolean {
   return (
+    pathname === MANAGER_WORKFLOW_LINKS.scheduleHome ||
     pathname === '/coverage' ||
     pathname === '/analytics' ||
     pathname === '/schedule' ||
@@ -71,22 +72,42 @@ export function usesAppShell(pathname: string): boolean {
 export function buildManagerSections(pendingCount: number): readonly ShellSection[] {
   return [
     {
-      key: 'today',
-      label: 'Today',
+      key: 'inbox',
+      label: 'Inbox',
       href: MANAGER_WORKFLOW_LINKS.dashboard,
-      isActive: (pathname) => pathname.startsWith('/dashboard/manager'),
+      isActive: (pathname) => pathname === MANAGER_WORKFLOW_LINKS.dashboard,
       subItems: [],
     },
     {
       key: 'schedule',
       label: 'Schedule',
-      href: '/schedule',
+      href: MANAGER_WORKFLOW_LINKS.scheduleHome,
       isActive: (pathname) => isManagerScheduleRoute(pathname),
       subItems: [
+        {
+          href: MANAGER_WORKFLOW_LINKS.scheduleHome,
+          label: 'Home',
+          active: (pathname) => pathname === MANAGER_WORKFLOW_LINKS.scheduleHome,
+        },
         {
           href: '/coverage',
           label: 'Coverage',
           active: (pathname) => pathname === '/coverage',
+        },
+        {
+          href: '/approvals',
+          label: 'Approvals',
+          active: (pathname) => pathname === '/approvals',
+        },
+        {
+          href: '/publish',
+          label: 'Publish',
+          active: (pathname) => pathname === '/publish' || pathname.startsWith('/publish/'),
+        },
+        {
+          href: '/availability',
+          label: 'Availability',
+          active: (pathname) => pathname === '/availability',
         },
         {
           href: '/schedule',
@@ -97,21 +118,6 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
           href: '/analytics',
           label: 'Analytics',
           active: (pathname) => pathname === '/analytics',
-        },
-        {
-          href: '/availability',
-          label: 'Availability',
-          active: (pathname) => pathname === '/availability',
-        },
-        {
-          href: '/publish',
-          label: 'Publish',
-          active: (pathname) => pathname === '/publish' || pathname.startsWith('/publish/'),
-        },
-        {
-          href: '/approvals',
-          label: 'Approvals',
-          active: (pathname) => pathname === '/approvals',
         },
       ],
     },

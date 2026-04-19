@@ -27,10 +27,6 @@ type ManagerTriageDashboardProps = {
   recentActivity: Array<{ title: string; timeLabel: string; href: string }>
   pendingRequests: number | '--'
   approvalsWaiting: number | '--'
-  currentCycleStatus: string
-  currentCycleDetail: string
-  nextCycleLabel: string
-  nextCycleDetail: string
   needsReviewCount: number | '--'
   needsReviewDetail: string
   dayShiftsFilled: number | '--'
@@ -38,11 +34,10 @@ type ManagerTriageDashboardProps = {
   nightShiftsFilled: number | '--'
   nightShiftsTotal: number | '--'
   approvalsHref: string
+  scheduleHomeHref: string
   scheduleHref: string
   reviewHref: string
   activeCycleDateRange?: string
-  currentCycleCtaHref?: string
-  nextCycleCtaHref?: string
 }
 
 export function ManagerTriageDashboard({
@@ -54,10 +49,6 @@ export function ManagerTriageDashboard({
   recentActivity,
   pendingRequests,
   approvalsWaiting,
-  currentCycleStatus,
-  currentCycleDetail,
-  nextCycleLabel,
-  nextCycleDetail,
   needsReviewCount,
   needsReviewDetail,
   dayShiftsFilled,
@@ -65,11 +56,10 @@ export function ManagerTriageDashboard({
   nightShiftsFilled,
   nightShiftsTotal,
   approvalsHref,
+  scheduleHomeHref,
   scheduleHref,
   reviewHref,
   activeCycleDateRange,
-  currentCycleCtaHref,
-  nextCycleCtaHref,
 }: ManagerTriageDashboardProps) {
   const isLoading =
     todayCoverageCovered === '--' ||
@@ -132,15 +122,15 @@ export function ManagerTriageDashboard({
           </div>
           <div className="relative flex gap-2">
             <Button variant="outline" size="sm" className="min-h-11 px-4" asChild>
-              <Link href={scheduleHref}>
+              <Link href={scheduleHomeHref}>
                 <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
-                Open schedule
+                Open schedule home
               </Link>
             </Button>
             <Button size="sm" className="min-h-11 px-4" asChild>
               <Link href={approvalsHref}>
                 <Send className="mr-1.5 h-3.5 w-3.5" />
-                Publish flow
+                Review approvals
               </Link>
             </Button>
           </div>
@@ -307,30 +297,33 @@ export function ManagerTriageDashboard({
             </CardHeader>
             <CardContent className="space-y-3 pb-4">
               <InboxRow
-                label="Current cycle"
-                value={currentCycleStatus}
-                detail={currentCycleDetail}
-                ctaHref={currentCycleCtaHref}
-                ctaLabel="New 6-week block"
-              />
-              <InboxRow
-                label="Next 6-week cycle"
-                value={nextCycleLabel}
-                detail={nextCycleDetail}
-                ctaHref={nextCycleCtaHref}
-                ctaLabel="Plan next cycle"
+                label="Pending approvals"
+                value={approvalsWaiting === '--' ? LOADING_LABEL : String(approvalsWaiting)}
+                detail={
+                  approvalsWaiting === '--'
+                    ? LOADING_LABEL
+                    : `${approvalsWaiting} waiting for a manager decision`
+                }
               />
               <InboxRow
                 label="Needs review"
                 value={needsReviewCount === '--' ? '--' : String(needsReviewCount)}
                 detail={needsReviewDetail}
               />
-              <p className="text-[11px] text-muted-foreground">
-                {approvalsWaiting === '--' ? LOADING_LABEL : `${approvalsWaiting} waiting`}
-              </p>
+              <InboxRow
+                label="Workflow"
+                value="Schedule home"
+                detail="Start from the canonical manager schedule view, then move into detailed workflow pages."
+              />
+              <Button variant="ghost" size="sm" className="min-h-11 gap-1 px-0 text-xs" asChild>
+                <Link href={scheduleHomeHref}>
+                  Open schedule home
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </Button>
               <Button variant="ghost" size="sm" className="min-h-11 gap-1 px-0 text-xs" asChild>
                 <Link href={reviewHref}>
-                  {needsReviewCount === 0 ? 'Open coverage workflow' : 'Review updates'}
+                  {needsReviewCount === 0 ? 'Review workflow updates' : 'Review updates'}
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </Button>

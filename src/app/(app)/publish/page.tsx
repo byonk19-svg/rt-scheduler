@@ -135,7 +135,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
       <div className="space-y-4">
         <div className="border-b border-border bg-card px-6 pb-4 pt-5">
           <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">
-            Publish History
+            Publish readiness
           </h1>
           <p className="mt-0.5 text-xs text-muted-foreground">Schedule email delivery log.</p>
         </div>
@@ -168,7 +168,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
               Publish History
             </h1>
             <p className="mt-0.5 max-w-xl text-xs text-muted-foreground">
-              Choose what to do with draft and live blocks, then review email delivery history.
+              Finalize the current block and review email delivery history.
             </p>
           </div>
           <Button asChild variant="outline" size="sm" className="text-xs">
@@ -345,7 +345,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
             color: 'var(--info-text)',
           }}
         >
-          <p className="text-xs font-semibold">Ready to publish a draft?</p>
+          <p className="text-xs font-semibold">Ready to finalize this block?</p>
           <p className="mt-0.5 text-xs">
             Open the cycle in Schedule using the link below, then click <strong>Publish</strong> in
             the action bar. This page only shows delivery history after publishing.
