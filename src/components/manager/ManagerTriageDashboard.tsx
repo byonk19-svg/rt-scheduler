@@ -227,9 +227,22 @@ export function ManagerTriageDashboard({
                   </div>
                 ))
               ) : (
-                <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
-                  {isLoading ? LOADING_LABEL : 'No active shift risks right now.'}
-                </p>
+                <div className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+                  <p>{isLoading ? LOADING_LABEL : 'No active shift risks right now.'}</p>
+                  {!isLoading ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-2 min-h-11 gap-1 px-0 text-xs"
+                      asChild
+                    >
+                      <Link href={scheduleHref}>
+                        Open coverage review
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
+                  ) : null}
+                </div>
               )}
               {todayActiveShifts.length > 0 && (
                 <Button variant="ghost" size="sm" className="min-h-11 gap-1 px-0 text-xs" asChild>
@@ -260,11 +273,26 @@ export function ManagerTriageDashboard({
                   </div>
                 ))
               ) : (
-                <p className="rounded-lg border border-dashed border-border px-3 py-5 text-center text-xs text-muted-foreground">
-                  {isLoading
-                    ? LOADING_LABEL
-                    : 'Activity appears here as shifts are drafted, approved, and published.'}
-                </p>
+                <div className="rounded-lg border border-dashed border-border px-3 py-5 text-center text-xs text-muted-foreground">
+                  <p>
+                    {isLoading
+                      ? LOADING_LABEL
+                      : 'Activity appears here as shifts are drafted, approved, and published.'}
+                  </p>
+                  {!isLoading ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-2 min-h-11 gap-1 px-0 text-xs"
+                      asChild
+                    >
+                      <Link href={scheduleHref}>
+                        Open schedule activity
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
+                  ) : null}
+                </div>
               )}
             </CardContent>
           </Card>
@@ -302,7 +330,7 @@ export function ManagerTriageDashboard({
               </p>
               <Button variant="ghost" size="sm" className="min-h-11 gap-1 px-0 text-xs" asChild>
                 <Link href={reviewHref}>
-                  Review updates
+                  {needsReviewCount === 0 ? 'Open coverage workflow' : 'Review updates'}
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </Button>
@@ -324,9 +352,22 @@ export function ManagerTriageDashboard({
                   </div>
                 ))
               ) : (
-                <p className="text-xs text-muted-foreground">
-                  {isLoading ? LOADING_LABEL : 'No upcoming shift clusters right now.'}
-                </p>
+                <div className="text-xs text-muted-foreground">
+                  <p>{isLoading ? LOADING_LABEL : 'No upcoming shift clusters right now.'}</p>
+                  {!isLoading ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-2 min-h-11 gap-1 px-0 text-xs"
+                      asChild
+                    >
+                      <Link href={scheduleHref}>
+                        See the full schedule
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
+                  ) : null}
+                </div>
               )}
             </CardContent>
           </Card>

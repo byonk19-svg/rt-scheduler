@@ -173,6 +173,7 @@ function CollapsibleTeamGroup({
   count,
   isOpen,
   onToggle,
+  showSelectionControls,
   allSelected,
   onToggleSelectAll,
   children,
@@ -182,6 +183,7 @@ function CollapsibleTeamGroup({
   count: number
   isOpen: boolean
   onToggle: (sectionKey: TeamDirectorySectionKey, nextOpen: boolean) => void
+  showSelectionControls: boolean
   allSelected: boolean
   onToggleSelectAll: (checked: boolean) => void
   children: ReactNode
@@ -193,13 +195,15 @@ function CollapsibleTeamGroup({
   return (
     <section className="border-b border-border/70 pb-1 last:border-b-0">
       <div className="flex items-center gap-2 px-2 py-1.5">
-        <input
-          type="checkbox"
-          className="h-11 w-11 rounded border-border text-primary focus-visible:ring-2 focus-visible:ring-ring sm:h-6 sm:w-6"
-          checked={allSelected}
-          onChange={(event) => onToggleSelectAll(event.target.checked)}
-          aria-label={`Select all in ${title}`}
-        />
+        {showSelectionControls ? (
+          <input
+            type="checkbox"
+            className="h-11 w-11 rounded border-border text-primary focus-visible:ring-2 focus-visible:ring-ring sm:h-6 sm:w-6"
+            checked={allSelected}
+            onChange={(event) => onToggleSelectAll(event.target.checked)}
+            aria-label={`Select all in ${title}`}
+          />
+        ) : null}
         <button
           type="button"
           id={summaryId}
@@ -238,7 +242,8 @@ function renderGroupRows(
   profiles: TeamProfileRecord[],
   onOpen: (id: string) => void,
   selectedIds: Set<string>,
-  onToggleSelected: (id: string) => void
+  onToggleSelected: (id: string) => void,
+  showSelectionControls: boolean
 ): ReactNode {
   if (profiles.length === 0) return null
   return profiles.map((profile) => (
@@ -248,6 +253,7 @@ function renderGroupRows(
       onOpen={onOpen}
       isSelected={selectedIds.has(profile.id)}
       onToggle={() => onToggleSelected(profile.id)}
+      showSelectionControl={showSelectionControls}
     />
   ))
 }
@@ -307,6 +313,7 @@ export function TeamDirectory({
   saveTeamQuickEditAction,
   bulkUpdateTeamMembersAction,
 }: TeamDirectoryProps) {
+  const [bulkMode, setBulkMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [chipFilter, setChipFilter] = useState<DirectoryChipFilter>('all')
@@ -497,6 +504,15 @@ export function TeamDirectory({
     [bulkUpdateTeamMembersAction, selectedIds]
   )
 
+  function toggleBulkMode() {
+    setBulkMode((current) => {
+      if (current) {
+        setSelectedIds(new Set())
+      }
+      return !current
+    })
+  }
+
   return (
     <>
       <div className="space-y-2 rounded-lg border border-border/60 bg-background p-2">
@@ -510,7 +526,19 @@ export function TeamDirectory({
               className="min-h-10 rounded-md border border-border/70 bg-card px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground sm:min-h-9 sm:px-2.5 sm:py-1.5 sm:text-[11px]"
               onClick={() => setShowAdvancedFilters((current) => !current)}
             >
-              {showAdvancedFilters ? 'Hide advanced' : 'More filters'}
+              {showAdvancedFilters ? 'Hide advanced' : 'Advanced filters'}
+            </button>
+            <button
+              type="button"
+              className={cn(
+                'min-h-10 rounded-md border px-3 py-2 text-sm font-medium sm:min-h-9 sm:px-2.5 sm:py-1.5 sm:text-[11px]',
+                bulkMode
+                  ? 'border-primary/40 bg-primary/10 text-foreground'
+                  : 'border-border/70 bg-card text-muted-foreground hover:text-foreground'
+              )}
+              onClick={toggleBulkMode}
+            >
+              {bulkMode ? 'Exit bulk mode' : 'Bulk mode'}
             </button>
             <p className="text-xs text-muted-foreground">{filteredProfiles.length} shown</p>
           </div>
@@ -578,6 +606,7 @@ export function TeamDirectory({
           count={sections.managers.length}
           isOpen={effectiveSectionOpenState.managers}
           onToggle={handleSectionToggle}
+          showSelectionControls={bulkMode}
           allSelected={
             sections.managers.length > 0 &&
             sections.managers.every((profile) => selectedIds.has(profile.id))
@@ -589,7 +618,7 @@ export function TeamDirectory({
             )
           }
         >
-          {renderGroupRows(sections.managers, openEditor, selectedIds, onToggleSelected)}
+          {renderGroupRows(sections.managers, openEditor, selectedIds, onToggleSelected, bulkMode)}
         </CollapsibleTeamGroup>
 
         <CollapsibleTeamGroup
@@ -598,6 +627,7 @@ export function TeamDirectory({
           count={sections.dayLeads.length}
           isOpen={effectiveSectionOpenState.dayLeads}
           onToggle={handleSectionToggle}
+          showSelectionControls={bulkMode}
           allSelected={
             sections.dayLeads.length > 0 &&
             sections.dayLeads.every((profile) => selectedIds.has(profile.id))
@@ -609,7 +639,7 @@ export function TeamDirectory({
             )
           }
         >
-          {renderGroupRows(sections.dayLeads, openEditor, selectedIds, onToggleSelected)}
+          {renderGroupRows(sections.dayLeads, openEditor, selectedIds, onToggleSelected, bulkMode)}
         </CollapsibleTeamGroup>
 
         <CollapsibleTeamGroup
@@ -618,6 +648,7 @@ export function TeamDirectory({
           count={sections.dayTherapists.length}
           isOpen={effectiveSectionOpenState.dayTherapists}
           onToggle={handleSectionToggle}
+          showSelectionControls={bulkMode}
           allSelected={
             sections.dayTherapists.length > 0 &&
             sections.dayTherapists.every((profile) => selectedIds.has(profile.id))
@@ -629,7 +660,13 @@ export function TeamDirectory({
             )
           }
         >
-          {renderGroupRows(sections.dayTherapists, openEditor, selectedIds, onToggleSelected)}
+          {renderGroupRows(
+            sections.dayTherapists,
+            openEditor,
+            selectedIds,
+            onToggleSelected,
+            bulkMode
+          )}
         </CollapsibleTeamGroup>
 
         <CollapsibleTeamGroup
@@ -638,6 +675,7 @@ export function TeamDirectory({
           count={sections.nightLeads.length}
           isOpen={effectiveSectionOpenState.nightLeads}
           onToggle={handleSectionToggle}
+          showSelectionControls={bulkMode}
           allSelected={
             sections.nightLeads.length > 0 &&
             sections.nightLeads.every((profile) => selectedIds.has(profile.id))
@@ -649,7 +687,13 @@ export function TeamDirectory({
             )
           }
         >
-          {renderGroupRows(sections.nightLeads, openEditor, selectedIds, onToggleSelected)}
+          {renderGroupRows(
+            sections.nightLeads,
+            openEditor,
+            selectedIds,
+            onToggleSelected,
+            bulkMode
+          )}
         </CollapsibleTeamGroup>
 
         <CollapsibleTeamGroup
@@ -658,6 +702,7 @@ export function TeamDirectory({
           count={sections.nightTherapists.length}
           isOpen={effectiveSectionOpenState.nightTherapists}
           onToggle={handleSectionToggle}
+          showSelectionControls={bulkMode}
           allSelected={
             sections.nightTherapists.length > 0 &&
             sections.nightTherapists.every((profile) => selectedIds.has(profile.id))
@@ -669,7 +714,13 @@ export function TeamDirectory({
             )
           }
         >
-          {renderGroupRows(sections.nightTherapists, openEditor, selectedIds, onToggleSelected)}
+          {renderGroupRows(
+            sections.nightTherapists,
+            openEditor,
+            selectedIds,
+            onToggleSelected,
+            bulkMode
+          )}
         </CollapsibleTeamGroup>
 
         <CollapsibleTeamGroup
@@ -678,6 +729,7 @@ export function TeamDirectory({
           count={sections.inactive.length}
           isOpen={effectiveSectionOpenState.inactive}
           onToggle={handleSectionToggle}
+          showSelectionControls={bulkMode}
           allSelected={
             sections.inactive.length > 0 &&
             sections.inactive.every((profile) => selectedIds.has(profile.id))
@@ -689,7 +741,7 @@ export function TeamDirectory({
             )
           }
         >
-          {renderGroupRows(sections.inactive, openEditor, selectedIds, onToggleSelected)}
+          {renderGroupRows(sections.inactive, openEditor, selectedIds, onToggleSelected, bulkMode)}
         </CollapsibleTeamGroup>
       </div>
 
@@ -700,7 +752,7 @@ export function TeamDirectory({
       )}
 
       <BulkActionBar
-        selectedCount={selectedIds.size}
+        selectedCount={bulkMode ? selectedIds.size : 0}
         onClear={() => setSelectedIds(new Set())}
         onApply={onApplyBulk}
       />

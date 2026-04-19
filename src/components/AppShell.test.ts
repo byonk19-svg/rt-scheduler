@@ -85,12 +85,15 @@ describe('AppShell navigation structure', () => {
     expect(scheduleSection?.isActive('/schedule')).toBe(true)
   })
 
-  it('routes the manager Coverage sub-item to the editable coverage workspace', () => {
+  it('routes the manager Coverage sub-item to the editable coverage workspace and keeps a separate read-only Roster item', () => {
     const scheduleSection = buildManagerSections(0).find((section) => section.key === 'schedule')
 
     expect(scheduleSection?.href).toBe('/schedule')
     expect(scheduleSection?.subItems.find((item) => item.label === 'Coverage')?.href).toBe(
       '/coverage'
+    )
+    expect(scheduleSection?.subItems.find((item) => item.label === 'Roster')?.href).toBe(
+      '/schedule'
     )
   })
 
@@ -120,8 +123,9 @@ describe('AppShell navigation structure', () => {
     expect(shellConfigSource).toContain("key: 'people'")
   })
 
-  it('puts Coverage, Availability, Publish, and Approvals under the Schedule section', () => {
+  it('puts Coverage, Roster, Availability, Publish, and Approvals under the Schedule section', () => {
     expect(shellConfigSource).toContain("label: 'Coverage'")
+    expect(shellConfigSource).toContain("label: 'Roster'")
     expect(shellConfigSource).toContain("label: 'Availability'")
     expect(shellConfigSource).toContain("label: 'Publish'")
     expect(shellConfigSource).toContain("label: 'Approvals'")
@@ -131,14 +135,14 @@ describe('AppShell navigation structure', () => {
     expect(localSectionNavSource).toContain('overflow-x-auto')
   })
 
-  it('merges Team and Requests under the People section', () => {
+  it('merges Team and People requests under the People section', () => {
     expect(shellConfigSource).toContain("label: 'Team'")
-    expect(shellConfigSource).toContain("label: 'Requests'")
+    expect(shellConfigSource).toContain("label: 'People requests'")
     // User Access Requests is no longer a separate top-level nav item
     expect(shellConfigSource).not.toContain("label: 'User Access Requests'")
   })
 
-  it('shows pending badge on Requests sub-item when there are pending access requests', () => {
+  it('shows pending badge on People requests sub-item when there are pending access requests', () => {
     expect(shellConfigSource).toContain('badgeCount: pendingCount > 0 ? pendingCount : undefined')
   })
 })

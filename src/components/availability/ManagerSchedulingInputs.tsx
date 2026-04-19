@@ -76,6 +76,7 @@ type Props = {
   missingRows: AvailabilityStatusSummaryRow[]
   initialRosterFilter?: AvailabilityRosterFilter
   defaultSecondaryTab?: 'roster' | 'inbox'
+  defaultSecondaryOpen?: boolean
   saveManagerPlannerDatesAction: (formData: FormData) => void | Promise<void>
   deleteManagerPlannerDateAction: (formData: FormData) => void | Promise<void>
   copyAvailabilityFromPreviousCycleAction: (formData: FormData) => void | Promise<void>
@@ -94,6 +95,7 @@ export function ManagerSchedulingInputs({
   missingRows,
   initialRosterFilter = 'missing',
   defaultSecondaryTab = 'roster',
+  defaultSecondaryOpen = false,
   saveManagerPlannerDatesAction,
   deleteManagerPlannerDateAction,
   copyAvailabilityFromPreviousCycleAction,
@@ -326,6 +328,12 @@ export function ManagerSchedulingInputs({
         }
         secondaryContent={
           <AvailabilitySecondaryPanel
+            awaitingCount={missingRows.length}
+            submittedCount={submittedRows.length}
+            requestCount={
+              availabilityEntries.filter((row) => row.cycleId === selectedCycleId).length
+            }
+            defaultOpen={defaultSecondaryOpen}
             defaultTab={defaultSecondaryTab}
             roster={
               <AvailabilityStatusSummary

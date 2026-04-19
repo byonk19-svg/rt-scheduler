@@ -169,6 +169,22 @@ describe('PublishHistoryPage', () => {
     expect(html).toContain('Old cycle')
   })
 
+  it('replaces dense orientation copy with short decision cards', async () => {
+    createClientMock.mockResolvedValue(
+      createSupabaseMock({
+        userId: 'manager-1',
+        role: 'manager',
+      })
+    )
+
+    const html = renderToStaticMarkup(await PublishHistoryPage({}))
+
+    expect(html).toContain('Draft actions')
+    expect(html).toContain('Live actions')
+    expect(html).toContain('Email log')
+    expect(html).not.toContain('Manage 6-week schedule blocks (the same list as on Schedule)')
+  })
+
   it('shows a success banner after restarting a cycle', async () => {
     createClientMock.mockResolvedValue(
       createSupabaseMock({

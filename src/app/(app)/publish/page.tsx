@@ -168,8 +168,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
               Publish History
             </h1>
             <p className="mt-0.5 max-w-xl text-xs text-muted-foreground">
-              Manage 6-week schedule blocks (the same list as on Schedule) and review email delivery
-              when you publish.
+              Choose what to do with draft and live blocks, then review email delivery history.
             </p>
           </div>
           <Button asChild variant="outline" size="sm" className="text-xs">
@@ -193,6 +192,30 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
             {queuedCount} queued
           </StatusBadge>
         </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <section className="rounded-xl border border-border/70 bg-card px-4 py-3">
+          <h2 className="text-sm font-semibold text-foreground">Draft actions</h2>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Draft blocks stay private. Open the block in Coverage to review assignments, send a
+            preliminary schedule, or publish when it is ready.
+          </p>
+        </section>
+        <section className="rounded-xl border border-border/70 bg-card px-4 py-3">
+          <h2 className="text-sm font-semibold text-foreground">Live actions</h2>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Take a live block offline to keep its assignments as draft, or clear and restart when
+            the published grid needs to be rebuilt.
+          </p>
+        </section>
+        <section className="rounded-xl border border-border/70 bg-card px-4 py-3">
+          <h2 className="text-sm font-semibold text-foreground">Email log</h2>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            The publish log shows each email run. Deleting a log entry does not remove the schedule
+            block itself.
+          </p>
+        </section>
       </div>
 
       {resolvedSearchParams.success === 'cycle_restarted' && (

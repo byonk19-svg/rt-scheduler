@@ -581,6 +581,13 @@ export default async function AvailabilityPage({
     initialFilters.endDate
       ? 'inbox'
       : 'roster'
+  const defaultSecondaryOpen = Boolean(
+    initialStatus ||
+    searchFromUrl.trim() !== '' ||
+    initialFilters.startDate ||
+    initialFilters.endDate ||
+    initialRoster
+  )
 
   const entriesCard = (
     <AvailabilityEntriesTable
@@ -690,7 +697,7 @@ export default async function AvailabilityPage({
                 }
               >
                 <Plus className="h-3.5 w-3.5" />
-                {canManageAvailability ? 'Open planner' : 'Add availability'}
+                {canManageAvailability ? 'Plan coverage dates' : 'Add availability'}
               </a>
             </Button>
             <Button
@@ -702,7 +709,7 @@ export default async function AvailabilityPage({
               <Link href="/shift-board">Shift board</Link>
             </Button>
             <MoreActionsMenu
-              label="Utilities"
+              label="Exports"
               triggerClassName="inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-border/80 bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground"
             >
               <a
@@ -767,6 +774,7 @@ export default async function AvailabilityPage({
               : 'missing'
           }
           defaultSecondaryTab={defaultSecondaryTab}
+          defaultSecondaryOpen={defaultSecondaryOpen}
           saveManagerPlannerDatesAction={saveManagerPlannerDatesAction}
           deleteManagerPlannerDateAction={deleteManagerPlannerDateAction}
           copyAvailabilityFromPreviousCycleAction={copyAvailabilityFromPreviousCycleAction}

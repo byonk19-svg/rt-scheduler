@@ -122,6 +122,10 @@ describe('ManagerTriageDashboard', () => {
     expect(html).not.toContain('Publish Readiness')
     expect(html).toContain('No draft started yet')
     expect(html).toContain('Open schedule to auto-draft')
+    expect(html).toContain('Open coverage review')
+    expect(html).toContain('Open schedule activity')
+    expect(html).toContain('See the full schedule')
+    expect(html).toContain('Open coverage workflow')
   })
 
   it('renders Schedule Completion before Recent Activity', () => {

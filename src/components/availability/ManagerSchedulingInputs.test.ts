@@ -1,8 +1,15 @@
 import { createElement } from 'react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { ManagerSchedulingInputs } from '@/components/availability/ManagerSchedulingInputs'
+
+const source = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/ManagerSchedulingInputs.tsx'),
+  'utf8'
+)
 
 describe('ManagerSchedulingInputs', () => {
   it('renders the manager workspace shell for the planner surface', () => {
@@ -92,6 +99,7 @@ describe('ManagerSchedulingInputs', () => {
     expect(html).toContain('selected therapist inside the current schedule cycle')
     expect(html).toContain('data-slot="availability-workspace-context"')
     expect(html).toContain('data-slot="availability-workspace-secondary"')
+    expect(source).toContain('defaultOpen={defaultSecondaryOpen}')
   })
 
   it('renders a setup message when no cycles exist', () => {
@@ -113,5 +121,11 @@ describe('ManagerSchedulingInputs', () => {
     )
 
     expect(html).toContain('Create a schedule cycle before planning hard staffing dates.')
+  })
+
+  it('forwards deep-link state into the secondary workspace boundary', () => {
+    expect(source).toContain("defaultSecondaryTab?: 'roster' | 'inbox'")
+    expect(source).toContain('defaultSecondaryOpen?: boolean')
+    expect(source).toContain('defaultOpen={defaultSecondaryOpen}')
   })
 })

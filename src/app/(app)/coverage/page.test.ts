@@ -50,6 +50,28 @@ describe('coverage publish override affordance', () => {
     expect(source).toContain('Publish history')
   })
 
+  it('promotes the workflow sequence before secondary cycle tools', () => {
+    const source = readFileSync(coverageClientPath, 'utf8')
+
+    expect(source).toContain('1 Draft')
+    expect(source).toContain('2 Review')
+    expect(source).toContain('3 Send preliminary')
+    expect(source).toContain('4 Publish')
+    expect(source).toContain('label="Cycle tools"')
+    expect(source).not.toContain('label="More"')
+  })
+
+  it('makes the review step jump to the first issue day in the current cycle', () => {
+    const source = readFileSync(coverageClientPath, 'utf8')
+
+    expect(source).toContain('const reviewTargetDay = useMemo(() => {')
+    expect(source).toContain('const reviewTargetIndex = useMemo(() => {')
+    expect(source).toContain('return days.findIndex((day) => day.id === reviewTargetDay.id)')
+    expect(source).toContain("day.constraintBlocked || !day.leadShift || countActive(day) < 3")
+    expect(source).toContain('setSelectedId(reviewTargetDay.id)')
+    expect(source).toContain('setWeekOffset(Math.floor(reviewTargetIndex / 7))')
+  })
+
   it('defaults schedule shift tab from profile shift_type and honors ?shift= query', () => {
     const client = readFileSync(coverageClientPath, 'utf8')
     const server = readFileSync(coverageServerDataPath, 'utf8')

@@ -24,4 +24,22 @@ describe('AvailabilityOverviewHeader', () => {
     expect(html).toContain('11 request to work')
     expect(html).not.toContain('9/24 responded')
   })
+
+  it('renders summary content overrides without falling back to generic request counts', () => {
+    const html = renderToStaticMarkup(
+      createElement(AvailabilityOverviewHeader, {
+        title: 'Availability Planning',
+        subtitle: 'Mar 22-May 2',
+        totalRequests: 18,
+        needOffRequests: 7,
+        availableToWorkRequests: 11,
+        responseRatio: '9/24',
+        summaryContent: createElement('div', null, 'Custom cycle summary'),
+      })
+    )
+
+    expect(html).toContain('Custom cycle summary')
+    expect(html).not.toContain('requests on file')
+    expect(html).not.toContain('9/24 responded')
+  })
 })

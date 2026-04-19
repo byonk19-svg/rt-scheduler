@@ -50,7 +50,7 @@ export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <ScheduleHeader
-              title="Schedule"
+              title="Roster"
               status="READ ONLY"
               dateRange={live.shortLabel}
               helperText={helperText}

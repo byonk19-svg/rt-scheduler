@@ -11,7 +11,7 @@ describe('app-shell-config', () => {
     expect(APP_HEADER_HEIGHT).toBe(56)
   })
 
-  it('maps /team into the People section with Team, Requests, and Audit log local items', () => {
+  it('maps /team into the People section with Team, People requests, and Audit log local items', () => {
     const context = getShellContext({
       pathname: '/team',
       canAccessManagerUi: true,
@@ -21,10 +21,12 @@ describe('app-shell-config', () => {
     expect(context.primaryKey).toBe('people')
     expect(context.localNav?.items.map((item) => item.label)).toEqual([
       'Team',
-      'Requests',
+      'People requests',
       'Audit log',
     ])
-    expect(context.localNav?.items.find((item) => item.label === 'Requests')?.badgeCount).toBe(3)
+    expect(
+      context.localNav?.items.find((item) => item.label === 'People requests')?.badgeCount
+    ).toBe(3)
   })
 
   it('does not return local nav for manager dashboard', () => {
@@ -54,5 +56,24 @@ describe('app-shell-config', () => {
     expect(context.localNav?.items.find((item) => item.label === 'Analytics')?.href).toBe(
       '/analytics'
     )
+  })
+
+  it('distinguishes editable Coverage from read-only Roster in manager local nav', () => {
+    const context = getShellContext({
+      pathname: '/schedule',
+      canAccessManagerUi: true,
+      pendingCount: 0,
+    })
+
+    expect(context.primaryKey).toBe('schedule')
+    expect(context.localNav?.items.map((item) => item.label)).toContain('Coverage')
+    expect(context.localNav?.items.map((item) => item.label)).toContain('Roster')
+    expect(context.localNav?.items.find((item) => item.label === 'Coverage')?.href).toBe(
+      '/coverage'
+    )
+    expect(context.localNav?.items.find((item) => item.label === 'Roster')?.href).toBe('/schedule')
+    expect(
+      context.localNav?.items.find((item) => item.label === 'Roster')?.active('/schedule')
+    ).toBe(true)
   })
 })

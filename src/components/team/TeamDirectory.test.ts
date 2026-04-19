@@ -1,3 +1,7 @@
+import { createElement } from 'react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -7,6 +11,12 @@ import {
   teamMemberHasAppAccess,
   type TeamProfileRecord,
 } from '@/components/team/team-directory-model'
+import { TeamDirectory } from '@/components/team/TeamDirectory'
+
+const directorySource = readFileSync(
+  resolve(process.cwd(), 'src/components/team/TeamDirectory.tsx'),
+  'utf8'
+)
 
 function makeProfile(overrides: Partial<TeamProfileRecord>): TeamProfileRecord {
   return {
@@ -60,5 +70,38 @@ describe('teamMemberHasAppAccess', () => {
 
   it('keeps app access for active employees', () => {
     expect(teamMemberHasAppAccess(makeProfile({ is_active: true }))).toBe(true)
+  })
+})
+
+describe('TeamDirectory', () => {
+  it('hides bulk-selection controls until bulk mode is enabled', () => {
+    const html = renderToStaticMarkup(
+      createElement(TeamDirectory, {
+        summary: {
+          totalStaff: 2,
+          managers: 0,
+          leadTherapists: 1,
+          therapists: 1,
+          dayShift: 2,
+          nightShift: 0,
+          inactive: 0,
+          onFmla: 0,
+        },
+        profiles: [
+          makeProfile({ id: 'lead-1', role: 'lead' }),
+          makeProfile({ id: 'ther-1', role: 'therapist' }),
+        ],
+        archiveTeamMemberAction: async () => {},
+        saveTeamQuickEditAction: async () => {},
+        bulkUpdateTeamMembersAction: async () => {},
+      })
+    )
+
+    expect(html).toContain('Bulk mode')
+    expect(html).toContain('Advanced filters')
+    expect(html).not.toContain('aria-label="Bulk team actions"')
+    expect(html).not.toContain('Select all in')
+    expect(directorySource).toContain('showSelectionControls={bulkMode}')
+    expect(directorySource).toContain('selectedCount={bulkMode ? selectedIds.size : 0}')
   })
 })

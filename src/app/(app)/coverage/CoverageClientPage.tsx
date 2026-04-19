@@ -513,6 +513,47 @@ export function CoverageClientPage({
   const canRunAutoDraft = Boolean(activeCycleId) && !activeCyclePublished
   const canSendPreliminary = Boolean(activeCycleId) && !activeCyclePublished && selectedCycleHasShiftRows
   const canPublishCycle = Boolean(activeCycleId) && selectedCycleHasShiftRows
+  const reviewTargetDay = useMemo(() => {
+    return (
+      days.find((day) => day.constraintBlocked || !day.leadShift || countActive(day) < 3) ?? null
+    )
+  }, [days])
+  const reviewTargetIndex = useMemo(() => {
+    if (!reviewTargetDay) return -1
+    return days.findIndex((day) => day.id === reviewTargetDay.id)
+  }, [days, reviewTargetDay])
+  const coverageWorkflowSteps = [
+    '1 Draft',
+    '2 Review',
+    '3 Send preliminary',
+    '4 Publish',
+  ] as const
+  const actionBarStatusHint = noCycleSelected
+    ? 'Create a 6-week block to start the scheduling workflow.'
+    : !selectedCycleHasShiftRows
+      ? 'Draft first. Run Auto-draft or open a day to add the first assignments.'
+      : activeCyclePublished
+        ? 'This block is live. Use Cycle tools for restart, history, and print tasks.'
+        : !canSendPreliminary
+          ? 'Draft enough staffing to send a preliminary schedule.'
+          : !canPublishCycle
+            ? 'Complete the draft before publishing.'
+            : 'Review the draft, send preliminary if needed, then publish.'
+
+  const handleReviewStep = useCallback(() => {
+    setViewMode('week')
+    const params = new URLSearchParams(search.toString())
+    params.set('view', 'week')
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    setShowPlanningDetails(true)
+    if (!reviewTargetDay || reviewTargetIndex < 0) {
+      return
+    }
+    setSelectedId(reviewTargetDay.id)
+    setWeekOffset(Math.floor(reviewTargetIndex / 7))
+    setAssignError('')
+    setRosterCellError(null)
+  }, [pathname, reviewTargetDay, reviewTargetIndex, router, search])
   const nextActionLabel = noCycleSelected
     ? canManageCoverage
       ? 'Create a 6-week block to start planning.'
@@ -1007,7 +1048,20 @@ export function CoverageClientPage({
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex max-w-full flex-col items-stretch gap-2">
+              {canManageCoverage && !noCycleSelected ? (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {coverageWorkflowSteps.map((step) => (
+                    <span
+                      key={step}
+                      className="inline-flex items-center rounded-full border border-border/70 bg-card px-2.5 py-1 text-[11px] font-semibold text-muted-foreground"
+                    >
+                      {step}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-2">
               {canManageCoverage ? (
                 noCycleSelected ? (
                   <>
@@ -1035,8 +1089,34 @@ export function CoverageClientPage({
                       onClick={() => setPreFlightDialogOpen(true)}
                     >
                       <Sparkles className="h-3.5 w-3.5" />
-                      Auto-draft
+                      1 Draft
                     </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 text-xs"
+                      disabled={!activeCycleId}
+                      onClick={handleReviewStep}
+                    >
+                      2 Review
+                    </Button>
+                    <form action={sendPreliminaryScheduleAction}>
+                      <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
+                      <input type="hidden" name="view" value="week" />
+                      <input type="hidden" name="show_unavailable" value="false" />
+                      <input type="hidden" name="return_to" value="coverage" />
+                      <Button
+                        type="submit"
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 text-xs"
+                        disabled={!canSendPreliminary}
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                        3 Send preliminary
+                      </Button>
+                    </form>
                     {activeCyclePublished ? (
                       <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-1 text-xs font-medium text-[var(--success-text)]">
                         <span className="h-1.5 w-1.5 rounded-full bg-[var(--success-text)]" />
@@ -1059,25 +1139,14 @@ export function CoverageClientPage({
                           disabled={!canPublishCycle}
                         >
                           <Send className="h-3.5 w-3.5" />
-                          Publish
+                          4 Publish
                         </Button>
                       </form>
                     )}
-                    <MoreActionsMenu triggerClassName="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs text-foreground transition-colors hover:bg-secondary">
-                      <form action={sendPreliminaryScheduleAction}>
-                        <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
-                        <input type="hidden" name="view" value="week" />
-                        <input type="hidden" name="show_unavailable" value="false" />
-                        <input type="hidden" name="return_to" value="coverage" />
-                        <button
-                          type="submit"
-                          disabled={!canSendPreliminary}
-                          className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary disabled:pointer-events-none disabled:opacity-40"
-                        >
-                          <Send className="h-3.5 w-3.5" />
-                          {preliminaryLive ? 'Refresh preliminary' : 'Send preliminary'}
-                        </button>
-                      </form>
+                    <MoreActionsMenu
+                      label="Cycle tools"
+                      triggerClassName="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs text-foreground transition-colors hover:bg-secondary"
+                    >
                       <button
                         type="button"
                         onClick={() => setCycleDialogOpen(true)}
@@ -1131,6 +1200,10 @@ export function CoverageClientPage({
                   <Printer className="h-3.5 w-3.5" />
                   Print
                 </Button>
+              ) : null}
+              </div>
+              {canManageCoverage ? (
+                <p className="text-[11px] font-medium text-muted-foreground">{actionBarStatusHint}</p>
               ) : null}
             </div>
           </div>

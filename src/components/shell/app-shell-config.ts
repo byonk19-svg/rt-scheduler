@@ -86,7 +86,12 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
         {
           href: '/coverage',
           label: 'Coverage',
-          active: (pathname) => pathname === '/coverage' || pathname === '/schedule',
+          active: (pathname) => pathname === '/coverage',
+        },
+        {
+          href: '/schedule',
+          label: 'Roster',
+          active: (pathname) => pathname === '/schedule',
         },
         {
           href: '/analytics',
@@ -129,7 +134,7 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
         },
         {
           href: '/requests',
-          label: 'Requests',
+          label: 'People requests',
           active: (pathname) =>
             pathname === '/requests' ||
             pathname.startsWith('/requests/') ||
