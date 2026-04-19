@@ -83,11 +83,15 @@ export async function prepareDevDistDir({
   if (!envDistDir && isWindowsOneDriveWorkspace(cwd, platform)) {
     const linkPath = path.resolve(cwd, '.next-dev')
     const externalTarget = resolveExternalWindowsDevCacheTarget(cwd)
+    const externalNodeModulesLink = path.join(externalTarget, 'node_modules')
+    const workspaceNodeModulesPath = path.resolve(cwd, 'node_modules')
 
     await rm(linkPath, { recursive: true, force: true })
     await rm(externalTarget, { recursive: true, force: true })
     await mkdir(path.dirname(externalTarget), { recursive: true })
     await mkdir(externalTarget, { recursive: true })
+    // Keep React/Next resolution stable when dist artifacts live outside workspace root.
+    await symlink(workspaceNodeModulesPath, externalNodeModulesLink, 'junction')
     await symlink(externalTarget, linkPath, 'junction')
   }
 
