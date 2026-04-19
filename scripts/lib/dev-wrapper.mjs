@@ -1,4 +1,6 @@
-import { rm } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { mkdir, rm, symlink } from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -11,6 +13,36 @@ const nextBinPath = fileURLToPath(new URL('../../node_modules/next/dist/bin/next
  */
 export function isWindowsOneDriveWorkspace(cwd, platform = process.platform) {
   return platform === 'win32' && cwd.replaceAll('/', '\\').toLowerCase().includes('\\onedrive\\')
+}
+
+function sanitizeWorkspaceName(cwd) {
+  const baseName = path.win32.basename(cwd.replaceAll('/', '\\')) || 'workspace'
+  const normalized = baseName
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+  return normalized || 'workspace'
+}
+
+function hashWorkspacePath(cwd) {
+  return createHash('sha1').update(cwd.toLowerCase()).digest('hex').slice(0, 8)
+}
+
+export function resolveExternalWindowsDevCacheTarget(
+  cwd,
+  localAppData = process.env.LOCALAPPDATA,
+  tempDir = process.env.TEMP || process.env.TMPDIR || os.tmpdir()
+) {
+  const baseDir = localAppData || tempDir
+  if (!baseDir) return path.resolve(cwd, '.next-dev')
+
+  return path.join(
+    baseDir,
+    'Teamwise',
+    'next-dev',
+    `${sanitizeWorkspaceName(cwd)}-${hashWorkspacePath(cwd)}`
+  )
 }
 
 /**
@@ -48,8 +80,15 @@ export async function prepareDevDistDir({
 } = {}) {
   const distDir = resolveDevDistDir(cwd, envDistDir, platform)
 
-  if (distDir === '.next-dev') {
-    await rm(path.resolve(cwd, distDir), { recursive: true, force: true })
+  if (!envDistDir && isWindowsOneDriveWorkspace(cwd, platform)) {
+    const linkPath = path.resolve(cwd, '.next-dev')
+    const externalTarget = resolveExternalWindowsDevCacheTarget(cwd)
+
+    await rm(linkPath, { recursive: true, force: true })
+    await rm(externalTarget, { recursive: true, force: true })
+    await mkdir(path.dirname(externalTarget), { recursive: true })
+    await mkdir(externalTarget, { recursive: true })
+    await symlink(externalTarget, linkPath, 'junction')
   }
 
   return distDir
