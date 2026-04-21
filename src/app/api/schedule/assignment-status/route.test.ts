@@ -1,7 +1,50 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { notifyPublishedShiftStatusChangedMock } = vi.hoisted(() => ({
+const {
+  notifyPublishedShiftStatusChangedMock,
+  updateAssignmentStatusWithLotteryMock,
+} = vi.hoisted(() => ({
   notifyPublishedShiftStatusChangedMock: vi.fn(async () => undefined),
+  updateAssignmentStatusWithLotteryMock: vi.fn(
+    async ({
+      authClient,
+      shiftId,
+      nextStatus,
+      note,
+    }: {
+      authClient: {
+        rpc: (
+          fn: string,
+          args: {
+            p_assignment_id: string
+            p_status: string
+            p_note: string | null
+            p_left_early_time: string | null
+          }
+        ) => Promise<{ data: unknown; error: { code?: string; message?: string } | null }>
+      }
+      shiftId: string
+      nextStatus: string
+      note?: string | null
+    }) => {
+      const rpcResult = await authClient.rpc('update_assignment_status', {
+        p_assignment_id: shiftId,
+        p_status: nextStatus,
+        p_note: note ?? null,
+        p_left_early_time: null,
+      })
+
+      if (rpcResult.error) {
+        return {
+          ok: false as const,
+          error: rpcResult.error.message ?? 'RPC failed',
+          code: rpcResult.error.code,
+        }
+      }
+
+      return { ok: true as const, previousStatus: 'scheduled' as const }
+    }
+  ),
 }))
 
 import { POST } from '@/app/api/schedule/assignment-status/route'
@@ -17,6 +60,10 @@ vi.mock('@/lib/supabase/admin', () => ({
 
 vi.mock('@/lib/published-schedule-notifications', () => ({
   notifyPublishedShiftStatusChanged: notifyPublishedShiftStatusChangedMock,
+}))
+
+vi.mock('@/lib/lottery/service', () => ({
+  updateAssignmentStatusWithLottery: updateAssignmentStatusWithLotteryMock,
 }))
 
 type Scenario = {
@@ -80,6 +127,9 @@ function makeSupabaseMock(scenario: Scenario) {
               role: scenario.role ?? 'therapist',
               is_active: scenario.isActive ?? true,
               archived_at: scenario.archivedAt ?? null,
+              full_name: 'Actor User',
+              site_id: 'site-1',
+              shift_type: 'day',
             },
             error: null,
           }
