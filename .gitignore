@@ -81,3 +81,4 @@ security_best_practices_report.md
 .tmp-*
 .tmp-*.json
 .tmp-*.log
+.env
