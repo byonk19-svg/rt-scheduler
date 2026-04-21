@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { History } from 'lucide-react'
@@ -7,6 +8,10 @@ import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { getOne } from '@/lib/csv-utils'
 import { createClient } from '@/lib/supabase/server'
+
+export const metadata: Metadata = {
+  title: 'Request History',
+}
 
 const PAGE_SIZE = 25
 
@@ -195,18 +200,18 @@ export default async function StaffSwapHistoryPage({
                   const claimer = getOne(row.claimer)
                   const iPosted = row.posted_by === user.id
                   const partnerName = iPosted
-                    ? (claimer?.full_name ?? '—')
-                    : (poster?.full_name ?? '—')
+                    ? (claimer?.full_name ?? 'â€”')
+                    : (poster?.full_name ?? 'â€”')
                   const roleLabel = iPosted ? 'Posted' : 'Claimed'
                   const st = shift?.shift_type ?? ''
                   const chip = statusChipMeta(row.status)
                   const msg = row.message ?? ''
-                  const snippet = msg.length > 60 ? `${msg.slice(0, 60)}…` : msg
+                  const snippet = msg.length > 60 ? `${msg.slice(0, 60)}â€¦` : msg
 
                   return (
                     <tr key={row.id} className="hover:bg-secondary/15">
                       <td className="whitespace-nowrap px-4 py-2.5 text-foreground">
-                        {shift?.date ? formatDisplayDate(shift.date) : '—'}
+                        {shift?.date ? formatDisplayDate(shift.date) : 'â€”'}
                       </td>
                       <td className="px-4 py-2.5">
                         {st === 'day' || st === 'night' ? (
@@ -223,7 +228,7 @@ export default async function StaffSwapHistoryPage({
                             {st}
                           </span>
                         ) : (
-                          <span className="text-muted-foreground">—</span>
+                          <span className="text-muted-foreground">â€”</span>
                         )}
                       </td>
                       <td className="px-4 py-2.5 text-foreground">{roleLabel}</td>
@@ -241,7 +246,7 @@ export default async function StaffSwapHistoryPage({
                         </span>
                       </td>
                       <td className="max-w-[14rem] px-4 py-2.5 text-muted-foreground">
-                        {snippet || '—'}
+                        {snippet || 'â€”'}
                       </td>
                     </tr>
                   )
@@ -254,7 +259,7 @@ export default async function StaffSwapHistoryPage({
             <p className="text-xs text-muted-foreground">
               {total > 0 ? (
                 <>
-                  Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of{' '}
+                  Showing {page * PAGE_SIZE + 1}â€“{Math.min((page + 1) * PAGE_SIZE, total)} of{' '}
                   {total}
                 </>
               ) : null}

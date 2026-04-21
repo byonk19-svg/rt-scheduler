@@ -3,20 +3,10 @@
 import Link from 'next/link'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  AlertCircle,
-  AlertTriangle,
-  CalendarDays,
-  Eye,
-  EyeOff,
-  Info,
-  Loader2,
-  X,
-} from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { LoginBrandPanel } from '@/components/public/LoginBrandPanel'
+import { LoginFormPanel } from '@/components/public/LoginFormPanel'
 import {
   buildCleanedLoginSearchParams,
   extractAuthErrorFromSearchParams,
@@ -24,7 +14,6 @@ import {
   sanitizeRedirectTo,
 } from '@/lib/auth/login-utils'
 import { createClient } from '@/lib/supabase/client'
-import { cn } from '@/lib/utils'
 
 const AUTH_REQUEST_TIMEOUT_MS = 10000
 
@@ -164,204 +153,34 @@ function LoginPageClient() {
 
   return (
     <main className="flex min-h-[calc(100vh-73px)]">
-      {/* Left brand panel — desktop only */}
-      <aside className="relative hidden overflow-hidden bg-[var(--sidebar)] lg:flex lg:w-[440px] lg:shrink-0 lg:flex-col lg:justify-between lg:p-12">
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              'linear-gradient(color-mix(in srgb, var(--sidebar-primary) 7%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--sidebar-primary) 7%, transparent) 1px, transparent 1px)',
-            backgroundSize: '28px 28px',
-          }}
-        />
-        <div className="relative flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--attention)] shadow-tw-md-soft">
-            <CalendarDays className="h-5 w-5 text-accent-foreground" />
-          </div>
-          <div>
-            <p className="font-heading text-base font-bold text-sidebar-primary">Teamwise</p>
-            <p className="text-[0.7rem] text-[var(--sidebar-foreground)]">Respiratory Therapy</p>
-          </div>
-        </div>
-        <div className="relative space-y-5 border-l-[4px] border-[var(--attention)]/45 pl-6">
-          <p className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-sidebar-primary/85">
-            Scheduling for RT teams
-          </p>
-          <div className="space-y-3">
-            <p className="font-display text-[1.95rem] font-bold leading-[1.06] tracking-[-0.035em] text-sidebar-primary xl:text-[2.35rem]">
-              Scheduling that keeps care moving.
-            </p>
-            <p className="text-sm font-medium leading-relaxed text-[var(--sidebar-foreground)]">
-              Coverage planning, availability, and shift management — built for RT departments.
-            </p>
-          </div>
-        </div>
-      </aside>
-
-      {/* Right form panel */}
-      <div className="flex flex-1 flex-col items-center justify-center bg-background px-6 py-10">
-        <section className="w-full max-w-[380px]">
-          <h1 className="app-page-title text-3xl">Sign in</h1>
-          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-            Pick up where you left off — schedules, availability, and handoffs in one place.
-          </p>
-
-          {showPostSignupBanner && postSignupBanner && (
-            <div
-              role="status"
-              aria-live="polite"
-              className="mt-4 flex items-start gap-2 rounded-md border border-[var(--info-border)] bg-[var(--info-subtle)] px-3 py-2.5 text-sm text-[var(--info-text)] shadow-sm"
-            >
-              <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-              <p className="min-w-0 flex-1 leading-snug">{postSignupBanner}</p>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="shrink-0 text-foreground/70 hover:bg-transparent hover:text-foreground"
-                aria-label="Dismiss alert"
-                onClick={() => setDismissedPostSignupKey(postSignupBanner)}
-              >
-                <X className="h-4 w-4" aria-hidden />
-              </Button>
-            </div>
-          )}
-
-          {showBanner && (
-            <div
-              role="alert"
-              aria-live="polite"
-              className={cn(
-                'mt-4 flex items-start gap-2 rounded-md border px-3 py-2.5 text-sm shadow-sm',
-                approvalBanner
-                  ? 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
-                  : 'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]'
-              )}
-            >
-              {approvalBanner ? (
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-              ) : (
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-              )}
-              <div className="min-w-0 flex-1 space-y-1.5 leading-snug">
-                <p>{displayError ?? ''}</p>
-                {approvalBanner && (
-                  <p>
-                    <Link
-                      href="/signup"
-                      className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline decoration-primary/60 underline-offset-2 hover:decoration-primary"
-                    >
-                      Request access
-                    </Link>
-                  </p>
-                )}
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="shrink-0 text-foreground/70 hover:bg-transparent hover:text-foreground"
-                aria-label="Dismiss alert"
-                onClick={() => setDismissedMessageKey(displayError ?? '')}
-              >
-                <X className="h-4 w-4" aria-hidden />
-              </Button>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="email">Email address</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                inputMode="email"
-                spellCheck={false}
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-                aria-required="true"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <Link
-                  href="/reset-password"
-                  className="inline-flex min-h-11 items-center text-xs font-medium text-primary hover:underline"
-                >
-                  Forgot password?
-                </Link>
-              </div>
-              <div className="relative">
-                <Input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  onKeyDown={updateCapsFromEvent}
-                  onKeyUp={updateCapsFromEvent}
-                  onFocus={(event) => {
-                    const native = event.nativeEvent as {
-                      getModifierState?: (key: string) => boolean
-                    }
-                    if (typeof native.getModifierState === 'function') {
-                      setCapsLockOn(native.getModifierState('CapsLock'))
-                    }
-                  }}
-                  required
-                  aria-required="true"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((value) => !value)}
-                  className="absolute inset-y-0 right-0 inline-flex min-h-11 min-w-11 items-center justify-center px-3 text-muted-foreground hover:text-foreground"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              {capsLockOn && (
-                <p className="text-xs font-medium text-[var(--warning-text)]" aria-live="polite">
-                  Caps Lock is on.
-                </p>
-              )}
-            </div>
-
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Signing in
-                </>
-              ) : (
-                'Sign in'
-              )}
-            </Button>
-          </form>
-
-          <div className="mt-6 text-center text-sm text-muted-foreground">
-            <p>
-              Need access?{' '}
-              <Link
-                href="/signup"
-                className="inline-flex min-h-11 items-center font-semibold text-primary hover:underline"
-              >
-                Request access
-              </Link>
-            </p>
-            <p className="mt-2 text-xs font-medium leading-snug text-foreground/75">
-              Manager approval required before you can use the app.
-            </p>
-          </div>
-        </section>
-      </div>
+      <LoginBrandPanel />
+      <LoginFormPanel
+        approvalBanner={approvalBanner}
+        capsLockOn={capsLockOn}
+        displayError={displayError}
+        email={email}
+        errorBannerVisible={showBanner}
+        handleSubmit={handleSubmit}
+        loading={loading}
+        onDismissAuthBanner={() => setDismissedMessageKey(displayError ?? '')}
+        onDismissPostSignupBanner={() => setDismissedPostSignupKey(postSignupBanner)}
+        onEmailChange={setEmail}
+        onPasswordChange={setPassword}
+        onPasswordFocus={(event) => {
+          const native = event.nativeEvent as {
+            getModifierState?: (key: string) => boolean
+          }
+          if (typeof native.getModifierState === 'function') {
+            setCapsLockOn(native.getModifierState('CapsLock'))
+          }
+        }}
+        onTogglePassword={() => setShowPassword((value) => !value)}
+        password={password}
+        postSignupBanner={postSignupBanner}
+        postSignupBannerVisible={showPostSignupBanner}
+        showPassword={showPassword}
+        updateCapsFromEvent={updateCapsFromEvent}
+      />
     </main>
   )
 }

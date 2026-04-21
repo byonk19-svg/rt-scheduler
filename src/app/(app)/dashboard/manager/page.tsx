@@ -85,11 +85,12 @@ function toRelativeTime(value: string | null | undefined): string {
 
 function getNotificationHref(item: NotificationRow): string {
   if (item.event_type === 'preliminary_request_submitted') return '/approvals'
-  if (item.event_type.startsWith('preliminary_')) return '/preliminary'
-  if (item.target_type === 'shift_post') return '/requests'
+  if (item.event_type.startsWith('preliminary_')) return '/publish'
+  if (item.event_type.includes('publish')) return '/publish/history'
+  if (item.target_type === 'shift_post') return '/shift-board'
   if (item.target_type === 'shift') return '/coverage?view=week'
   if (item.target_type === 'schedule_cycle') return '/coverage?view=week'
-  if (item.event_type.includes('request')) return '/requests'
+  if (item.event_type.includes('request')) return '/requests/user-access'
   return '/coverage?view=week'
 }
 

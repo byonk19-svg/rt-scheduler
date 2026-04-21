@@ -289,15 +289,15 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
     })
 
     await loginAs(page, manager.email, manager.password)
-    const responseRoster = page
-      .locator('section')
-      .filter({ has: page.locator('#availability-response-heading') })
-    const rosterPanels = responseRoster.locator('div.overflow-y-auto > div.space-y-3')
-
     await page.goto(`/availability?cycle=${cycleId}`)
-    await responseRoster.getByRole('button', { name: /Not submitted yet/ }).click()
+    await page.getByRole('button', { name: /show response roster and inbox/i }).click()
+    await page
+      .getByRole('button', { name: /^Submitted\b/i })
+      .first()
+      .click()
+    const missingRosterList = page.locator('div.divide-y').first()
     await expect(
-      rosterPanels.nth(0).getByText(nightTherapist.firstName, { exact: false })
+      missingRosterList.getByText(nightTherapist.firstName, { exact: false })
     ).toBeVisible({ timeout: 20_000 })
 
     await supabase.from('therapist_availability_submissions').insert({
@@ -308,10 +308,15 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
     })
 
     await page.goto(`/availability?cycle=${cycleId}`)
-    // Official submission moves this therapist off "Not submitted"; name only exists in Submitted panel.
-    await responseRoster.getByRole('button', { name: /^Submitted\b/ }).click()
+    await page.getByRole('button', { name: /show response roster and inbox/i }).click()
+    // Response roster tracks that the therapist has responded; official submission should not remove them.
+    await page
+      .getByRole('button', { name: /^Submitted\b/i })
+      .first()
+      .click()
+    const submittedRosterList = page.locator('div.divide-y').first()
     await expect(
-      rosterPanels.nth(1).getByText(nightTherapist.firstName, { exact: false })
+      submittedRosterList.getByText(nightTherapist.firstName, { exact: false })
     ).toBeVisible({ timeout: 20_000 })
   })
 })

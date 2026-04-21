@@ -1,1 +1,5 @@
-export { default } from '../dashboard/staff/page'
+import { redirect } from 'next/navigation'
+
+export default function TherapistLegacyRoute() {
+  redirect('/dashboard/staff')
+}

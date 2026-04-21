@@ -30,11 +30,11 @@ describe('buildPublishEmailPayload', () => {
     const payload = buildPublishEmailPayload({
       recipientName: 'Tannie',
       cycleLabel: 'Mar 22 - May 2',
-      scheduleUrl: 'https://teamwise.test/staff/schedule',
+      scheduleUrl: 'https://teamwise.test/staff/my-schedule',
     })
 
     expect(payload.subject).toContain('Mar 22 - May 2')
-    expect(payload.text).toContain('https://teamwise.test/staff/schedule')
+    expect(payload.text).toContain('https://teamwise.test/staff/my-schedule')
     expect(payload.html).toContain('View your schedule')
   })
 })

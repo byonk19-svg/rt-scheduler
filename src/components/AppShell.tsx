@@ -3,10 +3,12 @@
 import ThemeProvider from '@/components/ThemeProvider'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ArrowLeftRight, CalendarDays, ChevronDown, LogOut, Menu, Settings, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { CalendarDays } from 'lucide-react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { DeferredNotificationBell } from '@/components/DeferredNotificationBell'
+import { AppShellMobileNav } from '@/components/shell/AppShellMobileNav'
+import { AppShellUserDropdown } from '@/components/shell/AppShellUserDropdown'
 import { AppHeader } from '@/components/shell/AppHeader'
 import { LocalSectionNav } from '@/components/shell/LocalSectionNav'
 import {
@@ -63,94 +65,6 @@ function Logo() {
           Respiratory Therapy
         </p>
       </div>
-    </div>
-  )
-}
-
-function UserDropdown({
-  user,
-  canAccessManagerUi,
-}: {
-  user: AppShellUser | null
-  canAccessManagerUi: boolean
-}) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  const roleLabel =
-    user?.role === 'manager' ? 'Manager' : user?.role === 'lead' ? 'Lead' : 'Staff Therapist'
-
-  useEffect(() => {
-    function handleOutside(event: MouseEvent) {
-      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false)
-    }
-    if (open) document.addEventListener('mousedown', handleOutside)
-    return () => document.removeEventListener('mousedown', handleOutside)
-  }, [open])
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
-        aria-label="User menu"
-        className="flex min-h-11 items-center gap-1.5 rounded-lg px-3 py-2 transition-colors duration-150 hover:bg-sidebar-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring sm:min-h-10 sm:px-2 sm:py-1.5"
-      >
-        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[color:var(--attention)] text-[10px] font-bold text-accent-foreground select-none">
-          {initials(user?.fullName ?? 'TM')}
-        </span>
-        <span className="hidden max-w-[120px] truncate text-xs font-semibold text-sidebar-primary md:block">
-          {user?.fullName ?? 'Team member'}
-        </span>
-        <ChevronDown
-          className={cn(
-            'h-3 w-3 text-sidebar-foreground transition-transform duration-150',
-            open && 'rotate-180'
-          )}
-        />
-      </button>
-
-      {open ? (
-        <div className="absolute right-0 top-full z-50 mt-1.5 w-52 overflow-hidden rounded-xl border border-border bg-card shadow-tw-md">
-          <div className="border-b border-border px-3 py-2.5">
-            <p className="truncate text-sm font-semibold text-foreground">
-              {user?.fullName ?? 'Team member'}
-            </p>
-            <p className="text-xs text-muted-foreground">{roleLabel}</p>
-          </div>
-          <div className="p-1">
-            <Link
-              href="/settings"
-              className="flex min-h-11 items-center gap-2 rounded-md px-2.5 py-2 text-sm text-foreground no-underline transition-colors hover:bg-muted hover:no-underline sm:min-h-10 sm:py-1.5"
-              onClick={() => setOpen(false)}
-            >
-              <Settings className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-              Settings
-            </Link>
-            {canAccessManagerUi ? (
-              <Link
-                href="/therapist"
-                className="flex min-h-11 items-center gap-2 rounded-md px-2.5 py-2 text-sm text-foreground no-underline transition-colors hover:bg-muted hover:no-underline sm:min-h-10 sm:py-1.5"
-                onClick={() => setOpen(false)}
-              >
-                <ArrowLeftRight className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-                Therapist view
-              </Link>
-            ) : null}
-          </div>
-          <div className="border-t border-border p-1">
-            <form action="/auth/signout" method="post">
-              <button
-                type="submit"
-                className="flex min-h-11 w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-foreground transition-colors hover:bg-muted sm:min-h-10 sm:py-1.5"
-              >
-                <LogOut className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-                Log out
-              </button>
-            </form>
-          </div>
-        </div>
-      ) : null}
     </div>
   )
 }
@@ -278,21 +192,22 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
                 variant="shell"
                 initialUnreadCount={unreadNotificationCount}
               />
-              <UserDropdown user={user} canAccessManagerUi={canAccessManagerUi} />
+              <AppShellUserDropdown user={user} />
             </>
           }
           mobileToggle={
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              onClick={() => setMobileMenuOpen((open) => !open)}
-              aria-expanded={mobileMenuOpen}
-              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-            >
-              {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-            </Button>
+            <AppShellMobileNav
+              APP_SHELL_ACTIVE_NAV_CLASS={APP_SHELL_ACTIVE_NAV_CLASS}
+              APP_SHELL_PROFILE_CARD_CLASS={APP_SHELL_PROFILE_CARD_CLASS}
+              canAccessManagerUi={canAccessManagerUi}
+              initials={initials}
+              managerSections={managerSections}
+              mobileMenuOpen={mobileMenuOpen}
+              onClose={() => setMobileMenuOpen(false)}
+              onToggle={() => setMobileMenuOpen((open) => !open)}
+              primaryItems={primaryItems}
+              user={user}
+            />
           }
         />
 
@@ -323,170 +238,6 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
             {children}
           </main>
         </div>
-
-        {mobileMenuOpen ? (
-          <div
-            className="fixed inset-0 z-40 md:hidden"
-            aria-modal="true"
-            role="dialog"
-            aria-labelledby="mobile-nav-heading"
-          >
-            <button
-              type="button"
-              className="absolute inset-0 bg-black/45"
-              onClick={() => setMobileMenuOpen(false)}
-              aria-label="Close navigation menu"
-            />
-            <aside
-              id="app-shell-mobile-nav"
-              className="app-shell-chrome-primary relative z-10 flex h-full w-[85vw] max-w-[20rem] flex-col overscroll-contain border-r border-sidebar-border text-sidebar-foreground shadow-tw-app-chrome-sub"
-            >
-              <h2 id="mobile-nav-heading" className="sr-only">
-                Navigation menu
-              </h2>
-              <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-4">
-                <Logo />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  onClick={() => setMobileMenuOpen(false)}
-                  aria-label="Close navigation menu"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <nav
-                className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-y-contain px-3 py-3"
-                aria-label="Mobile navigation"
-              >
-                {canAccessManagerUi ? (
-                  <>
-                    {managerSections.map((section) =>
-                      section.subItems.length > 0 ? (
-                        <div key={section.key}>
-                          <p className="px-2 pb-1 pt-3 text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--sidebar-muted)]">
-                            {section.label}
-                          </p>
-                          {section.subItems.map((item) => {
-                            const active = item.active(pathname)
-                            return (
-                              <Link
-                                key={item.href}
-                                href={item.href}
-                                className={cn(
-                                  'flex min-h-[42px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
-                                  active
-                                    ? APP_SHELL_ACTIVE_NAV_CLASS
-                                    : 'text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground'
-                                )}
-                                aria-current={active ? 'page' : undefined}
-                                onClick={() => setMobileMenuOpen(false)}
-                              >
-                                <span>{item.label}</span>
-                                {item.badgeCount ? (
-                                  <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--attention)] px-1.5 text-[10px] font-bold text-accent-foreground">
-                                    {item.badgeCount}
-                                  </span>
-                                ) : null}
-                              </Link>
-                            )
-                          })}
-                        </div>
-                      ) : (
-                        <Link
-                          key={section.key}
-                          href={section.href}
-                          className={cn(
-                            'flex min-h-[42px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
-                            section.isActive(pathname)
-                              ? APP_SHELL_ACTIVE_NAV_CLASS
-                              : 'text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground'
-                          )}
-                          aria-current={section.isActive(pathname) ? 'page' : undefined}
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
-                          {section.label}
-                        </Link>
-                      )
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <p className="px-2 pb-2 pt-3 text-[10px] font-medium tracking-[0.08em] text-[color:var(--sidebar-muted)]">
-                      MY SHIFTS
-                    </p>
-                    {primaryItems.map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={cn(
-                          'flex min-h-[42px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
-                          item.current
-                            ? APP_SHELL_ACTIVE_NAV_CLASS
-                            : 'text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground'
-                        )}
-                        aria-current={item.current ? 'page' : undefined}
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        {item.label}
-                      </Link>
-                    ))}
-                  </>
-                )}
-              </nav>
-
-              <div className="mt-auto shrink-0 space-y-1 border-t border-sidebar-border bg-sidebar px-3 py-3">
-                <div className={APP_SHELL_PROFILE_CARD_CLASS}>
-                  <div className="flex items-center gap-2.5">
-                    <span className="inline-flex h-[1.625rem] w-[1.625rem] shrink-0 items-center justify-center rounded-full bg-[color:var(--attention)] text-[10px] font-bold text-accent-foreground">
-                      {initials(user?.fullName ?? 'Team member')}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-semibold text-sidebar-primary">
-                        {user?.fullName ?? 'Team member'}
-                      </p>
-                      <p className="mt-0.5 text-[10px] capitalize text-[color:var(--sidebar-muted)]">
-                        {user?.role === 'manager'
-                          ? 'Manager'
-                          : user?.role === 'lead'
-                            ? 'Lead'
-                            : 'Staff Therapist'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                {canAccessManagerUi ? (
-                  <Link
-                    href="/therapist"
-                    className="flex min-h-[38px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-[color:var(--sidebar-muted)] transition-colors hover:text-sidebar-foreground"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden="true" />
-                    Switch to Therapist view
-                  </Link>
-                ) : null}
-                <Link
-                  href="/settings"
-                  className="flex min-h-[38px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/45"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Settings
-                </Link>
-                <form action="/auth/signout" method="post">
-                  <button
-                    type="submit"
-                    className="flex min-h-[38px] w-full items-center rounded-lg px-2.5 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
-                  >
-                    Log out
-                  </button>
-                </form>
-              </div>
-            </aside>
-          </div>
-        ) : null}
       </div>
     </ThemeProvider>
   )

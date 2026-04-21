@@ -8,7 +8,7 @@ describe('AvailabilityOverviewHeader', () => {
   it('keeps the manager header clean and planning-led', () => {
     const html = renderToStaticMarkup(
       createElement(AvailabilityOverviewHeader, {
-        title: 'Availability And Staffing Inputs',
+        title: 'Availability planning',
         subtitle: 'Mar 22-May 2 · 2026-03-22 to 2026-05-02',
         totalRequests: 18,
         needOffRequests: 7,

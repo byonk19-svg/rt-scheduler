@@ -282,7 +282,7 @@ export async function processQueuedPublishEmails(
 
   for (const row of rows) {
     const cycleLabel = cycleLabelByEventId.get(row.publish_event_id) ?? 'Current cycle'
-    const scheduleUrl = `${emailConfig.appBaseUrl.replace(/\/$/, '')}/staff/schedule`
+    const scheduleUrl = `${emailConfig.appBaseUrl.replace(/\/$/, '')}/staff/my-schedule`
     const emailPayload = buildPublishEmailPayload({
       recipientName: row.name,
       cycleLabel,

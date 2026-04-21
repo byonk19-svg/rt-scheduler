@@ -47,7 +47,7 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('Manager Inbox')
     expect(html).toContain('Recent Activity')
     expect(html).toContain('Brianna approved a shift swap')
-    expect(html).toContain('Open schedule home')
+    expect(html).toContain('Open schedule')
     expect(html).not.toContain('Current cycle')
     expect(html).not.toContain('Next 6-week cycle')
   })
@@ -116,7 +116,7 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('Open coverage review')
     expect(html).toContain('Open schedule activity')
     expect(html).toContain('See the full schedule')
-    expect(html).toContain('Open schedule home')
+    expect(html).toContain('Open schedule')
   })
 
   it('renders Schedule Completion before Recent Activity', () => {

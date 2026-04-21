@@ -1,4 +1,6 @@
 import { createElement } from 'react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -9,6 +11,43 @@ vi.mock('next/navigation', () => ({
 }))
 
 import { EmailIntakePanel } from '@/components/availability/EmailIntakePanel'
+
+const emailIntakePanelSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/EmailIntakePanel.tsx'),
+  'utf8'
+)
+const emailIntakeBatchCardSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/EmailIntakeBatchCard.tsx'),
+  'utf8'
+)
+const emailIntakeBatchHeaderSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/EmailIntakeBatchHeader.tsx'),
+  'utf8'
+)
+const emailIntakeOriginalSourcePanelSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/EmailIntakeOriginalSourcePanel.tsx'),
+  'utf8'
+)
+const emailIntakeItemSectionSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/EmailIntakeItemSection.tsx'),
+  'utf8'
+)
+const emailIntakeItemCardSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/EmailIntakeItemCard.tsx'),
+  'utf8'
+)
+const emailIntakeMatchFormSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/EmailIntakeMatchForm.tsx'),
+  'utf8'
+)
+const emailIntakeItemSummarySource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/EmailIntakeItemSummary.tsx'),
+  'utf8'
+)
+const emailIntakeRequestChipListSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/EmailIntakeRequestChipList.tsx'),
+  'utf8'
+)
 
 const baseRow = {
   id: 'intake-1',
@@ -184,5 +223,50 @@ describe('EmailIntakePanel', () => {
     expect(html).toContain('border-info-border')
     expect(html).toContain('bg-info-subtle')
     expect(html).toContain('text-info-text')
+  })
+
+  it('keeps the therapist/cycle matching workflow in a dedicated component', () => {
+    expect(emailIntakeMatchFormSource).toContain('Action needed')
+    expect(emailIntakeMatchFormSource).toContain('Save matches')
+    expect(emailIntakeItemCardSource).toContain('EmailIntakeMatchForm')
+  })
+
+  it('keeps the top item summary and apply CTA in a dedicated component', () => {
+    expect(emailIntakeItemSummarySource).toContain('Detected employee:')
+    expect(emailIntakeItemSummarySource).toContain('Apply dates')
+    expect(emailIntakeItemSummarySource).toContain('confidence')
+    expect(emailIntakeItemCardSource).toContain('EmailIntakeItemSummary')
+  })
+
+  it('keeps parsed request chip interactions in a dedicated component', () => {
+    expect(emailIntakeRequestChipListSource).toContain(
+      'Switch between day off and available to work'
+    )
+    expect(emailIntakeRequestChipListSource).toContain('Remove')
+    expect(emailIntakeItemCardSource).toContain('EmailIntakeRequestChipList')
+  })
+
+  it('keeps per-email batch review chrome in a dedicated component', () => {
+    expect(emailIntakePanelSource).toContain('EmailIntakeBatchCard')
+    expect(emailIntakeBatchCardSource).toContain('EmailIntakeBatchHeader')
+    expect(emailIntakeBatchCardSource).toContain('auto-applied - show')
+  })
+
+  it('keeps intake item grouping in a dedicated section component', () => {
+    expect(emailIntakeBatchCardSource).toContain('EmailIntakeItemSection')
+    expect(emailIntakeItemSectionSource).toContain('summaryLabel ?? title')
+    expect(emailIntakeItemSectionSource).toContain('collapsible = false')
+  })
+
+  it('keeps original-email source disclosure in a dedicated component', () => {
+    expect(emailIntakeBatchCardSource).toContain('EmailIntakeOriginalSourcePanel')
+    expect(emailIntakeOriginalSourcePanelSource).toContain('View original email')
+    expect(emailIntakeOriginalSourcePanelSource).toContain('Email body')
+  })
+
+  it('keeps batch sender/status/actions in a dedicated header component', () => {
+    expect(emailIntakeBatchCardSource).toContain('EmailIntakeBatchHeader')
+    expect(emailIntakeBatchHeaderSource).toContain('Received')
+    expect(emailIntakeBatchHeaderSource).toContain('Reparse')
   })
 })

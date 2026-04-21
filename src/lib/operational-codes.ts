@@ -46,21 +46,27 @@ export async function fetchActiveOperationalCodeMap(
     }
   }
 
-  const { data, error } = await client
-    .from('shift_operational_entries')
-    .select('shift_id, code')
-    .eq('active', true)
-    .in('shift_id', shiftIds)
-
-  if (error) {
-    console.error('Could not load active operational entries:', error)
-    return new Map()
-  }
-
   const map = new Map<string, OperationalCode>()
-  for (const row of (data ?? []) as ActiveOperationalEntryRow[]) {
-    if (!row.shift_id || !row.code) continue
-    map.set(row.shift_id, row.code)
+
+  const CHUNK_SIZE = 150
+  for (let index = 0; index < shiftIds.length; index += CHUNK_SIZE) {
+    const chunk = shiftIds.slice(index, index + CHUNK_SIZE)
+    const { data, error } = await client
+      .from('shift_operational_entries')
+      .select('shift_id, code')
+      .eq('active', true)
+      .in('shift_id', chunk)
+
+    if (error) {
+      console.error('Could not load active operational entries:', error)
+      return new Map()
+    }
+
+    for (const row of (data ?? []) as ActiveOperationalEntryRow[]) {
+      if (!row.shift_id || !row.code) continue
+      map.set(row.shift_id, row.code)
+    }
   }
+
   return map
 }

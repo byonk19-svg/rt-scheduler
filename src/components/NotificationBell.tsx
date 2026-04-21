@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Bell } from 'lucide-react'
 
-import { Skeleton } from '@/components/ui/skeleton'
+import { NotificationBellDropdown } from '@/components/NotificationBellDropdown'
 
 type NotificationItem = {
   id: string
@@ -40,10 +40,11 @@ function timeAgo(iso: string): string {
 
 function getNotificationHref(item: NotificationItem): string | null {
   if (item.event_type === 'preliminary_request_submitted') return '/approvals'
-  if (item.event_type.startsWith('preliminary_')) return '/preliminary'
+  if (item.event_type.startsWith('preliminary_')) return '/publish'
+  if (item.event_type.includes('publish')) return '/publish/history'
   if (item.target_type === 'shift_post') return '/requests'
-  if (item.target_type === 'shift') return '/coverage'
-  if (item.target_type === 'schedule_cycle') return '/schedule'
+  if (item.target_type === 'shift') return '/coverage?view=week'
+  if (item.target_type === 'schedule_cycle') return '/coverage?view=week'
   if (item.event_type.includes('request')) return '/requests'
   return null
 }
@@ -235,93 +236,20 @@ export function NotificationBell({
           ))}
       </button>
 
-      {open && (
-        <div
-          className={`absolute z-40 mt-2 w-80 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-border bg-card shadow-lg ${dropdownPositionClass}`}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-              Notifications
-            </p>
-            {unreadCount > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  void markAllAsRead()
-                }}
-                className="text-xs font-semibold text-primary hover:underline"
-              >
-                Mark all read
-              </button>
-            )}
-          </div>
-
-          {/* Body */}
-          <div className="max-h-80 divide-y divide-border overflow-auto">
-            {loading ? (
-              <div className="space-y-0 divide-y divide-border">
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="flex gap-3 px-4 py-3">
-                    <Skeleton className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-3 w-2/3" />
-                      <Skeleton className="h-2.5 w-full" />
-                      <Skeleton className="h-2 w-1/4" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : notifications.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-muted">
-                  <Bell className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <p className="text-sm font-medium text-foreground">You&apos;re all caught up</p>
-                <p className="text-xs text-muted-foreground">No notifications yet.</p>
-              </div>
-            ) : (
-              notifications.map((item) => {
-                const href = getNotificationHref(item)
-                const isUnread = !item.read_at
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      void handleNotificationClick(item)
-                    }}
-                    aria-label={`${item.title}${isUnread ? ' (unread)' : ''}`}
-                    className={`flex w-full gap-3 px-4 py-3 text-left transition-colors ${
-                      isUnread ? 'bg-muted/60' : 'bg-card'
-                    } ${href ? 'cursor-pointer hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50' : 'cursor-default'}`}
-                  >
-                    {/* Unread indicator */}
-                    <div className="mt-1.5 flex w-2 shrink-0 items-start justify-center">
-                      {isUnread && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className={`text-sm leading-snug text-foreground ${
-                          isUnread ? 'font-semibold' : 'font-medium'
-                        } break-words`}
-                      >
-                        {item.title}
-                      </p>
-                      <p className="mt-0.5 break-words text-xs text-muted-foreground">
-                        {item.message}
-                      </p>
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        {timeAgo(item.created_at)}
-                      </p>
-                    </div>
-                  </button>
-                )
-              })
-            )}
-          </div>
-        </div>
-      )}
+      {open ? (
+        <NotificationBellDropdown
+          dropdownPositionClass={dropdownPositionClass}
+          loading={loading}
+          notifications={notifications}
+          onItemClick={(item) => {
+            void handleNotificationClick(item)
+          }}
+          onMarkAllAsRead={() => {
+            void markAllAsRead()
+          }}
+          unreadCount={unreadCount}
+        />
+      ) : null}
     </div>
   )
 }

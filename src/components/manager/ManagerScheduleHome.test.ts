@@ -37,7 +37,7 @@ function createSnapshot(
       coverageUnfilled: '/coverage?cycle=cycle-1&view=week&filter=unfilled&focus=first',
       coverageNeedsAttention:
         '/coverage?cycle=cycle-1&view=week&filter=needs_attention&focus=first',
-      publish: '/coverage?cycle=cycle-1&view=week',
+      publish: '/publish',
     },
     ...overrides,
   }
@@ -58,6 +58,7 @@ describe('ManagerScheduleHome', () => {
     expect(html).toContain('Publish')
     expect(html).toContain('Availability')
     expect(html).toContain('Roster')
+    expect(html).toContain('Delivery history')
     expect(html).toContain('Analytics')
     expect(html).toContain('May 3 – Jun 13, 2026')
     expect(html).toContain(

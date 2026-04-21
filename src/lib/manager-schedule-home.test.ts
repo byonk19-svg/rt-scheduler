@@ -34,7 +34,7 @@ function createSnapshot(
       coverageUnfilled: '/coverage?cycle=cycle-1&view=week&filter=unfilled&focus=first',
       coverageNeedsAttention:
         '/coverage?cycle=cycle-1&view=week&filter=needs_attention&focus=first',
-      publish: '/coverage?cycle=cycle-1&view=week',
+      publish: '/publish',
     },
     ...overrides,
   }
@@ -88,8 +88,12 @@ describe('buildManagerScheduleHomeModel', () => {
       })
     )
 
-    expect(model.primaryAction.label).toBe('Review publish readiness')
+    expect(model.primaryAction.label).toBe('Finalize schedule')
     expect(model.primaryAction.href).toBe('/publish')
-    expect(model.secondaryLinks.map((item) => item.label)).toEqual(['Roster', 'Analytics'])
+    expect(model.secondaryLinks.map((item) => item.label)).toEqual([
+      'Roster',
+      'Delivery history',
+      'Analytics',
+    ])
   })
 })

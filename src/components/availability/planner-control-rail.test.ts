@@ -1,8 +1,19 @@
 import { createElement } from 'react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { PlannerControlRail } from '@/components/availability/planner-control-rail'
+
+const source = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/planner-control-rail.tsx'),
+  'utf8'
+)
+const selectedDatesFormSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/PlannerSelectedDatesForm.tsx'),
+  'utf8'
+)
 
 const baseProps = {
   cycles: [
@@ -70,5 +81,11 @@ describe('PlannerControlRail', () => {
     expect(html).toContain('1 selected')
     expect(html).toContain('Mar 24, 2026')
     expect(html).toContain('Save 1 will-work date')
+  })
+
+  it('keeps selected-date save handling in a dedicated form component', () => {
+    expect(source).toContain('PlannerSelectedDatesForm')
+    expect(selectedDatesFormSource).toContain('Select dates to save')
+    expect(selectedDatesFormSource).toContain('Clear selected dates')
   })
 })

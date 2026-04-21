@@ -19,7 +19,6 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/app/publish/actions', () => ({
   restartPublishedCycleAction: vi.fn(),
   unpublishCycleKeepShiftsAction: vi.fn(),
-  deletePublishEventAction: vi.fn(),
   archiveCycleAction: vi.fn(),
 }))
 
@@ -29,24 +28,34 @@ vi.mock('@/app/schedule/actions', () => ({
 
 vi.mock('@/lib/coverage/fetch-schedule-cycles', () => ({
   fetchScheduleCyclesForCoverage: vi.fn(async () => ({
-    data: [],
+    data: [
+      {
+        id: 'cycle-live',
+        label: 'Live cycle',
+        start_date: '2026-03-19',
+        end_date: '2026-03-25',
+        published: true,
+      },
+      {
+        id: 'cycle-draft',
+        label: 'Draft cycle',
+        start_date: '2026-03-26',
+        end_date: '2026-04-01',
+        published: false,
+      },
+    ],
     error: null,
   })),
 }))
 
-import PublishHistoryPage from '@/app/(app)/publish/page'
+import FinalizeSchedulePage from '@/app/(app)/publish/page'
 
-type TestContext = {
-  userId?: string | null
-  role?: string | null
-}
-
-function createSupabaseMock(context: TestContext) {
+function createSupabaseMock(role: string | null) {
   return {
     auth: {
       getUser: vi.fn(async () => ({
         data: {
-          user: context.userId ? { id: context.userId } : null,
+          user: { id: 'manager-1' },
         },
       })),
     },
@@ -63,77 +72,11 @@ function createSupabaseMock(context: TestContext) {
           filters.set(column, value)
           return builder
         },
-        order() {
-          return builder
-        },
-        limit() {
-          return builder
-        },
         async maybeSingle() {
-          if (table === 'profiles' && selected === 'role' && filters.get('id') === context.userId) {
-            return { data: { role: context.role }, error: null }
+          if (table === 'profiles' && selected === 'role' && filters.get('id') === 'manager-1') {
+            return { data: { role }, error: null }
           }
-
           return { data: null, error: null }
-        },
-        then(
-          resolve: (value: {
-            data: Array<{
-              id: string
-              cycle_id: string
-              published_at: string
-              status: 'success' | 'failed'
-              recipient_count: number
-              channel: string
-              queued_count: number
-              sent_count: number
-              failed_count: number
-              error_message: string | null
-              schedule_cycles: { label: string; published: boolean }
-              profiles: { full_name: string | null }
-            }>
-            error: null
-          }) => unknown
-        ) {
-          if (table === 'publish_events') {
-            return Promise.resolve(
-              resolve({
-                data: [
-                  {
-                    id: 'event-live',
-                    cycle_id: 'cycle-live',
-                    published_at: '2026-03-19T08:00:00.000Z',
-                    status: 'success',
-                    recipient_count: 12,
-                    channel: 'email',
-                    queued_count: 0,
-                    sent_count: 12,
-                    failed_count: 0,
-                    error_message: null,
-                    schedule_cycles: { label: 'Live cycle', published: true },
-                    profiles: { full_name: 'Manager A.' },
-                  },
-                  {
-                    id: 'event-old',
-                    cycle_id: 'cycle-old',
-                    published_at: '2026-03-12T08:00:00.000Z',
-                    status: 'success',
-                    recipient_count: 10,
-                    channel: 'email',
-                    queued_count: 0,
-                    sent_count: 10,
-                    failed_count: 0,
-                    error_message: null,
-                    schedule_cycles: { label: 'Old cycle', published: false },
-                    profiles: { full_name: 'Manager B.' },
-                  },
-                ],
-                error: null,
-              })
-            )
-          }
-
-          return Promise.resolve(resolve({ data: [], error: null }))
         },
       }
 
@@ -142,59 +85,32 @@ function createSupabaseMock(context: TestContext) {
   }
 }
 
-describe('PublishHistoryPage', () => {
+describe('FinalizeSchedulePage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('shows start over for currently published cycles and marks reopened cycles as no longer live', async () => {
-    createClientMock.mockResolvedValue(
-      createSupabaseMock({
-        userId: 'manager-1',
-        role: 'manager',
-      })
-    )
+  it('renders the finalization surface and links to delivery history', async () => {
+    createClientMock.mockResolvedValue(createSupabaseMock('manager'))
 
-    const html = renderToStaticMarkup(await PublishHistoryPage({}))
+    const html = renderToStaticMarkup(await FinalizeSchedulePage({}))
 
-    expect(html).toContain('Schedule blocks')
-    expect(html).toContain('Publish email log')
+    expect(html).toContain('Finalize schedule')
+    expect(html).toContain('Delivery history')
+    expect(html).toContain('Schedule blocks to finalize')
     expect(html).toContain('Take offline')
     expect(html).toContain('Clear &amp; restart')
-    expect(html).toContain('Archive cycle')
-    expect(html).toContain('Delete history')
-    expect(html).toContain('Open cycle')
-    expect(html).toContain('No longer live')
+    expect(html).toContain('Archive')
+    expect(html).toContain('Delete draft')
     expect(html).toContain('Live cycle')
-    expect(html).toContain('Old cycle')
+    expect(html).toContain('Draft cycle')
   })
 
-  it('replaces dense orientation copy with short decision cards', async () => {
-    createClientMock.mockResolvedValue(
-      createSupabaseMock({
-        userId: 'manager-1',
-        role: 'manager',
-      })
-    )
-
-    const html = renderToStaticMarkup(await PublishHistoryPage({}))
-
-    expect(html).toContain('Draft actions')
-    expect(html).toContain('Live actions')
-    expect(html).toContain('Email log')
-    expect(html).not.toContain('Manage 6-week schedule blocks (the same list as on Schedule)')
-  })
-
-  it('shows a success banner after restarting a cycle', async () => {
-    createClientMock.mockResolvedValue(
-      createSupabaseMock({
-        userId: 'manager-1',
-        role: 'manager',
-      })
-    )
+  it('shows cycle success banners on the finalization page', async () => {
+    createClientMock.mockResolvedValue(createSupabaseMock('manager'))
 
     const html = renderToStaticMarkup(
-      await PublishHistoryPage({
+      await FinalizeSchedulePage({
         searchParams: Promise.resolve({ success: 'cycle_restarted' }),
       })
     )
@@ -203,38 +119,9 @@ describe('PublishHistoryPage', () => {
     expect(html).toContain('published shifts were cleared')
   })
 
-  it('shows a success banner after deleting publish history', async () => {
-    createClientMock.mockResolvedValue(
-      createSupabaseMock({
-        userId: 'manager-1',
-        role: 'manager',
-      })
-    )
+  it('redirects non-managers away from the finalization page', async () => {
+    createClientMock.mockResolvedValue(createSupabaseMock('therapist'))
 
-    const html = renderToStaticMarkup(
-      await PublishHistoryPage({
-        searchParams: Promise.resolve({ success: 'publish_event_deleted' }),
-      })
-    )
-
-    expect(html).toContain('Publish history entry deleted')
-  })
-
-  it('shows a success banner after archiving a cycle', async () => {
-    createClientMock.mockResolvedValue(
-      createSupabaseMock({
-        userId: 'manager-1',
-        role: 'manager',
-      })
-    )
-
-    const html = renderToStaticMarkup(
-      await PublishHistoryPage({
-        searchParams: Promise.resolve({ success: 'cycle_archived' }),
-      })
-    )
-
-    expect(html).toContain('Cycle archived')
-    expect(html).toContain('will no longer appear in Coverage')
+    await expect(FinalizeSchedulePage({})).rejects.toThrow('REDIRECT:/dashboard')
   })
 })

@@ -1,6 +1,25 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 import { getVisibleWeek, nextIndex, resolveSwipeDirection } from './CalendarGrid'
+
+const calendarGridSource = readFileSync(
+  resolve(process.cwd(), 'src/components/coverage/CalendarGrid.tsx'),
+  'utf8'
+)
+const calendarGridMobileViewSource = readFileSync(
+  resolve(process.cwd(), 'src/components/coverage/CalendarGridMobileView.tsx'),
+  'utf8'
+)
+const calendarGridDesktopViewSource = readFileSync(
+  resolve(process.cwd(), 'src/components/coverage/CalendarGridDesktopView.tsx'),
+  'utf8'
+)
+const calendarGridDayCardSource = readFileSync(
+  resolve(process.cwd(), 'src/components/coverage/CalendarGridDayCard.tsx'),
+  'utf8'
+)
 
 describe('CalendarGrid keyboard navigation index', () => {
   it('moves right by 1', () => {
@@ -53,5 +72,25 @@ describe('CalendarGrid mobile week helpers', () => {
     expect(resolveSwipeDirection(80, 150)).toBe('right')
     expect(resolveSwipeDirection(100, 70)).toBeNull()
     expect(resolveSwipeDirection(null, 70)).toBeNull()
+  })
+})
+
+describe('CalendarGrid framing', () => {
+  it('keeps the mobile calendar shell in a dedicated component', () => {
+    expect(calendarGridMobileViewSource).toContain('Prev week')
+    expect(calendarGridMobileViewSource).toContain('Next week')
+    expect(calendarGridSource).toContain('CalendarGridMobileView')
+  })
+
+  it('keeps the desktop calendar shell in a dedicated component', () => {
+    expect(calendarGridDesktopViewSource).toContain('Coverage calendar')
+    expect(calendarGridDesktopViewSource).toContain('Week {weekIndex + 1}')
+    expect(calendarGridSource).toContain('CalendarGridDesktopView')
+  })
+
+  it('keeps the shared day-card rendering in a dedicated component', () => {
+    expect(calendarGridDayCardSource).toContain('Open day editor')
+    expect(calendarGridDayCardSource).toContain('No lead')
+    expect(calendarGridSource).toContain('CalendarGridDayCard')
   })
 })

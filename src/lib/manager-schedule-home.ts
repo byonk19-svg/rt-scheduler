@@ -69,10 +69,10 @@ export function buildManagerScheduleHomeModel(
           }
         : snapshot.publishReady
           ? {
-              label: 'Review publish readiness',
+              label: 'Finalize schedule',
               href: '/publish',
               description:
-                'Coverage and approvals are clear. Confirm the final publish state for this block.',
+                'Coverage and approvals are clear. Finalize the schedule and review delivery history if needed.',
             }
           : {
               label: 'Review current schedule',
@@ -143,14 +143,14 @@ export function buildManagerScheduleHomeModel(
     {
       label: 'Publish',
       href: '/publish',
-      description: 'Check publish readiness and review delivery history.',
-      status: snapshot.publishReady ? 'Ready to publish' : 'Blocked by open issues',
+      description: 'Finalize the active block and confirm the live schedule state.',
+      status: snapshot.publishReady ? 'Ready to finalize' : 'Blocked by open issues',
       tone: snapshot.publishReady ? 'success' : 'warning',
     },
     {
       label: 'Availability',
       href: '/availability',
-      description: 'Review staffing inputs and therapist responses for this cycle.',
+      description: 'Review availability planning details and therapist responses for this cycle.',
       status: activeCycle ? 'Cycle inputs available' : 'No active cycle selected',
       tone: activeCycle ? 'info' : 'neutral',
     },
@@ -159,9 +159,17 @@ export function buildManagerScheduleHomeModel(
   const secondaryLinks: ManagerScheduleHomeLink[] = [
     {
       label: 'Roster',
-      href: '/schedule',
-      description: 'Open the read-only roster reference for this cycle.',
+      href: '/coverage?view=roster',
+      description: 'Open the roster layout inside the main schedule workspace.',
       status: 'Reference view',
+      tone: 'neutral',
+    },
+    {
+      label: 'Delivery history',
+      href: '/publish/history',
+      description:
+        'Review delivery logs and archived publish activity outside the finalization step.',
+      status: 'Supporting history',
       tone: 'neutral',
     },
     {
@@ -179,7 +187,7 @@ export function buildManagerScheduleHomeModel(
     cycleStatus: !activeCycle
       ? 'No active cycle'
       : snapshot.publishReady
-        ? 'Ready to publish'
+        ? 'Ready to finalize'
         : snapshot.coverageIssues > 0
           ? 'Needs staffing'
           : snapshot.pendingApprovals > 0

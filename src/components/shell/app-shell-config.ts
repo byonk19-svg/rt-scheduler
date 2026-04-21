@@ -39,6 +39,7 @@ const SHELL_ROUTES = [
   '/swaps',
   '/team',
   '/settings',
+  '/staff',
   '/therapist',
   '/schedule',
 ] as const
@@ -102,17 +103,21 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
         {
           href: '/publish',
           label: 'Publish',
-          active: (pathname) => pathname === '/publish' || pathname.startsWith('/publish/'),
+          active: (pathname) => pathname === '/publish',
+        },
+        {
+          href: '/publish/history',
+          label: 'History',
+          active: (pathname) =>
+            pathname === '/publish/history' ||
+            pathname.startsWith('/publish/history/') ||
+            pathname === '/publish/' ||
+            (/^\/publish\/[^/]+$/.test(pathname) && pathname !== '/publish'),
         },
         {
           href: '/availability',
           label: 'Availability',
           active: (pathname) => pathname === '/availability',
-        },
-        {
-          href: '/schedule',
-          label: 'Roster',
-          active: (pathname) => pathname === '/schedule',
         },
         {
           href: '/analytics',
@@ -139,12 +144,15 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
           active: (pathname) => pathname === '/team',
         },
         {
-          href: '/requests',
-          label: 'People requests',
+          href: '/shift-board',
+          label: 'Open shifts',
+          active: (pathname) => pathname === '/shift-board',
+        },
+        {
+          href: '/requests/user-access',
+          label: 'Access requests',
           active: (pathname) =>
-            pathname === '/requests' ||
-            pathname.startsWith('/requests/') ||
-            pathname === '/shift-board',
+            pathname === '/requests' || pathname.startsWith('/requests/user-access'),
           badgeCount: pendingCount > 0 ? pendingCount : undefined,
         },
         {
@@ -166,7 +174,7 @@ export function getStaffNavItems(): readonly ShellNavItem[] {
     },
     {
       href: '/coverage',
-      label: 'Team schedule',
+      label: 'Schedule',
       active: (pathname) =>
         pathname === '/coverage' || pathname === '/schedule' || pathname === '/preliminary',
     },

@@ -7,7 +7,11 @@ describe('MANAGER_WORKFLOW_LINKS', () => {
     expect(MANAGER_WORKFLOW_LINKS.scheduleHome).toBe('/dashboard/manager/schedule')
   })
 
-  it('routes publish to the schedule workspace', () => {
-    expect(MANAGER_WORKFLOW_LINKS.publish).toBe('/coverage?view=week')
+  it('routes publish to the finalization surface', () => {
+    expect(MANAGER_WORKFLOW_LINKS.publish).toBe('/publish')
+  })
+
+  it('exposes delivery history as a separate manager workflow link', () => {
+    expect(MANAGER_WORKFLOW_LINKS.publishHistory).toBe('/publish/history')
   })
 })

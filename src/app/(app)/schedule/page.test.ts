@@ -6,13 +6,13 @@ import { describe, expect, it } from 'vitest'
 const source = readFileSync(resolve(process.cwd(), 'src/app/(app)/schedule/page.tsx'), 'utf8')
 
 describe('schedule route', () => {
-  it('renders the roster screen and only redirects staff on forbidden access', () => {
-    expect(source).toContain('ScheduleRosterScreen')
-    expect(source).toContain("redirect('/dashboard/staff')")
-    expect(source).not.toContain("redirect('/coverage')")
+  it('redirects to the roster mode inside the canonical schedule workspace', () => {
+    expect(source).toContain("nextParams.set('view', 'roster')")
+    expect(source).toContain('redirect(`/coverage?${nextParams.toString()}`)')
   })
 
-  it('keeps the screen deterministic by using the mock roster data layer', () => {
-    expect(source).toContain("from '@/components/schedule-roster/ScheduleRosterScreen'")
+  it('preserves cycle and shift params when redirecting to coverage', () => {
+    expect(source).toContain("if (cycle) nextParams.set('cycle', cycle)")
+    expect(source).toContain("if (shift) nextParams.set('shift', shift)")
   })
 })

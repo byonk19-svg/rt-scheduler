@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
@@ -12,6 +13,10 @@ import {
 } from '@/lib/staff-my-schedule'
 import { createClient } from '@/lib/supabase/server'
 
+export const metadata: Metadata = {
+  title: 'My Shifts',
+}
+
 function formatShortDate(isoDate: string): string {
   const parsed = new Date(`${isoDate}T12:00:00`)
   if (Number.isNaN(parsed.getTime())) return isoDate
@@ -24,7 +29,7 @@ function weekRangeLabel(shifts: MyScheduleShiftRow[]): string {
   const first = dates[0]!
   const last = dates[dates.length - 1]!
   if (first === last) return formatShortDate(first)
-  return `${formatShortDate(first)} – ${formatShortDate(last)}`
+  return `${formatShortDate(first)} â€“ ${formatShortDate(last)}`
 }
 
 export default async function StaffMySchedulePage() {
@@ -112,10 +117,10 @@ export default async function StaffMySchedulePage() {
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
-                      Week · {weekRangeLabel(weekShifts)}
+                      Week Â· {weekRangeLabel(weekShifts)}
                     </h2>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {count} shift{count === 1 ? '' : 's'} this week · cap {safeCap} days / week
+                      {count} shift{count === 1 ? '' : 's'} this week Â· cap {safeCap} days / week
                     </p>
                   </div>
                   <div className="w-full max-w-md sm:w-56">

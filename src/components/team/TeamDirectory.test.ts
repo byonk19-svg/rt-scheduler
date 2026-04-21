@@ -17,6 +17,34 @@ const directorySource = readFileSync(
   resolve(process.cwd(), 'src/components/team/TeamDirectory.tsx'),
   'utf8'
 )
+const controlPanelSource = readFileSync(
+  resolve(process.cwd(), 'src/components/team/TeamDirectoryControlPanel.tsx'),
+  'utf8'
+)
+const groupedSectionsSource = readFileSync(
+  resolve(process.cwd(), 'src/components/team/TeamDirectoryGroupedSections.tsx'),
+  'utf8'
+)
+const groupSectionSource = readFileSync(
+  resolve(process.cwd(), 'src/components/team/TeamDirectoryGroupSection.tsx'),
+  'utf8'
+)
+const groupRowsSource = readFileSync(
+  resolve(process.cwd(), 'src/components/team/TeamDirectoryGroupRows.tsx'),
+  'utf8'
+)
+const teamQuickEditDialogSource = readFileSync(
+  resolve(process.cwd(), 'src/components/team/TeamQuickEditDialog.tsx'),
+  'utf8'
+)
+const teamQuickEditBasicsSectionSource = readFileSync(
+  resolve(process.cwd(), 'src/components/team/TeamQuickEditBasicsSection.tsx'),
+  'utf8'
+)
+const teamQuickEditSchedulingSectionSource = readFileSync(
+  resolve(process.cwd(), 'src/components/team/TeamQuickEditSchedulingSection.tsx'),
+  'utf8'
+)
 
 function makeProfile(overrides: Partial<TeamProfileRecord>): TeamProfileRecord {
   return {
@@ -40,6 +68,18 @@ describe('TEAM_QUICK_EDIT_DIALOG_CLASS', () => {
 
   it('uses the lead therapist label on the team surface', () => {
     expect(TEAM_LEAD_ROLE_LABEL).toBe('Lead Therapist')
+  })
+
+  it('keeps scheduling constraints in a dedicated quick-edit section', () => {
+    expect(teamQuickEditSchedulingSectionSource).toContain('Scheduling Constraints')
+    expect(teamQuickEditSchedulingSectionSource).toContain('Weekend rotation')
+    expect(teamQuickEditDialogSource).toContain('TeamQuickEditSchedulingSection')
+  })
+
+  it('keeps profile basics in a dedicated quick-edit section', () => {
+    expect(teamQuickEditBasicsSectionSource).toContain('Employment Type')
+    expect(teamQuickEditBasicsSectionSource).toContain('FMLA Return Date')
+    expect(teamQuickEditDialogSource).toContain('TeamQuickEditBasicsSection')
   })
 })
 
@@ -101,7 +141,12 @@ describe('TeamDirectory', () => {
     expect(html).toContain('Advanced filters')
     expect(html).not.toContain('aria-label="Bulk team actions"')
     expect(html).not.toContain('Select all in')
-    expect(directorySource).toContain('showSelectionControls={bulkMode}')
+    expect(directorySource).toContain('TeamDirectoryControlPanel')
+    expect(controlPanelSource).toContain('Directory quick views')
+    expect(groupedSectionsSource).toContain('TeamDirectoryGroupSection')
+    expect(groupedSectionsSource).toContain('TeamDirectoryGroupRows')
+    expect(groupSectionSource).toContain('Select all in ${title}')
+    expect(groupRowsSource).toContain('showSelectionControl={showSelectionControls}')
     expect(directorySource).toContain('selectedCount={bulkMode ? selectedIds.size : 0}')
   })
 })

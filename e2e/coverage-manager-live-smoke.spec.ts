@@ -2,13 +2,15 @@ import { expect, test } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
-import { addDays, formatDateKey, getEnv } from './helpers/env'
-import { createServiceRoleClientOrNull } from './helpers/supabase'
+import { addDays, formatDateKey, getEnv, randomString } from './helpers/env'
+import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type LiveSmokeContext = {
   supabase: SupabaseClient
   manager: { email: string; password: string }
   cycle: { id: string; targetDate: string }
+  lead: { id: string }
+  supportStaff: { id: string }[]
   therapist: { id: string; fullName: string }
 }
 
@@ -28,6 +30,7 @@ test.describe.serial('coverage manager live smoke', () => {
   test.setTimeout(120_000)
 
   let ctx: LiveSmokeContext | null = null
+  const createdUserIds: string[] = []
 
   test.beforeAll(async () => {
     const supabase = createServiceRoleClientOrNull()
@@ -35,82 +38,112 @@ test.describe.serial('coverage manager live smoke', () => {
     const managerPassword = getEnv('E2E_USER_PASSWORD')
     if (!supabase || !managerEmail || !managerPassword) return
 
-    const cycleResult = await supabase
+    const cycleStart = addDays(new Date(), -1)
+    const cycleEnd = addDays(cycleStart, 13)
+    const targetDate = formatDateKey(addDays(cycleStart, 2))
+    const cycleInsert = await supabase
       .from('schedule_cycles')
-      .select('id, start_date, archived_at')
-      .is('archived_at', null)
-      .order('start_date', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+      .insert({
+        label: `Coverage Live Smoke ${randomString('cycle')}`,
+        start_date: formatDateKey(cycleStart),
+        end_date: formatDateKey(cycleEnd),
+        published: true,
+      })
+      .select('id')
+      .single()
 
-    if (cycleResult.error) {
-      throw new Error(`Could not load live coverage cycle: ${cycleResult.error.message}`)
-    }
-    if (!cycleResult.data?.id || !cycleResult.data.start_date) {
-      throw new Error('Expected an active live coverage cycle for the manager smoke.')
-    }
-
-    const therapistResult = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .eq('role', 'therapist')
-      .eq('shift_type', 'day')
-      .eq('employment_type', 'full_time')
-      .eq('is_active', true)
-      .eq('on_fmla', false)
-      .order('full_name', { ascending: true })
-      .limit(1)
-      .maybeSingle()
-
-    if (therapistResult.error || !therapistResult.data?.id || !therapistResult.data.full_name) {
-      throw new Error(
-        therapistResult.error?.message ??
-          'Expected an active full-time day therapist for the live smoke.'
-      )
+    if (cycleInsert.error || !cycleInsert.data?.id) {
+      throw new Error(cycleInsert.error?.message ?? 'Could not create live smoke cycle.')
     }
 
-    let targetDate = cycleResult.data.start_date
-    for (let offset = 0; offset < 7; offset += 1) {
-      const candidate = formatDateKey(
-        addDays(new Date(`${cycleResult.data.start_date}T00:00:00`), offset)
-      )
-      const existingShift = await supabase
-        .from('shifts')
-        .select('id')
-        .eq('cycle_id', cycleResult.data.id)
-        .eq('user_id', therapistResult.data.id)
-        .eq('date', candidate)
-        .eq('shift_type', 'day')
-        .maybeSingle()
+    const therapistFullName = `Coverage Live ${randomString('ther')}`
+    const therapistEmail = `${randomString('coverage-live')}@example.com`
+    const therapistPassword = `Ther!${Math.random().toString(16).slice(2, 8)}`
+    const therapist = await createE2EUser(supabase, {
+      email: therapistEmail,
+      password: therapistPassword,
+      fullName: therapistFullName,
+      role: 'therapist',
+      employmentType: 'full_time',
+      shiftType: 'day',
+      isLeadEligible: false,
+      maxWorkDaysPerWeek: 5,
+    })
+    createdUserIds.push(therapist.id)
 
-      if (existingShift.error) {
-        throw new Error(existingShift.error.message)
-      }
+    const lead = await createE2EUser(supabase, {
+      email: `${randomString('coverage-lead')}@example.com`,
+      password: `Lead!${Math.random().toString(16).slice(2, 8)}`,
+      fullName: `Coverage Lead ${randomString('lead')}`,
+      role: 'lead',
+      employmentType: 'full_time',
+      shiftType: 'day',
+      isLeadEligible: true,
+      maxWorkDaysPerWeek: 5,
+    })
+    createdUserIds.push(lead.id)
 
-      if (!existingShift.data?.id) {
-        targetDate = candidate
-        break
-      }
+    const supportStaff = await Promise.all(
+      Array.from({ length: 2 }, async (_, index) => {
+        const user = await createE2EUser(supabase, {
+          email: `${randomString(`coverage-staff-${index}`)}@example.com`,
+          password: `Ther!${Math.random().toString(16).slice(2, 8)}`,
+          fullName: `Coverage Staff ${index + 1} ${randomString('staff')}`,
+          role: 'therapist',
+          employmentType: 'full_time',
+          shiftType: 'day',
+          isLeadEligible: false,
+          maxWorkDaysPerWeek: 5,
+        })
+        createdUserIds.push(user.id)
+        return user
+      })
+    )
+
+    const seedShifts = await supabase.from('shifts').insert([
+      {
+        cycle_id: cycleInsert.data.id,
+        user_id: lead.id,
+        date: targetDate,
+        shift_type: 'day',
+        status: 'scheduled',
+        assignment_status: 'scheduled',
+        role: 'lead',
+      },
+      ...supportStaff.map((staff) => ({
+        cycle_id: cycleInsert.data.id,
+        user_id: staff.id,
+        date: targetDate,
+        shift_type: 'day' as const,
+        status: 'scheduled' as const,
+        assignment_status: 'scheduled' as const,
+        role: 'staff' as const,
+      })),
+    ])
+
+    if (seedShifts.error) {
+      throw new Error(seedShifts.error.message)
     }
 
     ctx = {
       supabase,
       manager: { email: managerEmail, password: managerPassword },
-      cycle: { id: cycleResult.data.id, targetDate },
-      therapist: { id: therapistResult.data.id, fullName: therapistResult.data.full_name },
+      cycle: { id: cycleInsert.data.id, targetDate },
+      lead,
+      supportStaff,
+      therapist: { id: therapist.id, fullName: therapistFullName },
     }
   })
 
   test.afterAll(async () => {
     if (!ctx) return
 
-    await ctx.supabase
-      .from('shifts')
-      .delete()
-      .eq('cycle_id', ctx.cycle.id)
-      .eq('user_id', ctx.therapist.id)
-      .eq('date', ctx.cycle.targetDate)
-      .eq('shift_type', 'day')
+    await ctx.supabase.from('shifts').delete().eq('cycle_id', ctx.cycle.id)
+    await ctx.supabase.from('schedule_cycles').delete().eq('id', ctx.cycle.id)
+
+    for (const userId of createdUserIds) {
+      await ctx.supabase.auth.admin.deleteUser(userId)
+    }
   })
 
   test('manager can assign, update status, and unassign from the live coverage workspace', async ({
@@ -186,7 +219,7 @@ test.describe.serial('coverage manager live smoke', () => {
     await assignmentTrigger.click()
     const statusPopover = page.locator('[data-testid="coverage-status-popover"]:visible').first()
     await expect(statusPopover).toBeVisible({ timeout: 10_000 })
-    await statusPopover.getByRole('button', { name: 'On Call' }).click({ force: true })
+    await statusPopover.getByRole('button', { name: 'Call In' }).click({ force: true })
     await expect.poll(() => statusRequests.length, { timeout: 10_000 }).toBeGreaterThan(0)
     await expect.poll(() => statusResponses.at(-1)?.status ?? null, { timeout: 10_000 }).toBe(200)
 
@@ -205,9 +238,9 @@ test.describe.serial('coverage manager live smoke', () => {
         },
         { timeout: 20_000 }
       )
-      .toBe('on_call')
+      .toBe('call_in')
 
-    await expect(dayCell(page, ctx!.cycle.targetDate).getByText('On Call')).toBeVisible({
+    await expect(dayCell(page, ctx!.cycle.targetDate).getByText('Call In')).toBeVisible({
       timeout: 10_000,
     })
 

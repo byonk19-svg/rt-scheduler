@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 import { getCandidatePriority } from '@/components/coverage/ShiftEditorDialog'
 import { shiftEditorDialogLayout } from '@/components/coverage/shift-editor-dialog-layout'
+
+const shiftEditorDialogSource = readFileSync(
+  resolve(process.cwd(), 'src/components/coverage/ShiftEditorDialog.tsx'),
+  'utf8'
+)
+const shiftEditorTherapistSectionsSource = readFileSync(
+  resolve(process.cwd(), 'src/components/coverage/ShiftEditorTherapistSections.tsx'),
+  'utf8'
+)
+const shiftEditorTherapistRowSource = readFileSync(
+  resolve(process.cwd(), 'src/components/coverage/ShiftEditorTherapistRow.tsx'),
+  'utf8'
+)
 
 describe('shiftEditorDialogLayout', () => {
   it('uses even compact dialog sizing tokens', () => {
@@ -116,5 +131,19 @@ describe('getCandidatePriority', () => {
     })
 
     expect(priority.assignedElsewhere).toBe(false)
+  })
+})
+
+describe('ShiftEditorDialog framing', () => {
+  it('keeps therapist list sections in a dedicated component', () => {
+    expect(shiftEditorTherapistSectionsSource).toContain('Lead therapists')
+    expect(shiftEditorTherapistSectionsSource).toContain('Staff therapists')
+    expect(shiftEditorDialogSource).toContain('ShiftEditorTherapistSections')
+  })
+
+  it('keeps therapist row rendering in a dedicated component', () => {
+    expect(shiftEditorTherapistRowSource).toContain('Best fit')
+    expect(shiftEditorTherapistRowSource).toContain('Already on day')
+    expect(shiftEditorTherapistSectionsSource).toContain('ShiftEditorTherapistRow')
   })
 })

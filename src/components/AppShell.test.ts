@@ -22,6 +22,14 @@ const localSectionNavSource = fs.readFileSync(
   path.join(process.cwd(), 'src/components/shell/LocalSectionNav.tsx'),
   'utf8'
 )
+const appShellMobileNavSource = fs.readFileSync(
+  path.join(process.cwd(), 'src/components/shell/AppShellMobileNav.tsx'),
+  'utf8'
+)
+const appShellUserDropdownSource = fs.readFileSync(
+  path.join(process.cwd(), 'src/components/shell/AppShellUserDropdown.tsx'),
+  'utf8'
+)
 
 describe('AppShell exported constants', () => {
   it('keeps legacy sidebar class export for test compatibility', () => {
@@ -55,16 +63,20 @@ describe('AppShell mobile menu', () => {
   })
 
   it('uses a real button for the mobile backdrop dismiss target', () => {
-    expect(appShellSource).toMatch(/<button[\s\S]*className="absolute inset-0 bg-black\/45"/)
+    expect(appShellMobileNavSource).toMatch(
+      /<button[\s\S]*className="absolute inset-0 bg-black\/45"/
+    )
   })
 
   it('contains overscroll within the mobile drawer', () => {
-    expect(appShellSource).toContain('overscroll-contain')
+    expect(appShellMobileNavSource).toContain('overscroll-contain')
   })
 
   it('renders the authenticated shell through shared header primitives', () => {
     expect(appShellSource).toContain('<AppHeader')
     expect(appShellSource).toContain('<LocalSectionNav')
+    expect(appShellSource).toContain('<AppShellUserDropdown')
+    expect(appShellUserDropdownSource).toContain('User menu')
   })
 
   it('does not keep a second fixed shell bar under the main header', () => {
@@ -91,15 +103,13 @@ describe('AppShell navigation structure', () => {
     expect(scheduleSection?.href).toBe('/dashboard/manager/schedule')
   })
 
-  it('routes the manager Coverage sub-item to the editable coverage workspace and keeps a separate read-only Roster item', () => {
+  it('routes the manager Coverage sub-item to the editable schedule workspace', () => {
     const scheduleSection = buildManagerSections(0).find((section) => section.key === 'schedule')
 
     expect(scheduleSection?.subItems.find((item) => item.label === 'Coverage')?.href).toBe(
       '/coverage'
     )
-    expect(scheduleSection?.subItems.find((item) => item.label === 'Roster')?.href).toBe(
-      '/schedule'
-    )
+    expect(scheduleSection?.subItems.find((item) => item.label === 'Roster')).toBeUndefined()
   })
 
   it('adds a schedule home local-nav item ahead of the detailed workflow pages', () => {
@@ -110,8 +120,8 @@ describe('AppShell navigation structure', () => {
       'Coverage',
       'Approvals',
       'Publish',
+      'History',
       'Availability',
-      'Roster',
       'Analytics',
     ])
   })
@@ -132,7 +142,7 @@ describe('AppShell navigation structure', () => {
   })
 
   it('labels team coverage separately from personal shifts in staff nav', () => {
-    expect(shellConfigSource).toContain("label: 'Team schedule'")
+    expect(shellConfigSource).toContain("label: 'Schedule'")
   })
   it('routes manager Inbox section to the manager dashboard', () => {
     expect(shellConfigSource).toContain("label: 'Inbox'")
@@ -145,13 +155,13 @@ describe('AppShell navigation structure', () => {
     expect(shellConfigSource).toContain("key: 'people'")
   })
 
-  it('puts Home, Coverage, Approvals, Publish, Availability, Roster, and Analytics under the Schedule section', () => {
+  it('puts Home, Coverage, Approvals, Publish, History, Availability, and Analytics under the Schedule section', () => {
     expect(shellConfigSource).toContain("label: 'Home'")
     expect(shellConfigSource).toContain("label: 'Coverage'")
     expect(shellConfigSource).toContain("label: 'Approvals'")
     expect(shellConfigSource).toContain("label: 'Publish'")
+    expect(shellConfigSource).toContain("label: 'History'")
     expect(shellConfigSource).toContain("label: 'Availability'")
-    expect(shellConfigSource).toContain("label: 'Roster'")
     expect(shellConfigSource).toContain("label: 'Analytics'")
   })
 
@@ -159,14 +169,13 @@ describe('AppShell navigation structure', () => {
     expect(localSectionNavSource).toContain('overflow-x-auto')
   })
 
-  it('merges Team and People requests under the People section', () => {
+  it('exposes Team, Open shifts, and Access requests directly under the People section', () => {
     expect(shellConfigSource).toContain("label: 'Team'")
-    expect(shellConfigSource).toContain("label: 'People requests'")
-    // User Access Requests is no longer a separate top-level nav item
-    expect(shellConfigSource).not.toContain("label: 'User Access Requests'")
+    expect(shellConfigSource).toContain("label: 'Open shifts'")
+    expect(shellConfigSource).toContain("label: 'Access requests'")
   })
 
-  it('shows pending badge on People requests sub-item when there are pending access requests', () => {
+  it('shows pending badge on Access requests sub-item when there are pending access requests', () => {
     expect(shellConfigSource).toContain('badgeCount: pendingCount > 0 ? pendingCount : undefined')
   })
 })

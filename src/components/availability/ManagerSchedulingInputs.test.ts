@@ -10,6 +10,18 @@ const source = readFileSync(
   resolve(process.cwd(), 'src/components/availability/ManagerSchedulingInputs.tsx'),
   'utf8'
 )
+const stateSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/useManagerSchedulingState.ts'),
+  'utf8'
+)
+const contextPanelSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/therapist-context-panel.tsx'),
+  'utf8'
+)
+const contextActivitySource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/TherapistContextActivityPanel.tsx'),
+  'utf8'
+)
 
 describe('ManagerSchedulingInputs', () => {
   it('renders the manager workspace shell for the planner surface', () => {
@@ -94,7 +106,7 @@ describe('ManagerSchedulingInputs', () => {
 
     expect(html).toContain('id="staff-scheduling-inputs"')
     expect(html).toContain('data-slot="availability-workspace-primary"')
-    expect(html).toContain('Planning workspace')
+    expect(html).toContain('Availability planning workspace')
     expect(html).toContain('Plan staffing')
     expect(html).toContain('selected therapist inside the current schedule cycle')
     expect(html).toContain('data-slot="availability-workspace-context"')
@@ -127,5 +139,18 @@ describe('ManagerSchedulingInputs', () => {
     expect(source).toContain("defaultSecondaryTab?: 'roster' | 'inbox'")
     expect(source).toContain('defaultSecondaryOpen?: boolean')
     expect(source).toContain('defaultOpen={defaultSecondaryOpen}')
+  })
+
+  it('keeps planner selection and sync logic in a dedicated hook', () => {
+    expect(stateSource).toContain('useManagerSchedulingState')
+    expect(stateSource).toContain('replacePlannerQuery')
+    expect(stateSource).toContain('syncSelection')
+    expect(source).toContain('useManagerSchedulingState')
+  })
+
+  it('keeps therapist activity tabs in a dedicated context subcomponent', () => {
+    expect(contextPanelSource).toContain('TherapistContextActivityPanel')
+    expect(contextActivitySource).toContain('Recent requests')
+    expect(contextActivitySource).toContain('Saved planner dates')
   })
 })

@@ -162,7 +162,7 @@ test.describe.serial('publish history lifecycle', () => {
     createdPublishEventIds.push(eventInsert.data.id)
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto('/publish')
+    await page.goto('/publish/history')
     const eventRow = page
       .locator('tr')
       .filter({ has: page.getByText(cycleLabel).first() })

@@ -4,6 +4,7 @@ import {
   APP_HEADER_HEIGHT,
   buildManagerSections,
   getShellContext,
+  usesAppShell,
 } from '@/components/shell/app-shell-config'
 
 describe('app-shell-config', () => {
@@ -11,7 +12,7 @@ describe('app-shell-config', () => {
     expect(APP_HEADER_HEIGHT).toBe(56)
   })
 
-  it('maps /team into the People section with Team, People requests, and Audit log local items', () => {
+  it('maps /team into the People section with Team, Open shifts, Access requests, and Audit log local items', () => {
     const context = getShellContext({
       pathname: '/team',
       canAccessManagerUi: true,
@@ -21,11 +22,12 @@ describe('app-shell-config', () => {
     expect(context.primaryKey).toBe('people')
     expect(context.localNav?.items.map((item) => item.label)).toEqual([
       'Team',
-      'People requests',
+      'Open shifts',
+      'Access requests',
       'Audit log',
     ])
     expect(
-      context.localNav?.items.find((item) => item.label === 'People requests')?.badgeCount
+      context.localNav?.items.find((item) => item.label === 'Access requests')?.badgeCount
     ).toBe(3)
   })
 
@@ -36,13 +38,13 @@ describe('app-shell-config', () => {
       pendingCount: 0,
     })
 
-    expect(context.primaryKey).toBe('today')
+    expect(context.primaryKey).toBe('inbox')
     expect(context.localNav).toBeNull()
   })
 
-  it('keeps the manager sections grouped into Today, Schedule, and People', () => {
+  it('keeps the manager sections grouped into Inbox, Schedule, and People', () => {
     const sections = buildManagerSections(0)
-    expect(sections.map((section) => section.key)).toEqual(['today', 'schedule', 'people'])
+    expect(sections.map((section) => section.key)).toEqual(['inbox', 'schedule', 'people'])
   })
 
   it('adds Analytics under Schedule and keeps /analytics schedule-active', () => {
@@ -58,7 +60,7 @@ describe('app-shell-config', () => {
     )
   })
 
-  it('distinguishes editable Coverage from read-only Roster in manager local nav', () => {
+  it('keeps schedule local nav focused on workflow pages inside the canonical schedule workspace', () => {
     const context = getShellContext({
       pathname: '/schedule',
       canAccessManagerUi: true,
@@ -67,13 +69,15 @@ describe('app-shell-config', () => {
 
     expect(context.primaryKey).toBe('schedule')
     expect(context.localNav?.items.map((item) => item.label)).toContain('Coverage')
-    expect(context.localNav?.items.map((item) => item.label)).toContain('Roster')
+    expect(context.localNav?.items.map((item) => item.label)).toContain('History')
     expect(context.localNav?.items.find((item) => item.label === 'Coverage')?.href).toBe(
       '/coverage'
     )
-    expect(context.localNav?.items.find((item) => item.label === 'Roster')?.href).toBe('/schedule')
-    expect(
-      context.localNav?.items.find((item) => item.label === 'Roster')?.active('/schedule')
-    ).toBe(true)
+    expect(context.localNav?.items.map((item) => item.label)).not.toContain('Roster')
+  })
+
+  it('keeps /staff child routes inside the authenticated app shell', () => {
+    expect(usesAppShell('/staff/my-schedule')).toBe(true)
+    expect(usesAppShell('/staff/history')).toBe(true)
   })
 })

@@ -1,8 +1,19 @@
 import { createElement } from 'react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { AvailabilityStatusSummary } from '@/components/availability/AvailabilityStatusSummary'
+
+const source = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/AvailabilityStatusSummary.tsx'),
+  'utf8'
+)
+const listSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/AvailabilityStatusSummaryList.tsx'),
+  'utf8'
+)
 
 describe('AvailabilityStatusSummary', () => {
   it('renders a compact response roster with dense filters and submission metadata', () => {
@@ -80,5 +91,11 @@ describe('AvailabilityStatusSummary', () => {
 
     expect(html).toContain('max-h-[420px]')
     expect(html).not.toMatch(/flex-1.*overflow-y-auto|overflow-y-auto.*flex-1/)
+  })
+
+  it('keeps roster row rendering in a dedicated summary list component', () => {
+    expect(source).toContain('AvailabilityStatusSummaryList')
+    expect(listSource).toContain('No therapists match the current roster filter.')
+    expect(listSource).toContain('Last activity')
   })
 })

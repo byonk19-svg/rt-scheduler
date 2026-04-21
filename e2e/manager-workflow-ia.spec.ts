@@ -24,7 +24,7 @@ test('manager navigates through inbox and schedule home', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'Coverage', exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Approvals', exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Publish', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'History', exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Availability', exact: true })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Roster', exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Analytics', exact: true })).toBeVisible()
 })

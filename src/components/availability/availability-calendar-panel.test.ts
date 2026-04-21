@@ -1,8 +1,19 @@
 import { createElement } from 'react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { AvailabilityCalendarPanel } from '@/components/availability/availability-calendar-panel'
+
+const source = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/availability-calendar-panel.tsx'),
+  'utf8'
+)
+const gridSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/AvailabilityCalendarGrid.tsx'),
+  'utf8'
+)
 
 describe('AvailabilityCalendarPanel', () => {
   it('renders month navigation, weekday headings, and selected saved dates', () => {
@@ -42,5 +53,11 @@ describe('AvailabilityCalendarPanel', () => {
     expect(html).toContain('Sa')
     expect(html).toContain('data-status="will_work"')
     expect(html).toContain('data-in-cycle="false"')
+  })
+
+  it('keeps the interactive day grid in a dedicated calendar subcomponent', () => {
+    expect(source).toContain('AvailabilityCalendarGrid')
+    expect(gridSource).toContain('data-saved-kind')
+    expect(gridSource).toContain('data-status')
   })
 })

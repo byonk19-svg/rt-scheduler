@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils'
 
-type AvailabilitySummaryChip = {
+export type AvailabilitySummaryChip = {
   label: string
   count: number
   href: string
