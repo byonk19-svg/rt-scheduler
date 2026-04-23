@@ -802,6 +802,13 @@ export function CoverageClientPage({
     [handleSelect]
   )
 
+  const handleRosterQuickAssign = useCallback(
+    (date: string, memberId: string, role: 'lead' | 'staff') => {
+      void assignTherapistToDay(date, memberId, role, { inline: true })
+    },
+    [assignTherapistToDay]
+  )
+
   const handleChangeStatus = useCallback(
     async (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => {
       if (!canUpdateAssignmentStatus) return
@@ -1439,6 +1446,7 @@ export function CoverageClientPage({
                   selectedDayId={deferredSelectedId}
                   cellError={rosterCellError}
                   onOpenEditor={handleRosterOpenEditor}
+                  onQuickAssign={handleRosterQuickAssign}
                   onChangeStatus={handleChangeStatus}
                 />
               ) : (

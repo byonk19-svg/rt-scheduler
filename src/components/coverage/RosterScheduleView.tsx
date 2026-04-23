@@ -27,6 +27,7 @@ type RosterScheduleViewProps = {
   selectedDayId?: string | null
   cellError?: { dayId: string; memberId: string; message: string } | null
   onOpenEditor?: (dayId: string) => void
+  onQuickAssign?: (date: string, memberId: string, role: 'lead' | 'staff') => void
   onChangeStatus?: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
 }
 
@@ -314,6 +315,7 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
   cellError,
   assignedMemberCounts,
   onOpenEditor,
+  onQuickAssign,
   onChangeStatus,
 }: {
   weekDates: string[]
@@ -325,6 +327,7 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
   cellError: { dayId: string; memberId: string; message: string } | null
   assignedMemberCounts: Map<string, number>
   onOpenEditor?: (dayId: string) => void
+  onQuickAssign?: (date: string, memberId: string, role: 'lead' | 'staff') => void
   onChangeStatus?: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
 }) {
   const weekGroups = chunkRosterWeeks(weekDates)
@@ -349,14 +352,20 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
     )
 
     if (intent === 'manage' || intent === 'quick_assign') {
+      const handleClick = () => {
+        if (intent === 'quick_assign' && onQuickAssign) {
+          const leadRole = member.role === 'lead' && !day?.leadShift ? 'lead' : 'staff'
+          onQuickAssign(date, member.id, leadRole)
+        } else {
+          onOpenEditor?.(date)
+        }
+      }
       const trigger = (
         <button
           type="button"
-          onClick={() => {
-            onOpenEditor?.(date)
-          }}
+          onClick={handleClick}
           className={sharedClass}
-          title={cell ? 'Open day editor' : 'Add from day editor'}
+          title={cell ? 'Open day editor' : 'Assign to shift'}
         >
           {token || '+'}
         </button>
@@ -500,6 +509,7 @@ const RosterSection = memo(function RosterSection({
   selectedDayId,
   cellError,
   onOpenEditor,
+  onQuickAssign,
   onChangeStatus,
 }: {
   label: string
@@ -512,6 +522,7 @@ const RosterSection = memo(function RosterSection({
   selectedDayId: string | null
   cellError: { dayId: string; memberId: string; message: string } | null
   onOpenEditor?: (dayId: string) => void
+  onQuickAssign?: (date: string, memberId: string, role: 'lead' | 'staff') => void
   onChangeStatus?: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
 }) {
   const assignedMemberCounts = useMemo(
@@ -541,6 +552,7 @@ const RosterSection = memo(function RosterSection({
         cellError={cellError}
         assignedMemberCounts={assignedMemberCounts}
         onOpenEditor={onOpenEditor}
+        onQuickAssign={onQuickAssign}
         onChangeStatus={onChangeStatus}
       />
     </section>
@@ -559,6 +571,7 @@ export const RosterScheduleView = memo(function RosterScheduleView({
   selectedDayId = null,
   cellError = null,
   onOpenEditor,
+  onQuickAssign,
   onChangeStatus,
 }: RosterScheduleViewProps) {
   const sections = buildRosterSections(members)
@@ -573,7 +586,7 @@ export const RosterScheduleView = memo(function RosterScheduleView({
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-muted/15 px-3 py-2 text-[11px] text-muted-foreground">
         <span className="font-semibold text-foreground">Roster matrix legend</span>
         <span className="rounded border border-border/70 bg-background px-1.5 py-0.5 font-semibold text-foreground">+</span>
-        <span>Open day editor to add coverage</span>
+        <span>Click to assign directly</span>
         <span className="rounded border border-border/70 bg-background px-1.5 py-0.5 font-semibold text-foreground">1</span>
         <span>Scheduled</span>
         <span className="rounded border border-border/70 bg-background px-1.5 py-0.5 font-semibold text-foreground">OC/LE/CX/CI</span>
@@ -610,6 +623,7 @@ export const RosterScheduleView = memo(function RosterScheduleView({
         selectedDayId={selectedDayId}
         cellError={cellError}
         onOpenEditor={onOpenEditor}
+        onQuickAssign={onQuickAssign}
         onChangeStatus={onChangeStatus}
         />
       </div>
@@ -627,6 +641,7 @@ export const RosterScheduleView = memo(function RosterScheduleView({
             selectedDayId={selectedDayId}
             cellError={cellError}
             onOpenEditor={onOpenEditor}
+            onQuickAssign={onQuickAssign}
             onChangeStatus={onChangeStatus}
           />
         </div>
