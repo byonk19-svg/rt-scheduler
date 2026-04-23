@@ -115,14 +115,21 @@ export default function SignUpPage() {
     <div className="flex min-h-[calc(100vh-73px)]">
       {/* Left brand panel — desktop only */}
       <aside className="relative hidden overflow-hidden bg-[var(--sidebar)] lg:flex lg:w-[440px] lg:shrink-0 lg:flex-col lg:justify-between lg:p-12">
+        {/* Grid texture */}
         <div
           aria-hidden
-          className="absolute inset-0"
+          className="pointer-events-none absolute inset-0 opacity-[0.055]"
           style={{
             backgroundImage:
-              'linear-gradient(color-mix(in srgb, var(--sidebar-primary) 7%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--sidebar-primary) 7%, transparent) 1px, transparent 1px)',
-            backgroundSize: '28px 28px',
+              'linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)',
+            backgroundSize: '32px 32px',
           }}
+        />
+        {/* Amber right stripe */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute bottom-0 right-0 top-0 z-10 w-1 opacity-70"
+          style={{ background: 'var(--attention)' }}
         />
         <div className="relative flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--attention)] shadow-tw-md-soft">
@@ -133,12 +140,24 @@ export default function SignUpPage() {
             <p className="text-[0.7rem] text-[var(--sidebar-foreground)]">Respiratory Therapy</p>
           </div>
         </div>
-        <div className="relative space-y-5 border-l-[4px] border-[var(--attention)]/45 pl-6">
-          <p className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-sidebar-primary/85">
-            Scheduling for RT teams
-          </p>
+        <div className="relative space-y-4">
+          <div className="flex items-center gap-2">
+            <div
+              className="h-[2.5px] w-8 shrink-0 rounded-sm"
+              style={{ background: 'var(--attention)' }}
+            />
+            <p
+              className="text-[9.5px] font-bold uppercase tracking-[0.18em]"
+              style={{ color: 'rgba(255,255,255,0.4)', whiteSpace: 'nowrap' }}
+            >
+              Scheduling for RT teams
+            </p>
+          </div>
           <div className="space-y-3">
-            <p className="font-display text-[1.95rem] font-bold leading-[1.06] tracking-[-0.035em] text-sidebar-primary xl:text-[2.35rem]">
+            <p
+              className="font-display leading-[1.08] text-sidebar-primary"
+              style={{ fontSize: '2.625rem', letterSpacing: '-0.02em' }}
+            >
               Scheduling that keeps care moving.
             </p>
             <p className="text-sm font-medium leading-relaxed text-[var(--sidebar-foreground)]">

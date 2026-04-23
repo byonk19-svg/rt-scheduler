@@ -1,14 +1,14 @@
 import type { Metadata } from 'next'
-import { DM_Sans, Geist_Mono } from 'next/font/google'
+import { Geist_Mono, Plus_Jakarta_Sans } from 'next/font/google'
 import { cookies } from 'next/headers'
 import { getServerThemeClass, THEME_KEY } from '@/lib/theme'
 import { getSiteUrl, getSupabaseOrigin } from '@/lib/site-url'
 import './globals.css'
 
-const dmSans = DM_Sans({
+const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ['latin'],
   display: 'swap',
-  variable: '--font-dm-sans',
+  variable: '--font-plus-jakarta-sans',
 })
 
 const geistMono = Geist_Mono({
@@ -68,14 +68,16 @@ export default async function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={[dmSans.variable, geistMono.variable, themeClass].filter(Boolean).join(' ')}
+      className={[plusJakartaSans.variable, geistMono.variable, themeClass]
+        .filter(Boolean)
+        .join(' ')}
     >
       <head>
         {supabaseOrigin ? (
           <link rel="preconnect" href={supabaseOrigin} crossOrigin="anonymous" />
         ) : null}
       </head>
-      <body className={`${dmSans.className} antialiased`}>{children}</body>
+      <body className={`${plusJakartaSans.className} antialiased`}>{children}</body>
     </html>
   )
 }

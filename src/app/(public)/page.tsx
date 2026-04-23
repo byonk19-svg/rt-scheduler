@@ -1,127 +1,207 @@
 import type { Metadata } from 'next'
-import Image from 'next/image'
 import Link from 'next/link'
-import { CalendarDays } from 'lucide-react'
-
-import { Button } from '@/components/ui/button'
 
 export const metadata: Metadata = {
   title: 'Scheduling for respiratory therapy teams',
   description:
-    'Keep schedules, availability, and coverage in one calm view. Built for RT teams who need shift clarity and fewer back-and-forth messages.',
+    "Coverage planning, availability, and shift management — built for RT departments that can't afford gaps.",
 }
 
-const trustNotes = [
-  'Availability stays visible before the next handoff.',
-  'Coverage changes stay clear without the back-and-forth.',
+const features = [
+  {
+    title: 'Shift coverage',
+    body: 'Availability stays visible before the next handoff — no chasing threads.',
+  },
+  {
+    title: 'Manager control',
+    body: "Sign-in and roster access stay under your manager's control at all times.",
+  },
+  {
+    title: 'Clear handoffs',
+    body: 'Coverage changes stay clear without the back-and-forth.',
+  },
 ]
-
-const therapistSubcopy =
-  'Built for respiratory therapists who need quick shift clarity, fewer back-and-forth messages, and a workspace they can trust before the next handoff.'
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-background">
-      <section className="teamwise-home-luminous relative overflow-hidden">
-        <div aria-hidden className="teamwise-home-grid absolute inset-0" />
+    <div className="min-h-screen bg-background" style={{ fontFamily: 'inherit' }}>
+      {/* ── Hero: full-bleed dark teal ── */}
+      <div className="relative overflow-hidden bg-[var(--sidebar)]">
+        {/* Grid texture */}
         <div
           aria-hidden
-          className="absolute left-[4%] top-24 h-40 w-40 rounded-full bg-[var(--home-glow-warm)] blur-2xl"
+          className="pointer-events-none absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)',
+            backgroundSize: '40px 40px',
+          }}
         />
+        {/* Amber right stripe */}
         <div
           aria-hidden
-          className="absolute right-[8%] top-16 h-56 w-56 rounded-full bg-[var(--home-glow-cool)] blur-2xl"
+          className="pointer-events-none absolute bottom-0 right-0 top-0 z-10 w-[5px] opacity-80"
+          style={{ background: 'var(--attention)' }}
         />
 
-        <div className="relative mx-auto w-full max-w-6xl px-6 pb-16 pt-16 lg:pb-24 lg:pt-24">
-          <div className="flex flex-col gap-10 lg:grid lg:grid-cols-12 lg:items-start lg:gap-x-12 lg:gap-y-12">
-            <div className="flex flex-col gap-10 lg:col-span-7">
-              <div className="fade-up space-y-6 border-l-[5px] border-primary/40 pl-5 sm:pl-7">
-                <p className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-primary/80">
-                  Scheduling for RT teams
-                </p>
-                <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--attention)]/30 bg-card/80 px-4 py-2 text-xs font-semibold tracking-[0.02em] text-[var(--attention)] shadow-tw-sm">
-                  <CalendarDays className="h-3.5 w-3.5" />
-                  Built for respiratory therapy teams
-                </div>
-
-                <div className="space-y-7">
-                  <h1 className="max-w-[14ch] text-balance font-display text-[3.65rem] font-bold leading-[0.92] tracking-[-0.058em] text-foreground sm:max-w-[18ch] sm:text-[5.1rem] lg:max-w-[13ch] lg:text-[6.85rem] xl:text-[7.35rem]">
-                    Keep your schedule, availability, and coverage in one calm view.
-                  </h1>
-                  <p className="max-w-xl text-[1.08rem] font-medium leading-8 text-foreground/75 sm:text-lg sm:leading-8">
-                    {therapistSubcopy}
-                  </p>
-                </div>
-              </div>
-
-              <div
-                className="fade-up flex flex-col gap-4 sm:flex-row sm:items-center"
-                style={{ animationDelay: '80ms' }}
-              >
-                <Button
-                  asChild
-                  size="lg"
-                  className="h-12 min-h-11 min-w-[180px] rounded-xl text-base font-semibold shadow-tw-primary-glow"
-                >
-                  <Link href="/login">Sign in</Link>
-                </Button>
-                <Button
-                  asChild
-                  variant="outline"
-                  size="lg"
-                  className="h-12 min-h-11 min-w-[180px] rounded-xl border-border/70 bg-card/80 text-base font-semibold hover:bg-card"
-                >
-                  <Link href="/signup">Create account</Link>
-                </Button>
-              </div>
-
-              <div className="fade-up flex flex-col gap-4" style={{ animationDelay: '120ms' }}>
-                <p className="text-sm text-muted-foreground">
-                  Your manager will need to approve your account before your first sign-in.
-                </p>
-                <ul className="flex flex-col gap-3 border-l border-border/60 pl-4 sm:flex-row sm:flex-wrap sm:gap-x-8 sm:border-l-0 sm:pl-0">
-                  {trustNotes.map((note) => (
-                    <li key={note} className="flex min-w-0 items-start gap-2.5 sm:items-center">
-                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-sm bg-[var(--primary)]/80 sm:mt-0 sm:h-1.5 sm:w-1.5 sm:rounded-full" />
-                      <span className="text-sm font-medium leading-snug text-foreground/70">
-                        {note}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            <div
-              className="fade-up relative mt-2 w-full lg:col-span-5 lg:mt-0 lg:pt-4"
-              style={{ animationDelay: '160ms' }}
+        {/* Nav */}
+        <nav className="relative flex h-[62px] items-center justify-between px-[52px]">
+          <Link href="/" className="flex items-center gap-2.5 hover:no-underline">
+            <span
+              className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[8px]"
+              style={{ background: 'var(--attention)' }}
             >
-              <div
-                aria-hidden
-                className="absolute inset-x-6 -bottom-8 h-20 rounded-full bg-[var(--home-glow-cool)]/55 blur-2xl lg:inset-x-2"
-              />
-              <div className="teamwise-home-preview-shell relative overflow-hidden rounded-[2rem] p-3 ring-1 ring-primary/15 md:p-4">
-                <div
-                  aria-hidden
-                  className="teamwise-home-preview-sheen pointer-events-none absolute inset-x-0 top-0 h-28"
+              <svg width="19" height="19" viewBox="0 0 20 20" fill="none">
+                <rect
+                  x="2.5"
+                  y="4"
+                  width="15"
+                  height="13"
+                  rx="2"
+                  stroke="white"
+                  strokeWidth="1.6"
                 />
-                <div className="relative min-h-[300px] overflow-hidden rounded-[1.5rem] border border-border/50 bg-card/90 sm:min-h-[380px] lg:min-h-[420px]">
-                  <Image
-                    src="/images/app-preview.png"
-                    alt="Teamwise schedule view"
-                    fill
-                    className="object-cover object-top"
-                    priority
-                    sizes="(min-width: 1024px) 960px, (min-width: 640px) 92vw, 100vw"
-                  />
-                  <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-[var(--background)] via-[color-mix(in_srgb,var(--card)_84%,transparent)] to-transparent" />
-                </div>
-              </div>
-            </div>
+                <line x1="2.5" y1="8" x2="17.5" y2="8" stroke="white" strokeWidth="1.6" />
+                <line
+                  x1="7"
+                  y1="2"
+                  x2="7"
+                  y2="5.5"
+                  stroke="white"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+                <line
+                  x1="13"
+                  y1="2"
+                  x2="13"
+                  y2="5.5"
+                  stroke="white"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </span>
+            <span>
+              <span className="block text-[15px] font-bold leading-tight text-white">Teamwise</span>
+              <span
+                className="block text-[11px] leading-none"
+                style={{ color: 'rgba(255,255,255,0.45)', marginTop: 1 }}
+              >
+                Respiratory Therapy
+              </span>
+            </span>
+          </Link>
+
+          <div className="flex items-center gap-1.5">
+            <Link
+              href="/login"
+              className="rounded-lg px-[14px] py-2 text-[13.5px] font-medium hover:no-underline"
+              style={{ color: 'rgba(255,255,255,0.55)', background: 'none' }}
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/signup"
+              className="rounded-lg px-5 py-[9px] text-[13.5px] font-bold hover:brightness-110 hover:no-underline"
+              style={{
+                background: 'var(--attention)',
+                color: 'var(--sidebar)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Create account
+            </Link>
+          </div>
+        </nav>
+
+        {/* Hero copy */}
+        <div className="relative mx-auto max-w-[900px] px-[52px] pb-[84px] pt-[72px]">
+          <div className="mb-[30px] flex items-center gap-3">
+            <div
+              className="h-[2.5px] w-8 shrink-0 rounded-sm"
+              style={{ background: 'var(--attention)' }}
+            />
+            <span
+              className="text-[10.5px] font-bold uppercase tracking-[0.18em]"
+              style={{
+                color: 'rgba(255,255,255,0.45)',
+                whiteSpace: 'nowrap',
+                letterSpacing: '0.18em',
+              }}
+            >
+              Scheduling for RT teams
+            </span>
+          </div>
+
+          <h1
+            className="font-display mb-7 max-w-[780px] text-[80px] font-normal leading-[1.0] text-white"
+            style={{ letterSpacing: '-0.01em' }}
+          >
+            Scheduling that keeps care moving.
+          </h1>
+
+          <p
+            className="mb-12 max-w-[480px] text-[17px] leading-[1.65]"
+            style={{ color: 'rgba(255,255,255,0.5)' }}
+          >
+            Coverage planning, availability, and shift management — built for RT departments that
+            can&apos;t afford gaps.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/login"
+              className="rounded-lg px-8 py-[14px] text-[15px] font-bold hover:brightness-110 hover:no-underline"
+              style={{
+                background: 'var(--attention)',
+                color: 'var(--sidebar)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/signup"
+              className="rounded-lg border px-8 py-[14px] text-[15px] font-medium text-white hover:no-underline"
+              style={{
+                borderColor: 'rgba(255,255,255,0.22)',
+                background: 'none',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Request access
+            </Link>
+            <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
+              Manager approval required.
+            </span>
           </div>
         </div>
-      </section>
+
+        {/* Section break */}
+        <div className="relative h-px" style={{ background: 'rgba(255,255,255,0.07)' }}>
+          <div
+            className="absolute left-[52px] top-[-4px] h-2 w-2 rounded-full"
+            style={{ background: 'var(--attention)' }}
+          />
+        </div>
+      </div>
+
+      {/* ── Feature strip ── */}
+      <div className="mx-auto max-w-[900px] px-[52px] pb-16 pt-[52px]">
+        <div className="grid grid-cols-3 gap-12">
+          {features.map(({ title, body }) => (
+            <div key={title}>
+              <div
+                className="mb-[14px] h-[3px] w-7 rounded-sm"
+                style={{ background: 'var(--attention)' }}
+              />
+              <div className="mb-2 text-[14px] font-bold text-foreground">{title}</div>
+              <div className="text-[13px] leading-[1.65] text-muted-foreground">{body}</div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

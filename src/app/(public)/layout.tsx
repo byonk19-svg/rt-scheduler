@@ -1,15 +1,16 @@
 import type { Metadata } from 'next'
-import { Fraunces } from 'next/font/google'
+import { Instrument_Serif } from 'next/font/google'
 import dynamic from 'next/dynamic'
 
 import { cn } from '@/lib/utils'
 
-const PublicHeader = dynamic(() =>
-  import('@/components/public/PublicHeader').then((m) => m.default ?? (() => null))
+const PublicHeaderConditional = dynamic(() =>
+  import('@/components/public/PublicHeaderConditional').then((m) => m.default ?? (() => null))
 )
 
-const fraunces = Fraunces({
+const instrumentSerif = Instrument_Serif({
   subsets: ['latin'],
+  weight: '400',
   display: 'swap',
   variable: '--font-display',
 })
@@ -24,7 +25,7 @@ export default function PublicLayout({
   children: React.ReactNode
 }>) {
   return (
-    <div className={`${fraunces.variable} min-h-screen bg-background`}>
+    <div className={`${instrumentSerif.variable} min-h-screen bg-background`}>
       <a
         href="#main-content"
         className={cn(
@@ -35,7 +36,7 @@ export default function PublicLayout({
       >
         Skip to main content
       </a>
-      <PublicHeader />
+      <PublicHeaderConditional />
       <main id="main-content" tabIndex={-1} className="outline-none">
         {children}
       </main>
