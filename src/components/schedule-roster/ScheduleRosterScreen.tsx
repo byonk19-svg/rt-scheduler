@@ -9,6 +9,7 @@ import { RosterTable } from '@/components/schedule-roster/RosterTable'
 import { ScheduleCycleSelect } from '@/components/schedule-roster/ScheduleCycleSelect'
 import { ScheduleHeader } from '@/components/schedule-roster/ScheduleHeader'
 import { SegmentedControl } from '@/components/schedule-roster/SegmentedControl'
+import { WorkspaceHero } from '@/components/shell/WorkspaceHero'
 import { Badge } from '@/components/ui/badge'
 import { buildRosterWeeks, type ShiftType } from '@/lib/mock-coverage-roster'
 import { splitStaffByRosterAndShift } from '@/lib/schedule-roster-data'
@@ -46,6 +47,27 @@ export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
 
   return (
     <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+      <WorkspaceHero
+        eyebrow={`${selectedShift === 'day' ? 'Day shift' : 'Night shift'} · ${live.shortLabel}`}
+        title="Schedule"
+        metrics={[
+          {
+            label: 'Cycle',
+            value: live.label,
+          },
+          {
+            label: 'Weeks',
+            value: '6',
+          },
+        ]}
+        actions={
+          <>
+            <ScheduleCycleSelect cycles={live.availableCycles} activeCycleId={live.cycleId} />
+            <ActionBar showMockWorkflow={false} />
+          </>
+        }
+      />
+
       <section className="rounded-[2rem] border border-border/80 bg-card/80 px-5 py-5 shadow-tw-md-soft sm:px-6 sm:py-6">
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -55,7 +77,6 @@ export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
               dateRange={live.shortLabel}
               helperText={helperText}
             />
-            <ActionBar showMockWorkflow={false} />
           </div>
 
           <div className="flex flex-col gap-4 rounded-[1.75rem] border border-border/80 bg-background/60 px-4 py-4">
@@ -70,7 +91,6 @@ export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
                 <span className="rounded-full border border-border/80 bg-card px-3 py-1 text-sm font-medium text-foreground">
                   {live.label}
                 </span>
-                <ScheduleCycleSelect cycles={live.availableCycles} activeCycleId={live.cycleId} />
               </div>
 
               <div className="flex flex-wrap items-center gap-3">

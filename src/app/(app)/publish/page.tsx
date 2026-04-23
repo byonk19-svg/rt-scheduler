@@ -72,27 +72,13 @@ type PublishHistoryPageProps = {
 function StatusChip({ status }: { status: 'success' | 'failed' }) {
   if (status === 'success') {
     return (
-      <span
-        className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-        style={{
-          borderColor: 'var(--success-border)',
-          backgroundColor: 'var(--success-subtle)',
-          color: 'var(--success-text)',
-        }}
-      >
+      <span className="inline-flex items-center rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--success-text)]">
         Success
       </span>
     )
   }
   return (
-    <span
-      className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-      style={{
-        borderColor: 'var(--error-border)',
-        backgroundColor: 'var(--error-subtle)',
-        color: 'var(--error-text)',
-      }}
-    >
+    <span className="inline-flex items-center rounded-full border border-[var(--error-border)] bg-[var(--error-subtle)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--error-text)]">
       Failed
     </span>
   )
@@ -139,14 +125,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
           </h1>
           <p className="mt-0.5 text-xs text-muted-foreground">Schedule email delivery log.</p>
         </div>
-        <div
-          className="rounded-xl border px-4 py-3 text-sm font-medium"
-          style={{
-            borderColor: 'var(--error-border)',
-            backgroundColor: 'var(--error-subtle)',
-            color: 'var(--error-text)',
-          }}
-        >
+        <div className="rounded-xl border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 py-3 text-sm font-medium text-[var(--error-text)]">
           Could not load publish history. Please try refreshing.
         </div>
       </div>
@@ -196,68 +175,33 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
       </div>
 
       {resolvedSearchParams.success === 'cycle_restarted' && (
-        <div
-          className="rounded-xl border px-4 py-3 text-sm font-medium"
-          style={{
-            borderColor: 'var(--warning-border)',
-            backgroundColor: 'var(--warning-subtle)',
-            color: 'var(--warning-text)',
-          }}
-        >
+        <div className="rounded-xl border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-4 py-3 text-sm font-medium text-[var(--warning-text)]">
           Cycle restarted. The block is draft again, published shifts were cleared, and any active
           preliminary snapshot was closed.
         </div>
       )}
 
       {resolvedSearchParams.success === 'unpublished_keep_shifts' && (
-        <div
-          className="rounded-xl border px-4 py-3 text-sm font-medium"
-          style={{
-            borderColor: 'var(--success-border)',
-            backgroundColor: 'var(--success-subtle)',
-            color: 'var(--success-text)',
-          }}
-        >
+        <div className="rounded-xl border border-[var(--success-border)] bg-[var(--success-subtle)] px-4 py-3 text-sm font-medium text-[var(--success-text)]">
           Block unpublished. Assignments stay on the draft grid; staff no longer see it as a
           published schedule until you publish again.
         </div>
       )}
 
       {resolvedSearchParams.success === 'publish_event_deleted' && (
-        <div
-          className="rounded-xl border px-4 py-3 text-sm font-medium"
-          style={{
-            borderColor: 'var(--success-border)',
-            backgroundColor: 'var(--success-subtle)',
-            color: 'var(--success-text)',
-          }}
-        >
+        <div className="rounded-xl border border-[var(--success-border)] bg-[var(--success-subtle)] px-4 py-3 text-sm font-medium text-[var(--success-text)]">
           Publish history entry deleted.
         </div>
       )}
 
       {resolvedSearchParams.success === 'cycle_archived' && (
-        <div
-          className="rounded-xl border px-4 py-3 text-sm font-medium"
-          style={{
-            borderColor: 'var(--success-border)',
-            backgroundColor: 'var(--success-subtle)',
-            color: 'var(--success-text)',
-          }}
-        >
+        <div className="rounded-xl border border-[var(--success-border)] bg-[var(--success-subtle)] px-4 py-3 text-sm font-medium text-[var(--success-text)]">
           Cycle archived. It will no longer appear in Coverage or availability views.
         </div>
       )}
 
       {resolvedSearchParams.success === 'cycle_deleted' && (
-        <div
-          className="rounded-xl border px-4 py-3 text-sm font-medium"
-          style={{
-            borderColor: 'var(--success-border)',
-            backgroundColor: 'var(--success-subtle)',
-            color: 'var(--success-text)',
-          }}
-        >
+        <div className="rounded-xl border border-[var(--success-border)] bg-[var(--success-subtle)] px-4 py-3 text-sm font-medium text-[var(--success-text)]">
           Draft schedule block deleted.
         </div>
       )}
@@ -275,14 +219,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
         resolvedSearchParams.error === 'delete_cycle_not_found' ||
         resolvedSearchParams.error === 'delete_cycle_published' ||
         resolvedSearchParams.error === 'delete_cycle_failed') && (
-        <div
-          className="rounded-xl border px-4 py-3 text-sm font-medium"
-          style={{
-            borderColor: 'var(--error-border)',
-            backgroundColor: 'var(--error-subtle)',
-            color: 'var(--error-text)',
-          }}
-        >
+        <div className="rounded-xl border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 py-3 text-sm font-medium text-[var(--error-text)]">
           {resolvedSearchParams.error === 'missing_cycle'
             ? 'Could not restart that cycle because no cycle was selected.'
             : resolvedSearchParams.error === 'cycle_restart_failed'
@@ -314,14 +251,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
       )}
 
       {hasDraftCycles && (
-        <div
-          className="rounded-xl border px-4 py-3"
-          style={{
-            borderColor: 'var(--info-border)',
-            backgroundColor: 'var(--info-subtle)',
-            color: 'var(--info-text)',
-          }}
-        >
+        <div className="rounded-xl border border-[var(--info-border)] bg-[var(--info-subtle)] px-4 py-3 text-[var(--info-text)]">
           <p className="text-xs font-semibold">Ready to publish a draft?</p>
           <p className="mt-0.5 text-xs">
             Open the cycle in Schedule using the link below, then click <strong>Publish</strong> in
@@ -399,7 +329,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                 <input type="hidden" name="cycle_id" value={cycle.id} />
                                 <button
                                   type="submit"
-                                  className="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80"
+                                  className="inline-flex min-h-11 items-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80 sm:h-8 sm:min-h-8"
                                 >
                                   Take offline
                                 </button>
@@ -409,7 +339,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                 <button
                                   type="submit"
                                   title="Draft again and clear all assignments for this block"
-                                  className="inline-flex h-8 items-center rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 text-xs font-semibold text-[var(--warning-text)] transition-opacity hover:opacity-80"
+                                  className="inline-flex min-h-11 items-center rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 text-xs font-semibold text-[var(--warning-text)] transition-opacity hover:opacity-80 sm:h-8 sm:min-h-8"
                                 >
                                   Clear & restart
                                 </button>
@@ -421,7 +351,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                 <input type="hidden" name="cycle_id" value={cycle.id} />
                                 <button
                                   type="submit"
-                                  className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80"
+                                  className="inline-flex min-h-11 items-center gap-1 rounded-md border border-border px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80 sm:h-8 sm:min-h-8"
                                 >
                                   <Archive className="h-3.5 w-3.5" />
                                   Archive
@@ -432,7 +362,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                 <input type="hidden" name="return_to" value="publish" />
                                 <button
                                   type="submit"
-                                  className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 text-xs font-semibold text-[var(--error-text)] transition-opacity hover:opacity-80"
+                                  className="inline-flex min-h-11 items-center gap-1 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 text-xs font-semibold text-[var(--error-text)] transition-opacity hover:opacity-80 sm:h-8 sm:min-h-8"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                   Delete draft
@@ -551,7 +481,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                 <input type="hidden" name="cycle_id" value={event.cycle_id} />
                                 <button
                                   type="submit"
-                                  className="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80"
+                                  className="inline-flex min-h-11 items-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80 sm:h-8 sm:min-h-8"
                                 >
                                   Take offline
                                 </button>
@@ -561,7 +491,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                 <button
                                   type="submit"
                                   title="Draft again and clear all assignments for this block"
-                                  className="inline-flex h-8 items-center rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 text-xs font-semibold text-[var(--warning-text)] transition-opacity hover:opacity-80"
+                                  className="inline-flex min-h-11 items-center rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 text-xs font-semibold text-[var(--warning-text)] transition-opacity hover:opacity-80 sm:h-8 sm:min-h-8"
                                 >
                                   Clear & restart
                                 </button>
@@ -574,7 +504,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                 <input type="hidden" name="cycle_id" value={event.cycle_id} />
                                 <button
                                   type="submit"
-                                  className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80"
+                                  className="inline-flex min-h-11 items-center gap-1 rounded-md border border-border px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80 sm:h-8 sm:min-h-8"
                                 >
                                   <Archive className="h-3.5 w-3.5" />
                                   Archive cycle
@@ -584,7 +514,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                 <input type="hidden" name="publish_event_id" value={event.id} />
                                 <button
                                   type="submit"
-                                  className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 text-xs font-semibold text-[var(--error-text)] transition-opacity hover:opacity-80"
+                                  className="inline-flex min-h-11 items-center gap-1 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 text-xs font-semibold text-[var(--error-text)] transition-opacity hover:opacity-80 sm:h-8 sm:min-h-8"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                   Delete history

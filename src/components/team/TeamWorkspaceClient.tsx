@@ -3,10 +3,10 @@
 import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useState } from 'react'
 
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import type { TeamProfileRecord, WorkPatternRecord } from '@/components/team/TeamDirectory'
 import type { EmployeeRosterTableRow } from '@/components/team/employee-roster-table'
 import type { TeamSummaryCounts } from '@/components/team/team-directory-model'
-import { cn } from '@/lib/utils'
 
 const TeamDirectory = dynamic(() =>
   import('@/components/team/TeamDirectory').then((module) => module.TeamDirectory ?? (() => null))
@@ -72,44 +72,17 @@ function TeamWorkspaceClient({
 
   return (
     <div className="space-y-3">
-      <div
-        role="tablist"
-        aria-label="Team workspace"
-        className="inline-flex max-w-full flex-nowrap gap-1 overflow-x-auto rounded-lg border border-border/70 bg-muted/20 p-1 sm:flex-wrap sm:overflow-visible"
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'directory'}
-          id="team-tab-directory"
-          aria-controls="team-panel-directory"
-          className={cn(
-            'min-h-11 rounded-md px-3.5 py-2 text-sm font-semibold transition-colors sm:min-h-10 sm:py-1.5',
-            activeTab === 'directory'
-              ? 'bg-card text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          )}
-          onClick={() => setTab('directory')}
-        >
-          Team directory
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'roster'}
-          id="team-tab-roster"
-          aria-controls="team-panel-roster"
-          className={cn(
-            'min-h-11 rounded-md px-3.5 py-2 text-sm font-semibold transition-colors sm:min-h-10 sm:py-1.5',
-            activeTab === 'roster'
-              ? 'bg-card text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          )}
-          onClick={() => setTab('roster')}
-        >
-          Roster admin
-        </button>
-      </div>
+      <SegmentedControl
+        ariaLabel="People workspace"
+        value={activeTab}
+        onChange={setTab}
+        className="rounded-xl border-border/70 bg-muted/20"
+        optionClassName="rounded-lg px-4"
+        options={[
+          { value: 'directory', label: 'Directory' },
+          { value: 'roster', label: 'Roster admin' },
+        ]}
+      />
 
       {activeTab === 'directory' ? (
         <div

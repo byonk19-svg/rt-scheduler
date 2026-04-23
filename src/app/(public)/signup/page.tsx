@@ -133,10 +133,13 @@ export default function SignUpPage() {
             <p className="text-[0.7rem] text-[var(--sidebar-foreground)]">Respiratory Therapy</p>
           </div>
         </div>
-        <div className="relative space-y-5 border-l-[4px] border-[var(--attention)]/45 pl-6">
-          <p className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-sidebar-primary/85">
-            Scheduling for RT teams
-          </p>
+        <div className="relative space-y-5">
+          <div className="flex items-center gap-3">
+            <span className="h-0.5 w-8 rounded-full bg-[var(--attention)]" />
+            <p className="font-mono text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-sidebar-primary/85">
+              Scheduling for RT teams
+            </p>
+          </div>
           <div className="space-y-3">
             <p className="font-display text-[1.95rem] font-bold leading-[1.06] tracking-[-0.035em] text-sidebar-primary xl:text-[2.35rem]">
               Scheduling that keeps care moving.

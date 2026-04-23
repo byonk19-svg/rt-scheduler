@@ -17,6 +17,7 @@ import { ChevronRight, Printer, Send, Sparkles } from 'lucide-react'
 import { MoreActionsMenu } from '@/components/more-actions-menu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { cn } from '@/lib/utils'
 
 import {
@@ -183,46 +184,6 @@ function CoverageSurfaceBanner({
         {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
     </section>
-  )
-}
-
-function CoverageSegmentedControl<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-  testIdPrefix,
-}: {
-  label: string
-  value: T
-  options: readonly { value: T; label: string }[]
-  onChange: (nextValue: T) => void
-  testIdPrefix?: string
-}) {
-  return (
-    <div className="space-y-1">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        {label}
-      </p>
-      <div className="inline-flex overflow-hidden rounded-lg border border-border/70 bg-background">
-        {options.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            data-testid={testIdPrefix ? `${testIdPrefix}-${option.value.toLowerCase()}` : undefined}
-            onClick={() => onChange(option.value)}
-            className={cn(
-              'px-3 py-1.5 text-xs font-medium transition-colors',
-              value === option.value
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground'
-            )}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-    </div>
   )
 }
 
@@ -976,7 +937,7 @@ export function CoverageClientPage({
           <input type="hidden" name="return_to" value="coverage" />
         </form>
 
-        <header className="border-b border-border/70 bg-card/80 px-5 py-4 backdrop-blur">
+        <header className="border-b border-border/70 bg-card/95 px-5 py-4">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
@@ -1196,22 +1157,36 @@ export function CoverageClientPage({
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <CoverageSegmentedControl
-                    label="Layout"
-                    value={renderedViewMode}
-                    options={VIEW_OPTIONS}
-                    onChange={handleViewModeChange}
-                  />
-                  <CoverageSegmentedControl
-                    label="Shift"
-                    value={shiftTab}
-                    options={[
-                      { value: 'Day', label: 'Day shift' },
-                      { value: 'Night', label: 'Night shift' },
-                    ]}
-                    onChange={handleTabSwitch}
-                    testIdPrefix="coverage-shift-tab"
-                  />
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      Layout
+                    </p>
+                    <SegmentedControl
+                      ariaLabel="Coverage layout"
+                      value={renderedViewMode}
+                      onChange={handleViewModeChange}
+                      className="rounded-lg border-border/70 bg-background shadow-none"
+                      optionClassName="min-h-10 rounded-md px-3 py-1.5 text-xs"
+                      options={VIEW_OPTIONS}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      Shift
+                    </p>
+                    <SegmentedControl
+                      ariaLabel="Coverage shift"
+                      value={shiftTab}
+                      onChange={handleTabSwitch}
+                      className="rounded-lg border-border/70 bg-background shadow-none"
+                      optionClassName="min-h-10 rounded-md px-3 py-1.5 text-xs"
+                      getOptionTestId={(value) => `coverage-shift-tab-${value.toLowerCase()}`}
+                      options={[
+                        { value: 'Day', label: 'Day shift' },
+                        { value: 'Night', label: 'Night shift' },
+                      ]}
+                    />
+                  </div>
                 </div>
               </div>
             </section>

@@ -41,9 +41,9 @@ export function CycleFillRateChart({ rows, idealCoveragePerShift }: Props) {
             </div>
             <div className="h-3 overflow-hidden rounded-full bg-[var(--muted)]">
               <div
-                className="h-full rounded-full transition-[width]"
+                className="h-full origin-left rounded-full transition-transform motion-reduce:transition-none"
                 style={{
-                  width: `${Math.max(0, Math.min(row.fillPercent, 100))}%`,
+                  transform: `scaleX(${Math.max(0, Math.min(row.fillPercent, 100)) / 100})`,
                   backgroundColor: getBarColor(row.fillPercent),
                 }}
               />

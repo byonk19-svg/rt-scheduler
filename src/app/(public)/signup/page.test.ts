@@ -11,6 +11,10 @@ const signupPageSource = fs.readFileSync(
   path.join(process.cwd(), 'src/app/(public)/signup/page.tsx'),
   'utf8'
 )
+const loginPageSource = fs.readFileSync(
+  path.join(process.cwd(), 'src/app/(public)/login/page.tsx'),
+  'utf8'
+)
 
 describe('public signup shell', () => {
   it('mounts the shared public header from the public layout', () => {
@@ -24,5 +28,10 @@ describe('public signup shell', () => {
   it('always redirects new signups to the generic requested status', () => {
     expect(signupPageSource).toContain("router.push('/login?status=requested')")
     expect(signupPageSource).not.toContain("'/login?status=matched'")
+  })
+
+  it('removes the old left-accent auth stripe in favor of the shared bar motif', () => {
+    expect(signupPageSource).not.toContain('border-l-[4px]')
+    expect(loginPageSource).not.toContain('border-l-[4px]')
   })
 })

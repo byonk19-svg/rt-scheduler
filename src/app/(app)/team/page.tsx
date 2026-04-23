@@ -10,7 +10,7 @@ import {
   upsertEmployeeRosterEntryAction,
 } from '@/app/team/actions'
 import { FeedbackToast } from '@/components/feedback-toast'
-import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
+import { WorkspaceHero } from '@/components/shell/WorkspaceHero'
 import TeamWorkspaceClient from '@/components/team/TeamWorkspaceClient'
 import type { WorkPatternRecord } from '@/components/team/team-directory-model'
 import { can } from '@/lib/auth/can'
@@ -293,14 +293,19 @@ export default async function TeamPage({
     <div className="max-w-6xl space-y-4 py-5">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
-      <ManagerWorkspaceHeader
-        title="Team"
+      <WorkspaceHero
+        eyebrow="RT department"
+        title="People"
         subtitle="Manage staffing, roles, and roster access from one workspace."
-        className="px-0"
+        metrics={[
+          { label: 'People', value: summary.totalStaff },
+          { label: 'Day shift', value: summary.dayShift },
+          { label: 'Night shift', value: summary.nightShift },
+        ]}
         actions={
           <a
             href="/team/import"
-            className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground shadow-xs transition-colors hover:bg-secondary/70"
+            className="inline-flex min-h-11 items-center justify-center rounded-md border border-white/18 bg-white/8 px-4 text-sm font-medium text-sidebar-primary transition-colors hover:bg-white/12"
           >
             Import
           </a>

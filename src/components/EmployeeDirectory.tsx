@@ -226,7 +226,7 @@ function SortHeaderButton({
       className={cn(
         'inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-semibold transition-colors',
         isActive
-          ? 'bg-secondary text-foreground shadow-[inset_0_0_0_1px_var(--border)]'
+          ? 'bg-secondary text-foreground ring-1 ring-border'
           : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
       )}
       onClick={() => onSort(column)}

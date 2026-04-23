@@ -18,6 +18,7 @@ import { can } from '@/lib/auth/can'
 import type { UiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
+import { WorkspaceHero } from '@/components/shell/WorkspaceHero'
 import { cn } from '@/lib/utils'
 import { loadShiftBoardSnapshot } from '@/lib/shift-board-snapshot'
 import { groupPickupsBySlot } from '@/app/(app)/shift-board/prn-interest-helpers'
@@ -400,58 +401,62 @@ export default function ShiftBoardClientPage({
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-border/70 bg-card px-6 pb-4 pt-5 shadow-tw-float">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
-              Open shifts
-            </h1>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {canReview
-                ? 'Review and approve swap and pickup requests in the live schedule.'
-                : 'Post swaps or pickups for the published schedule only.'}
-            </p>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
-              <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5 text-muted-foreground">
-                {loading ? '--' : openPostCount} open
-              </span>
-              <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5 text-muted-foreground">
-                {loading ? '--' : pending} pending
-              </span>
-              {canReview ? (
-                <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[var(--warning-text)]">
-                  {loading ? '--' : metrics.unfilled + metrics.missingLead} needs attention
-                </span>
-              ) : null}
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
+      <WorkspaceHero
+        eyebrow={canReview ? 'Coverage-aware review queue' : 'Coverage-aware swap'}
+        title={canReview ? 'People Requests' : 'Swap Requests'}
+        subtitle={
+          canReview
+            ? 'Review and approve swap and pickup requests in the live schedule.'
+            : 'Post swaps or pickups for the published schedule only.'
+        }
+        metrics={[
+          { label: 'Open posts', value: loading ? '--' : openPostCount },
+          { label: 'Pending', value: loading ? '--' : pending },
+          {
+            label: canReview ? 'Needs attention' : 'Approved / denied',
+            value: loading
+              ? '--'
+              : canReview
+                ? metrics.unfilled + metrics.missingLead
+                : `${approvedCount}/${deniedCount}`,
+            accentClassName: canReview ? 'text-[var(--attention)]' : undefined,
+          },
+        ]}
+        actions={
+          <>
             <Button
               size="sm"
-              className="gap-1.5 text-xs"
+              className="min-h-11 gap-1.5 bg-[var(--attention)] text-[var(--sidebar)] shadow-none hover:brightness-105"
               onClick={() => router.push('/requests/new')}
             >
               <ArrowRightLeft className="h-3.5 w-3.5" />
               {!canReview && employmentType === 'prn' ? 'Express interest' : 'Post request'}
             </Button>
-            <Button asChild size="sm" variant="outline" className="text-xs">
-              <Link href="/availability">Future availability</Link>
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              className="min-h-11 border-white/18 bg-white/8 text-sidebar-primary hover:bg-white/12 hover:text-sidebar-primary"
+            >
+              <Link href={canReview ? '/coverage' : '/availability'}>
+                {canReview ? 'Open coverage' : 'Future availability'}
+              </Link>
             </Button>
             {!canReview && (
-              <Button asChild size="sm" variant="outline" className="text-xs">
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="min-h-11 border-white/18 bg-white/8 text-sidebar-primary hover:bg-white/12 hover:text-sidebar-primary"
+              >
                 <Link href="/staff/history">View my history</Link>
               </Button>
             )}
-            {canReview && (
-              <Button asChild size="sm" variant="outline" className="text-xs">
-                <Link href="/coverage">Open coverage</Link>
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      <div className="grid grid-cols-2 gap-4 px-6 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiTile
           label="Open posts"
           value={loading ? '--' : openPostCount}
@@ -761,9 +766,9 @@ function FilterPill({
       type="button"
       onClick={onClick}
       className={cn(
-        'h-9 rounded-md border px-3 text-xs font-semibold transition-colors',
+        'min-h-11 rounded-md border px-3 text-xs font-semibold transition-colors sm:h-9 sm:min-h-9',
         active
-          ? 'border-primary bg-primary/10 text-primary shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--primary)_35%,transparent)]'
+          ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary/25'
           : 'border-border bg-card text-muted-foreground hover:bg-secondary'
       )}
     >

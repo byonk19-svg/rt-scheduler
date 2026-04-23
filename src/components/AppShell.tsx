@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { DeferredNotificationBell } from '@/components/DeferredNotificationBell'
 import { AppHeader } from '@/components/shell/AppHeader'
 import { LocalSectionNav } from '@/components/shell/LocalSectionNav'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   APP_PAGE_MAX_WIDTH_CLASS,
   buildManagerSections,
@@ -324,169 +325,156 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
           </main>
         </div>
 
-        {mobileMenuOpen ? (
-          <div
-            className="fixed inset-0 z-40 md:hidden"
-            aria-modal="true"
-            role="dialog"
-            aria-labelledby="mobile-nav-heading"
+        <Dialog open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+          <DialogContent
+            showCloseButton={false}
+            className="app-shell-chrome-primary left-0 top-0 z-40 flex h-dvh max-h-dvh w-[85vw] max-w-[20rem] translate-x-0 translate-y-0 flex-col gap-0 rounded-none border-0 border-r border-sidebar-border p-0 text-sidebar-foreground shadow-tw-app-chrome-sub md:hidden"
           >
-            <button
-              type="button"
-              className="absolute inset-0 bg-black/45"
-              onClick={() => setMobileMenuOpen(false)}
-              aria-label="Close navigation menu"
-            />
-            <aside
-              id="app-shell-mobile-nav"
-              className="app-shell-chrome-primary relative z-10 flex h-full w-[85vw] max-w-[20rem] flex-col overscroll-contain border-r border-sidebar-border text-sidebar-foreground shadow-tw-app-chrome-sub"
-            >
-              <h2 id="mobile-nav-heading" className="sr-only">
-                Navigation menu
-              </h2>
-              <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-4">
-                <Logo />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  onClick={() => setMobileMenuOpen(false)}
-                  aria-label="Close navigation menu"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <nav
-                className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-y-contain px-3 py-3"
-                aria-label="Mobile navigation"
+            <DialogHeader className="sr-only">
+              <DialogTitle>Navigation menu</DialogTitle>
+            </DialogHeader>
+            <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-4">
+              <Logo />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                onClick={() => setMobileMenuOpen(false)}
+                aria-label="Close navigation menu"
               >
-                {canAccessManagerUi ? (
-                  <>
-                    {managerSections.map((section) =>
-                      section.subItems.length > 0 ? (
-                        <div key={section.key}>
-                          <p className="px-2 pb-1 pt-3 text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--sidebar-muted)]">
-                            {section.label}
-                          </p>
-                          {section.subItems.map((item) => {
-                            const active = item.active(pathname)
-                            return (
-                              <Link
-                                key={item.href}
-                                href={item.href}
-                                className={cn(
-                                  'flex min-h-[42px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
-                                  active
-                                    ? APP_SHELL_ACTIVE_NAV_CLASS
-                                    : 'text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground'
-                                )}
-                                aria-current={active ? 'page' : undefined}
-                                onClick={() => setMobileMenuOpen(false)}
-                              >
-                                <span>{item.label}</span>
-                                {item.badgeCount ? (
-                                  <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--attention)] px-1.5 text-[10px] font-bold text-accent-foreground">
-                                    {item.badgeCount}
-                                  </span>
-                                ) : null}
-                              </Link>
-                            )
-                          })}
-                        </div>
-                      ) : (
-                        <Link
-                          key={section.key}
-                          href={section.href}
-                          className={cn(
-                            'flex min-h-[42px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
-                            section.isActive(pathname)
-                              ? APP_SHELL_ACTIVE_NAV_CLASS
-                              : 'text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground'
-                          )}
-                          aria-current={section.isActive(pathname) ? 'page' : undefined}
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <nav
+              className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain px-3 py-3"
+              aria-label="Mobile navigation"
+            >
+              {canAccessManagerUi ? (
+                <>
+                  {managerSections.map((section) =>
+                    section.subItems.length > 0 ? (
+                      <div key={section.key}>
+                        <p className="px-2 pb-1 pt-3 text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--sidebar-muted)]">
                           {section.label}
-                        </Link>
-                      )
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <p className="px-2 pb-2 pt-3 text-[10px] font-medium tracking-[0.08em] text-[color:var(--sidebar-muted)]">
-                      MY SHIFTS
-                    </p>
-                    {primaryItems.map((item) => (
+                        </p>
+                        {section.subItems.map((item) => {
+                          const active = item.active(pathname)
+                          return (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              className={cn(
+                                'flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
+                                active
+                                  ? APP_SHELL_ACTIVE_NAV_CLASS
+                                  : 'text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground'
+                              )}
+                              aria-current={active ? 'page' : undefined}
+                              onClick={() => setMobileMenuOpen(false)}
+                            >
+                              <span>{item.label}</span>
+                              {item.badgeCount ? (
+                                <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--attention)] px-1.5 text-[10px] font-bold text-accent-foreground">
+                                  {item.badgeCount}
+                                </span>
+                              ) : null}
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    ) : (
                       <Link
-                        key={item.href}
-                        href={item.href}
+                        key={section.key}
+                        href={section.href}
                         className={cn(
-                          'flex min-h-[42px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
-                          item.current
+                          'flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
+                          section.isActive(pathname)
                             ? APP_SHELL_ACTIVE_NAV_CLASS
                             : 'text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground'
                         )}
-                        aria-current={item.current ? 'page' : undefined}
+                        aria-current={section.isActive(pathname) ? 'page' : undefined}
                         onClick={() => setMobileMenuOpen(false)}
                       >
-                        {item.label}
+                        {section.label}
                       </Link>
-                    ))}
-                  </>
-                )}
-              </nav>
+                    )
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="px-2 pb-2 pt-3 text-[10px] font-medium tracking-[0.08em] text-[color:var(--sidebar-muted)]">
+                    MY SHIFTS
+                  </p>
+                  {primaryItems.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        'flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium',
+                        item.current
+                          ? APP_SHELL_ACTIVE_NAV_CLASS
+                          : 'text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground'
+                      )}
+                      aria-current={item.current ? 'page' : undefined}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </>
+              )}
+            </nav>
 
-              <div className="mt-auto shrink-0 space-y-1 border-t border-sidebar-border bg-sidebar px-3 py-3">
-                <div className={APP_SHELL_PROFILE_CARD_CLASS}>
-                  <div className="flex items-center gap-2.5">
-                    <span className="inline-flex h-[1.625rem] w-[1.625rem] shrink-0 items-center justify-center rounded-full bg-[color:var(--attention)] text-[10px] font-bold text-accent-foreground">
-                      {initials(user?.fullName ?? 'Team member')}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-semibold text-sidebar-primary">
-                        {user?.fullName ?? 'Team member'}
-                      </p>
-                      <p className="mt-0.5 text-[10px] capitalize text-[color:var(--sidebar-muted)]">
-                        {user?.role === 'manager'
-                          ? 'Manager'
-                          : user?.role === 'lead'
-                            ? 'Lead'
-                            : 'Staff Therapist'}
-                      </p>
-                    </div>
+            <div className="mt-auto shrink-0 space-y-1 border-t border-sidebar-border bg-sidebar px-3 py-3">
+              <div className={APP_SHELL_PROFILE_CARD_CLASS}>
+                <div className="flex items-center gap-2.5">
+                  <span className="inline-flex h-[1.625rem] w-[1.625rem] shrink-0 items-center justify-center rounded-full bg-[color:var(--attention)] text-[10px] font-bold text-accent-foreground">
+                    {initials(user?.fullName ?? 'Team member')}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-semibold text-sidebar-primary">
+                      {user?.fullName ?? 'Team member'}
+                    </p>
+                    <p className="mt-0.5 text-[10px] capitalize text-[color:var(--sidebar-muted)]">
+                      {user?.role === 'manager'
+                        ? 'Manager'
+                        : user?.role === 'lead'
+                          ? 'Lead'
+                          : 'Staff Therapist'}
+                    </p>
                   </div>
                 </div>
-                {canAccessManagerUi ? (
-                  <Link
-                    href="/therapist"
-                    className="flex min-h-[38px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-[color:var(--sidebar-muted)] transition-colors hover:text-sidebar-foreground"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden="true" />
-                    Switch to Therapist view
-                  </Link>
-                ) : null}
+              </div>
+              {canAccessManagerUi ? (
                 <Link
-                  href="/settings"
-                  className="flex min-h-[38px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/45"
+                  href="/therapist"
+                  className="flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-[color:var(--sidebar-muted)] transition-colors hover:text-sidebar-foreground"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  Settings
+                  <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  Switch to Therapist view
                 </Link>
-                <form action="/auth/signout" method="post">
-                  <button
-                    type="submit"
-                    className="flex min-h-[38px] w-full items-center rounded-lg px-2.5 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
-                  >
-                    Log out
-                  </button>
-                </form>
-              </div>
-            </aside>
-          </div>
-        ) : null}
+              ) : null}
+              <Link
+                href="/settings"
+                className="flex min-h-11 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/45"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Settings
+              </Link>
+              <form action="/auth/signout" method="post">
+                <button
+                  type="submit"
+                  className="flex min-h-11 w-full items-center rounded-lg px-2.5 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
+                >
+                  Log out
+                </button>
+              </form>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </ThemeProvider>
   )

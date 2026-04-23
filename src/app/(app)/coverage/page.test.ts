@@ -64,6 +64,14 @@ describe('coverage publish override affordance', () => {
     expect(client).toContain('handleTabSwitch')
   })
 
+  it('uses the shared segmented control pattern for layout and shift selectors', () => {
+    const source = readFileSync(coverageClientPath, 'utf8')
+
+    expect(source).toContain("ariaLabel=\"Coverage layout\"")
+    expect(source).toContain("ariaLabel=\"Coverage shift\"")
+    expect(source).not.toContain('function CoverageSegmentedControl')
+  })
+
   it('shows an explicit empty state instead of a synthetic 6-week window when no cycle exists', () => {
     const source = readFileSync(coverageClientPath, 'utf8')
 

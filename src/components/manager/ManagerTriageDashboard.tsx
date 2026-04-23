@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 
 import { ScheduleProgress } from '@/components/manager/ScheduleProgress'
+import { WorkspaceHero } from '@/components/shell/WorkspaceHero'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -116,36 +117,50 @@ export function ManagerTriageDashboard({
 
   return (
     <div className="max-w-[1120px] space-y-4 px-5 py-5 xl:px-7">
-      <div className="relative overflow-hidden rounded-[26px] border border-border/70 bg-card p-5 shadow-tw-inbox-hero">
-        <div className="relative flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="font-heading text-5xl font-bold tracking-[-0.05em] text-foreground">
-                Inbox
-              </h1>
-              {activeCycleDateRange && (
-                <span className="rounded-full border border-border/70 bg-muted/20 px-3 py-1 text-xs text-muted-foreground">
-                  {activeCycleDateRange}
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="relative flex gap-2">
-            <Button variant="outline" size="sm" className="min-h-11 px-4" asChild>
+      <WorkspaceHero
+        eyebrow={activeCycleDateRange ?? 'Upcoming manager queue'}
+        title="Inbox"
+        metrics={[
+          {
+            label: 'Coverage issues',
+            value: riskCount === '--' ? '--' : String(riskCount),
+            accentClassName: 'text-[var(--attention)]',
+          },
+          {
+            label: 'Pending approvals',
+            value: pendingRequests === '--' ? '--' : String(pendingRequests),
+          },
+          {
+            label: 'Upcoming shifts',
+            value: upcomingShiftCount === '--' ? '--' : String(upcomingShiftCount),
+          },
+        ]}
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              className="min-h-11 border-white/18 bg-white/8 px-4 text-sidebar-primary hover:bg-white/12 hover:text-sidebar-primary"
+              asChild
+            >
               <Link href={scheduleHref}>
                 <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
                 Open schedule
               </Link>
             </Button>
-            <Button size="sm" className="min-h-11 px-4" asChild>
+            <Button
+              size="sm"
+              className="min-h-11 bg-[var(--attention)] px-4 text-[var(--sidebar)] shadow-none hover:brightness-105"
+              asChild
+            >
               <Link href={approvalsHref}>
                 <Send className="mr-1.5 h-3.5 w-3.5" />
-                Publish flow
+                Review approvals
               </Link>
             </Button>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
         <div className="space-y-4">
@@ -368,12 +383,14 @@ function MetricCard({
     <Link href={href} className="block">
       <Card
         className={cn(
-          'relative overflow-hidden rounded-[24px] border-border/70 bg-card/95 shadow-tw-metric transition-transform duration-200 hover:-translate-y-0.5',
+          'relative overflow-hidden rounded-[18px] border-border/70 bg-card/95 shadow-tw-metric transition-transform duration-200 hover:-translate-y-0.5',
           isEmpty && 'border-dashed bg-muted/20 shadow-none'
         )}
       >
-        <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4">
-          <CardTitle className="text-sm font-medium text-foreground">{title}</CardTitle>
+        <CardHeader className="flex flex-row items-start justify-between pb-2 pt-4">
+          <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            {title}
+          </CardTitle>
           <div className={cn('rounded-full p-2', toneClasses.badge)}>{icon}</div>
         </CardHeader>
         <CardContent className="space-y-1 pb-4">

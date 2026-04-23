@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AvailabilityEntryTableRow } from '@/app/availability/availability-requests-table'
 import { ScheduledConflictBanner } from '@/components/availability/ScheduledConflictBanner'
 import { FormSubmitButton } from '@/components/form-submit-button'
+import { WorkspaceHero } from '@/components/shell/WorkspaceHero'
 import { Label } from '@/components/ui/label'
 import type { ConflictItem } from '@/lib/availability-scheduled-conflict'
 import { addDays, formatDateLabel, formatHumanCycleRange, toIsoDate } from '@/lib/calendar-utils'
@@ -360,27 +361,49 @@ export function TherapistAvailabilityWorkspace({
   if (cycles.length === 0) {
     return (
       <section id="therapist-availability-workspace" className="space-y-3">
-        <header className="border-b border-border/70 pb-4">
-          <h1 className="font-heading text-[1.4rem] font-semibold leading-tight tracking-tight text-foreground">
-            Availability for This Cycle
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            No upcoming cycle is open for availability yet.
-          </p>
-        </header>
+        <WorkspaceHero
+          eyebrow="Availability"
+          title="My Availability"
+          subtitle="No upcoming cycle is open for availability yet."
+        />
       </section>
     )
   }
 
   return (
     <section id="therapist-availability-workspace" className="space-y-5">
-      <header className="border-b border-border/70 pb-4">
-        <h1 className="font-heading text-[1.4rem] font-semibold leading-tight tracking-tight text-foreground">
-          Availability for This Cycle
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">{cyclePageSubtitle}</p>
+      <WorkspaceHero
+        eyebrow={`Click days to update · ${weeks.length} weeks`}
+        title="My Availability"
+        subtitle={
+          <>
+            <p>{cyclePageSubtitle}</p>
+            {deadlinePresentation ? (
+              <span className="mt-2 block">
+                {submissionUi.isSubmitted
+                  ? deadlinePresentation.submittedPrimaryLine
+                  : deadlinePresentation.deadlineHeadline}
+              </span>
+            ) : null}
+          </>
+        }
+        metrics={[
+          {
+            label: 'Available',
+            value: availableCount,
+            accentClassName: 'text-[var(--success-text)]',
+          },
+          {
+            label: 'Off requests',
+            value: cannotWorkDates.length,
+            accentClassName: 'text-[var(--attention)]',
+          },
+          { label: 'Request to work', value: requestToWorkCount },
+        ]}
+      />
+      <div className="space-y-3">
         {deadlinePresentation ? (
-          <div className="mt-3 space-y-2">
+          <div className="space-y-2">
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-2">
               <span
                 className={cn(
@@ -445,7 +468,7 @@ export function TherapistAvailabilityWorkspace({
             </li>
           ))}
         </ol>
-      </header>
+      </div>
 
       {conflicts.length > 0 ? (
         <ScheduledConflictBanner conflicts={conflicts} onDismiss={() => {}} />

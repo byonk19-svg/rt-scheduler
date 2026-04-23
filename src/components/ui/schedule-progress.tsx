@@ -21,8 +21,11 @@ function ProgressBar({ label, completed, total, colorClass }: ProgressBarProps) 
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-muted">
         <div
-          className={cn('h-full rounded-full transition-[width] duration-500 ease-out', colorClass)}
-          style={{ width: `${pct}%` }}
+          className={cn(
+            'h-full origin-left rounded-full transition-transform duration-500 ease-out motion-reduce:transition-none',
+            colorClass
+          )}
+          style={{ transform: `scaleX(${pct / 100})` }}
         />
       </div>
       <div className="mt-1 flex justify-between">

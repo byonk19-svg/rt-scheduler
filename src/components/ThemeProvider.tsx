@@ -2,8 +2,8 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { getStoredTheme, resolveTheme, setStoredTheme, type Theme } from '@/lib/theme'
-import { cn } from '@/lib/utils'
 
 type ThemeContextValue = {
   theme: Theme
@@ -80,29 +80,16 @@ export function ThemePreferenceControl() {
 
   return (
     <div className="space-y-3">
-      <div className="inline-flex overflow-hidden rounded-lg border border-border/70 bg-background">
-        {(
-          [
-            { value: 'light', label: 'Light' },
-            { value: 'system', label: 'System' },
-            { value: 'dark', label: 'Dark' },
-          ] as const
-        ).map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => setTheme(option.value)}
-            className={cn(
-              'px-3 py-1.5 text-sm font-medium transition-colors',
-              theme === option.value
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground'
-            )}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        ariaLabel="Theme preference"
+        value={theme}
+        onChange={setTheme}
+        options={[
+          { value: 'light', label: 'Light' },
+          { value: 'system', label: 'System' },
+          { value: 'dark', label: 'Dark' },
+        ]}
+      />
       <p className="text-xs text-muted-foreground">Currently showing: {resolvedTheme}</p>
     </div>
   )
