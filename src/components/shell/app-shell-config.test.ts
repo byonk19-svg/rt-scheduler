@@ -69,15 +69,28 @@ describe('app-shell-config', () => {
 
     expect(context.primaryKey).toBe('schedule')
     expect(context.localNav?.items.map((item) => item.label)).toContain('Coverage')
+    expect(context.localNav?.items.map((item) => item.label)).toContain('Lottery')
     expect(context.localNav?.items.map((item) => item.label)).toContain('History')
     expect(context.localNav?.items.find((item) => item.label === 'Coverage')?.href).toBe(
       '/coverage'
     )
+    expect(context.localNav?.items.find((item) => item.label === 'Lottery')?.href).toBe('/lottery')
     expect(context.localNav?.items.map((item) => item.label)).not.toContain('Roster')
   })
 
   it('keeps /staff child routes inside the authenticated app shell', () => {
     expect(usesAppShell('/staff/my-schedule')).toBe(true)
     expect(usesAppShell('/staff/history')).toBe(true)
+  })
+
+  it('treats /lottery as a schedule workspace route for managers', () => {
+    const context = getShellContext({
+      pathname: '/lottery',
+      canAccessManagerUi: true,
+      pendingCount: 0,
+    })
+
+    expect(context.primaryKey).toBe('schedule')
+    expect(context.localNav?.items.find((item) => item.label === 'Lottery')?.href).toBe('/lottery')
   })
 })

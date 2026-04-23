@@ -74,7 +74,7 @@ export function ManagerScheduleHome({ model }: { model: ManagerScheduleHomeModel
             </p>
           </div>
         </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           {model.workflowCards.map((card) => (
             <Card key={card.label} className="border-border/70 bg-card/85 shadow-none">
               <CardHeader className="gap-2 pb-2">

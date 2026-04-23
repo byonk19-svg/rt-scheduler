@@ -3,6 +3,7 @@ export const MANAGER_WORKFLOW_LINKS = {
   scheduleHome: '/dashboard/manager/schedule',
   approvals: '/approvals?status=pending',
   coverage: '/coverage?view=week',
+  lottery: '/lottery',
   publish: '/publish',
   publishHistory: '/publish/history',
   team: '/team',

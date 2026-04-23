@@ -76,9 +76,14 @@ describe('buildManagerScheduleHomeModel', () => {
     expect(model.workflowCards.map((card) => card.label)).toEqual([
       'Coverage',
       'Approvals',
+      'Lottery',
       'Publish',
       'Availability',
     ])
+    expect(model.workflowCards.find((card) => card.label === 'Lottery')).toMatchObject({
+      href: '/lottery',
+      status: 'Manager workflow',
+    })
   })
 
   it('falls through to publish readiness when no blockers remain', () => {

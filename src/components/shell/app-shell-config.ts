@@ -29,6 +29,7 @@ const SHELL_ROUTES = [
   '/coverage',
   '/analytics',
   '/availability',
+  '/lottery',
   '/shift-board',
   '/publish',
   '/profile',
@@ -60,6 +61,7 @@ function isManagerScheduleRoute(pathname: string): boolean {
     pathname === '/analytics' ||
     pathname === '/schedule' ||
     pathname === '/availability' ||
+    pathname === MANAGER_WORKFLOW_LINKS.lottery ||
     pathname === '/publish' ||
     pathname.startsWith('/publish/') ||
     pathname === '/approvals'
@@ -99,6 +101,11 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
           href: '/approvals',
           label: 'Approvals',
           active: (pathname) => pathname === '/approvals',
+        },
+        {
+          href: MANAGER_WORKFLOW_LINKS.lottery,
+          label: 'Lottery',
+          active: (pathname) => pathname === MANAGER_WORKFLOW_LINKS.lottery,
         },
         {
           href: '/publish',

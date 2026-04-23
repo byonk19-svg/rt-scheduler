@@ -1,5 +1,6 @@
 import { formatHumanCycleRange } from '@/lib/calendar-utils'
 import type { ManagerAttentionSnapshot } from '@/lib/manager-workflow'
+import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 import type { StatusBadgeVariant } from '@/components/ui/status-badge'
 
 export type ManagerScheduleHomeMetric = {
@@ -139,6 +140,14 @@ export function buildManagerScheduleHomeModel(
           ? 'No pending approvals'
           : toCountLabel(snapshot.pendingApprovals, 'pending request', 'pending requests'),
       tone: snapshot.pendingApprovals === 0 ? 'success' : 'pending',
+    },
+    {
+      label: 'Lottery',
+      href: MANAGER_WORKFLOW_LINKS.lottery,
+      description:
+        'Review same-day low-census requests, confirm the fixed order, and apply on-call reductions.',
+      status: activeCycle ? 'Manager workflow' : 'No active cycle selected',
+      tone: activeCycle ? 'info' : 'neutral',
     },
     {
       label: 'Publish',

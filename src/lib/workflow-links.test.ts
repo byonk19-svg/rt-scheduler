@@ -11,6 +11,10 @@ describe('MANAGER_WORKFLOW_LINKS', () => {
     expect(MANAGER_WORKFLOW_LINKS.publish).toBe('/publish')
   })
 
+  it('exposes lottery as a canonical manager workflow route', () => {
+    expect(MANAGER_WORKFLOW_LINKS.lottery).toBe('/lottery')
+  })
+
   it('exposes delivery history as a separate manager workflow link', () => {
     expect(MANAGER_WORKFLOW_LINKS.publishHistory).toBe('/publish/history')
   })

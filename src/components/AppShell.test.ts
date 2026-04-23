@@ -119,6 +119,7 @@ describe('AppShell navigation structure', () => {
       'Home',
       'Coverage',
       'Approvals',
+      'Lottery',
       'Publish',
       'History',
       'Availability',
@@ -155,10 +156,11 @@ describe('AppShell navigation structure', () => {
     expect(shellConfigSource).toContain("key: 'people'")
   })
 
-  it('puts Home, Coverage, Approvals, Publish, History, Availability, and Analytics under the Schedule section', () => {
+  it('puts Home, Coverage, Approvals, Lottery, Publish, History, Availability, and Analytics under the Schedule section', () => {
     expect(shellConfigSource).toContain("label: 'Home'")
     expect(shellConfigSource).toContain("label: 'Coverage'")
     expect(shellConfigSource).toContain("label: 'Approvals'")
+    expect(shellConfigSource).toContain("label: 'Lottery'")
     expect(shellConfigSource).toContain("label: 'Publish'")
     expect(shellConfigSource).toContain("label: 'History'")
     expect(shellConfigSource).toContain("label: 'Availability'")

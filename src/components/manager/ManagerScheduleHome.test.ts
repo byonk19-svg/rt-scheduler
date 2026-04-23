@@ -55,11 +55,14 @@ describe('ManagerScheduleHome', () => {
     expect(html).toContain('Continue staffing current block')
     expect(html).toContain('Coverage')
     expect(html).toContain('Approvals')
+    expect(html).toContain('Lottery')
     expect(html).toContain('Publish')
     expect(html).toContain('Availability')
     expect(html).toContain('Roster')
     expect(html).toContain('Delivery history')
     expect(html).toContain('Analytics')
+    expect(html).toContain('Review same-day low-census requests')
+    expect(html).toContain('href="/lottery"')
     expect(html).toContain('May 3 – Jun 13, 2026')
     expect(html).toContain(
       'href="/coverage?cycle=cycle-1&amp;view=week&amp;filter=missing_lead&amp;focus=first"'
