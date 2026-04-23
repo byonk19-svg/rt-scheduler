@@ -42,7 +42,7 @@ export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
   )
 
   const helperText =
-    'Read-only roster for the selected cycle: coverage assignments and therapist availability that has been officially submitted. x = submitted need off; 1 = submitted request to work and/or a coverage assignment. Edit staffing in Coverage.'
+    'Read-only roster for the selected cycle: coverage assignments, applied availability, and weekly blocked days. x = unavailable or blocked off; 1 = available to work and/or a coverage assignment. Edit staffing in Coverage.'
 
   return (
     <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -50,7 +50,7 @@ export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <ScheduleHeader
-              title="Schedule"
+              title="Roster"
               status="READ ONLY"
               dateRange={live.shortLabel}
               helperText={helperText}
@@ -100,8 +100,9 @@ export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
                     Grid editing is in Coverage
                   </h2>
                   <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-                    This page is a roster matrix for reading assignments and submitted availability.
-                    Use the coverage workspace to add, move, or remove shifts.
+                    This page is a roster matrix for reading assignments, applied availability, and
+                    weekly scheduling constraints. Use the coverage workspace to add, move, or
+                    remove shifts.
                   </p>
                 </div>
                 <div className="mt-4">

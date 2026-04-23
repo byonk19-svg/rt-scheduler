@@ -29,6 +29,7 @@ const SHELL_ROUTES = [
   '/coverage',
   '/analytics',
   '/availability',
+  '/lottery',
   '/shift-board',
   '/publish',
   '/profile',
@@ -39,6 +40,7 @@ const SHELL_ROUTES = [
   '/swaps',
   '/team',
   '/settings',
+  '/staff',
   '/therapist',
   '/schedule',
 ] as const
@@ -54,10 +56,12 @@ function isRouteActive(pathname: string, href: string): boolean {
 
 function isManagerScheduleRoute(pathname: string): boolean {
   return (
+    pathname === MANAGER_WORKFLOW_LINKS.scheduleHome ||
     pathname === '/coverage' ||
     pathname === '/analytics' ||
     pathname === '/schedule' ||
     pathname === '/availability' ||
+    pathname === MANAGER_WORKFLOW_LINKS.lottery ||
     pathname === '/publish' ||
     pathname.startsWith('/publish/') ||
     pathname === '/approvals'
@@ -71,27 +75,51 @@ export function usesAppShell(pathname: string): boolean {
 export function buildManagerSections(pendingCount: number): readonly ShellSection[] {
   return [
     {
-      key: 'today',
-      label: 'Today',
+      key: 'inbox',
+      label: 'Inbox',
       href: MANAGER_WORKFLOW_LINKS.dashboard,
-      isActive: (pathname) => pathname.startsWith('/dashboard/manager'),
+      isActive: (pathname) => pathname === MANAGER_WORKFLOW_LINKS.dashboard,
       subItems: [],
     },
     {
       key: 'schedule',
       label: 'Schedule',
-      href: '/schedule',
+      href: MANAGER_WORKFLOW_LINKS.scheduleHome,
       isActive: (pathname) => isManagerScheduleRoute(pathname),
       subItems: [
         {
-          href: '/schedule',
-          label: 'Coverage',
-          active: (pathname) => pathname === '/coverage' || pathname === '/schedule',
+          href: MANAGER_WORKFLOW_LINKS.scheduleHome,
+          label: 'Home',
+          active: (pathname) => pathname === MANAGER_WORKFLOW_LINKS.scheduleHome,
         },
         {
-          href: '/analytics',
-          label: 'Analytics',
-          active: (pathname) => pathname === '/analytics',
+          href: '/coverage',
+          label: 'Coverage',
+          active: (pathname) => pathname === '/coverage',
+        },
+        {
+          href: '/approvals',
+          label: 'Approvals',
+          active: (pathname) => pathname === '/approvals',
+        },
+        {
+          href: MANAGER_WORKFLOW_LINKS.lottery,
+          label: 'Lottery',
+          active: (pathname) => pathname === MANAGER_WORKFLOW_LINKS.lottery,
+        },
+        {
+          href: '/publish',
+          label: 'Publish',
+          active: (pathname) => pathname === '/publish',
+        },
+        {
+          href: '/publish/history',
+          label: 'History',
+          active: (pathname) =>
+            pathname === '/publish/history' ||
+            pathname.startsWith('/publish/history/') ||
+            pathname === '/publish/' ||
+            (/^\/publish\/[^/]+$/.test(pathname) && pathname !== '/publish'),
         },
         {
           href: '/availability',
@@ -99,14 +127,9 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
           active: (pathname) => pathname === '/availability',
         },
         {
-          href: '/publish',
-          label: 'Publish',
-          active: (pathname) => pathname === '/publish' || pathname.startsWith('/publish/'),
-        },
-        {
-          href: '/approvals',
-          label: 'Approvals',
-          active: (pathname) => pathname === '/approvals',
+          href: '/analytics',
+          label: 'Analytics',
+          active: (pathname) => pathname === '/analytics',
         },
       ],
     },
@@ -128,12 +151,15 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
           active: (pathname) => pathname === '/team',
         },
         {
-          href: '/requests',
-          label: 'Requests',
+          href: '/shift-board',
+          label: 'Open shifts',
+          active: (pathname) => pathname === '/shift-board',
+        },
+        {
+          href: '/requests/user-access',
+          label: 'Access requests',
           active: (pathname) =>
-            pathname === '/requests' ||
-            pathname.startsWith('/requests/') ||
-            pathname === '/shift-board',
+            pathname === '/requests' || pathname.startsWith('/requests/user-access'),
           badgeCount: pendingCount > 0 ? pendingCount : undefined,
         },
         {
@@ -161,7 +187,7 @@ export function getStaffNavItems(): readonly ShellNavItem[] {
     },
     {
       href: '/staff/my-schedule',
-      label: 'My Schedule',
+      label: 'My shifts',
       active: (pathname) => pathname === '/staff/my-schedule',
     },
     {

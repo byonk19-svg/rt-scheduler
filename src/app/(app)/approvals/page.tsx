@@ -92,7 +92,7 @@ export default async function ApprovalsPage({
       <div className="space-y-4">
         <ManagerWorkspaceHeader
           title="Preliminary approvals"
-          subtitle="Review live claims and schedule change requests before final publish."
+          subtitle="Review live claims and schedule change requests as part of the current schedule workflow."
           summary={
             <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 font-medium text-foreground">
               Couldn&apos;t load requests
@@ -173,7 +173,7 @@ export default async function ApprovalsPage({
     <div className="space-y-6">
       <ManagerWorkspaceHeader
         title="Preliminary approvals"
-        subtitle="Review live claims and schedule change requests before final publish."
+        subtitle="Review live claims and schedule change requests as part of the current schedule workflow."
         summary={
           <>
             <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 font-medium text-foreground">

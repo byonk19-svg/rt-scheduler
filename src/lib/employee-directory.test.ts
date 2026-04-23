@@ -313,6 +313,35 @@ describe('employee directory helpers', () => {
     expect(row?.submitted).toBe(true)
     expect(row?.overridesCount).toBe(0)
   })
+
+  it('can treat any cycle override as a submitted response for roster workflows', () => {
+    const rows = buildMissingAvailabilityRows(
+      sampleEmployees,
+      [
+        {
+          id: 'ov-m',
+          therapist_id: '1',
+          cycle_id: 'cycle-a',
+          date: '2026-03-02',
+          shift_type: 'both',
+          override_type: 'force_on',
+          note: null,
+          created_at: '2026-02-28T12:00:00.000Z',
+          source: 'manager',
+        },
+      ],
+      'cycle-a',
+      {
+        officialSubmissionTherapistIds: new Set(),
+        countAnyOverrideAsSubmitted: true,
+      }
+    )
+
+    const row = new Map(rows.map((r) => [r.therapistId, r])).get('1')
+    expect(row?.submitted).toBe(true)
+    expect(row?.overridesCount).toBe(1)
+    expect(row?.lastUpdatedAt).toBe('2026-02-28T12:00:00.000Z')
+  })
 })
 
 // ---------------------------------------------------------------------------

@@ -1,3 +1,7 @@
+import { createElement } from 'react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -7,6 +11,40 @@ import {
   teamMemberHasAppAccess,
   type TeamProfileRecord,
 } from '@/components/team/team-directory-model'
+import { TeamDirectory } from '@/components/team/TeamDirectory'
+
+const directorySource = readFileSync(
+  resolve(process.cwd(), 'src/components/team/TeamDirectory.tsx'),
+  'utf8'
+)
+const controlPanelSource = readFileSync(
+  resolve(process.cwd(), 'src/components/team/TeamDirectoryControlPanel.tsx'),
+  'utf8'
+)
+const groupedSectionsSource = readFileSync(
+  resolve(process.cwd(), 'src/components/team/TeamDirectoryGroupedSections.tsx'),
+  'utf8'
+)
+const groupSectionSource = readFileSync(
+  resolve(process.cwd(), 'src/components/team/TeamDirectoryGroupSection.tsx'),
+  'utf8'
+)
+const groupRowsSource = readFileSync(
+  resolve(process.cwd(), 'src/components/team/TeamDirectoryGroupRows.tsx'),
+  'utf8'
+)
+const teamQuickEditDialogSource = readFileSync(
+  resolve(process.cwd(), 'src/components/team/TeamQuickEditDialog.tsx'),
+  'utf8'
+)
+const teamQuickEditBasicsSectionSource = readFileSync(
+  resolve(process.cwd(), 'src/components/team/TeamQuickEditBasicsSection.tsx'),
+  'utf8'
+)
+const teamQuickEditSchedulingSectionSource = readFileSync(
+  resolve(process.cwd(), 'src/components/team/TeamQuickEditSchedulingSection.tsx'),
+  'utf8'
+)
 
 function makeProfile(overrides: Partial<TeamProfileRecord>): TeamProfileRecord {
   return {
@@ -30,6 +68,18 @@ describe('TEAM_QUICK_EDIT_DIALOG_CLASS', () => {
 
   it('uses the lead therapist label on the team surface', () => {
     expect(TEAM_LEAD_ROLE_LABEL).toBe('Lead Therapist')
+  })
+
+  it('keeps scheduling constraints in a dedicated quick-edit section', () => {
+    expect(teamQuickEditSchedulingSectionSource).toContain('Scheduling Constraints')
+    expect(teamQuickEditSchedulingSectionSource).toContain('Weekend rotation')
+    expect(teamQuickEditDialogSource).toContain('TeamQuickEditSchedulingSection')
+  })
+
+  it('keeps profile basics in a dedicated quick-edit section', () => {
+    expect(teamQuickEditBasicsSectionSource).toContain('Employment Type')
+    expect(teamQuickEditBasicsSectionSource).toContain('FMLA Return Date')
+    expect(teamQuickEditDialogSource).toContain('TeamQuickEditBasicsSection')
   })
 })
 
@@ -60,5 +110,43 @@ describe('teamMemberHasAppAccess', () => {
 
   it('keeps app access for active employees', () => {
     expect(teamMemberHasAppAccess(makeProfile({ is_active: true }))).toBe(true)
+  })
+})
+
+describe('TeamDirectory', () => {
+  it('hides bulk-selection controls until bulk mode is enabled', () => {
+    const html = renderToStaticMarkup(
+      createElement(TeamDirectory, {
+        summary: {
+          totalStaff: 2,
+          managers: 0,
+          leadTherapists: 1,
+          therapists: 1,
+          dayShift: 2,
+          nightShift: 0,
+          inactive: 0,
+          onFmla: 0,
+        },
+        profiles: [
+          makeProfile({ id: 'lead-1', role: 'lead' }),
+          makeProfile({ id: 'ther-1', role: 'therapist' }),
+        ],
+        archiveTeamMemberAction: async () => {},
+        saveTeamQuickEditAction: async () => {},
+        bulkUpdateTeamMembersAction: async () => {},
+      })
+    )
+
+    expect(html).toContain('Bulk mode')
+    expect(html).toContain('Advanced filters')
+    expect(html).not.toContain('aria-label="Bulk team actions"')
+    expect(html).not.toContain('Select all in')
+    expect(directorySource).toContain('TeamDirectoryControlPanel')
+    expect(controlPanelSource).toContain('Directory quick views')
+    expect(groupedSectionsSource).toContain('TeamDirectoryGroupSection')
+    expect(groupedSectionsSource).toContain('TeamDirectoryGroupRows')
+    expect(groupSectionSource).toContain('Select all in ${title}')
+    expect(groupRowsSource).toContain('showSelectionControl={showSelectionControls}')
+    expect(directorySource).toContain('selectedCount={bulkMode ? selectedIds.size : 0}')
   })
 })

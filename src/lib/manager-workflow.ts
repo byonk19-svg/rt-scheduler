@@ -91,7 +91,7 @@ export function getManagerAttentionLinks(activeCycleId: string | null): Dashboar
     coverageUnderCoverage: buildCoverageFilterLink(activeCycleId, 'under_coverage'),
     coverageUnfilled: buildCoverageFilterLink(activeCycleId, 'unfilled'),
     coverageNeedsAttention: buildCoverageFilterLink(activeCycleId, 'needs_attention'),
-    publish: coverage,
+    publish: MANAGER_WORKFLOW_LINKS.publish,
   }
 }
 

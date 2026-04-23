@@ -294,6 +294,7 @@ async function main() {
     is_active: true,
     is_lead_eligible: false,
     on_fmla: false,
+    archived_at: null,
   })
 
   const leadSpecs = [
@@ -321,6 +322,7 @@ async function main() {
       is_active: true,
       is_lead_eligible: true,
       on_fmla: false,
+      archived_at: null,
     })
     await ensureWorkPattern(id, [1, 2, 3, 4, 5])
   }
@@ -349,6 +351,7 @@ async function main() {
       is_active: true,
       is_lead_eligible: alsoLeadEligible,
       on_fmla: false,
+      archived_at: null,
     })
     await ensureWorkPattern(id, [1, 2, 3, 4, 5])
     therapistRows.push({

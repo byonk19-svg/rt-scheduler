@@ -55,9 +55,11 @@ function AssignShiftContent({
   const approvalNote =
     availabilityApproval === 'approved_off'
       ? 'Approved day off (availability)'
-      : availabilityApproval === 'approved_work'
-        ? 'Approved request to work (availability)'
-        : null
+      : availabilityApproval === 'pattern_blocked_off'
+        ? 'Blocked by weekly scheduling constraint'
+        : availabilityApproval === 'approved_work'
+          ? 'Approved request to work (availability)'
+          : null
 
   return (
     <div className="space-y-4">

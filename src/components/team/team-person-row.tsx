@@ -47,6 +47,7 @@ type TeamPersonRowProps = {
   onOpen: (profileId: string) => void
   isSelected?: boolean
   onToggle?: () => void
+  showSelectionControl?: boolean
 }
 
 export function TeamPersonRow({
@@ -54,6 +55,7 @@ export function TeamPersonRow({
   onOpen,
   isSelected = false,
   onToggle,
+  showSelectionControl = false,
 }: TeamPersonRowProps) {
   const isActive = teamMemberHasAppAccess(profile)
   const showLeadEligibleTag = profile.role === 'therapist' && profile.is_lead_eligible
@@ -66,7 +68,7 @@ export function TeamPersonRow({
         'group flex w-full cursor-pointer items-center gap-2 rounded-lg border border-border/60 bg-card/80 px-2.5 py-1.5 text-left text-sm transition-colors hover:border-primary/45 hover:bg-card/95 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none',
         profile.role === 'lead' && 'border-primary/25 bg-primary/[0.03]',
         !isActive && 'opacity-80',
-        onToggle && isSelected && 'ring-2 ring-primary/25'
+        showSelectionControl && onToggle && isSelected && 'ring-2 ring-primary/25'
       )}
     >
       <div
@@ -147,7 +149,7 @@ export function TeamPersonRow({
     </button>
   )
 
-  if (!onToggle) return row
+  if (!showSelectionControl || !onToggle) return row
 
   return (
     <div className="flex items-center gap-2">

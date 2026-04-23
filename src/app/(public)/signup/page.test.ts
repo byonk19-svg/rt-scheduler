@@ -11,6 +11,14 @@ const signupPageSource = fs.readFileSync(
   path.join(process.cwd(), 'src/app/(public)/signup/page.tsx'),
   'utf8'
 )
+const signupBrandPanelSource = fs.readFileSync(
+  path.join(process.cwd(), 'src/components/public/SignupBrandPanel.tsx'),
+  'utf8'
+)
+const signupFormPanelSource = fs.readFileSync(
+  path.join(process.cwd(), 'src/components/public/SignupFormPanel.tsx'),
+  'utf8'
+)
 
 describe('public signup shell', () => {
   it('mounts the shared public header from the public layout', () => {
@@ -24,5 +32,13 @@ describe('public signup shell', () => {
   it('always redirects new signups to the generic requested status', () => {
     expect(signupPageSource).toContain("router.push('/login?status=requested')")
     expect(signupPageSource).not.toContain("'/login?status=matched'")
+  })
+
+  it('keeps the signup brand and form panels in dedicated components', () => {
+    expect(signupBrandPanelSource).toContain('Scheduling that keeps care moving.')
+    expect(signupFormPanelSource).toContain('Request access')
+    expect(signupFormPanelSource).toContain('Already have an account?')
+    expect(signupPageSource).toContain('SignupBrandPanel')
+    expect(signupPageSource).toContain('SignupFormPanel')
   })
 })

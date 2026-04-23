@@ -7,6 +7,10 @@ const coverageClientSource = readFileSync(
   resolve(process.cwd(), 'src/app/(app)/coverage/CoverageClientPage.tsx'),
   'utf8'
 )
+const coverageOverlaysSource = readFileSync(
+  resolve(process.cwd(), 'src/components/coverage/CoverageWorkspaceOverlays.tsx'),
+  'utf8'
+)
 const availabilityPageSource = readFileSync(
   resolve(process.cwd(), 'src/app/(app)/availability/page.tsx'),
   'utf8'
@@ -17,38 +21,29 @@ const shiftBoardPageSource = readFileSync(
 )
 
 describe('coverage client performance contract', () => {
-  it('lazy-loads the heavy coverage views instead of statically importing both', () => {
-    expect(coverageClientSource).not.toContain(
-      "import { CalendarGrid } from '@/components/coverage/CalendarGrid'"
-    )
-    expect(coverageClientSource).not.toContain(
-      "import { RosterScheduleView, type RosterMemberRow } from '@/components/coverage/RosterScheduleView'"
-    )
-    expect(coverageClientSource).toContain('const CalendarGrid = dynamic(() =>')
-    expect(coverageClientSource).toContain('const RosterScheduleView = dynamic(() =>')
+  it('keeps heavy dialog and print surfaces lazy-loaded behind the overlay boundary', () => {
+    expect(coverageClientSource).toContain('CoverageWorkspaceOverlays')
+    expect(coverageOverlaysSource).toContain('const PreFlightDialog = dynamic(() =>')
+    expect(coverageOverlaysSource).toContain('const PrintSchedule = dynamic(() =>')
   })
 
-  it('lazy-loads the print surface instead of bundling it eagerly with the main coverage client chunk', () => {
-    expect(coverageClientSource).not.toContain(
-      "import { PrintSchedule } from '@/components/print-schedule'"
-    )
-    expect(coverageClientSource).toContain('const PrintSchedule = dynamic(() =>')
+  it('keeps the main coverage client focused on workspace composition instead of route-local dynamic imports', () => {
+    expect(coverageClientSource).not.toContain('const PrintSchedule = dynamic(() =>')
+    expect(coverageClientSource).not.toContain('const PreFlightDialog = dynamic(() =>')
   })
 })
 
 describe('availability route performance contract', () => {
-  it('lazy-loads the major availability client workspaces instead of statically bundling them together', () => {
-    expect(availabilityPageSource).not.toContain(
-      "import {\n  AvailabilityEntriesTable,\n  type AvailabilityEntryTableRow,\n} from '@/app/availability/availability-requests-table'"
-    )
-    expect(availabilityPageSource).not.toContain(
+  it('imports the main availability workspaces directly to avoid fragile next/dynamic default resolution on the server page', () => {
+    expect(availabilityPageSource).toContain('import { AvailabilityEntriesTable')
+    expect(availabilityPageSource).toContain(
       "import { ManagerSchedulingInputs } from '@/components/availability/ManagerSchedulingInputs'"
     )
     expect(availabilityPageSource).not.toContain(
       "import {\n  EmailIntakePanel,\n  type EmailIntakePanelRow,\n} from '@/components/availability/EmailIntakePanel'"
     )
-    expect(availabilityPageSource).toContain('const AvailabilityEntriesTable = dynamic(() =>')
-    expect(availabilityPageSource).toContain('const ManagerSchedulingInputs = dynamic(() =>')
+    expect(availabilityPageSource).not.toContain('const AvailabilityEntriesTable = dynamic(() =>')
+    expect(availabilityPageSource).not.toContain('const ManagerSchedulingInputs = dynamic(() =>')
     expect(availabilityPageSource).not.toContain('const EmailIntakePanel = dynamic(() =>')
     expect(availabilityPageSource).toContain('redirect(`/therapist/availability')
     expect(availabilityPageSource).toContain('redirect(`/availability/intake')

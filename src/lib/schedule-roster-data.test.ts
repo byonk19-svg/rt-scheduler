@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildAssignmentStoreFromShifts,
+  buildAvailabilityApprovalStoreFromWorkPatterns,
   buildAvailabilityApprovalStoreFromSubmittedOverrides,
   splitStaffByRosterAndShift,
 } from '@/lib/schedule-roster-data'
@@ -51,6 +52,30 @@ describe('buildAvailabilityApprovalStoreFromSubmittedOverrides', () => {
       new Set()
     )
     expect(Object.keys(store)).toHaveLength(0)
+  })
+})
+
+describe('buildAvailabilityApprovalStoreFromWorkPatterns', () => {
+  it('marks never-work weekdays as blocked off in the roster store', () => {
+    const store = buildAvailabilityApprovalStoreFromWorkPatterns(
+      [
+        {
+          therapist_id: 't1',
+          works_dow: [1, 2, 3],
+          offs_dow: [4],
+          weekend_rotation: 'none',
+          weekend_anchor_date: null,
+          works_dow_mode: 'hard',
+          shift_preference: 'either',
+        },
+      ],
+      '2026-05-03',
+      '2026-05-10'
+    )
+
+    expect(store[createAssignmentKey('t1', '2026-05-07', 'day')]).toBe('pattern_blocked_off')
+    expect(store[createAssignmentKey('t1', '2026-05-07', 'night')]).toBe('pattern_blocked_off')
+    expect(store[createAssignmentKey('t1', '2026-05-08', 'day')]).toBeUndefined()
   })
 })
 

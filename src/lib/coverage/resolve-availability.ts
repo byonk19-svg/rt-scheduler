@@ -1,6 +1,6 @@
 import type { AvailabilityOverrideRow, ShiftTypeForAvailability } from '@/lib/coverage/types'
 import type { WorkPattern } from '@/lib/coverage/work-patterns'
-import { shiftTypeMatches } from '@/lib/coverage/work-patterns'
+import { isAllowedByPattern, shiftTypeMatches } from '@/lib/coverage/work-patterns'
 
 export type EligibilityReason =
   | 'inactive'
@@ -148,6 +148,20 @@ export function resolveEligibility(params: ResolveEligibilityParams): Eligibilit
 
   if (params.therapist.employment_type === 'prn') {
     return buildResolution('prn_not_offered_for_date')
+  }
+
+  if (params.therapist.pattern) {
+    const patternDecision = isAllowedByPattern(params.therapist.pattern, params.date)
+    if (!patternDecision.allowed) {
+      return buildResolution(patternDecision.reason, {
+        penalty: patternDecision.penalty,
+      })
+    }
+    if (patternDecision.reason === 'soft_outside_works_dow') {
+      return buildResolution('soft_outside_works_dow', {
+        penalty: patternDecision.penalty,
+      })
+    }
   }
 
   return buildResolution('allowed')

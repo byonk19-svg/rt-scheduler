@@ -2,61 +2,90 @@
 
 import { useState, type ReactNode } from 'react'
 
-import { cn } from '@/lib/utils'
+import { AvailabilitySecondaryHeader } from '@/components/availability/AvailabilitySecondaryHeader'
 
 type AvailabilitySecondaryTab = 'roster' | 'inbox'
 
 type AvailabilitySecondaryPanelProps = {
   roster: ReactNode
   inbox: ReactNode
+  submittedCount?: number
+  awaitingCount?: number
+  requestCount?: number
+  defaultOpen?: boolean
   defaultTab?: AvailabilitySecondaryTab
 }
 
 export function AvailabilitySecondaryPanel({
   roster,
   inbox,
+  submittedCount = 0,
+  awaitingCount = 0,
+  requestCount = 0,
+  defaultOpen = false,
   defaultTab = 'roster',
 }: AvailabilitySecondaryPanelProps) {
+  const [open, setOpen] = useState(defaultOpen)
   const [activeTab, setActiveTab] = useState<AvailabilitySecondaryTab>(defaultTab)
+  const rosterTabId = 'availability-secondary-tab-roster'
+  const inboxTabId = 'availability-secondary-tab-inbox'
+  const rosterPanelId = 'availability-secondary-panel-roster'
+  const inboxPanelId = 'availability-secondary-panel-inbox'
+
+  if (!open) {
+    return (
+      <section aria-label="Availability secondary workflows" className="flex flex-col">
+        <AvailabilitySecondaryHeader
+          open={open}
+          activeTab={activeTab}
+          submittedCount={submittedCount}
+          awaitingCount={awaitingCount}
+          requestCount={requestCount}
+          rosterTabId={rosterTabId}
+          inboxTabId={inboxTabId}
+          rosterPanelId={rosterPanelId}
+          inboxPanelId={inboxPanelId}
+          onOpenChange={setOpen}
+          onTabChange={setActiveTab}
+        />
+      </section>
+    )
+  }
 
   return (
     <section aria-label="Availability secondary workflows" className="flex flex-col">
-      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border/70 px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold text-foreground">Secondary workflow</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Follow up on responses and requests without leaving the planner.
-          </p>
-        </div>
-        <div className="inline-flex shrink-0 rounded-full border border-border/70 bg-muted/[0.08] p-0.5">
-          <button
-            type="button"
-            className={cn(
-              'min-h-11 rounded-full px-3 py-2 text-sm font-semibold transition-colors sm:min-h-10 sm:px-2.5 sm:py-1 sm:text-[11px]',
-              activeTab === 'roster'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-            onClick={() => setActiveTab('roster')}
-          >
-            Response roster
-          </button>
-          <button
-            type="button"
-            className={cn(
-              'min-h-11 rounded-full px-3 py-2 text-sm font-semibold transition-colors sm:min-h-10 sm:px-2.5 sm:py-1 sm:text-[11px]',
-              activeTab === 'inbox'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-            onClick={() => setActiveTab('inbox')}
-          >
-            Request inbox
-          </button>
-        </div>
-      </div>
+      <AvailabilitySecondaryHeader
+        open={open}
+        activeTab={activeTab}
+        submittedCount={submittedCount}
+        awaitingCount={awaitingCount}
+        requestCount={requestCount}
+        rosterTabId={rosterTabId}
+        inboxTabId={inboxTabId}
+        rosterPanelId={rosterPanelId}
+        inboxPanelId={inboxPanelId}
+        onOpenChange={setOpen}
+        onTabChange={setActiveTab}
+      />
 
-      <div className="min-h-0">{activeTab === 'roster' ? roster : inbox}</div>
+      <div
+        id={rosterPanelId}
+        role="tabpanel"
+        aria-labelledby={rosterTabId}
+        hidden={activeTab !== 'roster'}
+        className="min-h-0"
+      >
+        {activeTab === 'roster' ? roster : null}
+      </div>
+      <div
+        id={inboxPanelId}
+        role="tabpanel"
+        aria-labelledby={inboxTabId}
+        hidden={activeTab !== 'inbox'}
+        className="min-h-0"
+      >
+        {activeTab === 'inbox' ? inbox : null}
+      </div>
     </section>
   )
 }

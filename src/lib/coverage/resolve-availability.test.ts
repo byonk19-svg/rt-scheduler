@@ -221,6 +221,49 @@ describe('resolveAvailability', () => {
     expect(resolution.forcedByManager).toBe(true)
   })
 
+  it('blocks days marked as never work in the weekly pattern', () => {
+    const resolution = resolveAvailability({
+      therapistId: 'therapist-1',
+      cycleId: 'cycle-a',
+      date: '2026-03-06',
+      shiftType: 'day',
+      isActive: true,
+      onFmla: false,
+      pattern: buildPattern({
+        works_dow: [1, 2, 3],
+        offs_dow: [5],
+        weekend_rotation: 'none',
+        works_dow_mode: 'hard',
+      }),
+      overrides: [],
+    })
+
+    expect(resolution.allowed).toBe(false)
+    expect(resolution.reason).toBe('blocked_offs_dow')
+  })
+
+  it('applies soft non-work penalties when outside a soft weekly pattern', () => {
+    const resolution = resolveAvailability({
+      therapistId: 'therapist-1',
+      cycleId: 'cycle-a',
+      date: '2026-03-06',
+      shiftType: 'day',
+      isActive: true,
+      onFmla: false,
+      pattern: buildPattern({
+        works_dow: [1, 2, 3],
+        offs_dow: [],
+        weekend_rotation: 'none',
+        works_dow_mode: 'soft',
+      }),
+      overrides: [],
+    })
+
+    expect(resolution.allowed).toBe(true)
+    expect(resolution.reason).toBe('soft_outside_works_dow')
+    expect(resolution.penalty).toBeGreaterThan(0)
+  })
+
   it('prefers manager overrides when exact and broad rows both match the date', () => {
     const resolution = resolveAvailability({
       therapistId: 'therapist-1',

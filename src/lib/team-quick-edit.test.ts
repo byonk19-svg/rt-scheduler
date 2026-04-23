@@ -23,6 +23,21 @@ function buildFormData(overrides: Record<string, string | boolean | undefined> =
   return formData
 }
 
+function buildFormDataWithArrays(input: {
+  overrides?: Record<string, string | boolean | undefined>
+  worksDow?: number[]
+  offsDow?: number[]
+}) {
+  const formData = buildFormData(input.overrides)
+  for (const day of input.worksDow ?? []) {
+    formData.append('works_dow', String(day))
+  }
+  for (const day of input.offsDow ?? []) {
+    formData.append('offs_dow', String(day))
+  }
+  return formData
+}
+
 describe('parseTeamQuickEditFormData', () => {
   it('parses the quick edit fields for a therapist', () => {
     const result = parseTeamQuickEditFormData(
@@ -103,6 +118,31 @@ describe('parseTeamQuickEditFormData', () => {
       value: expect.objectContaining({
         onFmla: false,
         fmlaReturnDate: null,
+      }),
+    })
+  })
+
+  it('persists never-work weekdays even when fixed weekly pattern is off', () => {
+    const result = parseTeamQuickEditFormData(
+      buildFormDataWithArrays({
+        overrides: {
+          has_recurring_schedule: false,
+        },
+        offsDow: [4],
+      })
+    )
+
+    expect(result).toEqual({
+      ok: true,
+      value: expect.objectContaining({
+        workPattern: {
+          hasPattern: true,
+          worksDow: [],
+          offsDow: [4],
+          worksDowMode: 'hard',
+          weekendRotation: 'none',
+          weekendAnchorDate: null,
+        },
       }),
     })
   })

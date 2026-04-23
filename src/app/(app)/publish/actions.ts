@@ -73,6 +73,7 @@ export async function requeueFailedPublishEmailsAction(formData: FormData) {
   await refreshPublishEventCounts(admin, [publishEventId])
 
   revalidatePath('/publish')
+  revalidatePath('/publish/history')
   revalidatePath(`/publish/${publishEventId}`)
 
   const requeued = requeuedRows?.length ?? 0
@@ -143,6 +144,7 @@ export async function restartPublishedCycleAction(formData: FormData) {
   void deletedShifts
 
   revalidatePath('/publish')
+  revalidatePath('/publish/history')
   revalidatePath('/coverage')
   revalidatePath('/schedule')
   revalidatePath('/preliminary')
@@ -206,6 +208,7 @@ export async function unpublishCycleKeepShiftsAction(formData: FormData) {
   }
 
   revalidatePath('/publish')
+  revalidatePath('/publish/history')
   revalidatePath('/coverage')
   revalidatePath('/schedule')
   revalidatePath('/preliminary')
@@ -219,7 +222,7 @@ export async function deletePublishEventAction(formData: FormData) {
 
   const publishEventId = String(formData.get('publish_event_id') ?? '').trim()
   if (!publishEventId) {
-    redirect('/publish?error=missing_publish_event')
+    redirect('/publish/history?error=missing_publish_event')
   }
 
   const supabase = await createClient()
@@ -231,11 +234,11 @@ export async function deletePublishEventAction(formData: FormData) {
 
   if (publishEventError || !publishEvent) {
     console.error('Failed to load publish event for deletion:', publishEventError)
-    redirect('/publish?error=delete_publish_event_failed')
+    redirect('/publish/history?error=delete_publish_event_failed')
   }
 
   if (getOne(publishEvent.schedule_cycles)?.published) {
-    redirect('/publish?error=delete_live_publish_event')
+    redirect('/publish/history?error=delete_live_publish_event')
   }
 
   const admin = (() => {
@@ -243,7 +246,7 @@ export async function deletePublishEventAction(formData: FormData) {
       return createAdminClient()
     } catch (error) {
       console.error('Failed to initialize admin client for publish event delete:', error)
-      redirect('/publish?error=delete_publish_event_failed')
+      redirect('/publish/history?error=delete_publish_event_failed')
     }
   })()
 
@@ -254,14 +257,15 @@ export async function deletePublishEventAction(formData: FormData) {
 
   if (deleteError) {
     console.error('Failed to delete publish event:', deleteError)
-    redirect('/publish?error=delete_publish_event_failed')
+    redirect('/publish/history?error=delete_publish_event_failed')
   }
 
   revalidatePath('/publish')
+  revalidatePath('/publish/history')
   revalidatePath('/coverage')
   revalidatePath('/schedule')
 
-  redirect('/publish?success=publish_event_deleted')
+  redirect('/publish/history?success=publish_event_deleted')
 }
 
 export async function archiveCycleAction(formData: FormData) {
@@ -299,6 +303,7 @@ export async function archiveCycleAction(formData: FormData) {
   }
 
   revalidatePath('/publish')
+  revalidatePath('/publish/history')
   revalidatePath('/coverage')
   revalidatePath('/schedule')
   revalidatePath('/availability')

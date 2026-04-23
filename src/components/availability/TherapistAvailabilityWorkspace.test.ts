@@ -7,7 +7,46 @@ import { describe, expect, it } from 'vitest'
 
 import { TherapistAvailabilityWorkspace } from '@/components/availability/TherapistAvailabilityWorkspace'
 
+const workspaceSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/TherapistAvailabilityWorkspace.tsx'),
+  'utf8'
+)
+const calendarSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/TherapistAvailabilityCalendar.tsx'),
+  'utf8'
+)
+const weekSectionSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/TherapistAvailabilityWeekSection.tsx'),
+  'utf8'
+)
+const selectedDayEditorSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/TherapistAvailabilitySelectedDayEditor.tsx'),
+  'utf8'
+)
+const notesSummarySource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/TherapistAvailabilityNotesSummary.tsx'),
+  'utf8'
+)
+
 describe('TherapistAvailabilityWorkspace', () => {
+  it('renders CTAs when no cycle exists yet', () => {
+    const html = renderToStaticMarkup(
+      createElement(TherapistAvailabilityWorkspace, {
+        cycles: [],
+        availabilityRows: [],
+        conflicts: [],
+        initialCycleId: '',
+        submissionsByCycleId: {},
+        submitTherapistAvailabilityGridAction: async () => {},
+      })
+    )
+
+    expect(html).toContain('id="therapist-availability-workspace"')
+    expect(html).toContain('href="/dashboard/staff"')
+    expect(html).toContain('href="/shift-board"')
+    expect(html).toContain('href="/staff/my-schedule"')
+  })
+
   it('renders therapist-only controls, summary, and full-availability status copy', () => {
     const html = renderToStaticMarkup(
       createElement(TherapistAvailabilityWorkspace, {
@@ -89,11 +128,34 @@ describe('TherapistAvailabilityWorkspace', () => {
   })
 
   it('documents that Available days do not persist notes (source)', () => {
-    const src = readFileSync(
-      resolve(process.cwd(), 'src/components/availability/TherapistAvailabilityWorkspace.tsx'),
+    const draftSrc = readFileSync(
+      resolve(process.cwd(), 'src/lib/therapist-availability-draft.ts'),
       'utf8'
     )
-    expect(src).toContain('Notes are only saved for Need Off or Request to Work days.')
-    expect(src).toContain('Persisted notes only exist for Need Off')
+    const stateSrc = readFileSync(
+      resolve(process.cwd(), 'src/components/availability/useTherapistAvailabilityState.ts'),
+      'utf8'
+    )
+    expect(weekSectionSource).toContain('TherapistAvailabilitySelectedDayEditor')
+    expect(selectedDayEditorSource).toContain(
+      'Notes are only saved for Need Off or Request to Work days.'
+    )
+    expect(draftSrc).toContain('Persisted notes only exist for Need Off')
+    expect(stateSrc).toContain('useTherapistAvailabilityState')
+    expect(workspaceSource).toContain('useTherapistAvailabilityState')
+  })
+
+  it('keeps week grid rendering in a dedicated calendar section component', () => {
+    expect(calendarSource).toContain('TherapistAvailabilityWeekSection')
+    expect(weekSectionSource).toContain('Week {weekIndex + 1}')
+    expect(weekSectionSource).toContain(
+      'aria-label={`${formatDateLabel(date)}: ${therapistDayStatusLabel(status)}`}'
+    )
+  })
+
+  it('keeps the day-notes summary in a dedicated component', () => {
+    expect(workspaceSource).toContain('TherapistAvailabilityNotesSummary')
+    expect(notesSummarySource).toContain('Day Notes')
+    expect(notesSummarySource).toContain('No day-specific notes yet.')
   })
 })

@@ -57,6 +57,14 @@ const THERAPIST_REVIEW_ROWS: AvailabilityEntryTableRow[] = [
     canDelete: true,
   },
 ]
+const availabilityEntriesTableRowsSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/AvailabilityEntriesTableRows.tsx'),
+  'utf8'
+)
+const availabilityEntriesTableStateSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/useAvailabilityEntriesTableState.ts'),
+  'utf8'
+)
 
 describe('AvailabilityEntriesTable', () => {
   it('frames manager review as a compact request inbox with selected-therapist scope', () => {
@@ -145,14 +153,32 @@ describe('AvailabilityEntriesTable', () => {
   })
 
   it('uses Entry saved + last activity timestamp in expanded row detail (source)', () => {
-    const src = readFileSync(
-      resolve(process.cwd(), 'src/app/(app)/availability/availability-requests-table.tsx'),
-      'utf8'
-    )
+    const src = availabilityEntriesTableRowsSource
     expect(src).toContain('Entry saved')
     expect(src).toContain('formatDateTime(row.updatedAt ?? row.createdAt)')
     expect(src).not.toMatch(
       />[\s\n]*Submitted[\s\n]*<\/p>[\s\n]*<p className="text-sm text-foreground">[\s\n]*\{formatDateTime\(row\.createdAt\)\}/
     )
+  })
+
+  it('keeps interactive row/detail rendering in a dedicated component (source)', () => {
+    const tableSource = readFileSync(
+      resolve(process.cwd(), 'src/app/(app)/availability/availability-requests-table.tsx'),
+      'utf8'
+    )
+    expect(availabilityEntriesTableRowsSource).toContain('Delete request')
+    expect(availabilityEntriesTableRowsSource).toContain('View')
+    expect(tableSource).toContain('AvailabilityEntriesTableRows')
+  })
+
+  it('keeps inbox scope/filter/list derivation in a dedicated hook (source)', () => {
+    const tableSource = readFileSync(
+      resolve(process.cwd(), 'src/app/(app)/availability/availability-requests-table.tsx'),
+      'utf8'
+    )
+    expect(availabilityEntriesTableStateSource).toContain('useAvailabilityEntriesTableState')
+    expect(availabilityEntriesTableStateSource).toContain('filterAndSortRows')
+    expect(availabilityEntriesTableStateSource).toContain("'focused-therapist'")
+    expect(tableSource).toContain('useAvailabilityEntriesTableState')
   })
 })

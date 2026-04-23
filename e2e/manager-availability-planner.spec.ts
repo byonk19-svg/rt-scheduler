@@ -177,10 +177,10 @@ test.describe.serial('/availability manager planner', () => {
     })
     const refreshedPlanner = page.locator('#staff-scheduling-inputs')
     await refreshedPlanner.getByRole('button', { name: /^Cannot work$/ }).click()
+    await calendarDay(refreshedPlanner, ctx!.therapistCannotWorkDate).click()
     await expect(
       refreshedPlanner.getByRole('button', { name: 'Save 1 blocked date' })
     ).toBeVisible()
-    await calendarDay(refreshedPlanner, ctx!.therapistCannotWorkDate).click()
     await refreshedPlanner.getByRole('button', { name: 'Save 1 blocked date' }).click()
 
     await expect

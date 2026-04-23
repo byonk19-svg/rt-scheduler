@@ -1,10 +1,11 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowLeftRight, CheckCircle2, Clock, Send } from 'lucide-react'
+import { Send } from 'lucide-react'
 
 import { FeedbackToast } from '@/components/feedback-toast'
-import { MyScheduleCard } from '@/components/schedule/MyScheduleCard'
-import { Button } from '@/components/ui/button'
+import { StaffDashboardHero } from '@/components/staff/StaffDashboardHero'
+import { StaffDashboardPublishedShifts } from '@/components/staff/StaffDashboardPublishedShifts'
+import { StaffDashboardSummaryCards } from '@/components/staff/StaffDashboardSummaryCards'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { dateFromKey, formatDateLabel, formatHumanCycleRange } from '@/lib/calendar-utils'
@@ -14,7 +15,6 @@ import {
 } from '@/lib/therapist-availability-submission'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { cn } from '@/lib/utils'
 import { fetchMyPublishedUpcomingShifts } from '@/lib/staff-my-schedule'
 import { createClient } from '@/lib/supabase/server'
 
@@ -249,278 +249,27 @@ export default async function StaffDashboardPage({
     <div className="space-y-4">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
-      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-tw-float-lg">
-        <div className="flex flex-col gap-3 border-b border-border px-4 py-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              Welcome, {firstName}
-            </h1>
-            {activeCycle && cycleRangeLabel ? (
-              <>
-                <p className="mt-2 text-sm font-medium text-foreground">Cycle: {cycleRangeLabel}</p>
-                {activeCycle.published ? (
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Published {formatDateLabel(activeCycle.start_date)}
-                  </p>
-                ) : null}
-              </>
-            ) : (
-              <p className="mt-2 text-sm text-muted-foreground">No active scheduling cycle yet.</p>
-            )}
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span
-                className={cn(
-                  'rounded-full border px-2 py-0.5',
-                  availabilitySubmitted
-                    ? 'border-border/70 bg-muted/20'
-                    : 'border-[var(--warning-border)] bg-[var(--warning-subtle)]/50 text-[var(--warning-text)]'
-                )}
-              >
-                {availabilitySubmitted ? 'Availability: Submitted' : 'Availability: Not submitted'}
-              </span>
-              <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5">
-                {upcomingCount} upcoming shifts
-              </span>
-              <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5">
-                {pendingPostCount} requests awaiting action
-              </span>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {!availabilitySubmitted ? (
-              <>
-                <Button asChild size="sm">
-                  <Link href="/therapist/availability">
-                    <Send className="mr-1.5 h-3.5 w-3.5" />
-                    Submit availability
-                  </Link>
-                </Button>
-                <Button asChild size="sm" variant="outline">
-                  <Link href="/shift-board">Browse open shifts</Link>
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button asChild size="sm">
-                  <Link href="/shift-board">Browse open shifts</Link>
-                </Button>
-                <Button asChild size="sm" variant="outline">
-                  <Link href="/therapist/availability">Edit availability</Link>
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-        <div className="px-4 py-3.5">
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            Upcoming Shifts
-          </p>
-          {upcomingRoster.length > 0 ? (
-            <div className="divide-y divide-border">
-              {upcomingRoster.map((shift) => (
-                <div
-                  key={shift.date}
-                  className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0"
-                >
-                  <div className="w-[96px] shrink-0">
-                    <p className="text-xs font-semibold text-foreground">{shift.label}</p>
-                    <p className="mt-0.5 text-[10px] capitalize text-muted-foreground">
-                      {shift.shiftType} shift
-                    </p>
-                    {shift.myRole === 'lead' && (
-                      <span
-                        className="mt-1 inline-block rounded border px-1.5 py-0.5 text-[10px] font-bold"
-                        style={{
-                          borderColor: 'var(--warning-border)',
-                          backgroundColor: 'var(--warning-subtle)',
-                          color: 'var(--warning-text)',
-                        }}
-                      >
-                        Lead
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-1 pt-0.5">
-                    {shift.colleagues.length > 0 ? (
-                      shift.colleagues.map((c, i) => (
-                        <span
-                          key={i}
-                          className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
-                          style={
-                            c.isLead
-                              ? {
-                                  borderColor: 'var(--warning-border)',
-                                  backgroundColor: 'var(--warning-subtle)',
-                                  color: 'var(--warning-text)',
-                                }
-                              : {
-                                  borderColor: 'var(--border)',
-                                  backgroundColor: 'var(--muted)',
-                                  color: 'var(--muted-foreground)',
-                                }
-                          }
-                        >
-                          {c.isLead ? 'Lead: ' : ''}
-                          {c.name.split(' ')[0]}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        No colleagues assigned yet.
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-6 text-center">
-              <p className="text-sm font-medium text-foreground">
-                No shifts scheduled yet for this cycle
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                The schedule is still being filled. You can browse open shifts now, and submit
-                availability if you have not done so yet.
-              </p>
-              <div className="mt-3 flex justify-center">
-                <Button asChild size="sm">
-                  <Link href="/shift-board">Browse open shifts</Link>
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
+      <StaffDashboardHero
+        activeCyclePublished={Boolean(activeCycle?.published)}
+        availabilitySubmitted={availabilitySubmitted}
+        cycleRangeLabel={cycleRangeLabel}
+        firstName={firstName}
+        pendingPostCount={pendingPostCount}
+        upcomingCount={upcomingCount}
+        upcomingRoster={upcomingRoster}
+      />
 
-      <section className="rounded-xl border border-border bg-card px-4 py-4 shadow-tw-sm">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-bold tracking-tight text-foreground">Upcoming shifts</h2>
-          <Link
-            href="/staff/my-schedule"
-            className="text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            View all
-          </Link>
-        </div>
-        {upcomingPublishedWidget.length > 0 ? (
-          <div className="space-y-2">
-            {upcomingPublishedWidget.map((row) => (
-              <MyScheduleCard
-                key={row.id}
-                date={row.date}
-                shiftType={row.shift_type === 'night' ? 'night' : 'day'}
-                role={row.role ?? 'staff'}
-                status={row.status}
-                assignmentStatus={row.assignment_status}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            No upcoming shifts on published schedules. Your draft-cycle assignments stay hidden
-            until publish.
-          </p>
-        )}
-      </section>
+      <StaffDashboardPublishedShifts rows={upcomingPublishedWidget} />
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-border bg-muted/30 px-3 py-2.5">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Next Shift</span>
-            <Clock className="h-3.5 w-3.5" />
-          </div>
-          {nextShift && nextShiftLabel ? (
-            <>
-              <p className="mt-1.5 text-lg font-semibold tracking-tight text-foreground">
-                {nextShiftLabel}
-              </p>
-              {nextShiftTypeLabel ? (
-                <p className="mt-0.5 text-sm font-medium capitalize text-foreground">
-                  {nextShiftTypeLabel}
-                </p>
-              ) : null}
-              <p className="mt-1 text-xs text-muted-foreground">
-                Your next shift in this published schedule
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="mt-1.5 text-sm font-medium text-foreground">No shift scheduled yet</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Your next scheduled shift will appear here once you are on the roster.
-              </p>
-            </>
-          )}
-        </div>
-        <div
-          className={cn(
-            'rounded-xl border px-3 py-2.5',
-            availabilitySubmitted
-              ? 'border-border bg-muted/30'
-              : 'border-[var(--warning-border)] bg-[var(--warning-subtle)]/40'
-          )}
-        >
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Availability for This Cycle</span>
-            <CheckCircle2
-              className={cn(
-                'h-3.5 w-3.5',
-                availabilitySubmitted ? 'text-[var(--success-text)]' : 'text-[var(--warning-text)]'
-              )}
-            />
-          </div>
-          <p
-            className={cn(
-              'mt-1.5 text-lg font-semibold tracking-tight',
-              availabilitySubmitted ? 'text-[var(--success-text)]' : 'text-[var(--warning-text)]'
-            )}
-          >
-            {availabilitySubmitted ? 'Submitted' : 'Not submitted'}
-          </p>
-          {availabilitySubmitted && submissionUi.submittedAtDisplay ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Submitted {submissionUi.submittedAtDisplay}
-            </p>
-          ) : null}
-          {availabilitySubmitted && submissionUi.lastEditedDisplay ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Last edited {submissionUi.lastEditedDisplay}
-            </p>
-          ) : null}
-          {!availabilitySubmitted && availabilityDueLine ? (
-            <p className="mt-2 text-xs font-medium leading-snug text-foreground/90">
-              {availabilityDueLine}
-            </p>
-          ) : null}
-          {!availabilitySubmitted ? (
-            <Link
-              href="/therapist/availability"
-              className="mt-2.5 inline-block text-xs font-medium text-primary hover:underline"
-            >
-              Submit availability &rarr;
-            </Link>
-          ) : (
-            <Link
-              href="/therapist/availability"
-              className="mt-2.5 inline-block text-xs font-medium text-primary hover:underline"
-            >
-              Edit availability &rarr;
-            </Link>
-          )}
-        </div>
-        <div className="rounded-xl border border-border bg-muted/30 px-3 py-2.5">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Requests Awaiting Action</span>
-            <ArrowLeftRight className="h-3.5 w-3.5" />
-          </div>
-          <p className="mt-1.5 text-lg font-semibold tracking-tight text-foreground">
-            {pendingPostCount}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Swap or pickup requests that need your response
-          </p>
-        </div>
-      </section>
+      <StaffDashboardSummaryCards
+        availabilityDueLine={availabilityDueLine}
+        availabilitySubmitted={availabilitySubmitted}
+        lastEditedDisplay={submissionUi.lastEditedDisplay}
+        nextShiftLabel={nextShiftLabel}
+        nextShiftTypeLabel={nextShiftTypeLabel}
+        pendingPostCount={pendingPostCount}
+        submittedAtDisplay={submissionUi.submittedAtDisplay}
+      />
     </div>
   )
 }

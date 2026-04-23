@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { can } from '@/lib/auth/can'
+import { updateAssignmentStatusWithLottery } from '@/lib/lottery/service'
 import { parseRole } from '@/lib/auth/roles'
 import { notifyPublishedShiftStatusChanged } from '@/lib/published-schedule-notifications'
 import { isTrustedMutationRequest } from '@/lib/security/request-origin'
@@ -28,6 +29,9 @@ type ActorProfile = {
   role: string | null
   is_active: boolean | null
   archived_at: string | null
+  full_name: string | null
+  site_id: string | null
+  shift_type: 'day' | 'night' | null
 }
 
 type RpcAssignmentStatusRow = {
@@ -90,7 +94,7 @@ export async function POST(request: Request) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, is_active, archived_at')
+    .select('role, is_active, archived_at, full_name, site_id, shift_type')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -107,32 +111,58 @@ export async function POST(request: Request) {
     )
   }
 
-  const { data, error } = await supabase.rpc('update_assignment_status', {
-    p_assignment_id: assignmentId,
-    p_status: status,
-    p_note: note,
-    p_left_early_time: status === 'left_early' ? leftEarlyTimeRaw : null,
+  if (!actorProfile?.site_id) {
+    return NextResponse.json({ error: 'Actor site is missing.' }, { status: 403 })
+  }
+
+  const mutation = await updateAssignmentStatusWithLottery({
+    authClient: {
+      rpc: supabase.rpc.bind(supabase),
+    },
+    actor: {
+      userId: user.id,
+      fullName: actorProfile.full_name?.trim() || 'Team member',
+      role:
+        parseRole(actorProfile.role) === 'manager'
+          ? 'manager'
+          : parseRole(actorProfile.role) === 'lead'
+            ? 'lead'
+            : 'therapist',
+      siteId: actorProfile.site_id,
+      shiftType: actorProfile.shift_type ?? null,
+    },
+    shiftId: assignmentId,
+    nextStatus: status,
+    note,
   })
 
-  if (error) {
-    if (error.code === '42501') {
-      console.warn('Assignment status RPC authorization denied:', error.message || error)
+  if (!mutation.ok) {
+    if (mutation.code === '42501') {
+      console.warn('Assignment status RPC authorization denied:', mutation.error)
       return NextResponse.json(
         { error: 'Not authorized to update this assignment status.' },
         { status: 403 }
       )
     }
-    if (error.code === 'P0002') {
+    if (mutation.code === 'P0002') {
       return NextResponse.json({ error: 'Assignment not found.' }, { status: 404 })
     }
-    console.error('Failed to update assignment status via RPC:', error)
-    return NextResponse.json({ error: 'Could not update assignment status.' }, { status: 500 })
+    console.error('Failed to update assignment status via Lottery-aware mutation:', mutation.error)
+    return NextResponse.json(
+      { error: mutation.error || 'Could not update assignment status.' },
+      { status: 500 }
+    )
   }
 
-  const row = Array.isArray(data) ? ((data[0] ?? null) as RpcAssignmentStatusRow | null) : null
-  if (!row) {
-    return NextResponse.json({ error: 'Assignment status response was empty.' }, { status: 500 })
-  }
+  const row = {
+    id: assignmentId,
+    assignment_status: status,
+    status_note: note,
+    left_early_time: status === 'left_early' ? leftEarlyTimeRaw : null,
+    status_updated_at: new Date().toISOString(),
+    status_updated_by: user.id,
+    status_updated_by_name: actorProfile.full_name?.trim() || 'Team member',
+  } satisfies RpcAssignmentStatusRow
 
   const { data: shiftLookup } = await supabase
     .from('shifts')

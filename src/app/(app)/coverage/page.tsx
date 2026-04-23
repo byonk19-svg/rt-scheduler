@@ -1,5 +1,11 @@
-import { CoverageClientPage } from '@/app/coverage/CoverageClientPage'
+import type { Metadata } from 'next'
+
+import { CoverageClientPage } from '@/app/(app)/coverage/CoverageClientPage'
 import { getCoveragePageServerData } from '@/app/(app)/coverage/coverage-page-data'
+
+export const metadata: Metadata = {
+  title: 'Schedule',
+}
 
 export default async function CoveragePage({
   searchParams,

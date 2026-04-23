@@ -1,1 +1,5 @@
-export { default } from '../shift-board/page'
+import { redirect } from 'next/navigation'
+
+export default function SwapsLegacyRoute() {
+  redirect('/shift-board')
+}

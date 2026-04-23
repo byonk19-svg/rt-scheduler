@@ -66,4 +66,104 @@ describe('generateDraftForCycle', () => {
     })
     expect(result.forcedMustWorkMisses).toBe(1)
   })
+
+  it('prioritizes alternating on-weekend therapists for the last open day slot', () => {
+    const scheduledLead: Therapist = {
+      id: 'lead',
+      full_name: 'Lead Therapist',
+      shift_type: 'day',
+      is_lead_eligible: true,
+      employment_type: 'full_time',
+      max_work_days_per_week: 5,
+      works_dow: [],
+      offs_dow: [],
+      weekend_rotation: 'none',
+      weekend_anchor_date: null,
+      works_dow_mode: 'hard',
+      shift_preference: 'day',
+      on_fmla: false,
+      fmla_return_date: null,
+      is_active: true,
+    }
+    const scheduledStaffOne: Therapist = {
+      ...scheduledLead,
+      id: 'staff-1',
+      full_name: 'Staff One',
+      is_lead_eligible: false,
+    }
+    const scheduledStaffTwo: Therapist = {
+      ...scheduledLead,
+      id: 'staff-2',
+      full_name: 'Staff Two',
+      is_lead_eligible: false,
+    }
+    const ordinaryCandidate: Therapist = {
+      ...scheduledLead,
+      id: 'ordinary',
+      full_name: 'Ordinary Candidate',
+      is_lead_eligible: false,
+    }
+    const requiredWeekendCandidate: Therapist = {
+      ...scheduledLead,
+      id: 'required-weekend',
+      full_name: 'Required Weekend',
+      is_lead_eligible: false,
+      weekend_rotation: 'every_other',
+      weekend_anchor_date: '2026-04-18',
+    }
+
+    const result = generateDraftForCycle({
+      cycleId: 'cycle-1',
+      cycleStartDate: '2026-04-18',
+      cycleEndDate: '2026-04-18',
+      therapists: [
+        scheduledLead,
+        scheduledStaffOne,
+        scheduledStaffTwo,
+        ordinaryCandidate,
+        requiredWeekendCandidate,
+      ],
+      existingShifts: [
+        {
+          user_id: 'lead',
+          date: '2026-04-18',
+          shift_type: 'day',
+          status: 'scheduled',
+          role: 'lead',
+        },
+        {
+          user_id: 'staff-1',
+          date: '2026-04-18',
+          shift_type: 'day',
+          status: 'scheduled',
+          role: 'staff',
+        },
+        {
+          user_id: 'staff-2',
+          date: '2026-04-18',
+          shift_type: 'day',
+          status: 'scheduled',
+          role: 'staff',
+        },
+      ],
+      allAvailabilityOverrides: [],
+      weeklyShifts: [],
+    })
+
+    expect(result.draftShiftsToInsert).toContainEqual(
+      expect.objectContaining({
+        user_id: 'required-weekend',
+        date: '2026-04-18',
+        shift_type: 'day',
+      })
+    )
+    expect(result.draftShiftsToInsert).not.toContainEqual(
+      expect.objectContaining({
+        user_id: 'ordinary',
+        date: '2026-04-18',
+        shift_type: 'day',
+      })
+    )
+    expect(result.forcedMustWorkMisses).toBe(0)
+  })
 })

@@ -315,11 +315,12 @@ describe('deletePublishEventAction', () => {
     })
 
     await expect(deletePublishEventAction(makeDeleteFormData())).rejects.toThrow(
-      'REDIRECT:/publish?success=publish_event_deleted'
+      'REDIRECT:/publish/history?success=publish_event_deleted'
     )
 
     expect(deleteMock).toHaveBeenCalledWith('id', 'event-1')
     expect(revalidatePathMock).toHaveBeenCalledWith('/publish')
+    expect(revalidatePathMock).toHaveBeenCalledWith('/publish/history')
   })
 
   it('blocks deletion for live publish history entries', async () => {
@@ -331,7 +332,7 @@ describe('deletePublishEventAction', () => {
     createClientMock.mockResolvedValue(supabase)
 
     await expect(deletePublishEventAction(makeDeleteFormData())).rejects.toThrow(
-      'REDIRECT:/publish?error=delete_live_publish_event'
+      'REDIRECT:/publish/history?error=delete_live_publish_event'
     )
   })
 })

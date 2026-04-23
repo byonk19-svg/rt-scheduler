@@ -7,7 +7,13 @@ function firstValue(value: string | string[] | undefined): string | undefined {
   return value
 }
 
-/** Canonical staff schedule UI lives on `/coverage` (permission-gated actions). */
+/**
+ * Legacy `/therapist/schedule` URL — redirects to the shared team calendar (`/coverage`), preserving
+ * query params (for example `?date=`). Nav and product copy use “Team schedule” for this surface;
+ * personal published assignments live under `/staff/my-schedule` (“My shifts”). The redirect target
+ * stays `/coverage` so existing bookmarks and shared links keep working; change only with an
+ * explicit product decision.
+ */
 export default async function TherapistSchedulePage({
   searchParams,
 }: {

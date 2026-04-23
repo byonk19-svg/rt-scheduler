@@ -122,8 +122,9 @@ test.describe.serial('/team quick edit modal', () => {
     await expect(updatedCard).toContainText('Part-time')
     await expect(updatedCard).toContainText('Return May 12, 2026')
 
-    await updatedCard.click()
+    await page.goto(`/team?edit_profile=${ctx!.therapist.id}`, { waitUntil: 'domcontentloaded' })
     const inactiveDialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
+    await expect(inactiveDialog).toBeVisible({ timeout: 10_000 })
     await inactiveDialog.getByLabel('Active').uncheck()
     await inactiveDialog.getByRole('button', { name: 'Save changes' }).click()
 

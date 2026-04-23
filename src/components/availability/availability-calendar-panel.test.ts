@@ -1,8 +1,19 @@
 import { createElement } from 'react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { AvailabilityCalendarPanel } from '@/components/availability/availability-calendar-panel'
+
+const source = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/availability-calendar-panel.tsx'),
+  'utf8'
+)
+const gridSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/AvailabilityCalendarGrid.tsx'),
+  'utf8'
+)
 
 describe('AvailabilityCalendarPanel', () => {
   it('renders month navigation, weekday headings, and selected saved dates', () => {
@@ -15,7 +26,11 @@ describe('AvailabilityCalendarPanel', () => {
         cycleLabel: 'Mar 22 - May 2, 2026',
         dayStates: {
           '2026-03-24': { draftSelection: 'will_work' },
-          '2026-03-26': { savedPlanner: 'cannot_work' },
+          '2026-03-26': {
+            savedPlanner: 'cannot_work',
+            savedPlannerKind: 'weekly_default',
+            savedPlannerBadge: 'Never',
+          },
           '2026-03-27': { requestTypes: ['need_off'] },
         },
         onPreviousMonth: () => {},
@@ -28,12 +43,21 @@ describe('AvailabilityCalendarPanel', () => {
     expect(html).toContain('Selected therapist')
     expect(html).toContain('Current cycle')
     expect(html).toContain('Saved plan')
+    expect(html).toContain('Weekly default')
     expect(html).toContain('Need off request')
+    expect(html).toContain('Never')
+    expect(html).toContain('data-saved-kind="weekly_default"')
     expect(html).toContain('aria-label="Previous month"')
     expect(html).toContain('aria-label="Next month"')
     expect(html).toContain('Su')
     expect(html).toContain('Sa')
     expect(html).toContain('data-status="will_work"')
     expect(html).toContain('data-in-cycle="false"')
+  })
+
+  it('keeps the interactive day grid in a dedicated calendar subcomponent', () => {
+    expect(source).toContain('AvailabilityCalendarGrid')
+    expect(gridSource).toContain('data-saved-kind')
+    expect(gridSource).toContain('data-status')
   })
 })

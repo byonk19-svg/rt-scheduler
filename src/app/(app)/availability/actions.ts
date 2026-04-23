@@ -105,6 +105,15 @@ function revalidateTherapistAvailabilitySurfaces() {
 type AvailabilityOverrideType = 'force_off' | 'force_on'
 type AvailabilityShiftType = 'day' | 'night' | 'both'
 type AvailabilityEmailItemStatus = 'parsed' | 'auto_applied' | 'needs_review' | 'failed'
+type IntakeScopedOverrideRow = {
+  id: string
+  cycle_id: string
+  therapist_id: string
+  date: string
+  shift_type: AvailabilityShiftType
+  source_intake_id: string | null
+  source_intake_item_id: string | null
+}
 
 type AvailabilityEmailItemSummaryRow = {
   parse_status: AvailabilityEmailItemStatus
@@ -180,6 +189,91 @@ function summarizeAvailabilityItemRows(rows: AvailabilityEmailItemSummaryRow[]) 
     needsReviewCount: rows.filter((row) => row.parse_status === 'needs_review').length,
     failedCount: rows.filter((row) => row.parse_status === 'failed').length,
   }
+}
+
+function buildOverrideScopeKey(params: {
+  cycleId: string
+  therapistId: string
+  date: string
+  shiftType: AvailabilityShiftType
+}) {
+  return `${params.cycleId}::${params.therapistId}::${params.date}::${params.shiftType}`
+}
+
+async function syncAvailabilityOverridesForEmailIntake(params: {
+  supabase: SupabaseClient
+  intakeId: string
+  itemId?: string
+  payload: Array<
+    ReturnType<typeof buildManagerOverrideInput> & {
+      source_intake_id: string
+      source_intake_item_id: string | null
+    }
+  >
+}) {
+  const { supabase, intakeId, itemId, payload } = params
+  const existingOverridesQuery = supabase
+    .from('availability_overrides')
+    .select('id, cycle_id, therapist_id, date, shift_type, source_intake_id, source_intake_item_id')
+
+  const { data: existingOverrides, error: existingOverridesError } = itemId
+    ? await existingOverridesQuery.eq('source_intake_item_id', itemId)
+    : await existingOverridesQuery.eq('source_intake_id', intakeId)
+
+  if (existingOverridesError) {
+    console.error(
+      'Failed to load existing intake-linked availability overrides:',
+      existingOverridesError
+    )
+    return { error: existingOverridesError }
+  }
+
+  const keepKeys = new Set(
+    payload.map((row) =>
+      buildOverrideScopeKey({
+        cycleId: row.cycle_id,
+        therapistId: row.therapist_id,
+        date: row.date,
+        shiftType: row.shift_type,
+      })
+    )
+  )
+  const rowsToDelete = ((existingOverrides ?? []) as IntakeScopedOverrideRow[])
+    .filter(
+      (row) =>
+        !keepKeys.has(
+          buildOverrideScopeKey({
+            cycleId: row.cycle_id,
+            therapistId: row.therapist_id,
+            date: row.date,
+            shiftType: row.shift_type,
+          })
+        )
+    )
+    .map((row) => row.id)
+
+  if (rowsToDelete.length > 0) {
+    const { error: deleteError } = await supabase
+      .from('availability_overrides')
+      .delete()
+      .in('id', rowsToDelete)
+
+    if (deleteError) {
+      console.error('Failed to clear stale intake-linked availability overrides:', deleteError)
+      return { error: deleteError }
+    }
+  }
+
+  const { error: upsertError } = await supabase
+    .from('availability_overrides')
+    .upsert(payload, { onConflict: 'cycle_id,therapist_id,date,shift_type' })
+
+  if (upsertError) {
+    console.error('Failed to apply availability email intake:', upsertError)
+    return { error: upsertError }
+  }
+
+  return { error: null }
 }
 
 async function refreshAvailabilityEmailIntakeBatchState(
@@ -725,24 +819,34 @@ export async function applyEmailAvailabilityImportAction(formData: FormData) {
     redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_apply_failed' }))
   }
 
-  const payload = parsedRequests.map((request) =>
-    buildManagerOverrideInput({
-      cycleId: matchedCycleId,
-      therapistId: matchedTherapistId,
-      date: request.date,
-      shiftType: request.shift_type,
-      overrideType: request.override_type,
-      note: request.note ?? `Imported from email: ${request.source_line}`,
-      managerId: user.id,
-    })
+  const payload = parsedRequests.map(
+    (request) =>
+      ({
+        ...buildManagerOverrideInput({
+          cycleId: matchedCycleId,
+          therapistId: matchedTherapistId,
+          date: request.date,
+          shiftType: request.shift_type,
+          overrideType: request.override_type,
+          note: request.note ?? `Imported from email: ${request.source_line}`,
+          managerId: user.id,
+        }),
+        source_intake_id: effectiveIntakeId,
+        source_intake_item_id: itemId || null,
+      }) satisfies ReturnType<typeof buildManagerOverrideInput> & {
+        source_intake_id: string
+        source_intake_item_id: string | null
+      }
   )
 
-  const { error: upsertError } = await supabase
-    .from('availability_overrides')
-    .upsert(payload, { onConflict: 'cycle_id,therapist_id,date,shift_type' })
+  const { error: upsertError } = await syncAvailabilityOverridesForEmailIntake({
+    supabase,
+    intakeId: effectiveIntakeId,
+    itemId: itemId || undefined,
+    payload,
+  })
 
   if (upsertError) {
-    console.error('Failed to apply availability email intake:', upsertError)
     redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_apply_failed' }))
   }
 

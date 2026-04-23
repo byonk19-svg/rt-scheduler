@@ -1,46 +1,46 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { ReactNode } from 'react'
 
-import { useAvailabilityPlannerFocus } from '@/components/availability/availability-planner-focus-context'
 import type {
   AvailabilityRosterFilter,
   AvailabilityStatusSummaryRow,
 } from '@/components/availability/AvailabilityStatusSummary'
 import { AvailabilityWorkspaceShell } from '@/components/availability/availability-workspace-shell'
 import {
-  splitPlannerDatesByMode,
-  type PlannerMode,
-  type PlannerOverrideRow,
-} from '@/lib/availability-planner'
-import { formatHumanCycleRange, shiftMonthKey, toMonthStartKey } from '@/lib/calendar-utils'
-import { isDateWithinCycle } from '@/lib/employee-directory'
+  type ManagerAvailabilityEntryRow,
+  type ManagerPlannerOverrideRecord,
+  getCycleLabel,
+} from '@/components/availability/manager-scheduling-helpers'
+import { useManagerSchedulingState } from '@/components/availability/useManagerSchedulingState'
+import { shiftMonthKey } from '@/lib/calendar-utils'
+import type { WorkPattern } from '@/lib/coverage/work-patterns'
 
 const AvailabilityStatusSummary = dynamic(() =>
   import('@/components/availability/AvailabilityStatusSummary').then(
-    (module) => module.AvailabilityStatusSummary ?? (() => null)
+    (module) => module.AvailabilityStatusSummary
   )
 )
 const AvailabilityCalendarPanel = dynamic(() =>
   import('@/components/availability/availability-calendar-panel').then(
-    (module) => module.AvailabilityCalendarPanel ?? (() => null)
+    (module) => module.AvailabilityCalendarPanel
   )
 )
 const AvailabilitySecondaryPanel = dynamic(() =>
   import('@/components/availability/availability-secondary-panel').then(
-    (module) => module.AvailabilitySecondaryPanel ?? (() => null)
+    (module) => module.AvailabilitySecondaryPanel
   )
 )
 const PlannerControlRail = dynamic(() =>
   import('@/components/availability/planner-control-rail').then(
-    (module) => module.PlannerControlRail ?? (() => null)
+    (module) => module.PlannerControlRail
   )
 )
 const TherapistContextPanel = dynamic(() =>
   import('@/components/availability/therapist-context-panel').then(
-    (module) => module.TherapistContextPanel ?? (() => null)
+    (module) => module.TherapistContextPanel
   )
 )
 
@@ -59,55 +59,30 @@ type TherapistOption = {
   employment_type: 'full_time' | 'part_time' | 'prn'
 }
 
-type PlannerOverrideRecord = PlannerOverrideRow & {
-  therapist_id: string
-  cycle_id: string
-}
-
-type AvailabilityEntryRow = {
-  id: string
-  therapistId: string
-  cycleId: string
-  date: string
-  reason: string | null
-  createdAt: string
-  updatedAt?: string
-  requestedBy: string
-  entryType: 'force_off' | 'force_on'
-}
-
 type Props = {
   cycles: Cycle[]
   therapists: TherapistOption[]
-  overrides: PlannerOverrideRecord[]
-  availabilityEntries: AvailabilityEntryRow[]
+  overrides: ManagerPlannerOverrideRecord[]
+  workPatternsByTherapist: Record<string, WorkPattern | null | undefined>
+  availabilityEntries: ManagerAvailabilityEntryRow[]
   initialCycleId: string
   initialTherapistId: string
   submittedRows: AvailabilityStatusSummaryRow[]
   missingRows: AvailabilityStatusSummaryRow[]
   initialRosterFilter?: AvailabilityRosterFilter
   defaultSecondaryTab?: 'roster' | 'inbox'
+  defaultSecondaryOpen?: boolean
   saveManagerPlannerDatesAction: (formData: FormData) => void | Promise<void>
   deleteManagerPlannerDateAction: (formData: FormData) => void | Promise<void>
   copyAvailabilityFromPreviousCycleAction: (formData: FormData) => void | Promise<void>
   reviewRequestsPanel?: ReactNode
 }
 
-function getSavedBucketsForSelection(
-  overrides: PlannerOverrideRecord[],
-  cycleId: string,
-  therapistId: string
-) {
-  return splitPlannerDatesByMode(
-    overrides.filter((row) => row.cycle_id === cycleId && row.therapist_id === therapistId),
-    { source: 'manager' }
-  )
-}
-
 export function ManagerSchedulingInputs({
   cycles,
   therapists,
   overrides,
+  workPatternsByTherapist,
   availabilityEntries,
   initialCycleId,
   initialTherapistId,
@@ -115,156 +90,42 @@ export function ManagerSchedulingInputs({
   missingRows,
   initialRosterFilter = 'missing',
   defaultSecondaryTab = 'roster',
+  defaultSecondaryOpen = false,
   saveManagerPlannerDatesAction,
   deleteManagerPlannerDateAction,
   copyAvailabilityFromPreviousCycleAction,
   reviewRequestsPanel,
 }: Props) {
-  const plannerFocus = useAvailabilityPlannerFocus()
-
-  const initialSelectedCycleId = initialCycleId || cycles[0]?.id || ''
-  const initialSelectedTherapistId = initialTherapistId || therapists[0]?.id || ''
-
-  const [selectedCycleId, setSelectedCycleId] = useState(initialSelectedCycleId)
-  const [selectedTherapistId, setSelectedTherapistId] = useState(initialSelectedTherapistId)
-  const [mode, setMode] = useState<PlannerMode>('will_work')
-  const [selectedDates, setSelectedDates] = useState<string[]>(() => {
-    const initialBuckets = getSavedBucketsForSelection(
-      overrides,
-      initialSelectedCycleId,
-      initialSelectedTherapistId
-    )
-    return initialBuckets.willWork
+  const {
+    dayStates,
+    handleCycleChange,
+    handleModeChange,
+    handleTherapistChange,
+    mode,
+    monthStart,
+    savedOverrides,
+    selectedCycle,
+    selectedCycleId,
+    selectedCycleLabel,
+    selectedDates,
+    selectedTherapist,
+    selectedTherapistId,
+    setMonthStart,
+    setSelectedDates,
+    submissionStatus,
+    therapistRequestRows,
+    toggleDate,
+  } = useManagerSchedulingState({
+    availabilityEntries,
+    cycles,
+    initialCycleId,
+    initialTherapistId,
+    missingRows,
+    overrides,
+    submittedRows,
+    therapists,
+    workPatternsByTherapist,
   })
-  const [monthStart, setMonthStart] = useState(() => {
-    const cycle = cycles.find((item) => item.id === initialSelectedCycleId)
-    return toMonthStartKey(cycle?.start_date ?? initialSelectedCycleId)
-  })
-
-  const selectedCycle = useMemo(
-    () => cycles.find((cycle) => cycle.id === selectedCycleId) ?? null,
-    [cycles, selectedCycleId]
-  )
-  const selectedTherapist = useMemo(
-    () => therapists.find((therapist) => therapist.id === selectedTherapistId) ?? null,
-    [selectedTherapistId, therapists]
-  )
-
-  const savedOverrides = useMemo(
-    () =>
-      overrides
-        .filter(
-          (row) => row.cycle_id === selectedCycleId && row.therapist_id === selectedTherapistId
-        )
-        .sort((a, b) => a.date.localeCompare(b.date)),
-    [overrides, selectedCycleId, selectedTherapistId]
-  )
-
-  const savedBuckets = useMemo(
-    () => splitPlannerDatesByMode(savedOverrides, { source: 'manager' }),
-    [savedOverrides]
-  )
-
-  const therapistRequestRows = useMemo(
-    () =>
-      availabilityEntries.filter(
-        (row) => row.cycleId === selectedCycleId && row.therapistId === selectedTherapistId
-      ),
-    [availabilityEntries, selectedCycleId, selectedTherapistId]
-  )
-
-  const rosterRow =
-    submittedRows.find((row) => row.therapistId === selectedTherapistId) ??
-    missingRows.find((row) => row.therapistId === selectedTherapistId) ??
-    null
-
-  const submissionStatus = rosterRow
-    ? {
-        submitted: submittedRows.some((row) => row.therapistId === selectedTherapistId),
-        overridesCount: rosterRow.overridesCount,
-        lastUpdatedAt: rosterRow.lastUpdatedAt,
-      }
-    : null
-
-  function syncSelection(nextMode: PlannerMode, cycleId: string, therapistId: string) {
-    const nextBuckets = getSavedBucketsForSelection(overrides, cycleId, therapistId)
-    setSelectedDates(nextMode === 'will_work' ? nextBuckets.willWork : nextBuckets.cannotWork)
-  }
-
-  function replacePlannerQuery(nextCycleId: string, nextTherapistId: string) {
-    if (typeof window === 'undefined') return
-    const currentUrl = new URL(window.location.href)
-    const params = new URLSearchParams(currentUrl.search)
-    params.set('tab', 'planner')
-    if (nextCycleId) params.set('cycle', nextCycleId)
-    if (nextTherapistId) params.set('therapist', nextTherapistId)
-    params.delete('search')
-    const query = params.toString()
-    window.location.assign(query ? `${currentUrl.pathname}?${query}` : currentUrl.pathname)
-  }
-
-  function handleCycleChange(nextCycleId: string) {
-    setSelectedCycleId(nextCycleId)
-    const nextCycle = cycles.find((cycle) => cycle.id === nextCycleId)
-    if (nextCycle) {
-      setMonthStart(toMonthStartKey(nextCycle.start_date))
-    }
-    syncSelection(mode, nextCycleId, selectedTherapistId)
-    replacePlannerQuery(nextCycleId, selectedTherapistId)
-  }
-
-  function handleTherapistChange(nextTherapistId: string) {
-    setSelectedTherapistId(nextTherapistId)
-    const nextTherapist = therapists.find((therapist) => therapist.id === nextTherapistId) ?? null
-    plannerFocus?.setFocusedTherapistName(nextTherapist?.full_name ?? null)
-    syncSelection(mode, selectedCycleId, nextTherapistId)
-    replacePlannerQuery(selectedCycleId, nextTherapistId)
-  }
-
-  function handleModeChange(nextMode: PlannerMode) {
-    setMode(nextMode)
-    syncSelection(nextMode, selectedCycleId, selectedTherapistId)
-  }
-
-  function toggleDate(date: string) {
-    if (!selectedCycle || !isDateWithinCycle(date, selectedCycle)) return
-    setSelectedDates((current) =>
-      current.includes(date)
-        ? current.filter((value) => value !== date)
-        : [...current, date].sort((a, b) => a.localeCompare(b))
-    )
-  }
-
-  const dayStates = useMemo(() => {
-    const next: Record<
-      string,
-      {
-        draftSelection?: 'will_work' | 'cannot_work'
-        savedPlanner?: 'will_work' | 'cannot_work'
-        requestTypes?: Array<'need_off' | 'request_to_work'>
-      }
-    > = {}
-
-    for (const date of savedBuckets.willWork) {
-      next[date] = { ...(next[date] ?? {}), savedPlanner: 'will_work' }
-    }
-    for (const date of savedBuckets.cannotWork) {
-      next[date] = { ...(next[date] ?? {}), savedPlanner: 'cannot_work' }
-    }
-    for (const date of selectedDates) {
-      next[date] = { ...(next[date] ?? {}), draftSelection: mode }
-    }
-    for (const row of therapistRequestRows) {
-      const current = next[row.date] ?? {}
-      const requestType = row.entryType === 'force_off' ? 'need_off' : 'request_to_work'
-      next[row.date] = {
-        ...current,
-        requestTypes: [...(current.requestTypes ?? []), requestType],
-      }
-    }
-
-    return next
-  }, [mode, savedBuckets.cannotWork, savedBuckets.willWork, selectedDates, therapistRequestRows])
 
   if (cycles.length === 0) {
     return (
@@ -295,7 +156,7 @@ export function ManagerSchedulingInputs({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-                Planning workspace
+                Availability planning workspace
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Plan staffing for the selected therapist inside the current schedule cycle.
@@ -329,11 +190,7 @@ export function ManagerSchedulingInputs({
             cycleStart={selectedCycle?.start_date ?? monthStart}
             cycleEnd={selectedCycle?.end_date ?? monthStart}
             selectedTherapistName={selectedTherapist?.full_name ?? 'Select a therapist'}
-            cycleLabel={
-              selectedCycle
-                ? formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)
-                : ''
-            }
+            cycleLabel={selectedCycleLabel}
             dayStates={dayStates}
             onPreviousMonth={() => setMonthStart((current) => shiftMonthKey(current, -1))}
             onNextMonth={() => setMonthStart((current) => shiftMonthKey(current, 1))}
@@ -343,11 +200,7 @@ export function ManagerSchedulingInputs({
         context={
           <TherapistContextPanel
             therapist={selectedTherapist}
-            cycleLabel={
-              selectedCycle
-                ? formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)
-                : 'No cycle selected'
-            }
+            cycleLabel={getCycleLabel(selectedCycle, 'No cycle selected')}
             requestRows={therapistRequestRows}
             savedPlannerRows={savedOverrides}
             submissionStatus={submissionStatus}
@@ -358,6 +211,12 @@ export function ManagerSchedulingInputs({
         }
         secondaryContent={
           <AvailabilitySecondaryPanel
+            awaitingCount={missingRows.length}
+            submittedCount={submittedRows.length}
+            requestCount={
+              availabilityEntries.filter((row) => row.cycleId === selectedCycleId).length
+            }
+            defaultOpen={defaultSecondaryOpen}
             defaultTab={defaultSecondaryTab}
             roster={
               <AvailabilityStatusSummary

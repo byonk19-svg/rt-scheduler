@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
@@ -10,6 +11,10 @@ import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
+
+export const metadata: Metadata = {
+  title: 'Access Requests',
+}
 
 type SearchParams = Record<string, string | string[] | undefined>
 
@@ -72,7 +77,7 @@ export default async function UserAccessRequestsPage({
   return (
     <div className="space-y-5">
       <ManagerWorkspaceHeader
-        title="User Access Requests"
+        title="Access requests"
         subtitle="Approve or decline pending account requests."
         summary={
           <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 text-sm font-medium text-foreground">
@@ -81,7 +86,7 @@ export default async function UserAccessRequestsPage({
         }
         actions={
           <Button asChild variant="outline" size="sm">
-            <Link href="/requests">Back to Requests</Link>
+            <Link href="/team">Back to team</Link>
           </Button>
         }
       />

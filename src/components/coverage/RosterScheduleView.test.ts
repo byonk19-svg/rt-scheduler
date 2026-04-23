@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 import {
   buildRosterSections,
@@ -6,6 +8,23 @@ import {
   resolveRosterCellIntent,
   type RosterMemberRow,
 } from '@/components/coverage/RosterScheduleView'
+
+const rosterScheduleViewSource = readFileSync(
+  resolve(process.cwd(), 'src/components/coverage/RosterScheduleView.tsx'),
+  'utf8'
+)
+const mobileRosterDayCardsSource = readFileSync(
+  resolve(process.cwd(), 'src/components/coverage/MobileRosterDayCards.tsx'),
+  'utf8'
+)
+const rosterScheduleHeaderSource = readFileSync(
+  resolve(process.cwd(), 'src/components/coverage/RosterScheduleHeader.tsx'),
+  'utf8'
+)
+const rosterScheduleDesktopSource = readFileSync(
+  resolve(process.cwd(), 'src/components/coverage/RosterScheduleDesktop.tsx'),
+  'utf8'
+)
 
 function makeMember(overrides: Partial<RosterMemberRow> = {}): RosterMemberRow {
   return {
@@ -65,5 +84,25 @@ describe('resolveRosterCellIntent', () => {
 
   it('returns none for read-only cells', () => {
     expect(resolveRosterCellIntent(false, false, true)).toBe('none')
+  })
+})
+
+describe('RosterScheduleView framing', () => {
+  it('keeps mobile day cards in a dedicated component', () => {
+    expect(mobileRosterDayCardsSource).toContain('Open day editor')
+    expect(mobileRosterDayCardsSource).toContain('PRN coverage')
+    expect(rosterScheduleViewSource).toContain('MobileRosterDayCards')
+  })
+
+  it('keeps roster legend and heading chrome in a dedicated component', () => {
+    expect(rosterScheduleHeaderSource).toContain('Roster matrix legend')
+    expect(rosterScheduleHeaderSource).toContain('Operational status')
+    expect(rosterScheduleViewSource).toContain('RosterScheduleHeader')
+  })
+
+  it('keeps desktop roster matrix rendering in a dedicated component', () => {
+    expect(rosterScheduleDesktopSource).toContain('Clinical staff')
+    expect(rosterScheduleDesktopSource).toContain('Active tally')
+    expect(rosterScheduleViewSource).toContain('RosterSection')
   })
 })

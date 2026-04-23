@@ -68,10 +68,17 @@ On `/team`, use Employee roster (single add or bulk paste) so names match what s
 
 - Day-level table: `availability_overrides` (cycle-scoped).
 - Official therapist submit state: `therapist_availability_submissions` (one row per therapist per cycle after Submit availability; Save progress stores overrides only and does not create this row).
+- Recurring defaults: manager `/availability` now derives planner defaults from `work_patterns` without writing them into `availability_overrides`.
+  - `offs_dow` renders as default `Cannot work`
+  - `works_dow` renders as default `Will work`
+  - explicit cycle/date overrides still win over the defaults
 - Therapist grid (`/therapist/availability`, staff `/availability`): Save progress (draft) vs Submit availability / Save changes (updates submission timestamps per app rules).
 - Single-row therapist save (`submitAvailabilityEntryAction`) also upserts the submission row so it cannot drift from the grid path.
 - Therapist self-service now warns when a Need Off (`force_off`) selection collides with an already scheduled active-cycle shift on that date. This is a warning banner only and does not block saving.
 - Manager planner entries use `source = manager` on `availability_overrides` (separate from therapist official submit).
+- Response semantics on `/availability` are intentionally split:
+  - top summary chips use `therapist_availability_submissions` only
+  - response roster counts any received cycle availability, including applied email-intake imports and manager-entered overrides
 - Manager planner can also Copy from last block for one therapist on `/availability`:
   - finds the most recent other cycle with manager-entered overrides for that therapist
   - shifts dates by the difference between source and target cycle starts
@@ -102,6 +109,8 @@ On `/team`, use Employee roster (single add or bulk paste) so names match what s
 - Apply path:
   - manager clicks Apply dates
   - parsed dates are written into `availability_overrides` with `source = manager`
+  - imported rows are stamped with `source_intake_id` / `source_intake_item_id`
+  - reapplying the same intake item removes stale previously imported dates from that same item before upserting the new set
   - intake row is marked `applied`
 
 Current operational guidance:
@@ -156,6 +165,7 @@ Current operational guidance:
 3. Each row shows work days, off days, weekend rotation, and hard/soft mode.
 4. Edit opens a dedicated dialog that upserts `work_patterns`.
 5. `weekend_anchor_date` must be a Saturday before save succeeds.
+6. Team quick edit now preserves `offs_dow` even if the user leaves **Has a fixed weekly pattern** unchecked, so managers can save "never work" weekdays without also opting into recurring workdays.
 
 ## 10) Manager: Team CSV Import
 

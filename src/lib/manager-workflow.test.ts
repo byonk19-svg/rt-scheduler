@@ -13,7 +13,7 @@ describe('getManagerAttentionLinks', () => {
       coverageUnderCoverage: '/coverage?view=week&filter=under_coverage&focus=first',
       coverageUnfilled: '/coverage?view=week&filter=unfilled&focus=first',
       coverageNeedsAttention: '/coverage?view=week&filter=needs_attention&focus=first',
-      publish: '/coverage?view=week',
+      publish: '/publish',
     })
   })
 
@@ -29,7 +29,7 @@ describe('getManagerAttentionLinks', () => {
       coverageUnfilled: '/coverage?cycle=cycle-abc&view=week&filter=unfilled&focus=first',
       coverageNeedsAttention:
         '/coverage?cycle=cycle-abc&view=week&filter=needs_attention&focus=first',
-      publish: '/coverage?cycle=cycle-abc&view=week',
+      publish: '/publish',
     })
   })
 })

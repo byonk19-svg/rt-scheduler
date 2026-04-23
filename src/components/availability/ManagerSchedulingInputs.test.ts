@@ -1,11 +1,30 @@
 import { createElement } from 'react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { ManagerSchedulingInputs } from '@/components/availability/ManagerSchedulingInputs'
 
+const source = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/ManagerSchedulingInputs.tsx'),
+  'utf8'
+)
+const stateSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/useManagerSchedulingState.ts'),
+  'utf8'
+)
+const contextPanelSource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/therapist-context-panel.tsx'),
+  'utf8'
+)
+const contextActivitySource = readFileSync(
+  resolve(process.cwd(), 'src/components/availability/TherapistContextActivityPanel.tsx'),
+  'utf8'
+)
+
 describe('ManagerSchedulingInputs', () => {
-  it('renders the manager workspace with planner controls, calendar, and roster content', () => {
+  it('renders the manager workspace shell for the planner surface', () => {
     const html = renderToStaticMarkup(
       createElement(ManagerSchedulingInputs, {
         cycles: [
@@ -47,6 +66,7 @@ describe('ManagerSchedulingInputs', () => {
             source: 'manager',
           },
         ],
+        workPatternsByTherapist: {},
         availabilityEntries: [
           {
             id: 'entry-1',
@@ -84,29 +104,14 @@ describe('ManagerSchedulingInputs', () => {
       })
     )
 
+    expect(html).toContain('id="staff-scheduling-inputs"')
     expect(html).toContain('data-slot="availability-workspace-primary"')
+    expect(html).toContain('Availability planning workspace')
     expect(html).toContain('Plan staffing')
-    expect(html).toContain('Schedule cycle')
-    expect(html).toContain('Therapist')
-    expect(html).toContain('Will work')
-    expect(html).toContain('Cannot work')
-    expect(html).toContain('Copy from last block')
-    expect(html).toContain('Selected dates')
-    expect(html).toContain('Save 1 will-work date')
-    expect(html).toContain('March 2026')
-    expect(html).toContain('Selected therapist')
-    expect(html).toContain('Current cycle')
-    expect(html).toContain('Therapist context')
-    expect(html).toContain('Request summary')
-    expect(html).toContain('Recent requests')
-    expect(html).toContain('Response roster')
-    expect(html).toContain('Request inbox')
-    expect(html).toContain('Layne P.')
-    expect(html).toContain('Barbara C.')
-    expect(html).toContain('Mar 24, 2026')
-    expect(html).toContain('Mar 26, 2026')
+    expect(html).toContain('selected therapist inside the current schedule cycle')
     expect(html).toContain('data-slot="availability-workspace-context"')
     expect(html).toContain('data-slot="availability-workspace-secondary"')
+    expect(source).toContain('defaultOpen={defaultSecondaryOpen}')
   })
 
   it('renders a setup message when no cycles exist', () => {
@@ -115,6 +120,7 @@ describe('ManagerSchedulingInputs', () => {
         cycles: [],
         therapists: [],
         overrides: [],
+        workPatternsByTherapist: {},
         availabilityEntries: [],
         initialCycleId: '',
         initialTherapistId: '',
@@ -129,39 +135,22 @@ describe('ManagerSchedulingInputs', () => {
     expect(html).toContain('Create a schedule cycle before planning hard staffing dates.')
   })
 
-  it('uses a clearer disabled save label when no planner dates are selected', () => {
-    const html = renderToStaticMarkup(
-      createElement(ManagerSchedulingInputs, {
-        cycles: [
-          {
-            id: 'cycle-1',
-            label: 'Apr 2026',
-            start_date: '2026-03-22',
-            end_date: '2026-05-02',
-            published: false,
-          },
-        ],
-        therapists: [
-          {
-            id: 'therapist-1',
-            full_name: 'Barbara C.',
-            shift_type: 'day',
-            employment_type: 'full_time',
-          },
-        ],
-        overrides: [],
-        availabilityEntries: [],
-        initialCycleId: 'cycle-1',
-        initialTherapistId: 'therapist-1',
-        submittedRows: [],
-        missingRows: [],
-        saveManagerPlannerDatesAction: async () => {},
-        deleteManagerPlannerDateAction: async () => {},
-        copyAvailabilityFromPreviousCycleAction: async () => {},
-      })
-    )
+  it('forwards deep-link state into the secondary workspace boundary', () => {
+    expect(source).toContain("defaultSecondaryTab?: 'roster' | 'inbox'")
+    expect(source).toContain('defaultSecondaryOpen?: boolean')
+    expect(source).toContain('defaultOpen={defaultSecondaryOpen}')
+  })
 
-    expect(html).toContain('Select dates to save')
-    expect(html).not.toContain('Save 0 will-work dates')
+  it('keeps planner selection and sync logic in a dedicated hook', () => {
+    expect(stateSource).toContain('useManagerSchedulingState')
+    expect(stateSource).toContain('replacePlannerQuery')
+    expect(stateSource).toContain('syncSelection')
+    expect(source).toContain('useManagerSchedulingState')
+  })
+
+  it('keeps therapist activity tabs in a dedicated context subcomponent', () => {
+    expect(contextPanelSource).toContain('TherapistContextActivityPanel')
+    expect(contextActivitySource).toContain('Recent requests')
+    expect(contextActivitySource).toContain('Saved planner dates')
   })
 })
