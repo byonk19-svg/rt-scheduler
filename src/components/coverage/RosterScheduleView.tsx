@@ -27,6 +27,7 @@ type RosterScheduleViewProps = {
   selectedDayId?: string | null
   cellError?: { dayId: string; memberId: string; message: string } | null
   onOpenEditor?: (dayId: string) => void
+  onQuickAssign?: (date: string, memberId: string, role: 'lead' | 'staff') => void
   onChangeStatus?: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
 }
 
@@ -304,6 +305,13 @@ function MobileRosterDayCards({
   )
 }
 
+function tallyClass(count: number): string {
+  if (count === 0) return 'text-muted-foreground/35'
+  if (count < 3) return 'text-[var(--error-text)] font-bold'
+  if (count <= 5) return 'text-[var(--success-text)] font-bold'
+  return 'text-[var(--warning-text)] font-semibold'
+}
+
 const RosterMatrixTable = memo(function RosterMatrixTable({
   weekDates,
   rows,
@@ -314,6 +322,7 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
   cellError,
   assignedMemberCounts,
   onOpenEditor,
+  onQuickAssign,
   onChangeStatus,
 }: {
   weekDates: string[]
@@ -325,9 +334,27 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
   cellError: { dayId: string; memberId: string; message: string } | null
   assignedMemberCounts: Map<string, number>
   onOpenEditor?: (dayId: string) => void
+  onQuickAssign?: (date: string, memberId: string, role: 'lead' | 'staff') => void
   onChangeStatus?: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
 }) {
   const weekGroups = chunkRosterWeeks(weekDates)
+
+  const weekBoundaries = useMemo(() => {
+    const set = new Set<string>()
+    weekDates.forEach((date, i) => {
+      if (i % 7 === 0) set.add(date)
+    })
+    return set
+  }, [weekDates])
+
+  const weekendDates = useMemo(() => {
+    return new Set(
+      weekDates.filter((date) => {
+        const d = new Date(`${date}T00:00:00`)
+        return d.getDay() === 0 || d.getDay() === 6
+      })
+    )
+  }, [weekDates])
 
   const renderCell = (member: RosterMemberRow, date: string) => {
     const day = dayMap.get(date)
@@ -335,28 +362,52 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
     const intent = resolveRosterCellIntent(canManageCoverage, canUpdateAssignmentStatus, cell !== null)
     const token = statusToken(cell?.shift.status)
     const cellHasError = cellError?.dayId === date && cellError?.memberId === member.id
+
+    const isAssigned = cell !== null
+    const isActive = cell?.shift.status === 'active'
+    const isLead = cell?.isLead === true
+    const isOtherStatus = isAssigned && !isActive
+
     const sharedClass = cn(
-      'flex h-7.5 w-full cursor-pointer items-center justify-center rounded-md border text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors',
-      token.length > 0
-        ? 'border-border/60 bg-background text-foreground'
-        : 'border-transparent bg-transparent text-transparent',
-      (intent === 'manage' || intent === 'quick_assign') &&
-        !cellHasError &&
-        'border-primary/25 bg-primary/[0.03] text-foreground hover:bg-primary/[0.08]',
-      cell?.isLead && 'border-[var(--warning-border)]/65 bg-[var(--warning-subtle)]/35 text-[var(--warning-text)]',
-      selectedDayId === date && 'bg-primary/10 ring-1 ring-primary/25',
-      cellHasError && 'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]'
+      'flex h-7 w-full items-center justify-center rounded-[5px] border text-[10px] font-bold uppercase tracking-[0.08em] transition-all duration-100',
+      // Empty cell — invisible at rest
+      !isAssigned && 'border-transparent bg-transparent text-transparent',
+      // Active scheduled (non-lead)
+      isActive && !isLead && 'border-[var(--success-border)]/55 bg-[var(--success-subtle)]/50 text-[var(--success-text)]',
+      // Lead cell
+      isLead && 'border-[var(--warning-border)]/65 bg-[var(--warning-subtle)]/45 text-[var(--warning-text)]',
+      // Operational status (OC/LE/CX/CI, non-lead)
+      isOtherStatus && !isLead && 'border-border/55 bg-muted/30 text-foreground',
+      // Interactive states
+      intent === 'quick_assign' && !cellHasError &&
+        'cursor-pointer hover:border-primary/35 hover:bg-primary/[0.06] hover:text-primary/55',
+      intent === 'manage' && 'cursor-pointer',
+      intent === 'manage' && isActive && !isLead && !cellHasError &&
+        'hover:border-[var(--success-border)]/75 hover:bg-[var(--success-subtle)]/70',
+      intent === 'manage' && isLead && !cellHasError && 'hover:bg-[var(--warning-subtle)]/60',
+      intent === 'manage' && isOtherStatus && !isLead && !cellHasError && 'hover:bg-muted/50',
+      // Selected day column
+      selectedDayId === date && !isAssigned && 'bg-primary/[0.04]',
+      selectedDayId === date && isAssigned && 'ring-1 ring-primary/30',
+      // Error
+      cellHasError && 'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]',
     )
 
     if (intent === 'manage' || intent === 'quick_assign') {
+      const handleClick = () => {
+        if (intent === 'quick_assign' && onQuickAssign) {
+          const leadRole = member.role === 'lead' && !day?.leadShift ? 'lead' : 'staff'
+          onQuickAssign(date, member.id, leadRole)
+        } else {
+          onOpenEditor?.(date)
+        }
+      }
       const trigger = (
         <button
           type="button"
-          onClick={() => {
-            onOpenEditor?.(date)
-          }}
+          onClick={handleClick}
           className={sharedClass}
-          title={cell ? 'Open day editor' : 'Add from day editor'}
+          title={cell ? 'Open day editor' : 'Assign to shift'}
         >
           {token || '+'}
         </button>
@@ -408,35 +459,54 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
 
   return (
     <div className="overflow-x-auto rounded-lg border border-border/70 bg-background/95 xl:overflow-visible">
-      <table className="w-full min-w-[960px] table-fixed border-collapse xl:min-w-0">
+      <table className="w-full min-w-[900px] table-fixed border-collapse xl:min-w-0">
         <thead>
-          <tr className="bg-muted/35">
-            <th className="sticky left-0 top-0 z-30 w-44 border-b border-r border-border/70 bg-muted/50 px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Clinical staff
+          {/* Week group row */}
+          <tr className="bg-muted/30">
+            <th className="sticky left-0 top-0 z-30 w-36 border-b border-r border-border/70 bg-muted/45 px-3 py-1 text-left text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Staff
             </th>
             {weekGroups.map((week, index) => (
               <th
                 key={`week-group-${index}`}
                 colSpan={week.length}
-                className="sticky top-0 z-20 border-b border-border/70 bg-muted/35 px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground"
+                className={cn(
+                  'sticky top-0 z-20 border-b border-border/70 bg-muted/30 px-2 py-1 text-left text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground',
+                  index > 0 && 'border-l-2 border-l-border/55'
+                )}
               >
-                Week {index + 1} - {formatWeekLabel(week[0] ?? '')}
+                Wk {index + 1} · {formatWeekLabel(week[0] ?? '')}
               </th>
             ))}
           </tr>
+          {/* Day header row */}
           <tr className="bg-card">
-              <th className="sticky left-0 top-[32px] z-30 border-b border-r border-border/70 bg-card px-4 py-2 text-left text-[11px] font-semibold text-foreground">
-                Therapist
-              </th>
-            {weekDates.map((date) => (
-              <th
-                key={`head-${date}`}
-                className="sticky top-[32px] z-20 border-b border-border/70 bg-card px-1 py-2 text-center text-[10px] font-semibold text-muted-foreground"
-              >
-                <div className="leading-none">{formatWeekdayShort(date)}</div>
-                <div className="mt-1 leading-none text-foreground/80">{formatDayNumber(date)}</div>
-              </th>
-            ))}
+            <th className="sticky left-0 top-[24px] z-30 border-b border-r border-border/70 bg-card px-3 py-1 text-left text-[10px] font-semibold text-muted-foreground">
+              Therapist
+            </th>
+            {weekDates.map((date) => {
+              const isWeekBoundary = weekBoundaries.has(date)
+              const isWeekend = weekendDates.has(date)
+              return (
+                <th
+                  key={`head-${date}`}
+                  className={cn(
+                    'sticky top-[24px] z-20 border-b border-border/70 bg-card px-0.5 py-1 text-center',
+                    isWeekBoundary && 'border-l-2 border-l-border/55',
+                    !isWeekBoundary && 'border-l border-l-border/25',
+                    isWeekend && 'bg-muted/[0.06]',
+                    selectedDayId === date && 'bg-primary/[0.05]',
+                  )}
+                >
+                  <div className="text-[9px] font-semibold leading-none text-muted-foreground/70">
+                    {formatWeekdayShort(date)}
+                  </div>
+                  <div className="mt-0.5 text-[10px] font-bold leading-none tabular-nums text-foreground/80">
+                    {formatDayNumber(date)}
+                  </div>
+                </th>
+              )
+            })}
           </tr>
         </thead>
         <tbody>
@@ -444,44 +514,80 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
             <tr
               key={member.id}
               className={cn(
-                'border-b border-border/50 hover:bg-muted/8',
-                member.role === 'lead' && 'bg-[var(--warning-subtle)]/18'
+                'border-b border-border/40 hover:bg-muted/[0.06]',
+                member.role === 'lead' && 'bg-[var(--warning-subtle)]/12'
               )}
             >
               <th
                 scope="row"
                 className={cn(
-                  'sticky left-0 z-10 border-r border-border/70 bg-card px-4 py-1.5 text-left text-[12px] font-medium text-foreground',
-                  member.role === 'lead' && 'bg-[var(--warning-subtle)]/30 text-[var(--warning-text)]'
+                  'sticky left-0 z-10 border-r border-border/70 bg-card px-3 py-1 text-left',
+                  member.role === 'lead' && 'bg-[var(--warning-subtle)]/25'
                 )}
               >
-                {member.full_name}
-              </th>
-              {weekDates.map((date) => (
-                <td
-                  key={`${member.id}-${date}`}
-                  className={cn(
-                    'border-l border-border/35 px-1 py-1 text-center',
-                    selectedDayId === date && 'bg-primary/[0.04]'
+                <div className="flex min-w-0 items-center gap-1">
+                  <span
+                    className={cn(
+                      'truncate text-[11px] font-medium',
+                      member.role === 'lead' ? 'text-[var(--warning-text)]' : 'text-foreground'
+                    )}
+                  >
+                    {member.full_name}
+                  </span>
+                  {member.role === 'lead' && (
+                    <span className="shrink-0 rounded-[3px] border border-[var(--warning-border)]/55 bg-[var(--warning-subtle)]/60 px-[3px] py-px text-[8px] font-bold uppercase tracking-[0.08em] text-[var(--warning-text)]">
+                      L
+                    </span>
                   )}
-                >
-                  {renderCell(member, date)}
-                </td>
-              ))}
+                  {member.employment_type === 'prn' && (
+                    <span className="shrink-0 text-[9px] text-muted-foreground/55">PRN</span>
+                  )}
+                  {member.employment_type === 'part_time' && (
+                    <span className="shrink-0 text-[9px] text-muted-foreground/55">PT</span>
+                  )}
+                </div>
+              </th>
+              {weekDates.map((date) => {
+                const isWeekBoundary = weekBoundaries.has(date)
+                const isWeekend = weekendDates.has(date)
+                return (
+                  <td
+                    key={`${member.id}-${date}`}
+                    className={cn(
+                      'px-0.5 py-0.5',
+                      isWeekBoundary ? 'border-l-2 border-l-border/55' : 'border-l border-l-border/25',
+                      isWeekend && 'bg-muted/[0.04]',
+                      selectedDayId === date && 'bg-primary/[0.04]',
+                    )}
+                  >
+                    {renderCell(member, date)}
+                  </td>
+                )
+              })}
             </tr>
           ))}
-          <tr className="bg-muted/25">
-            <th className="sticky left-0 z-10 border-r border-border/70 bg-muted/35 px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              Active tally
+          <tr className="border-t border-border/50 bg-muted/20">
+            <th className="sticky left-0 z-10 border-r border-border/70 bg-muted/30 px-3 py-1.5 text-left text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Tally
             </th>
-            {weekDates.map((date) => (
-              <td
-                key={`tally-${date}`}
-                className="border-l border-border/35 px-1 py-2 text-center text-[10px] font-semibold text-foreground/75"
-              >
-                {assignedMemberCounts.get(date) || ''}
-              </td>
-            ))}
+            {weekDates.map((date) => {
+              const count = assignedMemberCounts.get(date) ?? 0
+              const isWeekBoundary = weekBoundaries.has(date)
+              const isWeekend = weekendDates.has(date)
+              return (
+                <td
+                  key={`tally-${date}`}
+                  className={cn(
+                    'py-1.5 text-center text-[10px] tabular-nums',
+                    tallyClass(count),
+                    isWeekBoundary ? 'border-l-2 border-l-border/55' : 'border-l border-l-border/25',
+                    isWeekend && 'bg-muted/[0.04]',
+                  )}
+                >
+                  {count > 0 ? count : ''}
+                </td>
+              )
+            })}
           </tr>
         </tbody>
       </table>
@@ -491,7 +597,7 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
 
 const RosterSection = memo(function RosterSection({
   label,
-  description,
+  staffCount,
   rows,
   dayMap,
   effectiveCycleDates,
@@ -500,10 +606,11 @@ const RosterSection = memo(function RosterSection({
   selectedDayId,
   cellError,
   onOpenEditor,
+  onQuickAssign,
   onChangeStatus,
 }: {
   label: string
-  description: string
+  staffCount: number
   rows: RosterMemberRow[]
   dayMap: Map<string, DayItem>
   effectiveCycleDates: string[]
@@ -512,6 +619,7 @@ const RosterSection = memo(function RosterSection({
   selectedDayId: string | null
   cellError: { dayId: string; memberId: string; message: string } | null
   onOpenEditor?: (dayId: string) => void
+  onQuickAssign?: (date: string, memberId: string, role: 'lead' | 'staff') => void
   onChangeStatus?: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
 }) {
   const assignedMemberCounts = useMemo(
@@ -520,14 +628,16 @@ const RosterSection = memo(function RosterSection({
   )
 
   return (
-    <section className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-sm font-semibold text-foreground">{label}</p>
-          <p className="text-xs text-muted-foreground">{description}</p>
-        </div>
-        <span className="rounded-full border border-border/70 bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-          {rows.length} staff
+    <section className="space-y-1.5">
+      <div className="flex items-center gap-2 px-0.5">
+        <span className="text-[11px] font-semibold text-foreground">{label}</span>
+        <span className="text-[10px] text-muted-foreground/70">· {staffCount} staff</span>
+        <span className="ml-auto text-[9px] text-muted-foreground/50">
+          <span className="mr-1 inline-block rounded border border-[var(--success-border)]/50 bg-[var(--success-subtle)]/50 px-1 text-[var(--success-text)]">1</span>scheduled
+          <span className="mx-1.5 text-muted-foreground/30">·</span>
+          <span className="mr-1 inline-block rounded border border-[var(--warning-border)]/50 bg-[var(--warning-subtle)]/40 px-1 text-[var(--warning-text)]">L</span>lead
+          <span className="mx-1.5 text-muted-foreground/30">·</span>
+          OC/LE/CX/CI status
         </span>
       </div>
 
@@ -541,6 +651,7 @@ const RosterSection = memo(function RosterSection({
         cellError={cellError}
         assignedMemberCounts={assignedMemberCounts}
         onOpenEditor={onOpenEditor}
+        onQuickAssign={onQuickAssign}
         onChangeStatus={onChangeStatus}
       />
     </section>
@@ -559,6 +670,7 @@ export const RosterScheduleView = memo(function RosterScheduleView({
   selectedDayId = null,
   cellError = null,
   onOpenEditor,
+  onQuickAssign,
   onChangeStatus,
 }: RosterScheduleViewProps) {
   const sections = buildRosterSections(members)
@@ -570,16 +682,6 @@ export const RosterScheduleView = memo(function RosterScheduleView({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-muted/15 px-3 py-2 text-[11px] text-muted-foreground">
-        <span className="font-semibold text-foreground">Roster matrix legend</span>
-        <span className="rounded border border-border/70 bg-background px-1.5 py-0.5 font-semibold text-foreground">+</span>
-        <span>Open day editor to add coverage</span>
-        <span className="rounded border border-border/70 bg-background px-1.5 py-0.5 font-semibold text-foreground">1</span>
-        <span>Scheduled</span>
-        <span className="rounded border border-border/70 bg-background px-1.5 py-0.5 font-semibold text-foreground">OC/LE/CX/CI</span>
-        <span>Operational status</span>
-      </div>
-
       {title || cycleLabel ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 bg-muted/12 px-3 py-2 text-xs">
           <span className="font-semibold text-foreground">{heading}</span>
@@ -600,17 +702,18 @@ export const RosterScheduleView = memo(function RosterScheduleView({
 
       <div className="hidden xl:block">
         <RosterSection
-        label="Core roster"
-        description="Lead and regular coverage staff"
-        rows={sections.regularRows}
-        dayMap={dayMap}
-        effectiveCycleDates={effectiveCycleDates}
-        canManageCoverage={canManageCoverage}
-        canUpdateAssignmentStatus={canUpdateAssignmentStatus}
-        selectedDayId={selectedDayId}
-        cellError={cellError}
-        onOpenEditor={onOpenEditor}
-        onChangeStatus={onChangeStatus}
+          label="Core roster"
+          staffCount={sections.regularRows.length}
+          rows={sections.regularRows}
+          dayMap={dayMap}
+          effectiveCycleDates={effectiveCycleDates}
+          canManageCoverage={canManageCoverage}
+          canUpdateAssignmentStatus={canUpdateAssignmentStatus}
+          selectedDayId={selectedDayId}
+          cellError={cellError}
+          onOpenEditor={onOpenEditor}
+          onQuickAssign={onQuickAssign}
+          onChangeStatus={onChangeStatus}
         />
       </div>
 
@@ -618,7 +721,7 @@ export const RosterScheduleView = memo(function RosterScheduleView({
         <div className="hidden xl:block">
           <RosterSection
             label="PRN coverage"
-            description="Additional staff available for open coverage"
+            staffCount={sections.prnRows.length}
             rows={sections.prnRows}
             dayMap={dayMap}
             effectiveCycleDates={effectiveCycleDates}
@@ -627,6 +730,7 @@ export const RosterScheduleView = memo(function RosterScheduleView({
             selectedDayId={selectedDayId}
             cellError={cellError}
             onOpenEditor={onOpenEditor}
+            onQuickAssign={onQuickAssign}
             onChangeStatus={onChangeStatus}
           />
         </div>
