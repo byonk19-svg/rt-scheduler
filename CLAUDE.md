@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-21 (workflow decomposition + verification repair baseline)
+Updated: 2026-04-23 (manager schedule home + lottery workflow)
 
 ## Handoff Snapshot
 
@@ -39,6 +39,7 @@ Updated: 2026-04-21 (workflow decomposition + verification repair baseline)
 - **Shared header/navigation system:** authenticated routes now use one shared sticky `AppHeader` plus surface-level `LocalSectionNav` driven by `src/components/shell/app-shell-config.ts`; page titles/actions are being standardized through `PageIntro`, and public/auth routes now share `src/components/public/PublicHeader.tsx` from `src/app/(public)/layout.tsx`. Avoid reintroducing page-specific top bars or dark secondary sticky bars.
 - **Schedule roster route:** `/schedule` no longer redirects to `/coverage`, but it is also no longer a public mock. It now loads live roster/availability data through `src/app/(app)/schedule/schedule-roster-live-data.ts`, stays auth-protected by `src/proxy.ts`, and renders a read-only roster matrix inside the shared app shell.
 - **Schedule roster shift filtering:** `/schedule` now respects `profiles.shift_type` when splitting the read-only roster. Day shift shows only day therapists and PRN, night shift shows only night therapists and PRN, and the staff-count badges follow the selected shift instead of listing the full therapist pool on both tabs.
+- **Manager schedule home + Lottery workflow:** `/dashboard/manager/schedule` is the manager Schedule home and should expose the core workflow surfaces directly, including Lottery as a first-class workflow card instead of leaving it hidden in nav only. `/lottery` is now a live authenticated manager/lead workspace backed by `src/components/lottery/LotteryClientPage.tsx`, `src/lib/lottery/service.ts`, and `/api/lottery/*`.
 - **Lead role source of truth:** product behavior now treats `profiles.role = 'lead'` as the source of truth for lead-only UI/actions. The legacy `is_lead_eligible` column is kept in sync to `role`, but Coverage, print/export, profile badges, swap partner filtering, and designated-lead actions should all be reasoned about in terms of `role`, not the legacy flag.
 - **Auth entry (`/login`, `/signup`):** `src/lib/auth/login-utils.ts` parses auth errors from top-level query params **or nested inside `redirectTo`** (e.g. `/availability?error=...`), maps friendly copy, and `router.replace` cleans error keys while preserving a sanitized `redirectTo`. Approval/allowlist copy shows as a **warning** banner with optional **Request access** link and dismiss; credential failures stay **destructive**. Successful access **request** redirects to **`/login?status=requested`** with an **info** banner (dismiss + URL strip); signup no longer auto-signs-in before that redirect, and the public signup page now always uses that same generic redirect instead of exposing roster-match state. **Name roster auto-match:** managers maintain **`employee_roster`** on **`/team`** (single row, **bulk paste**, or ops script). On signup, **`handle_new_user`** still matches **normalized full name** to an active roster row on the server; matched users can receive roster **role/settings** immediately (non-pending), and the roster row records **`matched_profile_id`**, but the public UX no longer discloses whether that match happened. Unmatched signups stay **`profiles.role = null`** pending approval. **Migration:** `20260413123000_add_employee_roster_and_name_match_signup.sql`. **Ops:** `npm run sync:roster` bulk-creates **auth + profiles** from an email list file (separate from **`employee_roster`** name pre-match). **Public homepage (`/`):** therapist-first copy, luminous background utilities (`--home-*`, `.teamwise-home-*`), header **Get started** (`/signup`) + **Sign in**, hero **Sign in** + **Create account** (`/signup`); Vitest contracts in `src/app/page.test.ts` and `src/app/globals.test.ts`. Shared **Input** focus ring uses **`--ring`**; **`:autofill`** + **`-webkit-autofill`** theming lives in `globals.css`.
 - Mixed off/work sentences are parsed more accurately than before, but parser changes should continue to be driven by real inbound examples.
@@ -561,6 +562,7 @@ Assignment status is informational only (does not affect coverage counts or publ
 
 `/coverage` is the shared schedule workspace for all roles; actions and edits are permission-gated.
 `/schedule` is a **read-only roster matrix** for managers and leads (assignments + submitted availability for the selected cycle); edits happen in `/coverage`.
+`/lottery` is the manager/lead workspace for same-day low-census reduction requests, fixed-order review, and applying on-call/cancelled outcomes against the live schedule.
 The manager shell must still show the `Schedule` primary section as active on `/schedule`, with the `Coverage` secondary tab highlighted as the adjacent workflow entry.
 
 - `/coverage` supports both `Grid` and `Roster` layouts. Explicit `view` params must survive compatibility redirects, and default layout selection belongs in `/coverage` where profile context is available.
@@ -580,6 +582,7 @@ The manager shell must still show the `Schedule` primary section as active on `/
 - `Schedule` secondary nav items are `Coverage`, `Availability`, `Publish`, and `Approvals`
 - `People` secondary nav items are `Team` and `Requests`
 - The fixed secondary nav must preserve `overflow-x-auto` with non-shrinking items so narrow mobile widths scroll instead of clipping tabs
+- Current manager Schedule nav truth: `Home`, `Coverage`, `Approvals`, `Lottery`, `Publish`, `History`, `Availability`, `Analytics`.
 - **Staff (therapist/lead) flat nav** (`getStaffNavItems`): Dashboard → **Team schedule** (`/coverage`) → **My shifts** (`/staff/my-schedule`) → Availability (`/therapist/availability`) → **Open shifts** (`/shift-board`) → History (`/staff/history`). Avoid duplicating old **Schedule** vs **My Schedule** wording in new copy.
 
 ## Assignment Status
@@ -591,6 +594,7 @@ Shift fields: `assignment_status`, `status_note`, `left_early_time`, `status_upd
 Write path: `POST /api/schedule/assignment-status` with optimistic local update + rollback.
 
 - Allowed actors: manager or lead.
+- Statuses that affect Lottery state (`on_call`, `cancelled`) must keep flowing through the Lottery-aware mutation path in `src/lib/lottery/service.ts` so suppression/history reconciliation stays consistent even when the edit starts outside `/lottery`.
 
 ## Notifications
 
