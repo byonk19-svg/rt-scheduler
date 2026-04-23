@@ -265,6 +265,12 @@ test.describe.serial('lottery workflow', () => {
     await expect(
       page.getByText('Scheduled full-time therapists are missing from the fixed Lottery order.')
     ).toHaveCount(0)
+    const charlieListRow = page
+      .locator('div.rounded-lg')
+      .filter({ has: page.getByText(ctx!.charlie.fullName) })
+      .filter({ has: page.getByRole('button', { name: 'History' }) })
+      .first()
+    await expect(charlieListRow).toBeVisible()
 
     await page.getByLabel('Keep working').fill('2')
     const applyButton = page.getByRole('button', { name: 'Apply result' })

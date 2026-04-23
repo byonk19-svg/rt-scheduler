@@ -137,6 +137,53 @@ describe('lottery workflow routes', () => {
     })
   })
 
+  it('removes a lottery request for the supplied therapist and defaults the shift to day', async () => {
+    createClientMock.mockResolvedValue(createSupabaseMock(actor.userId))
+
+    const response = await lotteryRequestPost(
+      new Request('http://localhost/api/lottery/request', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          action: 'remove',
+          therapistId: ' therapist-9 ',
+          shiftDate: '2026-04-23',
+        }),
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(removeLotteryRequestMock).toHaveBeenCalledWith({
+      actor,
+      therapistId: 'therapist-9',
+      shiftDate: '2026-04-23',
+      shiftType: 'day',
+    })
+  })
+
+  it('adds a therapist to the lottery list for the selected shift', async () => {
+    createClientMock.mockResolvedValue(createSupabaseMock(actor.userId))
+
+    const response = await lotteryListPost(
+      new Request('http://localhost/api/lottery/list', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          action: 'add',
+          therapistId: ' therapist-3 ',
+          shiftType: 'night',
+        }),
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(addLotteryListEntryMock).toHaveBeenCalledWith({
+      actor,
+      therapistId: 'therapist-3',
+      shiftType: 'night',
+    })
+  })
+
   it('moves a lottery list row down for the selected shift', async () => {
     createClientMock.mockResolvedValue(createSupabaseMock(actor.userId))
 
