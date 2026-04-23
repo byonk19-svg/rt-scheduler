@@ -1,15 +1,8 @@
 import { redirect } from 'next/navigation'
 
-import {
-  AvailabilityEntriesTable,
-  type AvailabilityEntryTableRow,
-} from '@/app/availability/availability-requests-table'
-import {
-  deleteAvailabilityEntryAction,
-  submitTherapistAvailabilityGridAction,
-} from '@/app/availability/actions'
+import type { AvailabilityEntryTableRow } from '@/app/availability/availability-requests-table'
+import { submitTherapistAvailabilityGridAction } from '@/app/availability/actions'
 import { TherapistAvailabilityWorkspace } from '@/components/availability/TherapistAvailabilityWorkspace'
-import type { TableToolbarFilters } from '@/components/TableToolbar'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { can } from '@/lib/auth/can'
 import { findScheduledConflicts } from '@/lib/availability-scheduled-conflict'
@@ -21,11 +14,6 @@ type AvailabilityPageSearchParams = {
   cycle?: string | string[]
   error?: string | string[]
   success?: string | string[]
-  search?: string | string[]
-  status?: string | string[]
-  startDate?: string | string[]
-  endDate?: string | string[]
-  sort?: string | string[]
 }
 
 type Cycle = {
@@ -139,15 +127,6 @@ export default async function TherapistAvailabilityPage({
 
   const params = searchParams ? await searchParams : undefined
   const feedback = getAvailabilityFeedback(params)
-  const initialStatus = getSearchParam(params?.status)
-  const initialSort = getSearchParam(params?.sort)
-  const initialFilters: Partial<TableToolbarFilters> = {
-    search: getSearchParam(params?.search) ?? '',
-    status: initialStatus ?? undefined,
-    startDate: getSearchParam(params?.startDate) ?? '',
-    endDate: getSearchParam(params?.endDate) ?? '',
-    sort: initialSort === 'oldest' ? 'oldest' : 'newest',
-  }
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -271,17 +250,6 @@ export default async function TherapistAvailabilityPage({
         submissionsByCycleId={submissionsByCycleId}
         submitTherapistAvailabilityGridAction={submitTherapistAvailabilityGridAction}
         returnToPath="/therapist/availability"
-      />
-
-      <AvailabilityEntriesTable
-        role={role}
-        rows={availabilityRows}
-        deleteAvailabilityEntryAction={deleteAvailabilityEntryAction}
-        initialFilters={initialFilters}
-        returnToPath="/therapist/availability"
-        titleOverride="Submitted Availability"
-        descriptionOverride="Day-level availability entries for the selected cycle."
-        emptyMessageOverride="No day-level entries yet for this cycle."
       />
     </div>
   )

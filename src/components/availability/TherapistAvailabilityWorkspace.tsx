@@ -428,23 +428,9 @@ export function TherapistAvailabilityWorkspace({
           </p>
         ) : null}
         <p className="mt-2 text-xs tabular-nums text-muted-foreground">
-          Availability summary: {availableCount} available · {cannotWorkDates.length} need off ·{' '}
+          {availableCount} available · {cannotWorkDates.length} need off ·{' '}
           {requestToWorkCount} request to work
         </p>
-        <ol className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground">
-          {[
-            'Tap each date to set Available, Need Off, or Request to Work',
-            'Use Save progress when you are not ready to finalize',
-            'Use Submit availability when this cycle is complete',
-          ].map((step, i) => (
-            <li key={step} className="flex items-center gap-2">
-              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-foreground/70">
-                {i + 1}
-              </span>
-              {step}
-            </li>
-          ))}
-        </ol>
       </header>
 
       {conflicts.length > 0 ? (

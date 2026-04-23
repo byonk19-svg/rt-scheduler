@@ -94,19 +94,19 @@ describe('AppShell navigation structure', () => {
     )
   })
 
-  it('uses Open shifts wording in staff shell navigation', () => {
-    expect(shellConfigSource).toContain("label: 'Open shifts'")
+  it('uses Open Shifts wording in staff shell navigation', () => {
+    expect(shellConfigSource).toContain("label: 'Open Shifts'")
     expect(shellConfigSource).not.toContain("label: 'Shift Swaps'")
   })
 
   it('includes staff swap history in the flat staff nav', () => {
     expect(shellConfigSource).toContain("href: '/staff/history'")
-    expect(shellConfigSource).toContain("label: 'History'")
+    expect(shellConfigSource).toContain("label: 'Swap History'")
   })
 
   it('includes personal schedule in the flat staff nav', () => {
     expect(shellConfigSource).toContain("href: '/staff/my-schedule'")
-    expect(shellConfigSource).toContain("label: 'My Schedule'")
+    expect(shellConfigSource).toContain("label: 'My Shifts'")
   })
 
   it('routes manager Today section to the manager dashboard', () => {

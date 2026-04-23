@@ -29,10 +29,11 @@ describe('therapist availability route', () => {
     const workspaceSource = readFileSync(workspacePath, 'utf8')
 
     expect(workspaceSource).toContain('Availability for This Cycle')
-    expect(pageSource).toContain('Submitted Availability')
-    expect(pageSource).toContain('No day-level entries yet for this cycle.')
     expect(pageSource).not.toContain('days selected')
     expect(pageSource).toContain('therapist_availability_submissions')
+    // The raw availability entries table is intentionally not shown to therapists;
+    // the calendar workspace handles all availability display and editing.
+    expect(pageSource).not.toContain('AvailabilityEntriesTable')
   })
 
   it('loads active-cycle scheduled shifts and passes conflicts into the therapist workspace', () => {
