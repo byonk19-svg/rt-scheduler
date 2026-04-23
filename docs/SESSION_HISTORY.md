@@ -1,5 +1,15 @@
 # Session History
 
+## Session 88 - 2026-04-21
+
+- Stopped the broad structural cleanup loop after the remaining work crossed into diminishing returns rather than meaningful workflow rescue.
+- Ran a full verification sweep and then repaired the fallout:
+  - `npm run build` passes
+  - `npm run lint` now passes with warnings only
+  - `npm run test:unit` now passes (`171` files / `918` tests)
+  - targeted Playwright flows now pass for manager availability planner, therapist availability trust smoke, team quick edit, and live coverage manager smoke
+- Updated repo guidance to reflect the new stopping rule for cleanup work and the current verification baseline.
+
 ## Session 87 - 2026-04-19
 
 - Split manager availability semantics so the top chips still reflect **official submissions** while the **Response roster** now counts any received cycle availability, including applied email-intake imports and manager-entered overrides.

@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-19 (therapist UX clarity + accurate-commits handoff)
+Updated: 2026-04-21 (workflow decomposition + verification repair baseline)
 
 ## Handoff Snapshot
 
@@ -59,6 +59,17 @@ Updated: 2026-04-19 (therapist UX clarity + accurate-commits handoff)
 - **Shift reminders:** `vercel.json` now schedules `/api/cron/shift-reminders` at `0 6 * * *`. The cron route requires `CRON_SECRET`, queues rows in `shift_reminder_outbox`, sends 24h reminder emails for next-day `scheduled` shifts only, and writes matching in-app notifications.
 - **Manager analytics:** `/analytics` now provides cycle fill rates, therapist submission compliance, and force-on miss reporting using server-side Supabase queries plus simple CSS-based summary components.
 - **Dedicated work-pattern page:** managers now have `/team/work-patterns` for day/night grouped recurring pattern review and editing outside the quick-edit modal. The quick-edit modal still retains its work-pattern section.
+- **Workflow decomposition baseline:** the major manager/staff workflow shells are now split into dedicated view and state boundaries across coverage, availability, requests, team, publish, shift board, intake, employee directory, profile, staff dashboard, and app shell. The remaining larger files are increasingly isolated domain widgets rather than mixed-responsibility route shells.
+- **Verification baseline (current branch state):**
+  - `npm run build` passes
+  - `npm run lint` passes with warnings only
+  - `npm run test:unit` passes (`171` files / `918` tests)
+  - targeted Playwright browser verification passes for:
+    - `e2e/manager-availability-planner.spec.ts`
+    - `e2e/therapist-schedule-trust-smoke.spec.ts`
+    - `e2e/team-quick-edit.spec.ts`
+    - `e2e/coverage-manager-live-smoke.spec.ts`
+- **Long role-journey caveat:** `e2e/role-journeys.spec.ts` was repaired substantially, but a final clean full-suite rerun is still vulnerable to external Supabase/network instability over the full long-running sequence. Treat that suite as high-value smoke plus environment sensitivity, not the only health signal.
 - **`resolveRosterCellIntent` intent split:** the function now returns `'quick_assign'` for manager + empty roster cell and `'manage'` for manager + filled cell. Both intents render the same editor-open button in `RosterMatrixTable`; the distinction exists for test assertions and future intent-specific styling. Do not collapse them back into a single `'manage'` return.
 - **Dead `onUnassign` prop removed from roster matrix:** `onUnassign` no longer exists on `RosterScheduleViewProps`, `RosterSection`, or `RosterMatrixTable`. `handleUnassign` in `CoverageClientPage` is still wired exclusively to `ShiftEditorDialog` where it is actually called.
 - **Availability intake utilities:** `src/lib/availability-email-intake.ts` and related tests now cover richer request-edit parsing and manager-edit workflows more explicitly.
@@ -91,6 +102,11 @@ Updated: 2026-04-19 (therapist UX clarity + accurate-commits handoff)
 
 ### Where We Want To Go
 
+Current priority override (2026-04-21):
+
+- Production UAT for `/coverage`, `/availability`, `/team`, `/requests`, `/publish`, and `/shift-board` is now the highest-value next step because the local verification baseline is green again after the large workflow decomposition and repair pass.
+- Repo-wide lint warnings are still worth burning down, but they are now maintenance debt rather than verification blockers.
+
 1. **Merge `claude/audit-log-bulk-team-clean` to `main`** - the branch is CI-green and now includes the audit remediation pass on top of the manager/therapist feature work.
 2. Run a full browser QA pass across shared headers, `/coverage`, `/schedule`, `/team/import`, and `/settings/audit-log` on desktop, tablet, and mobile before shipping.
 3. **Add "Send reminders" bulk action** to the response roster on `/availability` - bulk email nudge for non-respondents is still the top operational gap.
@@ -103,10 +119,15 @@ Updated: 2026-04-19 (therapist UX clarity + accurate-commits handoff)
 
 ### Verification Baseline
 
-- As of session 86 on `claude/audit-log-bulk-team-clean`, `npm run lint`, `npm run test:unit`, `npm run build`, and `npx tsc --noEmit` all pass.
+- As of 2026-04-21 on `codex/clarify-manager-workflow-labels`, `npm run lint`, `npm run test:unit`, `npm run build`, and `npx tsc --noEmit` all pass.
 - `npm run lint`
 - `npm run build`
 - `npm run test:unit`
+- targeted Playwright lanes currently verified:
+  - `npx playwright test e2e/manager-availability-planner.spec.ts --workers=1`
+  - `npx playwright test e2e/therapist-schedule-trust-smoke.spec.ts --workers=1`
+  - `npx playwright test e2e/team-quick-edit.spec.ts --workers=1`
+  - `npx playwright test e2e/coverage-manager-live-smoke.spec.ts --workers=1`
 - `npm run test:e2e` when auth/env setup is available
 - `vercel deploy --prod --yes` for production shipping
 - Targeted availability lane: `npx vitest run src/app/availability/`
