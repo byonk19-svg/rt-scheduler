@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-17 (session 86)
+Updated: 2026-04-23 (session 87)
 
 ## Handoff Snapshot
 
@@ -83,13 +83,18 @@ Updated: 2026-04-17 (session 86)
   - dedicated work-patterns page at `/team/work-patterns`
 - Current branch work also fixes the live `/schedule` roster segmentation so day and night tabs no longer mix therapists from the opposite shift.
 - Current branch also includes the audit-driven cleanup pass: `npm run lint` now scopes to `src`, stale route-group source tests have been repaired, shared header/dashboard/public shells are less templated, and the remaining compact scheduling actions use larger hit areas.
+- **`claude/simplify-therapist-workflow-MW6wY`** (session 87) adds the following therapist UX simplifications on top of that baseline:
+  - Therapist nav trimmed from 6 to 5 items: removed "Schedule" (`/coverage`, a manager surface), renamed "My Schedule" → **"My Shifts"**, renamed "History" → **"Swap History"**, reordered to Dashboard → My Shifts → Availability → Open Shifts → Swap History
+  - Removed the duplicate "Upcoming shifts" card from the staff dashboard (`upcomingPublishedWidget` / `MyScheduleCard`); the hero card already shows the next 3 shifts with colleagues, and "My Shifts" in the nav covers the full view — replaced with a compact "View all my shifts →" link
+  - Removed the redundant 3-step numbered instruction list from the `TherapistAvailabilityWorkspace` header; the inline info banner already explains Available / Need Off / Request to Work in context
+  - Removed `AvailabilityEntriesTable` from `/therapist/availability` — the calendar handles all editing; the raw data table added scroll length without helping therapists take any action
 
 ### Where We Want To Go
 
 1. **Merge `claude/audit-log-bulk-team-clean` to `main`** - the branch is CI-green and now includes the audit remediation pass on top of the manager/therapist feature work.
 2. Run a full browser QA pass across shared headers, `/coverage`, `/schedule`, `/team/import`, and `/settings/audit-log` on desktop, tablet, and mobile before shipping.
 3. **Add "Send reminders" bulk action** to the response roster on `/availability` - bulk email nudge for non-respondents is still the top operational gap.
-4. **Swap history and My Schedule quick view** - `src/app/(app)/staff/history` and `src/app/(app)/staff/my-schedule` are still not implemented.
+4. **Swap history and My Schedule** - both `src/app/staff/history` and `src/app/staff/my-schedule` are implemented and reachable via the therapist nav as "Swap History" and "My Shifts".
 5. **Schedule/roster CSV export** - `/api/schedule/export` and `/api/team/roster/export` are still not implemented; `csv-utils.ts` still needs to be extracted from the availability export route.
 6. **Print confidentiality footer** - `print-schedule.tsx` still lacks the "Internal Use Only" footer.
 7. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
@@ -118,6 +123,14 @@ Updated: 2026-04-17 (session 86)
 - Targeted schedule-roster lane: `npm run test:unit -- src/lib/schedule-roster-data.test.ts`
 
 ## Recent changelog
+
+**Session 87 (2026-04-23)** — Therapist workflow and navigation simplification on `claude/simplify-therapist-workflow-MW6wY`:
+
+- Therapist nav reduced from 6 to 5 items: dropped "Schedule" (→ `/coverage`, a manager-only surface), renamed "My Schedule" → "My Shifts" and "History" → "Swap History", reordered items so the most-used tasks come first (Dashboard → My Shifts → Availability → Open Shifts → Swap History).
+- Removed the duplicate "Upcoming shifts" card from the staff dashboard; the hero card already shows the next 3 upcoming shifts with colleagues, and the "My Shifts" nav item covers the full view. Added a compact "View all my shifts →" link in its place.
+- Removed the 3-step numbered instruction list from the `TherapistAvailabilityWorkspace` header — it duplicated the inline info banner already inside the form. The availability summary line ("X available · Y need off · Z request to work") is preserved.
+- Removed `AvailabilityEntriesTable` from `/therapist/availability` — the raw data table added length without helping therapists act; all editing is handled by the calendar, and clearing a day via "Clear day" + submit covers deletions.
+- Updated `AppShell.test.ts` and `therapist/availability/page.test.ts` to match the new labels and removed section.
 
 **Session 86 (2026-04-17)** - Audit-driven cleanup, responsive follow-up, and verification reset on `claude/audit-log-bulk-team-clean`:
 
