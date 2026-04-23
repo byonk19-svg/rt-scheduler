@@ -42,7 +42,7 @@ export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
   )
 
   const helperText =
-    'Read-only roster for the selected cycle: coverage assignments and therapist availability that has been officially submitted. x = submitted need off; 1 = submitted request to work and/or a coverage assignment. Edit staffing in Coverage.'
+    'Read-only roster for this 6-week block. Edit assignments in Coverage. This page shows coverage assignments and therapist availability that has been officially submitted. x = submitted need off; 1 = submitted request to work and/or a coverage assignment.'
 
   return (
     <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -50,7 +50,7 @@ export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <ScheduleHeader
-              title="Schedule"
+              title="Roster"
               status="READ ONLY"
               dateRange={live.shortLabel}
               helperText={helperText}

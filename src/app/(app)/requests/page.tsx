@@ -34,7 +34,7 @@ export default async function RequestsPage() {
   return (
     <div className="space-y-5">
       <ManagerWorkspaceHeader
-        title="Requests"
+        title="People requests"
         subtitle="Manage open shift requests and user access requests."
         summary={
           <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 text-sm font-medium text-foreground">

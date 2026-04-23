@@ -21,10 +21,12 @@ describe('app-shell-config', () => {
     expect(context.primaryKey).toBe('people')
     expect(context.localNav?.items.map((item) => item.label)).toEqual([
       'Team',
-      'Requests',
+      'People requests',
       'Audit log',
     ])
-    expect(context.localNav?.items.find((item) => item.label === 'Requests')?.badgeCount).toBe(3)
+    expect(
+      context.localNav?.items.find((item) => item.label === 'People requests')?.badgeCount
+    ).toBe(3)
   })
 
   it('does not return local nav for manager dashboard', () => {
@@ -53,6 +55,20 @@ describe('app-shell-config', () => {
     expect(context.primaryKey).toBe('schedule')
     expect(context.localNav?.items.find((item) => item.label === 'Analytics')?.href).toBe(
       '/analytics'
+    )
+  })
+
+  it('distinguishes the editable coverage workspace from the read-only roster route', () => {
+    const context = getShellContext({
+      pathname: '/schedule',
+      canAccessManagerUi: true,
+      pendingCount: 0,
+    })
+
+    expect(context.primaryKey).toBe('schedule')
+    expect(context.localNav?.items.find((item) => item.label === 'Roster')?.href).toBe('/schedule')
+    expect(context.localNav?.items.find((item) => item.label === 'Coverage')?.href).toBe(
+      '/coverage'
     )
   })
 })
