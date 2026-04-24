@@ -100,4 +100,12 @@ describe('coverage publish override affordance', () => {
     expect(source).toContain('{clearDraftDialogOpen ? (')
     expect(source).toContain('{cycleDialogOpen ? (')
   })
+
+  it('declares each lazy-loaded dialog exactly once', () => {
+    const source = readFileSync(coverageClientPath, 'utf8')
+
+    expect(source.match(/const PreFlightDialog = dynamic\(/g)).toHaveLength(1)
+    expect(source.match(/const SaveAsTemplateDialog = dynamic\(/g)).toHaveLength(1)
+    expect(source.match(/const StartFromTemplateDialog = dynamic\(/g)).toHaveLength(1)
+  })
 })

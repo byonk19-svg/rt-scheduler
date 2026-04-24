@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { DeferredNotificationBell } from '@/components/DeferredNotificationBell'
 import { AppHeader } from '@/components/shell/AppHeader'
 import { LocalSectionNav } from '@/components/shell/LocalSectionNav'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   APP_PAGE_MAX_WIDTH_CLASS,
   buildManagerSections,
@@ -324,26 +325,15 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
           </main>
         </div>
 
-        {mobileMenuOpen ? (
-          <div
-            className="fixed inset-0 z-40 md:hidden"
-            aria-modal="true"
-            role="dialog"
-            aria-labelledby="mobile-nav-heading"
+        <Dialog open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+          <DialogContent
+            showCloseButton={false}
+            className="app-shell-chrome-primary left-0 top-0 z-40 flex h-dvh max-h-dvh w-[85vw] max-w-[20rem] translate-x-0 translate-y-0 flex-col gap-0 rounded-none border-0 border-r border-sidebar-border p-0 text-sidebar-foreground shadow-tw-app-chrome-sub md:hidden sm:max-w-none"
           >
-            <button
-              type="button"
-              className="absolute inset-0 bg-black/45"
-              onClick={() => setMobileMenuOpen(false)}
-              aria-label="Close navigation menu"
-            />
-            <aside
-              id="app-shell-mobile-nav"
-              className="app-shell-chrome-primary relative z-10 flex h-full w-[85vw] max-w-[20rem] flex-col overscroll-contain border-r border-sidebar-border text-sidebar-foreground shadow-tw-app-chrome-sub"
-            >
-              <h2 id="mobile-nav-heading" className="sr-only">
-                Navigation menu
-              </h2>
+            <DialogHeader className="sr-only">
+              <DialogTitle>Navigation menu</DialogTitle>
+            </DialogHeader>
+            <aside id="app-shell-mobile-nav" className="flex h-full flex-col overscroll-contain">
               <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-4">
                 <Logo />
                 <Button
@@ -485,8 +475,8 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
                 </form>
               </div>
             </aside>
-          </div>
-        ) : null}
+          </DialogContent>
+        </Dialog>
       </div>
     </ThemeProvider>
   )

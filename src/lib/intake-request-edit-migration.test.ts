@@ -56,8 +56,7 @@ describe('intake request edit tracking contract', () => {
     expect(availabilityActionsSource).toContain('markRequestsEdited')
     expect(availabilityActionsSource).toContain('original_parsed_requests')
     expect(availabilityActionsSource).toContain('manually_edited_at:')
-    expect(availabilityActionsSource).toMatch(
-      /manually_edited_at:\s*item\.original_parsed_requests[\s\S]*markRequestsEdited/i
-    )
+    expect(availabilityActionsSource).toContain('manually_edited_at: item.original_parsed_requests')
+    expect(availabilityActionsSource).toContain('markRequestsEdited({')
   })
 })

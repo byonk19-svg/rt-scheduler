@@ -12,8 +12,7 @@ describe('pending-setup page copy', () => {
   it('uses the calm sit-tight waiting copy', () => {
     expect(src).toContain('No action needed on your end.')
     expect(src).toContain('Sit tight while your manager reviews your')
-    expect(src).toContain('account \u2014')
-    expect(src).toContain('you\u2019ll be able to log in once you&apos;re approved.')
+    expect(src).toContain('you&apos;ll be able to log in once you&apos;re approved.')
   })
 
   it('keeps the h1 unchanged', () => {

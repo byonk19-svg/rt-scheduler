@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { resolveNextDistDir } from '@/lib/next-dist-dir'
+
 async function loadNextConfig() {
   vi.resetModules()
   const loaded = await import('../../next.config')
@@ -25,13 +27,14 @@ describe('next.config distDir', () => {
     }
   })
 
-  it('uses the OneDrive-safe development distDir when no override is set', async () => {
-    env.NODE_ENV = 'development'
-    delete env.NEXT_DIST_DIR
-
-    const config = await loadNextConfig()
-
-    expect(config.distDir).toBe('.next-dev')
+  it('uses the OneDrive-safe development distDir for Windows OneDrive workspaces', () => {
+    expect(
+      resolveNextDistDir({
+        cwd: 'C:\\Users\\byonk\\OneDrive\\Projects\\rt-scheduler',
+        nodeEnv: 'development',
+        platform: 'win32',
+      })
+    ).toBe('.next-dev')
   })
 
   it('still honors an explicit NEXT_DIST_DIR override', async () => {

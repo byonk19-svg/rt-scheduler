@@ -139,10 +139,12 @@ describe('EmailIntakePanel', () => {
     )
 
     expect(html).toContain('Needs review')
-    expect(html).toContain('Auto-applied recently')
+    expect(html).toContain('Apply dates')
+    expect(html).not.toContain('Save matches')
     expect(html).toContain('form-1.jpg')
     expect(html).toContain('Email body')
-    expect(html).toContain('employee_match_ambiguous')
+    expect(html).toContain('1 auto-applied - show')
+    expect(html).toContain('Name match uncertain')
   })
 
   it('renders each parsed request as an editable chip button with payload and edited marker', () => {

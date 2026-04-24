@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import appPreview from '../../../public/images/app-preview.png'
 import Image from 'next/image'
 import Link from 'next/link'
 import { CalendarDays } from 'lucide-react'
@@ -108,12 +109,13 @@ export default function HomePage() {
                 />
                 <div className="relative min-h-[300px] overflow-hidden rounded-[1.5rem] border border-border/50 bg-card/90 sm:min-h-[380px] lg:min-h-[420px]">
                   <Image
-                    src="/images/app-preview.png"
+                    src={appPreview}
                     alt="Teamwise schedule view"
                     fill
                     className="object-cover object-top"
                     priority
                     sizes="(min-width: 1024px) 960px, (min-width: 640px) 92vw, 100vw"
+                    placeholder="blur"
                   />
                   <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-[var(--background)] via-[color-mix(in_srgb,var(--card)_84%,transparent)] to-transparent" />
                 </div>

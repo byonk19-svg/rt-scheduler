@@ -4,6 +4,10 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const pageSource = fs.readFileSync(path.join(process.cwd(), 'src/app/(public)/page.tsx'), 'utf8')
+const publicHeaderSource = fs.readFileSync(
+  path.join(process.cwd(), 'src/components/public/PublicHeader.tsx'),
+  'utf8'
+)
 
 describe('public homepage redesign contract', () => {
   it('uses therapist-first trust-forward copy', () => {
@@ -13,9 +17,10 @@ describe('public homepage redesign contract', () => {
     )
   })
 
-  it('keeps the hero CTAs aligned with the public auth flow', () => {
+  it('keeps the header and hero CTA roles aligned', () => {
     expect(pageSource).toContain('<Link href="/login">Sign in</Link>')
     expect(pageSource).toContain('<Link href="/signup">Create account</Link>')
+    expect(publicHeaderSource).toContain("ctaLabel: 'Get started'")
   })
 
   it('keeps the approval note and trust bullets visible', () => {
@@ -33,8 +38,9 @@ describe('public homepage redesign contract', () => {
     expect(pageSource).toContain('teamwise-home-preview-sheen')
   })
 
-  it('optimizes the preview image for production (responsive sizes, no unoptimized bypass)', () => {
-    expect(pageSource).toContain('src="/images/app-preview.png"')
+  it('optimizes the preview image for production (responsive sizes, blur, no unoptimized bypass)', () => {
+    expect(pageSource).toContain("import appPreview from '../../../public/images/app-preview.png'")
+    expect(pageSource).toContain('placeholder="blur"')
     expect(pageSource).toContain('sizes=')
     expect(pageSource).not.toContain('unoptimized')
   })

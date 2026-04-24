@@ -54,8 +54,15 @@ describe('AppShell mobile menu', () => {
     )
   })
 
-  it('uses a real button for the mobile backdrop dismiss target', () => {
-    expect(appShellSource).toMatch(/<button[\s\S]*className="absolute inset-0 bg-black\/45"/)
+  it('uses the shared dialog primitive for the mobile drawer so focus is trapped and restored', () => {
+    expect(appShellSource).toContain(
+      "import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'"
+    )
+    expect(appShellSource).toContain(
+      '<Dialog open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>'
+    )
+    expect(appShellSource).toContain('<DialogContent')
+    expect(appShellSource).toContain('<DialogTitle>Navigation menu</DialogTitle>')
   })
 
   it('contains overscroll within the mobile drawer', () => {
