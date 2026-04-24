@@ -15,4 +15,9 @@ describe('notifications page copy guardrails', () => {
     )
     expect(notificationsPageSource).toContain('You&apos;re all caught up')
   })
+
+  it('classifies call-in help alerts with the request workflow filter', () => {
+    expect(notificationsPageSource).toContain("eventType === 'call_in_help_available'")
+    expect(notificationsPageSource).toContain("item.event_type === 'call_in_help_available'")
+  })
 })

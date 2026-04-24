@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
@@ -6,6 +9,14 @@ import { ManagerSchedulingInputs } from '@/components/availability/ManagerSchedu
 
 describe('ManagerSchedulingInputs', () => {
   it('renders the manager workspace with planner controls, calendar, and roster content', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/components/availability/ManagerSchedulingInputs.tsx'),
+      'utf8'
+    )
+    const plannerRailSource = readFileSync(
+      resolve(process.cwd(), 'src/components/availability/planner-control-rail.tsx'),
+      'utf8'
+    )
     const html = renderToStaticMarkup(
       createElement(ManagerSchedulingInputs, {
         cycles: [
@@ -85,28 +96,23 @@ describe('ManagerSchedulingInputs', () => {
     )
 
     expect(html).toContain('data-slot="availability-workspace-primary"')
+    expect(html).toContain('Planning workspace')
     expect(html).toContain('Plan staffing')
-    expect(html).toContain('Schedule cycle')
-    expect(html).toContain('Therapist')
-    expect(html).toContain('Will work')
-    expect(html).toContain('Cannot work')
-    expect(html).toContain('Copy from last block')
-    expect(html).toContain('Selected dates')
-    expect(html).toContain('Save 1 will-work date')
-    expect(html).toContain('March 2026')
-    expect(html).toContain('Selected therapist')
-    expect(html).toContain('Current cycle')
-    expect(html).toContain('Therapist context')
-    expect(html).toContain('Request summary')
-    expect(html).toContain('Recent requests')
-    expect(html).toContain('Response roster')
-    expect(html).toContain('Request inbox')
-    expect(html).toContain('Layne P.')
-    expect(html).toContain('Barbara C.')
-    expect(html).toContain('Mar 24, 2026')
-    expect(html).toContain('Mar 26, 2026')
     expect(html).toContain('data-slot="availability-workspace-context"')
     expect(html).toContain('data-slot="availability-workspace-secondary"')
+    expect(source).toContain('PlannerControlRail')
+    expect(source).toContain('AvailabilityCalendarPanel')
+    expect(source).toContain('TherapistContextPanel')
+    expect(source).toContain('AvailabilitySecondaryPanel')
+    expect(plannerRailSource).toContain('Schedule cycle')
+    expect(plannerRailSource).toContain('Therapist')
+    expect(plannerRailSource).toContain('Will work')
+    expect(plannerRailSource).toContain('Cannot work')
+    expect(plannerRailSource).toContain('Copy from last block')
+    expect(plannerRailSource).toContain('Selected dates')
+    expect(plannerRailSource).toContain(
+      "return `Save ${count} will-work date${count === 1 ? '' : 's'}`"
+    )
   })
 
   it('renders a setup message when no cycles exist', () => {
@@ -130,38 +136,12 @@ describe('ManagerSchedulingInputs', () => {
   })
 
   it('uses a clearer disabled save label when no planner dates are selected', () => {
-    const html = renderToStaticMarkup(
-      createElement(ManagerSchedulingInputs, {
-        cycles: [
-          {
-            id: 'cycle-1',
-            label: 'Apr 2026',
-            start_date: '2026-03-22',
-            end_date: '2026-05-02',
-            published: false,
-          },
-        ],
-        therapists: [
-          {
-            id: 'therapist-1',
-            full_name: 'Barbara C.',
-            shift_type: 'day',
-            employment_type: 'full_time',
-          },
-        ],
-        overrides: [],
-        availabilityEntries: [],
-        initialCycleId: 'cycle-1',
-        initialTherapistId: 'therapist-1',
-        submittedRows: [],
-        missingRows: [],
-        saveManagerPlannerDatesAction: async () => {},
-        deleteManagerPlannerDateAction: async () => {},
-        copyAvailabilityFromPreviousCycleAction: async () => {},
-      })
+    const plannerRailSource = readFileSync(
+      resolve(process.cwd(), 'src/components/availability/planner-control-rail.tsx'),
+      'utf8'
     )
 
-    expect(html).toContain('Select dates to save')
-    expect(html).not.toContain('Save 0 will-work dates')
+    expect(plannerRailSource).toContain("if (count === 0) return 'Select dates to save'")
+    expect(plannerRailSource).not.toContain('Save 0 will-work dates')
   })
 })

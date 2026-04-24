@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { AlertCircle, CalendarDays, CheckCircle2, ChevronLeft, Plus, Star } from 'lucide-react'
 
 import { dateKeyFromDate } from '@/lib/schedule-helpers'
@@ -11,10 +11,12 @@ import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHea
 import { SkeletonCard, SkeletonListItem } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
+import { getPickupInterestTherapistCopy } from '@/lib/pickup-interest-presentation'
 
 type RequestType = 'swap' | 'pickup'
-type PersistedRequestStatus = 'pending' | 'approved' | 'denied' | 'expired'
-type RequestStatus = PersistedRequestStatus | 'expired'
+type PersistedRequestStatus = 'pending' | 'approved' | 'denied' | 'expired' | 'withdrawn'
+type InterestStatus = 'pending' | 'selected' | 'declined' | 'withdrawn'
+type RequestStatus = PersistedRequestStatus | 'expired' | 'selected' | 'withdrawn'
 type ShiftType = 'day' | 'night'
 type ShiftRole = 'lead' | 'staff'
 type ShiftStatus = 'scheduled' | 'on_call' | 'sick' | 'called_off'
@@ -25,16 +27,29 @@ type ShiftRow = {
   shift_type: ShiftType
   role: ShiftRole
   status: ShiftStatus
+  schedule_cycles?: { published: boolean } | { published: boolean }[] | null
 }
 
 type ShiftPostRow = {
   id: string
   type: RequestType
   status: PersistedRequestStatus
+  recipient_response: 'pending' | 'accepted' | 'declined' | null
+  request_kind: 'standard' | 'call_in' | null
   created_at: string
   shift_id: string | null
+  posted_by: string | null
   claimed_by: string | null
+  visibility: 'team' | 'direct' | null
   message: string
+}
+
+type ShiftPostInterestRow = {
+  id: string
+  shift_post_id: string
+  therapist_id: string
+  status: InterestStatus
+  created_at: string
 }
 
 type ProfileRow = {
@@ -67,6 +82,11 @@ type TeamMember = {
 type OpenRequest = {
   id: string
   type: RequestType
+  visibility: 'team' | 'direct'
+  involvement: 'posted' | 'received_direct' | 'claimed' | 'interest'
+  sourcePostId: string | null
+  recipientResponse: 'pending' | 'accepted' | 'declined' | null
+  requestKind: 'standard' | 'call_in'
   shift: string
   status: RequestStatus
   swapWith: string | null
@@ -95,6 +115,18 @@ const STATUS_META: Record<
     colorClass: 'text-[var(--error-text)]',
     bgClass: 'bg-[var(--error-subtle)]',
     borderClass: 'border-[var(--error-border)]',
+  },
+  selected: {
+    label: 'Selected',
+    colorClass: 'text-[var(--success-text)]',
+    bgClass: 'bg-[var(--success-subtle)]',
+    borderClass: 'border-[var(--success-border)]',
+  },
+  withdrawn: {
+    label: 'Withdrawn',
+    colorClass: 'text-muted-foreground',
+    bgClass: 'bg-muted',
+    borderClass: 'border-border',
   },
   expired: {
     label: 'Expired',
@@ -150,6 +182,13 @@ function toUiStatus(status: PersistedRequestStatus, createdAt: string): RequestS
   return status
 }
 
+function toInterestUiStatus(status: InterestStatus): RequestStatus {
+  if (status === 'selected') return 'selected'
+  if (status === 'withdrawn') return 'withdrawn'
+  if (status === 'declined') return 'denied'
+  return 'pending'
+}
+
 function defaultMessage(type: RequestType): string {
   return type === 'swap'
     ? 'Requesting a swap for this shift.'
@@ -162,11 +201,10 @@ function slotKey(date: string, shiftType: ShiftType): string {
 
 function SwapRequestPageContent() {
   const router = useRouter()
-  const pathname = usePathname()
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
   const shiftIdFromQuery = searchParams.get('shiftId')
-  const newFromParam = searchParams.get('new') === '1'
+  const composeMode = searchParams.get('new') === '1'
 
   const [view, setView] = useState<'list' | 'form'>('list')
   const [requestType, setRequestType] = useState<RequestType>('swap')
@@ -175,6 +213,7 @@ function SwapRequestPageContent() {
   const [message, setMessage] = useState('')
   const [search, setSearch] = useState('')
   const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [requestVisibility, setRequestVisibility] = useState<'team' | 'direct'>('team')
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -198,10 +237,10 @@ function SwapRequestPageContent() {
   }, [leadCountsBySlot, selectedShiftData])
 
   useEffect(() => {
-    if (pathname === '/requests/new' || newFromParam) {
+    if (composeMode) {
       setView('form')
     }
-  }, [pathname, newFromParam])
+  }, [composeMode])
 
   useEffect(() => {
     let active = true
@@ -223,18 +262,26 @@ function SwapRequestPageContent() {
         const todayKey = dateKeyFromDate(new Date())
         setCurrentUserId(user.id)
 
-        const [myShiftsResult, myRequestsResult] = await Promise.all([
+        const [myShiftsResult, myRequestsResult, myInterestRowsResult] = await Promise.all([
           supabase
             .from('shifts')
-            .select('id, date, shift_type, role, status')
+            .select('id, date, shift_type, role, status, schedule_cycles!inner(published)')
             .eq('user_id', user.id)
             .gte('date', todayKey)
             .eq('status', 'scheduled')
+            .eq('schedule_cycles.published', true)
             .order('date', { ascending: true }),
           supabase
             .from('shift_posts')
-            .select('id, type, status, created_at, shift_id, claimed_by, message')
-            .eq('posted_by', user.id)
+            .select(
+              'id, type, status, recipient_response, request_kind, created_at, shift_id, posted_by, claimed_by, visibility, message'
+            )
+            .or(`posted_by.eq.${user.id},claimed_by.eq.${user.id}`)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('shift_post_interests')
+            .select('id, shift_post_id, therapist_id, status, created_at')
+            .eq('therapist_id', user.id)
             .order('created_at', { ascending: false }),
         ])
 
@@ -288,9 +335,30 @@ function SwapRequestPageContent() {
         }
 
         const requestRows = (myRequestsResult.data ?? []) as ShiftPostRow[]
+        const interestRows = (myInterestRowsResult.data ?? []) as ShiftPostInterestRow[]
+        const requestRowIds = new Set(requestRows.map((row) => row.id))
+        const interestPostIds = Array.from(
+          new Set(
+            interestRows.map((row) => row.shift_post_id).filter((id) => !requestRowIds.has(id))
+          )
+        )
+
+        let interestPostRows: ShiftPostRow[] = []
+        if (interestPostIds.length > 0) {
+          const { data: interestPostData } = await supabase
+            .from('shift_posts')
+            .select(
+              'id, type, status, recipient_response, request_kind, created_at, shift_id, posted_by, claimed_by, visibility, message'
+            )
+            .in('id', interestPostIds)
+
+          interestPostRows = (interestPostData ?? []) as ShiftPostRow[]
+        }
+
+        const allRequestRows = [...requestRows, ...interestPostRows]
         const shiftIds = Array.from(
           new Set(
-            requestRows
+            allRequestRows
               .map((row) => row.shift_id)
               .filter((value): value is string => Boolean(value))
           )
@@ -308,8 +376,8 @@ function SwapRequestPageContent() {
 
         const requestedPartnerIds = Array.from(
           new Set(
-            requestRows
-              .map((row) => row.claimed_by)
+            allRequestRows
+              .flatMap((row) => [row.claimed_by, row.posted_by])
               .filter((value): value is string => Boolean(value))
           )
         )
@@ -336,6 +404,16 @@ function SwapRequestPageContent() {
           return {
             id: row.id,
             type: row.type,
+            visibility: row.visibility ?? 'team',
+            involvement:
+              row.posted_by === user.id
+                ? 'posted'
+                : row.visibility === 'direct'
+                  ? 'received_direct'
+                  : 'claimed',
+            sourcePostId: row.id,
+            recipientResponse: row.recipient_response ?? null,
+            requestKind: row.request_kind ?? 'standard',
             shift: shift ? formatShiftLabel(shift.date, shift.shift_type) : 'Shift unavailable',
             status,
             swapWith: row.claimed_by ? (partnerById.get(row.claimed_by) ?? null) : null,
@@ -343,12 +421,34 @@ function SwapRequestPageContent() {
             message: row.message,
           } satisfies OpenRequest
         })
+        const postById = new Map(allRequestRows.map((row) => [row.id, row]))
+        const interestOnlyRequests = interestRows
+          .filter((interest) => !requestRowIds.has(interest.shift_post_id))
+          .map((interest) => {
+            const row = postById.get(interest.shift_post_id)
+            const shift = row?.shift_id ? (shiftById.get(row.shift_id) ?? null) : null
+
+            return {
+              id: interest.id,
+              type: row?.type ?? 'pickup',
+              visibility: row?.visibility ?? 'team',
+              involvement: 'interest',
+              sourcePostId: row?.id ?? null,
+              recipientResponse: row?.recipient_response ?? null,
+              requestKind: row?.request_kind ?? 'standard',
+              shift: shift ? formatShiftLabel(shift.date, shift.shift_type) : 'Shift unavailable',
+              status: toInterestUiStatus(interest.status),
+              swapWith: row?.posted_by ? (partnerById.get(row.posted_by) ?? null) : null,
+              posted: formatRelativeTime(interest.created_at),
+              message: row?.message ?? 'Pickup interest submitted.',
+            } satisfies OpenRequest
+          })
 
         if (!active) return
 
         setMyShifts(mappedMyShifts)
         setLeadCountsBySlot(leadCounts)
-        setMyOpenRequests(mappedOpenRequests)
+        setMyOpenRequests([...mappedOpenRequests, ...interestOnlyRequests])
       } catch (loadError) {
         console.error('Failed to load swap request form data:', loadError)
         if (active) {
@@ -462,6 +562,10 @@ function SwapRequestPageContent() {
       setError('Please select a shift first.')
       return
     }
+    if (requestVisibility === 'direct' && !swapWith) {
+      setError('Choose the teammate for this direct request.')
+      return
+    }
 
     setSubmitting(true)
     setError(null)
@@ -469,7 +573,11 @@ function SwapRequestPageContent() {
     const { error: insertError } = await supabase.from('shift_posts').insert({
       type: requestType,
       shift_id: selectedShift,
-      claimed_by: requestType === 'swap' ? swapWith : null,
+      claimed_by:
+        requestVisibility === 'direct' ? swapWith : requestType === 'swap' ? swapWith : null,
+      visibility: requestVisibility,
+      recipient_response: requestVisibility === 'direct' ? 'pending' : null,
+      recipient_responded_at: null,
       message: message.trim() || defaultMessage(requestType),
       status: 'pending',
       posted_by: currentUserId,
@@ -483,17 +591,14 @@ function SwapRequestPageContent() {
       return
     }
 
-    const destination =
-      pathname.startsWith('/staff') || pathname === '/requests/new'
-        ? '/staff/requests'
-        : '/requests'
-    router.push(destination)
+    router.push('/requests/new')
   }
 
   const handleNew = () => {
     setView('form')
     setStep(1)
     setRequestType('swap')
+    setRequestVisibility('team')
     setSelectedShift(null)
     setSwapWith(null)
     setMessage('')
@@ -502,10 +607,6 @@ function SwapRequestPageContent() {
   }
 
   const handleBack = () => {
-    if (pathname === '/requests/new') {
-      router.push('/staff/requests')
-      return
-    }
     setView('list')
     setStep(1)
     setError(null)
@@ -522,6 +623,10 @@ function SwapRequestPageContent() {
       return
     }
     if (step === 2) {
+      if (requestVisibility === 'direct' && !swapWith) {
+        setError('Choose the teammate for this direct request before continuing.')
+        return
+      }
       setStep(3)
     }
   }
@@ -540,17 +645,167 @@ function SwapRequestPageContent() {
   }
 
   const pendingCount = myOpenRequests.filter((request) => request.status === 'pending').length
-  const approvedCount = myOpenRequests.filter((request) => request.status === 'approved').length
+  const approvedCount = myOpenRequests.filter(
+    (request) => request.status === 'approved' || request.status === 'selected'
+  ).length
   const totalRequests = myOpenRequests.length
   const stepTitle =
     step === 1 ? 'Request details' : step === 2 ? 'Choose teammate' : 'Final message'
+
+  const handleRecipientDecision = async (requestId: string, decision: 'accepted' | 'declined') => {
+    setError(null)
+    const payload =
+      decision === 'accepted'
+        ? {
+            recipient_response: 'accepted',
+            recipient_responded_at: new Date().toISOString(),
+          }
+        : {
+            recipient_response: 'declined',
+            recipient_responded_at: new Date().toISOString(),
+            status: 'denied',
+          }
+
+    const { error: updateError } = await supabase
+      .from('shift_posts')
+      .update(payload)
+      .eq('id', requestId)
+    if (updateError) {
+      console.error('Failed to update direct request response:', updateError)
+      setError('Could not update that direct request. Please try again.')
+      return
+    }
+
+    setMyOpenRequests((current) =>
+      current.map((request) =>
+        request.id === requestId
+          ? {
+              ...request,
+              recipientResponse: decision,
+              status: decision === 'declined' ? 'denied' : request.status,
+            }
+          : request
+      )
+    )
+  }
+
+  const handleInterestWithdrawal = async (
+    interestId: string,
+    sourcePostId: string | null,
+    status: RequestStatus
+  ) => {
+    setError(null)
+
+    const { error: updateError } = await supabase
+      .from('shift_post_interests')
+      .update({
+        status: 'withdrawn',
+        responded_at: new Date().toISOString(),
+      })
+      .eq('id', interestId)
+
+    if (updateError) {
+      console.error('Failed to withdraw pickup interest:', updateError)
+      setError('Could not withdraw that interest. Please try again.')
+      return
+    }
+
+    if (sourcePostId && status === 'selected') {
+      const { data: nextInterestRows, error: nextInterestError } = await supabase
+        .from('shift_post_interests')
+        .select('id')
+        .eq('shift_post_id', sourcePostId)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true })
+        .limit(1)
+
+      if (nextInterestError) {
+        console.error('Failed to load the next pickup backup during withdrawal:', nextInterestError)
+        setError('Interest was withdrawn, but the queue could not be refreshed. Please reload.')
+        return
+      }
+
+      const nextInterestId =
+        ((nextInterestRows ?? []) as Array<{ id: string | null }>)[0]?.id ?? null
+      if (nextInterestId) {
+        const { error: promoteError } = await supabase
+          .from('shift_post_interests')
+          .update({
+            status: 'selected',
+            responded_at: null,
+          })
+          .eq('id', nextInterestId)
+
+        if (promoteError) {
+          console.error('Failed to promote the next pickup backup during withdrawal:', promoteError)
+          setError('Interest was withdrawn, but the queue could not be refreshed. Please reload.')
+          return
+        }
+      }
+    }
+
+    setMyOpenRequests((current) =>
+      current.map((request) =>
+        request.id === interestId
+          ? {
+              ...request,
+              status: 'withdrawn',
+            }
+          : request
+      )
+    )
+  }
+
+  const handleRequestWithdrawal = async (requestId: string, sourcePostId: string | null) => {
+    setError(null)
+
+    const { error: updateError } = await supabase
+      .from('shift_posts')
+      .update({
+        status: 'withdrawn',
+        override_reason: 'Withdrawn by requester.',
+      })
+      .eq('id', requestId)
+
+    if (updateError) {
+      console.error('Failed to withdraw shift request:', updateError)
+      setError('Could not withdraw that request. Please try again.')
+      return
+    }
+
+    if (sourcePostId) {
+      const { error: interestError } = await supabase
+        .from('shift_post_interests')
+        .update({
+          status: 'declined',
+          responded_at: new Date().toISOString(),
+        })
+        .eq('shift_post_id', sourcePostId)
+        .in('status', ['pending', 'selected'])
+
+      if (interestError) {
+        console.error('Failed to close pending interests for withdrawn request:', interestError)
+      }
+    }
+
+    setMyOpenRequests((current) =>
+      current.map((request) =>
+        request.id === requestId
+          ? {
+              ...request,
+              status: 'withdrawn',
+            }
+          : request
+      )
+    )
+  }
 
   return (
     <div className="space-y-6">
       {view === 'list' && (
         <ManagerWorkspaceHeader
           title="My Requests"
-          subtitle="Track your swap and pickup requests."
+          subtitle="Track posted, claimed, and direct requests."
           summary={
             <div className="flex flex-wrap items-center gap-2 text-foreground">
               <span className="inline-flex items-center rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold text-foreground">
@@ -640,7 +895,7 @@ function SwapRequestPageContent() {
               </div>
               <p className="mb-1 text-sm font-bold text-foreground">No requests yet</p>
               <p className="mb-4 text-xs text-muted-foreground">
-                Create a swap or pickup request to post it to the shift board.
+                Create a swap, pickup, or direct request to track it here.
               </p>
               <Button size="sm" onClick={handleNew}>
                 Start request
@@ -650,6 +905,13 @@ function SwapRequestPageContent() {
             myOpenRequests.map((request) => {
               const meta = STATUS_META[request.status]
               const isPending = request.status === 'pending'
+              const pickupInterestCopy =
+                request.involvement === 'interest' &&
+                (request.status === 'pending' || request.status === 'selected')
+                  ? getPickupInterestTherapistCopy(
+                      request.status === 'selected' ? 'selected' : 'pending'
+                    )
+                  : null
               return (
                 <div
                   key={request.id}
@@ -679,6 +941,23 @@ function SwapRequestPageContent() {
                     >
                       {meta.label}
                     </span>
+                    <span className="rounded-full border border-border/70 bg-muted/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                      {request.visibility === 'direct' ? 'Direct' : 'Team'}
+                    </span>
+                    <span className="rounded-full border border-border/70 bg-muted/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                      {request.involvement === 'posted'
+                        ? 'Posted'
+                        : request.involvement === 'received_direct'
+                          ? 'Received'
+                          : request.involvement === 'interest'
+                            ? (pickupInterestCopy?.roleLabel ?? 'Interested')
+                            : 'Claimed'}
+                    </span>
+                    {request.requestKind === 'call_in' ? (
+                      <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--warning-text)]">
+                        Call-in help
+                      </span>
+                    ) : null}
                     <span className="ml-auto text-xs text-muted-foreground">{request.posted}</span>
                   </div>
 
@@ -691,7 +970,7 @@ function SwapRequestPageContent() {
 
                   {request.swapWith && (
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Swap with:{' '}
+                      {request.involvement === 'interest' ? 'Posted by: ' : 'Swap with: '}
                       <span className="font-medium text-foreground">{request.swapWith}</span>
                     </p>
                   )}
@@ -702,6 +981,116 @@ function SwapRequestPageContent() {
                       Approved by manager
                     </div>
                   )}
+                  {pickupInterestCopy ? (
+                    <div
+                      className={cn(
+                        'mt-2 flex items-center gap-1.5 text-xs font-medium',
+                        request.status === 'selected'
+                          ? 'text-[var(--success-text)]'
+                          : 'text-muted-foreground'
+                      )}
+                    >
+                      {request.status === 'selected' ? (
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      ) : null}
+                      {pickupInterestCopy.helperText}
+                    </div>
+                  ) : null}
+                  {request.visibility === 'direct' &&
+                  request.involvement === 'posted' &&
+                  request.recipientResponse === 'pending' ? (
+                    <p className="mt-2 text-xs text-[var(--warning-text)]">
+                      Waiting for the recipient to respond before manager approval.
+                    </p>
+                  ) : null}
+                  {request.visibility === 'direct' &&
+                  request.involvement === 'posted' &&
+                  request.recipientResponse === 'accepted' &&
+                  request.status === 'pending' ? (
+                    <p className="mt-2 text-xs text-[var(--warning-text)]">
+                      Recipient accepted. Waiting for manager approval.
+                    </p>
+                  ) : null}
+                  {request.visibility === 'direct' &&
+                  request.involvement === 'posted' &&
+                  request.recipientResponse === 'declined' ? (
+                    <p className="mt-2 text-xs text-[var(--error-text)]">
+                      Recipient declined this direct request.
+                    </p>
+                  ) : null}
+                  {request.visibility === 'direct' && request.recipientResponse ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Recipient response:{' '}
+                      <span className="font-medium text-foreground capitalize">
+                        {request.recipientResponse}
+                      </span>
+                    </p>
+                  ) : null}
+                  {request.visibility === 'direct' &&
+                  request.involvement === 'received_direct' &&
+                  request.recipientResponse === 'accepted' &&
+                  request.status === 'pending' ? (
+                    <p className="mt-2 text-xs text-[var(--warning-text)]">
+                      You accepted. Waiting for manager approval.
+                    </p>
+                  ) : null}
+                  {request.visibility === 'direct' && request.status === 'withdrawn' ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      This direct request was withdrawn before final approval.
+                    </p>
+                  ) : null}
+                  {request.visibility === 'direct' &&
+                  request.involvement === 'received_direct' &&
+                  request.recipientResponse === 'pending' ? (
+                    <div className="mt-3 flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => void handleRecipientDecision(request.id, 'accepted')}
+                      >
+                        Accept
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void handleRecipientDecision(request.id, 'declined')}
+                      >
+                        Decline
+                      </Button>
+                    </div>
+                  ) : request.involvement === 'posted' &&
+                    request.requestKind !== 'call_in' &&
+                    request.status === 'pending' ? (
+                    <div className="mt-3 flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          void handleRequestWithdrawal(request.id, request.sourcePostId)
+                        }
+                      >
+                        Withdraw request
+                      </Button>
+                    </div>
+                  ) : request.involvement === 'interest' &&
+                    (request.status === 'pending' || request.status === 'selected') ? (
+                    <div className="mt-3 flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          void handleInterestWithdrawal(
+                            request.id,
+                            request.sourcePostId,
+                            request.status
+                          )
+                        }
+                      >
+                        {request.status === 'selected'
+                          ? 'Withdraw primary claim'
+                          : 'Withdraw interest'}
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               )
             })
@@ -718,7 +1107,7 @@ function SwapRequestPageContent() {
                 <div>
                   <p className="text-sm font-bold text-foreground">Step 1: Request details</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    Choose request type and your shift.
+                    Choose request type and one of your published shifts.
                   </p>
                 </div>
 
@@ -741,6 +1130,32 @@ function SwapRequestPageContent() {
                 </div>
 
                 <div className="space-y-1.5">
+                  <p className="text-xs font-semibold text-foreground">Request visibility</p>
+                  <div className="flex gap-2">
+                    {(['team', 'direct'] as const).map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setRequestVisibility(value)}
+                        className={cn(
+                          'rounded-lg border px-4 py-2 text-xs font-semibold transition-colors capitalize',
+                          requestVisibility === value
+                            ? 'border-primary bg-primary/5 text-primary'
+                            : 'border-border bg-card text-muted-foreground hover:bg-secondary'
+                        )}
+                      >
+                        {value === 'team' ? 'Team board' : 'Direct request'}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {requestVisibility === 'direct'
+                      ? 'Direct requests stay private between you, the selected teammate, and managers.'
+                      : 'Team board requests are visible to the full published-schedule board.'}
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-foreground" htmlFor="selected-shift">
                     Select shift
                   </label>
@@ -758,6 +1173,12 @@ function SwapRequestPageContent() {
                       </option>
                     ))}
                   </select>
+                  {myShifts.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No published shifts are available for new requests right now. Swaps and
+                      pickups stay paused while a schedule is reopened in preliminary.
+                    </p>
+                  ) : null}
                 </div>
 
                 {selectedShiftData && (
@@ -853,9 +1274,11 @@ function SwapRequestPageContent() {
                 </div>
 
                 <p className="text-xs text-muted-foreground">
-                  {requestType === 'swap'
-                    ? 'Selecting a swap partner is optional. Leave blank to post an open swap.'
-                    : 'Pickup requests usually do not need a specific teammate.'}
+                  {requestVisibility === 'direct'
+                    ? 'Pick the teammate you want to send this request to.'
+                    : requestType === 'swap'
+                      ? 'Selecting a swap partner is optional. Leave blank to post an open swap.'
+                      : 'Pickup requests usually do not need a specific teammate.'}
                 </p>
               </div>
             )}
@@ -881,6 +1304,9 @@ function SwapRequestPageContent() {
                   </p>
                   <p className="text-xs text-muted-foreground">
                     With: {selectedMember ? selectedMember.name : 'No specific teammate'}
+                  </p>
+                  <p className="text-xs text-muted-foreground capitalize">
+                    Visibility: {requestVisibility === 'direct' ? 'Direct request' : 'Team board'}
                   </p>
                 </div>
 

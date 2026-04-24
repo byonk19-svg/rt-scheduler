@@ -1,0 +1,26 @@
+import fs from 'node:fs'
+import path from 'node:path'
+
+import { describe, expect, it } from 'vitest'
+
+const source = fs.readFileSync(path.join(process.cwd(), 'src/app/staff/history/page.tsx'), 'utf8')
+
+describe('staff history page', () => {
+  it('shows direct vs team visibility, received roles, and pickup interest history', () => {
+    expect(source).toContain('visibilityLabel')
+    expect(source).toContain("const roleLabel: HistoryItem['roleLabel']")
+    expect(source).toContain("'Received'")
+    expect(source).toContain("const visibilityLabel: HistoryItem['visibilityLabel']")
+    expect(source).toContain("'Direct'")
+    expect(source).toContain("row.requestKind === 'call_in'")
+    expect(source).toContain('Primary claimant')
+    expect(source).toContain('Backup interest')
+    expect(source).toContain('shift_post_interests')
+  })
+
+  it('includes pickup-interest lifecycle statuses in history rows', () => {
+    expect(source).toContain("case 'selected'")
+    expect(source).toContain("case 'withdrawn'")
+    expect(source).toContain('getPickupInterestTherapistCopy(row.status)')
+  })
+})

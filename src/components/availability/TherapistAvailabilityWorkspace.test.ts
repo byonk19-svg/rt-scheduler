@@ -43,7 +43,7 @@ describe('TherapistAvailabilityWorkspace', () => {
       })
     )
 
-    expect(html).toContain('Availability for This Cycle')
+    expect(html).toContain('Future Availability')
     expect(html).toContain('Submit availability')
     expect(html).toContain('id="therapist-availability-workspace"')
     expect(html).toContain('Not submitted')

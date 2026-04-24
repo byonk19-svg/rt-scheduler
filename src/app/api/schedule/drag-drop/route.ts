@@ -3,6 +3,11 @@ import { NextResponse } from 'next/server'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import {
+  notifyPreliminaryShiftAdded,
+  notifyPreliminaryShiftMoved,
+  notifyPreliminaryShiftRemoved,
+} from '@/lib/preliminary-schedule-notifications'
+import {
   notifyPublishedShiftAdded,
   notifyPublishedShiftMoved,
   notifyPublishedShiftRemoved,
@@ -28,6 +33,7 @@ import { formatEligibilityReason, resolveEligibility } from '@/lib/coverage/reso
 import { normalizeWorkPattern } from '@/lib/coverage/work-patterns'
 import type { AvailabilityOverrideRow as CycleAvailabilityOverrideRow } from '@/lib/coverage/types'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
+import { preserveShiftPostHistoryBeforeShiftDeletion } from '@/lib/shift-post-cleanup'
 import type { ShiftStatus, ShiftRole, EmploymentType } from '@/app/schedule/types'
 type RemovableShift = {
   id: string
@@ -95,6 +101,67 @@ type DragAction =
 
 type ShiftSlotRow = {
   id: string
+}
+
+async function closePendingShiftPostsForShiftIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  shiftIds: string[],
+  reason: string
+): Promise<void> {
+  const targetShiftIds = Array.from(new Set(shiftIds.filter(Boolean)))
+  if (targetShiftIds.length === 0) return
+
+  const { data: pendingPosts, error: pendingPostsError } = await supabase
+    .from('shift_posts')
+    .select('id')
+    .in('shift_id', targetShiftIds)
+    .eq('status', 'pending')
+
+  if (pendingPostsError) {
+    console.error(
+      'Could not load pending shift posts for published-schedule cleanup:',
+      pendingPostsError
+    )
+    return
+  }
+
+  const postIds = ((pendingPosts ?? []) as Array<{ id: string | null }>)
+    .map((row) => row.id)
+    .filter((id): id is string => Boolean(id))
+
+  if (postIds.length === 0) return
+
+  const nowIso = new Date().toISOString()
+  const { error: postUpdateError } = await supabase
+    .from('shift_posts')
+    .update({
+      status: 'denied',
+      override_reason: reason,
+    })
+    .in('id', postIds)
+
+  if (postUpdateError) {
+    console.error(
+      'Could not close stale shift posts after published schedule change:',
+      postUpdateError
+    )
+  }
+
+  const { error: interestUpdateError } = await supabase
+    .from('shift_post_interests')
+    .update({
+      status: 'declined',
+      responded_at: nowIso,
+    })
+    .in('shift_post_id', postIds)
+    .in('status', ['pending', 'selected'])
+
+  if (interestUpdateError) {
+    console.error(
+      'Could not close stale pickup interests after published schedule change:',
+      interestUpdateError
+    )
+  }
 }
 
 async function getCoverageCountForSlot(
@@ -450,6 +517,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Schedule cycle not found' }, { status: 404 })
   }
 
+  const { data: activePreliminarySnapshot } = await supabase
+    .from('preliminary_snapshots')
+    .select('id')
+    .eq('cycle_id', payload.cycleId)
+    .eq('status', 'active')
+    .maybeSingle()
+  const preliminaryActive = Boolean(activePreliminarySnapshot) && !Boolean(cycle.published)
+
   if (payload.action === 'assign') {
     if (!payload.userId || !payload.shiftType || !payload.date) {
       return NextResponse.json({ error: 'Missing assignment data' }, { status: 400 })
@@ -598,6 +673,13 @@ export async function POST(request: Request) {
 
     await notifyPublishedShiftAdded(supabase, {
       cyclePublished: Boolean(cycle.published),
+      userId: payload.userId,
+      date: payload.date,
+      shiftType: payload.shiftType,
+      targetId: insertedShift?.id ?? `${payload.cycleId}:${payload.userId}:${payload.date}`,
+    })
+    await notifyPreliminaryShiftAdded(supabase, {
+      preliminaryActive,
       userId: payload.userId,
       date: payload.date,
       shiftType: payload.shiftType,
@@ -766,8 +848,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Incomplete shift data' }, { status: 422 })
     }
 
+    if (cycle.published || preliminaryActive) {
+      await closePendingShiftPostsForShiftIds(
+        supabase,
+        [shift.id],
+        'Schedule changed after this request was posted.'
+      )
+    }
+
     await notifyPublishedShiftMoved(supabase, {
       cyclePublished: Boolean(cycle.published),
+      userId: shift.user_id,
+      fromDate: shift.date,
+      fromShiftType: shift.shift_type as 'day' | 'night',
+      toDate: payload.targetDate,
+      toShiftType: payload.targetShiftType,
+      targetId: shift.id,
+    })
+    await notifyPreliminaryShiftMoved(supabase, {
+      preliminaryActive,
       userId: shift.user_id,
       fromDate: shift.date,
       fromShiftType: shift.shift_type as 'day' | 'night',
@@ -839,6 +938,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Shift not found in this cycle' }, { status: 404 })
     }
 
+    await preserveShiftPostHistoryBeforeShiftDeletion(
+      supabase,
+      [shift.id],
+      'Schedule changed after this request was posted.'
+    )
+
     const { error } = await supabase.from('shifts').delete().eq('id', shift.id)
     if (error) {
       return NextResponse.json({ error: 'Could not remove shift' }, { status: 500 })
@@ -853,6 +958,13 @@ export async function POST(request: Request) {
 
     await notifyPublishedShiftRemoved(supabase, {
       cyclePublished: Boolean(cycle.published),
+      userId: shift.user_id,
+      date: shift.date,
+      shiftType: shift.shift_type,
+      targetId: shift.id,
+    })
+    await notifyPreliminaryShiftRemoved(supabase, {
+      preliminaryActive,
       userId: shift.user_id,
       date: shift.date,
       shiftType: shift.shift_type,
@@ -1090,6 +1202,14 @@ export async function POST(request: Request) {
           .maybeSingle()
       ).data?.id ??
       `${payload.cycleId}:${payload.therapistId}:${payload.date}:${payload.shiftType}`
+
+    if (cycle.published || preliminaryActive) {
+      await closePendingShiftPostsForShiftIds(
+        supabase,
+        [leadShiftId],
+        'Schedule changed after this request was posted.'
+      )
+    }
 
     const shouldLogPostPublishModification = await shouldLogPostPublishModificationForSlot(
       supabase,

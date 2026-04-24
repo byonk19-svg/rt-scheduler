@@ -218,8 +218,8 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
             color: 'var(--success-text)',
           }}
         >
-          Block unpublished. Assignments stay on the draft grid; staff no longer see it as a
-          published schedule until you publish again.
+          Schedule reopened. Assignments stay on the draft grid, preliminary editing is live again,
+          and new swaps or pickups stay paused until you publish again.
         </div>
       )}
 

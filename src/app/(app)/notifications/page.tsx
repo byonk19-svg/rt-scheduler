@@ -39,6 +39,7 @@ function formatTime(iso: string): string {
 
 function getEventTypeLabel(eventType: string): string {
   if (eventType.startsWith('preliminary_')) return 'Preliminary'
+  if (eventType === 'call_in_help_available') return 'Request'
   if (eventType.includes('publish')) return 'Publish'
   if (eventType.includes('request')) return 'Request'
   if (eventType.includes('schedule')) return 'Schedule'
@@ -62,9 +63,14 @@ function includesFilter(item: NotificationRow, filter: NotificationFilter): bool
   if (filter === 'all') return true
   if (filter === 'unread') return item.read_at === null
   if (filter === 'preliminary') return item.event_type.startsWith('preliminary_')
-  if (filter === 'requests') return item.event_type.includes('request')
+  if (filter === 'requests')
+    return item.event_type.includes('request') || item.event_type === 'call_in_help_available'
   if (filter === 'schedule')
-    return item.event_type.includes('schedule') || item.event_type.includes('publish')
+    return (
+      item.event_type.includes('schedule') ||
+      item.event_type.includes('publish') ||
+      item.event_type === 'shift_reminder'
+    )
   return true
 }
 

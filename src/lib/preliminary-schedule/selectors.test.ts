@@ -93,6 +93,7 @@ describe('toPreliminaryShiftCard', () => {
         reserved_by: 'therapist-2',
         active_request_id: 'request-claim',
       }),
+      reservedByName: 'Alex P.',
       currentUserId: 'therapist-1',
     })
 
@@ -101,8 +102,9 @@ describe('toPreliminaryShiftCard', () => {
       state: 'pending_claim',
       canClaim: false,
       canRequestChange: false,
-      assignedName: null,
+      assignedName: 'Alex P.',
       reservedById: 'therapist-2',
+      reservedByName: 'Alex P.',
       requestId: 'request-claim',
     })
   })
@@ -116,6 +118,21 @@ describe('toPreliminaryShiftCard', () => {
 
     expect(result.canRequestChange).toBe(true)
     expect(result.canClaim).toBe(false)
+  })
+
+  it('offers express interest on open opposite-shift slots', () => {
+    const result = toPreliminaryShiftCard({
+      shift: makeShift({ id: 'shift-night', shift_type: 'night', user_id: null, full_name: null }),
+      shiftState: makeShiftState({
+        shift_id: 'shift-night',
+        state: 'open',
+      }),
+      currentUserId: 'therapist-1',
+      currentUserShiftType: 'day',
+    })
+
+    expect(result.directAction).toBe('express_interest')
+    expect(result.directActionLabel).toBe('Express interest')
   })
 })
 
@@ -148,6 +165,7 @@ describe('toTherapistPreliminaryHistory', () => {
     expect(result[0]).toMatchObject({
       requestType: 'claim_open_shift',
       shiftDate: '2026-03-23',
+      isOppositeShiftRequest: false,
     })
   })
 })
@@ -171,10 +189,32 @@ describe('toManagerPreliminaryQueue', () => {
     expect(result[0]).toMatchObject({
       id: 'request-queue',
       requestType: 'claim_open_shift',
+      isOppositeShiftRequest: false,
       note: 'Can take this PRN shift',
       shiftDate: '2026-03-24',
       shiftType: 'night',
       requesterName: 'Barbara C.',
+    })
+  })
+
+  it('flags opposite-shift claims in the manager queue', () => {
+    const result = toManagerPreliminaryQueue(
+      [
+        makeRequest({
+          id: 'request-opposite',
+          requester_id: 'therapist-2',
+          type: 'claim_open_shift',
+        }),
+      ],
+      new Map<string, PreliminaryShiftRow>([
+        ['shift-1', makeShift({ id: 'shift-1', shift_type: 'night' })],
+      ]),
+      new Map([['therapist-2', 'day' as const]])
+    )
+
+    expect(result[0]).toMatchObject({
+      requestType: 'claim_open_shift',
+      isOppositeShiftRequest: true,
     })
   })
 })

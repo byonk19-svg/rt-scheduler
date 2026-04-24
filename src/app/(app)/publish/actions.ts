@@ -5,7 +5,9 @@ import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
+import { sendPreliminarySnapshot } from '@/lib/preliminary-schedule/mutations'
 import { refreshPublishEventCounts } from '@/lib/publish-events'
+import { preserveShiftPostHistoryBeforeShiftDeletion } from '@/lib/shift-post-cleanup'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -118,6 +120,25 @@ export async function restartPublishedCycleAction(formData: FormData) {
     redirect('/publish?error=cycle_restart_failed')
   }
 
+  const shiftIdsToDelete = (statefulShifts: Array<{ id: string | null }>) =>
+    statefulShifts.map((row) => row.id).filter((id): id is string => Boolean(id))
+
+  const { data: shiftsBeforeDelete, error: shiftsBeforeDeleteError } = await supabase
+    .from('shifts')
+    .select('id')
+    .eq('cycle_id', cycleId)
+
+  if (shiftsBeforeDeleteError) {
+    console.error('Failed to load shifts during cycle restart cleanup:', shiftsBeforeDeleteError)
+    redirect('/publish?error=cycle_restart_failed')
+  }
+
+  await preserveShiftPostHistoryBeforeShiftDeletion(
+    supabase,
+    shiftIdsToDelete((shiftsBeforeDelete ?? []) as Array<{ id: string | null }>),
+    'Schedule restarted before this request could be resolved.'
+  )
+
   const { data: deletedShifts, error: deleteShiftsError } = await supabase
     .from('shifts')
     .delete()
@@ -153,7 +174,7 @@ export async function restartPublishedCycleAction(formData: FormData) {
 
 /** Sets published=false without removing shifts (draft again, assignments preserved). */
 export async function unpublishCycleKeepShiftsAction(formData: FormData) {
-  await requireManagerUser()
+  const user = await requireManagerUser()
 
   const cycleId = String(formData.get('cycle_id') ?? '').trim()
   if (!cycleId) {
@@ -194,14 +215,24 @@ export async function unpublishCycleKeepShiftsAction(formData: FormData) {
     redirect('/publish?error=unpublish_keep_shifts_failed')
   }
 
-  const { error: closeSnapshotError } = await admin
-    .from('preliminary_snapshots')
-    .update({ status: 'closed' })
+  const { data: currentShifts, error: shiftsError } = await supabase
+    .from('shifts')
+    .select('*')
     .eq('cycle_id', cycleId)
-    .eq('status', 'active')
 
-  if (closeSnapshotError) {
-    console.error('Failed to close preliminary snapshot during unpublish:', closeSnapshotError)
+  if (shiftsError) {
+    console.error('Failed to load shifts for preliminary reopen:', shiftsError)
+    redirect('/publish?error=unpublish_keep_shifts_failed')
+  }
+
+  const reopenResult = await sendPreliminarySnapshot(admin as never, {
+    cycleId,
+    actorId: user.id,
+    shifts: (currentShifts ?? []) as Array<Record<string, unknown>> as never,
+  })
+
+  if (reopenResult.error) {
+    console.error('Failed to reopen preliminary snapshot during unpublish:', reopenResult.error)
     redirect('/publish?error=unpublish_keep_shifts_failed')
   }
 

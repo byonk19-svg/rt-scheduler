@@ -21,10 +21,15 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { loadShiftBoardSnapshot } from '@/lib/shift-board-snapshot'
 import { groupPickupsBySlot } from '@/app/(app)/shift-board/prn-interest-helpers'
+import { partitionPickupInterestQueue } from '@/lib/pickup-interest-presentation'
+import {
+  resolveNextPickupQueueCandidate,
+  resolvePickupApprovalCandidate,
+} from '@/lib/pickup-interest-selection'
 
 type Role = UiRole
 type RequestType = 'swap' | 'pickup'
-type RequestStatus = 'pending' | 'approved' | 'denied' | 'expired'
+type RequestStatus = 'pending' | 'approved' | 'denied' | 'expired' | 'withdrawn'
 type ShiftType = 'day' | 'night'
 type ShiftRole = 'lead' | 'staff'
 
@@ -39,6 +44,9 @@ type ProfileLookupRow = {
 type ShiftBoardRequest = {
   id: string
   type: RequestType
+  visibility: 'team' | 'direct'
+  recipientResponse: 'pending' | 'accepted' | 'declined' | null
+  requestKind: 'standard' | 'call_in'
   poster: string
   postedById: string | null
   avatar: string
@@ -52,6 +60,17 @@ type ShiftBoardRequest = {
   swapWithName: string | null
   swapWithId: string | null
   claimedById: string | null
+  pendingInterestCount: number
+  hasMyInterest: boolean
+  myInterestId: string | null
+  myInterestStatus: 'pending' | 'selected' | null
+  interestCandidates: Array<{
+    id: string
+    therapistId: string
+    therapistName: string
+    createdAt: string
+    status: 'pending' | 'selected'
+  }>
   shiftType: ShiftType | null
   shiftRole: ShiftRole | null
   overrideReason: string | null
@@ -95,6 +114,12 @@ const STATUS_META: Record<
     bg: 'var(--error-subtle)',
     border: 'var(--error-border)',
   },
+  withdrawn: {
+    label: 'Withdrawn',
+    color: 'var(--muted-foreground)',
+    bg: 'var(--muted)',
+    border: 'var(--border)',
+  },
   expired: {
     label: 'Expired',
     color: 'var(--muted-foreground)',
@@ -119,7 +144,16 @@ const TYPE_META: Record<RequestType, { label: string; color: string; bg: string;
     },
   }
 
-const HISTORY_STATUSES: RequestStatus[] = ['approved', 'denied', 'expired']
+const HISTORY_STATUSES: RequestStatus[] = ['approved', 'denied', 'expired', 'withdrawn']
+
+function formatPickupQueueTimestamp(value: string): string {
+  return new Date(value).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
 
 export default function ShiftBoardClientPage({
   initialSnapshot,
@@ -152,6 +186,9 @@ export default function ShiftBoardClientPage({
     initialSnapshot.employmentType
   )
   const [swapPartners, setSwapPartners] = useState<Record<string, string>>({})
+  const [selectedPickupInterestIds, setSelectedPickupInterestIds] = useState<
+    Record<string, string>
+  >({})
   const [overrideReasons, setOverrideReasons] = useState<Record<string, string>>({})
   const [scheduledByDate, setScheduledByDate] = useState<Map<string, Map<string, ShiftType>>>(
     () =>
@@ -227,7 +264,9 @@ export default function ShiftBoardClientPage({
       isStaffRole && scope === 'mine' && currentUserId
         ? requests.filter(
             (request) =>
-              request.postedById === currentUserId || request.claimedById === currentUserId
+              request.postedById === currentUserId ||
+              request.claimedById === currentUserId ||
+              request.hasMyInterest
           )
         : requests
 
@@ -236,7 +275,11 @@ export default function ShiftBoardClientPage({
         return false
       }
 
-      if (activeTab === 'open' && request.status === 'expired' && statusFilter !== 'all') {
+      if (
+        activeTab === 'open' &&
+        (request.status === 'expired' || request.status === 'withdrawn') &&
+        statusFilter !== 'all'
+      ) {
         return false
       }
 
@@ -258,6 +301,117 @@ export default function ShiftBoardClientPage({
       return haystack.includes(normalizedSearch)
     })
   }, [activeTab, currentUserId, isStaffRole, requests, scope, search, statusFilter, typeFilter])
+
+  const handlePickupInterest = useCallback(
+    async (request: ShiftBoardRequest) => {
+      if (!currentUserId || request.type !== 'pickup' || request.visibility !== 'team') return
+
+      if (request.hasMyInterest && request.myInterestId) {
+        const nextPrimaryCandidate =
+          request.myInterestStatus === 'selected'
+            ? (request.interestCandidates
+                .filter((candidate) => candidate.id !== request.myInterestId)
+                .sort((left, right) => left.createdAt.localeCompare(right.createdAt))[0] ?? null)
+            : null
+        const { error } = await supabase
+          .from('shift_post_interests')
+          .update({ status: 'withdrawn', responded_at: new Date().toISOString() })
+          .eq('id', request.myInterestId)
+
+        if (error) {
+          setError('Could not withdraw pickup interest. Please try again.')
+          return
+        }
+
+        if (nextPrimaryCandidate) {
+          const { error: promoteError } = await supabase
+            .from('shift_post_interests')
+            .update({ status: 'selected', responded_at: null })
+            .eq('id', nextPrimaryCandidate.id)
+
+          if (promoteError) {
+            setError('Could not update the pickup queue. Please refresh and try again.')
+            return
+          }
+        }
+
+        setRequests((current) =>
+          current.map((row) =>
+            row.id === request.id
+              ? {
+                  ...row,
+                  hasMyInterest: false,
+                  myInterestId: null,
+                  myInterestStatus: null,
+                  pendingInterestCount: Math.max(0, row.pendingInterestCount - 1),
+                  interestCandidates: row.interestCandidates
+                    .filter((candidate) => candidate.id !== request.myInterestId)
+                    .map((candidate) =>
+                      nextPrimaryCandidate && candidate.id === nextPrimaryCandidate.id
+                        ? { ...candidate, status: 'selected' as const }
+                        : candidate
+                    ),
+                }
+              : row
+          )
+        )
+        return
+      }
+
+      const nextInterestStatus: 'pending' | 'selected' = request.interestCandidates.some(
+        (candidate) => candidate.status === 'selected'
+      )
+        ? 'pending'
+        : 'selected'
+      const insertedAt = new Date().toISOString()
+      const { data, error } = await supabase
+        .from('shift_post_interests')
+        .insert({
+          shift_post_id: request.id,
+          therapist_id: currentUserId,
+          status: nextInterestStatus,
+        })
+        .select('id')
+        .single()
+
+      if (error) {
+        setError('Could not record pickup interest. Please try again.')
+        return
+      }
+
+      const therapistName =
+        therapists.find((therapist) => therapist.id === currentUserId)?.full_name ?? 'You'
+      setRequests((current) =>
+        current.map((row) =>
+          row.id === request.id
+            ? {
+                ...row,
+                hasMyInterest: true,
+                myInterestId: (data as { id: string }).id,
+                myInterestStatus: nextInterestStatus,
+                pendingInterestCount: row.pendingInterestCount + 1,
+                interestCandidates: [
+                  ...row.interestCandidates,
+                  {
+                    id: (data as { id: string }).id,
+                    therapistId: currentUserId,
+                    therapistName,
+                    createdAt: insertedAt,
+                    status: nextInterestStatus,
+                  },
+                ].sort((left, right) => {
+                  if (left.status === right.status) {
+                    return left.createdAt.localeCompare(right.createdAt)
+                  }
+                  return left.status === 'selected' ? -1 : 1
+                }),
+              }
+            : row
+        )
+      )
+    },
+    [currentUserId, supabase, therapists]
+  )
 
   const handleAction = useCallback(
     async (id: string, action: 'approve' | 'deny', opts?: { override?: boolean }) => {
@@ -295,6 +449,66 @@ export default function ShiftBoardClientPage({
       // For swap approvals with no partner yet, assign claimed_by first
       if (action === 'approve') {
         const req = requests.find((r) => r.id === id)
+        if (req?.visibility === 'direct' && req.recipientResponse !== 'accepted') {
+          setRequestErrors((prev) => ({
+            ...prev,
+            [id]: 'Cannot approve this direct request until the recipient accepts it.',
+          }))
+          return
+        }
+        if (req?.type === 'pickup' && !req.claimedById) {
+          const selectedCandidate = resolvePickupApprovalCandidate(
+            req,
+            selectedPickupInterestIds[id] ?? null
+          )
+          if (!selectedCandidate) {
+            setRequestErrors((prev) => ({
+              ...prev,
+              [id]: 'No pickup interest is available to approve for this post.',
+            }))
+            return
+          }
+
+          setSavingState((current) => ({ ...current, [id]: true }))
+          const { error: claimantError } = await supabase
+            .from('shift_posts')
+            .update({ claimed_by: selectedCandidate.therapistId })
+            .eq('id', id)
+          const { error: selectedInterestError } = await supabase
+            .from('shift_post_interests')
+            .update({ status: 'selected', responded_at: new Date().toISOString() })
+            .eq('id', selectedCandidate.interestId)
+          const { error: declineOthersError } = await supabase
+            .from('shift_post_interests')
+            .update({ status: 'declined', responded_at: new Date().toISOString() })
+            .eq('shift_post_id', id)
+            .neq('id', selectedCandidate.interestId)
+
+          if (claimantError || selectedInterestError || declineOthersError) {
+            setRequestErrors((prev) => ({
+              ...prev,
+              [id]: 'Could not select the pickup interest for approval. Please try again.',
+            }))
+            setSavingState((current) => ({ ...current, [id]: false }))
+            return
+          }
+
+          const selectedTherapistName = selectedCandidate.therapistName
+          setRequests((current) =>
+            current.map((request) =>
+              request.id === id
+                ? {
+                    ...request,
+                    claimedById: selectedCandidate.therapistId,
+                    swapWithId: selectedCandidate.therapistId,
+                    swapWithName: selectedTherapistName,
+                    pendingInterestCount: 0,
+                    interestCandidates: [],
+                  }
+                : request
+            )
+          )
+        }
         if (req?.type === 'swap' && !req.swapWithId) {
           const partnerId = swapPartners[id]
           if (!partnerId) {
@@ -334,12 +548,37 @@ export default function ShiftBoardClientPage({
       setRequests((current) =>
         current.map((request) => {
           if (request.id !== id) return request
-          return { ...request, status: nextStatus }
+          return action === 'deny' && request.type === 'pickup'
+            ? { ...request, status: nextStatus, pendingInterestCount: 0, interestCandidates: [] }
+            : { ...request, status: nextStatus }
         })
       )
 
       setSavingState((current) => ({ ...current, [id]: true }))
       setError(null)
+
+      if (action === 'deny') {
+        const request = requests.find((row) => row.id === id)
+        if (request?.type === 'pickup') {
+          const denialTimestamp = new Date().toISOString()
+          const { error: declinePendingInterestError } = await supabase
+            .from('shift_post_interests')
+            .update({ status: 'declined', responded_at: denialTimestamp })
+            .eq('shift_post_id', id)
+            .in('status', ['pending', 'selected'])
+
+          if (declinePendingInterestError) {
+            console.error(
+              'Failed to close pickup interest queue after denial:',
+              declinePendingInterestError.message
+            )
+            setRequests(previousRequests)
+            setError('Could not save request update. Changes were rolled back.')
+            setSavingState((current) => ({ ...current, [id]: false }))
+            return
+          }
+        }
+      }
 
       const { error: updateError } = await supabase
         .from('shift_posts')
@@ -375,7 +614,95 @@ export default function ShiftBoardClientPage({
       }
       setSavingState((current) => ({ ...current, [id]: false }))
     },
-    [canReview, overrideReasons, requests, supabase, swapPartners, therapists]
+    [
+      canReview,
+      overrideReasons,
+      requests,
+      selectedPickupInterestIds,
+      supabase,
+      swapPartners,
+      therapists,
+    ]
+  )
+
+  const handlePickupClaimantDenial = useCallback(
+    async (requestId: string, interestId: string) => {
+      if (!canReview) return
+
+      const request = requests.find((row) => row.id === requestId)
+      if (!request || request.type !== 'pickup') return
+
+      setRequestErrors((prev) => {
+        const next = { ...prev }
+        delete next[requestId]
+        return next
+      })
+      setSavingState((current) => ({ ...current, [requestId]: true }))
+      setError(null)
+
+      const nextCandidate = resolveNextPickupQueueCandidate(request.interestCandidates, interestId)
+      const deniedAt = new Date().toISOString()
+
+      const { error: denyInterestError } = await supabase
+        .from('shift_post_interests')
+        .update({ status: 'declined', responded_at: deniedAt })
+        .eq('id', interestId)
+
+      if (denyInterestError) {
+        console.error('Failed to deny pickup claimant:', denyInterestError.message)
+        setRequestErrors((prev) => ({
+          ...prev,
+          [requestId]: 'Could not deny that claimant. Please try again.',
+        }))
+        setSavingState((current) => ({ ...current, [requestId]: false }))
+        return
+      }
+
+      if (nextCandidate && nextCandidate.interestId !== interestId) {
+        const { error: promoteError } = await supabase
+          .from('shift_post_interests')
+          .update({ status: 'selected', responded_at: null })
+          .eq('id', nextCandidate.interestId)
+
+        if (promoteError) {
+          console.error('Failed to promote next pickup backup:', promoteError.message)
+          setRequestErrors((prev) => ({
+            ...prev,
+            [requestId]: 'Could not promote the next backup claimant. Please try again.',
+          }))
+          setSavingState((current) => ({ ...current, [requestId]: false }))
+          return
+        }
+      }
+
+      setRequests((current) =>
+        current.map((row) =>
+          row.id === requestId
+            ? {
+                ...row,
+                pendingInterestCount: Math.max(0, row.pendingInterestCount - 1),
+                myInterestStatus:
+                  row.myInterestId && nextCandidate?.interestId === row.myInterestId
+                    ? 'selected'
+                    : row.myInterestId === interestId
+                      ? null
+                      : row.myInterestStatus,
+                hasMyInterest: row.myInterestId === interestId ? false : row.hasMyInterest,
+                myInterestId: row.myInterestId === interestId ? null : row.myInterestId,
+                interestCandidates: row.interestCandidates
+                  .filter((candidate) => candidate.id !== interestId)
+                  .map((candidate) =>
+                    nextCandidate && candidate.id === nextCandidate.interestId
+                      ? { ...candidate, status: 'selected' as const }
+                      : candidate
+                  ),
+              }
+            : row
+        )
+      )
+      setSavingState((current) => ({ ...current, [requestId]: false }))
+    },
+    [canReview, requests, supabase]
   )
 
   const handleViewShift = useCallback(
@@ -389,11 +716,11 @@ export default function ShiftBoardClientPage({
         return
       }
 
-      const params = new URLSearchParams({ view: 'week' })
       if (shiftDate) {
-        params.set('date', shiftDate)
+        router.push(`/therapist/schedule?date=${shiftDate}`)
+        return
       }
-      router.push(`/schedule?${params.toString()}`)
+      router.push('/therapist/schedule')
     },
     [canReview, router]
   )
@@ -404,12 +731,12 @@ export default function ShiftBoardClientPage({
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
-              Open shifts
+              Shift Swaps &amp; Pickups
             </h1>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {canReview
                 ? 'Review and approve swap and pickup requests in the live schedule.'
-                : 'Post swaps or pickups for the published schedule only.'}
+                : 'Post swaps or pickups for the published schedule only. Team board and direct requests both live here.'}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
               <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5 text-muted-foreground">
@@ -429,17 +756,17 @@ export default function ShiftBoardClientPage({
             <Button
               size="sm"
               className="gap-1.5 text-xs"
-              onClick={() => router.push('/requests/new')}
+              onClick={() => router.push('/requests/new?new=1')}
             >
               <ArrowRightLeft className="h-3.5 w-3.5" />
               {!canReview && employmentType === 'prn' ? 'Express interest' : 'Post request'}
             </Button>
             <Button asChild size="sm" variant="outline" className="text-xs">
-              <Link href="/availability">Future availability</Link>
+              <Link href="/therapist/availability">Future Availability</Link>
             </Button>
             {!canReview && (
               <Button asChild size="sm" variant="outline" className="text-xs">
-                <Link href="/staff/history">View my history</Link>
+                <Link href="/staff/history">View history</Link>
               </Button>
             )}
             {canReview && (
@@ -611,7 +938,7 @@ export default function ShiftBoardClientPage({
         {canReview && multiCandidateSlots.length > 0 && (
           <section className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              PRN Interest - Multiple Candidates
+              Multiple pending candidates
             </p>
             {multiCandidateSlots.map((group) => (
               <div key={group.shiftId} className="rounded-xl border border-border bg-card p-4">
@@ -621,38 +948,121 @@ export default function ShiftBoardClientPage({
                     {group.candidates.length} interested
                   </span>
                 </p>
-                <div className="space-y-2">
-                  {group.candidates.map((candidate, index) => (
-                    <div
-                      key={candidate.id}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                          #{index + 1}
-                        </span>
-                        <span className="text-sm font-medium text-foreground">
-                          {candidate.poster}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(candidate.postedAt).toLocaleString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: 'numeric',
-                            minute: '2-digit',
-                          })}
-                        </span>
+                <div className="space-y-3">
+                  {group.primaryCandidate ? (
+                    <div className="rounded-lg border border-[var(--success-border)] bg-[var(--success-subtle)]/40 px-3 py-3">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--success-text)]">
+                        Current primary pending claimant
+                      </p>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-[var(--success-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--success-text)]">
+                            Primary
+                          </span>
+                          <span className="text-sm font-medium text-foreground">
+                            {group.primaryCandidate.poster}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatPickupQueueTimestamp(group.primaryCandidate.postedAt)}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={savingState[group.requestId]}
+                            onClick={() =>
+                              void handlePickupClaimantDenial(
+                                group.requestId,
+                                group.primaryCandidate!.id
+                              )
+                            }
+                            className="rounded-lg border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--error-text)] disabled:opacity-50"
+                          >
+                            Deny claimant
+                          </button>
+                          <button
+                            type="button"
+                            disabled={savingState[group.requestId]}
+                            onClick={() => void handleAction(group.requestId, 'approve')}
+                            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                          >
+                            {savingState[group.requestId] ? 'Selecting...' : 'Approve'}
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        disabled={savingState[candidate.id]}
-                        onClick={() => void handleAction(candidate.id, 'approve')}
-                        className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                      >
-                        {savingState[candidate.id] ? 'Selecting...' : 'Select'}
-                      </button>
                     </div>
-                  ))}
+                  ) : null}
+
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {group.primaryCandidate
+                        ? 'Backups / interested therapists'
+                        : 'Interested therapists'}
+                    </p>
+                    {(group.primaryCandidate ? group.backupCandidates : group.candidates).map(
+                      (candidate, index) => (
+                        <div
+                          key={candidate.id}
+                          className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                              #{index + 1}
+                            </span>
+                            <span className="text-sm font-medium text-foreground">
+                              {candidate.poster}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {formatPickupQueueTimestamp(candidate.postedAt)}
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedPickupInterestIds((current) => ({
+                                  ...current,
+                                  [group.requestId]: candidate.id,
+                                }))
+                              }
+                              className={cn(
+                                'rounded-lg border px-3 py-1.5 text-xs font-semibold',
+                                selectedPickupInterestIds[group.requestId] === candidate.id
+                                  ? 'border-primary bg-primary/10 text-primary'
+                                  : 'border-border bg-card text-muted-foreground hover:bg-secondary'
+                              )}
+                            >
+                              Select
+                            </button>
+                            <button
+                              type="button"
+                              disabled={savingState[group.requestId]}
+                              onClick={() =>
+                                void handlePickupClaimantDenial(group.requestId, candidate.id)
+                              }
+                              className="rounded-lg border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--error-text)] disabled:opacity-50"
+                            >
+                              Deny claimant
+                            </button>
+                            <button
+                              type="button"
+                              disabled={savingState[group.requestId]}
+                              onClick={() => {
+                                setSelectedPickupInterestIds((current) => ({
+                                  ...current,
+                                  [group.requestId]: candidate.id,
+                                }))
+                                void handleAction(group.requestId, 'approve')
+                              }}
+                              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                            >
+                              {savingState[group.requestId] ? 'Selecting...' : 'Approve'}
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -674,6 +1084,7 @@ export default function ShiftBoardClientPage({
               key={request.id}
               req={request}
               canReview={canReview}
+              onPickupInterest={() => void handlePickupInterest(request)}
               saving={Boolean(savingState[request.id])}
               error={requestErrors[request.id]}
               therapists={therapists}
@@ -775,6 +1186,7 @@ function FilterPill({
 function RequestCard({
   req,
   canReview,
+  onPickupInterest,
   saving,
   error,
   therapists,
@@ -791,6 +1203,7 @@ function RequestCard({
 }: {
   req: ShiftBoardRequest
   canReview: boolean
+  onPickupInterest: () => void
   saving: boolean
   error?: string
   therapists: ProfileLookupRow[]
@@ -808,8 +1221,14 @@ function RequestCard({
   const statusMeta = STATUS_META[req.status]
   const typeMeta = TYPE_META[req.type]
   const isPending = req.status === 'pending'
+  const pickupQueue =
+    req.type === 'pickup' && req.visibility === 'team'
+      ? partitionPickupInterestQueue(req.interestCandidates)
+      : null
   const needsPartner = req.type === 'swap' && !req.swapWithId && isPending && canReview
   const needsLeadPartner = shiftRole === 'lead'
+  const awaitingDirectAcceptance =
+    req.visibility === 'direct' && req.recipientResponse !== 'accepted'
   // Filter to therapists working the same date and shift type; fall back to full list if coverage not loaded.
   const eligibleTherapists =
     scheduledOnDate.size > 0
@@ -850,6 +1269,14 @@ function RequestCard({
             >
               {typeMeta.label}
             </span>
+            <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              {req.visibility === 'direct' ? 'Direct' : 'Team'}
+            </span>
+            {req.requestKind === 'call_in' ? (
+              <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--warning-text)]">
+                Call-in help
+              </span>
+            ) : null}
             <span
               className="ml-auto rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
               style={{
@@ -875,6 +1302,60 @@ function RequestCard({
               Swap with: <span className="font-medium text-foreground">{req.swapWithName}</span>
             </p>
           )}
+          {req.visibility === 'direct' && req.recipientResponse ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Recipient response:{' '}
+              <span className="font-medium text-foreground capitalize">
+                {req.recipientResponse}
+              </span>
+            </p>
+          ) : null}
+          {awaitingDirectAcceptance ? (
+            <p className="mt-1 text-xs text-[var(--warning-text)]">
+              Waiting for the recipient to accept before manager approval.
+            </p>
+          ) : null}
+          {req.type === 'pickup' && req.visibility === 'team' ? (
+            <>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {req.pendingInterestCount}{' '}
+                {req.requestKind === 'call_in' ? 'pending claim' : 'pending interest'}
+                {req.pendingInterestCount === 1 ? '' : 's'}
+              </p>
+              {canReview && pickupQueue?.primaryCandidate ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Current primary pending claimant:{' '}
+                  <span className="font-medium text-foreground">
+                    {pickupQueue.primaryCandidate.therapistName}
+                  </span>
+                </p>
+              ) : null}
+              {canReview && pickupQueue ? (
+                <>
+                  {pickupQueue.primaryCandidate && pickupQueue.backupCandidates.length > 0 ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Backups / interested therapists:{' '}
+                      <span className="font-medium text-foreground">
+                        {pickupQueue.backupCandidates
+                          .map((candidate) => candidate.therapistName)
+                          .join(', ')}
+                      </span>
+                    </p>
+                  ) : null}
+                  {!pickupQueue.primaryCandidate && pickupQueue.orderedCandidates.length > 0 ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Interested therapists:{' '}
+                      <span className="font-medium text-foreground">
+                        {pickupQueue.orderedCandidates
+                          .map((candidate) => candidate.therapistName)
+                          .join(', ')}
+                      </span>
+                    </p>
+                  ) : null}
+                </>
+              ) : null}
+            </>
+          ) : null}
           {req.status === 'denied' && req.overrideReason && (
             <p className="mt-1.5 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-2.5 py-1.5 text-xs text-[var(--error-text)]">
               Reason: {req.overrideReason}
@@ -936,7 +1417,7 @@ function RequestCard({
           <Button
             size="sm"
             className="min-h-9 flex-1"
-            disabled={saving || (needsPartner && !swapPartnerId)}
+            disabled={saving || (needsPartner && !swapPartnerId) || awaitingDirectAcceptance}
             onClick={() => onAction('approve')}
           >
             {saving ? 'Saving...' : 'Approve'}
@@ -952,6 +1433,20 @@ function RequestCard({
           </Button>
           <Button size="sm" variant="outline" onClick={onViewShift}>
             View shift
+          </Button>
+        </div>
+      )}
+
+      {!canReview && req.type === 'pickup' && req.visibility === 'team' && (
+        <div className="mt-3 flex justify-end border-t border-border pt-3">
+          <Button size="sm" variant="outline" onClick={onPickupInterest}>
+            {req.requestKind === 'call_in'
+              ? req.hasMyInterest
+                ? 'Withdraw claim'
+                : 'Claim help'
+              : req.hasMyInterest
+                ? 'Withdraw interest'
+                : 'Express interest'}
           </Button>
         </div>
       )}

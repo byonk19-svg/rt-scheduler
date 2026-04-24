@@ -160,19 +160,19 @@ export function getStaffNavItems(): readonly ShellNavItem[] {
         pathname === '/coverage' || pathname === '/schedule' || pathname === '/preliminary',
     },
     {
-      href: '/staff/my-schedule',
-      label: 'My Schedule',
-      active: (pathname) => pathname === '/staff/my-schedule',
+      href: '/therapist/schedule',
+      label: 'My Published Schedule',
+      active: (pathname) => pathname === '/therapist/schedule' || pathname === '/staff/my-schedule',
     },
     {
       href: '/therapist/availability',
-      label: 'Availability',
+      label: 'Future Availability',
       active: (pathname) => pathname === '/therapist/availability' || pathname === '/availability',
     },
     {
-      href: '/shift-board',
-      label: 'Open shifts',
-      active: (pathname) => pathname === '/shift-board',
+      href: '/therapist/swaps',
+      label: 'Shift Swaps & Pickups',
+      active: (pathname) => pathname === '/therapist/swaps' || pathname === '/shift-board',
     },
     {
       href: '/staff/history',
