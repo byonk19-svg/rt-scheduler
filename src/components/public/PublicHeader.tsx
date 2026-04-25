@@ -39,36 +39,72 @@ function getHeaderActions(pathname: string) {
     secondaryHref: '/login',
     secondaryLabel: 'Sign in',
     ctaHref: '/signup',
-    ctaLabel: 'Get started',
+    ctaLabel: 'Create account',
   }
 }
 
 export default function PublicHeader({ className }: { className?: string }) {
   const pathname = usePathname()
   const actions = getHeaderActions(pathname)
+  const isDark = pathname === '/'
 
   return (
-    <header className={cn('border-b border-border/50 bg-background/90', className)}>
+    <header
+      className={cn(
+        isDark
+          ? 'border-b border-white/10 bg-transparent'
+          : 'border-b border-border/50 bg-background/90',
+        className
+      )}
+    >
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
         <Link href="/" className="flex min-h-11 items-center gap-3 hover:no-underline">
           <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--attention)] shadow-tw-md-soft">
             <CalendarDays className="h-4 w-4 text-accent-foreground" />
           </span>
           <span>
-            <span className="block font-heading text-sm font-bold tracking-[-0.02em] text-foreground">
+            <span
+              className={cn(
+                'block font-heading text-sm font-bold tracking-[-0.02em]',
+                isDark ? 'text-white' : 'text-foreground'
+              )}
+            >
               Teamwise
             </span>
-            <span className="block text-[0.72rem] font-medium text-muted-foreground">
+            <span
+              className={cn(
+                'block text-[0.72rem] font-medium',
+                isDark ? 'text-white/60' : 'text-muted-foreground'
+              )}
+            >
               Respiratory Therapy
             </span>
           </span>
         </Link>
 
         <div className="flex items-center gap-2">
-          <Button asChild variant="ghost" size="sm" className="text-foreground/80 hover:bg-card/75">
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className={cn(
+              isDark
+                ? 'text-white/80 hover:bg-white/10 hover:text-white'
+                : 'text-foreground/80 hover:bg-card/75'
+            )}
+          >
             <Link href={actions.secondaryHref}>{actions.secondaryLabel}</Link>
           </Button>
-          <Button asChild size="sm" className="rounded-xl px-5 shadow-tw-primary-glow">
+          <Button
+            asChild
+            size="sm"
+            className={cn(
+              'rounded-lg px-5',
+              isDark
+                ? 'bg-[var(--attention)] text-[var(--primary)] hover:bg-[var(--attention)]/90 shadow-none font-bold'
+                : 'rounded-xl shadow-tw-primary-glow'
+            )}
+          >
             <Link href={actions.ctaHref}>{actions.ctaLabel}</Link>
           </Button>
         </div>
