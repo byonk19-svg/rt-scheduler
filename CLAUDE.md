@@ -1,6 +1,6 @@
 # Teamwise Scheduler
 
-Updated: 2026-04-17 (session 86)
+Updated: 2026-04-24 (session 87)
 
 ## Handoff Snapshot
 
@@ -62,6 +62,21 @@ Updated: 2026-04-17 (session 86)
 
 ### Local In-Progress Work
 
+- `codex/therapist-workflow-accuracy` now carries the full therapist workflow accuracy pass:
+  - centralized therapist workflow state in `src/lib/therapist-workflow.ts`
+  - therapist-safe dashboard, schedule, swaps, and availability routing
+  - therapist `Preferences / Work Rules` page plus notification preference enforcement
+  - preliminary team-overview visibility, same-shift direct therapist edits, opposite-shift pending-interest labeling, and manager-change notifications
+  - published-schedule and reopened-preliminary cleanup that preserves `shift_posts` history by nulling `shift_id` before shift deletion
+  - deterministic pickup queue behavior using `shift_post_interests.status` (`selected` primary claimant + `pending` backups) with promotion on withdraw/claimant denial
+  - `My Requests` + history support for direct requests, pickup interests, call-in help, therapist withdrawal, and direct-request recipient response
+  - direct-request terminal notifications for recipient decline/withdraw and manager approval/denial
+  - supporting migrations through `20260425133000_add_direct_request_manager_resolution_notifications.sql`
+- Verification for `codex/therapist-workflow-accuracy` is currently green:
+  - `supabase db push`
+  - `npx tsc --noEmit`
+  - `npm run lint`
+  - `npm run test:unit` (`154` files / `828` tests)
 - `main` includes the merged email-intake apply gating fix from PR `#27` and the **therapist-first luminous homepage** (replaces the older `codex/therapist-homepage-redesign` intent; that branch may be deleted when convenient).
 - `main` now also carries the compact Coverage workspace pass: denser grid/roster surfaces, tighter shift editor, ranked modal candidates, and the roster-cell performance fix where empty `+` cells open the day editor immediately instead of firing an assignment mutation.
 - `main` now also carries the route-group performance refactor: public routes live under `src/app/(public)`, authenticated routes under `src/app/(app)`, `/dashboard/manager` is server-first again, `/coverage` hydrates from a server snapshot helper, and the top-nav notification panel fetches only when opened.
