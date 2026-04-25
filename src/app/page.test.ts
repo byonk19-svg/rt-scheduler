@@ -10,38 +10,31 @@ const publicHeaderSource = fs.readFileSync(
 )
 
 describe('public homepage redesign contract', () => {
-  it('uses therapist-first trust-forward copy', () => {
-    expect(pageSource).toContain('Keep your schedule, availability, and coverage in one calm view.')
-    expect(pageSource).toContain(
-      'Built for respiratory therapists who need quick shift clarity, fewer back-and-forth messages, and a workspace they can trust before the next handoff.'
-    )
+  it('uses the scheduling-first hero copy', () => {
+    expect(pageSource).toContain('Scheduling that keeps care moving.')
+    expect(pageSource).toContain('Coverage planning, availability, and shift management')
   })
 
   it('keeps the header and hero CTA roles aligned', () => {
     expect(pageSource).toContain('<Link href="/login">Sign in</Link>')
-    expect(pageSource).toContain('<Link href="/signup">Create account</Link>')
-    expect(publicHeaderSource).toContain("ctaLabel: 'Get started'")
+    expect(pageSource).toContain('<Link href="/signup">Request access</Link>')
+    expect(publicHeaderSource).toContain("ctaLabel: 'Create account'")
   })
 
-  it('keeps the approval note and trust bullets visible', () => {
-    expect(pageSource).toContain(
-      'Your manager will need to approve your account before your first sign-in.'
-    )
-    expect(pageSource).toContain('Availability stays visible before the next handoff.')
+  it('keeps the approval note and feature bullets visible', () => {
+    expect(pageSource).toContain('Manager approval required.')
+    expect(pageSource).toContain('Availability stays visible before the next handoff')
     expect(pageSource).toContain('Coverage changes stay clear without the back-and-forth.')
   })
 
-  it('uses the luminous clinical wrapper classes', () => {
-    expect(pageSource).toContain('teamwise-home-luminous')
-    expect(pageSource).toContain('teamwise-home-grid')
-    expect(pageSource).toContain('teamwise-home-preview-shell')
-    expect(pageSource).toContain('teamwise-home-preview-sheen')
+  it('uses the dark teal hero with decorative elements', () => {
+    expect(pageSource).toContain('bg-[var(--primary)]')
+    expect(pageSource).toContain('bg-[var(--attention)]')
+    expect(pageSource).toContain('Scheduling for RT teams')
   })
 
-  it('optimizes the preview image for production (responsive sizes, blur, no unoptimized bypass)', () => {
-    expect(pageSource).toContain("import appPreview from '../../../public/images/app-preview.png'")
-    expect(pageSource).toContain('placeholder="blur"')
-    expect(pageSource).toContain('sizes=')
-    expect(pageSource).not.toContain('unoptimized')
+  it('does not use the old luminous light-mode wrapper classes', () => {
+    expect(pageSource).not.toContain('teamwise-home-luminous')
+    expect(pageSource).not.toContain('teamwise-home-preview-shell')
   })
 })
