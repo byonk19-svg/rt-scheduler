@@ -480,6 +480,7 @@ export function CoverageClientPage({
   )
   const noCycleSelected = !loading && !activeCycleId
   const showEmptyDraftState = !loading && Boolean(activeCycleId) && !selectedCycleHasShiftRows
+  const proactiveCoverageRisk = initialSnapshot.proactiveCoverageRisk
   const today = toIsoDate(new Date())
   const isPastDate = selectedDay !== null && selectedDay.isoDate < today
   const selectedDayShiftIds = [
@@ -539,6 +540,7 @@ export function CoverageClientPage({
           ? 'Finish draft checks, send preliminary if needed, then publish.'
           : 'Draft staffing is in progress.'
   const planningNotices = [
+    proactiveCoverageRisk?.notice ?? null,
     successParam === 'cycle_published' ? 'Published - visible to employees.' : null,
     successParam === 'preliminary_sent'
       ? 'Preliminary schedule sent. Therapists can now review it in the app.'
@@ -1246,6 +1248,25 @@ export function CoverageClientPage({
           ) : null}
 
           <div className="space-y-2">
+            {!noCycleSelected ? (
+              proactiveCoverageRisk && canManageCoverage && !activeCyclePublished ? (
+                <CoverageSurfaceBanner
+                  tone={proactiveCoverageRisk.tone}
+                  title={proactiveCoverageRisk.title}
+                  description={proactiveCoverageRisk.description}
+                  actions={
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setPreFlightDialogOpen(true)}
+                    >
+                      Review pre-flight
+                    </Button>
+                  }
+                />
+              ) : null
+            ) : null}
             {!noCycleSelected ? (
               <CoverageSurfaceBanner
                 tone={workspaceStatusTone}
