@@ -71,12 +71,19 @@ Updated: 2026-04-24 (session 87)
   - deterministic pickup queue behavior using `shift_post_interests.status` (`selected` primary claimant + `pending` backups) with promotion on withdraw/claimant denial
   - `My Requests` + history support for direct requests, pickup interests, call-in help, therapist withdrawal, and direct-request recipient response
   - direct-request terminal notifications for recipient decline/withdraw and manager approval/denial
-  - supporting migrations through `20260425133000_add_direct_request_manager_resolution_notifications.sql`
+  - trusted request/queue mutation route in `src/app/api/shift-posts/route.ts` so therapists and managers no longer mutate `shift_posts` / `shift_post_interests` directly from the browser
+  - RLS and lifecycle hardening in `supabase/migrations/20260426090000_harden_shift_post_request_mutations.sql`:
+    - direct `shift_posts` visible only to participants/managers
+    - therapist-created team posts cannot pre-assign `claimed_by`
+    - therapist interest updates are limited to withdrawing their own active interest
+    - pickup queue promotion/claimant denial/review now run through DB functions instead of client multi-write sequences
+  - reopened-schedule cleanup now consistently closes pending posts/interests through `src/lib/shift-post-cleanup.ts` and shared callers (`publish` unpublish + schedule drag-drop)
+  - stale request/access action files and the unused `shift-posts-table` surface have been removed, and the workflow label is now consistently `Shift Swaps & Pickups`
 - Verification for `codex/therapist-workflow-accuracy` is currently green:
-  - `supabase db push`
   - `npx tsc --noEmit`
   - `npm run lint`
-  - `npm run test:unit` (`154` files / `828` tests)
+  - targeted `npm run test:unit -- "src/app/api/shift-posts/route.test.ts" "src/app/(app)/publish/actions.test.ts" "src/lib/pickup-interest-selection.test.ts" "src/lib/pickup-interest-presentation.test.ts" "src/lib/shift-board-snapshot.test.ts" "src/app/api/schedule/assignment-status/route.test.ts" "src/app/api/schedule/drag-drop/route.test.ts" "src/app/(app)/shift-board/page.test.ts" "src/app/(app)/therapist/swaps/page.test.ts" "src/lib/therapist-workflow.test.ts" "src/components/AppShell.test.ts"` (`79` tests)
+  - `supabase db reset` is still pending because Docker Desktop is unavailable on this machine, so the new migration has not been executed locally yet
 - `main` includes the merged email-intake apply gating fix from PR `#27` and the **therapist-first luminous homepage** (replaces the older `codex/therapist-homepage-redesign` intent; that branch may be deleted when convenient).
 - `main` now also carries the compact Coverage workspace pass: denser grid/roster surfaces, tighter shift editor, ranked modal candidates, and the roster-cell performance fix where empty `+` cells open the day editor immediately instead of firing an assignment mutation.
 - `main` now also carries the route-group performance refactor: public routes live under `src/app/(public)`, authenticated routes under `src/app/(app)`, `/dashboard/manager` is server-first again, `/coverage` hydrates from a server snapshot helper, and the top-nav notification panel fetches only when opened.
