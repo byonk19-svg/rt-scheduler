@@ -81,6 +81,7 @@ type TeamMember = {
 
 type OpenRequest = {
   id: string
+  createdAt: string
   type: RequestType
   visibility: 'team' | 'direct'
   involvement: 'posted' | 'received_direct' | 'claimed' | 'interest'
@@ -277,12 +278,14 @@ function SwapRequestPageContent() {
               'id, type, status, recipient_response, request_kind, created_at, shift_id, posted_by, claimed_by, visibility, message'
             )
             .or(`posted_by.eq.${user.id},claimed_by.eq.${user.id}`)
-            .order('created_at', { ascending: false }),
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false }),
           supabase
             .from('shift_post_interests')
             .select('id, shift_post_id, therapist_id, status, created_at')
             .eq('therapist_id', user.id)
-            .order('created_at', { ascending: false }),
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false }),
         ])
 
         if (!active) return
@@ -416,6 +419,7 @@ function SwapRequestPageContent() {
             requestKind: row.request_kind ?? 'standard',
             shift: shift ? formatShiftLabel(shift.date, shift.shift_type) : 'Shift unavailable',
             status,
+            createdAt: row.created_at,
             swapWith: row.claimed_by ? (partnerById.get(row.claimed_by) ?? null) : null,
             posted: formatRelativeTime(row.created_at),
             message: row.message,
@@ -438,6 +442,7 @@ function SwapRequestPageContent() {
               requestKind: row?.request_kind ?? 'standard',
               shift: shift ? formatShiftLabel(shift.date, shift.shift_type) : 'Shift unavailable',
               status: toInterestUiStatus(interest.status),
+              createdAt: interest.created_at,
               swapWith: row?.posted_by ? (partnerById.get(row.posted_by) ?? null) : null,
               posted: formatRelativeTime(interest.created_at),
               message: row?.message ?? 'Pickup interest submitted.',
@@ -448,7 +453,16 @@ function SwapRequestPageContent() {
 
         setMyShifts(mappedMyShifts)
         setLeadCountsBySlot(leadCounts)
-        setMyOpenRequests([...mappedOpenRequests, ...interestOnlyRequests])
+        setMyOpenRequests(
+          [...mappedOpenRequests, ...interestOnlyRequests].sort((left, right) => {
+            const createdAtComparison = right.createdAt.localeCompare(left.createdAt)
+            if (createdAtComparison !== 0) {
+              return createdAtComparison
+            }
+
+            return right.id.localeCompare(left.id)
+          })
+        )
       } catch (loadError) {
         console.error('Failed to load swap request form data:', loadError)
         if (active) {
@@ -717,6 +731,7 @@ function SwapRequestPageContent() {
         .eq('shift_post_id', sourcePostId)
         .eq('status', 'pending')
         .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
         .limit(1)
 
       if (nextInterestError) {

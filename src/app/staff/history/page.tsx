@@ -180,12 +180,14 @@ export default async function StaffSwapHistoryPage({
         'id, status, visibility, recipient_response, request_kind, message, created_at, shift_id, posted_by, claimed_by, shifts!shift_posts_shift_id_fkey(date, shift_type), poster:profiles!shift_posts_posted_by_fkey(full_name), claimer:profiles!shift_posts_claimed_by_fkey(full_name)'
       )
       .or(filter)
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false }),
     supabase
       .from('shift_post_interests')
       .select('id, shift_post_id, therapist_id, status, created_at')
       .eq('therapist_id', user.id)
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false }),
   ])
 
   if (postRowsError) {
@@ -306,7 +308,14 @@ export default async function StaffSwapHistoryPage({
           message: post?.message ?? 'Pickup interest submitted.',
         }
       }),
-  ].sort((left, right) => right.created_at.localeCompare(left.created_at))
+  ].sort((left, right) => {
+    const createdAtComparison = right.created_at.localeCompare(left.created_at)
+    if (createdAtComparison !== 0) {
+      return createdAtComparison
+    }
+
+    return right.id.localeCompare(left.id)
+  })
 
   const total = historyItems.length
   const rows = historyItems.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)

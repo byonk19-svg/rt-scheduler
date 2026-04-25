@@ -9,11 +9,16 @@ export type PickupInterestCandidate = {
 }
 
 export function sortPickupInterestCandidates<
-  T extends { createdAt: string; status: PickupInterestStatus },
+  T extends { id: string; createdAt: string; status: PickupInterestStatus },
 >(candidates: T[]): T[] {
   return candidates.slice().sort((left, right) => {
     if (left.status === right.status) {
-      return left.createdAt.localeCompare(right.createdAt)
+      const createdAtComparison = left.createdAt.localeCompare(right.createdAt)
+      if (createdAtComparison !== 0) {
+        return createdAtComparison
+      }
+
+      return left.id.localeCompare(right.id)
     }
     return left.status === 'selected' ? -1 : 1
   })

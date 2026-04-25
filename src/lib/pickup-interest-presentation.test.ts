@@ -67,6 +67,30 @@ describe('partitionPickupInterestQueue', () => {
       'interest-2',
     ])
   })
+
+  it('breaks equal-timestamp ties by id so queue ordering stays deterministic', () => {
+    const queue = partitionPickupInterestQueue([
+      {
+        id: 'interest-b',
+        therapistId: 'ther-2',
+        therapistName: 'Blair',
+        createdAt: '2026-04-24T08:00:00.000Z',
+        status: 'pending' as const,
+      },
+      {
+        id: 'interest-a',
+        therapistId: 'ther-1',
+        therapistName: 'Alex',
+        createdAt: '2026-04-24T08:00:00.000Z',
+        status: 'pending' as const,
+      },
+    ])
+
+    expect(queue.orderedCandidates.map((candidate) => candidate.id)).toEqual([
+      'interest-a',
+      'interest-b',
+    ])
+  })
 })
 
 describe('getPickupInterestTherapistCopy', () => {

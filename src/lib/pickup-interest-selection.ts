@@ -1,3 +1,5 @@
+import { sortPickupInterestCandidates } from '@/lib/pickup-interest-presentation'
+
 export function resolvePickupApprovalCandidate(
   request: {
     claimedById: string | null
@@ -14,15 +16,11 @@ export function resolvePickupApprovalCandidate(
   interestId: string
   therapistId: string
   therapistName: string
+  status: 'pending' | 'selected'
 } | null {
   if (request.claimedById) return null
 
-  const candidates = request.interestCandidates.slice().sort((left, right) => {
-    if (left.status === right.status) {
-      return left.createdAt.localeCompare(right.createdAt)
-    }
-    return left.status === 'selected' ? -1 : 1
-  })
+  const candidates = sortPickupInterestCandidates(request.interestCandidates)
   if (candidates.length === 0) return null
 
   const candidate =
@@ -34,6 +32,7 @@ export function resolvePickupApprovalCandidate(
     interestId: candidate.id,
     therapistId: candidate.therapistId,
     therapistName: candidate.therapistName,
+    status: candidate.status,
   }
 }
 
@@ -50,6 +49,7 @@ export function resolveNextPickupQueueCandidate(
   interestId: string
   therapistId: string
   therapistName: string
+  status: 'pending' | 'selected'
 } | null {
   const remaining = candidates.filter((candidate) => candidate.id !== removedInterestId)
   if (remaining.length === 0) return null
@@ -60,12 +60,11 @@ export function resolveNextPickupQueueCandidate(
       interestId: alreadySelected.id,
       therapistId: alreadySelected.therapistId,
       therapistName: alreadySelected.therapistName,
+      status: alreadySelected.status,
     }
   }
 
-  const nextCandidate = remaining
-    .slice()
-    .sort((left, right) => left.createdAt.localeCompare(right.createdAt))[0]
+  const nextCandidate = sortPickupInterestCandidates(remaining)[0]
 
   if (!nextCandidate) return null
 
@@ -73,5 +72,6 @@ export function resolveNextPickupQueueCandidate(
     interestId: nextCandidate.id,
     therapistId: nextCandidate.therapistId,
     therapistName: nextCandidate.therapistName,
+    status: nextCandidate.status,
   }
 }

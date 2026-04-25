@@ -23,4 +23,10 @@ describe('staff history page', () => {
     expect(source).toContain("case 'withdrawn'")
     expect(source).toContain('getPickupInterestTherapistCopy(row.status)')
   })
+
+  it('keeps merged history rows sorted deterministically when timestamps match', () => {
+    expect(source).toContain(".order('id', { ascending: false })")
+    expect(source).toContain('right.created_at.localeCompare(left.created_at)')
+    expect(source).toContain('right.id.localeCompare(left.id)')
+  })
 })

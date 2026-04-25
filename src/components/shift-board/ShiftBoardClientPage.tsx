@@ -21,7 +21,10 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { loadShiftBoardSnapshot } from '@/lib/shift-board-snapshot'
 import { groupPickupsBySlot } from '@/app/(app)/shift-board/prn-interest-helpers'
-import { partitionPickupInterestQueue } from '@/lib/pickup-interest-presentation'
+import {
+  partitionPickupInterestQueue,
+  sortPickupInterestCandidates,
+} from '@/lib/pickup-interest-presentation'
 import {
   resolveNextPickupQueueCandidate,
   resolvePickupApprovalCandidate,
@@ -309,9 +312,11 @@ export default function ShiftBoardClientPage({
       if (request.hasMyInterest && request.myInterestId) {
         const nextPrimaryCandidate =
           request.myInterestStatus === 'selected'
-            ? (request.interestCandidates
-                .filter((candidate) => candidate.id !== request.myInterestId)
-                .sort((left, right) => left.createdAt.localeCompare(right.createdAt))[0] ?? null)
+            ? (sortPickupInterestCandidates(
+                request.interestCandidates.filter(
+                  (candidate) => candidate.id !== request.myInterestId
+                )
+              )[0] ?? null)
             : null
         const { error } = await supabase
           .from('shift_post_interests')
@@ -364,7 +369,7 @@ export default function ShiftBoardClientPage({
         ? 'pending'
         : 'selected'
       const insertedAt = new Date().toISOString()
-      const { data, error } = await supabase
+      let { data, error: insertError } = await supabase
         .from('shift_post_interests')
         .insert({
           shift_post_id: request.id,
@@ -374,7 +379,25 @@ export default function ShiftBoardClientPage({
         .select('id')
         .single()
 
-      if (error) {
+      let resolvedInterestStatus = nextInterestStatus
+
+      if (insertError && nextInterestStatus === 'selected' && insertError.code === '23505') {
+        const retryResult = await supabase
+          .from('shift_post_interests')
+          .insert({
+            shift_post_id: request.id,
+            therapist_id: currentUserId,
+            status: 'pending',
+          })
+          .select('id')
+          .single()
+
+        data = retryResult.data
+        insertError = retryResult.error
+        resolvedInterestStatus = 'pending'
+      }
+
+      if (insertError) {
         setError('Could not record pickup interest. Please try again.')
         return
       }
@@ -388,23 +411,18 @@ export default function ShiftBoardClientPage({
                 ...row,
                 hasMyInterest: true,
                 myInterestId: (data as { id: string }).id,
-                myInterestStatus: nextInterestStatus,
+                myInterestStatus: resolvedInterestStatus,
                 pendingInterestCount: row.pendingInterestCount + 1,
-                interestCandidates: [
+                interestCandidates: sortPickupInterestCandidates([
                   ...row.interestCandidates,
                   {
                     id: (data as { id: string }).id,
                     therapistId: currentUserId,
                     therapistName,
                     createdAt: insertedAt,
-                    status: nextInterestStatus,
+                    status: resolvedInterestStatus,
                   },
-                ].sort((left, right) => {
-                  if (left.status === right.status) {
-                    return left.createdAt.localeCompare(right.createdAt)
-                  }
-                  return left.status === 'selected' ? -1 : 1
-                }),
+                ]),
               }
             : row
         )
@@ -470,6 +488,24 @@ export default function ShiftBoardClientPage({
           }
 
           setSavingState((current) => ({ ...current, [id]: true }))
+          if (selectedCandidate.status !== 'selected') {
+            const { error: declineBeforeSelectionError } = await supabase
+              .from('shift_post_interests')
+              .update({ status: 'declined', responded_at: new Date().toISOString() })
+              .eq('shift_post_id', id)
+              .neq('id', selectedCandidate.interestId)
+              .in('status', ['pending', 'selected'])
+
+            if (declineBeforeSelectionError) {
+              setRequestErrors((prev) => ({
+                ...prev,
+                [id]: 'Could not reorder the pickup queue for approval. Please try again.',
+              }))
+              setSavingState((current) => ({ ...current, [id]: false }))
+              return
+            }
+          }
+
           const { error: claimantError } = await supabase
             .from('shift_posts')
             .update({ claimed_by: selectedCandidate.therapistId })
@@ -483,6 +519,7 @@ export default function ShiftBoardClientPage({
             .update({ status: 'declined', responded_at: new Date().toISOString() })
             .eq('shift_post_id', id)
             .neq('id', selectedCandidate.interestId)
+            .in('status', ['pending', 'selected'])
 
           if (claimantError || selectedInterestError || declineOthersError) {
             setRequestErrors((prev) => ({

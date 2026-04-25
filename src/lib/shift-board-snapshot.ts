@@ -1,6 +1,7 @@
 import { toUiRole, type UiRole } from '@/lib/auth/roles'
 import { resolveCoverageCycle } from '@/lib/coverage/active-cycle'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
+import { sortPickupInterestCandidates } from '@/lib/pickup-interest-presentation'
 import { buildDateRange, dateKeyFromDate } from '@/lib/schedule-helpers'
 import { canUserSeeShiftPost } from '@/lib/shift-post-visibility'
 
@@ -209,6 +210,7 @@ export async function loadShiftBoardSnapshot({
       'id, shift_id, posted_by, claimed_by, visibility, recipient_response, request_kind, message, type, status, created_at, override_reason'
     )
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
 
   if (tab === 'open') {
     postsQuery = postsQuery.neq('status', 'expired')
@@ -323,6 +325,8 @@ export async function loadShiftBoardSnapshot({
           .from('shift_post_interests')
           .select('id, shift_post_id, therapist_id, status, created_at')
           .in('shift_post_id', postIds)
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
       : { data: [] }
   const shiftIds = Array.from(
     new Set(postRows.map((row) => row.shift_id).filter((value): value is string => Boolean(value)))
@@ -362,7 +366,16 @@ export async function loadShiftBoardSnapshot({
     )
   }
 
-  const visiblePostRows = postRows.filter((row) => canUserSeeShiftPost(row, user.id, role))
+  const visiblePostRows = postRows
+    .filter((row) => canUserSeeShiftPost(row, user.id, role))
+    .sort((left, right) => {
+      const createdAtComparison = right.created_at.localeCompare(left.created_at)
+      if (createdAtComparison !== 0) {
+        return createdAtComparison
+      }
+
+      return right.id.localeCompare(left.id)
+    })
 
   const interestsByPostId = new Map<string, ShiftPostInterestRow[]>()
   for (const row of (interestRowsData ?? []) as ShiftPostInterestRow[]) {
@@ -386,14 +399,13 @@ export async function loadShiftBoardSnapshot({
           status: 'pending' | 'selected'
         } => interest.status === 'pending' || interest.status === 'selected'
       )
-      .sort((left, right) => {
-        if (left.status === right.status) {
-          return left.created_at.localeCompare(right.created_at)
-        }
-        return left.status === 'selected' ? -1 : 1
-      })
+      .map((interest) => ({
+        ...interest,
+        createdAt: interest.created_at,
+      }))
+    const orderedActiveInterests = sortPickupInterestCandidates(activeInterests)
     const myActiveInterest =
-      activeInterests.find((interest) => interest.therapist_id === user.id) ?? null
+      orderedActiveInterests.find((interest) => interest.therapist_id === user.id) ?? null
     return {
       id: row.id,
       type: row.type,
@@ -413,18 +425,18 @@ export async function loadShiftBoardSnapshot({
       swapWithName: row.claimed_by ? (namesById.get(row.claimed_by) ?? null) : null,
       swapWithId: row.claimed_by ?? null,
       claimedById: row.claimed_by ?? null,
-      pendingInterestCount: activeInterests.length,
+      pendingInterestCount: orderedActiveInterests.length,
       hasMyInterest: Boolean(myActiveInterest),
       myInterestId: myActiveInterest?.id ?? null,
       myInterestStatus:
         myActiveInterest?.status === 'selected' || myActiveInterest?.status === 'pending'
           ? myActiveInterest.status
           : null,
-      interestCandidates: activeInterests.map((interest) => ({
+      interestCandidates: orderedActiveInterests.map((interest) => ({
         id: interest.id,
         therapistId: interest.therapist_id,
         therapistName: namesById.get(interest.therapist_id) ?? 'Unknown therapist',
-        createdAt: interest.created_at,
+        createdAt: interest.createdAt,
         status: interest.status,
       })),
       shiftType: shift?.shift_type ?? null,

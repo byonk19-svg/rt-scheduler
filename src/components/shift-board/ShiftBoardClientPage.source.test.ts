@@ -22,6 +22,17 @@ describe('shift board pickup denial guardrails', () => {
     expect(source).toContain('resolveNextPickupQueueCandidate')
   })
 
+  it('retries queue inserts as backup interest when the selected-claim race is lost', () => {
+    expect(source).toContain("insertError.code === '23505'")
+    expect(source).toContain('resolvedInterestStatus =')
+    expect(source).toContain('retryResult')
+  })
+
+  it('reorders pickup approval updates when a manager promotes a backup claimant', () => {
+    expect(source).toContain("selectedCandidate.status !== 'selected'")
+    expect(source).toContain('declineBeforeSelectionError')
+  })
+
   it('distinguishes the current primary pickup claimant from backup therapists in the manager queue', () => {
     expect(source).toContain('Current primary pending claimant')
     expect(source).toContain('Backups / interested therapists')

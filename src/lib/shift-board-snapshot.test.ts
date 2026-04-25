@@ -74,6 +74,19 @@ function makeSupabaseMock() {
               resolve({
                 data: [
                   {
+                    id: 'team-2',
+                    shift_id: null,
+                    posted_by: 'other-2',
+                    claimed_by: null,
+                    visibility: 'team',
+                    recipient_response: null,
+                    message: 'Open pickup second',
+                    type: 'pickup',
+                    status: 'pending',
+                    created_at: '2026-04-24T12:00:00.000Z',
+                    override_reason: null,
+                  },
+                  {
                     id: 'team-1',
                     shift_id: null,
                     posted_by: 'other-1',
@@ -111,12 +124,24 @@ function makeSupabaseMock() {
       if (table === 'shift_post_interests') {
         return {
           select() {
-            return {
-              in: async () => ({
-                data: [],
-                error: null,
-              }),
+            const builder = {
+              in() {
+                return builder
+              },
+              order() {
+                return builder
+              },
+              then(resolve: (value: unknown) => unknown) {
+                return Promise.resolve(
+                  resolve({
+                    data: [],
+                    error: null,
+                  })
+                )
+              },
             }
+
+            return builder
           },
         }
       }
@@ -168,6 +193,6 @@ describe('loadShiftBoardSnapshot', () => {
 
     expect(snapshot.unauthorized).toBe(false)
     if (snapshot.unauthorized) return
-    expect(snapshot.requests.map((request) => request.id)).toEqual(['team-1'])
+    expect(snapshot.requests.map((request) => request.id)).toEqual(['team-2', 'team-1'])
   })
 })
