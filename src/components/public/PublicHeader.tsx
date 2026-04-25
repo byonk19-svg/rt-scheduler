@@ -52,7 +52,7 @@ export default function PublicHeader({ className }: { className?: string }) {
     <header
       className={cn(
         isDark
-          ? 'border-b border-white/10 bg-transparent'
+          ? 'border-b border-white/10 bg-[var(--primary)]'
           : 'border-b border-border/50 bg-background/90',
         className
       )}

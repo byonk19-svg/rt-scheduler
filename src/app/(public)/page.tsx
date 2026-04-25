@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 const features = [
   {
     title: 'Shift coverage',
-    body: "Availability stays visible before the next handoff — no chasing threads.",
+    body: 'Availability stays visible before the next handoff — no chasing threads.',
   },
   {
     title: 'Manager control',
