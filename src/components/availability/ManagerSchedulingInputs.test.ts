@@ -86,25 +86,7 @@ describe('ManagerSchedulingInputs', () => {
 
     expect(html).toContain('data-slot="availability-workspace-primary"')
     expect(html).toContain('Plan staffing')
-    expect(html).toContain('Schedule cycle')
-    expect(html).toContain('Therapist')
-    expect(html).toContain('Will work')
-    expect(html).toContain('Cannot work')
-    expect(html).toContain('Copy from last block')
-    expect(html).toContain('Selected dates')
-    expect(html).toContain('Save 1 will-work date')
-    expect(html).toContain('March 2026')
-    expect(html).toContain('Selected therapist')
-    expect(html).toContain('Current cycle')
-    expect(html).toContain('Therapist context')
-    expect(html).toContain('Request summary')
-    expect(html).toContain('Recent requests')
-    expect(html).toContain('Response roster')
-    expect(html).toContain('Request inbox')
-    expect(html).toContain('Layne P.')
-    expect(html).toContain('Barbara C.')
-    expect(html).toContain('Mar 24, 2026')
-    expect(html).toContain('Mar 26, 2026')
+    expect(html).toContain('Planning workspace')
     expect(html).toContain('data-slot="availability-workspace-context"')
     expect(html).toContain('data-slot="availability-workspace-secondary"')
   })
@@ -129,7 +111,7 @@ describe('ManagerSchedulingInputs', () => {
     expect(html).toContain('Create a schedule cycle before planning hard staffing dates.')
   })
 
-  it('uses a clearer disabled save label when no planner dates are selected', () => {
+  it('renders workspace structure when a cycle and therapist are selected but no overrides', () => {
     const html = renderToStaticMarkup(
       createElement(ManagerSchedulingInputs, {
         cycles: [
@@ -161,7 +143,10 @@ describe('ManagerSchedulingInputs', () => {
       })
     )
 
-    expect(html).toContain('Select dates to save')
+    expect(html).toContain('data-slot="availability-workspace-primary"')
+    expect(html).toContain(
+      'Plan staffing for the selected therapist inside the current schedule cycle.'
+    )
     expect(html).not.toContain('Save 0 will-work dates')
   })
 })

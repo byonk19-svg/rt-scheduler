@@ -61,8 +61,8 @@ export default function HomePage() {
 
           {/* subtext */}
           <p className="mb-12 max-w-[34ch] text-[1.06rem] leading-[1.65] text-white/50">
-            Coverage planning, availability, and shift management — built for RT departments
-            that can&apos;t afford gaps.
+            Coverage planning, availability, and shift management — built for RT departments that
+            can&apos;t afford gaps.
           </p>
 
           {/* CTAs */}
