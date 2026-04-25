@@ -16,12 +16,12 @@
 
 ## Typography
 
-- **Display/Hero (marketing + rare page titles):** Fraunces — short headlines only; evokes craft and care without sacrificing web performance when loaded selectively.
-- **Body/UI:** DM Sans — primary interface type; already integrated via `globals.css` / Next font pipeline.
+- **Display/Hero (marketing + rare page titles):** Instrument Serif — editorial old-style serif loaded at weight 400 only; used on the landing hero h1, auth left panel headline, and any future display moments. CSS class: `font-display`.
+- **Body/UI:** Plus Jakarta Sans — clean modern geometric sans; primary interface type for all app surfaces. Replaces DM Sans. Integrated via `globals.css` / Next font pipeline with CSS var `--font-plus-jakarta-sans`.
 - **UI/Labels:** Same family as body; use weight (500–700) and letter-spacing for hierarchy instead of a third sans.
-- **Data/Tables:** DM Sans with `font-variant-numeric: tabular-nums` on counts, times, and schedule columns so digits align in coverage views.
+- **Data/Tables:** Plus Jakarta Sans with `font-variant-numeric: tabular-nums` on counts, times, and schedule columns so digits align in coverage views.
 - **Code:** Geist Mono (or system monospace stack) for technical surfaces, IDs, and developer-facing diagnostics.
-- **Loading:** Google Fonts (or self-host subset WOFF2 for display + DM Sans) — prefer self-hosting if privacy/perf policies tighten.
+- **Loading:** Google Fonts via `next/font` — Instrument Serif (display, weight 400 normal+italic) in `(public)/layout.tsx`; Plus Jakarta Sans (all weights) in root `layout.tsx`.
 - **Scale (initial targets):**
   - `text-xs` 0.75rem / labels, meta
   - `text-sm` 0.875rem / dense table cells

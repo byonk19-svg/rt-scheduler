@@ -1,14 +1,12 @@
 import type { Metadata } from 'next'
-import { Fraunces } from 'next/font/google'
-import dynamic from 'next/dynamic'
+import { Instrument_Serif } from 'next/font/google'
 
 import { cn } from '@/lib/utils'
+import PublicHeader from '@/components/public/PublicHeader'
 
-const PublicHeader = dynamic(() =>
-  import('@/components/public/PublicHeader').then((m) => m.default ?? (() => null))
-)
-
-const fraunces = Fraunces({
+const instrumentSerif = Instrument_Serif({
+  weight: ['400'],
+  style: ['normal', 'italic'],
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-display',
@@ -24,7 +22,7 @@ export default function PublicLayout({
   children: React.ReactNode
 }>) {
   return (
-    <div className={`${fraunces.variable} min-h-screen bg-background`}>
+    <div className={`${instrumentSerif.variable} min-h-screen bg-background`}>
       <a
         href="#main-content"
         className={cn(
