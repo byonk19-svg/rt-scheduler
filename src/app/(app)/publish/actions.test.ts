@@ -389,6 +389,8 @@ describe('unpublishCycleKeepShiftsAction', () => {
 
     expect(supabase.state.cyclePublished).toBe(false)
     expect(supabase.state.deletedShiftIds).toEqual([])
+    expect(supabase.state.deniedShiftPostIds).toEqual(['post-1'])
+    expect(supabase.state.declinedShiftPostInterestIds).toEqual(['post-1'])
     expect(sendPreliminarySnapshotMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({

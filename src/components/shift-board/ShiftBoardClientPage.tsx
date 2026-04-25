@@ -21,14 +21,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { loadShiftBoardSnapshot } from '@/lib/shift-board-snapshot'
 import { groupPickupsBySlot } from '@/app/(app)/shift-board/prn-interest-helpers'
-import {
-  partitionPickupInterestQueue,
-  sortPickupInterestCandidates,
-} from '@/lib/pickup-interest-presentation'
-import {
-  resolveNextPickupQueueCandidate,
-  resolvePickupApprovalCandidate,
-} from '@/lib/pickup-interest-selection'
+import { partitionPickupInterestQueue } from '@/lib/pickup-interest-presentation'
 
 type Role = UiRole
 type RequestType = 'swap' | 'pickup'
@@ -156,6 +149,41 @@ function formatPickupQueueTimestamp(value: string): string {
     hour: 'numeric',
     minute: '2-digit',
   })
+}
+
+async function mutateShiftPost(body: Record<string, unknown>) {
+  const response = await fetch('/api/shift-posts', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+
+  const payload = (await response.json().catch(() => null)) as { error?: string } | null
+  if (!response.ok) {
+    throw new Error(payload?.error ?? 'Could not update that request.')
+  }
+
+  return payload
+}
+
+function toReviewErrorMessage(message: string): string {
+  return message.includes('Team-visible swap approvals require a swap partner')
+    ? 'Cannot approve: this swap request has no partner assigned. Select a swap partner first.'
+    : message.includes('shifts_unique_cycle_user_date')
+      ? 'Cannot approve: the selected swap partner is already scheduled on this date.'
+      : message.includes('partner shift type mismatch')
+        ? 'Cannot approve: swap partners must be scheduled on the same shift type.'
+        : message.includes('operational code')
+          ? 'Cannot approve: shifts with active operational codes are locked from swaps.'
+          : message.includes('working scheduled shift')
+            ? 'Cannot approve: both swap partners must have working scheduled shifts.'
+            : message.includes('Lead coverage gap')
+              ? 'override:Lead coverage gap - approving this request would leave a shift without a lead. You can force-approve below.'
+              : message.includes('Double booking')
+                ? 'Cannot approve: double booking. This therapist is already assigned to this shift.'
+                : `Could not save: ${message}`
 }
 
 export default function ShiftBoardClientPage({
@@ -309,356 +337,87 @@ export default function ShiftBoardClientPage({
     async (request: ShiftBoardRequest) => {
       if (!currentUserId || request.type !== 'pickup' || request.visibility !== 'team') return
 
-      if (request.hasMyInterest && request.myInterestId) {
-        const nextPrimaryCandidate =
-          request.myInterestStatus === 'selected'
-            ? (sortPickupInterestCandidates(
-                request.interestCandidates.filter(
-                  (candidate) => candidate.id !== request.myInterestId
-                )
-              )[0] ?? null)
-            : null
-        const { error } = await supabase
-          .from('shift_post_interests')
-          .update({ status: 'withdrawn', responded_at: new Date().toISOString() })
-          .eq('id', request.myInterestId)
+      setSavingState((current) => ({ ...current, [request.id]: true }))
+      setError(null)
 
-        if (error) {
-          setError('Could not withdraw pickup interest. Please try again.')
-          return
-        }
-
-        if (nextPrimaryCandidate) {
-          const { error: promoteError } = await supabase
-            .from('shift_post_interests')
-            .update({ status: 'selected', responded_at: null })
-            .eq('id', nextPrimaryCandidate.id)
-
-          if (promoteError) {
-            setError('Could not update the pickup queue. Please refresh and try again.')
-            return
-          }
-        }
-
-        setRequests((current) =>
-          current.map((row) =>
-            row.id === request.id
-              ? {
-                  ...row,
-                  hasMyInterest: false,
-                  myInterestId: null,
-                  myInterestStatus: null,
-                  pendingInterestCount: Math.max(0, row.pendingInterestCount - 1),
-                  interestCandidates: row.interestCandidates
-                    .filter((candidate) => candidate.id !== request.myInterestId)
-                    .map((candidate) =>
-                      nextPrimaryCandidate && candidate.id === nextPrimaryCandidate.id
-                        ? { ...candidate, status: 'selected' as const }
-                        : candidate
-                    ),
-                }
-              : row
-          )
-        )
-        return
-      }
-
-      const nextInterestStatus: 'pending' | 'selected' = request.interestCandidates.some(
-        (candidate) => candidate.status === 'selected'
-      )
-        ? 'pending'
-        : 'selected'
-      const insertedAt = new Date().toISOString()
-      let { data, error: insertError } = await supabase
-        .from('shift_post_interests')
-        .insert({
-          shift_post_id: request.id,
-          therapist_id: currentUserId,
-          status: nextInterestStatus,
-        })
-        .select('id')
-        .single()
-
-      let resolvedInterestStatus = nextInterestStatus
-
-      if (insertError && nextInterestStatus === 'selected' && insertError.code === '23505') {
-        const retryResult = await supabase
-          .from('shift_post_interests')
-          .insert({
-            shift_post_id: request.id,
-            therapist_id: currentUserId,
-            status: 'pending',
+      try {
+        if (request.hasMyInterest && request.myInterestId) {
+          await mutateShiftPost({
+            action: 'withdraw_interest',
+            interestId: request.myInterestId,
           })
-          .select('id')
-          .single()
+        } else {
+          await mutateShiftPost({
+            action: 'express_interest',
+            requestId: request.id,
+          })
+        }
 
-        data = retryResult.data
-        insertError = retryResult.error
-        resolvedInterestStatus = 'pending'
+        await loadBoard(activeTab)
+      } catch (mutationError) {
+        console.error('Failed to update pickup interest:', mutationError)
+        setError('Could not update pickup interest. Please try again.')
+      } finally {
+        setSavingState((current) => ({ ...current, [request.id]: false }))
       }
-
-      if (insertError) {
-        setError('Could not record pickup interest. Please try again.')
-        return
-      }
-
-      const therapistName =
-        therapists.find((therapist) => therapist.id === currentUserId)?.full_name ?? 'You'
-      setRequests((current) =>
-        current.map((row) =>
-          row.id === request.id
-            ? {
-                ...row,
-                hasMyInterest: true,
-                myInterestId: (data as { id: string }).id,
-                myInterestStatus: resolvedInterestStatus,
-                pendingInterestCount: row.pendingInterestCount + 1,
-                interestCandidates: sortPickupInterestCandidates([
-                  ...row.interestCandidates,
-                  {
-                    id: (data as { id: string }).id,
-                    therapistId: currentUserId,
-                    therapistName,
-                    createdAt: insertedAt,
-                    status: resolvedInterestStatus,
-                  },
-                ]),
-              }
-            : row
-        )
-      )
     },
-    [currentUserId, supabase, therapists]
+    [activeTab, currentUserId, loadBoard]
   )
 
   const handleAction = useCallback(
     async (id: string, action: 'approve' | 'deny', opts?: { override?: boolean }) => {
       if (!canReview) return
 
-      const previousRequest = requests.find((request) => request.id === id) ?? null
-
       setRequestErrors((prev) => {
         const next = { ...prev }
         delete next[id]
         return next
       })
-
-      // If override requested, persist manager_override + reason before status update
-      if (opts?.override) {
-        setSavingState((current) => ({ ...current, [id]: true }))
-        const { error: overrideError } = await supabase
-          .from('shift_posts')
-          .update({
-            manager_override: true,
-            override_reason: overrideReasons[id]?.trim() || 'Manager override',
-          })
-          .eq('id', id)
-        if (overrideError) {
-          console.error('Failed to set manager override:', overrideError.message)
-          setRequestErrors((prev) => ({
-            ...prev,
-            [id]: 'Could not set override. Please try again.',
-          }))
-          setSavingState((current) => ({ ...current, [id]: false }))
-          return
-        }
+      const request = requests.find((row) => row.id === id)
+      if (
+        action === 'approve' &&
+        request?.type === 'swap' &&
+        request.visibility === 'team' &&
+        !swapPartners[id]
+      ) {
+        setRequestErrors((prev) => ({
+          ...prev,
+          [id]: 'Please select a swap partner before approving.',
+        }))
+        return
       }
-
-      // For swap approvals with no partner yet, assign claimed_by first
-      if (action === 'approve') {
-        const req = requests.find((r) => r.id === id)
-        if (req?.visibility === 'direct' && req.recipientResponse !== 'accepted') {
-          setRequestErrors((prev) => ({
-            ...prev,
-            [id]: 'Cannot approve this direct request until the recipient accepts it.',
-          }))
-          return
-        }
-        if (req?.type === 'pickup' && !req.claimedById) {
-          const selectedCandidate = resolvePickupApprovalCandidate(
-            req,
-            selectedPickupInterestIds[id] ?? null
-          )
-          if (!selectedCandidate) {
-            setRequestErrors((prev) => ({
-              ...prev,
-              [id]: 'No pickup interest is available to approve for this post.',
-            }))
-            return
-          }
-
-          setSavingState((current) => ({ ...current, [id]: true }))
-          if (selectedCandidate.status !== 'selected') {
-            const { error: declineBeforeSelectionError } = await supabase
-              .from('shift_post_interests')
-              .update({ status: 'declined', responded_at: new Date().toISOString() })
-              .eq('shift_post_id', id)
-              .neq('id', selectedCandidate.interestId)
-              .in('status', ['pending', 'selected'])
-
-            if (declineBeforeSelectionError) {
-              setRequestErrors((prev) => ({
-                ...prev,
-                [id]: 'Could not reorder the pickup queue for approval. Please try again.',
-              }))
-              setSavingState((current) => ({ ...current, [id]: false }))
-              return
-            }
-          }
-
-          const { error: claimantError } = await supabase
-            .from('shift_posts')
-            .update({ claimed_by: selectedCandidate.therapistId })
-            .eq('id', id)
-          const { error: selectedInterestError } = await supabase
-            .from('shift_post_interests')
-            .update({ status: 'selected', responded_at: new Date().toISOString() })
-            .eq('id', selectedCandidate.interestId)
-          const { error: declineOthersError } = await supabase
-            .from('shift_post_interests')
-            .update({ status: 'declined', responded_at: new Date().toISOString() })
-            .eq('shift_post_id', id)
-            .neq('id', selectedCandidate.interestId)
-            .in('status', ['pending', 'selected'])
-
-          if (claimantError || selectedInterestError || declineOthersError) {
-            setRequestErrors((prev) => ({
-              ...prev,
-              [id]: 'Could not select the pickup interest for approval. Please try again.',
-            }))
-            setSavingState((current) => ({ ...current, [id]: false }))
-            return
-          }
-
-          const selectedTherapistName = selectedCandidate.therapistName
-          setRequests((current) =>
-            current.map((request) =>
-              request.id === id
-                ? {
-                    ...request,
-                    claimedById: selectedCandidate.therapistId,
-                    swapWithId: selectedCandidate.therapistId,
-                    swapWithName: selectedTherapistName,
-                    pendingInterestCount: 0,
-                    interestCandidates: [],
-                  }
-                : request
-            )
-          )
-        }
-        if (req?.type === 'swap' && !req.swapWithId) {
-          const partnerId = swapPartners[id]
-          if (!partnerId) {
-            setRequestErrors((prev) => ({
-              ...prev,
-              [id]: 'Please select a swap partner before approving.',
-            }))
-            return
-          }
-          setSavingState((current) => ({ ...current, [id]: true }))
-          const { error: partnerError } = await supabase
-            .from('shift_posts')
-            .update({ claimed_by: partnerId })
-            .eq('id', id)
-          if (partnerError) {
-            console.error('Failed to assign swap partner:', partnerError.message)
-            setRequestErrors((prev) => ({
-              ...prev,
-              [id]: 'Could not assign swap partner. Please try again.',
-            }))
-            setSavingState((current) => ({ ...current, [id]: false }))
-            return
-          }
-          // Reflect the partner locally so the card updates immediately
-          const partnerName = therapists.find((t) => t.id === partnerId)?.full_name ?? 'Unknown'
-          setRequests((current) =>
-            current.map((r) =>
-              r.id === id ? { ...r, swapWithId: partnerId, swapWithName: partnerName } : r
-            )
-          )
-        }
-      }
-
-      const nextStatus: RequestStatus = action === 'approve' ? 'approved' : 'denied'
-      const previousRequests = requests
-
-      setRequests((current) =>
-        current.map((request) => {
-          if (request.id !== id) return request
-          return action === 'deny' && request.type === 'pickup'
-            ? { ...request, status: nextStatus, pendingInterestCount: 0, interestCandidates: [] }
-            : { ...request, status: nextStatus }
-        })
-      )
 
       setSavingState((current) => ({ ...current, [id]: true }))
       setError(null)
 
-      if (action === 'deny') {
-        const request = requests.find((row) => row.id === id)
-        if (request?.type === 'pickup') {
-          const denialTimestamp = new Date().toISOString()
-          const { error: declinePendingInterestError } = await supabase
-            .from('shift_post_interests')
-            .update({ status: 'declined', responded_at: denialTimestamp })
-            .eq('shift_post_id', id)
-            .in('status', ['pending', 'selected'])
-
-          if (declinePendingInterestError) {
-            console.error(
-              'Failed to close pickup interest queue after denial:',
-              declinePendingInterestError.message
-            )
-            setRequests(previousRequests)
-            setError('Could not save request update. Changes were rolled back.')
-            setSavingState((current) => ({ ...current, [id]: false }))
-            return
-          }
-        }
-      }
-
-      const { error: updateError } = await supabase
-        .from('shift_posts')
-        .update({ status: nextStatus })
-        .eq('id', id)
-
-      if (updateError) {
-        console.error('Failed to save action:', updateError.message)
-        setRequests(previousRequests)
-        setError('Could not save request update. Changes were rolled back.')
-        const msg = updateError.message.includes('no swap partner assigned')
-          ? 'Cannot approve: this swap request has no partner assigned. Select a swap partner first.'
-          : updateError.message.includes('shifts_unique_cycle_user_date')
-            ? 'Cannot approve: the selected swap partner is already scheduled on this date.'
-            : updateError.message.includes('partner shift type mismatch')
-              ? 'Cannot approve: swap partners must be scheduled on the same shift type.'
-              : updateError.message.includes('operational code')
-                ? 'Cannot approve: shifts with active operational codes are locked from swaps.'
-                : updateError.message.includes('is not working')
-                  ? 'Cannot approve: both swap partners must have working scheduled shifts.'
-                  : updateError.message.includes('Lead coverage gap')
-                    ? 'override:Lead coverage gap - approving this request would leave a shift without a lead. You can force-approve below.'
-                    : updateError.message.includes('Double booking')
-                      ? 'Cannot approve: double booking. This therapist is already assigned to this shift.'
-                      : `Could not save: ${updateError.message}`
-        setRequestErrors((prev) => ({ ...prev, [id]: msg }))
+      try {
+        await mutateShiftPost({
+          action: 'review_request',
+          requestId: id,
+          decision: action,
+          selectedInterestId: selectedPickupInterestIds[id] ?? null,
+          swapPartnerId: swapPartners[id] ?? null,
+          override: opts?.override === true,
+          overrideReason: overrideReasons[id] ?? null,
+        })
+        await loadBoard(activeTab)
+      } catch (updateError) {
+        const message =
+          updateError instanceof Error ? updateError.message : 'Could not save action.'
+        console.error('Failed to save action:', message)
+        setRequestErrors((prev) => ({ ...prev, [id]: toReviewErrorMessage(message) }))
+      } finally {
         setSavingState((current) => ({ ...current, [id]: false }))
-        return
       }
-
-      if (previousRequest?.status === 'pending') {
-        setPendingCount((current) => Math.max(current - 1, 0))
-      }
-      setSavingState((current) => ({ ...current, [id]: false }))
     },
     [
+      activeTab,
       canReview,
+      loadBoard,
       overrideReasons,
       requests,
       selectedPickupInterestIds,
-      supabase,
       swapPartners,
-      therapists,
     ]
   )
 
@@ -676,70 +435,28 @@ export default function ShiftBoardClientPage({
       })
       setSavingState((current) => ({ ...current, [requestId]: true }))
       setError(null)
-
-      const nextCandidate = resolveNextPickupQueueCandidate(request.interestCandidates, interestId)
-      const deniedAt = new Date().toISOString()
-
-      const { error: denyInterestError } = await supabase
-        .from('shift_post_interests')
-        .update({ status: 'declined', responded_at: deniedAt })
-        .eq('id', interestId)
-
-      if (denyInterestError) {
-        console.error('Failed to deny pickup claimant:', denyInterestError.message)
+      try {
+        await mutateShiftPost({
+          action: 'deny_claimant',
+          requestId,
+          interestId,
+        })
+        await loadBoard(activeTab)
+      } catch (denyError) {
+        const message =
+          denyError instanceof Error
+            ? denyError.message
+            : 'Could not deny that claimant. Please try again.'
+        console.error('Failed to deny pickup claimant:', message)
         setRequestErrors((prev) => ({
           ...prev,
-          [requestId]: 'Could not deny that claimant. Please try again.',
+          [requestId]: message,
         }))
+      } finally {
         setSavingState((current) => ({ ...current, [requestId]: false }))
-        return
       }
-
-      if (nextCandidate && nextCandidate.interestId !== interestId) {
-        const { error: promoteError } = await supabase
-          .from('shift_post_interests')
-          .update({ status: 'selected', responded_at: null })
-          .eq('id', nextCandidate.interestId)
-
-        if (promoteError) {
-          console.error('Failed to promote next pickup backup:', promoteError.message)
-          setRequestErrors((prev) => ({
-            ...prev,
-            [requestId]: 'Could not promote the next backup claimant. Please try again.',
-          }))
-          setSavingState((current) => ({ ...current, [requestId]: false }))
-          return
-        }
-      }
-
-      setRequests((current) =>
-        current.map((row) =>
-          row.id === requestId
-            ? {
-                ...row,
-                pendingInterestCount: Math.max(0, row.pendingInterestCount - 1),
-                myInterestStatus:
-                  row.myInterestId && nextCandidate?.interestId === row.myInterestId
-                    ? 'selected'
-                    : row.myInterestId === interestId
-                      ? null
-                      : row.myInterestStatus,
-                hasMyInterest: row.myInterestId === interestId ? false : row.hasMyInterest,
-                myInterestId: row.myInterestId === interestId ? null : row.myInterestId,
-                interestCandidates: row.interestCandidates
-                  .filter((candidate) => candidate.id !== interestId)
-                  .map((candidate) =>
-                    nextCandidate && candidate.id === nextCandidate.interestId
-                      ? { ...candidate, status: 'selected' as const }
-                      : candidate
-                  ),
-              }
-            : row
-        )
-      )
-      setSavingState((current) => ({ ...current, [requestId]: false }))
     },
-    [canReview, requests, supabase]
+    [activeTab, canReview, loadBoard, requests]
   )
 
   const handleViewShift = useCallback(

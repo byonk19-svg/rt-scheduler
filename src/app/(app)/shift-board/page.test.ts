@@ -24,17 +24,17 @@ vi.mock('@/lib/shift-board-snapshot', () => ({
 
 vi.mock('@/components/shift-board/ShiftBoardClientPage', () => ({
   default: ({ initialSnapshot }: { initialSnapshot: { currentUserId: string } }) =>
-    createElement('div', null, `Therapist swaps for ${initialSnapshot.currentUserId}`),
+    createElement('div', null, `Shift board for ${initialSnapshot.currentUserId}`),
 }))
 
-import TherapistSwapsPage from '@/app/(app)/therapist/swaps/page'
+import ShiftBoardPage from '@/app/(app)/shift-board/page'
 
-describe('therapist swaps route', () => {
+describe('shift-board page', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('uses the same open-board snapshot loader as the main shift-board route', async () => {
+  it('loads the open-board snapshot and renders the shared client page', async () => {
     const supabase = { id: 'server-client' }
     createClientMock.mockResolvedValue(supabase)
     loadShiftBoardSnapshotMock.mockResolvedValue({
@@ -43,22 +43,22 @@ describe('therapist swaps route', () => {
       requests: [],
       metrics: { unfilled: 0, missingLead: 0 },
       pendingCount: 0,
-      currentUserId: 'therapist-2',
+      currentUserId: 'therapist-1',
       therapists: [],
       employmentType: null,
       scheduledByDateEntries: [],
     })
 
-    const html = renderToStaticMarkup(await TherapistSwapsPage())
+    const html = renderToStaticMarkup(await ShiftBoardPage())
 
     expect(loadShiftBoardSnapshotMock).toHaveBeenCalledWith({ supabase, tab: 'open' })
-    expect(html).toContain('Therapist swaps for therapist-2')
+    expect(html).toContain('Shift board for therapist-1')
   })
 
-  it('redirects to login when the shared shift-board snapshot is unauthorized', async () => {
+  it('redirects unauthenticated users to login', async () => {
     createClientMock.mockResolvedValue({ id: 'server-client' })
     loadShiftBoardSnapshotMock.mockResolvedValue({ unauthorized: true })
 
-    await expect(TherapistSwapsPage()).rejects.toThrow('REDIRECT:/login')
+    await expect(ShiftBoardPage()).rejects.toThrow('REDIRECT:/login')
   })
 })

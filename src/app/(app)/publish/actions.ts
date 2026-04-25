@@ -7,7 +7,10 @@ import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { sendPreliminarySnapshot } from '@/lib/preliminary-schedule/mutations'
 import { refreshPublishEventCounts } from '@/lib/publish-events'
-import { preserveShiftPostHistoryBeforeShiftDeletion } from '@/lib/shift-post-cleanup'
+import {
+  closePendingShiftPostsForShiftIds,
+  preserveShiftPostHistoryBeforeShiftDeletion,
+} from '@/lib/shift-post-cleanup'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -225,6 +228,14 @@ export async function unpublishCycleKeepShiftsAction(formData: FormData) {
     redirect('/publish?error=unpublish_keep_shifts_failed')
   }
 
+  await closePendingShiftPostsForShiftIds(
+    supabase,
+    ((currentShifts ?? []) as Array<{ id: string | null }>)
+      .map((shift) => shift.id)
+      .filter((id): id is string => Boolean(id)),
+    'Schedule reopened in preliminary. Submit a new request after the draft is updated.'
+  )
+
   const reopenResult = await sendPreliminarySnapshot(admin as never, {
     cycleId,
     actorId: user.id,
@@ -241,6 +252,9 @@ export async function unpublishCycleKeepShiftsAction(formData: FormData) {
   revalidatePath('/schedule')
   revalidatePath('/preliminary')
   revalidatePath('/approvals')
+  revalidatePath('/requests')
+  revalidatePath('/shift-board')
+  revalidatePath('/staff/history')
 
   redirect('/publish?success=unpublished_keep_shifts')
 }

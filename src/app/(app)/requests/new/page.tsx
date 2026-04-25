@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AlertCircle, CalendarDays, CheckCircle2, ChevronLeft, Plus, Star } from 'lucide-react'
 
@@ -200,6 +200,23 @@ function slotKey(date: string, shiftType: ShiftType): string {
   return `${date}:${shiftType}`
 }
 
+async function mutateShiftPost(body: Record<string, unknown>) {
+  const response = await fetch('/api/shift-posts', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+
+  const payload = (await response.json().catch(() => null)) as { error?: string } | null
+  if (!response.ok) {
+    throw new Error(payload?.error ?? 'Could not update that request.')
+  }
+
+  return payload
+}
+
 function SwapRequestPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -243,244 +260,250 @@ function SwapRequestPageContent() {
     }
   }, [composeMode])
 
-  useEffect(() => {
+  const loadData = useCallback(async () => {
     let active = true
 
-    async function loadData() {
+    const complete = () => {
+      active = false
+    }
+
+    try {
       setLoading(true)
       setError(null)
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
+      if (!user) {
+        router.replace('/login')
+        return
+      }
 
-        if (!user) {
-          router.replace('/login')
-          return
-        }
+      const todayKey = dateKeyFromDate(new Date())
+      setCurrentUserId(user.id)
 
-        const todayKey = dateKeyFromDate(new Date())
-        setCurrentUserId(user.id)
-
-        const [myShiftsResult, myRequestsResult, myInterestRowsResult] = await Promise.all([
-          supabase
-            .from('shifts')
-            .select('id, date, shift_type, role, status, schedule_cycles!inner(published)')
-            .eq('user_id', user.id)
-            .gte('date', todayKey)
-            .eq('status', 'scheduled')
-            .eq('schedule_cycles.published', true)
-            .order('date', { ascending: true }),
-          supabase
-            .from('shift_posts')
-            .select(
-              'id, type, status, recipient_response, request_kind, created_at, shift_id, posted_by, claimed_by, visibility, message'
-            )
-            .or(`posted_by.eq.${user.id},claimed_by.eq.${user.id}`)
-            .order('created_at', { ascending: false })
-            .order('id', { ascending: false }),
-          supabase
-            .from('shift_post_interests')
-            .select('id, shift_post_id, therapist_id, status, created_at')
-            .eq('therapist_id', user.id)
-            .order('created_at', { ascending: false })
-            .order('id', { ascending: false }),
-        ])
-
-        if (!active) return
-
-        const myShiftRows = (myShiftsResult.data ?? []) as ShiftRow[]
-        const activeOperationalCodes = await fetchActiveOperationalCodeMap(
-          supabase,
-          myShiftRows.map((shift) => shift.id)
-        )
-        const mappedMyShifts = myShiftRows
-          .filter((shift) => !activeOperationalCodes.has(shift.id))
-          .map((shift) => {
-            const parsed = new Date(`${shift.date}T00:00:00`)
-            const dow = Number.isNaN(parsed.getTime())
-              ? shift.date
-              : parsed.toLocaleDateString('en-US', { weekday: 'long' })
-
-            return {
-              id: shift.id,
-              isoDate: shift.date,
-              date: formatShortDate(shift.date),
-              dow,
-              type: shift.shift_type === 'day' ? 'Day' : 'Night',
-              shiftType: shift.shift_type,
-              isLead: shift.role === 'lead',
-            } satisfies MyShift
-          })
-
-        const uniqueDates = Array.from(new Set(mappedMyShifts.map((shift) => shift.isoDate)))
-        let leadCounts: Record<string, number> = {}
-        if (uniqueDates.length > 0) {
-          const { data: leadRows, error: leadRowsError } = await supabase
-            .from('shifts')
-            .select('date, shift_type')
-            .eq('role', 'lead')
-            .in('date', uniqueDates)
-
-          if (leadRowsError) {
-            console.error('Failed to load lead coverage for swap form:', leadRowsError)
-          } else {
-            leadCounts = ((leadRows ?? []) as Array<Pick<ShiftRow, 'date' | 'shift_type'>>).reduce(
-              (acc, row) => {
-                const key = slotKey(row.date, row.shift_type)
-                acc[key] = (acc[key] ?? 0) + 1
-                return acc
-              },
-              {} as Record<string, number>
-            )
-          }
-        }
-
-        const requestRows = (myRequestsResult.data ?? []) as ShiftPostRow[]
-        const interestRows = (myInterestRowsResult.data ?? []) as ShiftPostInterestRow[]
-        const requestRowIds = new Set(requestRows.map((row) => row.id))
-        const interestPostIds = Array.from(
-          new Set(
-            interestRows.map((row) => row.shift_post_id).filter((id) => !requestRowIds.has(id))
+      const [myShiftsResult, myRequestsResult, myInterestRowsResult] = await Promise.all([
+        supabase
+          .from('shifts')
+          .select('id, date, shift_type, role, status, schedule_cycles!inner(published)')
+          .eq('user_id', user.id)
+          .gte('date', todayKey)
+          .eq('status', 'scheduled')
+          .eq('schedule_cycles.published', true)
+          .order('date', { ascending: true }),
+        supabase
+          .from('shift_posts')
+          .select(
+            'id, type, status, recipient_response, request_kind, created_at, shift_id, posted_by, claimed_by, visibility, message'
           )
-        )
+          .or(`posted_by.eq.${user.id},claimed_by.eq.${user.id}`)
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false }),
+        supabase
+          .from('shift_post_interests')
+          .select('id, shift_post_id, therapist_id, status, created_at')
+          .eq('therapist_id', user.id)
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false }),
+      ])
 
-        let interestPostRows: ShiftPostRow[] = []
-        if (interestPostIds.length > 0) {
-          const { data: interestPostData } = await supabase
-            .from('shift_posts')
-            .select(
-              'id, type, status, recipient_response, request_kind, created_at, shift_id, posted_by, claimed_by, visibility, message'
-            )
-            .in('id', interestPostIds)
+      if (!active) return
 
-          interestPostRows = (interestPostData ?? []) as ShiftPostRow[]
-        }
-
-        const allRequestRows = [...requestRows, ...interestPostRows]
-        const shiftIds = Array.from(
-          new Set(
-            allRequestRows
-              .map((row) => row.shift_id)
-              .filter((value): value is string => Boolean(value))
-          )
-        )
-
-        let shiftById = new Map<string, ShiftRow>()
-        if (shiftIds.length > 0) {
-          const { data: shiftRows } = await supabase
-            .from('shifts')
-            .select('id, date, shift_type, role')
-            .in('id', shiftIds)
-
-          shiftById = new Map(((shiftRows ?? []) as ShiftRow[]).map((row) => [row.id, row]))
-        }
-
-        const requestedPartnerIds = Array.from(
-          new Set(
-            allRequestRows
-              .flatMap((row) => [row.claimed_by, row.posted_by])
-              .filter((value): value is string => Boolean(value))
-          )
-        )
-
-        let partnerById = new Map<string, string>()
-        if (requestedPartnerIds.length > 0) {
-          const { data: partnerRows } = await supabase
-            .from('profiles')
-            .select('id, full_name')
-            .in('id', requestedPartnerIds)
-
-          partnerById = new Map(
-            ((partnerRows ?? []) as ProfileRow[]).map((row) => [
-              row.id,
-              row.full_name ?? 'Unknown therapist',
-            ])
-          )
-        }
-
-        const mappedOpenRequests = requestRows.map((row) => {
-          const shift = row.shift_id ? (shiftById.get(row.shift_id) ?? null) : null
-          const status = toUiStatus(row.status, row.created_at)
+      const myShiftRows = (myShiftsResult.data ?? []) as ShiftRow[]
+      const activeOperationalCodes = await fetchActiveOperationalCodeMap(
+        supabase,
+        myShiftRows.map((shift) => shift.id)
+      )
+      const mappedMyShifts = myShiftRows
+        .filter((shift) => !activeOperationalCodes.has(shift.id))
+        .map((shift) => {
+          const parsed = new Date(`${shift.date}T00:00:00`)
+          const dow = Number.isNaN(parsed.getTime())
+            ? shift.date
+            : parsed.toLocaleDateString('en-US', { weekday: 'long' })
 
           return {
-            id: row.id,
-            type: row.type,
-            visibility: row.visibility ?? 'team',
-            involvement:
-              row.posted_by === user.id
-                ? 'posted'
-                : row.visibility === 'direct'
-                  ? 'received_direct'
-                  : 'claimed',
-            sourcePostId: row.id,
-            recipientResponse: row.recipient_response ?? null,
-            requestKind: row.request_kind ?? 'standard',
+            id: shift.id,
+            isoDate: shift.date,
+            date: formatShortDate(shift.date),
+            dow,
+            type: shift.shift_type === 'day' ? 'Day' : 'Night',
+            shiftType: shift.shift_type,
+            isLead: shift.role === 'lead',
+          } satisfies MyShift
+        })
+
+      const uniqueDates = Array.from(new Set(mappedMyShifts.map((shift) => shift.isoDate)))
+      let leadCounts: Record<string, number> = {}
+      if (uniqueDates.length > 0) {
+        const { data: leadRows, error: leadRowsError } = await supabase
+          .from('shifts')
+          .select('date, shift_type')
+          .eq('role', 'lead')
+          .in('date', uniqueDates)
+
+        if (leadRowsError) {
+          console.error('Failed to load lead coverage for swap form:', leadRowsError)
+        } else {
+          leadCounts = ((leadRows ?? []) as Array<Pick<ShiftRow, 'date' | 'shift_type'>>).reduce(
+            (acc, row) => {
+              const key = slotKey(row.date, row.shift_type)
+              acc[key] = (acc[key] ?? 0) + 1
+              return acc
+            },
+            {} as Record<string, number>
+          )
+        }
+      }
+
+      const requestRows = (myRequestsResult.data ?? []) as ShiftPostRow[]
+      const interestRows = (myInterestRowsResult.data ?? []) as ShiftPostInterestRow[]
+      const requestRowIds = new Set(requestRows.map((row) => row.id))
+      const interestPostIds = Array.from(
+        new Set(interestRows.map((row) => row.shift_post_id).filter((id) => !requestRowIds.has(id)))
+      )
+
+      let interestPostRows: ShiftPostRow[] = []
+      if (interestPostIds.length > 0) {
+        const { data: interestPostData } = await supabase
+          .from('shift_posts')
+          .select(
+            'id, type, status, recipient_response, request_kind, created_at, shift_id, posted_by, claimed_by, visibility, message'
+          )
+          .in('id', interestPostIds)
+
+        interestPostRows = (interestPostData ?? []) as ShiftPostRow[]
+      }
+
+      const allRequestRows = [...requestRows, ...interestPostRows]
+      const shiftIds = Array.from(
+        new Set(
+          allRequestRows
+            .map((row) => row.shift_id)
+            .filter((value): value is string => Boolean(value))
+        )
+      )
+
+      let shiftById = new Map<string, ShiftRow>()
+      if (shiftIds.length > 0) {
+        const { data: shiftRows } = await supabase
+          .from('shifts')
+          .select('id, date, shift_type, role')
+          .in('id', shiftIds)
+
+        shiftById = new Map(((shiftRows ?? []) as ShiftRow[]).map((row) => [row.id, row]))
+      }
+
+      const requestedPartnerIds = Array.from(
+        new Set(
+          allRequestRows
+            .flatMap((row) => [row.claimed_by, row.posted_by])
+            .filter((value): value is string => Boolean(value))
+        )
+      )
+
+      let partnerById = new Map<string, string>()
+      if (requestedPartnerIds.length > 0) {
+        const { data: partnerRows } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', requestedPartnerIds)
+
+        partnerById = new Map(
+          ((partnerRows ?? []) as ProfileRow[]).map((row) => [
+            row.id,
+            row.full_name ?? 'Unknown therapist',
+          ])
+        )
+      }
+
+      const mappedOpenRequests = requestRows.map((row) => {
+        const shift = row.shift_id ? (shiftById.get(row.shift_id) ?? null) : null
+        const status = toUiStatus(row.status, row.created_at)
+
+        return {
+          id: row.id,
+          type: row.type,
+          visibility: row.visibility ?? 'team',
+          involvement:
+            row.posted_by === user.id
+              ? 'posted'
+              : row.visibility === 'direct'
+                ? 'received_direct'
+                : 'claimed',
+          sourcePostId: row.id,
+          recipientResponse: row.recipient_response ?? null,
+          requestKind: row.request_kind ?? 'standard',
+          shift: shift ? formatShiftLabel(shift.date, shift.shift_type) : 'Shift unavailable',
+          status,
+          createdAt: row.created_at,
+          swapWith: row.claimed_by ? (partnerById.get(row.claimed_by) ?? null) : null,
+          posted: formatRelativeTime(row.created_at),
+          message: row.message,
+        } satisfies OpenRequest
+      })
+      const postById = new Map(allRequestRows.map((row) => [row.id, row]))
+      const interestOnlyRequests = interestRows
+        .filter((interest) => !requestRowIds.has(interest.shift_post_id))
+        .map((interest) => {
+          const row = postById.get(interest.shift_post_id)
+          const shift = row?.shift_id ? (shiftById.get(row.shift_id) ?? null) : null
+
+          return {
+            id: interest.id,
+            type: row?.type ?? 'pickup',
+            visibility: row?.visibility ?? 'team',
+            involvement: 'interest',
+            sourcePostId: row?.id ?? null,
+            recipientResponse: row?.recipient_response ?? null,
+            requestKind: row?.request_kind ?? 'standard',
             shift: shift ? formatShiftLabel(shift.date, shift.shift_type) : 'Shift unavailable',
-            status,
-            createdAt: row.created_at,
-            swapWith: row.claimed_by ? (partnerById.get(row.claimed_by) ?? null) : null,
-            posted: formatRelativeTime(row.created_at),
-            message: row.message,
+            status: toInterestUiStatus(interest.status),
+            createdAt: interest.created_at,
+            swapWith: row?.posted_by ? (partnerById.get(row.posted_by) ?? null) : null,
+            posted: formatRelativeTime(interest.created_at),
+            message: row?.message ?? 'Pickup interest submitted.',
           } satisfies OpenRequest
         })
-        const postById = new Map(allRequestRows.map((row) => [row.id, row]))
-        const interestOnlyRequests = interestRows
-          .filter((interest) => !requestRowIds.has(interest.shift_post_id))
-          .map((interest) => {
-            const row = postById.get(interest.shift_post_id)
-            const shift = row?.shift_id ? (shiftById.get(row.shift_id) ?? null) : null
 
-            return {
-              id: interest.id,
-              type: row?.type ?? 'pickup',
-              visibility: row?.visibility ?? 'team',
-              involvement: 'interest',
-              sourcePostId: row?.id ?? null,
-              recipientResponse: row?.recipient_response ?? null,
-              requestKind: row?.request_kind ?? 'standard',
-              shift: shift ? formatShiftLabel(shift.date, shift.shift_type) : 'Shift unavailable',
-              status: toInterestUiStatus(interest.status),
-              createdAt: interest.created_at,
-              swapWith: row?.posted_by ? (partnerById.get(row.posted_by) ?? null) : null,
-              posted: formatRelativeTime(interest.created_at),
-              message: row?.message ?? 'Pickup interest submitted.',
-            } satisfies OpenRequest
-          })
+      if (!active) return
 
-        if (!active) return
+      setMyShifts(mappedMyShifts)
+      setLeadCountsBySlot(leadCounts)
+      setMyOpenRequests(
+        [...mappedOpenRequests, ...interestOnlyRequests].sort((left, right) => {
+          const createdAtComparison = right.createdAt.localeCompare(left.createdAt)
+          if (createdAtComparison !== 0) {
+            return createdAtComparison
+          }
 
-        setMyShifts(mappedMyShifts)
-        setLeadCountsBySlot(leadCounts)
-        setMyOpenRequests(
-          [...mappedOpenRequests, ...interestOnlyRequests].sort((left, right) => {
-            const createdAtComparison = right.createdAt.localeCompare(left.createdAt)
-            if (createdAtComparison !== 0) {
-              return createdAtComparison
-            }
-
-            return right.id.localeCompare(left.id)
-          })
-        )
-      } catch (loadError) {
-        console.error('Failed to load swap request form data:', loadError)
-        if (active) {
-          setError('Could not load your shifts and requests.')
-        }
-      } finally {
-        if (active) {
-          setLoading(false)
-        }
+          return right.id.localeCompare(left.id)
+        })
+      )
+    } catch (loadError) {
+      console.error('Failed to load swap request form data:', loadError)
+      if (active) {
+        setError('Could not load your shifts and requests.')
+      }
+    } finally {
+      if (active) {
+        setLoading(false)
       }
     }
 
-    void loadData()
+    return complete
+  }, [router, supabase])
+
+  useEffect(() => {
+    let teardown: (() => void) | undefined
+    void loadData().then((cleanup) => {
+      teardown = cleanup
+    })
 
     return () => {
-      active = false
+      teardown?.()
     }
-  }, [router, supabase])
+  }, [loadData])
 
   useEffect(() => {
     setSwapWith(null)
@@ -503,10 +526,19 @@ function SwapRequestPageContent() {
   }, [requestType])
 
   useEffect(() => {
+    if (requestVisibility === 'team') {
+      setSwapWith(null)
+      if (step === 2) {
+        setStep(3)
+      }
+    }
+  }, [requestVisibility, step])
+
+  useEffect(() => {
     let active = true
 
     async function loadTeamMembers() {
-      if (!selectedShiftData || !currentUserId) {
+      if (!selectedShiftData || !currentUserId || requestVisibility !== 'direct') {
         setTeamMembers([])
         return
       }
@@ -553,7 +585,13 @@ function SwapRequestPageContent() {
     return () => {
       active = false
     }
-  }, [currentUserId, selectedShiftData, selectedShiftRequiresLeadEligibleReplacement, supabase])
+  }, [
+    currentUserId,
+    requestVisibility,
+    selectedShiftData,
+    selectedShiftRequiresLeadEligibleReplacement,
+    supabase,
+  ])
 
   const eligibleMembers = useMemo(() => {
     const normalized = search.trim().toLowerCase()
@@ -584,27 +622,24 @@ function SwapRequestPageContent() {
     setSubmitting(true)
     setError(null)
 
-    const { error: insertError } = await supabase.from('shift_posts').insert({
-      type: requestType,
-      shift_id: selectedShift,
-      claimed_by:
-        requestVisibility === 'direct' ? swapWith : requestType === 'swap' ? swapWith : null,
-      visibility: requestVisibility,
-      recipient_response: requestVisibility === 'direct' ? 'pending' : null,
-      recipient_responded_at: null,
-      message: message.trim() || defaultMessage(requestType),
-      status: 'pending',
-      posted_by: currentUserId,
-    })
-
-    setSubmitting(false)
-
-    if (insertError) {
-      console.error('Failed to submit shift request:', insertError)
+    try {
+      await mutateShiftPost({
+        action: 'create_request',
+        shiftId: selectedShift,
+        requestType,
+        visibility: requestVisibility,
+        teammateId: swapWith,
+        message: message.trim() || defaultMessage(requestType),
+      })
+      await loadData()
+    } catch (submitError) {
+      console.error('Failed to submit shift request:', submitError)
       setError('Could not submit your request. Please try again.')
+      setSubmitting(false)
       return
     }
 
+    setSubmitting(false)
     router.push('/requests/new')
   }
 
@@ -633,7 +668,7 @@ function SwapRequestPageContent() {
         setError('Choose a shift before continuing.')
         return
       }
-      setStep(2)
+      setStep(requestVisibility === 'direct' ? 2 : 3)
       return
     }
     if (step === 2) {
@@ -655,7 +690,7 @@ function SwapRequestPageContent() {
       setStep(1)
       return
     }
-    setStep(2)
+    setStep(requestVisibility === 'direct' ? 2 : 1)
   }
 
   const pendingCount = myOpenRequests.filter((request) => request.status === 'pending').length
@@ -668,151 +703,45 @@ function SwapRequestPageContent() {
 
   const handleRecipientDecision = async (requestId: string, decision: 'accepted' | 'declined') => {
     setError(null)
-    const payload =
-      decision === 'accepted'
-        ? {
-            recipient_response: 'accepted',
-            recipient_responded_at: new Date().toISOString(),
-          }
-        : {
-            recipient_response: 'declined',
-            recipient_responded_at: new Date().toISOString(),
-            status: 'denied',
-          }
-
-    const { error: updateError } = await supabase
-      .from('shift_posts')
-      .update(payload)
-      .eq('id', requestId)
-    if (updateError) {
+    try {
+      await mutateShiftPost({
+        action: 'respond_direct_request',
+        requestId,
+        decision,
+      })
+      await loadData()
+    } catch (updateError) {
       console.error('Failed to update direct request response:', updateError)
       setError('Could not update that direct request. Please try again.')
-      return
     }
-
-    setMyOpenRequests((current) =>
-      current.map((request) =>
-        request.id === requestId
-          ? {
-              ...request,
-              recipientResponse: decision,
-              status: decision === 'declined' ? 'denied' : request.status,
-            }
-          : request
-      )
-    )
   }
 
-  const handleInterestWithdrawal = async (
-    interestId: string,
-    sourcePostId: string | null,
-    status: RequestStatus
-  ) => {
+  const handleInterestWithdrawal = async (interestId: string) => {
     setError(null)
-
-    const { error: updateError } = await supabase
-      .from('shift_post_interests')
-      .update({
-        status: 'withdrawn',
-        responded_at: new Date().toISOString(),
+    try {
+      await mutateShiftPost({
+        action: 'withdraw_interest',
+        interestId,
       })
-      .eq('id', interestId)
-
-    if (updateError) {
+      await loadData()
+    } catch (updateError) {
       console.error('Failed to withdraw pickup interest:', updateError)
       setError('Could not withdraw that interest. Please try again.')
-      return
     }
-
-    if (sourcePostId && status === 'selected') {
-      const { data: nextInterestRows, error: nextInterestError } = await supabase
-        .from('shift_post_interests')
-        .select('id')
-        .eq('shift_post_id', sourcePostId)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: true })
-        .order('id', { ascending: true })
-        .limit(1)
-
-      if (nextInterestError) {
-        console.error('Failed to load the next pickup backup during withdrawal:', nextInterestError)
-        setError('Interest was withdrawn, but the queue could not be refreshed. Please reload.')
-        return
-      }
-
-      const nextInterestId =
-        ((nextInterestRows ?? []) as Array<{ id: string | null }>)[0]?.id ?? null
-      if (nextInterestId) {
-        const { error: promoteError } = await supabase
-          .from('shift_post_interests')
-          .update({
-            status: 'selected',
-            responded_at: null,
-          })
-          .eq('id', nextInterestId)
-
-        if (promoteError) {
-          console.error('Failed to promote the next pickup backup during withdrawal:', promoteError)
-          setError('Interest was withdrawn, but the queue could not be refreshed. Please reload.')
-          return
-        }
-      }
-    }
-
-    setMyOpenRequests((current) =>
-      current.map((request) =>
-        request.id === interestId
-          ? {
-              ...request,
-              status: 'withdrawn',
-            }
-          : request
-      )
-    )
   }
 
-  const handleRequestWithdrawal = async (requestId: string, sourcePostId: string | null) => {
+  const handleRequestWithdrawal = async (requestId: string) => {
     setError(null)
-
-    const { error: updateError } = await supabase
-      .from('shift_posts')
-      .update({
-        status: 'withdrawn',
-        override_reason: 'Withdrawn by requester.',
+    try {
+      await mutateShiftPost({
+        action: 'withdraw_request',
+        requestId,
       })
-      .eq('id', requestId)
-
-    if (updateError) {
+      await loadData()
+    } catch (updateError) {
       console.error('Failed to withdraw shift request:', updateError)
       setError('Could not withdraw that request. Please try again.')
-      return
     }
-
-    if (sourcePostId) {
-      const { error: interestError } = await supabase
-        .from('shift_post_interests')
-        .update({
-          status: 'declined',
-          responded_at: new Date().toISOString(),
-        })
-        .eq('shift_post_id', sourcePostId)
-        .in('status', ['pending', 'selected'])
-
-      if (interestError) {
-        console.error('Failed to close pending interests for withdrawn request:', interestError)
-      }
-    }
-
-    setMyOpenRequests((current) =>
-      current.map((request) =>
-        request.id === requestId
-          ? {
-              ...request,
-              status: 'withdrawn',
-            }
-          : request
-      )
-    )
   }
 
   return (
@@ -1079,9 +1008,7 @@ function SwapRequestPageContent() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() =>
-                          void handleRequestWithdrawal(request.id, request.sourcePostId)
-                        }
+                        onClick={() => void handleRequestWithdrawal(request.id)}
                       >
                         Withdraw request
                       </Button>
@@ -1092,13 +1019,7 @@ function SwapRequestPageContent() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() =>
-                          void handleInterestWithdrawal(
-                            request.id,
-                            request.sourcePostId,
-                            request.status
-                          )
-                        }
+                        onClick={() => void handleInterestWithdrawal(request.id)}
                       >
                         {request.status === 'selected'
                           ? 'Withdraw primary claim'
@@ -1317,9 +1238,11 @@ function SwapRequestPageContent() {
                       ? `${selectedShiftData.date} — ${selectedShiftData.type}`
                       : 'Not selected'}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    With: {selectedMember ? selectedMember.name : 'No specific teammate'}
-                  </p>
+                  {requestVisibility === 'direct' ? (
+                    <p className="text-xs text-muted-foreground">
+                      With: {selectedMember ? selectedMember.name : 'No specific teammate'}
+                    </p>
+                  ) : null}
                   <p className="text-xs text-muted-foreground capitalize">
                     Visibility: {requestVisibility === 'direct' ? 'Direct request' : 'Team board'}
                   </p>

@@ -328,14 +328,14 @@ export default async function StaffSwapHistoryPage({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
-              My swap & pickup history
+              Shift Swaps & Pickups History
             </h1>
             <p className="mt-0.5 text-xs text-muted-foreground">
               Posts you created, direct requests, claims, and pickup interests, newest first.
             </p>
           </div>
           <Button asChild size="sm" variant="outline" className="text-xs">
-            <Link href="/shift-board">Back to open shifts</Link>
+            <Link href="/shift-board">Back to Shift Swaps & Pickups</Link>
           </Button>
         </div>
       </div>
@@ -350,7 +350,7 @@ export default async function StaffSwapHistoryPage({
             When you post, claim, or express pickup interest, it will show up here.
           </p>
           <Button asChild size="sm" variant="outline" className="mt-2 text-xs">
-            <Link href="/shift-board">Go to open shifts</Link>
+            <Link href="/shift-board">Go to Shift Swaps & Pickups</Link>
           </Button>
         </div>
       ) : (

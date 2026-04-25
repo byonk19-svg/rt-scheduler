@@ -325,7 +325,7 @@ export function resolveTherapistWorkflow(params: {
       },
       secondaryAction: {
         href: '/therapist/swaps',
-        label: 'Shift swaps & pickups',
+        label: 'Shift Swaps & Pickups',
       },
       scheduleAction,
       swapSummary: params.relevantShiftPostSummary,
