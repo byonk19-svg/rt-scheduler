@@ -6,6 +6,7 @@ import { useEffect, useState, type ComponentType } from 'react'
 type NotificationBellProps = {
   variant?: 'default' | 'staff' | 'shell'
   initialUnreadCount?: number
+  userRole?: 'manager' | 'therapist' | 'lead' | null
 }
 
 function NotificationBellFallback({

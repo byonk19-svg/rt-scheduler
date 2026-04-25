@@ -63,6 +63,28 @@ Updated: 2026-04-25 (session 87)
 ### Local In-Progress Work
 
 - `main` includes the merged email-intake apply gating fix from PR `#27`. The homepage has been redesigned to the dark teal "Teamwise Refined" style (PR `#42` on `claude/general-session-VWwFD`); the old luminous light-mode homepage and the `codex/therapist-homepage-redesign` branch can be deleted once `#42` merges.
+- `codex/therapist-workflow-accuracy` now carries the full therapist workflow accuracy pass:
+  - centralized therapist workflow state in `src/lib/therapist-workflow.ts`
+  - therapist-safe dashboard, schedule, swaps, and availability routing
+  - therapist `Preferences / Work Rules` page plus notification preference enforcement
+  - preliminary team-overview visibility, same-shift direct therapist edits, opposite-shift pending-interest labeling, and manager-change notifications
+  - published-schedule and reopened-preliminary cleanup that preserves `shift_posts` history by nulling `shift_id` before shift deletion
+  - deterministic pickup queue behavior using `shift_post_interests.status` (`selected` primary claimant + `pending` backups) with promotion on withdraw/claimant denial
+  - `My Requests` + history support for direct requests, pickup interests, call-in help, therapist withdrawal, and direct-request recipient response
+  - direct-request terminal notifications for recipient decline/withdraw and manager approval/denial
+  - trusted request/queue mutation route in `src/app/api/shift-posts/route.ts` so therapists and managers no longer mutate `shift_posts` / `shift_post_interests` directly from the browser
+  - RLS and lifecycle hardening in `supabase/migrations/20260426090000_harden_shift_post_request_mutations.sql`:
+    - direct `shift_posts` visible only to participants/managers
+    - therapist-created team posts cannot pre-assign `claimed_by`
+    - therapist interest updates are limited to withdrawing their own active interest
+    - pickup queue promotion/claimant denial/review now run through DB functions instead of client multi-write sequences
+  - reopened-schedule cleanup now consistently closes pending posts/interests through `src/lib/shift-post-cleanup.ts` and shared callers (`publish` unpublish + schedule drag-drop)
+  - stale request/access action files and the unused `shift-posts-table` surface have been removed, and the workflow label is now consistently `Shift Swaps & Pickups`
+- Verification for `codex/therapist-workflow-accuracy` is currently green:
+  - `npx tsc --noEmit`
+  - `npm run lint`
+  - targeted `npm run test:unit -- "src/app/api/shift-posts/route.test.ts" "src/app/(app)/publish/actions.test.ts" "src/lib/pickup-interest-selection.test.ts" "src/lib/pickup-interest-presentation.test.ts" "src/lib/shift-board-snapshot.test.ts" "src/app/api/schedule/assignment-status/route.test.ts" "src/app/api/schedule/drag-drop/route.test.ts" "src/app/(app)/shift-board/page.test.ts" "src/app/(app)/therapist/swaps/page.test.ts" "src/lib/therapist-workflow.test.ts" "src/components/AppShell.test.ts"` (`79` tests)
+  - `supabase db reset` is still pending because Docker Desktop is unavailable on this machine, so the new migration has not been executed locally yet
 - `main` now also carries the compact Coverage workspace pass: denser grid/roster surfaces, tighter shift editor, ranked modal candidates, and the roster-cell performance fix where empty `+` cells open the day editor immediately instead of firing an assignment mutation.
 - `main` now also carries the route-group performance refactor: public routes live under `src/app/(public)`, authenticated routes under `src/app/(app)`, `/dashboard/manager` is server-first again, `/coverage` hydrates from a server snapshot helper, and the top-nav notification panel fetches only when opened.
 - `main` now also carries the bundle-trim follow-up: the authenticated shell defers notification interactivity behind `DeferredNotificationBell`, `/coverage` lazy-loads closed dialogs/editor overlays, and `/team` code-splits the directory vs roster-admin tab surfaces so the inactive panel no longer ships in the initial route chunk.

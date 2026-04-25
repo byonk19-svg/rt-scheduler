@@ -20,6 +20,7 @@ type ApprovalsSearchParams = Record<string, string | string[] | undefined>
 type ProfileNameRow = {
   id: string
   full_name: string | null
+  shift_type?: 'day' | 'night' | null
 }
 
 type ActivePreliminarySnapshotRow = {
@@ -120,7 +121,7 @@ export default async function ApprovalsPage({
           .in('id', shiftIds)
       : Promise.resolve({ data: [] }),
     requesterIds.length
-      ? supabase.from('profiles').select('id, full_name').in('id', requesterIds)
+      ? supabase.from('profiles').select('id, full_name, shift_type').in('id', requesterIds)
       : Promise.resolve({ data: [] }),
   ])
 
@@ -152,13 +153,20 @@ export default async function ApprovalsPage({
       row.full_name ?? 'Unknown',
     ])
   )
+  const requesterShiftTypes = new Map(
+    ((requesterProfilesData ?? []) as ProfileNameRow[]).map((row) => [
+      row.id,
+      row.shift_type ?? null,
+    ])
+  )
 
   const queue = toManagerPreliminaryQueue(
     requests.map((request) => ({
       ...request,
       requester_name: requesterNames.get(request.requester_id) ?? 'Unknown',
     })),
-    shiftsById
+    shiftsById,
+    requesterShiftTypes
   )
   const { data: activePreliminaryData } = await supabase
     .from('preliminary_snapshots')
@@ -245,13 +253,21 @@ export default async function ApprovalsPage({
                     <p className="text-sm font-semibold text-foreground">{request.requesterName}</p>
                     <StatusBadge variant="warning" dot={false} className="text-[10px]">
                       {request.requestType === 'claim_open_shift'
-                        ? 'Claim open shift'
+                        ? request.isOppositeShiftRequest
+                          ? 'Opposite-shift interest'
+                          : 'Claim open shift'
                         : 'Request change'}
                     </StatusBadge>
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {formatShiftLabel(request.shiftDate, request.shiftType)}
                   </p>
+                  {request.isOppositeShiftRequest ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      This therapist is on the opposite shift and needs manager approval before the
+                      preliminary assignment becomes active.
+                    </p>
+                  ) : null}
                   {request.note && (
                     <p className="mt-2 rounded-lg bg-muted/70 px-3 py-2 text-sm text-foreground">
                       {request.note}

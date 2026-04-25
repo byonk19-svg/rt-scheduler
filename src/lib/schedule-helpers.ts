@@ -68,6 +68,42 @@ export function coverageSlotKey(date: string, shiftType: 'day' | 'night'): strin
   return `${date}:${shiftType}`
 }
 
+function previousIsoDate(value: string): string {
+  const parsed = new Date(`${value}T12:00:00`)
+  parsed.setDate(parsed.getDate() - 1)
+  return toIsoDate(parsed)
+}
+
+function nextIsoDate(value: string): string {
+  const parsed = new Date(`${value}T12:00:00`)
+  parsed.setDate(parsed.getDate() + 1)
+  return toIsoDate(parsed)
+}
+
+export function wouldExceedMaxConsecutiveDays(
+  workedDates: Set<string>,
+  targetDate: string,
+  maxConsecutiveDays: number
+): boolean {
+  if (maxConsecutiveDays < 1) return true
+  if (workedDates.has(targetDate)) return false
+
+  let streak = 1
+  let cursor = previousIsoDate(targetDate)
+  while (workedDates.has(cursor)) {
+    streak += 1
+    cursor = previousIsoDate(cursor)
+  }
+
+  cursor = nextIsoDate(targetDate)
+  while (workedDates.has(cursor)) {
+    streak += 1
+    cursor = nextIsoDate(cursor)
+  }
+
+  return streak > maxConsecutiveDays
+}
+
 export function getPrintShiftCode(status: string): string {
   if (status === 'on_call') return 'OC'
   if (status === 'sick') return 'S'
@@ -385,7 +421,8 @@ export function pickTherapistForDate(
   assignedUserIdsForDate: Set<string>,
   weeklyWorkedDatesByUserWeek: Map<string, Set<string>>,
   weeklyLimitByTherapist: Map<string, number>,
-  weeklyMinimumByTherapist: Map<string, number> = new Map()
+  weeklyMinimumByTherapist: Map<string, number> = new Map(),
+  workedDatesByUser: Map<string, Set<string>> = new Map()
 ): { therapist: Therapist | null; nextCursor: number } {
   if (therapists.length === 0) {
     return { therapist: null, nextCursor: cursor }
@@ -446,6 +483,10 @@ export function pickTherapistForDate(
       getDefaultWeeklyLimitForEmploymentType(therapist.employment_type)
     )
     if (!weeklyDates.has(date) && weeklyDates.size >= weeklyLimit) continue
+    const allWorkedDates = workedDatesByUser.get(therapist.id) ?? new Set<string>()
+    const maxConsecutiveDays =
+      typeof therapist.max_consecutive_days === 'number' ? therapist.max_consecutive_days : 3
+    if (wouldExceedMaxConsecutiveDays(allWorkedDates, date, maxConsecutiveDays)) continue
 
     const weeklyCount = weeklyDates.size
     const weeklyGap = Math.max(0, weeklyLimit - weeklyCount)

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
@@ -6,6 +9,14 @@ import { ManagerSchedulingInputs } from '@/components/availability/ManagerSchedu
 
 describe('ManagerSchedulingInputs', () => {
   it('renders the manager workspace with planner controls, calendar, and roster content', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/components/availability/ManagerSchedulingInputs.tsx'),
+      'utf8'
+    )
+    const plannerRailSource = readFileSync(
+      resolve(process.cwd(), 'src/components/availability/planner-control-rail.tsx'),
+      'utf8'
+    )
     const html = renderToStaticMarkup(
       createElement(ManagerSchedulingInputs, {
         cycles: [
@@ -85,10 +96,23 @@ describe('ManagerSchedulingInputs', () => {
     )
 
     expect(html).toContain('data-slot="availability-workspace-primary"')
-    expect(html).toContain('Plan staffing')
     expect(html).toContain('Planning workspace')
+    expect(html).toContain('Plan staffing')
     expect(html).toContain('data-slot="availability-workspace-context"')
     expect(html).toContain('data-slot="availability-workspace-secondary"')
+    expect(source).toContain('PlannerControlRail')
+    expect(source).toContain('AvailabilityCalendarPanel')
+    expect(source).toContain('TherapistContextPanel')
+    expect(source).toContain('AvailabilitySecondaryPanel')
+    expect(plannerRailSource).toContain('Schedule cycle')
+    expect(plannerRailSource).toContain('Therapist')
+    expect(plannerRailSource).toContain('Will work')
+    expect(plannerRailSource).toContain('Cannot work')
+    expect(plannerRailSource).toContain('Copy from last block')
+    expect(plannerRailSource).toContain('Selected dates')
+    expect(plannerRailSource).toContain(
+      "return `Save ${count} will-work date${count === 1 ? '' : 's'}`"
+    )
   })
 
   it('renders a setup message when no cycles exist', () => {
@@ -111,42 +135,13 @@ describe('ManagerSchedulingInputs', () => {
     expect(html).toContain('Create a schedule cycle before planning hard staffing dates.')
   })
 
-  it('renders workspace structure when a cycle and therapist are selected but no overrides', () => {
-    const html = renderToStaticMarkup(
-      createElement(ManagerSchedulingInputs, {
-        cycles: [
-          {
-            id: 'cycle-1',
-            label: 'Apr 2026',
-            start_date: '2026-03-22',
-            end_date: '2026-05-02',
-            published: false,
-          },
-        ],
-        therapists: [
-          {
-            id: 'therapist-1',
-            full_name: 'Barbara C.',
-            shift_type: 'day',
-            employment_type: 'full_time',
-          },
-        ],
-        overrides: [],
-        availabilityEntries: [],
-        initialCycleId: 'cycle-1',
-        initialTherapistId: 'therapist-1',
-        submittedRows: [],
-        missingRows: [],
-        saveManagerPlannerDatesAction: async () => {},
-        deleteManagerPlannerDateAction: async () => {},
-        copyAvailabilityFromPreviousCycleAction: async () => {},
-      })
+  it('uses a clearer disabled save label when no planner dates are selected', () => {
+    const plannerRailSource = readFileSync(
+      resolve(process.cwd(), 'src/components/availability/planner-control-rail.tsx'),
+      'utf8'
     )
 
-    expect(html).toContain('data-slot="availability-workspace-primary"')
-    expect(html).toContain(
-      'Plan staffing for the selected therapist inside the current schedule cycle.'
-    )
-    expect(html).not.toContain('Save 0 will-work dates')
+    expect(plannerRailSource).toContain("if (count === 0) return 'Select dates to save'")
+    expect(plannerRailSource).not.toContain('Save 0 will-work dates')
   })
 })

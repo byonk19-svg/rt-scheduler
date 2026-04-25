@@ -34,7 +34,9 @@ export function PreliminaryRequestHistory({ items, cancelAction }: PreliminaryRe
                 <div>
                   <p className="text-sm font-medium text-foreground">
                     {item.requestType === 'claim_open_shift'
-                      ? 'Claimed open shift'
+                      ? item.isOppositeShiftRequest
+                        ? 'Expressed opposite-shift interest'
+                        : 'Claimed open shift'
                       : 'Requested change'}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">{formatHistoryLabel(item)}</p>

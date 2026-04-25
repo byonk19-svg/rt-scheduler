@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { notifyPublishedShiftStatusChangedMock } = vi.hoisted(() => ({
-  notifyPublishedShiftStatusChangedMock: vi.fn(async () => undefined),
-}))
+const { notifyPublishedShiftStatusChangedMock, notifyUsersMock, createAdminClientMock } =
+  vi.hoisted(() => ({
+    notifyPublishedShiftStatusChangedMock: vi.fn(async () => undefined),
+    notifyUsersMock: vi.fn(async () => undefined),
+    createAdminClientMock: vi.fn(),
+  }))
 
 import { POST } from '@/app/api/schedule/assignment-status/route'
 import { createClient } from '@/lib/supabase/server'
@@ -12,11 +15,15 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 vi.mock('@/lib/supabase/admin', () => ({
-  createAdminClient: vi.fn(() => ({})),
+  createAdminClient: createAdminClientMock,
 }))
 
 vi.mock('@/lib/published-schedule-notifications', () => ({
   notifyPublishedShiftStatusChanged: notifyPublishedShiftStatusChangedMock,
+}))
+
+vi.mock('@/lib/notifications', () => ({
+  notifyUsers: notifyUsersMock,
 }))
 
 type Scenario = {
@@ -24,6 +31,9 @@ type Scenario = {
   role?: string
   isActive?: boolean | null
   archivedAt?: string | null
+  profilesData?: Array<{ id: string; shift_type: 'day' | 'night' | null }>
+  scheduledRows?: Array<{ user_id: string | null }>
+  existingCallInPostId?: string | null
   shiftLookup?: {
     date: string
     shift_type: 'day' | 'night'
@@ -59,29 +69,40 @@ function makeSupabaseMock(scenario: Scenario) {
   }
 
   const from = (table: string) => {
-    const state: { id?: string } = {}
+    const state: {
+      id?: string
+      filters: Record<string, unknown>
+      inFilters: Record<string, unknown[]>
+    } = { filters: {}, inFilters: {} }
 
     const builder = {
       select: () => builder,
       eq: (column: string, value: unknown) => {
+        state.filters[column] = value
         if (column === 'id' && typeof value === 'string') {
           state.id = value
         }
         return builder
       },
+      in: (column: string, value: unknown[]) => {
+        state.inFilters[column] = value
+        return builder
+      },
       maybeSingle: async () => {
         if (table === 'profiles') {
-          if (!state.id || scenario.userId === null) {
-            return { data: null, error: null }
+          if (state.id && scenario.userId !== null) {
+            return {
+              data: {
+                role: scenario.role ?? 'therapist',
+                is_active: scenario.isActive ?? true,
+                archived_at: scenario.archivedAt ?? null,
+              },
+              error: null,
+            }
           }
 
-          return {
-            data: {
-              role: scenario.role ?? 'therapist',
-              is_active: scenario.isActive ?? true,
-              archived_at: scenario.archivedAt ?? null,
-            },
-            error: null,
+          if (scenario.userId === null) {
+            return { data: null, error: null }
           }
         }
 
@@ -104,6 +125,29 @@ function makeSupabaseMock(scenario: Scenario) {
 
         return { data: null, error: null }
       },
+      then: (resolve: (value: unknown) => unknown) => {
+        if (table === 'profiles') {
+          return Promise.resolve(
+            resolve({
+              data: scenario.profilesData ?? [],
+              error: null,
+            })
+          )
+        }
+
+        if (table === 'shifts') {
+          if ('date' in state.filters && 'shift_type' in state.filters && !state.id) {
+            return Promise.resolve(
+              resolve({
+                data: scenario.scheduledRows ?? [],
+                error: null,
+              })
+            )
+          }
+        }
+
+        return Promise.resolve(resolve({ data: [], error: null }))
+      },
     }
 
     return builder
@@ -116,9 +160,67 @@ function makeSupabaseMock(scenario: Scenario) {
   }
 }
 
+function makeAdminClientMock(scenario: Scenario) {
+  const updateCalls: Array<{ payload: Record<string, unknown>; id: string | null }> = []
+  const insertCalls: Array<Record<string, unknown>> = []
+
+  const from = (table: string) => {
+    if (table !== 'shift_posts') {
+      throw new Error(`Unexpected admin table ${table}`)
+    }
+
+    const state: { id: string | null } = { id: null }
+    let pendingPayload: Record<string, unknown> | null = null
+
+    const builder = {
+      select: () => builder,
+      eq: (column: string, value: unknown) => {
+        if (column === 'id' && typeof value === 'string') {
+          state.id = value
+        }
+        return builder
+      },
+      maybeSingle: async () => ({
+        data: scenario.existingCallInPostId ? { id: scenario.existingCallInPostId } : null,
+        error: null,
+      }),
+      update: (payload: Record<string, unknown>) => {
+        pendingPayload = payload
+        return builder
+      },
+      insert: (payload: Record<string, unknown>) => {
+        insertCalls.push(payload)
+        return {
+          select: () => ({
+            single: async () => ({
+              data: { id: 'call-in-post-1' },
+              error: null,
+            }),
+          }),
+        }
+      },
+      then: (resolve: (value: unknown) => unknown) => {
+        if (pendingPayload) {
+          updateCalls.push({ payload: pendingPayload, id: state.id })
+        }
+        return Promise.resolve(resolve({ data: null, error: null }))
+      },
+    }
+
+    return builder
+  }
+
+  return {
+    client: { from },
+    updateCalls,
+    insertCalls,
+  }
+}
+
 describe('assignment status API', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    createAdminClientMock.mockReturnValue(makeAdminClientMock({}).client)
   })
 
   it('rejects cross-origin mutation requests', async () => {
@@ -265,6 +367,115 @@ describe('assignment status API', () => {
         shiftType: 'day',
         nextStatus: 'cancelled',
         targetId: 'shift-1',
+      })
+    )
+  })
+
+  it('creates a call-in help alert and notifies eligible therapists with a shift-post target', async () => {
+    const supabase = makeSupabaseMock({
+      role: 'lead',
+      userId: 'lead-1',
+      shiftLookup: {
+        date: '2026-02-23',
+        shift_type: 'night',
+        user_id: 'therapist-1',
+        published: true,
+      },
+      profilesData: [
+        { id: 'therapist-1', shift_type: 'night' },
+        { id: 'therapist-2', shift_type: 'night' },
+        { id: 'lead-2', shift_type: 'night' },
+      ],
+      scheduledRows: [{ user_id: 'lead-2' }],
+    })
+    const admin = makeAdminClientMock({})
+    createAdminClientMock.mockReturnValue(admin.client)
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/assignment-status', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          assignmentId: 'shift-1',
+          status: 'call_in',
+        }),
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(admin.insertCalls).toHaveLength(1)
+    expect(admin.insertCalls[0]).toMatchObject({
+      shift_id: 'shift-1',
+      request_kind: 'call_in',
+      type: 'pickup',
+      visibility: 'team',
+      status: 'pending',
+    })
+    expect(notifyUsersMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userIds: ['therapist-2'],
+        eventType: 'call_in_help_available',
+        targetType: 'shift_post',
+        targetId: 'call-in-post-1',
+      })
+    )
+  })
+
+  it('expires an open call-in alert when the published assignment status changes away from call_in', async () => {
+    const supabase = makeSupabaseMock({
+      role: 'manager',
+      userId: 'manager-1',
+      shiftLookup: {
+        date: '2026-02-23',
+        shift_type: 'day',
+        user_id: 'therapist-1',
+        published: true,
+      },
+      existingCallInPostId: 'call-in-post-9',
+      rpcData: [
+        {
+          id: 'shift-1',
+          assignment_status: 'scheduled',
+          status_note: null,
+          left_early_time: null,
+          status_updated_at: '2026-02-23T18:00:00.000Z',
+          status_updated_by: 'manager-1',
+          status_updated_by_name: 'Manager User',
+        },
+      ],
+    })
+    const admin = makeAdminClientMock({ existingCallInPostId: 'call-in-post-9' })
+    createAdminClientMock.mockReturnValue(admin.client)
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/assignment-status', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          assignmentId: 'shift-1',
+          status: 'scheduled',
+        }),
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(admin.updateCalls).toContainEqual({
+      id: 'call-in-post-9',
+      payload: expect.objectContaining({
+        status: 'expired',
+      }),
+    })
+    expect(notifyUsersMock).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        eventType: 'call_in_help_available',
       })
     )
   })

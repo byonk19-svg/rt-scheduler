@@ -21,10 +21,11 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { loadShiftBoardSnapshot } from '@/lib/shift-board-snapshot'
 import { groupPickupsBySlot } from '@/app/(app)/shift-board/prn-interest-helpers'
+import { partitionPickupInterestQueue } from '@/lib/pickup-interest-presentation'
 
 type Role = UiRole
 type RequestType = 'swap' | 'pickup'
-type RequestStatus = 'pending' | 'approved' | 'denied' | 'expired'
+type RequestStatus = 'pending' | 'approved' | 'denied' | 'expired' | 'withdrawn'
 type ShiftType = 'day' | 'night'
 type ShiftRole = 'lead' | 'staff'
 
@@ -39,6 +40,9 @@ type ProfileLookupRow = {
 type ShiftBoardRequest = {
   id: string
   type: RequestType
+  visibility: 'team' | 'direct'
+  recipientResponse: 'pending' | 'accepted' | 'declined' | null
+  requestKind: 'standard' | 'call_in'
   poster: string
   postedById: string | null
   avatar: string
@@ -52,6 +56,17 @@ type ShiftBoardRequest = {
   swapWithName: string | null
   swapWithId: string | null
   claimedById: string | null
+  pendingInterestCount: number
+  hasMyInterest: boolean
+  myInterestId: string | null
+  myInterestStatus: 'pending' | 'selected' | null
+  interestCandidates: Array<{
+    id: string
+    therapistId: string
+    therapistName: string
+    createdAt: string
+    status: 'pending' | 'selected'
+  }>
   shiftType: ShiftType | null
   shiftRole: ShiftRole | null
   overrideReason: string | null
@@ -95,6 +110,12 @@ const STATUS_META: Record<
     bg: 'var(--error-subtle)',
     border: 'var(--error-border)',
   },
+  withdrawn: {
+    label: 'Withdrawn',
+    color: 'var(--muted-foreground)',
+    bg: 'var(--muted)',
+    border: 'var(--border)',
+  },
   expired: {
     label: 'Expired',
     color: 'var(--muted-foreground)',
@@ -119,7 +140,51 @@ const TYPE_META: Record<RequestType, { label: string; color: string; bg: string;
     },
   }
 
-const HISTORY_STATUSES: RequestStatus[] = ['approved', 'denied', 'expired']
+const HISTORY_STATUSES: RequestStatus[] = ['approved', 'denied', 'expired', 'withdrawn']
+
+function formatPickupQueueTimestamp(value: string): string {
+  return new Date(value).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+async function mutateShiftPost(body: Record<string, unknown>) {
+  const response = await fetch('/api/shift-posts', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+
+  const payload = (await response.json().catch(() => null)) as { error?: string } | null
+  if (!response.ok) {
+    throw new Error(payload?.error ?? 'Could not update that request.')
+  }
+
+  return payload
+}
+
+function toReviewErrorMessage(message: string): string {
+  return message.includes('Team-visible swap approvals require a swap partner')
+    ? 'Cannot approve: this swap request has no partner assigned. Select a swap partner first.'
+    : message.includes('shifts_unique_cycle_user_date')
+      ? 'Cannot approve: the selected swap partner is already scheduled on this date.'
+      : message.includes('partner shift type mismatch')
+        ? 'Cannot approve: swap partners must be scheduled on the same shift type.'
+        : message.includes('operational code')
+          ? 'Cannot approve: shifts with active operational codes are locked from swaps.'
+          : message.includes('working scheduled shift')
+            ? 'Cannot approve: both swap partners must have working scheduled shifts.'
+            : message.includes('Lead coverage gap')
+              ? 'override:Lead coverage gap - approving this request would leave a shift without a lead. You can force-approve below.'
+              : message.includes('Double booking')
+                ? 'Cannot approve: double booking. This therapist is already assigned to this shift.'
+                : `Could not save: ${message}`
+}
 
 export default function ShiftBoardClientPage({
   initialSnapshot,
@@ -152,6 +217,9 @@ export default function ShiftBoardClientPage({
     initialSnapshot.employmentType
   )
   const [swapPartners, setSwapPartners] = useState<Record<string, string>>({})
+  const [selectedPickupInterestIds, setSelectedPickupInterestIds] = useState<
+    Record<string, string>
+  >({})
   const [overrideReasons, setOverrideReasons] = useState<Record<string, string>>({})
   const [scheduledByDate, setScheduledByDate] = useState<Map<string, Map<string, ShiftType>>>(
     () =>
@@ -227,7 +295,9 @@ export default function ShiftBoardClientPage({
       isStaffRole && scope === 'mine' && currentUserId
         ? requests.filter(
             (request) =>
-              request.postedById === currentUserId || request.claimedById === currentUserId
+              request.postedById === currentUserId ||
+              request.claimedById === currentUserId ||
+              request.hasMyInterest
           )
         : requests
 
@@ -236,7 +306,11 @@ export default function ShiftBoardClientPage({
         return false
       }
 
-      if (activeTab === 'open' && request.status === 'expired' && statusFilter !== 'all') {
+      if (
+        activeTab === 'open' &&
+        (request.status === 'expired' || request.status === 'withdrawn') &&
+        statusFilter !== 'all'
+      ) {
         return false
       }
 
@@ -259,123 +333,130 @@ export default function ShiftBoardClientPage({
     })
   }, [activeTab, currentUserId, isStaffRole, requests, scope, search, statusFilter, typeFilter])
 
+  const handlePickupInterest = useCallback(
+    async (request: ShiftBoardRequest) => {
+      if (!currentUserId || request.type !== 'pickup' || request.visibility !== 'team') return
+
+      setSavingState((current) => ({ ...current, [request.id]: true }))
+      setError(null)
+
+      try {
+        if (request.hasMyInterest && request.myInterestId) {
+          await mutateShiftPost({
+            action: 'withdraw_interest',
+            interestId: request.myInterestId,
+          })
+        } else {
+          await mutateShiftPost({
+            action: 'express_interest',
+            requestId: request.id,
+          })
+        }
+
+        await loadBoard(activeTab)
+      } catch (mutationError) {
+        console.error('Failed to update pickup interest:', mutationError)
+        setError('Could not update pickup interest. Please try again.')
+      } finally {
+        setSavingState((current) => ({ ...current, [request.id]: false }))
+      }
+    },
+    [activeTab, currentUserId, loadBoard]
+  )
+
   const handleAction = useCallback(
     async (id: string, action: 'approve' | 'deny', opts?: { override?: boolean }) => {
       if (!canReview) return
-
-      const previousRequest = requests.find((request) => request.id === id) ?? null
 
       setRequestErrors((prev) => {
         const next = { ...prev }
         delete next[id]
         return next
       })
-
-      // If override requested, persist manager_override + reason before status update
-      if (opts?.override) {
-        setSavingState((current) => ({ ...current, [id]: true }))
-        const { error: overrideError } = await supabase
-          .from('shift_posts')
-          .update({
-            manager_override: true,
-            override_reason: overrideReasons[id]?.trim() || 'Manager override',
-          })
-          .eq('id', id)
-        if (overrideError) {
-          console.error('Failed to set manager override:', overrideError.message)
-          setRequestErrors((prev) => ({
-            ...prev,
-            [id]: 'Could not set override. Please try again.',
-          }))
-          setSavingState((current) => ({ ...current, [id]: false }))
-          return
-        }
+      const request = requests.find((row) => row.id === id)
+      if (
+        action === 'approve' &&
+        request?.type === 'swap' &&
+        request.visibility === 'team' &&
+        !swapPartners[id]
+      ) {
+        setRequestErrors((prev) => ({
+          ...prev,
+          [id]: 'Please select a swap partner before approving.',
+        }))
+        return
       }
-
-      // For swap approvals with no partner yet, assign claimed_by first
-      if (action === 'approve') {
-        const req = requests.find((r) => r.id === id)
-        if (req?.type === 'swap' && !req.swapWithId) {
-          const partnerId = swapPartners[id]
-          if (!partnerId) {
-            setRequestErrors((prev) => ({
-              ...prev,
-              [id]: 'Please select a swap partner before approving.',
-            }))
-            return
-          }
-          setSavingState((current) => ({ ...current, [id]: true }))
-          const { error: partnerError } = await supabase
-            .from('shift_posts')
-            .update({ claimed_by: partnerId })
-            .eq('id', id)
-          if (partnerError) {
-            console.error('Failed to assign swap partner:', partnerError.message)
-            setRequestErrors((prev) => ({
-              ...prev,
-              [id]: 'Could not assign swap partner. Please try again.',
-            }))
-            setSavingState((current) => ({ ...current, [id]: false }))
-            return
-          }
-          // Reflect the partner locally so the card updates immediately
-          const partnerName = therapists.find((t) => t.id === partnerId)?.full_name ?? 'Unknown'
-          setRequests((current) =>
-            current.map((r) =>
-              r.id === id ? { ...r, swapWithId: partnerId, swapWithName: partnerName } : r
-            )
-          )
-        }
-      }
-
-      const nextStatus: RequestStatus = action === 'approve' ? 'approved' : 'denied'
-      const previousRequests = requests
-
-      setRequests((current) =>
-        current.map((request) => {
-          if (request.id !== id) return request
-          return { ...request, status: nextStatus }
-        })
-      )
 
       setSavingState((current) => ({ ...current, [id]: true }))
       setError(null)
 
-      const { error: updateError } = await supabase
-        .from('shift_posts')
-        .update({ status: nextStatus })
-        .eq('id', id)
-
-      if (updateError) {
-        console.error('Failed to save action:', updateError.message)
-        setRequests(previousRequests)
-        setError('Could not save request update. Changes were rolled back.')
-        const msg = updateError.message.includes('no swap partner assigned')
-          ? 'Cannot approve: this swap request has no partner assigned. Select a swap partner first.'
-          : updateError.message.includes('shifts_unique_cycle_user_date')
-            ? 'Cannot approve: the selected swap partner is already scheduled on this date.'
-            : updateError.message.includes('partner shift type mismatch')
-              ? 'Cannot approve: swap partners must be scheduled on the same shift type.'
-              : updateError.message.includes('operational code')
-                ? 'Cannot approve: shifts with active operational codes are locked from swaps.'
-                : updateError.message.includes('is not working')
-                  ? 'Cannot approve: both swap partners must have working scheduled shifts.'
-                  : updateError.message.includes('Lead coverage gap')
-                    ? 'override:Lead coverage gap - approving this request would leave a shift without a lead. You can force-approve below.'
-                    : updateError.message.includes('Double booking')
-                      ? 'Cannot approve: double booking. This therapist is already assigned to this shift.'
-                      : `Could not save: ${updateError.message}`
-        setRequestErrors((prev) => ({ ...prev, [id]: msg }))
+      try {
+        await mutateShiftPost({
+          action: 'review_request',
+          requestId: id,
+          decision: action,
+          selectedInterestId: selectedPickupInterestIds[id] ?? null,
+          swapPartnerId: swapPartners[id] ?? null,
+          override: opts?.override === true,
+          overrideReason: overrideReasons[id] ?? null,
+        })
+        await loadBoard(activeTab)
+      } catch (updateError) {
+        const message =
+          updateError instanceof Error ? updateError.message : 'Could not save action.'
+        console.error('Failed to save action:', message)
+        setRequestErrors((prev) => ({ ...prev, [id]: toReviewErrorMessage(message) }))
+      } finally {
         setSavingState((current) => ({ ...current, [id]: false }))
-        return
       }
-
-      if (previousRequest?.status === 'pending') {
-        setPendingCount((current) => Math.max(current - 1, 0))
-      }
-      setSavingState((current) => ({ ...current, [id]: false }))
     },
-    [canReview, overrideReasons, requests, supabase, swapPartners, therapists]
+    [
+      activeTab,
+      canReview,
+      loadBoard,
+      overrideReasons,
+      requests,
+      selectedPickupInterestIds,
+      swapPartners,
+    ]
+  )
+
+  const handlePickupClaimantDenial = useCallback(
+    async (requestId: string, interestId: string) => {
+      if (!canReview) return
+
+      const request = requests.find((row) => row.id === requestId)
+      if (!request || request.type !== 'pickup') return
+
+      setRequestErrors((prev) => {
+        const next = { ...prev }
+        delete next[requestId]
+        return next
+      })
+      setSavingState((current) => ({ ...current, [requestId]: true }))
+      setError(null)
+      try {
+        await mutateShiftPost({
+          action: 'deny_claimant',
+          requestId,
+          interestId,
+        })
+        await loadBoard(activeTab)
+      } catch (denyError) {
+        const message =
+          denyError instanceof Error
+            ? denyError.message
+            : 'Could not deny that claimant. Please try again.'
+        console.error('Failed to deny pickup claimant:', message)
+        setRequestErrors((prev) => ({
+          ...prev,
+          [requestId]: message,
+        }))
+      } finally {
+        setSavingState((current) => ({ ...current, [requestId]: false }))
+      }
+    },
+    [activeTab, canReview, loadBoard, requests]
   )
 
   const handleViewShift = useCallback(
@@ -389,11 +470,11 @@ export default function ShiftBoardClientPage({
         return
       }
 
-      const params = new URLSearchParams({ view: 'week' })
       if (shiftDate) {
-        params.set('date', shiftDate)
+        router.push(`/therapist/schedule?date=${shiftDate}`)
+        return
       }
-      router.push(`/schedule?${params.toString()}`)
+      router.push('/therapist/schedule')
     },
     [canReview, router]
   )
@@ -404,12 +485,12 @@ export default function ShiftBoardClientPage({
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
-              Open shifts
+              Shift Swaps &amp; Pickups
             </h1>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {canReview
                 ? 'Review and approve swap and pickup requests in the live schedule.'
-                : 'Post swaps or pickups for the published schedule only.'}
+                : 'Post swaps or pickups for the published schedule only. Team board and direct requests both live here.'}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
               <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5 text-muted-foreground">
@@ -429,17 +510,17 @@ export default function ShiftBoardClientPage({
             <Button
               size="sm"
               className="gap-1.5 text-xs"
-              onClick={() => router.push('/requests/new')}
+              onClick={() => router.push('/requests/new?new=1')}
             >
               <ArrowRightLeft className="h-3.5 w-3.5" />
               {!canReview && employmentType === 'prn' ? 'Express interest' : 'Post request'}
             </Button>
             <Button asChild size="sm" variant="outline" className="text-xs">
-              <Link href="/availability">Future availability</Link>
+              <Link href="/therapist/availability">Future Availability</Link>
             </Button>
             {!canReview && (
               <Button asChild size="sm" variant="outline" className="text-xs">
-                <Link href="/staff/history">View my history</Link>
+                <Link href="/staff/history">View history</Link>
               </Button>
             )}
             {canReview && (
@@ -611,7 +692,7 @@ export default function ShiftBoardClientPage({
         {canReview && multiCandidateSlots.length > 0 && (
           <section className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              PRN Interest - Multiple Candidates
+              Multiple pending candidates
             </p>
             {multiCandidateSlots.map((group) => (
               <div key={group.shiftId} className="rounded-xl border border-border bg-card p-4">
@@ -621,38 +702,121 @@ export default function ShiftBoardClientPage({
                     {group.candidates.length} interested
                   </span>
                 </p>
-                <div className="space-y-2">
-                  {group.candidates.map((candidate, index) => (
-                    <div
-                      key={candidate.id}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                          #{index + 1}
-                        </span>
-                        <span className="text-sm font-medium text-foreground">
-                          {candidate.poster}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(candidate.postedAt).toLocaleString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: 'numeric',
-                            minute: '2-digit',
-                          })}
-                        </span>
+                <div className="space-y-3">
+                  {group.primaryCandidate ? (
+                    <div className="rounded-lg border border-[var(--success-border)] bg-[var(--success-subtle)]/40 px-3 py-3">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--success-text)]">
+                        Current primary pending claimant
+                      </p>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-[var(--success-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--success-text)]">
+                            Primary
+                          </span>
+                          <span className="text-sm font-medium text-foreground">
+                            {group.primaryCandidate.poster}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatPickupQueueTimestamp(group.primaryCandidate.postedAt)}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={savingState[group.requestId]}
+                            onClick={() =>
+                              void handlePickupClaimantDenial(
+                                group.requestId,
+                                group.primaryCandidate!.id
+                              )
+                            }
+                            className="rounded-lg border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--error-text)] disabled:opacity-50"
+                          >
+                            Deny claimant
+                          </button>
+                          <button
+                            type="button"
+                            disabled={savingState[group.requestId]}
+                            onClick={() => void handleAction(group.requestId, 'approve')}
+                            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                          >
+                            {savingState[group.requestId] ? 'Selecting...' : 'Approve'}
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        disabled={savingState[candidate.id]}
-                        onClick={() => void handleAction(candidate.id, 'approve')}
-                        className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                      >
-                        {savingState[candidate.id] ? 'Selecting...' : 'Select'}
-                      </button>
                     </div>
-                  ))}
+                  ) : null}
+
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {group.primaryCandidate
+                        ? 'Backups / interested therapists'
+                        : 'Interested therapists'}
+                    </p>
+                    {(group.primaryCandidate ? group.backupCandidates : group.candidates).map(
+                      (candidate, index) => (
+                        <div
+                          key={candidate.id}
+                          className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                              #{index + 1}
+                            </span>
+                            <span className="text-sm font-medium text-foreground">
+                              {candidate.poster}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {formatPickupQueueTimestamp(candidate.postedAt)}
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedPickupInterestIds((current) => ({
+                                  ...current,
+                                  [group.requestId]: candidate.id,
+                                }))
+                              }
+                              className={cn(
+                                'rounded-lg border px-3 py-1.5 text-xs font-semibold',
+                                selectedPickupInterestIds[group.requestId] === candidate.id
+                                  ? 'border-primary bg-primary/10 text-primary'
+                                  : 'border-border bg-card text-muted-foreground hover:bg-secondary'
+                              )}
+                            >
+                              Select
+                            </button>
+                            <button
+                              type="button"
+                              disabled={savingState[group.requestId]}
+                              onClick={() =>
+                                void handlePickupClaimantDenial(group.requestId, candidate.id)
+                              }
+                              className="rounded-lg border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--error-text)] disabled:opacity-50"
+                            >
+                              Deny claimant
+                            </button>
+                            <button
+                              type="button"
+                              disabled={savingState[group.requestId]}
+                              onClick={() => {
+                                setSelectedPickupInterestIds((current) => ({
+                                  ...current,
+                                  [group.requestId]: candidate.id,
+                                }))
+                                void handleAction(group.requestId, 'approve')
+                              }}
+                              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                            >
+                              {savingState[group.requestId] ? 'Selecting...' : 'Approve'}
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -674,6 +838,7 @@ export default function ShiftBoardClientPage({
               key={request.id}
               req={request}
               canReview={canReview}
+              onPickupInterest={() => void handlePickupInterest(request)}
               saving={Boolean(savingState[request.id])}
               error={requestErrors[request.id]}
               therapists={therapists}
@@ -775,6 +940,7 @@ function FilterPill({
 function RequestCard({
   req,
   canReview,
+  onPickupInterest,
   saving,
   error,
   therapists,
@@ -791,6 +957,7 @@ function RequestCard({
 }: {
   req: ShiftBoardRequest
   canReview: boolean
+  onPickupInterest: () => void
   saving: boolean
   error?: string
   therapists: ProfileLookupRow[]
@@ -808,8 +975,14 @@ function RequestCard({
   const statusMeta = STATUS_META[req.status]
   const typeMeta = TYPE_META[req.type]
   const isPending = req.status === 'pending'
+  const pickupQueue =
+    req.type === 'pickup' && req.visibility === 'team'
+      ? partitionPickupInterestQueue(req.interestCandidates)
+      : null
   const needsPartner = req.type === 'swap' && !req.swapWithId && isPending && canReview
   const needsLeadPartner = shiftRole === 'lead'
+  const awaitingDirectAcceptance =
+    req.visibility === 'direct' && req.recipientResponse !== 'accepted'
   // Filter to therapists working the same date and shift type; fall back to full list if coverage not loaded.
   const eligibleTherapists =
     scheduledOnDate.size > 0
@@ -850,6 +1023,14 @@ function RequestCard({
             >
               {typeMeta.label}
             </span>
+            <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              {req.visibility === 'direct' ? 'Direct' : 'Team'}
+            </span>
+            {req.requestKind === 'call_in' ? (
+              <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--warning-text)]">
+                Call-in help
+              </span>
+            ) : null}
             <span
               className="ml-auto rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
               style={{
@@ -875,6 +1056,60 @@ function RequestCard({
               Swap with: <span className="font-medium text-foreground">{req.swapWithName}</span>
             </p>
           )}
+          {req.visibility === 'direct' && req.recipientResponse ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Recipient response:{' '}
+              <span className="font-medium text-foreground capitalize">
+                {req.recipientResponse}
+              </span>
+            </p>
+          ) : null}
+          {awaitingDirectAcceptance ? (
+            <p className="mt-1 text-xs text-[var(--warning-text)]">
+              Waiting for the recipient to accept before manager approval.
+            </p>
+          ) : null}
+          {req.type === 'pickup' && req.visibility === 'team' ? (
+            <>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {req.pendingInterestCount}{' '}
+                {req.requestKind === 'call_in' ? 'pending claim' : 'pending interest'}
+                {req.pendingInterestCount === 1 ? '' : 's'}
+              </p>
+              {canReview && pickupQueue?.primaryCandidate ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Current primary pending claimant:{' '}
+                  <span className="font-medium text-foreground">
+                    {pickupQueue.primaryCandidate.therapistName}
+                  </span>
+                </p>
+              ) : null}
+              {canReview && pickupQueue ? (
+                <>
+                  {pickupQueue.primaryCandidate && pickupQueue.backupCandidates.length > 0 ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Backups / interested therapists:{' '}
+                      <span className="font-medium text-foreground">
+                        {pickupQueue.backupCandidates
+                          .map((candidate) => candidate.therapistName)
+                          .join(', ')}
+                      </span>
+                    </p>
+                  ) : null}
+                  {!pickupQueue.primaryCandidate && pickupQueue.orderedCandidates.length > 0 ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Interested therapists:{' '}
+                      <span className="font-medium text-foreground">
+                        {pickupQueue.orderedCandidates
+                          .map((candidate) => candidate.therapistName)
+                          .join(', ')}
+                      </span>
+                    </p>
+                  ) : null}
+                </>
+              ) : null}
+            </>
+          ) : null}
           {req.status === 'denied' && req.overrideReason && (
             <p className="mt-1.5 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-2.5 py-1.5 text-xs text-[var(--error-text)]">
               Reason: {req.overrideReason}
@@ -936,7 +1171,7 @@ function RequestCard({
           <Button
             size="sm"
             className="min-h-9 flex-1"
-            disabled={saving || (needsPartner && !swapPartnerId)}
+            disabled={saving || (needsPartner && !swapPartnerId) || awaitingDirectAcceptance}
             onClick={() => onAction('approve')}
           >
             {saving ? 'Saving...' : 'Approve'}
@@ -952,6 +1187,20 @@ function RequestCard({
           </Button>
           <Button size="sm" variant="outline" onClick={onViewShift}>
             View shift
+          </Button>
+        </div>
+      )}
+
+      {!canReview && req.type === 'pickup' && req.visibility === 'team' && (
+        <div className="mt-3 flex justify-end border-t border-border pt-3">
+          <Button size="sm" variant="outline" onClick={onPickupInterest}>
+            {req.requestKind === 'call_in'
+              ? req.hasMyInterest
+                ? 'Withdraw claim'
+                : 'Claim help'
+              : req.hasMyInterest
+                ? 'Withdraw interest'
+                : 'Express interest'}
           </Button>
         </div>
       )}

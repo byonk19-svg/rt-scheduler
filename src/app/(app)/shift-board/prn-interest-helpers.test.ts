@@ -21,6 +21,14 @@ function makeRequest(
     status: 'pending',
     posted: postedAt,
     postedAt,
+    interestCandidates: [
+      {
+        id: `${id}-interest`,
+        therapistId: `${id}-therapist`,
+        therapistName: poster,
+        createdAt: postedAt,
+      },
+    ],
     swapWithName: null,
     swapWithId: null,
     shiftType: 'day',
@@ -32,8 +40,25 @@ function makeRequest(
 describe('groupPickupsBySlot', () => {
   it('groups pending pickup requests by shiftId', () => {
     const requests = [
-      makeRequest('a', 'shift-1', '2026-04-01T08:00:00Z', 'Alice'),
-      makeRequest('b', 'shift-1', '2026-04-01T09:00:00Z', 'Bob'),
+      {
+        ...makeRequest('a', 'shift-1', '2026-04-01T08:00:00Z', 'Alice'),
+        interestCandidates: [
+          {
+            id: 'a-1',
+            therapistId: 'alice',
+            therapistName: 'Alice',
+            createdAt: '2026-04-01T08:00:00Z',
+            status: 'selected' as const,
+          },
+          {
+            id: 'a-2',
+            therapistId: 'bob',
+            therapistName: 'Bob',
+            createdAt: '2026-04-01T09:00:00Z',
+            status: 'pending' as const,
+          },
+        ],
+      },
       makeRequest('c', 'shift-2', '2026-04-01T07:00:00Z', 'Carol'),
     ]
     const groups = groupPickupsBySlot(requests)
@@ -42,12 +67,32 @@ describe('groupPickupsBySlot', () => {
 
   it('sorts candidates within a slot by postedAt ascending', () => {
     const requests = [
-      makeRequest('late', 'shift-1', '2026-04-01T10:00:00Z', 'Late'),
-      makeRequest('early', 'shift-1', '2026-04-01T08:00:00Z', 'Early'),
+      {
+        ...makeRequest('slot', 'shift-1', '2026-04-01T10:00:00Z', 'Late'),
+        interestCandidates: [
+          {
+            id: 'late',
+            therapistId: 'late',
+            therapistName: 'Late',
+            createdAt: '2026-04-01T10:00:00Z',
+            status: 'pending' as const,
+          },
+          {
+            id: 'early',
+            therapistId: 'early',
+            therapistName: 'Early',
+            createdAt: '2026-04-01T08:00:00Z',
+            status: 'selected' as const,
+          },
+        ],
+      },
     ]
     const groups = groupPickupsBySlot(requests)
     expect(groups[0].candidates[0].id).toBe('early')
     expect(groups[0].candidates[1].id).toBe('late')
+    expect(groups[0].candidates[0].status).toBe('selected')
+    expect(groups[0].primaryCandidate?.id).toBe('early')
+    expect(groups[0].backupCandidates.map((candidate) => candidate.id)).toEqual(['late'])
   })
 
   it('excludes non-pickup and non-pending requests', () => {
@@ -63,8 +108,23 @@ describe('groupPickupsBySlot', () => {
 
   it('only includes slots with 2 or more candidates in the multi-candidate result', () => {
     const requests = [
-      makeRequest('a', 'shift-1', '2026-04-01T08:00:00Z'),
-      makeRequest('b', 'shift-1', '2026-04-01T09:00:00Z'),
+      {
+        ...makeRequest('a', 'shift-1', '2026-04-01T08:00:00Z'),
+        interestCandidates: [
+          {
+            id: 'a-1',
+            therapistId: 'alice',
+            therapistName: 'Alice',
+            createdAt: '2026-04-01T08:00:00Z',
+          },
+          {
+            id: 'a-2',
+            therapistId: 'bob',
+            therapistName: 'Bob',
+            createdAt: '2026-04-01T09:00:00Z',
+          },
+        ],
+      },
       makeRequest('c', 'shift-2', '2026-04-01T07:00:00Z'),
     ]
     const groups = groupPickupsBySlot(requests)

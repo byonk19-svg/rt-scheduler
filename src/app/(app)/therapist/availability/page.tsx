@@ -14,6 +14,7 @@ import { FeedbackToast } from '@/components/feedback-toast'
 import { can } from '@/lib/auth/can'
 import { findScheduledConflicts } from '@/lib/availability-scheduled-conflict'
 import { toUiRole } from '@/lib/auth/roles'
+import { resolveTherapistAvailabilityCycleId } from '@/lib/therapist-workflow'
 import { createClient } from '@/lib/supabase/server'
 
 type ToastVariant = 'success' | 'error'
@@ -172,9 +173,29 @@ export default async function TherapistAvailabilityPage({
 
   const cycles = (cyclesData ?? []) as Cycle[]
   const selectedCycleIdFromParams = getSearchParam(params?.cycle)
+  const { data: preliminarySnapshotsData } =
+    cycles.length > 0
+      ? await supabase
+          .from('preliminary_snapshots')
+          .select('cycle_id, status')
+          .eq('status', 'active')
+          .in(
+            'cycle_id',
+            cycles.map((cycle) => cycle.id)
+          )
+      : { data: [] }
+  const workflowCycleId = resolveTherapistAvailabilityCycleId({
+    todayKey,
+    cycles,
+    preliminarySnapshots:
+      ((preliminarySnapshotsData ?? []) as Array<{
+        cycle_id: string
+        status: 'active' | 'superseded' | 'closed'
+      }>) ?? [],
+  })
   const selectedCycle =
     cycles.find((cycle) => cycle.id === selectedCycleIdFromParams) ??
-    cycles.find((cycle) => cycle.published === false) ??
+    cycles.find((cycle) => cycle.id === workflowCycleId) ??
     cycles[0] ??
     null
   const selectedCycleId = selectedCycle?.id ?? ''

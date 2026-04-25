@@ -142,6 +142,8 @@ describe('queueAndSendShiftReminders', () => {
       email: 'therapist@example.com',
     })
     expect(fetchMock).toHaveBeenCalledOnce()
+    const fetchPayload = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string)
+    expect(fetchPayload.html).toContain('https://www.teamwise.work/therapist/schedule')
     expect(outboxUpdates[0]).toMatchObject({
       id: 'outbox-1',
       payload: expect.objectContaining({ status: 'sent', attempt_count: 1 }),

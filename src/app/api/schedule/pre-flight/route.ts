@@ -138,6 +138,8 @@ export async function POST(request: Request) {
     .select(
       'id, full_name, shift_type, is_lead_eligible, employment_type, max_work_days_per_week, on_fmla, fmla_return_date, is_active'
     )
+    .eq('is_active', true)
+    .eq('on_fmla', false)
     .in('role', ['therapist', 'lead'])
     .order('full_name', { ascending: true })
 

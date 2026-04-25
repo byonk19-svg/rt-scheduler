@@ -1,25 +1,33 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowLeftRight, CheckCircle2, Clock, Send } from 'lucide-react'
+import { ArrowLeftRight, CalendarClock, Clock, History, Send } from 'lucide-react'
 
 import { FeedbackToast } from '@/components/feedback-toast'
 import { MyScheduleCard } from '@/components/schedule/MyScheduleCard'
 import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
-import { dateFromKey, formatDateLabel, formatHumanCycleRange } from '@/lib/calendar-utils'
 import {
   buildTherapistSubmissionUiState,
   resolveAvailabilityDueSupportLine,
 } from '@/lib/therapist-availability-submission'
-import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { cn } from '@/lib/utils'
-import { fetchMyPublishedUpcomingShifts } from '@/lib/staff-my-schedule'
+import {
+  resolveTherapistWorkflow,
+  type TherapistWorkflowCycle,
+  type TherapistWorkflowPreliminarySnapshot,
+} from '@/lib/therapist-workflow'
 import { createClient } from '@/lib/supabase/server'
+import { fetchMyPublishedUpcomingShifts } from '@/lib/staff-my-schedule'
+import { cn } from '@/lib/utils'
 
 type StaffDashboardSearchParams = {
   success?: string | string[]
+}
+
+type SubmissionRow = {
+  schedule_cycle_id: string
+  submitted_at: string
+  last_edited_at: string
 }
 
 function getSearchParam(value: string | string[] | undefined): string | undefined {
@@ -32,9 +40,24 @@ function getStaffDashboardFeedback(
 ): { message: string; variant: 'success' } | null {
   const success = getSearchParam(params?.success)
   if (success === 'signed_in') return { message: 'Signed in successfully.', variant: 'success' }
-  if (success === 'access_requested')
+  if (success === 'access_requested') {
     return { message: 'Access request submitted and signed in.', variant: 'success' }
+  }
   return null
+}
+
+function badgeToneClasses(state: string): string {
+  switch (state) {
+    case 'published_schedule_available':
+      return 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
+    case 'preliminary_review_available':
+      return 'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)]'
+    case 'availability_draft':
+    case 'availability_not_started':
+      return 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+    default:
+      return 'border-border/70 bg-muted/20 text-foreground'
+  }
 }
 
 export default async function StaffDashboardPage({
@@ -59,466 +82,305 @@ export default async function StaffDashboardPage({
     .eq('id', user.id)
     .maybeSingle()
 
-  const isManager = can(parseRole(profile?.role), 'access_manager_ui')
-  if (isManager) {
+  if (can(parseRole(profile?.role), 'access_manager_ui')) {
     redirect('/dashboard/manager')
   }
 
-  const upcomingPublishedWidget = await fetchMyPublishedUpcomingShifts(supabase, user.id, 5)
-
   const fullName = profile?.full_name ?? user.user_metadata?.full_name ?? 'Staff member'
   const firstName = fullName.split(/\s+/)[0] ?? fullName
+  const todayKey = new Date().toISOString().slice(0, 10)
 
-  const today = new Date().toISOString().split('T')[0]
-
-  const { data: cycles } = await supabase
+  const { data: cyclesData } = await supabase
     .from('schedule_cycles')
     .select('id, label, start_date, end_date, archived_at, published, availability_due_at')
     .is('archived_at', null)
-    .gte('end_date', today)
+    .gte('end_date', todayKey)
     .order('start_date', { ascending: true })
-    .limit(2)
 
-  const activeCycle =
-    (cycles ?? []).find((c) => c.start_date <= today && c.end_date >= today) ??
-    (cycles ?? [])[0] ??
-    null
+  const cycles = ((cyclesData ?? []) as TherapistWorkflowCycle[]).map((cycle) => ({
+    ...cycle,
+    availability_due_at: cycle.availability_due_at ?? null,
+  }))
+  const cycleIds = cycles.map((cycle) => cycle.id)
 
-  type UpcomingShiftRow = {
-    id: string
-    date: string
-    shift_type: string | null
-    role: string | null
+  const [
+    upcomingPublishedWidget,
+    availabilityDraftRowsResult,
+    therapistSubmissionRowsResult,
+    preliminarySnapshotsResult,
+    relevantShiftPostsResult,
+  ] = await Promise.all([
+    fetchMyPublishedUpcomingShifts(supabase, user.id, 5),
+    cycleIds.length > 0
+      ? supabase
+          .from('availability_overrides')
+          .select('cycle_id')
+          .eq('therapist_id', user.id)
+          .in('cycle_id', cycleIds)
+      : Promise.resolve({ data: [] }),
+    cycleIds.length > 0
+      ? supabase
+          .from('therapist_availability_submissions')
+          .select('schedule_cycle_id, submitted_at, last_edited_at')
+          .eq('therapist_id', user.id)
+          .in('schedule_cycle_id', cycleIds)
+      : Promise.resolve({ data: [] }),
+    cycleIds.length > 0
+      ? supabase
+          .from('preliminary_snapshots')
+          .select('cycle_id, status')
+          .eq('status', 'active')
+          .in('cycle_id', cycleIds)
+      : Promise.resolve({ data: [] }),
+    supabase
+      .from('shift_posts')
+      .select('id, status')
+      .or(`posted_by.eq.${user.id},claimed_by.eq.${user.id}`),
+  ])
+
+  const availabilityEntryCountsByCycleId: Record<string, number> = {}
+  for (const row of availabilityDraftRowsResult.data ?? []) {
+    const cycleId = (row as { cycle_id: string }).cycle_id
+    availabilityEntryCountsByCycleId[cycleId] = (availabilityEntryCountsByCycleId[cycleId] ?? 0) + 1
   }
 
-  const [upcomingShiftsResult, therapistSubmissionResult, pendingPostCountResult] =
-    await Promise.all([
-      activeCycle
-        ? supabase
-            .from('shifts')
-            .select('id, date, shift_type, role')
-            .eq('user_id', user.id)
-            .eq('cycle_id', activeCycle.id)
-            .gte('date', today)
-            .order('date', { ascending: true })
-            .limit(10)
-        : Promise.resolve({ data: [] }),
-      activeCycle
-        ? supabase
-            .from('therapist_availability_submissions')
-            .select('submitted_at, last_edited_at, schedule_cycle_id')
-            .eq('therapist_id', user.id)
-            .eq('schedule_cycle_id', activeCycle.id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-      supabase
-        .from('shift_posts')
-        .select('id', { head: true, count: 'exact' })
-        .eq('posted_by', user.id)
-        .eq('status', 'pending'),
-    ])
+  const submissionsByCycleId: Record<string, { submittedAt: string; lastEditedAt: string }> = {}
+  for (const row of (therapistSubmissionRowsResult.data ?? []) as SubmissionRow[]) {
+    submissionsByCycleId[row.schedule_cycle_id] = {
+      submittedAt: row.submitted_at,
+      lastEditedAt: row.last_edited_at,
+    }
+  }
 
-  const upcomingShiftRows = (upcomingShiftsResult.data ?? []) as UpcomingShiftRow[]
-  const upcomingActiveOperationalCodesByShiftId = await fetchActiveOperationalCodeMap(
-    supabase,
-    upcomingShiftRows.map((row) => row.id)
-  )
-  const upcomingShifts = upcomingShiftRows.filter(
-    (row) => !upcomingActiveOperationalCodesByShiftId.has(row.id)
-  )
-  const upcomingCount = upcomingShifts.length
-  const nextShift = upcomingShifts[0] ?? null
-  const nextShiftLabel = nextShift
-    ? new Date(`${nextShift.date}T00:00:00`).toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-      })
+  const preliminarySnapshots =
+    ((preliminarySnapshotsResult.data ?? []) as TherapistWorkflowPreliminarySnapshot[]) ?? []
+  const relevantShiftPosts = (relevantShiftPostsResult.data ?? []) as Array<{ status: string }>
+
+  const workflow = resolveTherapistWorkflow({
+    todayKey,
+    cycles,
+    availabilityEntryCountsByCycleId,
+    submissionsByCycleId,
+    preliminarySnapshots,
+    publishedShifts: upcomingPublishedWidget.map((shift) => ({
+      cycle_id: shift.cycle_id,
+      date: shift.date,
+    })),
+    relevantShiftPostSummary: {
+      pendingCount: relevantShiftPosts.filter((post) => post.status === 'pending').length,
+      totalCount: relevantShiftPosts.length,
+    },
+  })
+
+  const actionCycleSubmission = workflow.actionCycle
+    ? (submissionsByCycleId[workflow.actionCycle.id] ?? null)
     : null
-
-  const submissionRow = therapistSubmissionResult.data as {
-    submitted_at: string
-    last_edited_at: string
-    schedule_cycle_id: string
-  } | null
   const submissionUi = buildTherapistSubmissionUiState(
-    submissionRow
+    workflow.actionCycle && actionCycleSubmission
       ? {
-          schedule_cycle_id: submissionRow.schedule_cycle_id,
-          submitted_at: submissionRow.submitted_at,
-          last_edited_at: submissionRow.last_edited_at,
+          schedule_cycle_id: workflow.actionCycle.id,
+          submitted_at: actionCycleSubmission.submittedAt,
+          last_edited_at: actionCycleSubmission.lastEditedAt,
         }
       : null
   )
-  const availabilitySubmitted = submissionUi.isSubmitted
-
-  const pendingPostCount = pendingPostCountResult.count ?? 0
-
-  const cycleRangeLabel =
-    activeCycle && !Number.isNaN(dateFromKey(activeCycle.start_date).getTime())
-      ? formatHumanCycleRange(activeCycle.start_date, activeCycle.end_date)
-      : null
 
   const availabilityDueLine =
-    activeCycle && !availabilitySubmitted
+    workflow.actionCycle &&
+    (workflow.state === 'availability_not_started' || workflow.state === 'availability_draft')
       ? resolveAvailabilityDueSupportLine(
           {
-            start_date: activeCycle.start_date,
-            availability_due_at: activeCycle.availability_due_at ?? null,
+            start_date: workflow.actionCycle.start_date,
+            availability_due_at: workflow.actionCycle.availability_due_at ?? null,
           },
-          availabilitySubmitted
+          false
         )
       : null
-
-  type RosterShift = {
-    id: string
-    user_id: string | null
-    date: string
-    shift_type: string | null
-    role: string | null
-  }
-  const rosterDates = upcomingShifts.slice(0, 3).map((s) => s.date)
-  const rosterRawShifts: RosterShift[] =
-    rosterDates.length > 0 && activeCycle
-      ? (((
-          await supabase
-            .from('shifts')
-            .select('id, user_id, date, shift_type, role')
-            .eq('cycle_id', activeCycle.id)
-            .in('date', rosterDates)
-            .neq('user_id', user.id)
-        ).data as RosterShift[] | null) ?? [])
-      : []
-  const rosterActiveOperationalCodesByShiftId = await fetchActiveOperationalCodeMap(
-    supabase,
-    rosterRawShifts.map((shift) => shift.id)
-  )
-  const rosterShifts = rosterRawShifts.filter(
-    (shift) => !rosterActiveOperationalCodesByShiftId.has(shift.id)
-  )
-
-  const rosterUserIds = [
-    ...new Set(rosterShifts.map((s) => s.user_id).filter((id): id is string => Boolean(id))),
-  ]
-  const rosterNameById = new Map<string, string>()
-  if (rosterUserIds.length > 0) {
-    const adminSupabase = createAdminClient()
-    const { data: rosterProfiles } = await adminSupabase
-      .from('profiles')
-      .select('id, full_name')
-      .in('id', rosterUserIds)
-    for (const p of rosterProfiles ?? []) {
-      if (p.id && p.full_name) rosterNameById.set(p.id, p.full_name)
-    }
-  }
-
-  type ShiftColleague = { name: string; isLead: boolean }
-  type UpcomingShiftRoster = {
-    date: string
-    label: string
-    shiftType: string
-    myRole: string
-    colleagues: ShiftColleague[]
-  }
-  const upcomingRoster: UpcomingShiftRoster[] = upcomingShifts.slice(0, 3).map((myShift) => {
-    const colleagues = rosterShifts
-      .filter((s) => s.date === myShift.date && s.shift_type === myShift.shift_type)
-      .map((s) => ({
-        name: s.user_id ? (rosterNameById.get(s.user_id) ?? '?') : '?',
-        isLead: s.role === 'lead',
-      }))
-      .sort((a, b) => (b.isLead ? 1 : 0) - (a.isLead ? 1 : 0))
-    return {
-      date: myShift.date,
-      label: new Date(`${myShift.date}T00:00:00`).toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-      }),
-      shiftType: myShift.shift_type ?? 'day',
-      myRole: myShift.role ?? 'staff',
-      colleagues,
-    }
-  })
-
-  const nextShiftTypeLabel = nextShift?.shift_type
-    ? `${nextShift.shift_type.charAt(0).toUpperCase()}${nextShift.shift_type.slice(1)} shift`
-    : null
 
   return (
     <div className="space-y-4">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
-      <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-tw-float-lg">
-        <div className="flex flex-col gap-3 border-b border-border px-4 py-4 lg:flex-row lg:items-start lg:justify-between">
+      <section className="rounded-2xl border border-border bg-card px-5 py-5 shadow-tw-float-lg">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              Welcome, {firstName}
-            </h1>
-            {activeCycle && cycleRangeLabel ? (
-              <>
-                <p className="mt-2 text-sm font-medium text-foreground">Cycle: {cycleRangeLabel}</p>
-                {activeCycle.published ? (
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Published {formatDateLabel(activeCycle.start_date)}
-                  </p>
-                ) : null}
-              </>
-            ) : (
-              <p className="mt-2 text-sm text-muted-foreground">No active scheduling cycle yet.</p>
-            )}
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                Welcome, {firstName}
+              </h1>
               <span
                 className={cn(
-                  'rounded-full border px-2 py-0.5',
-                  availabilitySubmitted
-                    ? 'border-border/70 bg-muted/20'
-                    : 'border-[var(--warning-border)] bg-[var(--warning-subtle)]/50 text-[var(--warning-text)]'
+                  'rounded-full border px-2.5 py-1 text-[11px] font-semibold',
+                  badgeToneClasses(workflow.state)
                 )}
               >
-                {availabilitySubmitted ? 'Availability: Submitted' : 'Availability: Not submitted'}
-              </span>
-              <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5">
-                {upcomingCount} upcoming shifts
-              </span>
-              <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5">
-                {pendingPostCount} requests awaiting action
+                {workflow.stateLabel}
               </span>
             </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Your dashboard always shows the next therapist-safe action for the current workflow.
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {!availabilitySubmitted ? (
-              <>
-                <Button asChild size="sm">
-                  <Link href="/therapist/availability">
-                    <Send className="mr-1.5 h-3.5 w-3.5" />
-                    Submit availability
-                  </Link>
-                </Button>
-                <Button asChild size="sm" variant="outline">
-                  <Link href="/shift-board">Browse open shifts</Link>
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button asChild size="sm">
-                  <Link href="/shift-board">Browse open shifts</Link>
-                </Button>
-                <Button asChild size="sm" variant="outline">
-                  <Link href="/therapist/availability">Edit availability</Link>
-                </Button>
-              </>
-            )}
+            <Button asChild size="sm">
+              <Link href={workflow.primaryAction.href}>
+                <Send className="mr-1.5 h-3.5 w-3.5" />
+                {workflow.primaryAction.label}
+              </Link>
+            </Button>
+            {workflow.secondaryAction ? (
+              <Button asChild size="sm" variant="outline">
+                <Link href={workflow.secondaryAction.href}>{workflow.secondaryAction.label}</Link>
+              </Button>
+            ) : null}
           </div>
-        </div>
-        <div className="px-4 py-3.5">
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            Upcoming Shifts
-          </p>
-          {upcomingRoster.length > 0 ? (
-            <div className="divide-y divide-border">
-              {upcomingRoster.map((shift) => (
-                <div
-                  key={shift.date}
-                  className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0"
-                >
-                  <div className="w-[96px] shrink-0">
-                    <p className="text-xs font-semibold text-foreground">{shift.label}</p>
-                    <p className="mt-0.5 text-[10px] capitalize text-muted-foreground">
-                      {shift.shiftType} shift
-                    </p>
-                    {shift.myRole === 'lead' && (
-                      <span
-                        className="mt-1 inline-block rounded border px-1.5 py-0.5 text-[10px] font-bold"
-                        style={{
-                          borderColor: 'var(--warning-border)',
-                          backgroundColor: 'var(--warning-subtle)',
-                          color: 'var(--warning-text)',
-                        }}
-                      >
-                        Lead
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-1 pt-0.5">
-                    {shift.colleagues.length > 0 ? (
-                      shift.colleagues.map((c, i) => (
-                        <span
-                          key={i}
-                          className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
-                          style={
-                            c.isLead
-                              ? {
-                                  borderColor: 'var(--warning-border)',
-                                  backgroundColor: 'var(--warning-subtle)',
-                                  color: 'var(--warning-text)',
-                                }
-                              : {
-                                  borderColor: 'var(--border)',
-                                  backgroundColor: 'var(--muted)',
-                                  color: 'var(--muted-foreground)',
-                                }
-                          }
-                        >
-                          {c.isLead ? 'Lead: ' : ''}
-                          {c.name.split(' ')[0]}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        No colleagues assigned yet.
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-6 text-center">
-              <p className="text-sm font-medium text-foreground">
-                No shifts scheduled yet for this cycle
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                The schedule is still being filled. You can browse open shifts now, and submit
-                availability if you have not done so yet.
-              </p>
-              <div className="mt-3 flex justify-center">
-                <Button asChild size="sm">
-                  <Link href="/shift-board">Browse open shifts</Link>
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
       </section>
 
-      <section className="rounded-xl border border-border bg-card px-4 py-4 shadow-tw-sm">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-bold tracking-tight text-foreground">Upcoming shifts</h2>
-          <Link
-            href="/staff/my-schedule"
-            className="text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            View all
-          </Link>
-        </div>
-        {upcomingPublishedWidget.length > 0 ? (
-          <div className="space-y-2">
-            {upcomingPublishedWidget.map((row) => (
-              <MyScheduleCard
-                key={row.id}
-                date={row.date}
-                shiftType={row.shift_type === 'night' ? 'night' : 'day'}
-                role={row.role ?? 'staff'}
-                status={row.status}
-                assignmentStatus={row.assignment_status}
-              />
-            ))}
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-[1.35fr_1fr_1fr]">
+        <article className="rounded-2xl border border-border bg-card px-5 py-5 shadow-tw-sm">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            <CalendarClock className="h-3.5 w-3.5" />
+            What needs your attention now
           </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            No upcoming shifts on published schedules. Your draft-cycle assignments stay hidden
-            until publish.
-          </p>
-        )}
-      </section>
-
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-border bg-muted/30 px-3 py-2.5">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Next Shift</span>
-            <Clock className="h-3.5 w-3.5" />
-          </div>
-          {nextShift && nextShiftLabel ? (
-            <>
-              <p className="mt-1.5 text-lg font-semibold tracking-tight text-foreground">
-                {nextShiftLabel}
-              </p>
-              {nextShiftTypeLabel ? (
-                <p className="mt-0.5 text-sm font-medium capitalize text-foreground">
-                  {nextShiftTypeLabel}
+          <h2 className="mt-3 text-xl font-semibold tracking-tight text-foreground">
+            {workflow.primaryTitle}
+          </h2>
+          {workflow.cycleLabel && workflow.cycleRangeLabel ? (
+            <div className="mt-3 rounded-xl border border-border/70 bg-muted/15 px-3 py-3">
+              <p className="text-sm font-semibold text-foreground">{workflow.cycleLabel}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{workflow.cycleRangeLabel}</p>
+              {workflow.cycleReason ? (
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  {workflow.cycleReason}
                 </p>
               ) : null}
-              <p className="mt-1 text-xs text-muted-foreground">
-                Your next shift in this published schedule
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="mt-1.5 text-sm font-medium text-foreground">No shift scheduled yet</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Your next scheduled shift will appear here once you are on the roster.
-              </p>
-            </>
-          )}
-        </div>
-        <div
-          className={cn(
-            'rounded-xl border px-3 py-2.5',
-            availabilitySubmitted
-              ? 'border-border bg-muted/30'
-              : 'border-[var(--warning-border)] bg-[var(--warning-subtle)]/40'
-          )}
-        >
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Availability for This Cycle</span>
-            <CheckCircle2
-              className={cn(
-                'h-3.5 w-3.5',
-                availabilitySubmitted ? 'text-[var(--success-text)]' : 'text-[var(--warning-text)]'
-              )}
-            />
-          </div>
-          <p
-            className={cn(
-              'mt-1.5 text-lg font-semibold tracking-tight',
-              availabilitySubmitted ? 'text-[var(--success-text)]' : 'text-[var(--warning-text)]'
-            )}
-          >
-            {availabilitySubmitted ? 'Submitted' : 'Not submitted'}
+            </div>
+          ) : null}
+          <p className="mt-4 text-sm leading-6 text-muted-foreground">
+            {workflow.primaryDescription}
           </p>
-          {availabilitySubmitted && submissionUi.submittedAtDisplay ? (
-            <p className="mt-1 text-xs text-muted-foreground">
+          {availabilityDueLine ? (
+            <p className="mt-3 text-sm font-medium text-foreground">{availabilityDueLine}</p>
+          ) : null}
+          {submissionUi.isSubmitted && submissionUi.submittedAtDisplay ? (
+            <p className="mt-3 text-sm text-muted-foreground">
               Submitted {submissionUi.submittedAtDisplay}
             </p>
           ) : null}
-          {availabilitySubmitted && submissionUi.lastEditedDisplay ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Last edited {submissionUi.lastEditedDisplay}
+          {submissionUi.isSubmitted && submissionUi.lastEditedDisplay ? (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Updated after submit {submissionUi.lastEditedDisplay}
             </p>
           ) : null}
-          {!availabilitySubmitted && availabilityDueLine ? (
-            <p className="mt-2 text-xs font-medium leading-snug text-foreground/90">
-              {availabilityDueLine}
-            </p>
-          ) : null}
-          {!availabilitySubmitted ? (
-            <Link
-              href="/therapist/availability"
-              className="mt-2.5 inline-block text-xs font-medium text-primary hover:underline"
-            >
-              Submit availability &rarr;
-            </Link>
-          ) : (
-            <Link
-              href="/therapist/availability"
-              className="mt-2.5 inline-block text-xs font-medium text-primary hover:underline"
-            >
-              Edit availability &rarr;
-            </Link>
-          )}
-        </div>
-        <div className="rounded-xl border border-border bg-muted/30 px-3 py-2.5">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Requests Awaiting Action</span>
-            <ArrowLeftRight className="h-3.5 w-3.5" />
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Button asChild size="sm">
+              <Link href={workflow.primaryAction.href}>{workflow.primaryAction.label}</Link>
+            </Button>
+            {workflow.secondaryAction ? (
+              <Button asChild size="sm" variant="outline">
+                <Link href={workflow.secondaryAction.href}>{workflow.secondaryAction.label}</Link>
+              </Button>
+            ) : null}
           </div>
-          <p className="mt-1.5 text-lg font-semibold tracking-tight text-foreground">
-            {pendingPostCount}
+        </article>
+
+        <article className="rounded-2xl border border-border bg-card px-5 py-5 shadow-tw-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                My Published Schedule
+              </p>
+              <h2 className="mt-2 text-lg font-semibold tracking-tight text-foreground">
+                {workflow.publishedShiftSummary.upcomingCount} upcoming published shift
+                {workflow.publishedShiftSummary.upcomingCount === 1 ? '' : 's'}
+              </h2>
+            </div>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            Published shifts only. Draft and preliminary assignments stay out of this view until the
+            schedule is finalized.
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Swap or pickup requests that need your response
-          </p>
+          {upcomingPublishedWidget.length > 0 ? (
+            <div className="mt-4 space-y-2">
+              {upcomingPublishedWidget.slice(0, 3).map((row) => (
+                <MyScheduleCard
+                  key={row.id}
+                  date={row.date}
+                  shiftType={row.shift_type === 'night' ? 'night' : 'day'}
+                  role={row.role ?? 'staff'}
+                  status={row.status}
+                  assignmentStatus={row.assignment_status}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-xl border border-dashed border-border bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
+              No published shifts are assigned to you yet.
+            </div>
+          )}
+          <div className="mt-4">
+            <Button asChild size="sm" variant="outline">
+              <Link href="/therapist/schedule">View my published schedule</Link>
+            </Button>
+          </div>
+        </article>
+
+        <div className="space-y-4">
+          <article className="rounded-2xl border border-border bg-card px-5 py-5 shadow-tw-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  Shift Swaps &amp; Pickups
+                </p>
+                <h2 className="mt-2 text-lg font-semibold tracking-tight text-foreground">
+                  {workflow.swapSummary.pendingCount} pending
+                </h2>
+              </div>
+              <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Relevant request activity includes both posts you created and pickups or swaps you
+              claimed.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
+              <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5">
+                {workflow.swapSummary.totalCount} total relevant requests
+              </span>
+              <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5">
+                Post-publish only
+              </span>
+            </div>
+            <div className="mt-4">
+              <Button asChild size="sm" variant="outline">
+                <Link href="/therapist/swaps">Shift Swaps &amp; Pickups</Link>
+              </Button>
+            </div>
+          </article>
+
+          <article className="rounded-2xl border border-border bg-card px-5 py-5 shadow-tw-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  History
+                </p>
+                <h2 className="mt-2 text-lg font-semibold tracking-tight text-foreground">
+                  Past requests and outcomes
+                </h2>
+              </div>
+              <History className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Review earlier swaps, pickups, and request outcomes without mixing them into the
+              active workflow.
+            </p>
+            <div className="mt-4">
+              <Button asChild size="sm" variant="outline">
+                <Link href="/staff/history">View history</Link>
+              </Button>
+            </div>
+          </article>
         </div>
       </section>
     </div>

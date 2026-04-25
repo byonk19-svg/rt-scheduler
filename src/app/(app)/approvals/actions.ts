@@ -35,21 +35,6 @@ async function getManagerContext() {
   return { supabase, userId: user.id }
 }
 
-async function syncApprovedPreliminaryRequestToDraft(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  request: {
-    shift_id: string
-    requester_id: string
-    type: 'claim_open_shift' | 'request_change'
-  }
-) {
-  const payload =
-    request.type === 'claim_open_shift' ? { user_id: request.requester_id } : { user_id: null }
-
-  const { error } = await supabase.from('shifts').update(payload).eq('id', request.shift_id)
-  return error
-}
-
 async function reviewPreliminaryRequestAction(formData: FormData, mode: 'approve' | 'deny') {
   const { supabase, userId } = await getManagerContext()
   const requestId = String(formData.get('request_id') ?? '').trim()
@@ -71,22 +56,6 @@ async function reviewPreliminaryRequestAction(formData: FormData, mode: 'approve
 
   if (review.error || !review.data) {
     redirect('/approvals?error=preliminary_review_failed')
-  }
-
-  if (mode === 'approve') {
-    const draftSyncError = await syncApprovedPreliminaryRequestToDraft(supabase, {
-      shift_id: review.data.shift_id,
-      requester_id: review.data.requester_id,
-      type: review.data.type,
-    })
-
-    if (draftSyncError) {
-      console.error(
-        'Failed to sync approved preliminary request to draft schedule:',
-        draftSyncError
-      )
-      redirect('/approvals?error=preliminary_review_failed')
-    }
   }
 
   await notifyUsers(supabase, {

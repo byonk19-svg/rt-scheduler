@@ -121,7 +121,7 @@ function UserDropdown({
           </div>
           <div className="p-1">
             <Link
-              href="/settings"
+              href={canAccessManagerUi ? '/settings' : '/therapist/settings'}
               className="flex min-h-11 items-center gap-2 rounded-md px-2.5 py-2 text-sm text-foreground no-underline transition-colors hover:bg-muted hover:no-underline sm:min-h-10 sm:py-1.5"
               onClick={() => setOpen(false)}
             >
@@ -278,6 +278,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
               <DeferredNotificationBell
                 variant="shell"
                 initialUnreadCount={unreadNotificationCount}
+                userRole={user?.role ?? null}
               />
               <UserDropdown user={user} canAccessManagerUi={canAccessManagerUi} />
             </>

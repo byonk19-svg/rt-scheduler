@@ -362,7 +362,7 @@ export function TherapistAvailabilityWorkspace({
       <section id="therapist-availability-workspace" className="space-y-3">
         <header className="border-b border-border/70 pb-4">
           <h1 className="font-heading text-[1.4rem] font-semibold leading-tight tracking-tight text-foreground">
-            Availability for This Cycle
+            Future Availability
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             No upcoming cycle is open for availability yet.
@@ -376,7 +376,7 @@ export function TherapistAvailabilityWorkspace({
     <section id="therapist-availability-workspace" className="space-y-5">
       <header className="border-b border-border/70 pb-4">
         <h1 className="font-heading text-[1.4rem] font-semibold leading-tight tracking-tight text-foreground">
-          Availability for This Cycle
+          Future Availability
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">{cyclePageSubtitle}</p>
         {deadlinePresentation ? (

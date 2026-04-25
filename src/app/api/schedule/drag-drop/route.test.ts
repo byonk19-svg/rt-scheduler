@@ -55,6 +55,8 @@ type Scenario = {
   >
   insertError?: { code?: string; message?: string } | null
   designatedLeadRpcError?: { code?: string; message?: string } | null
+  pendingShiftPosts?: Array<{ id: string; shift_id: string | null }>
+  hasActivePreliminary?: boolean
 }
 
 function makeSupabaseMock(scenario: Scenario) {
@@ -66,6 +68,14 @@ function makeSupabaseMock(scenario: Scenario) {
   }
 
   const insertedShiftPayloads: Array<Record<string, unknown>> = []
+  const updatedShiftPosts: Array<{
+    filters: Record<string, unknown>
+    payload: Record<string, unknown>
+  }> = []
+  const updatedShiftPostInterests: Array<{
+    filters: Record<string, unknown>
+    payload: Record<string, unknown>
+  }> = []
 
   const auth = {
     getUser: async () => ({ data: { user: { id: 'manager-1' } } }),
@@ -116,6 +126,7 @@ function makeSupabaseMock(scenario: Scenario) {
       op: 'select' | 'insert' | 'update' | 'delete'
       filters: Record<string, unknown>
       insertPayload?: Record<string, unknown>
+      selected?: string
     } = { table, op: 'select', filters: {} }
 
     const resolveSelect = (single: boolean) => {
@@ -214,10 +225,60 @@ function makeSupabaseMock(scenario: Scenario) {
         return { data: rows, error: null }
       }
 
+      if (table === 'preliminary_snapshots') {
+        if (single) {
+          return {
+            data: scenario.hasActivePreliminary ? { id: 'snapshot-1' } : null,
+            error: null,
+          }
+        }
+        return { data: scenario.hasActivePreliminary ? [{ id: 'snapshot-1' }] : [], error: null }
+      }
+
+      if (table === 'shift_posts') {
+        const targetShiftIds = Array.isArray(state.filters['in:shift_id'])
+          ? (state.filters['in:shift_id'] as string[])
+          : []
+        if (targetShiftIds.length > 0) {
+          const rows = (scenario.pendingShiftPosts ?? []).filter((row) =>
+            targetShiftIds.includes(row.shift_id ?? '')
+          )
+          if (state.selected?.includes('status')) {
+            return {
+              data: rows.map((row) => ({ ...row, status: 'pending' })),
+              error: null,
+            }
+          }
+          return { data: rows, error: null }
+        }
+
+        return { data: single ? null : [], error: null }
+      }
+
+      if (table === 'shift_post_interests') {
+        return { data: single ? null : [], error: null }
+      }
+
       return { data: single ? null : [], error: null }
     }
 
-    const resolveMutation = () => ({ data: null, error: null })
+    const resolveMutation = () => {
+      if (table === 'shift_posts' && state.op === 'update') {
+        updatedShiftPosts.push({
+          filters: { ...state.filters },
+          payload: state.insertPayload ?? {},
+        })
+      }
+
+      if (table === 'shift_post_interests' && state.op === 'update') {
+        updatedShiftPostInterests.push({
+          filters: { ...state.filters },
+          payload: state.insertPayload ?? {},
+        })
+      }
+
+      return { data: null, error: null }
+    }
 
     const builder: {
       select: (columns?: string) => typeof builder
@@ -247,7 +308,8 @@ function makeSupabaseMock(scenario: Scenario) {
         onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
       ) => Promise<TResult1 | TResult2>
     } = {
-      select: () => {
+      select: (columns?: string) => {
+        state.selected = columns
         return builder
       },
       eq: (column, value) => {
@@ -278,8 +340,9 @@ function makeSupabaseMock(scenario: Scenario) {
         insertedShiftPayloads.push(payload)
         return builder
       },
-      update: () => {
+      update: (payload) => {
         state.op = 'update'
+        state.insertPayload = payload as Record<string, unknown>
         return builder
       },
       delete: () => {
@@ -298,7 +361,7 @@ function makeSupabaseMock(scenario: Scenario) {
     return builder
   }
 
-  return { auth, from, rpc, insertedShiftPayloads }
+  return { auth, from, rpc, insertedShiftPayloads, updatedShiftPosts, updatedShiftPostInterests }
 }
 
 describe('drag-drop API behavior', () => {
@@ -745,20 +808,22 @@ describe('drag-drop API behavior', () => {
   })
 
   it('removes a shift by shiftId and returns undo payload', async () => {
+    const supabase = makeSupabaseMock({
+      coverageStatuses: [],
+      weeklyShifts: [],
+      cyclePublished: true,
+      removableShift: {
+        id: 'shift-1',
+        cycle_id: 'cycle-1',
+        user_id: 'therapist-2',
+        date: '2026-03-12',
+        shift_type: 'night',
+        role: 'staff',
+      },
+      pendingShiftPosts: [{ id: 'post-1', shift_id: 'shift-1' }],
+    })
     vi.mocked(createClient).mockResolvedValue(
-      makeSupabaseMock({
-        coverageStatuses: [],
-        weeklyShifts: [],
-        cyclePublished: true,
-        removableShift: {
-          id: 'shift-1',
-          cycle_id: 'cycle-1',
-          user_id: 'therapist-2',
-          date: '2026-03-12',
-          shift_type: 'night',
-          role: 'staff',
-        },
-      }) as unknown as Awaited<ReturnType<typeof createClient>>
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
     )
 
     const response = await POST(
@@ -792,6 +857,75 @@ describe('drag-drop API behavior', () => {
         message: 'Your published schedule changed: your night shift on Mar 12 was removed.',
       })
     )
+    expect(supabase.updatedShiftPosts).toContainEqual({
+      filters: expect.objectContaining({
+        'in:id': ['post-1'],
+      }),
+      payload: expect.objectContaining({
+        status: 'denied',
+      }),
+    })
+    expect(supabase.updatedShiftPostInterests).toContainEqual({
+      filters: expect.objectContaining({
+        'in:shift_post_id': ['post-1'],
+        'in:status': ['pending', 'selected'],
+      }),
+      payload: expect.objectContaining({
+        status: 'declined',
+      }),
+    })
+  })
+
+  it('closes pending shift posts when a reopened preliminary shift is removed', async () => {
+    const supabase = makeSupabaseMock({
+      coverageStatuses: [],
+      weeklyShifts: [],
+      cyclePublished: false,
+      hasActivePreliminary: true,
+      removableShift: {
+        id: 'shift-1',
+        cycle_id: 'cycle-1',
+        user_id: 'therapist-2',
+        date: '2026-03-12',
+        shift_type: 'night',
+        role: 'staff',
+      },
+      pendingShiftPosts: [{ id: 'post-1', shift_id: 'shift-1' }],
+    })
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          action: 'remove',
+          cycleId: 'cycle-1',
+          shiftId: 'shift-1',
+        }),
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(supabase.updatedShiftPosts).toContainEqual({
+      filters: expect.objectContaining({
+        'in:id': ['post-1'],
+      }),
+      payload: expect.objectContaining({
+        status: 'denied',
+      }),
+    })
+    expect(supabase.updatedShiftPostInterests).toContainEqual({
+      filters: expect.objectContaining({
+        'in:shift_post_id': ['post-1'],
+        'in:status': ['pending', 'selected'],
+      }),
+      payload: expect.objectContaining({
+        status: 'declined',
+      }),
+    })
   })
 
   it('notifies the affected therapist when a published shift is moved', async () => {

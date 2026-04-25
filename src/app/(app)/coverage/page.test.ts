@@ -79,6 +79,18 @@ describe('coverage publish override affordance', () => {
     expect(source).toContain('No shifts assigned yet. Run Auto-draft or click a day to assign manually.')
   })
 
+  it('surfaces a proactive coverage-risk warning in the manager workflow before auto-draft runs', () => {
+    const client = readFileSync(coverageClientPath, 'utf8')
+    const server = readFileSync(coverageServerDataPath, 'utf8')
+
+    expect(server).toContain('buildCoverageRiskAlert')
+    expect(server).toContain('snapshot.proactiveCoverageRisk')
+    expect(client).toContain('const proactiveCoverageRisk = initialSnapshot.proactiveCoverageRisk')
+    expect(client).toContain('title={proactiveCoverageRisk.title}')
+    expect(client).toContain('description={proactiveCoverageRisk.description}')
+    expect(client).toContain('Review pre-flight')
+  })
+
   it('calls out live operational status badges on the published schedule', () => {
     const source = readFileSync(coverageClientPath, 'utf8')
 

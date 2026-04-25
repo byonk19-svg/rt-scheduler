@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
+import { isTrustedMutationRequest } from '@/lib/security/request-origin'
 import { createClient } from '@/lib/supabase/server'
 
 async function requireManager() {
@@ -33,6 +34,10 @@ async function requireManager() {
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!isTrustedMutationRequest(_request)) {
+    return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 })
+  }
+
   const { error, supabase } = await requireManager()
   if (error) return error
 

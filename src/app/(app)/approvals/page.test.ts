@@ -49,6 +49,7 @@ import {
 type TestContext = {
   userId?: string | null
   role?: string | null
+  requesterShiftType?: 'day' | 'night' | null
   pendingRequests?: Array<{
     id: string
     snapshot_id: string
@@ -151,7 +152,13 @@ function createSupabaseMock(context: TestContext) {
           if (table === 'profiles' && Array.isArray(filters.get('id'))) {
             return Promise.resolve(
               resolve({
-                data: [{ id: 'therapist-1', full_name: 'Barbara C.' }],
+                data: [
+                  {
+                    id: 'therapist-1',
+                    full_name: 'Barbara C.',
+                    shift_type: context.requesterShiftType ?? 'day',
+                  },
+                ],
                 error: null,
               })
             )
@@ -231,6 +238,38 @@ describe('approvals preliminary queue', () => {
     expect(html).toContain('Barbara C.')
     expect(html).toContain('Approve')
     expect(html).toContain('I can fill this shift.')
+  })
+
+  it('labels opposite-shift preliminary interest explicitly in the queue', async () => {
+    createClientMock.mockResolvedValue(
+      createSupabaseMock({
+        userId: 'manager-1',
+        role: 'manager',
+        pendingRequests: [
+          {
+            id: 'request-1',
+            snapshot_id: 'snapshot-1',
+            shift_id: 'shift-1',
+            requester_id: 'therapist-1',
+            type: 'claim_open_shift',
+            status: 'pending',
+            note: 'Can cover if needed.',
+            decision_note: null,
+            approved_by: null,
+            approved_at: null,
+            created_at: '2026-03-19T10:00:00.000Z',
+          },
+        ],
+        requesterShiftType: 'night',
+      })
+    )
+
+    const html = renderToStaticMarkup(await ApprovalsPage({ searchParams: Promise.resolve({}) }))
+
+    expect(html).toContain('Opposite-shift interest')
+    expect(html).toContain(
+      'needs manager approval before the preliminary assignment becomes active'
+    )
   })
 
   it('redirects non-managers away from approvals', async () => {

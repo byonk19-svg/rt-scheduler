@@ -82,7 +82,7 @@ describe('AppShell mobile menu', () => {
 describe('AppShell navigation structure', () => {
   it('routes staff availability navigation to the therapist availability page', () => {
     expect(shellConfigSource).toContain("'/therapist/availability'")
-    expect(shellConfigSource).toContain("label: 'Availability'")
+    expect(shellConfigSource).toContain("label: 'Future Availability'")
   })
 
   it('keeps the manager Schedule section active on the legacy /schedule route', () => {
@@ -101,9 +101,9 @@ describe('AppShell navigation structure', () => {
     )
   })
 
-  it('uses Open shifts wording in staff shell navigation', () => {
-    expect(shellConfigSource).toContain("label: 'Open shifts'")
-    expect(shellConfigSource).not.toContain("label: 'Shift Swaps'")
+  it('uses Shift Swaps & Pickups wording in staff shell navigation', () => {
+    expect(shellConfigSource).toContain("label: 'Shift Swaps & Pickups'")
+    expect(shellConfigSource).not.toContain("label: 'Open shifts'")
   })
 
   it('includes staff swap history in the flat staff nav', () => {
@@ -111,9 +111,9 @@ describe('AppShell navigation structure', () => {
     expect(shellConfigSource).toContain("label: 'History'")
   })
 
-  it('includes personal schedule in the flat staff nav', () => {
-    expect(shellConfigSource).toContain("href: '/staff/my-schedule'")
-    expect(shellConfigSource).toContain("label: 'My Schedule'")
+  it('includes the published schedule route in the flat staff nav', () => {
+    expect(shellConfigSource).toContain("href: '/therapist/schedule'")
+    expect(shellConfigSource).toContain("label: 'My Published Schedule'")
   })
 
   it('routes manager Today section to the manager dashboard', () => {

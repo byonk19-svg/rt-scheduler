@@ -40,6 +40,7 @@ export type Therapist = {
   is_lead_eligible: boolean
   employment_type: EmploymentType
   max_work_days_per_week: number
+  max_consecutive_days?: number | null
   works_dow: number[]
   offs_dow: number[]
   weekend_rotation: WeekendRotation

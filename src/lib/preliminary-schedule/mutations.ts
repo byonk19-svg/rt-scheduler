@@ -1,5 +1,6 @@
 import { toPreliminaryStateFromShift } from '@/lib/preliminary-schedule/selectors'
 import type {
+  PreliminaryDirectEditAction,
   CancelPreliminaryRequestParams,
   PreliminaryRequestRow,
   PreliminaryShiftRow,
@@ -20,6 +21,7 @@ type PreliminaryMutationErrorCode =
   | 'not_request_owner'
   | 'request_not_found'
   | 'request_not_pending'
+  | 'action_not_allowed'
   | 'database_error'
 
 export type PreliminaryMutationError = {
@@ -302,6 +304,81 @@ async function getShift(
   return { data, error: null }
 }
 
+async function getProfile(
+  supabase: SupabaseLike,
+  requesterId: string
+): Promise<
+  MutationResult<{
+    id: string
+    role: string | null
+    shift_type: 'day' | 'night' | null
+    is_lead_eligible?: boolean | null
+  }>
+> {
+  const { data, error } = (await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', requesterId)
+    .maybeSingle()) as {
+    data: {
+      id: string
+      role: string | null
+      shift_type: 'day' | 'night' | null
+      is_lead_eligible?: boolean | null
+    } | null
+    error: QueryError
+  }
+
+  if (error) {
+    return {
+      data: null,
+      error: mutationError('database_error', error.message ?? 'Could not load profile.'),
+    }
+  }
+
+  if (!data) {
+    return {
+      data: null,
+      error: mutationError('database_error', 'Could not load profile.'),
+    }
+  }
+
+  return { data, error: null }
+}
+
+async function getUserShiftOnDate(
+  supabase: SupabaseLike,
+  params: {
+    cycleId: string | null
+    userId: string
+    date: string
+  }
+): Promise<MutationResult<PreliminaryShiftRow | null>> {
+  if (!params.cycleId) {
+    return { data: null, error: null }
+  }
+
+  const { data, error } = (await supabase
+    .from('shifts')
+    .select('*')
+    .eq('cycle_id', params.cycleId)
+    .eq('user_id', params.userId)
+    .eq('date', params.date)
+    .maybeSingle()) as {
+    data: PreliminaryShiftRow | null
+    error: QueryError
+  }
+
+  if (error) {
+    return {
+      data: null,
+      error: mutationError('database_error', error.message ?? 'Could not load shifts for date.'),
+    }
+  }
+
+  return { data: data ?? null, error: null }
+}
+
 function buildRequest(
   params: SubmitPreliminaryRequestParams,
   type: PreliminaryRequestRow['type']
@@ -318,6 +395,229 @@ function buildRequest(
     approved_by: null,
     approved_at: null,
     created_at: nowIso(),
+  }
+}
+
+export async function applyDirectPreliminaryEdit(
+  supabase: SupabaseLike,
+  params: {
+    snapshotId: string
+    shiftId: string
+    requesterId: string
+    action: Extract<PreliminaryDirectEditAction, 'add_here' | 'remove_me'>
+  }
+): Promise<MutationResult<{ shiftId: string; action: 'add_here' | 'remove_me' }>> {
+  const [shiftState, shift, profile] = await Promise.all([
+    getShiftState(supabase, params.snapshotId, params.shiftId),
+    getShift(supabase, params.shiftId),
+    getProfile(supabase, params.requesterId),
+  ])
+  if (shiftState.error) return { data: null, error: shiftState.error }
+  if (shift.error) return { data: null, error: shift.error }
+  if (profile.error) return { data: null, error: profile.error }
+  if (!shiftState.data || !shift.data || !profile.data) {
+    return {
+      data: null,
+      error: mutationError('database_error', 'Could not load preliminary edit context.'),
+    }
+  }
+
+  const currentShiftState = shiftState.data
+  const currentShift = shift.data
+  const currentProfile = profile.data
+
+  if (params.action === 'remove_me') {
+    if (
+      currentShift.user_id !== params.requesterId ||
+      currentShiftState.state !== 'tentative_assignment'
+    ) {
+      return {
+        data: null,
+        error: mutationError('action_not_allowed', 'Only your own tentative shift can be removed.'),
+      }
+    }
+
+    const updatedShift = await supabase
+      .from('shifts')
+      .update({ user_id: null })
+      .eq('id', currentShift.id)
+
+    if (updatedShift.error) {
+      return {
+        data: null,
+        error: mutationError(
+          'database_error',
+          updatedShift.error.message ?? 'Could not remove preliminary assignment.'
+        ),
+      }
+    }
+
+    const updatedShiftState = await supabase
+      .from('preliminary_shift_states')
+      .update({
+        state: 'open',
+        reserved_by: null,
+        active_request_id: null,
+        updated_at: nowIso(),
+      })
+      .eq('id', currentShiftState.id)
+
+    if (updatedShiftState.error) {
+      return {
+        data: null,
+        error: mutationError(
+          'database_error',
+          updatedShiftState.error.message ?? 'Could not reopen preliminary shift.'
+        ),
+      }
+    }
+
+    return { data: { shiftId: currentShift.id, action: 'remove_me' }, error: null }
+  }
+
+  if (currentProfile.shift_type && currentShift.shift_type !== currentProfile.shift_type) {
+    return {
+      data: null,
+      error: mutationError(
+        'action_not_allowed',
+        'Only same-shift preliminary edits can be applied immediately.'
+      ),
+    }
+  }
+
+  if (currentShift.role === 'lead' && currentProfile.is_lead_eligible !== true) {
+    return {
+      data: null,
+      error: mutationError(
+        'action_not_allowed',
+        'Only lead-eligible therapists can take this preliminary lead slot.'
+      ),
+    }
+  }
+
+  if (
+    currentShiftState.state !== 'open' &&
+    !(
+      currentShiftState.state === 'tentative_assignment' &&
+      currentShift.user_id !== params.requesterId
+    )
+  ) {
+    return {
+      data: null,
+      error: mutationError(
+        'action_not_allowed',
+        'Only open or filled same-shift preliminary slots can be taken immediately.'
+      ),
+    }
+  }
+
+  const existingShiftOnDate = await getUserShiftOnDate(supabase, {
+    cycleId: currentShift.cycle_id,
+    userId: params.requesterId,
+    date: currentShift.date,
+  })
+  if (existingShiftOnDate.error) return { data: null, error: existingShiftOnDate.error }
+  if (existingShiftOnDate.data && existingShiftOnDate.data.id !== currentShift.id) {
+    return {
+      data: null,
+      error: mutationError(
+        'action_not_allowed',
+        'You already have a preliminary shift on this date.'
+      ),
+    }
+  }
+
+  if (currentShiftState.state === 'open') {
+    const updatedShift = await supabase
+      .from('shifts')
+      .update({ user_id: params.requesterId })
+      .eq('id', currentShift.id)
+
+    if (updatedShift.error) {
+      return {
+        data: null,
+        error: mutationError(
+          'database_error',
+          updatedShift.error.message ?? 'Could not assign preliminary shift.'
+        ),
+      }
+    }
+
+    const updatedShiftState = await supabase
+      .from('preliminary_shift_states')
+      .update({
+        state: 'tentative_assignment',
+        reserved_by: params.requesterId,
+        active_request_id: null,
+        updated_at: nowIso(),
+      })
+      .eq('id', currentShiftState.id)
+
+    if (updatedShiftState.error) {
+      return {
+        data: null,
+        error: mutationError(
+          'database_error',
+          updatedShiftState.error.message ?? 'Could not update preliminary slot state.'
+        ),
+      }
+    }
+
+    return { data: { shiftId: currentShift.id, action: 'add_here' }, error: null }
+  }
+
+  const insertedShift = await supabase
+    .from('shifts')
+    .insert({
+      cycle_id: currentShift.cycle_id,
+      user_id: params.requesterId,
+      date: currentShift.date,
+      shift_type: currentShift.shift_type,
+      status: currentShift.status,
+      role: currentShift.role,
+    })
+    .select()
+    .single()
+
+  if (insertedShift.error || !insertedShift.data) {
+    return {
+      data: null,
+      error: mutationError(
+        'database_error',
+        insertedShift.error?.message ?? 'Could not add you to this preliminary shift.'
+      ),
+    }
+  }
+
+  const newShiftState: PreliminaryShiftStateRow = {
+    id: newId(),
+    snapshot_id: params.snapshotId,
+    shift_id: (insertedShift.data as PreliminaryShiftRow).id,
+    state: 'tentative_assignment',
+    reserved_by: params.requesterId,
+    active_request_id: null,
+    updated_at: nowIso(),
+  }
+
+  const insertedShiftState = await supabase
+    .from('preliminary_shift_states')
+    .upsert([newShiftState as unknown as Record<string, unknown>], {
+      onConflict: 'snapshot_id,shift_id',
+    })
+
+  if (insertedShiftState.error) {
+    return {
+      data: null,
+      error: mutationError(
+        'database_error',
+        insertedShiftState.error.message ?? 'Could not add the new preliminary shift state.'
+      ),
+    }
+  }
+
+  return {
+    data: { shiftId: (insertedShift.data as PreliminaryShiftRow).id, action: 'add_here' },
+    error: null,
   }
 }
 
@@ -538,6 +838,40 @@ async function reviewPreliminaryRequest(
         'database_error',
         updatedRequest.error.message ?? 'Could not review preliminary request.'
       ),
+    }
+  }
+
+  if (currentRequest.type === 'claim_open_shift') {
+    const shiftUpdate = await supabase
+      .from('shifts')
+      .update({ user_id: nextStatus === 'approved' ? currentRequest.requester_id : null })
+      .eq('id', currentRequest.shift_id)
+
+    if (shiftUpdate.error) {
+      return {
+        data: null,
+        error: mutationError(
+          'database_error',
+          shiftUpdate.error.message ?? 'Could not sync the preliminary claim to the schedule.'
+        ),
+      }
+    }
+  }
+
+  if (currentRequest.type === 'request_change' && nextStatus === 'approved') {
+    const shiftUpdate = await supabase
+      .from('shifts')
+      .update({ user_id: null })
+      .eq('id', currentRequest.shift_id)
+
+    if (shiftUpdate.error) {
+      return {
+        data: null,
+        error: mutationError(
+          'database_error',
+          shiftUpdate.error.message ?? 'Could not sync the preliminary change to the schedule.'
+        ),
+      }
     }
   }
 

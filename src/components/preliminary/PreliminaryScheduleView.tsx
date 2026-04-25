@@ -5,6 +5,7 @@ import { PreliminaryShiftCard } from '@/components/preliminary/PreliminaryShiftC
 import type {
   PreliminaryHistoryItem,
   PreliminaryShiftCard as PreliminaryShiftCardModel,
+  PreliminaryTeamScheduleShift,
 } from '@/lib/preliminary-schedule/types'
 
 type PreliminaryScheduleViewProps = {
@@ -12,10 +13,13 @@ type PreliminaryScheduleViewProps = {
   cycleLabel: string
   snapshotSentAt: string
   currentUserId: string
+  highlightedShiftId?: string | null
   cards: PreliminaryShiftCardModel[]
   historyItems: PreliminaryHistoryItem[]
+  teamShifts: PreliminaryTeamScheduleShift[]
   claimAction: (formData: FormData) => void | Promise<void>
   requestChangeAction: (formData: FormData) => void | Promise<void>
+  directEditAction: (formData: FormData) => void | Promise<void>
   cancelAction: (formData: FormData) => void | Promise<void>
   successMessage?: string | null
   errorMessage?: string | null
@@ -44,20 +48,49 @@ function formatWeekLabel(value: string) {
   return `Week of ${parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
 }
 
+function formatShiftDate(value: string) {
+  const parsed = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
 export function PreliminaryScheduleView({
   snapshotId,
   cycleLabel,
   snapshotSentAt,
   currentUserId,
+  highlightedShiftId = null,
   cards,
   historyItems,
+  teamShifts,
   claimAction,
   requestChangeAction,
+  directEditAction,
   cancelAction,
   successMessage,
   errorMessage,
 }: PreliminaryScheduleViewProps) {
-  void currentUserId
+  const groupedTeamShifts = teamShifts.reduce<
+    Array<{ weekStart: string; weekLabel: string; items: PreliminaryTeamScheduleShift[] }>
+  >((groups, shift) => {
+    const weekStart = getWeekStartKey(shift.shiftDate)
+    const existing = groups.find((group) => group.weekStart === weekStart)
+    if (existing) {
+      existing.items.push(shift)
+      return groups
+    }
+
+    groups.push({
+      weekStart,
+      weekLabel: formatWeekLabel(weekStart),
+      items: [shift],
+    })
+    return groups
+  }, [])
 
   const groupedCards = cards.reduce<
     Array<{ weekStart: string; weekLabel: string; items: PreliminaryShiftCardModel[] }>
@@ -89,6 +122,55 @@ export function PreliminaryScheduleView({
       </div>
 
       <div className="px-6">
+        <section className="rounded-xl border border-border bg-card px-4 py-4 shadow-tw-sm">
+          <h2 className="text-sm font-semibold text-foreground">Team schedule overview</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            You can review the full preliminary schedule here. You can only change your own
+            assignment or claim open shifts.
+          </p>
+          <div className="mt-4 space-y-5">
+            {groupedTeamShifts.map((group) => (
+              <div key={group.weekStart} className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <p className="text-[0.72rem] font-bold uppercase tracking-[0.12em] text-foreground/60">
+                    {group.weekLabel}
+                  </p>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+                <div className="space-y-2">
+                  {group.items.map((shift) => (
+                    <div
+                      key={shift.shiftId}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2.5"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          {formatShiftDate(shift.shiftDate)}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {shift.shiftType === 'day' ? 'Day' : 'Night'}
+                          {shift.shiftRole === 'lead' ? ' · Lead' : ''}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-foreground">
+                          {shift.assignedName ?? 'Open slot'}
+                          {shift.isCurrentUser ? ' · You' : ''}
+                        </p>
+                        <p className="mt-0.5 text-xs capitalize text-muted-foreground">
+                          {shift.pendingApproval
+                            ? 'pending approval'
+                            : shift.state.replaceAll('_', ' ')}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {successMessage && (
           <div className="mb-3 rounded-md border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-2 text-xs font-semibold text-[var(--success-text)]">
             {successMessage}
@@ -100,7 +182,7 @@ export function PreliminaryScheduleView({
           </div>
         )}
 
-        <div className="space-y-10">
+        <div className="mt-5 space-y-10">
           {cards.length === 0 ? (
             <div className="rounded-xl border border-border bg-card px-6 py-10 text-center shadow-tw-sm">
               <p className="text-sm font-semibold text-foreground">
@@ -126,8 +208,11 @@ export function PreliminaryScheduleView({
                       key={card.shiftId}
                       snapshotId={snapshotId}
                       card={card}
+                      currentUserId={currentUserId}
+                      highlighted={highlightedShiftId === card.shiftId}
                       claimAction={claimAction}
                       requestChangeAction={requestChangeAction}
+                      directEditAction={directEditAction}
                     />
                   ))}
                 </div>

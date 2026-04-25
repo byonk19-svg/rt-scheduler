@@ -30,11 +30,11 @@ describe('buildPublishEmailPayload', () => {
     const payload = buildPublishEmailPayload({
       recipientName: 'Tannie',
       cycleLabel: 'Mar 22 - May 2',
-      scheduleUrl: 'https://teamwise.test/staff/schedule',
+      scheduleUrl: 'https://teamwise.test/therapist/schedule',
     })
 
     expect(payload.subject).toContain('Mar 22 - May 2')
-    expect(payload.text).toContain('https://teamwise.test/staff/schedule')
+    expect(payload.text).toContain('https://teamwise.test/therapist/schedule')
     expect(payload.html).toContain('View your schedule')
   })
 })
@@ -217,6 +217,8 @@ describe('processQueuedPublishEmails', () => {
       publishEventCounts: { queuedCount: 0, sentCount: 1, failedCount: 0 },
     })
     expect(fetchMock).toHaveBeenCalledOnce()
+    const fetchPayload = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string)
+    expect(fetchPayload.html).toContain('https://www.teamwise.work/therapist/schedule')
     expect(outboxUpdates[0]).toMatchObject({
       id: 'outbox-1',
       payload: expect.objectContaining({ status: 'sent', attempt_count: 1 }),

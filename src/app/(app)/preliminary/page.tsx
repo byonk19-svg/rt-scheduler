@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 
 import {
+  applyDirectPreliminaryEditAction,
   cancelPreliminaryRequestAction,
   claimPreliminaryShiftAction,
   requestPreliminaryChangeAction,
@@ -15,6 +16,7 @@ import type {
   PreliminaryShiftRow,
   PreliminaryShiftStateRow,
   PreliminarySnapshotRow,
+  PreliminaryTeamScheduleShift,
 } from '@/lib/preliminary-schedule/types'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
@@ -24,6 +26,8 @@ type PreliminarySearchParams = Record<string, string | string[] | undefined>
 type PreliminaryProfileRow = {
   id: string
   role: string | null
+  shift_type: 'day' | 'night' | null
+  is_lead_eligible: boolean | null
   is_active: boolean | null
   archived_at: string | null
 }
@@ -31,6 +35,12 @@ type PreliminaryProfileRow = {
 type CycleRow = {
   id: string
   label: string
+}
+
+type ProfileNameRow = {
+  id: string
+  full_name: string | null
+  shift_type?: 'day' | 'night' | null
 }
 
 function getSearchParam(value: string | string[] | undefined): string | undefined {
@@ -83,6 +93,7 @@ export default async function PreliminaryPage({
   const params = searchParams ? await searchParams : undefined
   const success = toSuccessMessage(getSearchParam(params?.success))
   const error = toErrorMessage(getSearchParam(params?.error))
+  const highlightedShiftId = getSearchParam(params?.shift) ?? null
 
   const supabase = await createClient()
   const {
@@ -95,7 +106,7 @@ export default async function PreliminaryPage({
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, role, is_active, archived_at')
+    .select('id, role, shift_type, is_lead_eligible, is_active, archived_at')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -160,6 +171,16 @@ export default async function PreliminaryPage({
 
   const shiftStates = (shiftStatesData ?? []) as PreliminaryShiftStateRow[]
   const shiftIds = Array.from(new Set(shiftStates.map((state) => state.shift_id)))
+  const profileIds = Array.from(
+    new Set(
+      shiftStates
+        .map((state) => state.reserved_by)
+        .concat(
+          ((requestsData ?? []) as PreliminaryRequestRow[]).map((request) => request.requester_id)
+        )
+        .filter((value): value is string => Boolean(value))
+    )
+  )
 
   let shiftsData: Array<
     PreliminaryShiftRow & {
@@ -181,6 +202,20 @@ export default async function PreliminaryPage({
           profiles: { full_name: string | null } | { full_name: string | null }[] | null
         }
       > | null) ?? []
+  }
+
+  const profileNamesById = new Map<string, string>()
+  const profileShiftTypesById = new Map<string, 'day' | 'night' | null>()
+  if (profileIds.length > 0) {
+    const { data: profileRows } = await supabase
+      .from('profiles')
+      .select('id, full_name, shift_type')
+      .in('id', profileIds)
+
+    for (const row of (profileRows ?? []) as ProfileNameRow[]) {
+      profileNamesById.set(row.id, row.full_name ?? 'Unknown')
+      profileShiftTypesById.set(row.id, row.shift_type ?? null)
+    }
   }
 
   const shiftsById = new Map(
@@ -207,7 +242,11 @@ export default async function PreliminaryPage({
       return toPreliminaryShiftCard({
         shift,
         shiftState: state,
+        reservedByName: state.reserved_by
+          ? (profileNamesById.get(state.reserved_by) ?? null)
+          : null,
         currentUserId: user.id,
+        currentUserShiftType: currentProfile.shift_type ?? null,
       })
     })
     .filter((card): card is NonNullable<typeof card> => Boolean(card))
@@ -219,6 +258,7 @@ export default async function PreliminaryPage({
       return (
         card.canClaim ||
         card.canRequestChange ||
+        card.directAction != null ||
         card.assignedUserId === user.id ||
         card.reservedById === user.id
       )
@@ -230,9 +270,35 @@ export default async function PreliminaryPage({
       return left.shiftDate.localeCompare(right.shiftDate)
     })
 
+  const shiftStateByShiftId = new Map(shiftStates.map((state) => [state.shift_id, state]))
+  const teamShifts: PreliminaryTeamScheduleShift[] = Array.from(shiftsById.values())
+    .map((shift) => {
+      const shiftState = shiftStateByShiftId.get(shift.id)
+      return {
+        shiftId: shift.id,
+        shiftDate: shift.date,
+        shiftType: shift.shift_type,
+        shiftRole: shift.role,
+        assignedName:
+          shiftState?.state === 'pending_claim' && shiftState.reserved_by
+            ? (profileNamesById.get(shiftState.reserved_by) ?? shift.full_name)
+            : shift.full_name,
+        state: shiftState?.state ?? (shift.user_id ? 'tentative_assignment' : 'open'),
+        isCurrentUser: shift.user_id === user.id,
+        pendingApproval: shiftState?.state === 'pending_claim',
+      } satisfies PreliminaryTeamScheduleShift
+    })
+    .sort((left, right) => {
+      if (left.shiftDate === right.shiftDate) {
+        return left.shiftType.localeCompare(right.shiftType)
+      }
+      return left.shiftDate.localeCompare(right.shiftDate)
+    })
+
   const history = toTherapistPreliminaryHistory(
     (requestsData ?? []) as PreliminaryRequestRow[],
-    shiftsById
+    shiftsById,
+    profileShiftTypesById
   )
 
   return (
@@ -241,10 +307,13 @@ export default async function PreliminaryPage({
       cycleLabel={(cycleData as CycleRow | null)?.label ?? 'Preliminary schedule'}
       snapshotSentAt={snapshot.sent_at}
       currentUserId={user.id}
+      highlightedShiftId={highlightedShiftId}
       cards={cards}
       historyItems={history}
+      teamShifts={teamShifts}
       claimAction={claimPreliminaryShiftAction}
       requestChangeAction={requestPreliminaryChangeAction}
+      directEditAction={applyDirectPreliminaryEditAction}
       cancelAction={cancelPreliminaryRequestAction}
       successMessage={success}
       errorMessage={error}
