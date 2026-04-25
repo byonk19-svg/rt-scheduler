@@ -180,6 +180,19 @@ describe('POST /api/inbound/availability-email', () => {
     afterMock.mockClear()
   })
 
+  it('rejects invalid webhook signatures before background processing starts', async () => {
+    isValidResendWebhookRequestMock.mockResolvedValueOnce(false)
+
+    const response = await POST(createWebhookRequest())
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Invalid webhook signature.',
+    })
+    expect(createAdminClientMock).not.toHaveBeenCalled()
+    expect(afterMock).not.toHaveBeenCalled()
+  })
+
   it('creates batch items and auto-applies only high-confidence sources', async () => {
     const admin = createAdminMock()
     createAdminClientMock.mockReturnValue(admin)

@@ -16,4 +16,14 @@ describe('schedule pre-flight route', () => {
     expect(source).toContain('runPreFlight')
     expect(source).toContain('summarizePreFlight')
   })
+
+  it('matches the coverage page therapist-eligibility filters for pre-flight calculations', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/app/api/schedule/pre-flight/route.ts'),
+      'utf8'
+    )
+
+    expect(source).toContain(".eq('is_active', true)")
+    expect(source).toContain(".eq('on_fmla', false)")
+  })
 })

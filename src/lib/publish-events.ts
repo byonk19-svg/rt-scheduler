@@ -16,6 +16,7 @@ export type NotificationOutboxCountRow = {
 type OutboxRow = {
   id: string
   publish_event_id: string
+  user_id: string | null
   email: string
   name: string | null
   attempt_count: number
@@ -24,6 +25,11 @@ type OutboxRow = {
 type PublishEventLookupRow = {
   id: string
   schedule_cycles: { label: string | null } | { label: string | null }[] | null
+}
+
+type EmailPreferenceRow = {
+  id: string
+  notification_email_enabled?: boolean | null
 }
 
 export type ProcessQueuedPublishEmailsResult = {
@@ -203,7 +209,7 @@ export async function processQueuedPublishEmails(
 
   let outboxQuery = admin
     .from('notification_outbox')
-    .select('id, publish_event_id, email, name, attempt_count')
+    .select('id, publish_event_id, user_id, email, name, attempt_count')
     .eq('channel', 'email')
     .eq('status', 'queued')
     .order('created_at', { ascending: true })
@@ -221,6 +227,28 @@ export async function processQueuedPublishEmails(
 
   const rows = (queuedRows ?? []) as OutboxRow[]
   const eventIds = Array.from(new Set(rows.map((row) => row.publish_event_id)))
+  const preferenceUserIds = Array.from(
+    new Set(rows.map((row) => row.user_id).filter((value): value is string => Boolean(value)))
+  )
+
+  let emailPreferenceByUserId = new Map<string, boolean>()
+  if (preferenceUserIds.length > 0) {
+    const { data: preferenceRows, error: preferenceError } = await admin
+      .from('profiles')
+      .select('id, notification_email_enabled')
+      .in('id', preferenceUserIds)
+
+    if (preferenceError) {
+      throw new Error(preferenceError.message)
+    }
+
+    emailPreferenceByUserId = new Map(
+      ((preferenceRows ?? []) as EmailPreferenceRow[]).map((row) => [
+        row.id,
+        row.notification_email_enabled !== false,
+      ])
+    )
+  }
 
   if (rows.length === 0) {
     const counts = publishEventId
@@ -281,8 +309,26 @@ export async function processQueuedPublishEmails(
   let nextSendNotBefore = 0
 
   for (const row of rows) {
+    if (row.user_id && emailPreferenceByUserId.get(row.user_id) === false) {
+      const { error: skipUpdateError } = await admin
+        .from('notification_outbox')
+        .update({
+          status: 'sent',
+          attempt_count: row.attempt_count,
+          last_error: 'Skipped: email notifications disabled.',
+          sent_at: null,
+        })
+        .eq('id', row.id)
+
+      if (skipUpdateError) {
+        throw new Error(skipUpdateError.message)
+      }
+
+      continue
+    }
+
     const cycleLabel = cycleLabelByEventId.get(row.publish_event_id) ?? 'Current cycle'
-    const scheduleUrl = `${emailConfig.appBaseUrl.replace(/\/$/, '')}/staff/schedule`
+    const scheduleUrl = `${emailConfig.appBaseUrl.replace(/\/$/, '')}/therapist/schedule`
     const emailPayload = buildPublishEmailPayload({
       recipientName: row.name,
       cycleLabel,

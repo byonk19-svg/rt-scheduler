@@ -6,6 +6,7 @@ import {
   normalizeDefaultScheduleView,
   normalizeViewMode,
   pickTherapistForDate,
+  wouldExceedMaxConsecutiveDays,
 } from '@/lib/schedule-helpers'
 
 function buildTherapist(overrides?: Partial<Therapist>): Therapist {
@@ -25,6 +26,7 @@ function buildTherapist(overrides?: Partial<Therapist>): Therapist {
     on_fmla: false,
     fmla_return_date: null,
     is_active: true,
+    max_consecutive_days: 3,
     ...overrides,
   }
 }
@@ -408,5 +410,43 @@ describe('pickTherapistForDate', () => {
     )
 
     expect(pick.therapist).toBeNull()
+  })
+
+  it('blocks assignments that would exceed max consecutive days', () => {
+    const therapist = buildTherapist({
+      id: 'limited',
+      max_consecutive_days: 3,
+    })
+
+    const pick = pickTherapistForDate(
+      [therapist],
+      0,
+      '2026-03-04',
+      'day',
+      new Map<string, AvailabilityOverrideRow[]>(),
+      'cycle-1',
+      new Set<string>(),
+      new Map([['limited:2026-03-01', new Set(['2026-03-01', '2026-03-02', '2026-03-03'])]]),
+      new Map([['limited', 5]]),
+      new Map(),
+      new Map([['limited', new Set(['2026-03-01', '2026-03-02', '2026-03-03'])]])
+    )
+
+    expect(pick.therapist).toBeNull()
+  })
+})
+
+describe('wouldExceedMaxConsecutiveDays', () => {
+  it('counts the adjacent streak around the target date', () => {
+    expect(
+      wouldExceedMaxConsecutiveDays(
+        new Set(['2026-03-01', '2026-03-02', '2026-03-03']),
+        '2026-03-04',
+        3
+      )
+    ).toBe(true)
+    expect(
+      wouldExceedMaxConsecutiveDays(new Set(['2026-03-01', '2026-03-03']), '2026-03-02', 3)
+    ).toBe(false)
   })
 })

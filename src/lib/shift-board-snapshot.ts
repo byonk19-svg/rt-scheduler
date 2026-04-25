@@ -1,12 +1,19 @@
 import { toUiRole, type UiRole } from '@/lib/auth/roles'
 import { resolveCoverageCycle } from '@/lib/coverage/active-cycle'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
+import { sortPickupInterestCandidates } from '@/lib/pickup-interest-presentation'
 import { buildDateRange, dateKeyFromDate } from '@/lib/schedule-helpers'
+import { canUserSeeShiftPost } from '@/lib/shift-post-visibility'
 
 export type ShiftBoardTab = 'open' | 'history'
 export type ShiftBoardRequestType = 'swap' | 'pickup'
-export type ShiftBoardPersistedRequestStatus = 'pending' | 'approved' | 'denied' | 'expired'
-export type ShiftBoardRequestStatus = 'pending' | 'approved' | 'denied' | 'expired'
+export type ShiftBoardPersistedRequestStatus =
+  | 'pending'
+  | 'approved'
+  | 'denied'
+  | 'expired'
+  | 'withdrawn'
+export type ShiftBoardRequestStatus = 'pending' | 'approved' | 'denied' | 'expired' | 'withdrawn'
 export type ShiftBoardShiftType = 'day' | 'night'
 export type ShiftBoardShiftStatus = 'scheduled' | 'on_call' | 'sick' | 'called_off'
 export type ShiftBoardShiftRole = 'lead' | 'staff'
@@ -16,11 +23,22 @@ type ShiftPostRow = {
   shift_id: string | null
   posted_by: string | null
   claimed_by: string | null
+  visibility: 'team' | 'direct' | null
+  recipient_response: 'pending' | 'accepted' | 'declined' | null
+  request_kind: 'standard' | 'call_in' | null
   message: string
   type: ShiftBoardRequestType
   status: ShiftBoardPersistedRequestStatus
   created_at: string
   override_reason?: string | null
+}
+
+type ShiftPostInterestRow = {
+  id: string
+  shift_post_id: string
+  therapist_id: string
+  status: 'pending' | 'withdrawn' | 'selected' | 'declined'
+  created_at: string
 }
 
 type ShiftLookupRow = {
@@ -57,6 +75,9 @@ type ShiftCoverageRow = {
 export type ShiftBoardRequest = {
   id: string
   type: ShiftBoardRequestType
+  visibility: 'team' | 'direct'
+  recipientResponse: 'pending' | 'accepted' | 'declined' | null
+  requestKind: 'standard' | 'call_in'
   poster: string
   postedById: string | null
   avatar: string
@@ -70,6 +91,17 @@ export type ShiftBoardRequest = {
   swapWithName: string | null
   swapWithId: string | null
   claimedById: string | null
+  pendingInterestCount: number
+  hasMyInterest: boolean
+  myInterestId: string | null
+  myInterestStatus: 'pending' | 'selected' | null
+  interestCandidates: Array<{
+    id: string
+    therapistId: string
+    therapistName: string
+    createdAt: string
+    status: 'pending' | 'selected'
+  }>
   shiftType: ShiftBoardShiftType | null
   shiftRole: ShiftBoardShiftRole | null
   overrideReason: string | null
@@ -94,7 +126,7 @@ export type ShiftBoardAuthorizedSnapshot = {
 
 export type ShiftBoardSnapshot = { unauthorized: true } | ShiftBoardAuthorizedSnapshot
 
-const HISTORY_STATUSES: ShiftBoardRequestStatus[] = ['approved', 'denied', 'expired']
+const HISTORY_STATUSES: ShiftBoardRequestStatus[] = ['approved', 'denied', 'expired', 'withdrawn']
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
@@ -175,12 +207,14 @@ export async function loadShiftBoardSnapshot({
   let postsQuery = supabase
     .from('shift_posts')
     .select(
-      'id, shift_id, posted_by, claimed_by, message, type, status, created_at, override_reason'
+      'id, shift_id, posted_by, claimed_by, visibility, recipient_response, request_kind, message, type, status, created_at, override_reason'
     )
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
 
   if (tab === 'open') {
     postsQuery = postsQuery.neq('status', 'expired')
+    postsQuery = postsQuery.neq('status', 'withdrawn')
   } else {
     postsQuery = postsQuery.in('status', HISTORY_STATUSES).limit(50)
   }
@@ -284,6 +318,16 @@ export async function loadShiftBoardSnapshot({
   }
 
   const postRows = (postsResult.data ?? []) as ShiftPostRow[]
+  const postIds = postRows.map((row) => row.id)
+  const { data: interestRowsData } =
+    postIds.length > 0
+      ? await supabase
+          .from('shift_post_interests')
+          .select('id, shift_post_id, therapist_id, status, created_at')
+          .in('shift_post_id', postIds)
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
+      : { data: [] }
   const shiftIds = Array.from(
     new Set(postRows.map((row) => row.shift_id).filter((value): value is string => Boolean(value)))
   )
@@ -302,6 +346,7 @@ export async function loadShiftBoardSnapshot({
     new Set(
       postRows
         .flatMap((row) => [row.posted_by, row.claimed_by])
+        .concat(((interestRowsData ?? []) as ShiftPostInterestRow[]).map((row) => row.therapist_id))
         .filter((value): value is string => Boolean(value))
     )
   )
@@ -321,16 +366,52 @@ export async function loadShiftBoardSnapshot({
     )
   }
 
-  const requests = postRows.map((row) => {
+  const visiblePostRows = postRows
+    .filter((row) => canUserSeeShiftPost(row, user.id, role))
+    .sort((left, right) => {
+      const createdAtComparison = right.created_at.localeCompare(left.created_at)
+      if (createdAtComparison !== 0) {
+        return createdAtComparison
+      }
+
+      return right.id.localeCompare(left.id)
+    })
+
+  const interestsByPostId = new Map<string, ShiftPostInterestRow[]>()
+  for (const row of (interestRowsData ?? []) as ShiftPostInterestRow[]) {
+    const bucket = interestsByPostId.get(row.shift_post_id) ?? []
+    bucket.push(row)
+    interestsByPostId.set(row.shift_post_id, bucket)
+  }
+
+  const requests = visiblePostRows.map((row) => {
     const shift = row.shift_id ? shiftsById.get(row.shift_id) : null
     const posterName = row.posted_by
       ? (namesById.get(row.posted_by) ?? 'Unknown therapist')
       : 'Unknown therapist'
     const shiftLabel = shift ? formatShiftLabel(shift.date, shift.shift_type) : 'Shift unavailable'
 
+    const activeInterests = (interestsByPostId.get(row.id) ?? [])
+      .filter(
+        (
+          interest
+        ): interest is ShiftPostInterestRow & {
+          status: 'pending' | 'selected'
+        } => interest.status === 'pending' || interest.status === 'selected'
+      )
+      .map((interest) => ({
+        ...interest,
+        createdAt: interest.created_at,
+      }))
+    const orderedActiveInterests = sortPickupInterestCandidates(activeInterests)
+    const myActiveInterest =
+      orderedActiveInterests.find((interest) => interest.therapist_id === user.id) ?? null
     return {
       id: row.id,
       type: row.type,
+      visibility: row.visibility ?? 'team',
+      recipientResponse: row.recipient_response ?? null,
+      requestKind: row.request_kind ?? 'standard',
       poster: posterName,
       postedById: row.posted_by,
       avatar: initials(posterName),
@@ -344,6 +425,20 @@ export async function loadShiftBoardSnapshot({
       swapWithName: row.claimed_by ? (namesById.get(row.claimed_by) ?? null) : null,
       swapWithId: row.claimed_by ?? null,
       claimedById: row.claimed_by ?? null,
+      pendingInterestCount: orderedActiveInterests.length,
+      hasMyInterest: Boolean(myActiveInterest),
+      myInterestId: myActiveInterest?.id ?? null,
+      myInterestStatus:
+        myActiveInterest?.status === 'selected' || myActiveInterest?.status === 'pending'
+          ? myActiveInterest.status
+          : null,
+      interestCandidates: orderedActiveInterests.map((interest) => ({
+        id: interest.id,
+        therapistId: interest.therapist_id,
+        therapistName: namesById.get(interest.therapist_id) ?? 'Unknown therapist',
+        createdAt: interest.createdAt,
+        status: interest.status,
+      })),
       shiftType: shift?.shift_type ?? null,
       shiftRole: shift?.role ?? null,
       overrideReason: row.override_reason ?? null,

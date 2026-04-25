@@ -50,14 +50,14 @@ export default async function RequestsPage() {
               <Repeat className="h-4 w-4" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-foreground">Open shifts</p>
+              <p className="text-sm font-semibold text-foreground">Shift Swaps & Pickups</p>
               <p className="mt-1 text-sm text-foreground/80">
-                Review and manage shift pickups and swaps.
+                Review and manage the shared shift-swaps-and-pickups workflow.
               </p>
             </div>
           </div>
           <Button asChild variant="outline" size="sm" className="mt-4">
-            <Link href="/shift-board">Open shifts</Link>
+            <Link href="/shift-board">Shift Swaps & Pickups</Link>
           </Button>
         </article>
 

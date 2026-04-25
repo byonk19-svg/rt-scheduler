@@ -8,6 +8,7 @@ export type PreliminaryShiftState =
   | 'pending_change'
 export type PreliminaryRequestType = 'claim_open_shift' | 'request_change'
 export type PreliminaryRequestStatus = 'pending' | 'approved' | 'denied' | 'cancelled'
+export type PreliminaryDirectEditAction = 'add_here' | 'remove_me' | 'express_interest'
 
 export type PreliminarySnapshotRow = {
   id: string
@@ -63,9 +64,23 @@ export type PreliminaryShiftCard = {
   assignedName: string | null
   state: PreliminaryShiftState
   reservedById: string | null
+  reservedByName: string | null
   requestId: string | null
   canClaim: boolean
   canRequestChange: boolean
+  directAction: PreliminaryDirectEditAction | null
+  directActionLabel: string | null
+}
+
+export type PreliminaryTeamScheduleShift = {
+  shiftId: string
+  shiftDate: string
+  shiftType: 'day' | 'night'
+  shiftRole: ShiftRole
+  assignedName: string | null
+  state: PreliminaryShiftState
+  isCurrentUser: boolean
+  pendingApproval: boolean
 }
 
 export type PreliminaryHistoryItem = {
@@ -75,6 +90,7 @@ export type PreliminaryHistoryItem = {
   shiftDate: string
   shiftType: 'day' | 'night'
   requestType: PreliminaryRequestType
+  isOppositeShiftRequest: boolean
   status: PreliminaryRequestStatus
   note: string | null
   createdAt: string
@@ -88,6 +104,7 @@ export type ManagerPreliminaryQueueItem = {
   requesterId: string
   requesterName: string
   requestType: PreliminaryRequestType
+  isOppositeShiftRequest: boolean
   status: PreliminaryRequestStatus
   note: string | null
   createdAt: string

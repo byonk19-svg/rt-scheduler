@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   approvePreliminaryRequest,
   cancelPreliminaryRequest,
+  applyDirectPreliminaryEdit,
   denyPreliminaryRequest,
   refreshPreliminarySnapshot,
   sendPreliminarySnapshot,
@@ -21,6 +22,12 @@ type DbState = {
   preliminaryShiftStates: PreliminaryShiftStateRow[]
   preliminaryRequests: PreliminaryRequestRow[]
   shifts: PreliminaryShiftRow[]
+  profiles: Array<{
+    id: string
+    role: string | null
+    shift_type: 'day' | 'night' | null
+    is_lead_eligible?: boolean | null
+  }>
 }
 
 function makeSnapshot(overrides: Partial<PreliminarySnapshotRow> = {}): PreliminarySnapshotRow {
@@ -88,6 +95,7 @@ function createSupabaseMock(initialState: Partial<DbState> = {}) {
     preliminaryShiftStates: initialState.preliminaryShiftStates ?? [],
     preliminaryRequests: initialState.preliminaryRequests ?? [],
     shifts: initialState.shifts ?? [],
+    profiles: initialState.profiles ?? [],
   }
 
   function applyFilters<T extends Record<string, unknown>>(
@@ -129,6 +137,11 @@ function createSupabaseMock(initialState: Partial<DbState> = {}) {
           return { data: row, error: null }
         }
 
+        if (table === 'profiles') {
+          const row = applyFilters(state.profiles, filters)[0] ?? null
+          return { data: row, error: null }
+        }
+
         return { data: null, error: null }
       },
       insert(payload: Record<string, unknown> | Array<Record<string, unknown>>) {
@@ -142,6 +155,8 @@ function createSupabaseMock(initialState: Partial<DbState> = {}) {
                   state.preliminarySnapshots.push(inserted as PreliminarySnapshotRow)
                 } else if (table === 'preliminary_requests') {
                   state.preliminaryRequests.push(inserted as PreliminaryRequestRow)
+                } else if (table === 'shifts') {
+                  state.shifts.push(inserted as PreliminaryShiftRow)
                 }
                 return { data: inserted, error: null }
               },
@@ -204,6 +219,18 @@ function createSupabaseMock(initialState: Partial<DbState> = {}) {
               return Promise.resolve({ data, error: null })
             }
 
+            if (table === 'shifts') {
+              state.shifts = state.shifts.map((row) =>
+                row[column as keyof PreliminaryShiftRow] === value
+                  ? ({ ...row, ...payload } as PreliminaryShiftRow)
+                  : row
+              )
+              const data =
+                state.shifts.find((row) => row[column as keyof PreliminaryShiftRow] === value) ??
+                null
+              return Promise.resolve({ data, error: null })
+            }
+
             return Promise.resolve({ data: null, error: null })
           },
         }
@@ -214,6 +241,11 @@ function createSupabaseMock(initialState: Partial<DbState> = {}) {
             if (table === 'preliminary_shift_states') {
               state.preliminaryShiftStates = state.preliminaryShiftStates.filter(
                 (row) => row[column as keyof PreliminaryShiftStateRow] !== value
+              )
+            }
+            if (table === 'shifts') {
+              state.shifts = state.shifts.filter(
+                (row) => row[column as keyof PreliminaryShiftRow] !== value
               )
             }
             return Promise.resolve({ error: null })
@@ -350,6 +382,56 @@ describe('submitPreliminaryChangeRequest', () => {
   })
 })
 
+describe('applyDirectPreliminaryEdit', () => {
+  it('lets a therapist remove themselves from their own tentative assignment immediately', async () => {
+    const supabase = createSupabaseMock({
+      preliminaryShiftStates: [
+        makeShiftState({ shift_id: 'shift-1', state: 'tentative_assignment' }),
+      ],
+      shifts: [makeShift({ id: 'shift-1', user_id: 'therapist-1' })],
+      profiles: [{ id: 'therapist-1', role: 'therapist', shift_type: 'day' }],
+    })
+
+    const result = await applyDirectPreliminaryEdit(supabase as never, {
+      snapshotId: 'snapshot-1',
+      shiftId: 'shift-1',
+      requesterId: 'therapist-1',
+      action: 'remove_me',
+    })
+
+    expect(result.error).toBeNull()
+    expect(supabase.state.shifts[0]).toMatchObject({ user_id: null })
+    expect(supabase.state.preliminaryShiftStates[0]).toMatchObject({
+      state: 'open',
+      reserved_by: null,
+      active_request_id: null,
+    })
+  })
+
+  it('lets a therapist add themselves to an open same-shift slot immediately', async () => {
+    const supabase = createSupabaseMock({
+      preliminaryShiftStates: [makeShiftState({ shift_id: 'shift-open', state: 'open' })],
+      shifts: [makeShift({ id: 'shift-open', user_id: null, full_name: null })],
+      profiles: [{ id: 'therapist-2', role: 'therapist', shift_type: 'day' }],
+    })
+
+    const result = await applyDirectPreliminaryEdit(supabase as never, {
+      snapshotId: 'snapshot-1',
+      shiftId: 'shift-open',
+      requesterId: 'therapist-2',
+      action: 'add_here',
+    })
+
+    expect(result.error).toBeNull()
+    expect(supabase.state.shifts[0]).toMatchObject({ user_id: 'therapist-2' })
+    expect(supabase.state.preliminaryShiftStates[0]).toMatchObject({
+      state: 'tentative_assignment',
+      reserved_by: 'therapist-2',
+      active_request_id: null,
+    })
+  })
+})
+
 describe('request review helpers', () => {
   it('approves a pending claim and keeps the slot filled in preliminary state', async () => {
     const supabase = createSupabaseMock({
@@ -369,6 +451,7 @@ describe('request review helpers', () => {
           active_request_id: 'request-claim',
         }),
       ],
+      shifts: [makeShift({ id: 'shift-open', user_id: null, full_name: null })],
     })
 
     const result = await approvePreliminaryRequest(supabase as never, {
@@ -385,6 +468,10 @@ describe('request review helpers', () => {
       state: 'tentative_assignment',
       reserved_by: 'therapist-2',
       active_request_id: null,
+    })
+    expect(supabase.state.shifts[0]).toMatchObject({
+      id: 'shift-open',
+      user_id: 'therapist-2',
     })
   })
 
@@ -406,6 +493,7 @@ describe('request review helpers', () => {
           active_request_id: 'request-claim',
         }),
       ],
+      shifts: [makeShift({ id: 'shift-open', user_id: 'therapist-2', full_name: 'Alex P.' })],
     })
 
     const result = await denyPreliminaryRequest(supabase as never, {
@@ -422,6 +510,10 @@ describe('request review helpers', () => {
       state: 'open',
       reserved_by: null,
       active_request_id: null,
+    })
+    expect(supabase.state.shifts[0]).toMatchObject({
+      id: 'shift-open',
+      user_id: null,
     })
   })
 
@@ -456,6 +548,47 @@ describe('request review helpers', () => {
     expect(supabase.state.preliminaryShiftStates[0]).toMatchObject({
       state: 'tentative_assignment',
       active_request_id: null,
+    })
+  })
+
+  it('approves a pending change request and removes the therapist from the tentative shift', async () => {
+    const supabase = createSupabaseMock({
+      preliminaryRequests: [
+        makeRequest({
+          id: 'request-change',
+          shift_id: 'shift-1',
+          requester_id: 'therapist-1',
+          type: 'request_change',
+        }),
+      ],
+      preliminaryShiftStates: [
+        makeShiftState({
+          shift_id: 'shift-1',
+          state: 'pending_change',
+          active_request_id: 'request-change',
+        }),
+      ],
+      shifts: [makeShift({ id: 'shift-1', user_id: 'therapist-1' })],
+    })
+
+    const result = await approvePreliminaryRequest(supabase as never, {
+      requestId: 'request-change',
+      actorId: 'manager-1',
+    })
+
+    expect(result.error).toBeNull()
+    expect(supabase.state.preliminaryRequests[0]).toMatchObject({
+      status: 'approved',
+      approved_by: 'manager-1',
+    })
+    expect(supabase.state.preliminaryShiftStates[0]).toMatchObject({
+      state: 'open',
+      reserved_by: null,
+      active_request_id: null,
+    })
+    expect(supabase.state.shifts[0]).toMatchObject({
+      id: 'shift-1',
+      user_id: null,
     })
   })
 })

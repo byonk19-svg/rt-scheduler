@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type MyScheduleShiftRow = {
   id: string
+  cycle_id: string
   date: string
   shift_type: string
   role: string | null
@@ -30,7 +31,7 @@ export async function fetchMyPublishedUpcomingShifts(
   const { data, error } = await supabase
     .from('shifts')
     .select(
-      'id, date, shift_type, role, status, assignment_status, schedule_cycles!shifts_cycle_id_fkey!inner(published)'
+      'id, cycle_id, date, shift_type, role, status, assignment_status, schedule_cycles!shifts_cycle_id_fkey!inner(published)'
     )
     .eq('user_id', userId)
     .gte('date', today)

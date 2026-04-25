@@ -94,6 +94,7 @@ export function generateDraftForCycle(input: GenerateDraftInput): GenerateDraftR
   }
 
   const weeklyWorkedDatesByUserWeek = new Map<string, Set<string>>()
+  const workedDatesByUser = new Map<string, Set<string>>()
   for (const row of weeklyShifts) {
     if (!countsTowardWeeklyLimit(row.status)) continue
     const bounds = getWeekBoundsForDate(row.date)
@@ -103,6 +104,9 @@ export function generateDraftForCycle(input: GenerateDraftInput): GenerateDraftR
     const workedDates = weeklyWorkedDatesByUserWeek.get(key) ?? new Set<string>()
     workedDates.add(row.date)
     weeklyWorkedDatesByUserWeek.set(key, workedDates)
+    const allWorkedDates = workedDatesByUser.get(row.user_id) ?? new Set<string>()
+    allWorkedDates.add(row.date)
+    workedDatesByUser.set(row.user_id, allWorkedDates)
   }
 
   const coverageBySlot = new Map<string, number>()
@@ -181,7 +185,8 @@ export function generateDraftForCycle(input: GenerateDraftInput): GenerateDraftR
         assignedForDate,
         weeklyWorkedDatesByUserWeek,
         weeklyLimitByTherapist,
-        weeklyMinimumByTherapist
+        weeklyMinimumByTherapist,
+        workedDatesByUser
       )
       dayLeadCursor = dayLeadPick.nextCursor
 
@@ -202,6 +207,9 @@ export function generateDraftForCycle(input: GenerateDraftInput): GenerateDraftR
           workedDates.add(date)
           weeklyWorkedDatesByUserWeek.set(key, workedDates)
         }
+        const allWorkedDates = workedDatesByUser.get(dayLeadPick.therapist.id) ?? new Set<string>()
+        allWorkedDates.add(date)
+        workedDatesByUser.set(dayLeadPick.therapist.id, allWorkedDates)
         dayCoverage += 1
         coverageBySlot.set(daySlotKey, dayCoverage)
         dayHasLead = true
@@ -220,6 +228,7 @@ export function generateDraftForCycle(input: GenerateDraftInput): GenerateDraftR
       weeklyWorkedDatesByUserWeek,
       weeklyLimitByTherapist,
       weeklyMinimumByTherapist,
+      workedDatesByUser,
       currentCoverage: dayCoverage,
       targetCoverage: AUTO_GENERATE_TARGET_COVERAGE_PER_SHIFT,
       minCoverage: MIN_SHIFT_COVERAGE_PER_DAY,
@@ -240,6 +249,9 @@ export function generateDraftForCycle(input: GenerateDraftInput): GenerateDraftR
         dayHasLead = true
         leadAssignedBySlot.set(daySlotKey, true)
       }
+      const allWorkedDates = workedDatesByUser.get(pickedTherapist.id) ?? new Set<string>()
+      allWorkedDates.add(date)
+      workedDatesByUser.set(pickedTherapist.id, allWorkedDates)
     }
     dayCoverage = dayFill.coverage
     coverageBySlot.set(daySlotKey, dayCoverage)
@@ -290,7 +302,8 @@ export function generateDraftForCycle(input: GenerateDraftInput): GenerateDraftR
         assignedForDate,
         weeklyWorkedDatesByUserWeek,
         weeklyLimitByTherapist,
-        weeklyMinimumByTherapist
+        weeklyMinimumByTherapist,
+        workedDatesByUser
       )
       nightLeadCursor = nightLeadPick.nextCursor
 
@@ -311,6 +324,9 @@ export function generateDraftForCycle(input: GenerateDraftInput): GenerateDraftR
           workedDates.add(date)
           weeklyWorkedDatesByUserWeek.set(key, workedDates)
         }
+        const allWorkedDates = workedDatesByUser.get(nightLeadPick.therapist.id) ?? new Set<string>()
+        allWorkedDates.add(date)
+        workedDatesByUser.set(nightLeadPick.therapist.id, allWorkedDates)
         nightCoverage += 1
         coverageBySlot.set(nightSlotKey, nightCoverage)
         nightHasLead = true
@@ -329,6 +345,7 @@ export function generateDraftForCycle(input: GenerateDraftInput): GenerateDraftR
       weeklyWorkedDatesByUserWeek,
       weeklyLimitByTherapist,
       weeklyMinimumByTherapist,
+      workedDatesByUser,
       currentCoverage: nightCoverage,
       targetCoverage: AUTO_GENERATE_TARGET_COVERAGE_PER_SHIFT,
       minCoverage: MIN_SHIFT_COVERAGE_PER_DAY,
@@ -349,6 +366,9 @@ export function generateDraftForCycle(input: GenerateDraftInput): GenerateDraftR
         nightHasLead = true
         leadAssignedBySlot.set(nightSlotKey, true)
       }
+      const allWorkedDates = workedDatesByUser.get(pickedTherapist.id) ?? new Set<string>()
+      allWorkedDates.add(date)
+      workedDatesByUser.set(pickedTherapist.id, allWorkedDates)
     }
     nightCoverage = nightFill.coverage
     coverageBySlot.set(nightSlotKey, nightCoverage)

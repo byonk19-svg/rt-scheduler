@@ -1,5 +1,15 @@
 # Session History
 
+## Session 87 - 2026-04-24
+
+- Completed the therapist workflow accuracy pass on `codex/therapist-workflow-accuracy`: therapist workflow state is centralized, dashboard routing is therapist-safe, `/therapist/schedule` and `/therapist/swaps` are real therapist-owned surfaces, and therapist wording now aligns across availability, schedule, swaps, and history.
+- Added therapist workflow support around preliminary and published scheduling: therapist-facing preliminary overview with pending opposite-shift interest visibility, same-shift direct preliminary edits, reopened-final cleanup, and manager-change notifications/deep links for preliminary/published schedule changes.
+- Closed the post-publish request lifecycle: `shift_posts` now support direct visibility, recipient response, withdrawn state, request kinds, pickup-interest backups, and direct-request manager-resolution notifications; `My Requests`, the shared board, and `/staff/history` all reflect posted, direct, claimed, interested, selected, denied, withdrawn, and call-in-help states consistently.
+- Added deterministic pickup queue behavior with one selected primary claimant plus ordered backups, promotion on claimant withdraw/denial, and whole-request cleanup when managers deny or schedules change.
+- Added therapist `Preferences / Work Rules`, notification preference enforcement, `max_consecutive_days` storage plus auto-draft enforcement, and shared cleanup that preserves request history by nulling `shift_id` before shift deletion/restart cleanup.
+- Restored the missing historical Supabase migrations needed for `supabase db push`, then added the new therapist workflow/request lifecycle migrations through `20260425133000_add_direct_request_manager_resolution_notifications.sql`.
+- Verification on this branch is green: `supabase db push`, `npx tsc --noEmit`, `npm run lint`, and `npm run test:unit` (`154` files / `828` tests).
+
 ## Session 86 - 2026-04-17
 
 - Completed the audit-driven cleanup pass on `claude/audit-log-bulk-team-clean`: removed the remaining accent-stripe/header chrome, reduced decorative public-shell halos, tokenized the logo plus lingering public/print values, and tightened a few shared semantics.

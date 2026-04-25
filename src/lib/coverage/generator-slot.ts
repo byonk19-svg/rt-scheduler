@@ -12,6 +12,7 @@ export type FillCoverageSlotArgs = {
   availabilityOverridesByTherapist: Map<string, AvailabilityOverrideRow[]>
   assignedUserIdsForDate: Set<string>
   weeklyWorkedDatesByUserWeek: Map<string, Set<string>>
+  workedDatesByUser?: Map<string, Set<string>>
   weeklyLimitByTherapist: Map<string, number>
   weeklyMinimumByTherapist: Map<string, number>
   currentCoverage: number
@@ -31,6 +32,7 @@ export function fillCoverageSlot(args: FillCoverageSlotArgs): FillCoverageSlotRe
   let cursor = args.cursor
   let coverage = args.currentCoverage
   const pickedTherapists: Therapist[] = []
+  const workedDatesByUser = args.workedDatesByUser ?? new Map<string, Set<string>>()
 
   while (coverage < args.targetCoverage) {
     const pick = pickTherapistForDate(
@@ -43,7 +45,8 @@ export function fillCoverageSlot(args: FillCoverageSlotArgs): FillCoverageSlotRe
       args.assignedUserIdsForDate,
       args.weeklyWorkedDatesByUserWeek,
       args.weeklyLimitByTherapist,
-      args.weeklyMinimumByTherapist
+      args.weeklyMinimumByTherapist,
+      workedDatesByUser
     )
     cursor = pick.nextCursor
 
@@ -62,6 +65,9 @@ export function fillCoverageSlot(args: FillCoverageSlotArgs): FillCoverageSlotRe
       workedDates.add(args.date)
       args.weeklyWorkedDatesByUserWeek.set(key, workedDates)
     }
+    const allWorkedDates = workedDatesByUser.get(therapist.id) ?? new Set<string>()
+    allWorkedDates.add(args.date)
+    workedDatesByUser.set(therapist.id, allWorkedDates)
 
     coverage += 1
   }

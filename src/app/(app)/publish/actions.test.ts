@@ -11,6 +11,20 @@ const { redirectMock, revalidatePathMock, createClientMock, createAdminClientMoc
   })
 )
 
+const { sendPreliminarySnapshotMock } = vi.hoisted(() => ({
+  sendPreliminarySnapshotMock: vi.fn(async () => ({
+    data: {
+      id: 'snapshot-1',
+      cycle_id: 'cycle-1',
+      created_by: 'manager-1',
+      sent_at: '2026-04-24T12:00:00.000Z',
+      status: 'active',
+      created_at: '2026-04-24T12:00:00.000Z',
+    },
+    error: null,
+  })),
+}))
+
 vi.mock('next/navigation', () => ({
   redirect: redirectMock,
 }))
@@ -29,6 +43,10 @@ vi.mock('@/lib/supabase/admin', () => ({
 
 vi.mock('@/lib/publish-events', () => ({
   refreshPublishEventCounts: vi.fn(),
+}))
+
+vi.mock('@/lib/preliminary-schedule/mutations', () => ({
+  sendPreliminarySnapshot: sendPreliminarySnapshotMock,
 }))
 
 import {
@@ -64,6 +82,19 @@ function createSupabaseMock(context: TestContext) {
     deletedShiftIds: [] as string[],
     closedSnapshots: [] as string[],
     publishEventPublished: false,
+    deniedShiftPostIds: [] as string[],
+    declinedShiftPostInterestIds: [] as string[],
+    cycleShifts: [
+      {
+        id: 'shift-1',
+        cycle_id: 'cycle-1',
+        user_id: 'therapist-1',
+        date: '2026-04-20',
+        shift_type: 'day',
+        status: 'scheduled',
+        role: 'staff',
+      },
+    ] as Array<Record<string, unknown>>,
   }
 
   return {
@@ -88,6 +119,10 @@ function createSupabaseMock(context: TestContext) {
           filters.set(column, value)
           return builder
         },
+        in(column: string, value: unknown[]) {
+          filters.set(column, value)
+          return builder
+        },
         maybeSingle: async () => {
           if (table === 'profiles' && String(selected).includes('role')) {
             return {
@@ -107,6 +142,13 @@ function createSupabaseMock(context: TestContext) {
             }
           }
 
+          if (table === 'shifts' && filters.get('cycle_id') === 'cycle-1') {
+            return {
+              data: state.cycleShifts,
+              error: null,
+            }
+          }
+
           if (table === 'publish_events') {
             return {
               data: {
@@ -114,6 +156,13 @@ function createSupabaseMock(context: TestContext) {
                 cycle_id: 'cycle-1',
                 schedule_cycles: { published: state.publishEventPublished },
               },
+              error: null,
+            }
+          }
+
+          if (table === 'shift_posts') {
+            return {
+              data: [{ id: 'post-1' }],
               error: null,
             }
           }
@@ -144,6 +193,41 @@ function createSupabaseMock(context: TestContext) {
                 return Promise.resolve({ data: null, error: null })
               }
 
+              if (table === 'shift_post_interests') {
+                return updateBuilder
+              }
+
+              if (table === 'shift_posts') {
+                if (Array.isArray(updateFilters.get('id'))) {
+                  state.deniedShiftPostIds = updateFilters.get('id') as string[]
+                  return Promise.resolve({ data: null, error: null })
+                }
+                return updateBuilder
+              }
+
+              return updateBuilder
+            },
+            in(column: string, value: unknown[]) {
+              updateFilters.set(column, value)
+
+              if (table === 'shift_posts' && column === 'id') {
+                state.deniedShiftPostIds = value as string[]
+                return Promise.resolve({ data: null, error: null })
+              }
+
+              if (table === 'shift_post_interests' && column === 'shift_post_id') {
+                state.declinedShiftPostInterestIds = value as string[]
+                return updateBuilder
+              }
+
+              if (
+                table === 'shift_post_interests' &&
+                column === 'status' &&
+                Array.isArray(updateFilters.get('shift_post_id'))
+              ) {
+                return Promise.resolve({ data: null, error: null })
+              }
+
               return updateBuilder
             },
           }
@@ -166,6 +250,32 @@ function createSupabaseMock(context: TestContext) {
               }
             },
           }
+        },
+        then<TResult1 = unknown, TResult2 = never>(
+          onfulfilled?:
+            | ((value: { data: unknown; error: null }) => TResult1 | PromiseLike<TResult1>)
+            | null,
+          onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+        ) {
+          let result: { data: unknown; error: null } = { data: null, error: null }
+
+          if (table === 'shifts' && filters.get('cycle_id') === 'cycle-1') {
+            result = {
+              data: state.cycleShifts,
+              error: null,
+            }
+          }
+
+          if (table === 'shift_posts' && Array.isArray(filters.get('shift_id'))) {
+            result = {
+              data: String(selected).includes('status')
+                ? [{ id: 'post-1', status: 'pending' }]
+                : [{ id: 'post-1' }],
+              error: null,
+            }
+          }
+
+          return Promise.resolve(result).then(onfulfilled, onrejected)
         },
       }
 
@@ -223,6 +333,7 @@ function makeDeleteFormData() {
 describe('restartPublishedCycleAction', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    sendPreliminarySnapshotMock.mockClear()
   })
 
   it('unpublishes the cycle, clears shifts, and closes active preliminary state', async () => {
@@ -240,6 +351,8 @@ describe('restartPublishedCycleAction', () => {
 
     expect(supabase.state.cyclePublished).toBe(false)
     expect(supabase.state.deletedShiftIds).toEqual(['shift-1', 'shift-2'])
+    expect(supabase.state.deniedShiftPostIds).toEqual(['post-1'])
+    expect(supabase.state.declinedShiftPostInterestIds).toEqual(['post-1'])
     expect(supabase.state.closedSnapshots).toEqual(['cycle-1'])
     expect(revalidatePathMock).toHaveBeenCalledWith('/coverage')
   })
@@ -261,7 +374,7 @@ describe('unpublishCycleKeepShiftsAction', () => {
     vi.clearAllMocks()
   })
 
-  it('sets published false, keeps shifts, and closes active preliminary', async () => {
+  it('sets published false, keeps shifts, and reopens preliminary from the current schedule', async () => {
     const supabase = createSupabaseMock({
       userId: 'manager-1',
       role: 'manager',
@@ -276,7 +389,16 @@ describe('unpublishCycleKeepShiftsAction', () => {
 
     expect(supabase.state.cyclePublished).toBe(false)
     expect(supabase.state.deletedShiftIds).toEqual([])
-    expect(supabase.state.closedSnapshots).toEqual(['cycle-1'])
+    expect(supabase.state.deniedShiftPostIds).toEqual(['post-1'])
+    expect(supabase.state.declinedShiftPostInterestIds).toEqual(['post-1'])
+    expect(sendPreliminarySnapshotMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        cycleId: 'cycle-1',
+        actorId: 'manager-1',
+        shifts: supabase.state.cycleShifts,
+      })
+    )
     expect(revalidatePathMock).toHaveBeenCalledWith('/coverage')
   })
 

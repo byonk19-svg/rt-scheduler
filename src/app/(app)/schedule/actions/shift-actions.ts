@@ -16,6 +16,7 @@ import {
 import { exceedsCoverageLimit, exceedsWeeklyLimit } from '@/lib/schedule-rule-validation'
 import { MAX_SHIFT_COVERAGE_PER_DAY, MAX_WORK_DAYS_PER_WEEK } from '@/lib/scheduling-constants'
 import { setDesignatedLeadMutation } from '@/lib/set-designated-lead'
+import { preserveShiftPostHistoryBeforeShiftDeletion } from '@/lib/shift-post-cleanup'
 import { writeAuditLog } from '@/lib/audit-log'
 import { createClient } from '@/lib/supabase/server'
 import type { ShiftStatus } from '@/app/schedule/types'
@@ -239,6 +240,12 @@ export async function deleteShiftAction(formData: FormData) {
     console.error('Failed to load cycle before delete:', cycleError)
     redirect(buildScheduleUrl(cycleId, view, { error: 'delete_shift_failed' }))
   }
+
+  await preserveShiftPostHistoryBeforeShiftDeletion(
+    supabase,
+    [shiftId],
+    'Schedule changed after this request was posted.'
+  )
 
   const { error } = await supabase.from('shifts').delete().eq('id', shiftId)
   if (error) {

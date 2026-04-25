@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
+import { buildCallInAlertMessage, shouldCreateCallInAlert } from '@/lib/call-in-alerts'
+import { notifyUsers } from '@/lib/notifications'
 import { notifyPublishedShiftStatusChanged } from '@/lib/published-schedule-notifications'
 import { isTrustedMutationRequest } from '@/lib/security/request-origin'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -46,6 +48,11 @@ type ShiftNotificationLookupRow = {
   shift_type: 'day' | 'night'
   user_id: string | null
   schedule_cycles: { published: boolean } | { published: boolean }[] | null
+}
+
+type ProfileNotificationRow = {
+  id: string
+  shift_type: 'day' | 'night' | null
 }
 
 function getOne<T>(value: T | T[] | null | undefined): T | null {
@@ -153,6 +160,87 @@ export async function POST(request: Request) {
       nextStatus: row.assignment_status,
       targetId: shift.id,
     })
+
+    const { data: existingCallInPost } = await admin
+      .from('shift_posts')
+      .select('id')
+      .eq('shift_id', shift.id)
+      .eq('request_kind', 'call_in')
+      .eq('status', 'pending')
+      .maybeSingle()
+
+    if (shouldCreateCallInAlert({ published: true, nextStatus: row.assignment_status })) {
+      let callInPostId = existingCallInPost?.id ?? null
+
+      const callInPayload = {
+        shift_id: shift.id,
+        posted_by: shift.user_id,
+        claimed_by: null,
+        type: 'pickup',
+        request_kind: 'call_in',
+        visibility: 'team',
+        recipient_response: null,
+        status: 'pending',
+        message: buildCallInAlertMessage({
+          date: shift.date,
+          shiftType: shift.shift_type,
+        }),
+      }
+
+      if (existingCallInPost?.id) {
+        await admin.from('shift_posts').update(callInPayload).eq('id', existingCallInPost.id)
+      } else {
+        const { data: insertedCallInPost } = await admin
+          .from('shift_posts')
+          .insert(callInPayload)
+          .select('id')
+          .single()
+        callInPostId = insertedCallInPost?.id ?? null
+      }
+
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, shift_type')
+        .in('role', ['therapist', 'lead'])
+        .eq('is_active', true)
+
+      const { data: scheduledRows } = await supabase
+        .from('shifts')
+        .select('user_id')
+        .eq('date', shift.date)
+        .eq('shift_type', shift.shift_type)
+
+      const scheduledUserIds = new Set(
+        ((scheduledRows ?? []) as Array<{ user_id: string | null }>)
+          .map((entry) => entry.user_id)
+          .filter((value): value is string => Boolean(value))
+      )
+
+      const eligibleUserIds = ((profilesData ?? []) as ProfileNotificationRow[])
+        .filter((profile) => profile.id !== shift.user_id)
+        .filter((profile) => !scheduledUserIds.has(profile.id))
+        .map((profile) => profile.id)
+
+      await notifyUsers(supabase, {
+        userIds: eligibleUserIds,
+        eventType: 'call_in_help_available',
+        title: 'Call-in help needed',
+        message: buildCallInAlertMessage({
+          date: shift.date,
+          shiftType: shift.shift_type,
+        }),
+        targetType: callInPostId ? 'shift_post' : 'shift',
+        targetId: callInPostId ?? shift.id,
+      })
+    } else if (existingCallInPost?.id) {
+      await admin
+        .from('shift_posts')
+        .update({
+          status: 'expired',
+          override_reason: 'Call-in help alert cleared after assignment status changed.',
+        })
+        .eq('id', existingCallInPost.id)
+    }
   }
 
   return NextResponse.json({ assignment: row })

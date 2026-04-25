@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { serializeCycleShifts } from '@/lib/cycle-template'
+import { isTrustedMutationRequest } from '@/lib/security/request-origin'
 import { createClient } from '@/lib/supabase/server'
 
 type CycleTemplateRow = {
@@ -79,6 +80,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!isTrustedMutationRequest(request)) {
+    return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 })
+  }
+
   const { error, supabase, user } = await requireManager()
   if (error || !user) return error
 

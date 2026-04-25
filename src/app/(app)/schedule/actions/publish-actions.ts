@@ -47,6 +47,7 @@ type PublishRecipientRow = {
   id: string
   email: string | null
   full_name: string | null
+  notification_email_enabled?: boolean | null
 }
 
 export async function toggleCyclePublishedAction(formData: FormData) {
@@ -281,7 +282,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
 
     const { data: therapistProfiles, error: therapistProfilesError } = await supabase
       .from('profiles')
-      .select('id, email, full_name')
+      .select('id, email, full_name, notification_email_enabled')
       .in('role', ['therapist', 'lead'])
       .eq('is_active', true)
 
@@ -293,7 +294,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
     const dedupedRecipients = Array.from(
       new Map(
         ((therapistProfiles ?? []) as PublishRecipientRow[])
-          .filter((row) => Boolean(row.email))
+          .filter((row) => Boolean(row.email) && row.notification_email_enabled !== false)
           .map((row) => [
             String(row.email ?? '')
               .trim()

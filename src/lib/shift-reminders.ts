@@ -11,10 +11,14 @@ type ShiftReminderShiftRow = {
     | {
         email: string | null
         full_name: string | null
+        notification_email_enabled?: boolean | null
+        notification_in_app_enabled?: boolean | null
       }
     | {
         email: string | null
         full_name: string | null
+        notification_email_enabled?: boolean | null
+        notification_in_app_enabled?: boolean | null
       }[]
     | null
 }
@@ -74,7 +78,9 @@ export async function queueAndSendShiftReminders(
 
   const { data: shiftRows, error: shiftError } = await adminClient
     .from('shifts')
-    .select('id, date, shift_type, user_id, profiles!shifts_user_id_fkey(email, full_name)')
+    .select(
+      'id, date, shift_type, user_id, profiles!shifts_user_id_fkey(email, full_name, notification_email_enabled, notification_in_app_enabled)'
+    )
     .eq('date', tomorrow)
     .eq('status', 'scheduled')
 
@@ -88,6 +94,8 @@ export async function queueAndSendShiftReminders(
       user_id: row.user_id,
       email: getOne(row.profiles)?.email ?? null,
       name: getOne(row.profiles)?.full_name ?? null,
+      notification_email_enabled: getOne(row.profiles)?.notification_email_enabled ?? true,
+      notification_in_app_enabled: getOne(row.profiles)?.notification_in_app_enabled ?? true,
       remind_type: '24h' as const,
       send_after: nowIso,
       status: 'queued' as const,
@@ -100,10 +108,12 @@ export async function queueAndSendShiftReminders(
         user_id: string
         email: string
         name: string | null
+        notification_email_enabled: boolean
+        notification_in_app_enabled: boolean
         remind_type: '24h'
         send_after: string
         status: 'queued'
-      } => Boolean(row.user_id && row.email)
+      } => Boolean(row.user_id && row.email && row.notification_email_enabled !== false)
     )
 
   let queued = 0
@@ -142,7 +152,7 @@ export async function queueAndSendShiftReminders(
   }
 
   const emailConfig = getPublishEmailConfig()
-  const scheduleUrl = `${emailConfig.appBaseUrl.replace(/\/$/, '')}/staff/my-schedule`
+  const scheduleUrl = `${emailConfig.appBaseUrl.replace(/\/$/, '')}/therapist/schedule`
 
   let sent = 0
   let failed = 0
@@ -213,17 +223,31 @@ export async function queueAndSendShiftReminders(
         throw new Error(sentUpdateError.message)
       }
 
-      const { error: notificationError } = await adminClient.from('notifications').insert({
-        user_id: row.user_id,
-        event_type: 'shift_reminder',
-        title: 'Shift reminder',
-        message: `You have a ${shiftType} shift tomorrow (${shiftDate}).`,
-        target_type: 'shift',
-        target_id: row.shift_id,
-      })
+      if (getOne((shiftRows ?? []) as ShiftReminderShiftRow[])?.profiles) {
+        // no-op placeholder to preserve local narrowing
+      }
 
-      if (notificationError) {
-        throw new Error(notificationError.message)
+      if (true) {
+        const shiftProfile = ((shiftRows ?? []) as ShiftReminderShiftRow[]).find(
+          (shiftRow) => shiftRow.id === row.shift_id
+        )
+        const notificationEnabled =
+          getOne(shiftProfile?.profiles)?.notification_in_app_enabled !== false
+
+        if (notificationEnabled) {
+          const { error: notificationError } = await adminClient.from('notifications').insert({
+            user_id: row.user_id,
+            event_type: 'shift_reminder',
+            title: 'Shift reminder',
+            message: `You have a ${shiftType} shift tomorrow (${shiftDate}).`,
+            target_type: 'shift',
+            target_id: row.shift_id,
+          })
+
+          if (notificationError) {
+            throw new Error(notificationError.message)
+          }
+        }
       }
 
       sent += 1
