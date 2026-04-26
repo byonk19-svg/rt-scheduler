@@ -6,7 +6,13 @@ import {
 } from '@/lib/scheduling-constants'
 import { resolveEligibility } from '@/lib/coverage/resolve-availability'
 import { normalizeWorkPattern } from '@/lib/coverage/work-patterns'
-import { toIsoDate, dateRange, formatDateLabel } from '@/lib/calendar-utils'
+import {
+  toIsoDate,
+  dateRange,
+  formatDateLabel,
+  formatDisplayDate,
+  parseLocalDate,
+} from '@/lib/calendar-utils'
 import type {
   AvailabilityOverrideRow,
   ScheduleSearchParams,
@@ -29,9 +35,7 @@ export function formatDayNumber(value: string): string {
 }
 
 export function formatWeekdayShort(value: string): string {
-  const parsed = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return '-'
-  return parsed.toLocaleDateString('en-US', { weekday: 'short' }).charAt(0)
+  return formatDisplayDate(value, { weekday: 'short' }).charAt(0)
 }
 
 export function getWeekBoundsForDate(value: string): { weekStart: string; weekEnd: string } | null {
@@ -69,13 +73,13 @@ export function coverageSlotKey(date: string, shiftType: 'day' | 'night'): strin
 }
 
 function previousIsoDate(value: string): string {
-  const parsed = new Date(`${value}T12:00:00`)
+  const parsed = parseLocalDate(value)
   parsed.setDate(parsed.getDate() - 1)
   return toIsoDate(parsed)
 }
 
 function nextIsoDate(value: string): string {
-  const parsed = new Date(`${value}T12:00:00`)
+  const parsed = parseLocalDate(value)
   parsed.setDate(parsed.getDate() + 1)
   return toIsoDate(parsed)
 }
