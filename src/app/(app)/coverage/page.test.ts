@@ -91,6 +91,17 @@ describe('coverage publish override affordance', () => {
     expect(client).toContain('Review pre-flight')
   })
 
+  it('exposes segmented-control and planning-disclosure state to assistive technology', () => {
+    const source = readFileSync(coverageClientPath, 'utf8')
+
+    expect(source).toContain('role="group"')
+    expect(source).toContain('aria-labelledby={labelId}')
+    expect(source).toContain('aria-pressed={value === option.value}')
+    expect(source).toContain('aria-expanded={showPlanningDetails}')
+    expect(source).toContain('aria-controls={planningDetailsId}')
+    expect(source).toContain('id={planningDetailsId}')
+  })
+
   it('calls out live operational status badges on the published schedule', () => {
     const source = readFileSync(coverageClientPath, 'utf8')
 

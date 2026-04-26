@@ -7,6 +7,7 @@ import {
   useCallback,
   useDeferredValue,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -199,17 +200,27 @@ function CoverageSegmentedControl<T extends string>({
   onChange: (nextValue: T) => void
   testIdPrefix?: string
 }) {
+  const labelId = useId()
+
   return (
     <div className="space-y-1">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+      <p
+        id={labelId}
+        className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+      >
         {label}
       </p>
-      <div className="inline-flex overflow-hidden rounded-lg border border-border/70 bg-background">
+      <div
+        role="group"
+        aria-labelledby={labelId}
+        className="inline-flex overflow-hidden rounded-lg border border-border/70 bg-background"
+      >
         {options.map((option) => (
           <button
             key={option.value}
             type="button"
             data-testid={testIdPrefix ? `${testIdPrefix}-${option.value.toLowerCase()}` : undefined}
+            aria-pressed={value === option.value}
             onClick={() => onChange(option.value)}
             className={cn(
               'px-3 py-1.5 text-xs font-medium transition-colors',
@@ -310,6 +321,7 @@ export function CoverageClientPage({
   const [actorRole, setActorRole] = useState<Role | null>(() => initialSnapshot.actorRole)
   const autoDraftFormRef = useRef<HTMLFormElement>(null)
   const clearDraftFormRef = useRef<HTMLFormElement>(null)
+  const planningDetailsId = useId()
   const deferredSelectedId = useDeferredValue(selectedId)
   const days = shiftTab === 'Day' ? dayDays : nightDays
   const setDays = shiftTab === 'Day' ? setDayDays : setNightDays
@@ -1278,6 +1290,8 @@ export function CoverageClientPage({
                       type="button"
                       size="sm"
                       variant="outline"
+                      aria-expanded={showPlanningDetails}
+                      aria-controls={planningDetailsId}
                       onClick={() => setShowPlanningDetails((current) => !current)}
                     >
                       {showPlanningDetails ? 'Hide details' : `Show details (${planningNotices.length})`}
@@ -1315,7 +1329,10 @@ export function CoverageClientPage({
             ) : null}
 
             {showPlanningDetails && planningNotices.length > 0 ? (
-              <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2">
+              <div
+                id={planningDetailsId}
+                className="rounded-md border border-border/70 bg-muted/20 px-3 py-2"
+              >
                 <ul className="space-y-1 text-xs text-foreground/85">
                   {planningNotices.map((notice) => (
                     <li key={notice} className="leading-5">

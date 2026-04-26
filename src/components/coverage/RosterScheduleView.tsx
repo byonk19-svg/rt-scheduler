@@ -429,7 +429,7 @@ const RosterMatrixTable = memo(function RosterMatrixTable({
             {onOpenEditor ? (
               <button
                 type="button"
-                className="mt-2 w-full rounded-lg bg-white px-2 py-1.5 text-left text-[12px] font-medium text-foreground hover:bg-muted/40"
+                className="mt-2 w-full rounded-lg bg-card px-2 py-1.5 text-left text-[12px] font-medium text-foreground hover:bg-muted/40"
                 onClick={() => onOpenEditor(date)}
               >
                 Open editor

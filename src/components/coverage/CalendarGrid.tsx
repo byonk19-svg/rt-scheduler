@@ -241,8 +241,8 @@ export function CalendarGrid({
         role="gridcell"
         data-testid={`coverage-day-panel-${day.id}`}
         className={cn(
-          'relative min-h-[108px] rounded-xl border px-2.5 py-2.5 shadow-sm transition-[border-color,box-shadow,transform] duration-150',
-          'hover:-translate-y-px hover:shadow-md',
+          'relative min-h-[108px] rounded-xl border px-2.5 py-2.5 shadow-tw-2xs transition-transform duration-150',
+          'hover:-translate-y-px',
           cellToneClassName(tone),
           selectedId === day.id && 'border-primary/65 ring-2 ring-primary/15',
           'coverage-calendar-mobile-day'

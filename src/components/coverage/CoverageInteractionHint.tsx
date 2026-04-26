@@ -58,7 +58,7 @@ export function CoverageInteractionHint({ show }: CoverageInteractionHintProps) 
       <button
         type="button"
         onClick={dismiss}
-        className="inline-flex h-8 w-8 shrink-0 touch-manipulation items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 outline-none"
+        className="inline-flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 outline-none"
         aria-label="Dismiss scheduling tip"
       >
         <X className="h-4 w-4" aria-hidden />
