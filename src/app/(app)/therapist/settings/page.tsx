@@ -1,4 +1,5 @@
 import { revalidatePath } from 'next/cache'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { AlertCircle } from 'lucide-react'
 
@@ -6,16 +7,17 @@ import { FeedbackToast } from '@/components/feedback-toast'
 import { FormSubmitButton } from '@/components/form-submit-button'
 import { ThemePreferenceControl } from '@/components/ThemeProvider'
 import { WorkPatternCard } from '@/components/team/WorkPatternCard'
-import {
-  validateWeekendAnchorDate,
-  WorkPatternEditDialog,
-} from '@/components/team/WorkPatternEditDialog'
-import type { WorkPatternRecord } from '@/components/team/team-directory-model'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { can } from '@/lib/auth/can'
 import { toUiRole } from '@/lib/auth/roles'
+import {
+  describeWorkPatternSummary,
+  normalizeWorkPattern,
+  type WorkPattern,
+} from '@/lib/coverage/work-patterns'
 import { normalizeDefaultScheduleView } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/server'
 
@@ -25,11 +27,17 @@ type SearchParams = {
 }
 
 type WorkPatternRow = {
+  pattern_type: WorkPattern['pattern_type'] | null
   works_dow: number[] | null
   offs_dow: number[] | null
   weekend_rotation: string | null
   weekend_anchor_date: string | null
   works_dow_mode: string | null
+  weekly_weekdays: number[] | null
+  weekend_rule: WorkPattern['weekend_rule'] | null
+  cycle_anchor_date: string | null
+  cycle_segments: WorkPattern['cycle_segments'] | null
+  shift_preference: WorkPattern['shift_preference'] | null
 }
 
 type ProfileRow = {
@@ -65,11 +73,6 @@ function getSearchParam(value: string | string[] | undefined): string | undefine
   return value
 }
 
-function getOne<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null
-  return value ?? null
-}
-
 function parseDowValues(values: FormDataEntryValue[]): number[] {
   return Array.from(
     new Set(
@@ -80,24 +83,32 @@ function parseDowValues(values: FormDataEntryValue[]): number[] {
   ).sort((left, right) => left - right)
 }
 
-function toPatternRecord(value: ProfileRow['work_patterns']): WorkPatternRecord | null {
+function getOne<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null
+  return value ?? null
+}
+
+function toPatternRecord(
+  therapistId: string,
+  value: ProfileRow['work_patterns']
+): WorkPattern | null {
   const row = getOne(value)
   if (!row) return null
 
-  const worksDow = row.works_dow ?? []
-  const offsDow = row.offs_dow ?? []
-  const weekendRotation = row.weekend_rotation === 'every_other' ? 'every_other' : 'none'
-  const worksDowMode = row.works_dow_mode === 'soft' ? 'soft' : 'hard'
-
-  if (worksDow.length === 0 && offsDow.length === 0 && weekendRotation === 'none') return null
-
-  return {
-    works_dow: worksDow,
-    offs_dow: offsDow,
-    weekend_rotation: weekendRotation,
+  return normalizeWorkPattern({
+    therapist_id: therapistId,
+    pattern_type: row.pattern_type ?? undefined,
+    works_dow: row.works_dow ?? [],
+    offs_dow: row.offs_dow ?? [],
+    weekend_rotation: row.weekend_rotation === 'every_other' ? 'every_other' : undefined,
     weekend_anchor_date: row.weekend_anchor_date ?? null,
-    works_dow_mode: worksDowMode,
-  }
+    works_dow_mode: row.works_dow_mode === 'soft' ? 'soft' : undefined,
+    weekly_weekdays: row.weekly_weekdays ?? row.works_dow ?? [],
+    weekend_rule: row.weekend_rule ?? undefined,
+    cycle_anchor_date: row.cycle_anchor_date ?? null,
+    cycle_segments: row.cycle_segments ?? [],
+    shift_preference: row.shift_preference ?? 'either',
+  })
 }
 
 function getFeedback(
@@ -177,68 +188,6 @@ async function saveTherapistSettingsAction(formData: FormData) {
   redirect('/therapist/settings?success=settings_saved')
 }
 
-async function saveOwnWorkPatternAction(formData: FormData) {
-  'use server'
-
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) redirect('/login')
-
-  const worksDow = parseDowValues(formData.getAll('works_dow'))
-  const offsDow = parseDowValues(formData.getAll('offs_dow'))
-  const worksDowModeRaw = String(formData.get('works_dow_mode') ?? 'hard').trim()
-  const worksDowMode: 'hard' | 'soft' = worksDowModeRaw === 'soft' ? 'soft' : 'hard'
-  const weekendRotationRaw = String(formData.get('weekend_rotation') ?? 'none').trim()
-  const weekendRotation: 'none' | 'every_other' =
-    weekendRotationRaw === 'every_other' ? 'every_other' : 'none'
-  const weekendAnchorDateRaw = String(formData.get('weekend_anchor_date') ?? '').trim()
-  const weekendAnchorDate =
-    weekendRotation === 'every_other' && weekendAnchorDateRaw ? weekendAnchorDateRaw : null
-
-  if (weekendAnchorDate && validateWeekendAnchorDate(weekendAnchorDate)) {
-    redirect('/therapist/settings?error=invalid_weekend_anchor')
-  }
-
-  const shouldDeletePattern =
-    worksDow.length === 0 &&
-    offsDow.length === 0 &&
-    weekendRotation === 'none' &&
-    !weekendAnchorDate
-
-  if (shouldDeletePattern) {
-    const { error } = await supabase.from('work_patterns').delete().eq('therapist_id', user.id)
-    if (error) {
-      console.error('Failed to delete own work pattern:', error)
-      redirect('/therapist/settings?error=work_pattern_save_failed')
-    }
-  } else {
-    const { error } = await supabase.from('work_patterns').upsert(
-      {
-        therapist_id: user.id,
-        works_dow: worksDow,
-        offs_dow: offsDow,
-        works_dow_mode: worksDowMode,
-        weekend_rotation: weekendRotation,
-        weekend_anchor_date: weekendAnchorDate,
-        shift_preference: 'either',
-      },
-      { onConflict: 'therapist_id' }
-    )
-
-    if (error) {
-      console.error('Failed to save own work pattern:', error)
-      redirect('/therapist/settings?error=work_pattern_save_failed')
-    }
-  }
-
-  revalidatePath('/therapist/settings')
-  revalidatePath('/profile')
-  redirect('/therapist/settings?success=work_pattern_saved')
-}
-
 export default async function TherapistSettingsPage({
   searchParams,
 }: {
@@ -257,7 +206,7 @@ export default async function TherapistSettingsPage({
   const { data: profile } = await supabase
     .from('profiles')
     .select(
-      'id, full_name, role, shift_type, employment_type, is_lead_eligible, max_work_days_per_week, max_consecutive_days, preferred_work_days, default_calendar_view, default_schedule_view, default_landing_page, notification_in_app_enabled, notification_email_enabled, work_patterns(works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode)'
+      'id, full_name, role, shift_type, employment_type, is_lead_eligible, max_work_days_per_week, max_consecutive_days, preferred_work_days, default_calendar_view, default_schedule_view, default_landing_page, notification_in_app_enabled, notification_email_enabled, work_patterns(pattern_type, works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode, weekly_weekdays, weekend_rule, cycle_anchor_date, cycle_segments, shift_preference)'
     )
     .eq('id', user.id)
     .maybeSingle()
@@ -279,8 +228,8 @@ export default async function TherapistSettingsPage({
     profile.default_schedule_view ?? undefined
   )
   const defaultLandingPage = profile.default_landing_page === 'coverage' ? 'coverage' : 'dashboard'
-  const pattern = toPatternRecord(profile.work_patterns)
-  const fullName = profile.full_name ?? 'Therapist'
+  const pattern = toPatternRecord(profile.id, profile.work_patterns)
+  const patternSummary = describeWorkPatternSummary(pattern)
 
   return (
     <div className="space-y-6">
@@ -315,28 +264,26 @@ export default async function TherapistSettingsPage({
         <CardHeader>
           <CardTitle>Recurring Pattern</CardTitle>
           <CardDescription>
-            Update the work pattern that carries into future availability and scheduling.
+            This is your default schedule template. Future availability starts from this pattern and
+            then lets you add cycle-only overrides.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            {pattern ? (
-              <WorkPatternCard
-                worksDow={pattern.works_dow}
-                offsDow={pattern.offs_dow}
-                weekendRotation={pattern.weekend_rotation}
-                worksDowMode={pattern.works_dow_mode}
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground">No recurring pattern saved yet.</p>
-            )}
+          <div className="space-y-3">
+            <WorkPatternCard pattern={pattern} />
+            <div className="rounded-xl border border-dashed border-border/70 bg-muted/10 px-3.5 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                What this controls
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">{patternSummary}</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Editing future availability will not change this recurring pattern.
+              </p>
+            </div>
           </div>
-          <WorkPatternEditDialog
-            therapistId={profile.id}
-            therapistName={fullName}
-            initialPattern={pattern}
-            saveWorkPatternAction={saveOwnWorkPatternAction}
-          />
+          <Button asChild>
+            <Link href="/therapist/recurring-pattern">Edit recurring pattern</Link>
+          </Button>
         </CardContent>
       </Card>
 

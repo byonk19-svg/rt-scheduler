@@ -1,4 +1,5 @@
 import type { UiRole } from '@/lib/auth/roles'
+import type { WorkPattern } from '@/lib/coverage/work-patterns'
 // Core domain primitives live in @/lib/shift-types; imported here for local use and re-exported
 // for backward compatibility so that the 17 callers of this module need no changes.
 import type {
@@ -46,6 +47,7 @@ export type Therapist = {
   weekend_rotation: WeekendRotation
   weekend_anchor_date: string | null
   works_dow_mode: WorksDowMode
+  pattern?: WorkPattern | null
   shift_preference?: 'day' | 'night' | 'either' | null
   on_fmla: boolean
   fmla_return_date: string | null

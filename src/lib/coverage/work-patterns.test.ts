@@ -1,6 +1,12 @@
 ﻿import { describe, expect, it } from 'vitest'
 
-import { isAllowedByPattern, isWeekendOn, normalizeWorkPattern, type WorkPattern } from '@/lib/coverage/work-patterns'
+import {
+  describeWorkPatternSummary,
+  isAllowedByPattern,
+  isWeekendOn,
+  normalizeWorkPattern,
+  type WorkPattern,
+} from '@/lib/coverage/work-patterns'
 
 function createPattern(overrides?: Partial<WorkPattern>): WorkPattern {
   return normalizeWorkPattern({
@@ -63,5 +69,44 @@ describe('work-patterns', () => {
     expect(decision.allowed).toBe(true)
     expect(decision.reason).toBe('soft_outside_works_dow')
     expect(decision.penalty).toBeGreaterThan(0)
+  })
+
+  it('normalizes explicit weekend rules and describes every-other-weekend summaries', () => {
+    const pattern = normalizeWorkPattern({
+      therapist_id: 'therapist-1',
+      pattern_type: 'weekly_with_weekend_rotation',
+      weekly_weekdays: [1, 2, 4, 5],
+      works_dow_mode: 'hard',
+      weekend_rule: 'every_other_weekend',
+      weekend_anchor_date: '2026-05-02',
+    })
+
+    expect(pattern.pattern_type).toBe('weekly_with_weekend_rotation')
+    expect(pattern.weekend_rule).toBe('every_other_weekend')
+    expect(pattern.weekly_weekdays).toEqual([1, 2, 4, 5])
+    expect(describeWorkPatternSummary(pattern)).toBe(
+      'Works Mon, Tue, Thu, Fri. Every other weekend starting May 2, 2026.'
+    )
+  })
+
+  it('supports repeating cycle patterns with anchors and plain-English summaries', () => {
+    const pattern = normalizeWorkPattern({
+      therapist_id: 'therapist-1',
+      pattern_type: 'repeating_cycle',
+      cycle_anchor_date: '2026-05-01',
+      cycle_segments: [
+        { kind: 'work', length_days: 4 },
+        { kind: 'off', length_days: 1 },
+        { kind: 'work', length_days: 2 },
+        { kind: 'off', length_days: 6 },
+      ],
+    })
+
+    expect(pattern.pattern_type).toBe('repeating_cycle')
+    expect(pattern.cycle_anchor_date).toBe('2026-05-01')
+    expect(pattern.cycle_segments).toHaveLength(4)
+    expect(describeWorkPatternSummary(pattern)).toBe(
+      'Repeats every 13 days starting May 1, 2026.'
+    )
   })
 })

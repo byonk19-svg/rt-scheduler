@@ -1,6 +1,6 @@
 import type { AvailabilityOverrideRow, ShiftTypeForAvailability } from '@/lib/coverage/types'
 import type { WorkPattern } from '@/lib/coverage/work-patterns'
-import { shiftTypeMatches } from '@/lib/coverage/work-patterns'
+import { isAllowedByPattern, shiftTypeMatches } from '@/lib/coverage/work-patterns'
 
 export type EligibilityReason =
   | 'inactive'
@@ -10,6 +10,7 @@ export type EligibilityReason =
   | 'blocked_offs_dow'
   | 'blocked_every_other_weekend'
   | 'blocked_outside_works_dow_hard'
+  | 'blocked_repeating_cycle_off_segment'
   | 'soft_outside_works_dow'
   | 'prn_not_offered_for_date'
   | 'allowed'
@@ -150,6 +151,20 @@ export function resolveEligibility(params: ResolveEligibilityParams): Eligibilit
     return buildResolution('prn_not_offered_for_date')
   }
 
+  if (params.therapist.pattern) {
+    const patternDecision = isAllowedByPattern(params.therapist.pattern, params.date)
+    if (!patternDecision.allowed) {
+      return buildResolution(patternDecision.reason, {
+        penalty: patternDecision.penalty,
+      })
+    }
+    if (patternDecision.reason === 'soft_outside_works_dow') {
+      return buildResolution('soft_outside_works_dow', {
+        penalty: patternDecision.penalty,
+      })
+    }
+  }
+
   return buildResolution('allowed')
 }
 
@@ -174,6 +189,7 @@ export function formatEligibilityReason(reason: EligibilityReason): string | nul
   if (reason === 'blocked_offs_dow') return 'Never works this weekday'
   if (reason === 'blocked_every_other_weekend') return 'Off weekend by alternating rotation'
   if (reason === 'blocked_outside_works_dow_hard') return 'Outside hard works-day rule'
+  if (reason === 'blocked_repeating_cycle_off_segment') return 'Off in repeating cycle'
   if (reason === 'inactive') return 'Inactive therapist'
   if (reason === 'on_fmla') return 'Therapist on FMLA'
   if (reason === 'prn_not_offered_for_date') return 'PRN not offered for this date'

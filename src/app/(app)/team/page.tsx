@@ -32,10 +32,17 @@ type ProfileRow = {
 
 type WorkPatternRow = {
   therapist_id: string
+  pattern_type?: 'weekly_fixed' | 'weekly_with_weekend_rotation' | 'repeating_cycle' | 'none' | null
   works_dow: number[]
   works_dow_mode: string
   weekend_rotation: string
   weekend_anchor_date: string | null
+  offs_dow?: number[] | null
+  weekly_weekdays?: number[] | null
+  weekend_rule?: 'none' | 'every_weekend' | 'every_other_weekend' | null
+  cycle_anchor_date?: string | null
+  cycle_segments?: Array<{ kind: 'work' | 'off'; length_days: number }> | null
+  shift_preference?: 'day' | 'night' | 'either' | null
 }
 
 type TeamSearchParams = {
@@ -242,7 +249,7 @@ export default async function TeamPage({
     supabase
       .from('work_patterns')
       .select(
-        'therapist_id, works_dow, offs_dow, works_dow_mode, weekend_rotation, weekend_anchor_date'
+        'therapist_id, pattern_type, works_dow, offs_dow, works_dow_mode, weekend_rotation, weekend_anchor_date, weekly_weekdays, weekend_rule, cycle_anchor_date, cycle_segments, shift_preference'
       ),
     supabase
       .from('employee_roster')
@@ -257,11 +264,17 @@ export default async function TeamPage({
   const workPatterns: Record<string, WorkPatternRecord> = {}
   for (const row of (patternRowsResult.data ?? []) as WorkPatternRow[]) {
     workPatterns[row.therapist_id] = {
+      pattern_type: row.pattern_type ?? 'weekly_fixed',
       works_dow: row.works_dow,
-      offs_dow: (row as { offs_dow?: number[] }).offs_dow ?? [],
+      offs_dow: row.offs_dow ?? [],
       works_dow_mode: row.works_dow_mode === 'soft' ? 'soft' : 'hard',
       weekend_rotation: row.weekend_rotation === 'every_other' ? 'every_other' : 'none',
       weekend_anchor_date: row.weekend_anchor_date ?? null,
+      weekly_weekdays: row.weekly_weekdays ?? row.works_dow ?? [],
+      weekend_rule: row.weekend_rule ?? 'none',
+      cycle_anchor_date: row.cycle_anchor_date ?? null,
+      cycle_segments: row.cycle_segments ?? [],
+      shift_preference: row.shift_preference ?? 'either',
     }
   }
   const activeProfiles = allProfiles.filter((profile) => profile.is_active !== false)

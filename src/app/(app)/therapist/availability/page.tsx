@@ -11,9 +11,15 @@ import {
 import { TherapistAvailabilityWorkspace } from '@/components/availability/TherapistAvailabilityWorkspace'
 import type { TableToolbarFilters } from '@/components/TableToolbar'
 import { FeedbackToast } from '@/components/feedback-toast'
+import { buildCycleAvailabilityBaseline } from '@/lib/availability-pattern-generator'
 import { can } from '@/lib/auth/can'
 import { findScheduledConflicts } from '@/lib/availability-scheduled-conflict'
 import { toUiRole } from '@/lib/auth/roles'
+import {
+  describeWorkPatternSummary,
+  normalizeWorkPattern,
+  type WorkPattern,
+} from '@/lib/coverage/work-patterns'
 import { resolveTherapistAvailabilityCycleId } from '@/lib/therapist-workflow'
 import { createClient } from '@/lib/supabase/server'
 
@@ -37,6 +43,20 @@ type Cycle = {
   published: boolean
   archived_at?: string | null
   availability_due_at?: string | null
+}
+
+type WorkPatternRow = {
+  pattern_type: WorkPattern['pattern_type'] | null
+  works_dow: number[] | null
+  offs_dow: number[] | null
+  weekend_rotation: string | null
+  weekend_anchor_date: string | null
+  works_dow_mode: string | null
+  weekly_weekdays: number[] | null
+  weekend_rule: WorkPattern['weekend_rule'] | null
+  cycle_anchor_date: string | null
+  cycle_segments: WorkPattern['cycle_segments'] | null
+  shift_preference: WorkPattern['shift_preference'] | null
 }
 
 type AvailabilityRow = {
@@ -152,7 +172,9 @@ export default async function TherapistAvailabilityPage({
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select(
+      'role, work_patterns(pattern_type, works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode, weekly_weekdays, weekend_rule, cycle_anchor_date, cycle_segments, shift_preference)'
+    )
     .eq('id', user.id)
     .maybeSingle()
 
@@ -160,6 +182,28 @@ export default async function TherapistAvailabilityPage({
   if (can(role, 'access_manager_ui')) {
     redirect('/availability')
   }
+
+  const workPatternSource = getOne(
+    (profile as { work_patterns?: WorkPatternRow | WorkPatternRow[] | null } | null)?.work_patterns
+  )
+  const recurringPattern = workPatternSource
+    ? normalizeWorkPattern({
+        therapist_id: user.id,
+        pattern_type: workPatternSource.pattern_type ?? undefined,
+        works_dow: workPatternSource.works_dow ?? [],
+        offs_dow: workPatternSource.offs_dow ?? [],
+        weekend_rotation:
+          workPatternSource.weekend_rotation === 'every_other' ? 'every_other' : undefined,
+        weekend_anchor_date: workPatternSource.weekend_anchor_date ?? null,
+        works_dow_mode: workPatternSource.works_dow_mode === 'soft' ? 'soft' : undefined,
+        weekly_weekdays: workPatternSource.weekly_weekdays ?? workPatternSource.works_dow ?? [],
+        weekend_rule: workPatternSource.weekend_rule ?? undefined,
+        cycle_anchor_date: workPatternSource.cycle_anchor_date ?? null,
+        cycle_segments: workPatternSource.cycle_segments ?? [],
+        shift_preference: workPatternSource.shift_preference ?? 'either',
+      })
+    : null
+  const recurringPatternSummary = describeWorkPatternSummary(recurringPattern)
 
   const today = new Date()
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -223,7 +267,7 @@ export default async function TherapistAvailabilityPage({
     }
   }
 
-  let entriesQuery = supabase
+  const entriesQuery = supabase
     .from('availability_overrides')
     .select(
       'id, date, shift_type, override_type, note, created_at, updated_at, therapist_id, cycle_id, profiles!availability_overrides_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
@@ -231,10 +275,6 @@ export default async function TherapistAvailabilityPage({
     .eq('therapist_id', user.id)
     .order('date', { ascending: true })
     .order('created_at', { ascending: false })
-
-  if (selectedCycleId) {
-    entriesQuery = entriesQuery.eq('cycle_id', selectedCycleId)
-  }
 
   const scheduledShiftsPromise =
     activeCycle && selectedCycleId === activeCycle.id
@@ -280,6 +320,17 @@ export default async function TherapistAvailabilityPage({
     }
   })
 
+  const generatedBaselineByCycleId = Object.fromEntries(
+    cycles.map((cycle) => [
+      cycle.id,
+      buildCycleAvailabilityBaseline({
+        cycleStart: cycle.start_date,
+        cycleEnd: cycle.end_date,
+        pattern: recurringPattern,
+      }),
+    ])
+  )
+
   return (
     <div className="space-y-7">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
@@ -289,6 +340,8 @@ export default async function TherapistAvailabilityPage({
         availabilityRows={availabilityRows}
         conflicts={conflicts}
         initialCycleId={selectedCycleId}
+        recurringPatternSummary={recurringPatternSummary}
+        generatedBaselineByCycleId={generatedBaselineByCycleId}
         submissionsByCycleId={submissionsByCycleId}
         submitTherapistAvailabilityGridAction={submitTherapistAvailabilityGridAction}
         returnToPath="/therapist/availability"

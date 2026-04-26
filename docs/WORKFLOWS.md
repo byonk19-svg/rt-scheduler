@@ -66,6 +66,14 @@ On `/team`, use Employee roster (single add or bulk paste) so names match what s
 
 ## 3) Therapist/Manager: Availability Input
 
+- Recurring scheduling is now split into:
+  - `Recurring Work Pattern` = the therapist's default template
+  - `Future Availability` = a generated cycle view derived from that template
+  - cycle overrides = date or range exceptions for that cycle only
+- Editing future availability must not change the saved recurring pattern.
+- Therapist recurring-pattern editor lives at `/therapist/recurring-pattern`.
+- Manager advanced recurring-pattern editor lives at `/team/work-patterns/[therapistId]`.
+- Legacy quick-edit and legacy work-pattern dialogs are weekly-only surfaces; advanced repeating-cycle patterns should be edited through the dedicated recurring-pattern pages.
 - Day-level table: `availability_overrides` (cycle-scoped).
 - Official therapist submit state: `therapist_availability_submissions` (one row per therapist per cycle after Submit availability; Save progress stores overrides only and does not create this row).
 - Therapist grid (`/therapist/availability`, staff `/availability`): Save progress (draft) vs Submit availability / Save changes (updates submission timestamps per app rules).
@@ -153,9 +161,10 @@ Current operational guidance:
 
 1. Manager opens `/team/work-patterns`.
 2. Therapists are grouped by day vs night shift.
-3. Each row shows work days, off days, weekend rotation, and hard/soft mode.
-4. Edit opens a dedicated dialog that upserts `work_patterns`.
-5. `weekend_anchor_date` must be a Saturday before save succeeds.
+3. Each row shows the plain-English recurring-pattern summary plus the day-level badge strip when applicable.
+4. `Open editor` routes to `/team/work-patterns/[therapistId]` for the full pattern-type-first editor.
+5. Weekly patterns still support weekday selection plus weekend rotation.
+6. Repeating cycles support anchored work/off segment input and should be edited only through the dedicated page.
 
 ## 10) Manager: Team CSV Import
 

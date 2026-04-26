@@ -30,7 +30,7 @@ import {
   isDateWithinRange,
 } from '@/lib/schedule-helpers'
 import { formatEligibilityReason, resolveEligibility } from '@/lib/coverage/resolve-availability'
-import { normalizeWorkPattern } from '@/lib/coverage/work-patterns'
+import { normalizeWorkPattern, type WorkPattern } from '@/lib/coverage/work-patterns'
 import type { AvailabilityOverrideRow as CycleAvailabilityOverrideRow } from '@/lib/coverage/types'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import {
@@ -209,7 +209,7 @@ async function getTherapistAvailabilityState(
     supabase
       .from('work_patterns')
       .select(
-        'therapist_id, works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode, shift_preference'
+        'therapist_id, pattern_type, works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode, weekly_weekdays, weekend_rule, cycle_anchor_date, cycle_segments, shift_preference'
       )
       .eq('therapist_id', therapistId)
       .maybeSingle(),
@@ -237,11 +237,28 @@ async function getTherapistAvailabilityState(
   const pattern = patternResult.data
     ? normalizeWorkPattern({
         therapist_id: therapistId,
+        pattern_type:
+          (patternResult.data as { pattern_type?: WorkPattern['pattern_type'] | null } | null)
+            ?.pattern_type ?? undefined,
         works_dow: patternResult.data.works_dow,
         offs_dow: patternResult.data.offs_dow,
-        weekend_rotation: patternResult.data.weekend_rotation,
+        weekend_rotation:
+          patternResult.data.weekend_rotation === 'every_other' ? 'every_other' : undefined,
         weekend_anchor_date: patternResult.data.weekend_anchor_date,
-        works_dow_mode: patternResult.data.works_dow_mode,
+        works_dow_mode: patternResult.data.works_dow_mode === 'soft' ? 'soft' : undefined,
+        weekly_weekdays:
+          (patternResult.data as { weekly_weekdays?: number[] | null } | null)?.weekly_weekdays ??
+          patternResult.data.works_dow ??
+          [],
+        weekend_rule:
+          (patternResult.data as { weekend_rule?: WorkPattern['weekend_rule'] | null } | null)
+            ?.weekend_rule ?? undefined,
+        cycle_anchor_date:
+          (patternResult.data as { cycle_anchor_date?: string | null } | null)?.cycle_anchor_date ??
+          null,
+        cycle_segments:
+          (patternResult.data as { cycle_segments?: WorkPattern['cycle_segments'] | null } | null)
+            ?.cycle_segments ?? [],
         shift_preference: patternResult.data.shift_preference,
       })
     : normalizeWorkPattern({

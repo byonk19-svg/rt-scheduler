@@ -1,11 +1,11 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
-import { saveWorkPatternAction } from '@/app/team/actions'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
 import { WorkPatternCard } from '@/components/team/WorkPatternCard'
-import { WorkPatternEditDialog } from '@/components/team/WorkPatternEditDialog'
 import type { WorkPatternRecord } from '@/components/team/team-directory-model'
+import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
@@ -23,18 +23,40 @@ type ProfileRow = {
   shift_type: 'day' | 'night' | null
   work_patterns:
     | {
+        pattern_type?:
+          | 'weekly_fixed'
+          | 'weekly_with_weekend_rotation'
+          | 'repeating_cycle'
+          | 'none'
+          | null
         works_dow: number[] | null
         offs_dow: number[] | null
         weekend_rotation: string | null
         weekend_anchor_date: string | null
         works_dow_mode: string | null
+        weekly_weekdays?: number[] | null
+        weekend_rule?: 'none' | 'every_weekend' | 'every_other_weekend' | null
+        cycle_anchor_date?: string | null
+        cycle_segments?: Array<{ kind: 'work' | 'off'; length_days: number }> | null
+        shift_preference?: 'day' | 'night' | 'either' | null
       }
     | {
+        pattern_type?:
+          | 'weekly_fixed'
+          | 'weekly_with_weekend_rotation'
+          | 'repeating_cycle'
+          | 'none'
+          | null
         works_dow: number[] | null
         offs_dow: number[] | null
         weekend_rotation: string | null
         weekend_anchor_date: string | null
         works_dow_mode: string | null
+        weekly_weekdays?: number[] | null
+        weekend_rule?: 'none' | 'every_weekend' | 'every_other_weekend' | null
+        cycle_anchor_date?: string | null
+        cycle_segments?: Array<{ kind: 'work' | 'off'; length_days: number }> | null
+        shift_preference?: 'day' | 'night' | 'either' | null
       }[]
     | null
 }
@@ -86,11 +108,17 @@ function toPatternRecord(
   if (worksDow.length === 0 && offsDow.length === 0 && weekendRotation === 'none') return null
 
   return {
+    pattern_type: row.pattern_type ?? 'weekly_fixed',
     works_dow: worksDow,
     offs_dow: offsDow,
     weekend_rotation: weekendRotation,
     weekend_anchor_date: row.weekend_anchor_date ?? null,
     works_dow_mode: worksDowMode,
+    weekly_weekdays: row.weekly_weekdays ?? worksDow,
+    weekend_rule: row.weekend_rule ?? 'none',
+    cycle_anchor_date: row.cycle_anchor_date ?? null,
+    cycle_segments: row.cycle_segments ?? [],
+    shift_preference: row.shift_preference ?? 'either',
   }
 }
 
@@ -126,7 +154,7 @@ export default async function WorkPatternsPage({
   const { data: profiles } = await supabase
     .from('profiles')
     .select(
-      'id, full_name, role, shift_type, work_patterns(works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode)'
+      'id, full_name, role, shift_type, work_patterns(pattern_type, works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode, weekly_weekdays, weekend_rule, cycle_anchor_date, cycle_segments, shift_preference)'
     )
     .in('role', ['therapist', 'lead'])
     .eq('is_active', true)
@@ -178,12 +206,7 @@ export default async function WorkPatternsPage({
                     </div>
 
                     {pattern ? (
-                      <WorkPatternCard
-                        worksDow={pattern.works_dow}
-                        offsDow={pattern.offs_dow}
-                        weekendRotation={pattern.weekend_rotation}
-                        worksDowMode={pattern.works_dow_mode}
-                      />
+                      <WorkPatternCard pattern={pattern} />
                     ) : (
                       <p className="text-sm text-muted-foreground">
                         No pattern set — click Edit to add one
@@ -191,12 +214,9 @@ export default async function WorkPatternsPage({
                     )}
                   </div>
 
-                  <WorkPatternEditDialog
-                    therapistId={profile.id}
-                    therapistName={profile.full_name ?? 'Unknown therapist'}
-                    initialPattern={pattern}
-                    saveWorkPatternAction={saveWorkPatternAction}
-                  />
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/team/work-patterns/${profile.id}`}>Open editor</Link>
+                  </Button>
                 </div>
               )
             })}

@@ -66,4 +66,48 @@ describe('generateDraftForCycle', () => {
     })
     expect(result.forcedMustWorkMisses).toBe(1)
   })
+
+  it('respects repeating-cycle off segments through therapist.pattern', () => {
+    const therapist: Therapist = {
+      id: 't2',
+      full_name: 'Cycle Therapist',
+      shift_type: 'day',
+      is_lead_eligible: false,
+      employment_type: 'full_time',
+      max_work_days_per_week: 5,
+      works_dow: [0, 1, 2, 3, 4, 5, 6],
+      offs_dow: [],
+      weekend_rotation: 'none',
+      weekend_anchor_date: null,
+      works_dow_mode: 'hard',
+      pattern: {
+        therapist_id: 't2',
+        pattern_type: 'repeating_cycle',
+        works_dow: [0, 1, 2, 3, 4, 5, 6],
+        offs_dow: [],
+        weekend_rotation: 'none',
+        weekend_anchor_date: null,
+        works_dow_mode: 'hard',
+        weekly_weekdays: [],
+        weekend_rule: 'none',
+        cycle_anchor_date: '2026-04-06',
+        cycle_segments: [
+          { kind: 'work', length_days: 1 },
+          { kind: 'off', length_days: 2 },
+        ],
+        shift_preference: 'day',
+      },
+      shift_preference: 'day',
+      on_fmla: false,
+      fmla_return_date: null,
+      is_active: true,
+    }
+
+    const result = generateDraftForCycle({
+      ...BASE_INPUT,
+      therapists: [therapist],
+    })
+
+    expect(result.draftShiftsToInsert.some((shift) => shift.user_id === therapist.id)).toBe(false)
+  })
 })

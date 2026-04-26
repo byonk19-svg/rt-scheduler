@@ -9,7 +9,7 @@ import type {
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { runPreFlight, summarizePreFlight } from '@/lib/coverage/pre-flight'
-import { normalizeWorkPattern } from '@/lib/coverage/work-patterns'
+import { normalizeWorkPattern, type WorkPattern } from '@/lib/coverage/work-patterns'
 import { getWeekBoundsForDate } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/server'
 
@@ -22,11 +22,16 @@ type CycleRow = {
 
 type WorkPatternRow = {
   therapist_id: string
+  pattern_type: WorkPattern['pattern_type'] | null
   works_dow: number[] | null
   offs_dow: number[] | null
   weekend_rotation: 'none' | 'every_other' | null
   weekend_anchor_date: string | null
   works_dow_mode: 'hard' | 'soft' | null
+  weekly_weekdays: number[] | null
+  weekend_rule: WorkPattern['weekend_rule'] | null
+  cycle_anchor_date: string | null
+  cycle_segments: WorkPattern['cycle_segments'] | null
   shift_preference: 'day' | 'night' | 'either' | null
 }
 
@@ -56,11 +61,16 @@ function buildTherapists(
       row.therapist_id,
       normalizeWorkPattern({
         therapist_id: row.therapist_id,
+        pattern_type: row.pattern_type ?? undefined,
         works_dow: row.works_dow ?? [],
         offs_dow: row.offs_dow ?? [],
-        weekend_rotation: row.weekend_rotation ?? 'none',
+        weekend_rotation: row.weekend_rotation ?? undefined,
         weekend_anchor_date: row.weekend_anchor_date,
-        works_dow_mode: row.works_dow_mode ?? 'hard',
+        works_dow_mode: row.works_dow_mode ?? undefined,
+        weekly_weekdays: row.weekly_weekdays ?? row.works_dow ?? [],
+        weekend_rule: row.weekend_rule ?? undefined,
+        cycle_anchor_date: row.cycle_anchor_date ?? null,
+        cycle_segments: row.cycle_segments ?? [],
         shift_preference: row.shift_preference ?? 'either',
       }),
     ])
@@ -85,6 +95,7 @@ function buildTherapists(
       weekend_rotation: 'none',
       weekend_anchor_date: null,
       works_dow_mode: 'hard',
+      pattern,
       shift_preference: pattern.shift_preference,
     }
   })
@@ -161,7 +172,7 @@ export async function POST(request: Request) {
         ? supabase
             .from('work_patterns')
             .select(
-              'therapist_id, works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode, shift_preference'
+              'therapist_id, pattern_type, works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode, weekly_weekdays, weekend_rule, cycle_anchor_date, cycle_segments, shift_preference'
             )
             .in('therapist_id', therapistIds)
         : Promise.resolve({ data: [], error: null }),

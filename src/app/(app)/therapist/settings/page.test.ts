@@ -11,7 +11,8 @@ const source = fs.readFileSync(
 describe('therapist settings route', () => {
   it('renders a therapist-owned preferences and work rules page', () => {
     expect(source).toContain('Preferences / Work Rules')
-    expect(source).toContain('WorkPatternEditDialog')
+    expect(source).toContain('Edit recurring pattern')
+    expect(source).toContain('/therapist/recurring-pattern')
     expect(source).toContain('Max consecutive days')
     expect(source).toContain('Notification preferences')
     expect(source).not.toContain("export { default } from '../../profile/page'")

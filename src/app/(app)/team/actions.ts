@@ -185,8 +185,16 @@ export async function saveTeamQuickEditAction(formData: FormData) {
     targetId: input.profileId,
   })
 
+  const { data: existingWorkPattern } = await supabase
+    .from('work_patterns')
+    .select('pattern_type')
+    .eq('therapist_id', input.profileId)
+    .maybeSingle()
+
   // Upsert or clear the recurring work pattern
-  if (input.workPattern.hasPattern) {
+  if (existingWorkPattern?.pattern_type === 'repeating_cycle') {
+    // Legacy quick edit cannot faithfully edit advanced repeating cycles.
+  } else if (input.workPattern.hasPattern) {
     const { error: patternError } = await supabase.from('work_patterns').upsert(
       {
         therapist_id: input.profileId,

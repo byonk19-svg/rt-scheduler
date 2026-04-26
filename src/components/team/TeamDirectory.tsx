@@ -360,6 +360,9 @@ export function TeamDirectory({
   const [hasPattern, setHasPattern] = useState(
     initialPattern !== null && initialPattern.works_dow.length > 0
   )
+  const [hasAdvancedPattern, setHasAdvancedPattern] = useState(
+    initialPattern?.pattern_type === 'repeating_cycle'
+  )
   const [selectedDays, setSelectedDays] = useState<number[]>(initialPattern?.works_dow ?? [])
   const [neverDays, setNeverDays] = useState<number[]>(initialPattern?.offs_dow ?? [])
   const [worksDowMode, setWorksDowMode] = useState<'hard' | 'soft'>(
@@ -413,6 +416,7 @@ export function TeamDirectory({
     setDraftRole((profile.role as EditableRole | null) ?? 'therapist')
     setOnFmla(profile.on_fmla === true)
     setHasPattern(pattern !== null && (pattern.works_dow ?? []).length > 0)
+    setHasAdvancedPattern(pattern?.pattern_type === 'repeating_cycle')
     setSelectedDays(pattern?.works_dow ?? [])
     setNeverDays(pattern?.offs_dow ?? [])
     setWorksDowMode(pattern?.works_dow_mode ?? 'hard')
@@ -834,6 +838,24 @@ export function TeamDirectory({
               <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-3">
                 <p className="text-sm font-semibold text-foreground">Scheduling Constraints</p>
 
+                {hasAdvancedPattern ? (
+                  <div className="rounded-lg border border-border/70 bg-card px-3 py-3">
+                    <p className="text-sm font-medium text-foreground">
+                      This therapist uses an advanced repeating-cycle pattern.
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Quick edit keeps that pattern unchanged. Use the full work-pattern editor for
+                      recurring schedule changes.
+                    </p>
+                    <a
+                      href={`/team/work-patterns/${editProfile.id}`}
+                      className="mt-2 inline-flex text-sm font-medium text-primary underline-offset-2 hover:underline"
+                    >
+                      Open full work-pattern editor
+                    </a>
+                  </div>
+                ) : null}
+
                 <div className="space-y-1.5">
                   <p className="text-xs font-medium text-foreground">Days they never work</p>
                   <p className="text-xs text-muted-foreground">
@@ -845,6 +867,7 @@ export function TeamDirectory({
                         key={day.value}
                         type="button"
                         onClick={() => toggleNeverDay(day.value)}
+                        disabled={hasAdvancedPattern}
                         className={cn(
                           'h-9 w-10 rounded-lg border text-xs font-semibold transition-colors',
                           neverDays.includes(day.value)
@@ -870,6 +893,7 @@ export function TeamDirectory({
                       name="has_recurring_schedule"
                       className="h-4 w-4"
                       checked={hasPattern}
+                      disabled={hasAdvancedPattern}
                       onChange={(e) => setHasPattern(e.target.checked)}
                     />
                     <span className="text-xs font-medium text-foreground">
@@ -890,6 +914,7 @@ export function TeamDirectory({
                               key={day.value}
                               type="button"
                               onClick={() => toggleDay(day.value)}
+                              disabled={hasAdvancedPattern}
                               className={cn(
                                 'h-9 w-10 rounded-lg border text-xs font-semibold transition-colors',
                                 selectedDays.includes(day.value)
@@ -916,6 +941,7 @@ export function TeamDirectory({
                               value="hard"
                               className="mt-0.5 h-4 w-4 shrink-0"
                               checked={worksDowMode === 'hard'}
+                              disabled={hasAdvancedPattern}
                               onChange={() => setWorksDowMode('hard')}
                             />
                             <span>
@@ -932,6 +958,7 @@ export function TeamDirectory({
                               value="soft"
                               className="mt-0.5 h-4 w-4 shrink-0"
                               checked={worksDowMode === 'soft'}
+                              disabled={hasAdvancedPattern}
                               onChange={() => setWorksDowMode('soft')}
                             />
                             <span>
@@ -956,6 +983,7 @@ export function TeamDirectory({
                               value="none"
                               className="h-4 w-4 shrink-0"
                               checked={weekendRotation === 'none'}
+                              disabled={hasAdvancedPattern}
                               onChange={() => setWeekendRotation('none')}
                             />
                             <span className="font-medium text-foreground">Works every weekend</span>
@@ -967,6 +995,7 @@ export function TeamDirectory({
                               value="every_other"
                               className="h-4 w-4 shrink-0"
                               checked={weekendRotation === 'every_other'}
+                              disabled={hasAdvancedPattern}
                               onChange={() => setWeekendRotation('every_other')}
                             />
                             <span className="font-medium text-foreground">Every other weekend</span>
@@ -986,6 +1015,7 @@ export function TeamDirectory({
                               name="weekend_anchor_date"
                               type="date"
                               defaultValue={workPatterns[editProfile.id]?.weekend_anchor_date ?? ''}
+                              disabled={hasAdvancedPattern}
                               required
                             />
                             <p className="text-xs text-muted-foreground">

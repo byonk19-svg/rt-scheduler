@@ -461,15 +461,17 @@ export function pickTherapistForDate(
         is_active: therapist.is_active,
         on_fmla: therapist.on_fmla,
         employment_type: therapist.employment_type,
-        pattern: normalizeWorkPattern({
-          therapist_id: therapist.id,
-          works_dow: therapist.works_dow,
-          offs_dow: therapist.offs_dow,
-          weekend_rotation: therapist.weekend_rotation,
-          weekend_anchor_date: therapist.weekend_anchor_date,
-          works_dow_mode: therapist.works_dow_mode,
-          shift_preference: therapist.shift_preference,
-        }),
+        pattern:
+          therapist.pattern ??
+          normalizeWorkPattern({
+            therapist_id: therapist.id,
+            works_dow: therapist.works_dow,
+            offs_dow: therapist.offs_dow,
+            weekend_rotation: therapist.weekend_rotation,
+            weekend_anchor_date: therapist.weekend_anchor_date,
+            works_dow_mode: therapist.works_dow_mode,
+            shift_preference: therapist.shift_preference,
+          }),
       },
       cycleId,
       date,

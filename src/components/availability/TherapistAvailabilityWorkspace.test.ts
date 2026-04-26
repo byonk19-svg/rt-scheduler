@@ -38,19 +38,38 @@ describe('TherapistAvailabilityWorkspace', () => {
         ],
         conflicts: [],
         initialCycleId: 'cycle-1',
+        recurringPatternSummary:
+          'Works Mon, Tue, Thu, Fri. Every other weekend starting May 2, 2026.',
+        generatedBaselineByCycleId: {
+          'cycle-1': {
+            '2026-03-23': {
+              baselineStatus: 'available',
+              baselineSource: 'recurring_pattern',
+              reason: 'allowed',
+            },
+            '2026-03-24': {
+              baselineStatus: 'available',
+              baselineSource: 'recurring_pattern',
+              reason: 'allowed',
+            },
+          },
+        },
         submissionsByCycleId: {},
         submitTherapistAvailabilityGridAction: async () => {},
       })
     )
 
     expect(html).toContain('Future Availability')
+    expect(html).toContain('Based on your recurring pattern')
+    expect(html).toContain('Works Mon, Tue, Thu, Fri. Every other weekend starting May 2, 2026.')
     expect(html).toContain('Submit availability')
     expect(html).toContain('id="therapist-availability-workspace"')
     expect(html).toContain('Not submitted')
     expect(html).toContain('Cycle:')
     expect(html).not.toContain('days selected')
     expect(html).toContain('Availability summary:')
-    expect(html).toContain('Tap a day to switch between Available, Need Off, and Request to Work.')
+    expect(html).toContain('Generated from your recurring pattern')
+    expect(html).toContain('This cycle only')
     expect(html).toContain('panel on the right')
     expect(html).toContain('Day Notes')
     expect(html).toContain('Mar')
@@ -58,6 +77,8 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('Request to Work')
     expect(html).toContain('Need Off')
     expect(html).toContain('request to work')
+    expect(html).toContain('Clear overrides')
+    expect(html).toContain('Reapply pattern')
     expect(html).toContain('Week 1')
     expect(html).not.toContain('Must work')
     expect(html).not.toContain('Unavailable')
@@ -78,6 +99,8 @@ describe('TherapistAvailabilityWorkspace', () => {
         availabilityRows: [],
         conflicts: [{ date: '2026-04-20', shiftType: 'day' }],
         initialCycleId: 'cycle-1',
+        recurringPatternSummary: 'No recurring pattern saved.',
+        generatedBaselineByCycleId: { 'cycle-1': {} },
         submissionsByCycleId: {},
         submitTherapistAvailabilityGridAction: async () => {},
       })

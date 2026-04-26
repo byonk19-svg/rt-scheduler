@@ -1,9 +1,16 @@
 export type WorkPatternRecord = {
+  therapist_id?: string
+  pattern_type?: 'weekly_fixed' | 'weekly_with_weekend_rotation' | 'repeating_cycle' | 'none'
   works_dow: number[]
   offs_dow: number[]
   works_dow_mode: 'hard' | 'soft'
   weekend_rotation: 'none' | 'every_other'
   weekend_anchor_date: string | null
+  weekly_weekdays?: number[]
+  weekend_rule?: 'none' | 'every_weekend' | 'every_other_weekend'
+  cycle_anchor_date?: string | null
+  cycle_segments?: Array<{ kind: 'work' | 'off'; length_days: number }>
+  shift_preference?: 'day' | 'night' | 'either' | null
 }
 
 export type TeamProfileRecord = {

@@ -52,6 +52,7 @@ export function WorkPatternEditDialog({
   initialPattern,
   saveWorkPatternAction,
 }: Props) {
+  const isAdvancedPattern = initialPattern?.pattern_type === 'repeating_cycle'
   const [open, setOpen] = useState(false)
   const [worksDow, setWorksDow] = useState<number[]>(initialPattern?.works_dow ?? [])
   const [offsDow, setOffsDow] = useState<number[]>(initialPattern?.offs_dow ?? [])
@@ -122,8 +123,19 @@ export function WorkPatternEditDialog({
 
   return (
     <>
-      <Button type="button" variant="outline" size="sm" onClick={openDialog}>
-        Edit
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={openDialog}
+        disabled={isAdvancedPattern}
+        title={
+          isAdvancedPattern
+            ? 'Repeating-cycle patterns cannot be edited in this quick weekly editor.'
+            : undefined
+        }
+      >
+        {isAdvancedPattern ? 'Advanced pattern' : 'Edit'}
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
