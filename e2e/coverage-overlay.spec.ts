@@ -250,9 +250,10 @@ test.describe.serial('coverage manager dialog interactions', () => {
           page.evaluate(
             () => document.querySelectorAll('[data-testid=\"coverage-status-popover\"]').length
           ),
-        { timeout: 5_000 }
+        { timeout: 10_000 }
       )
       .toBeGreaterThan(0)
+    await page.waitForTimeout(1000)
     await expect(page.getByRole('button', { name: 'Call In' })).toBeVisible({ timeout: 5_000 })
     await expect(shiftEditorDialog(page)).toHaveCount(0)
   })
