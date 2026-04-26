@@ -314,9 +314,19 @@ test.describe.serial('coverage manager dialog interactions', () => {
       )
       .toBe(1)
 
-    const unassignButton = page.getByRole('button', {
-      name: `Unassign ${ctx!.therapist2.fullName}`,
-    })
+    const assignedShiftResult = await ctx!.supabase
+      .from('shifts')
+      .select('id')
+      .eq('cycle_id', ctx!.cycle.id)
+      .eq('user_id', ctx!.therapist2.id)
+      .eq('date', ctx!.assignDate)
+      .eq('shift_type', 'day')
+      .single()
+
+    expect(assignedShiftResult.error).toBeNull()
+    expect(assignedShiftResult.data?.id).toBeTruthy()
+
+    const unassignButton = page.getByTestId(`coverage-unassign-${assignedShiftResult.data?.id}`)
     await expect(unassignButton).toBeVisible({ timeout: 15_000 })
 
     await unassignButton.click()
