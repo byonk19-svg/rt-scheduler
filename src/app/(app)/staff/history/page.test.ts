@@ -3,7 +3,10 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const source = fs.readFileSync(path.join(process.cwd(), 'src/app/staff/history/page.tsx'), 'utf8')
+const source = fs.readFileSync(
+  path.join(process.cwd(), 'src/app/(app)/staff/history/page.tsx'),
+  'utf8'
+)
 
 describe('staff history page', () => {
   it('shows direct vs team visibility, received roles, and pickup interest history', () => {
