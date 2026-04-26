@@ -1,6 +1,6 @@
 'use client'
 
-import { Send } from 'lucide-react'
+import { CalendarCheck, CalendarX2, Send } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { AvailabilityEntryTableRow } from '@/app/availability/availability-requests-table'
@@ -86,6 +86,7 @@ export function TherapistAvailabilityWorkspace({
     }
     return next
   }, [cycleRows])
+
   const initialNotesByDate = useMemo(() => {
     const next: Record<string, string> = {}
     for (const row of cycleRows) {
@@ -93,12 +94,12 @@ export function TherapistAvailabilityWorkspace({
     }
     return next
   }, [cycleRows])
+
   const [draftStatusByDate, setDraftStatusByDate] =
     useState<Record<string, DayStatus>>(initialStatusByDate)
   const [draftNotesByDate, setDraftNotesByDate] =
     useState<Record<string, string>>(initialNotesByDate)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
-  const selectedDayEditorRef = useRef<HTMLDivElement>(null)
   const noteTextareaRef = useRef<HTMLTextAreaElement>(null)
 
   function handleCycleChange(nextCycleId: string) {
@@ -161,6 +162,7 @@ export function TherapistAvailabilityWorkspace({
       }),
     [cycleDays, draftNotesByDate, draftStatusByDate]
   )
+
   const notesPayload = useMemo(
     () =>
       JSON.stringify(
@@ -243,48 +245,24 @@ export function TherapistAvailabilityWorkspace({
     return range
   }, [selectedCycle])
 
-  const actionButtons = (
-    <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
-      {!submissionUi.isSubmitted ? (
-        <>
-          <FormSubmitButton
-            type="submit"
-            name="workflow"
-            value="draft"
-            variant="outline"
-            size="sm"
-            pendingText="Saving…"
-            className="min-h-11 shrink-0 px-4 font-semibold sm:min-w-[8.5rem]"
-          >
-            Save progress
-          </FormSubmitButton>
-          <FormSubmitButton
-            type="submit"
-            name="workflow"
-            value="submit"
-            size="sm"
-            pendingText="Saving…"
-            className="min-h-11 shrink-0 gap-2 px-5 font-semibold shadow-sm sm:min-w-[10.5rem]"
-          >
-            <Send className="h-3.5 w-3.5" aria-hidden />
-            Submit availability
-          </FormSubmitButton>
-        </>
-      ) : (
-        <FormSubmitButton
-          type="submit"
-          name="workflow"
-          value="submit"
-          size="sm"
-          pendingText="Saving…"
-          className="min-h-11 shrink-0 gap-2 px-5 font-semibold shadow-sm"
-        >
-          <Send className="h-3.5 w-3.5" aria-hidden />
-          Save changes
-        </FormSubmitButton>
-      )}
-    </div>
+  const selectedDayStatus = selectedDate
+    ? (draftStatusByDate[selectedDate] ?? 'none')
+    : ('none' as DayStatus)
+
+  const selectedDayNeedsClear = Boolean(
+    selectedDate &&
+    ((draftStatusByDate[selectedDate] ?? 'none') !== 'none' ||
+      (draftNotesByDate[selectedDate] ?? '').trim().length > 0)
   )
+
+  useEffect(() => {
+    if (!selectedDate) return
+    if (selectedDayStatus !== 'force_off' && selectedDayStatus !== 'force_on') return
+    const id = requestAnimationFrame(() => {
+      noteTextareaRef.current?.focus()
+    })
+    return () => cancelAnimationFrame(id)
+  }, [selectedDate, selectedDayStatus])
 
   function toggleDate(date: string) {
     if (!selectedCycle) return
@@ -333,37 +311,54 @@ export function TherapistAvailabilityWorkspace({
     })
   }
 
-  const selectedDayNeedsClear = Boolean(
-    selectedDate &&
-    ((draftStatusByDate[selectedDate] ?? 'none') !== 'none' ||
-      (draftNotesByDate[selectedDate] ?? '').trim().length > 0)
+  const actionButtons = (
+    <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
+      {!submissionUi.isSubmitted ? (
+        <>
+          <FormSubmitButton
+            type="submit"
+            name="workflow"
+            value="draft"
+            variant="outline"
+            size="sm"
+            pendingText="Saving…"
+            className="min-h-11 shrink-0 px-4 font-semibold sm:min-w-[8.5rem]"
+          >
+            Save progress
+          </FormSubmitButton>
+          <FormSubmitButton
+            type="submit"
+            name="workflow"
+            value="submit"
+            size="sm"
+            pendingText="Saving…"
+            className="min-h-11 shrink-0 gap-2 px-5 font-semibold shadow-sm sm:min-w-[10.5rem]"
+          >
+            <Send className="h-3.5 w-3.5" aria-hidden />
+            Submit availability
+          </FormSubmitButton>
+        </>
+      ) : (
+        <FormSubmitButton
+          type="submit"
+          name="workflow"
+          value="submit"
+          size="sm"
+          pendingText="Saving…"
+          className="min-h-11 shrink-0 gap-2 px-5 font-semibold shadow-sm"
+        >
+          <Send className="h-3.5 w-3.5" aria-hidden />
+          Save changes
+        </FormSubmitButton>
+      )}
+    </div>
   )
-
-  useEffect(() => {
-    if (!selectedDate || !selectedDayEditorRef.current) return
-    selectedDayEditorRef.current.scrollIntoView({ block: 'nearest' })
-  }, [selectedDate])
-
-  const selectedDayStatus = selectedDate
-    ? (draftStatusByDate[selectedDate] ?? 'none')
-    : ('none' as DayStatus)
-
-  useEffect(() => {
-    if (!selectedDate) return
-    if (selectedDayStatus !== 'force_off' && selectedDayStatus !== 'force_on') return
-    const id = requestAnimationFrame(() => {
-      noteTextareaRef.current?.focus()
-    })
-    return () => cancelAnimationFrame(id)
-  }, [selectedDate, selectedDayStatus])
 
   if (cycles.length === 0) {
     return (
       <section id="therapist-availability-workspace" className="space-y-3">
         <header className="border-b border-border/70 pb-4">
-          <h1 className="font-heading text-[1.4rem] font-semibold leading-tight tracking-tight text-foreground">
-            Future Availability
-          </h1>
+          <h1 className="app-page-title">Future Availability</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             No upcoming cycle is open for availability yet.
           </p>
@@ -373,50 +368,54 @@ export function TherapistAvailabilityWorkspace({
   }
 
   return (
-    <section id="therapist-availability-workspace" className="space-y-5">
+    <section id="therapist-availability-workspace" className="space-y-4">
+      {/* ── Header ─────────────────────────────────── */}
       <header className="border-b border-border/70 pb-4">
-        <h1 className="font-heading text-[1.4rem] font-semibold leading-tight tracking-tight text-foreground">
-          Future Availability
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">{cyclePageSubtitle}</p>
-        {deadlinePresentation ? (
-          <div className="mt-3 space-y-2">
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-2">
-              <span
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <h1 className="app-page-title">Future Availability</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{cyclePageSubtitle}</p>
+          </div>
+
+          {/* Submission status badge — top right */}
+          <div className="shrink-0 text-right">
+            <p className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Submission Status
+            </p>
+            <span
+              className={cn(
+                'mt-1 inline-flex w-fit items-center rounded-full border px-3 py-1 text-[11px] font-semibold',
+                submissionUi.isSubmitted
+                  ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
+                  : 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+              )}
+            >
+              {submissionPrimaryLabel}
+            </span>
+            {deadlinePresentation &&
+            !submissionUi.isSubmitted &&
+            deadlinePresentation.deadlineHeadline ? (
+              <p
                 className={cn(
-                  'w-fit shrink-0 rounded-full border px-3 py-1 text-[11px] font-semibold',
-                  submissionUi.isSubmitted
-                    ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
-                    : 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+                  'mt-1 text-xs font-medium',
+                  deadlinePresentation.emphasis === 'past' && 'text-[var(--error-text)]',
+                  deadlinePresentation.emphasis === 'urgent' && 'text-[var(--warning-text)]',
+                  deadlinePresentation.emphasis === 'neutral' && 'text-muted-foreground'
                 )}
               >
-                {submissionPrimaryLabel}
-              </span>
-              {!submissionUi.isSubmitted && deadlinePresentation.deadlineHeadline ? (
-                <p
-                  className={cn(
-                    'min-w-0 text-base font-semibold leading-snug tracking-tight',
-                    deadlinePresentation.emphasis === 'past' && 'text-[var(--error-text)]',
-                    deadlinePresentation.emphasis === 'urgent' && 'text-[var(--warning-text)]',
-                    deadlinePresentation.emphasis === 'neutral' && 'text-foreground'
-                  )}
-                >
-                  {deadlinePresentation.deadlineHeadline}
-                </p>
-              ) : null}
-              {submissionUi.isSubmitted && deadlinePresentation.submittedPrimaryLine ? (
-                <p className="min-w-0 text-base font-semibold leading-snug text-foreground">
-                  {deadlinePresentation.submittedPrimaryLine}
-                </p>
-              ) : null}
-            </div>
-            {submissionUi.isSubmitted && deadlinePresentation.submittedDeadlineContextLine ? (
-              <p className="text-sm font-medium text-muted-foreground">
-                {deadlinePresentation.submittedDeadlineContextLine}
+                {deadlinePresentation.deadlineHeadline}
+              </p>
+            ) : null}
+            {deadlinePresentation &&
+            submissionUi.isSubmitted &&
+            deadlinePresentation.submittedPrimaryLine ? (
+              <p className="mt-1 text-xs font-medium text-muted-foreground">
+                {deadlinePresentation.submittedPrimaryLine}
               </p>
             ) : null}
           </div>
-        ) : null}
+        </div>
+
         {submissionUi.isSubmitted && hasUnsavedChanges ? (
           <p className="mt-2 text-xs font-medium text-[var(--warning-text)]">
             You have unsaved changes — save to update your submitted availability.
@@ -427,30 +426,44 @@ export function TherapistAvailabilityWorkspace({
             You have unsaved changes. Save progress or submit availability.
           </p>
         ) : null}
+
         <p className="mt-2 text-xs tabular-nums text-muted-foreground">
           Availability summary: {availableCount} available · {cannotWorkDates.length} need off ·{' '}
           {requestToWorkCount} request to work
         </p>
-        <ol className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground">
-          {[
-            'Tap each date to set Available, Need Off, or Request to Work',
-            'Use Save progress when you are not ready to finalize',
-            'Use Submit availability when this cycle is complete',
-          ].map((step, i) => (
-            <li key={step} className="flex items-center gap-2">
-              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-foreground/70">
-                {i + 1}
-              </span>
-              {step}
-            </li>
-          ))}
-        </ol>
       </header>
+
+      {/* ── Stat cards ─────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex items-center gap-3 rounded-xl border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 py-3">
+          <CalendarX2 className="h-5 w-5 shrink-0 text-[var(--error-text)]" aria-hidden />
+          <div>
+            <p className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[var(--error-text)]/70">
+              Need Off
+            </p>
+            <p className="text-2xl font-bold tabular-nums leading-none text-[var(--error-text)]">
+              {cannotWorkDates.length}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 rounded-xl border border-[var(--info-border)] bg-[var(--info-subtle)] px-4 py-3">
+          <CalendarCheck className="h-5 w-5 shrink-0 text-[var(--info-text)]" aria-hidden />
+          <div>
+            <p className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[var(--info-text)]/70">
+              Requested to Work
+            </p>
+            <p className="text-2xl font-bold tabular-nums leading-none text-[var(--info-text)]">
+              {requestToWorkCount}
+            </p>
+          </div>
+        </div>
+      </div>
 
       {conflicts.length > 0 ? (
         <ScheduledConflictBanner conflicts={conflicts} onDismiss={() => {}} />
       ) : null}
 
+      {/* ── Main form card ──────────────────────────── */}
       <form
         action={submitTherapistAvailabilityGridAction}
         className="overflow-hidden rounded-[20px] border border-border/80 bg-card shadow-tw-2xs-soft"
@@ -465,6 +478,7 @@ export function TherapistAvailabilityWorkspace({
           <input key={`cannot-${date}`} type="hidden" name="cannot_work_dates" value={date} />
         ))}
 
+        {/* Cycle selector */}
         <div className="flex flex-col gap-2 border-b border-border/80 px-5 py-3 sm:px-6">
           <div className="w-full max-w-[15rem] space-y-1 sm:max-w-[17.5rem]">
             <Label
@@ -493,164 +507,184 @@ export function TherapistAvailabilityWorkspace({
           </div>
         </div>
 
-        <div className="border-b border-[var(--info-border)] bg-[var(--info-subtle)] px-5 py-2 sm:px-6">
+        {/* Instruction banner */}
+        <div className="border-b border-[var(--info-border)] bg-[var(--info-subtle)] px-5 py-2.5 sm:px-6">
           <p className="text-xs font-medium leading-snug text-[var(--info-text)]">
-            Tap a day to switch between Available, Need Off, and Request to Work. Notes (Need Off /
-            Request to Work only) appear below the selected week when needed.
+            Tap a day to switch between Available, Need Off, and Request to Work. Select a day to
+            add notes in the panel on the right.
           </p>
-          <p className="mt-1 text-[11px] leading-snug text-[var(--info-text)]/95">
+          <p className="mt-1 text-[11px] leading-snug text-[var(--info-text)]/90">
             Available = I can work · Need Off = I&apos;m requesting the day off · Request to Work =
             Please consider me for a shift
           </p>
         </div>
 
-        <div className="space-y-5 px-5 py-5 sm:px-6 sm:py-6">
-          <div className="grid grid-cols-7 gap-3 border-y border-border/80 py-2.5">
-            {DOW.map((dow) => (
-              <p
-                key={dow}
-                className="text-center text-[0.68rem] font-semibold tracking-[0.1em] text-muted-foreground"
-              >
-                {dow}
-              </p>
-            ))}
+        {/* Two-column: calendar + sidebar */}
+        <div className="grid grid-cols-1 divide-y divide-border/80 lg:grid-cols-[1fr_256px] lg:divide-x lg:divide-y-0">
+          {/* ── Calendar ─────────────────────── */}
+          <div className="px-5 py-5 sm:px-6 sm:py-6">
+            {/* DOW headers */}
+            <div className="grid grid-cols-7 gap-1.5 border-y border-border/70 py-2">
+              {DOW.map((dow) => (
+                <p
+                  key={dow}
+                  className="text-center text-[0.68rem] font-semibold tracking-[0.1em] text-muted-foreground"
+                >
+                  {dow}
+                </p>
+              ))}
+            </div>
+
+            {/* Weeks */}
+            <div className="mt-3 space-y-4">
+              {weeks.map((week, idx) => (
+                <div key={`week-${idx}`} className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <p className="text-[0.68rem] font-semibold uppercase tracking-[0.09em] text-muted-foreground">
+                      Week {idx + 1}
+                    </p>
+                    <div className="h-px flex-1 bg-border/80" />
+                  </div>
+                  <div className="grid grid-cols-7 gap-1.5">
+                    {week.map((date) => {
+                      const status = draftStatusByDate[date] ?? 'none'
+                      const dayIndex = cycleDays.indexOf(date)
+                      const prevInCycle = dayIndex > 0 ? cycleDays[dayIndex - 1] : null
+                      const monthRibbon = monthRibbonLabel(date, prevInCycle)
+                      const dayNum = new Date(`${date}T00:00:00`).getDate()
+                      return (
+                        <button
+                          key={date}
+                          type="button"
+                          onClick={() => handleDayClick(date)}
+                          className={cn(
+                            'relative flex min-h-[4.5rem] flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 text-center transition-[border-color,background-color] duration-150',
+                            'hover:-translate-y-px focus-visible:border-ring focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                            status === 'none' &&
+                              'border-border/20 bg-muted/10 hover:border-border/50 hover:bg-muted/20',
+                            status === 'force_off' &&
+                              'border-[var(--error-border)] bg-[var(--error-subtle)]',
+                            status === 'force_on' &&
+                              'border-[var(--info-border)] bg-[var(--info-subtle)]',
+                            selectedDate === date &&
+                              'ring-2 ring-primary/60 ring-offset-1 ring-offset-card'
+                          )}
+                          aria-pressed={selectedDate === date}
+                          aria-label={`${formatDateLabel(date)}: ${therapistDayStatusLabel(status)}`}
+                        >
+                          {monthRibbon ? (
+                            <span
+                              className={cn(
+                                'text-[0.5rem] font-semibold uppercase tracking-[0.1em]',
+                                status === 'none' && 'text-muted-foreground/55',
+                                status === 'force_off' && 'text-[var(--error-text)]/70',
+                                status === 'force_on' && 'text-[var(--info-text)]/70'
+                              )}
+                            >
+                              {monthRibbon}
+                            </span>
+                          ) : (
+                            <span className="h-[0.5rem]" aria-hidden />
+                          )}
+                          <span
+                            className={cn(
+                              'text-[1.15rem] leading-none',
+                              status === 'none'
+                                ? 'font-medium text-muted-foreground/70'
+                                : 'font-bold text-foreground'
+                            )}
+                          >
+                            {dayNum}
+                          </span>
+                          {status !== 'none' ? (
+                            <span
+                              className={cn(
+                                'inline-flex items-center rounded-full px-1.5 py-px text-[0.5rem] font-semibold uppercase tracking-[0.05em]',
+                                status === 'force_off' &&
+                                  'bg-[var(--error-subtle)] text-[var(--error-text)] ring-1 ring-[var(--error-border)]/60',
+                                status === 'force_on' &&
+                                  'bg-[var(--info-subtle)] text-[var(--info-text)] ring-1 ring-[var(--info-border)]/60'
+                              )}
+                            >
+                              {status === 'force_off' ? 'Need Off' : 'Request'}
+                            </span>
+                          ) : (
+                            <span className="h-[0.5rem]" aria-hidden />
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {weeks.map((week, idx) => (
-            <div key={`week-${idx}`} className="space-y-2">
-              <div className="flex items-center gap-2">
-                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.09em] text-muted-foreground">
-                  Week {idx + 1}
-                </p>
-                <div className="h-px flex-1 bg-border/90" />
-              </div>
-              <div className="grid grid-cols-7 gap-2 sm:gap-2.5">
-                {week.map((date) => {
-                  const status = draftStatusByDate[date] ?? 'none'
-                  const dayIndex = cycleDays.indexOf(date)
-                  const prevInCycle = dayIndex > 0 ? cycleDays[dayIndex - 1] : null
-                  const monthRibbon = monthRibbonLabel(date, prevInCycle)
-                  return (
-                    <button
-                      key={date}
-                      type="button"
-                      onClick={() => handleDayClick(date)}
-                      className={cn(
-                        'relative flex min-h-[5.75rem] flex-col items-center justify-center rounded-[20px] border px-1 py-2 text-center shadow-tw-2xs transition-[border-color,box-shadow,transform,background-color] duration-200',
-                        'hover:-translate-y-px focus-visible:border-ring focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-                        status === 'none' &&
-                          'border-border/25 bg-muted/10 text-muted-foreground/85 shadow-none hover:border-primary/15 hover:bg-muted/18',
-                        status === 'force_off' &&
-                          'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)] shadow-tw-cell-error ring-1 ring-[var(--error-border)]/35',
-                        status === 'force_on' &&
-                          'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)] shadow-tw-cell-info ring-1 ring-[var(--info-border)]/40',
-                        selectedDate === date &&
-                          'z-[1] ring-1 ring-primary/70 ring-offset-1 ring-offset-card'
-                      )}
-                      aria-pressed={selectedDate === date}
-                      aria-label={`${formatDateLabel(date)}: ${therapistDayStatusLabel(status)}`}
-                    >
-                      {monthRibbon ? (
-                        <span
-                          className={cn(
-                            'mb-0.5 text-[0.58rem] font-semibold uppercase tracking-[0.12em]',
-                            status === 'none' && 'text-muted-foreground/65',
-                            status === 'force_on' && 'text-[var(--info-text)]/90',
-                            status === 'force_off' && 'text-[var(--error-text)]/90'
-                          )}
-                        >
-                          {monthRibbon}
-                        </span>
-                      ) : (
-                        <span className="mb-0.5 h-[0.58rem]" aria-hidden />
-                      )}
-                      <span
-                        className={cn(
-                          'text-[1.2rem] leading-none tracking-[-0.03em]',
-                          status === 'none'
-                            ? 'font-medium text-muted-foreground/75'
-                            : 'font-bold text-foreground'
-                        )}
-                      >
-                        {new Date(`${date}T00:00:00`).getDate()}
-                      </span>
-                      <span
-                        className={cn(
-                          'mt-1.5 block max-w-full px-0.5 text-[0.62rem] leading-snug',
-                          status === 'none' && 'font-medium text-muted-foreground/75',
-                          status === 'force_off' && 'font-semibold',
-                          status === 'force_on' && 'font-semibold'
-                        )}
-                      >
-                        {therapistDayStatusLabel(status)}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-
-              {selectedDate && week.includes(selectedDate) ? (
-                <div
-                  ref={selectedDayEditorRef}
-                  className="rounded-xl border border-border/60 bg-muted/10 px-3 py-1.5 sm:px-3.5"
-                >
-                  <p className="text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    Selected Day
-                  </p>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                    <p className="text-sm font-semibold leading-tight text-foreground">
-                      {formatDateLabel(selectedDate)}
-                    </p>
-                    <span
-                      className={cn(
-                        'inline-flex w-fit items-center rounded-full border px-2 py-px text-[10px] font-semibold uppercase tracking-[0.06em]',
-                        (draftStatusByDate[selectedDate] ?? 'none') === 'none' &&
-                          'border-border/80 bg-muted/30 text-muted-foreground',
-                        (draftStatusByDate[selectedDate] ?? 'none') === 'force_off' &&
-                          'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]',
-                        (draftStatusByDate[selectedDate] ?? 'none') === 'force_on' &&
-                          'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)]'
-                      )}
-                    >
-                      {therapistDayStatusLabel(draftStatusByDate[selectedDate] ?? 'none')}
-                    </span>
+          {/* ── Sidebar ──────────────────────── */}
+          <div className="flex flex-col gap-6 px-4 py-5">
+            {/* Legend */}
+            <div>
+              <h3 className="mb-2.5 text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                Legend
+              </h3>
+              <div className="space-y-2">
+                {[
+                  { label: 'Need Off', dotClass: 'bg-[var(--error-text)]' },
+                  { label: 'Request to Work', dotClass: 'bg-[var(--info-text)]' },
+                  { label: 'No Preference (Available)', dotClass: 'bg-border' },
+                ].map(({ label, dotClass }) => (
+                  <div key={label} className="flex items-center gap-2">
+                    <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', dotClass)} />
+                    <span className="text-xs text-muted-foreground">{label}</span>
                   </div>
+                ))}
+              </div>
+            </div>
 
-                  {(draftStatusByDate[selectedDate] ?? 'none') === 'none' ? (
-                    <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
-                      Notes are only saved for Need Off or Request to Work days.
-                    </p>
-                  ) : (
-                    <div className="mt-1.5 space-y-0.5">
-                      <Label
-                        htmlFor={`therapist-day-note-${selectedDate}`}
-                        className="text-[11px] font-medium text-foreground"
-                      >
-                        Optional note
-                      </Label>
-                      <p className="text-[10px] leading-snug text-muted-foreground">
-                        Add context only if it would help with scheduling.
-                      </p>
-                      <textarea
-                        id={`therapist-day-note-${selectedDate}`}
-                        ref={noteTextareaRef}
-                        value={draftNotesByDate[selectedDate] ?? ''}
-                        onChange={(event) => updateDateNote(selectedDate, event.target.value)}
-                        placeholder={
-                          (draftStatusByDate[selectedDate] ?? 'none') === 'force_off'
-                            ? 'Optional: why you need this day off'
-                            : 'Optional: anything the scheduler should know'
-                        }
-                        className="min-h-[56px] w-full rounded-lg border border-border/15 bg-background px-2.5 py-1.5 text-sm text-foreground shadow-none outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground/45 focus-visible:border-ring focus-visible:shadow-sm focus-visible:ring-2 focus-visible:ring-ring/50"
-                      />
-                    </div>
-                  )}
+            {/* Day Notes */}
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h3 className="text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                  Day Notes
+                </h3>
+                {selectedDate ? (
+                  <span className="rounded bg-muted/60 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground">
+                    {new Date(`${selectedDate}T00:00:00`)
+                      .toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                      .toUpperCase()}
+                  </span>
+                ) : null}
+              </div>
 
+              {!selectedDate ? (
+                <p className="text-xs italic text-muted-foreground">
+                  Optional details for selected date.
+                </p>
+              ) : selectedDayStatus === 'none' ? (
+                <p className="text-xs text-muted-foreground">
+                  Notes are only saved for Need Off or Request to Work days.
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor={`therapist-day-note-${selectedDate}`}
+                    className="text-[11px] font-medium text-foreground"
+                  >
+                    Optional note
+                  </Label>
+                  <textarea
+                    id={`therapist-day-note-${selectedDate}`}
+                    ref={noteTextareaRef}
+                    value={draftNotesByDate[selectedDate] ?? ''}
+                    onChange={(event) => updateDateNote(selectedDate, event.target.value)}
+                    placeholder="Add specific constraints or shift preferences for this day…"
+                    className="min-h-[80px] w-full rounded-lg border border-border/15 bg-background px-2.5 py-1.5 text-xs text-foreground outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground/45 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
+                  />
                   {selectedDayNeedsClear ? (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border/25 pt-1.5">
+                    <div className="flex gap-3">
                       <button
                         type="button"
-                        className="inline-flex h-7 shrink-0 items-center rounded-md border border-transparent px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+                        className="text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                         onClick={clearSelectedDay}
                       >
                         Clear day
@@ -658,7 +692,7 @@ export function TherapistAvailabilityWorkspace({
                       {(draftNotesByDate[selectedDate] ?? '').trim().length > 0 ? (
                         <button
                           type="button"
-                          className="text-[11px] font-medium text-muted-foreground/90 underline-offset-4 hover:text-foreground hover:underline"
+                          className="text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                           onClick={() => updateDateNote(selectedDate, '')}
                         >
                           Clear note
@@ -667,62 +701,57 @@ export function TherapistAvailabilityWorkspace({
                     </div>
                   ) : null}
                 </div>
-              ) : null}
+              )}
             </div>
-          ))}
+
+            {/* Notes summary */}
+            {daysWithNoteText.length > 0 ? (
+              <div>
+                <h3 className="mb-2 text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                  Notes Added
+                </h3>
+                <ul className="space-y-1.5">
+                  {daysWithNoteText.map((date) => {
+                    const status = draftStatusByDate[date] ?? 'none'
+                    const preview = (draftNotesByDate[date] ?? '').trim()
+                    return (
+                      <li
+                        key={`note-summary-${date}`}
+                        className="rounded-lg border border-border/60 bg-muted/10 px-2.5 py-1.5 text-xs"
+                      >
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="font-medium text-foreground">
+                            {formatDateLabel(date)}
+                          </span>
+                          <span
+                            className={cn(
+                              'font-medium',
+                              status === 'force_off' && 'text-[var(--error-text)]',
+                              status === 'force_on' && 'text-[var(--info-text)]'
+                            )}
+                          >
+                            · {therapistDayStatusLabel(status)}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 line-clamp-2 text-muted-foreground">
+                          &ldquo;{preview}&rdquo;
+                        </p>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            ) : null}
+          </div>
         </div>
 
+        {/* Footer */}
         <div className="flex flex-col gap-2 border-t border-border/70 bg-muted/10 px-5 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6">
           <p className="text-xs text-muted-foreground sm:mr-auto">
             Save progress keeps a draft. Submit availability marks this cycle as officially
             submitted.
           </p>
           {actionButtons}
-        </div>
-
-        <div className="border-t border-border/70 px-5 py-4 sm:px-6">
-          <div className="space-y-2">
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">Day Notes</h3>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Review notes you&apos;ve added for this cycle. Edit them by selecting the day in the
-                calendar above.
-              </p>
-            </div>
-            {daysWithNoteText.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No day-specific notes yet.</p>
-            ) : (
-              <ul className="space-y-2">
-                {daysWithNoteText.map((date) => {
-                  const status = draftStatusByDate[date] ?? 'none'
-                  const preview = (draftNotesByDate[date] ?? '').trim()
-                  return (
-                    <li
-                      key={`note-summary-${date}`}
-                      className="flex flex-col gap-0.5 rounded-xl border border-border/70 bg-muted/10 px-3 py-2 text-sm sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-2"
-                    >
-                      <span className="font-medium text-foreground">{formatDateLabel(date)}</span>
-                      <span className="text-muted-foreground">·</span>
-                      <span
-                        className={cn(
-                          'font-medium',
-                          status === 'force_off' && 'text-[var(--error-text)]',
-                          status === 'force_on' && 'text-[var(--info-text)]',
-                          status === 'none' && 'text-muted-foreground'
-                        )}
-                      >
-                        {therapistDayStatusLabel(status)}
-                      </span>
-                      <span className="hidden sm:inline text-muted-foreground">—</span>
-                      <span className="text-muted-foreground line-clamp-2 sm:min-w-0 sm:flex-1">
-                        &ldquo;{preview}&rdquo;
-                      </span>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </div>
         </div>
       </form>
     </section>
