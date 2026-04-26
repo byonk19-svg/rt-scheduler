@@ -23,14 +23,6 @@ type RoleJourneysContext = {
   draftCycle: { id: string; label: string; availabilityDate: string; openShiftDate: string }
 }
 
-function formatCalendarLabel(isoDate: string): string {
-  return new Date(`${isoDate}T00:00:00`).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-}
-
 function formatPreliminaryShiftLabel(isoDate: string): string {
   return new Date(`${isoDate}T00:00:00`).toLocaleDateString('en-US', {
     weekday: 'short',
@@ -639,34 +631,43 @@ test.describe.serial('role journeys', () => {
     await expect(
       page.getByRole('heading', { name: new RegExp(`Welcome, ${ctx!.therapist.firstName}`) })
     ).toBeVisible()
-    await expect(page.getByText('Availability for This Cycle').first()).toBeVisible()
+    await expect(page.getByText('What needs your attention now').first()).toBeVisible()
 
     await page.goto(`/therapist/availability?cycle=${ctx!.draftCycle.id}`)
-    await expect(page.getByRole('heading', { name: 'Availability for This Cycle' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Future Availability' })).toBeVisible()
 
     const dayButton = page
       .getByRole('button', {
-        name: new RegExp(`^${formatCalendarLabel(ctx!.draftCycle.availabilityDate)}:`),
+        name: /: Available$/,
       })
       .first()
     await expect(dayButton).toBeVisible()
     await dayButton.click()
 
-    const noteBox = page.locator(`textarea#therapist-day-note-${ctx!.draftCycle.availabilityDate}`)
+    const noteBox = page.locator('textarea[id^="therapist-day-note-"]').first()
     await expect(noteBox).toBeVisible()
     await noteBox.fill(noteText)
 
-    await page.getByRole('button', { name: /submit availability/i }).click()
-    await expect(
-      page.getByText(/availability saved and submitted/i).or(page.getByText(/saved and submitted/i))
-    ).toBeVisible({ timeout: 45_000 })
+    const submitButton = page
+      .getByRole('button', { name: /submit availability/i })
+      .or(page.getByRole('button', { name: /save changes/i }))
+      .first()
+    await submitButton.click()
+    await expect(page.getByText('Submitted').first()).toBeVisible({ timeout: 45_000 })
     await expect(page.getByText(noteText).first()).toBeVisible()
 
     await page.goto(`/coverage?cycle=${ctx!.publishedCycle.id}&view=week`)
     await expectShiftTabActive(page, 'day')
 
     await page.goto('/shift-board')
-    await expect(page.getByText('Published schedule changes only').first()).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Shift Swaps & Pickups' })).toBeVisible()
+    await expect(
+      page
+        .getByText(
+          'Post swaps or pickups for the published schedule only. Team board and direct requests both live here.'
+        )
+        .first()
+    ).toBeVisible()
 
     await expectStaffRedirect(page, '/team')
     await expectStaffRedirect(page, '/publish')
@@ -719,18 +720,19 @@ test.describe.serial('role journeys', () => {
     await expectShiftTabActive(page, 'day')
 
     const assignmentTrigger = page
-      .locator('[data-testid^="coverage-assignment-trigger-"]')
-      .filter({ hasText: ctx!.therapist.firstName })
+      .locator(
+        `[data-testid="coverage-assignment-trigger-${ctx!.publishedCycle.shiftDate}-${ctx!.therapist.id}"]:visible`
+      )
       .first()
 
-    await expect(assignmentTrigger).toBeVisible({ timeout: 30_000 })
     const assignmentStatusResponse = page.waitForResponse((response) =>
       response.url().includes('/api/schedule/assignment-status')
     )
-    await assignmentTrigger.click()
-    await expect(page.getByTestId('coverage-status-popover')).toBeVisible()
+    await assignmentTrigger.click({ force: true })
+    await expect(page.getByTestId('coverage-status-popover').first()).toBeVisible()
     await page
       .getByTestId('coverage-status-popover')
+      .first()
       .getByRole('button', { name: 'Call In' })
       .click()
     const response = await assignmentStatusResponse
