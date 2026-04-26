@@ -128,3 +128,18 @@ export function shiftMonthKey(monthStartKey: string, monthDelta: number): string
   const shifted = new Date(parsed.getFullYear(), parsed.getMonth() + monthDelta, 1)
   return toIsoDate(shifted)
 }
+
+/** Parse an ISO date string to a local Date object without shifting the calendar day. */
+export function parseLocalDate(isoDate: string): Date {
+  return new Date(`${isoDate}T12:00:00`)
+}
+
+/** Format an ISO date string for user-facing display with a consistent locale. */
+export function formatDisplayDate(
+  isoDate: string,
+  options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
+): string {
+  const parsed = parseLocalDate(isoDate)
+  if (Number.isNaN(parsed.getTime())) return isoDate
+  return parsed.toLocaleDateString('en-US', options)
+}
