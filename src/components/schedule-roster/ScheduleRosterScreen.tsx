@@ -242,7 +242,6 @@ export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
               assignments={live.assignments}
               availabilityApprovals={live.availabilityApprovals}
               selectedShift={selectedShift}
-              readOnly
             />
           )}
           {sections.prn.length > 0 && (
@@ -253,7 +252,6 @@ export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
               assignments={live.assignments}
               availabilityApprovals={live.availabilityApprovals}
               selectedShift={selectedShift}
-              readOnly
             />
           )}
           {sections.core.length === 0 && sections.prn.length === 0 && (
