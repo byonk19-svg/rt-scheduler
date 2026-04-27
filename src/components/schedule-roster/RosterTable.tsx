@@ -22,7 +22,6 @@ type RosterTableProps = {
   assignments: AssignmentStore
   availabilityApprovals: AvailabilityApprovalStore
   selectedShift: ShiftType
-  readOnly?: boolean
 }
 
 function cellClass(value: RosterCellValue, isWeekend: boolean): string {
@@ -55,7 +54,6 @@ export function RosterTable({
   assignments,
   availabilityApprovals,
   selectedShift,
-  readOnly = false,
 }: RosterTableProps) {
   const flatDays = useMemo(() => weeks.flatMap((w) => w.days), [weeks])
 
