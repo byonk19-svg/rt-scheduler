@@ -1,5 +1,9 @@
 export type RosterKind = 'core' | 'prn'
 export type ShiftType = 'day' | 'night'
+export type RosterShiftStatus = 'scheduled' | 'on_call' | 'cancelled' | 'left_early' | 'call_in'
+
+/** Display value for a roster cell. Empty string = unassigned/blank. */
+export type RosterCellValue = '' | '1' | 'OFF' | 'OC' | 'CX' | 'LE' | 'CI'
 
 export type Staff = {
   id: string
@@ -12,6 +16,7 @@ export type RosterDay = {
   isoDate: string
   dayLabel: string
   dayNumber: number
+  isWeekend: boolean
 }
 
 export type RosterWeek = {
@@ -27,6 +32,7 @@ export type Assignment = {
   isoDate: string
   shiftType: ShiftType
   status: 'assigned'
+  assignmentStatus: RosterShiftStatus | null
 }
 
 export type AssignmentStore = Record<string, Assignment>
@@ -71,6 +77,12 @@ const UTC_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   day: 'numeric',
 })
 
+function formatWeekRange(startIso: string, endIso: string): string {
+  const start = UTC_DATE_FORMATTER.format(parseIsoDate(startIso))
+  const end = UTC_DATE_FORMATTER.format(parseIsoDate(endIso))
+  return `${start} – ${end}`
+}
+
 const LONG_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   timeZone: 'UTC',
   month: 'long',
@@ -91,10 +103,6 @@ function addUtcDays(isoDate: string, daysToAdd: number): string {
   return parsed.toISOString().slice(0, 10)
 }
 
-function formatWeekLabel(startDate: string, weekIndex: number): string {
-  return `WEEK ${weekIndex + 1} • ${UTC_DATE_FORMATTER.format(parseIsoDate(startDate)).toUpperCase()}`
-}
-
 export function formatLongDate(isoDate: string): string {
   return LONG_DATE_FORMATTER.format(parseIsoDate(isoDate))
 }
@@ -109,18 +117,21 @@ export function buildRosterWeeks(startDate: string, endDate: string): RosterWeek
 
     for (let offset = 0; offset < 7 && cursor <= endDate; offset += 1) {
       const parsed = parseIsoDate(cursor)
+      const dow = parsed.getUTCDay()
       days.push({
         isoDate: cursor,
-        dayLabel: WEEKDAY_LABELS[parsed.getUTCDay()] ?? '-',
+        dayLabel: WEEKDAY_LABELS[dow] ?? '-',
         dayNumber: parsed.getUTCDate(),
+        isWeekend: dow === 0 || dow === 6,
       })
       cursor = addUtcDays(cursor, 1)
     }
 
     const startOfWeek = days[0]?.isoDate ?? startDate
+    const endOfWeek = days[days.length - 1]?.isoDate ?? startOfWeek
     weeks.push({
       id: `week-${weekIndex + 1}`,
-      label: formatWeekLabel(startOfWeek, weekIndex),
+      label: formatWeekRange(startOfWeek, endOfWeek),
       startDate: startOfWeek,
       days,
     })
@@ -199,6 +210,7 @@ export function assignShift(
       isoDate: input.isoDate,
       shiftType: input.shiftType,
       status: 'assigned',
+      assignmentStatus: null,
     },
   }
 }
@@ -234,17 +246,32 @@ export function getAssignment(
   return store[createAssignmentKey(staffId, isoDate, shiftType)] ?? null
 }
 
+/** @deprecated Use RosterCellValue */
 export type MockRosterCellSymbol = '+' | '1' | 'x'
+
+const STATUS_CODE_MAP: Record<RosterShiftStatus, RosterCellValue> = {
+  scheduled: '1',
+  on_call: 'OC',
+  cancelled: 'CX',
+  left_early: 'LE',
+  call_in: 'CI',
+}
 
 export function resolveMockRosterCellDisplay(
   assignment: Assignment | null,
   approval: AvailabilityApprovalKind | null
-): { symbol: MockRosterCellSymbol; countsTowardDayTally: boolean } {
+): { value: RosterCellValue; countsTowardDayTally: boolean } {
   if (approval === 'approved_off') {
-    return { symbol: 'x', countsTowardDayTally: false }
+    return { value: 'OFF', countsTowardDayTally: false }
   }
-  if (assignment != null || approval === 'approved_work') {
-    return { symbol: '1', countsTowardDayTally: true }
+  if (assignment != null) {
+    const code = assignment.assignmentStatus
+      ? (STATUS_CODE_MAP[assignment.assignmentStatus] ?? '1')
+      : '1'
+    return { value: code, countsTowardDayTally: code !== 'CX' }
   }
-  return { symbol: '+', countsTowardDayTally: false }
+  if (approval === 'approved_work') {
+    return { value: '1', countsTowardDayTally: true }
+  }
+  return { value: '', countsTowardDayTally: false }
 }

@@ -1,113 +1,63 @@
 'use client'
 
-import { useMemo, useRef } from 'react'
+import { useMemo } from 'react'
 
-import { AssignShiftPopover } from '@/components/schedule-roster/AssignShiftPopover'
 import {
-  createAssignmentKey,
   getAssignment,
   getAvailabilityApproval,
   resolveMockRosterCellDisplay,
   type AssignmentStore,
   type AvailabilityApprovalStore,
+  type RosterCellValue,
   type RosterWeek,
   type ShiftType,
   type Staff,
 } from '@/lib/mock-coverage-roster'
 import { cn } from '@/lib/utils'
 
-type SelectedCell = {
-  staffId: string
-  isoDate: string
-}
-
 type RosterTableProps = {
-  title: string
-  subtitle: string
-  badge: string
+  groupLabel: string
   staff: readonly Staff[]
   weeks: readonly RosterWeek[]
   assignments: AssignmentStore
   availabilityApprovals: AvailabilityApprovalStore
   selectedShift: ShiftType
-  selectedCell: SelectedCell | null
-  onSelectedCellChange: (cell: SelectedCell | null) => void
-  onAssign: (cell: SelectedCell) => void
-  onUnassign: (cell: SelectedCell) => void
-  /** Live data: cells are display-only (assignments and availability come from the server). */
   readOnly?: boolean
 }
 
-function getCellLabel(
-  staffName: string,
-  isoDate: string,
-  selectedShift: ShiftType,
-  symbol: ReturnType<typeof resolveMockRosterCellDisplay>['symbol']
-): string {
-  const ctx = `${staffName} on ${isoDate} for the ${selectedShift} shift`
-  if (symbol === 'x') return `Approved day off for ${ctx}`
-  if (symbol === '1') return `Manage roster cell for ${ctx}`
-  return `Assign ${ctx}`
+function cellClass(value: RosterCellValue, isWeekend: boolean): string {
+  const base = cn(
+    'flex h-full w-full items-center justify-center text-[10px] font-semibold leading-none',
+    isWeekend && value === '' && 'opacity-0'
+  )
+  switch (value) {
+    case '1':
+      return cn(base, 'text-foreground')
+    case 'OFF':
+      return cn(base, 'text-muted-foreground')
+    case 'OC':
+      return cn(base, 'rounded bg-[var(--primary)] text-white')
+    case 'CX':
+      return cn(base, 'rounded bg-[var(--error-subtle)] text-[var(--error-text)]')
+    case 'LE':
+      return cn(base, 'rounded bg-[var(--warning-subtle)] text-[var(--warning-text)]')
+    case 'CI':
+      return cn(base, 'rounded bg-[var(--info-subtle)] text-[var(--info-text)]')
+    default:
+      return base
+  }
 }
 
 export function RosterTable({
-  title,
-  subtitle,
-  badge,
+  groupLabel,
   staff,
   weeks,
   assignments,
   availabilityApprovals,
   selectedShift,
-  selectedCell,
-  onSelectedCellChange,
-  onAssign,
-  onUnassign,
   readOnly = false,
 }: RosterTableProps) {
-  const flatDays = useMemo(() => weeks.flatMap((week) => week.days), [weeks])
-  const buttonRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
-
-  const handleCellKeyDown = (
-    event: React.KeyboardEvent<HTMLButtonElement>,
-    rowIndex: number,
-    colIndex: number
-  ) => {
-    const lastRow = staff.length - 1
-    const lastColumn = flatDays.length - 1
-    let nextRow = rowIndex
-    let nextColumn = colIndex
-
-    switch (event.key) {
-      case 'ArrowRight':
-        nextColumn = Math.min(colIndex + 1, lastColumn)
-        break
-      case 'ArrowLeft':
-        nextColumn = Math.max(colIndex - 1, 0)
-        break
-      case 'ArrowDown':
-        nextRow = Math.min(rowIndex + 1, lastRow)
-        break
-      case 'ArrowUp':
-        nextRow = Math.max(rowIndex - 1, 0)
-        break
-      case 'Home':
-        nextColumn = 0
-        break
-      case 'End':
-        nextColumn = lastColumn
-        break
-      default:
-        return
-    }
-
-    event.preventDefault()
-    const nextDay = flatDays[nextColumn]
-    const nextStaff = staff[nextRow]
-    if (!nextDay || !nextStaff) return
-    const nextKey = createAssignmentKey(nextStaff.id, nextDay.isoDate, selectedShift)
-    buttonRefs.current.get(nextKey)?.focus()
-  }
+  const flatDays = useMemo(() => weeks.flatMap((w) => w.days), [weeks])
 
   const countFilledForDay = (isoDate: string): number =>
     staff.reduce((total, member) => {
@@ -122,174 +72,81 @@ export function RosterTable({
       return total + (countsTowardDayTally ? 1 : 0)
     }, 0)
 
+  const weekBoundaryDates = useMemo(() => new Set(weeks.map((w) => w.startDate)), [weeks])
+
   return (
-    <section className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-1">
-          <h3 className="text-base font-semibold tracking-[-0.03em] text-foreground">{title}</h3>
-          <p className="text-sm text-muted-foreground">{subtitle}</p>
-        </div>
-        <span className="rounded-full border border-border/80 bg-background px-3 py-1 text-xs font-semibold text-muted-foreground">
-          {badge}
+    <div>
+      {/* Group header */}
+      <div className="bg-muted/50 px-3 py-1.5 border-b border-border/80">
+        <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+          {groupLabel}
         </span>
       </div>
 
-      <div className="max-h-[34rem] overflow-auto rounded-3xl border border-border/80 bg-background/95 shadow-sm">
-        <table
-          role="grid"
-          aria-label={title}
-          className="min-w-full border-separate border-spacing-0"
-        >
-          <thead>
-            <tr>
-              <th className="sticky left-0 top-0 z-50 min-w-[142px] border-b border-r border-border/80 bg-card px-2.5 py-2 text-left xl:min-w-[152px]">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Clinical staff
-                </p>
-              </th>
-              {weeks.map((week) => (
-                <th
-                  key={week.id}
-                  colSpan={week.days.length}
-                  className="sticky top-0 z-40 border-b border-border/80 bg-card px-1 py-2 text-left text-[8px] font-semibold uppercase tracking-[0.12em] whitespace-nowrap text-muted-foreground xl:text-[9px]"
-                >
-                  {week.label}
-                </th>
-              ))}
-            </tr>
-            <tr>
-              <th className="sticky left-0 top-[38px] z-50 border-b border-r border-border/80 bg-card px-2.5 py-2 text-left text-sm font-semibold text-foreground">
-                Therapist
-              </th>
-              {flatDays.map((day) => (
-                <th
-                  key={`${title}-${day.isoDate}`}
-                  className="sticky top-[38px] z-40 min-w-[22px] border-b border-border/80 bg-card px-0 py-2 text-center xl:min-w-[24px]"
-                >
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    {day.dayLabel}
-                  </div>
-                  <div className="mt-0.5 text-[10px] font-semibold text-foreground xl:text-[11px]">
-                    {day.dayNumber}
-                  </div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {staff.map((member, rowIndex) => (
-              <tr key={member.id}>
-                <th
-                  scope="row"
-                  className="sticky left-0 z-30 border-b border-r border-border/80 bg-background px-2.5 py-1.5 text-left text-[13px] font-medium whitespace-nowrap text-foreground xl:text-sm"
-                >
-                  {member.name}
-                </th>
-                {flatDays.map((day, colIndex) => {
-                  const assignment = getAssignment(
-                    assignments,
-                    member.id,
-                    day.isoDate,
-                    selectedShift
-                  )
-                  const approval = getAvailabilityApproval(
-                    availabilityApprovals,
-                    member.id,
-                    day.isoDate,
-                    selectedShift
-                  )
-                  const { symbol } = resolveMockRosterCellDisplay(assignment, approval)
-                  const cell = { staffId: member.id, isoDate: day.isoDate }
-                  const isOpen =
-                    selectedCell?.staffId === member.id && selectedCell?.isoDate === day.isoDate
-                  const buttonKey = createAssignmentKey(member.id, day.isoDate, selectedShift)
+      {/* Matrix rows */}
+      {staff.map((member) => (
+        <div key={member.id} className="flex border-b border-border/60 hover:bg-muted/20">
+          {/* Sticky name cell */}
+          <div className="sticky left-0 z-10 min-w-[130px] w-[130px] shrink-0 border-r border-border/80 bg-background px-2.5 flex items-center">
+            <span className="text-[12px] font-medium text-foreground truncate leading-tight py-1.5">
+              {member.name}
+            </span>
+          </div>
 
-                  const cellButtonClass = cn(
-                    'flex h-5.5 w-full items-center justify-center rounded-full border text-[9px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 xl:h-6',
-                    symbol === '1' &&
-                      'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]',
-                    symbol === 'x' &&
-                      'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]',
-                    symbol === '+' &&
-                      'border-dashed border-border/70 bg-card text-muted-foreground hover:border-primary/55 hover:text-primary',
-                    readOnly && 'pointer-events-none opacity-95'
-                  )
+          {/* Day cells */}
+          {flatDays.map((day) => {
+            const assignment = getAssignment(assignments, member.id, day.isoDate, selectedShift)
+            const approval = getAvailabilityApproval(
+              availabilityApprovals,
+              member.id,
+              day.isoDate,
+              selectedShift
+            )
+            const { value } = resolveMockRosterCellDisplay(assignment, approval)
+            const isWeekBoundary = weekBoundaryDates.has(day.isoDate)
 
-                  return (
-                    <td
-                      key={buttonKey}
-                      className={cn(
-                        'border-b border-border/60 px-px py-1 text-center',
-                        colIndex % 7 === 0 && 'border-l border-border/80'
-                      )}
-                    >
-                      {readOnly ? (
-                        <span
-                          role="img"
-                          aria-label={getCellLabel(member.name, day.isoDate, selectedShift, symbol)}
-                          className={cellButtonClass}
-                        >
-                          {symbol}
-                        </span>
-                      ) : (
-                        <AssignShiftPopover
-                          open={isOpen}
-                          onOpenChange={(open) => onSelectedCellChange(open ? cell : null)}
-                          staffName={member.name}
-                          isoDate={day.isoDate}
-                          shiftType={selectedShift}
-                          assignment={assignment}
-                          availabilityApproval={approval}
-                          onConfirm={() => onAssign(cell)}
-                          onUnassign={() => onUnassign(cell)}
-                          trigger={
-                            <button
-                              ref={(node) => {
-                                if (node) {
-                                  buttonRefs.current.set(buttonKey, node)
-                                } else {
-                                  buttonRefs.current.delete(buttonKey)
-                                }
-                              }}
-                              type="button"
-                              aria-label={getCellLabel(
-                                member.name,
-                                day.isoDate,
-                                selectedShift,
-                                symbol
-                              )}
-                              onKeyDown={(event) => handleCellKeyDown(event, rowIndex, colIndex)}
-                              className={cellButtonClass}
-                            >
-                              {symbol}
-                            </button>
-                          }
-                        />
-                      )}
-                    </td>
-                  )
-                })}
-              </tr>
-            ))}
-            <tr>
-              <th className="sticky bottom-0 left-0 z-30 border-r border-border/80 bg-muted/45 px-2.5 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                Active tally
-              </th>
-              {flatDays.map((day, index) => (
-                <td
-                  key={`tally-${title}-${day.isoDate}`}
-                  className={cn(
-                    'sticky bottom-0 z-20 bg-muted/45 px-0 py-2 text-center text-[9px] font-semibold text-foreground',
-                    index % 7 === 0 && 'border-l border-border/80'
-                  )}
-                >
-                  {countFilledForDay(day.isoDate) || ''}
-                </td>
-              ))}
-            </tr>
-          </tbody>
-        </table>
+            return (
+              <div
+                key={day.isoDate}
+                className={cn(
+                  'h-8 min-w-[26px] flex-1 flex items-center justify-center',
+                  day.isWeekend && 'bg-muted/40',
+                  isWeekBoundary && 'border-l-2 border-border/70'
+                )}
+              >
+                <span className={cellClass(value, day.isWeekend && value === '')}>{value}</span>
+              </div>
+            )
+          })}
+        </div>
+      ))}
+
+      {/* Staffing Count row */}
+      <div className="flex bg-muted/30 border-b-2 border-border/80">
+        <div className="sticky left-0 z-10 min-w-[130px] w-[130px] shrink-0 border-r border-border/80 bg-muted/30 px-2.5 flex items-center">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground py-1.5 leading-tight">
+            Staffing Count
+          </span>
+        </div>
+        {flatDays.map((day) => {
+          const count = countFilledForDay(day.isoDate)
+          const isWeekBoundary = weekBoundaryDates.has(day.isoDate)
+          return (
+            <div
+              key={day.isoDate}
+              className={cn(
+                'h-7 min-w-[26px] flex-1 flex items-center justify-center',
+                day.isWeekend && 'bg-muted/50',
+                isWeekBoundary && 'border-l-2 border-border/70'
+              )}
+            >
+              <span className="text-[10px] font-semibold text-foreground">
+                {count > 0 ? count : ''}
+              </span>
+            </div>
+          )
+        })}
       </div>
-    </section>
+    </div>
   )
 }
