@@ -1,14 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { redirectMock, revalidatePathMock, createClientMock, extractTextFromAttachmentMock } =
-  vi.hoisted(() => ({
-    redirectMock: vi.fn((url: string) => {
-      throw new Error(`REDIRECT:${url}`)
-    }),
-    revalidatePathMock: vi.fn(),
-    createClientMock: vi.fn(),
-    extractTextFromAttachmentMock: vi.fn(),
-  }))
+const {
+  redirectMock,
+  revalidatePathMock,
+  createClientMock,
+  createAdminClientMock,
+  extractTextFromAttachmentMock,
+} = vi.hoisted(() => ({
+  redirectMock: vi.fn((url: string) => {
+    throw new Error(`REDIRECT:${url}`)
+  }),
+  revalidatePathMock: vi.fn(),
+  createClientMock: vi.fn(),
+  createAdminClientMock: vi.fn(),
+  extractTextFromAttachmentMock: vi.fn(),
+}))
 
 vi.mock('next/navigation', () => ({
   redirect: redirectMock,
@@ -20,6 +26,10 @@ vi.mock('next/cache', () => ({
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: createClientMock,
+}))
+
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: createAdminClientMock,
 }))
 
 vi.mock('@/lib/openai-ocr', () => ({
@@ -338,6 +348,7 @@ function makeTherapistGridFormData() {
 describe('availability actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    createAdminClientMock.mockReturnValue(createSupabaseMock())
     extractTextFromAttachmentMock.mockResolvedValue({
       status: 'completed',
       text: 'Employee Name: Brown\nNeed off Mar 25',

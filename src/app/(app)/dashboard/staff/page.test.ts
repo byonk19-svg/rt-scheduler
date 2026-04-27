@@ -26,7 +26,7 @@ describe('staff dashboard future availability links', () => {
 describe('staff dashboard therapist action-center copy', () => {
   it('uses the therapist workflow wording from the accuracy pass', () => {
     expect(staffDashboardSource).toContain('What needs your attention now')
-    expect(staffDashboardSource).toContain('My Published Schedule')
+    expect(staffDashboardSource).toContain('My Schedule')
     expect(staffDashboardSource).toContain('Shift Swaps &amp; Pickups')
     expect(staffDashboardSource).toContain('Past requests and outcomes')
     expect(staffDashboardSource).toContain('resolveTherapistWorkflow')

@@ -163,7 +163,7 @@ export function resolveTherapistWorkflow(params: {
   const scheduleAction = publishedSchedule.cycle
     ? {
         href: `/therapist/schedule?cycle=${publishedSchedule.cycle.id}`,
-        label: 'View my published schedule',
+        label: 'View my schedule',
       }
     : null
 
@@ -321,7 +321,7 @@ export function resolveTherapistWorkflow(params: {
       cycleReason: 'This is the current published schedule available to therapists.',
       primaryAction: {
         href: `/therapist/schedule?cycle=${publishedSchedule.cycle.id}`,
-        label: 'View my published schedule',
+        label: 'View my schedule',
       },
       secondaryAction: {
         href: '/therapist/swaps',

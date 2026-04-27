@@ -10,7 +10,7 @@ const therapistScheduleSource = fs.readFileSync(
 
 describe('therapist schedule route', () => {
   it('stays on a therapist-owned page instead of redirecting to shared coverage', () => {
-    expect(therapistScheduleSource).toContain('My Published Schedule')
+    expect(therapistScheduleSource).toContain('My Schedule')
     expect(therapistScheduleSource).toContain('/dashboard/staff')
     expect(therapistScheduleSource).not.toContain(
       "redirect(query ? `/coverage?${query}` : '/coverage')"

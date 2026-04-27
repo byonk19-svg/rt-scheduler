@@ -238,10 +238,10 @@ export default async function TherapistSettingsPage({
 
       <div className="border-b border-border bg-card px-6 pb-4 pt-5">
         <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">
-          Preferences / Work Rules
+          My Schedule Preferences
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage your recurring pattern, work rules, and notification preferences.
+          Manage your normal schedule, schedule preferences, and notification settings.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Badge variant="outline" className="capitalize">
@@ -296,9 +296,9 @@ export default async function TherapistSettingsPage({
 
       <Card className="border-border/90">
         <CardHeader>
-          <CardTitle>Work Rules</CardTitle>
+          <CardTitle>Schedule Preferences</CardTitle>
           <CardDescription>
-            Set the days you prefer to work and your maximum consecutive-day preference.
+            Set your preferred days, viewing defaults, and your maximum consecutive-day preference.
           </CardDescription>
         </CardHeader>
         <CardContent>

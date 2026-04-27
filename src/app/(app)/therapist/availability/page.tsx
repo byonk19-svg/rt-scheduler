@@ -20,6 +20,7 @@ import {
   normalizeWorkPattern,
   type WorkPattern,
 } from '@/lib/coverage/work-patterns'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveTherapistAvailabilityCycleId } from '@/lib/therapist-workflow'
 import { createClient } from '@/lib/supabase/server'
 
@@ -150,6 +151,7 @@ export default async function TherapistAvailabilityPage({
   searchParams?: Promise<AvailabilityPageSearchParams>
 }) {
   const supabase = await createClient()
+  const admin = createAdminClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -208,10 +210,11 @@ export default async function TherapistAvailabilityPage({
   const today = new Date()
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
-  const { data: cyclesData } = await supabase
+  const { data: cyclesData } = await admin
     .from('schedule_cycles')
     .select('id, label, start_date, end_date, published, archived_at, availability_due_at')
     .is('archived_at', null)
+    .eq('published', false)
     .gte('end_date', todayKey)
     .order('start_date', { ascending: true })
 
@@ -319,6 +322,9 @@ export default async function TherapistAvailabilityPage({
       canDelete: true,
     }
   })
+  const selectedCycleRows = selectedCycleId
+    ? availabilityRows.filter((row) => row.cycleId === selectedCycleId)
+    : availabilityRows
 
   const generatedBaselineByCycleId = Object.fromEntries(
     cycles.map((cycle) => [
@@ -349,7 +355,7 @@ export default async function TherapistAvailabilityPage({
 
       <AvailabilityEntriesTable
         role={role}
-        rows={availabilityRows}
+        rows={selectedCycleRows}
         deleteAvailabilityEntryAction={deleteAvailabilityEntryAction}
         initialFilters={initialFilters}
         returnToPath="/therapist/availability"

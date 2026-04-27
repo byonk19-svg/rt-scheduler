@@ -68,4 +68,24 @@ describe('buildCycleAvailabilityBaseline', () => {
     expect(baseline['2026-05-01']?.baselineStatus).toBe('neutral')
     expect(baseline['2026-05-03']?.baselineStatus).toBe('neutral')
   })
+
+  it('treats soft-mode days outside the usual weekdays as neutral, not normal work days', () => {
+    const pattern = normalizeWorkPattern({
+      therapist_id: 'therapist-1',
+      pattern_type: 'weekly_fixed',
+      weekly_weekdays: [1, 2, 4, 5],
+      works_dow_mode: 'soft',
+    })
+
+    const baseline = buildCycleAvailabilityBaseline({
+      cycleStart: '2026-04-26',
+      cycleEnd: '2026-05-03',
+      pattern,
+    })
+
+    expect(baseline['2026-04-27']?.baselineStatus).toBe('available')
+    expect(baseline['2026-04-29']?.baselineStatus).toBe('neutral')
+    expect(baseline['2026-05-02']?.baselineStatus).toBe('neutral')
+    expect(baseline['2026-05-03']?.baselineStatus).toBe('neutral')
+  })
 })

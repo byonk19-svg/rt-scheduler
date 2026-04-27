@@ -32,4 +32,9 @@ describe('staff history page', () => {
     expect(source).toContain('right.created_at.localeCompare(left.created_at)')
     expect(source).toContain('right.id.localeCompare(left.id)')
   })
+
+  it('routes therapist history back to the therapist-facing swaps page', () => {
+    expect(source).toContain('href="/therapist/swaps"')
+    expect(source).not.toContain('href="/shift-board">Back to Shift Swaps & Pickups</Link>')
+  })
 })

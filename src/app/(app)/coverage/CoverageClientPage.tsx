@@ -1035,7 +1035,7 @@ export function CoverageClientPage({
                 ) : canUpdateAssignmentStatus ? (
                   'View staffing and assignment status — click a therapist token to update status.'
                 ) : (
-                  'View staffing and assignment status.'
+                  'Read-only team staffing view. Use My Schedule for your own shifts and Future Availability for the next cycle.'
                 )}
               </div>
             </div>

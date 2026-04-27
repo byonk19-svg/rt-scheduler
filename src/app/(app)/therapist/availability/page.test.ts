@@ -36,6 +36,13 @@ describe('therapist availability route', () => {
     expect(pageSource).toContain('therapist_availability_submissions')
   })
 
+  it('keeps therapist future availability focused on upcoming non-published cycles', () => {
+    const filePath = resolve(process.cwd(), 'src/app/(app)/therapist/availability/page.tsx')
+    const source = readFileSync(filePath, 'utf8')
+
+    expect(source).toContain(".eq('published', false)")
+  })
+
   it('loads active-cycle scheduled shifts and passes conflicts into the therapist workspace', () => {
     const filePath = resolve(process.cwd(), 'src/app/(app)/therapist/availability/page.tsx')
     const source = readFileSync(filePath, 'utf8')

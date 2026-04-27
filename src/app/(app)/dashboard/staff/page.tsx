@@ -16,6 +16,7 @@ import {
   type TherapistWorkflowCycle,
   type TherapistWorkflowPreliminarySnapshot,
 } from '@/lib/therapist-workflow'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { fetchMyPublishedUpcomingShifts } from '@/lib/staff-my-schedule'
 import { cn } from '@/lib/utils'
@@ -66,6 +67,7 @@ export default async function StaffDashboardPage({
   searchParams?: Promise<StaffDashboardSearchParams>
 }) {
   const supabase = await createClient()
+  const admin = createAdminClient()
   const params = searchParams ? await searchParams : undefined
   const feedback = getStaffDashboardFeedback(params)
   const {
@@ -90,7 +92,7 @@ export default async function StaffDashboardPage({
   const firstName = fullName.split(/\s+/)[0] ?? fullName
   const todayKey = new Date().toISOString().slice(0, 10)
 
-  const { data: cyclesData } = await supabase
+  const { data: cyclesData } = await admin
     .from('schedule_cycles')
     .select('id, label, start_date, end_date, archived_at, published, availability_due_at')
     .is('archived_at', null)
@@ -126,7 +128,7 @@ export default async function StaffDashboardPage({
           .in('schedule_cycle_id', cycleIds)
       : Promise.resolve({ data: [] }),
     cycleIds.length > 0
-      ? supabase
+      ? admin
           .from('preliminary_snapshots')
           .select('cycle_id, status')
           .eq('status', 'active')
@@ -289,7 +291,7 @@ export default async function StaffDashboardPage({
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                My Published Schedule
+                My Schedule
               </p>
               <h2 className="mt-2 text-lg font-semibold tracking-tight text-foreground">
                 {workflow.publishedShiftSummary.upcomingCount} upcoming published shift
@@ -322,7 +324,7 @@ export default async function StaffDashboardPage({
           )}
           <div className="mt-4">
             <Button asChild size="sm" variant="outline">
-              <Link href="/therapist/schedule">View my published schedule</Link>
+              <Link href="/therapist/schedule">View my schedule</Link>
             </Button>
           </div>
         </article>

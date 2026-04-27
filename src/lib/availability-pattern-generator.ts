@@ -37,8 +37,15 @@ export function buildCycleAvailabilityBaseline(params: {
     }
 
     const decision = isAllowedByPattern(params.pattern, date)
+    const baselineStatus =
+      decision.reason === 'soft_outside_works_dow'
+        ? 'neutral'
+        : decision.allowed
+          ? 'available'
+          : 'off'
+
     baseline[date] = {
-      baselineStatus: decision.allowed ? 'available' : 'off',
+      baselineStatus,
       baselineSource: 'recurring_pattern',
       reason: decision.reason,
     }

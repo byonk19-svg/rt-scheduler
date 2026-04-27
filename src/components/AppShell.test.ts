@@ -111,9 +111,10 @@ describe('AppShell navigation structure', () => {
     expect(shellConfigSource).toContain("label: 'History'")
   })
 
-  it('includes the published schedule route in the flat staff nav', () => {
+  it('includes the personal schedule route in the flat staff nav', () => {
     expect(shellConfigSource).toContain("href: '/therapist/schedule'")
-    expect(shellConfigSource).toContain("label: 'My Published Schedule'")
+    expect(shellConfigSource).toContain("label: 'My Schedule'")
+    expect(shellConfigSource).toContain("label: 'Team Schedule'")
   })
 
   it('routes manager Today section to the manager dashboard', () => {

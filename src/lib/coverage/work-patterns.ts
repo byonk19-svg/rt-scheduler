@@ -241,6 +241,8 @@ export function normalizeWorkPattern(raw: Partial<WorkPattern> & { therapist_id:
   const weekendRule = normalizeWeekendRule(raw.weekend_rule, raw.weekend_rotation)
   const weeklyWeekdays = normalizeDowValues(raw.weekly_weekdays ?? raw.works_dow)
   const cycleSegments = normalizeCycleSegments(raw.cycle_segments)
+  const normalizedWorksDow = normalizeDowValues(raw.works_dow)
+  const normalizedOffsDow = normalizeDowValues(raw.offs_dow)
   const legacyWeeklyMirror = buildLegacyWeeklyMirror({
     patternType,
     weeklyWeekdays,
@@ -253,10 +255,12 @@ export function normalizeWorkPattern(raw: Partial<WorkPattern> & { therapist_id:
     works_dow:
       patternType === 'none'
         ? []
-        : normalizeDowValues(raw.works_dow ?? legacyWeeklyMirror.works_dow),
+        : normalizedWorksDow.length > 0
+          ? normalizedWorksDow
+          : legacyWeeklyMirror.works_dow,
     offs_dow:
       patternType === 'weekly_fixed'
-        ? normalizeDowValues(raw.offs_dow)
+        ? normalizedOffsDow
         : legacyWeeklyMirror.offs_dow,
     weekend_rotation: legacyWeeklyMirror.weekend_rotation,
     weekend_anchor_date: raw.weekend_anchor_date ?? null,

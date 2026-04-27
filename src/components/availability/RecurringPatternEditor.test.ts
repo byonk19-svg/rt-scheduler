@@ -19,4 +19,9 @@ describe('RecurringPatternEditor', () => {
     expect(source).toContain("'Not set'")
     expect(source).toContain("toLocaleDateString('en-US', { month: 'short', day: 'numeric' })")
   })
+
+  it('starts first-time therapists in a blank no-pattern state instead of a prefilled weekly template', () => {
+    expect(source).toContain("initialPattern?.pattern_type ?? 'none'")
+    expect(source).toContain('initialPattern?.weekly_weekdays ?? initialPattern?.works_dow ?? []')
+  })
 })

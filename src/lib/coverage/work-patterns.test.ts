@@ -109,4 +109,17 @@ describe('work-patterns', () => {
       'Repeats every 13 days starting May 1, 2026.'
     )
   })
+
+  it('rebuilds weekly works_dow from weekly_weekdays when legacy works_dow is empty', () => {
+    const pattern = normalizeWorkPattern({
+      therapist_id: 'therapist-1',
+      pattern_type: 'weekly_fixed',
+      works_dow: [],
+      weekly_weekdays: [1, 2, 4, 5],
+      works_dow_mode: 'hard',
+    })
+
+    expect(pattern.works_dow).toEqual([1, 2, 4, 5])
+    expect(pattern.weekly_weekdays).toEqual([1, 2, 4, 5])
+  })
 })

@@ -28,7 +28,7 @@ function weekRangeLabel(shifts: MyScheduleShiftRow[]): string {
 }
 
 export async function PublishedSchedulePage({
-  title = 'My Published Schedule',
+  title = 'My Schedule',
   backHref = '/dashboard/staff',
 }: {
   title?: string

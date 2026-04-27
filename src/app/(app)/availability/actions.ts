@@ -25,6 +25,7 @@ import {
 import { shiftOverridesToCycle } from '@/lib/copy-cycle-availability'
 import { buildManagerOverrideInput } from '@/lib/employee-directory'
 import { extractTextFromAttachment } from '@/lib/openai-ocr'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 async function upsertTherapistSubmissionAfterOfficialSave(
@@ -327,6 +328,7 @@ export async function submitAvailabilityEntryAction(formData: FormData) {
 
 export async function submitTherapistAvailabilityGridAction(formData: FormData) {
   const { supabase, user } = await getAuthenticatedUserWithRole()
+  const admin = createAdminClient()
   const returnPath = getReturnPath(String(formData.get('return_to') ?? '').trim() || null)
 
   const workflowRaw = String(formData.get('workflow') ?? 'submit')
@@ -349,7 +351,7 @@ export async function submitTherapistAvailabilityGridAction(formData: FormData) 
     redirect(buildAvailabilityUrl({ error: 'submit_failed' }, returnPath))
   }
 
-  const { data: cycle } = await supabase
+  const { data: cycle } = await admin
     .from('schedule_cycles')
     .select('start_date, end_date')
     .eq('id', cycleId)

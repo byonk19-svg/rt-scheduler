@@ -79,6 +79,14 @@ describe('coverage publish override affordance', () => {
     expect(source).toContain('No shifts assigned yet. Run Auto-draft or click a day to assign manually.')
   })
 
+  it('uses therapist-safe copy when the shared coverage page is read-only', () => {
+    const source = readFileSync(coverageClientPath, 'utf8')
+
+    expect(source).toContain(
+      'Read-only team staffing view. Use My Schedule for your own shifts and Future Availability for the next cycle.'
+    )
+  })
+
   it('surfaces a proactive coverage-risk warning in the manager workflow before auto-draft runs', () => {
     const client = readFileSync(coverageClientPath, 'utf8')
     const server = readFileSync(coverageServerDataPath, 'utf8')

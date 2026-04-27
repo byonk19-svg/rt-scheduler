@@ -10,7 +10,7 @@ const source = fs.readFileSync(
 
 describe('therapist settings route', () => {
   it('renders a therapist-owned preferences and work rules page', () => {
-    expect(source).toContain('Preferences / Work Rules')
+    expect(source).toContain('My Schedule Preferences')
     expect(source).toContain('Recurring Work Pattern')
     expect(source).toContain('This is your normal repeating schedule.')
     expect(source).toContain('Edit normal schedule')
@@ -19,6 +19,7 @@ describe('therapist settings route', () => {
       'Future Availability will start blank until you save a normal schedule.'
     )
     expect(source).toContain('/therapist/recurring-pattern')
+    expect(source).toContain('Schedule Preferences')
     expect(source).toContain('Max consecutive days')
     expect(source).toContain('Notification preferences')
     expect(source).not.toContain("export { default } from '../../profile/page'")

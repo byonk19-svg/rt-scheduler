@@ -41,8 +41,9 @@ test.describe.serial('therapist recurring pattern flow', () => {
     })
     createdUserIds.push(therapist.id)
 
-    const cycleStart = formatDateKey(new Date())
-    const cycleEnd = formatDateKey(addDays(new Date(), 13))
+    const cycleStartDate = addDays(new Date(), 14)
+    const cycleStart = formatDateKey(cycleStartDate)
+    const cycleEnd = formatDateKey(addDays(cycleStartDate, 13))
     const cycleInsert = await supabase
       .from('schedule_cycles')
       .insert({
@@ -104,7 +105,7 @@ test.describe.serial('therapist recurring pattern flow', () => {
     await expect(page.getByText('Recurring pattern saved.')).toBeVisible({ timeout: 45_000 })
 
     await page.goto(`/therapist/availability?cycle=${ctx!.cycleId}`)
-    await expect(page.getByText('Based on your recurring pattern')).toBeVisible()
+    await expect(page.getByText('Starting point for this cycle')).toBeVisible()
     await expect(page.getByText(/Repeats every 7 days starting/i)).toBeVisible()
 
     const offDayButton = page
@@ -112,18 +113,14 @@ test.describe.serial('therapist recurring pattern flow', () => {
       .first()
     await expect(offDayButton).toBeVisible({ timeout: 30_000 })
     await offDayButton.click()
-    await expect(page.getByText('Off in your recurring pattern')).toBeVisible()
-    await page.getByRole('button', { name: /Request to work this day/i }).click()
+    await expect(page.getByText('Off day in your normal schedule')).toBeVisible()
+    await page.getByRole('button', { name: /I can work this day/i }).click()
 
     const noteBox = page.locator(`textarea#therapist-day-note-${ctx!.offDate}`)
     await expect(noteBox).toBeVisible()
     await noteBox.fill(overrideNote)
     await page.getByRole('button', { name: /Save progress/i }).click()
-    await expect(page.getByText("Draft saved. Submit availability when you're ready.")).toBeVisible(
-      {
-        timeout: 45_000,
-      }
-    )
+    await page.waitForURL(/success=draft_saved/, { timeout: 45_000 })
 
     await page.goto(`/therapist/availability?cycle=${ctx!.cycleId}`)
     await offDayButton.click()

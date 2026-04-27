@@ -154,20 +154,20 @@ export function getStaffNavItems(): readonly ShellNavItem[] {
       active: (pathname) => pathname.startsWith('/dashboard/staff'),
     },
     {
-      href: '/coverage',
-      label: 'Schedule',
-      active: (pathname) =>
-        pathname === '/coverage' || pathname === '/schedule' || pathname === '/preliminary',
-    },
-    {
       href: '/therapist/schedule',
-      label: 'My Published Schedule',
+      label: 'My Schedule',
       active: (pathname) => pathname === '/therapist/schedule' || pathname === '/staff/my-schedule',
     },
     {
       href: '/therapist/availability',
       label: 'Future Availability',
       active: (pathname) => pathname === '/therapist/availability' || pathname === '/availability',
+    },
+    {
+      href: '/coverage',
+      label: 'Team Schedule',
+      active: (pathname) =>
+        pathname === '/coverage' || pathname === '/schedule' || pathname === '/preliminary',
     },
     {
       href: '/therapist/swaps',

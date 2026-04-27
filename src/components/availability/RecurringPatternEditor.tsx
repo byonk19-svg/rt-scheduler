@@ -82,10 +82,10 @@ function createDefaultSegments(initialPattern: WorkPattern | null): WorkPatternC
 
 export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
   const [patternType, setPatternType] = useState<RecurringPatternType>(
-    initialPattern?.pattern_type ?? 'weekly_fixed'
+    initialPattern?.pattern_type ?? 'none'
   )
   const [weeklyWeekdays, setWeeklyWeekdays] = useState<number[]>(
-    initialPattern?.weekly_weekdays ?? initialPattern?.works_dow ?? [1, 2, 4, 5]
+    initialPattern?.weekly_weekdays ?? initialPattern?.works_dow ?? []
   )
   const [worksDowMode, setWorksDowMode] = useState<'hard' | 'soft'>(
     initialPattern?.works_dow_mode ?? 'hard'
@@ -329,7 +329,8 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
             <CardHeader>
               <CardTitle>Weekend rule</CardTitle>
               <CardDescription>
-                Decide how weekends behave separately from your weekday template.
+                Decide how weekends work separately from your weekday pattern. If you choose every
+                other weekend, add the first weekend you work.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -359,7 +360,7 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
 
               {weekendRule === 'every_other_weekend' ? (
                 <div className="space-y-1">
-                  <Label htmlFor="weekend-anchor-date">Starting weekend</Label>
+                  <Label htmlFor="weekend-anchor-date">First weekend you work</Label>
                   <input
                     id="weekend-anchor-date"
                     type="date"
@@ -368,7 +369,7 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
                     className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Pick the first weekend you are scheduled to work in the rotation.
+                    Pick the Saturday or Sunday that starts your every-other-weekend rotation.
                   </p>
                 </div>
               ) : null}
@@ -380,11 +381,13 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
           <Card>
             <CardHeader>
               <CardTitle>Repeating cycle</CardTitle>
-              <CardDescription>Add work/off segments in the order they repeat.</CardDescription>
+              <CardDescription>
+                Add work and off blocks in the order they repeat. Example: 4 on, 1 off, 2 on, 6 off.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1">
-                <Label htmlFor="cycle-anchor-date">Pattern starts on</Label>
+                <Label htmlFor="cycle-anchor-date">First day in this repeating pattern</Label>
                 <input
                   id="cycle-anchor-date"
                   type="date"
@@ -442,10 +445,10 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
 
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" onClick={() => addSegment('work')}>
-                  Add work segment
+                  Add work block
                 </Button>
                 <Button type="button" variant="outline" onClick={() => addSegment('off')}>
-                  Add off segment
+                  Add off block
                 </Button>
               </div>
             </CardContent>

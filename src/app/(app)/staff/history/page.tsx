@@ -335,7 +335,7 @@ export default async function StaffSwapHistoryPage({
             </p>
           </div>
           <Button asChild size="sm" variant="outline" className="text-xs">
-            <Link href="/shift-board">Back to Shift Swaps & Pickups</Link>
+            <Link href="/therapist/swaps">Back to Shift Swaps & Pickups</Link>
           </Button>
         </div>
       </div>
@@ -350,7 +350,7 @@ export default async function StaffSwapHistoryPage({
             When you post, claim, or express pickup interest, it will show up here.
           </p>
           <Button asChild size="sm" variant="outline" className="mt-2 text-xs">
-            <Link href="/shift-board">Go to Shift Swaps & Pickups</Link>
+            <Link href="/therapist/swaps">Go to Shift Swaps & Pickups</Link>
           </Button>
         </div>
       ) : (
