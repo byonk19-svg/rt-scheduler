@@ -46,8 +46,8 @@ const PATTERN_OPTIONS: Array<{
   },
   {
     type: 'none',
-    title: 'No recurring pattern',
-    description: 'Future availability starts blank and you enter exceptions manually.',
+    title: 'No repeating schedule',
+    description: 'Each future cycle starts blank, and you choose the days manually.',
   },
 ]
 
@@ -60,6 +60,12 @@ const WEEKDAYS = [
   { value: 6, label: 'Sat' },
   { value: 0, label: 'Sun' },
 ]
+
+function formatPreviewDate(value: string): string {
+  const parsed = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
 
 function createDefaultSegments(initialPattern: WorkPattern | null): WorkPatternCycleSegment[] {
   if (
@@ -152,7 +158,7 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
   const previewBaseline = useMemo(() => {
     const start = new Date()
     const startKey = toIsoDate(start)
-    const endKey = toIsoDate(addDays(start, 20))
+    const endKey = toIsoDate(addDays(start, 13))
     return buildCycleAvailabilityBaseline({
       cycleStart: startKey,
       cycleEnd: endKey,
@@ -246,12 +252,14 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
         {(patternType === 'weekly_fixed' || patternType === 'weekly_with_weekend_rotation') && (
           <Card>
             <CardHeader>
-              <CardTitle>Weekday pattern</CardTitle>
-              <CardDescription>Select the weekdays you normally work.</CardDescription>
+              <CardTitle>Which days do you usually work?</CardTitle>
+              <CardDescription>
+                Pick the days that are normally part of your schedule.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="space-y-2">
-                <Label>Usually available on</Label>
+                <Label>Usual work days</Label>
                 <div className="flex flex-wrap gap-2">
                   {WEEKDAYS.map((day) => (
                     <button
@@ -271,9 +279,11 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>How strict is this pattern?</Label>
-                <div className="grid gap-2 md:grid-cols-2">
+              <details className="rounded-xl border border-border/70 bg-muted/10 px-3 py-3">
+                <summary className="cursor-pointer text-sm font-semibold text-foreground">
+                  This can vary sometimes
+                </summary>
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
                   <button
                     type="button"
                     onClick={() => setWorksDowMode('hard')}
@@ -284,9 +294,11 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
                         : 'border-border/70 bg-card'
                     )}
                   >
-                    <p className="text-sm font-semibold text-foreground">Fixed work days</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      These are my regular work days
+                    </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Use when these days should be treated as your normal schedule.
+                      Use this when other days should usually stay off your normal schedule.
                     </p>
                   </button>
                   <button
@@ -299,13 +311,15 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
                         : 'border-border/70 bg-card'
                     )}
                   >
-                    <p className="text-sm font-semibold text-foreground">Usual work days</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      These are my usual days, but other days can still happen
+                    </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Use when these days are preferred but can flex.
+                      Use this when the pattern is helpful as a starting point, but not rigid.
                     </p>
                   </button>
                 </div>
-              </div>
+              </details>
             </CardContent>
           </Card>
         )}
@@ -441,10 +455,10 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
         {patternType === 'none' && (
           <Card>
             <CardHeader>
-              <CardTitle>No recurring pattern</CardTitle>
+              <CardTitle>No repeating schedule</CardTitle>
               <CardDescription>
-                Future availability will start blank. Use this only if your schedule does not
-                repeat.
+                Each future cycle will start blank. Use this only if your schedule does not repeat
+                in a regular way.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -466,9 +480,9 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
       <div className="space-y-5">
         <Card>
           <CardHeader>
-            <CardTitle>Live summary</CardTitle>
+            <CardTitle>What this saves</CardTitle>
             <CardDescription>
-              Future availability will be generated from this template.
+              This becomes the starting point for each future cycle.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -487,26 +501,32 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
 
         <Card>
           <CardHeader>
-            <CardTitle>Preview</CardTitle>
-            <CardDescription>Next 3 weeks from this recurring pattern.</CardDescription>
+            <CardTitle>Quick preview</CardTitle>
+            <CardDescription>Next 2 weeks</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               {Object.entries(previewBaseline).map(([date, baseline]) => (
                 <div
                   key={date}
                   className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-sm"
                 >
-                  <span className="text-foreground">{date}</span>
+                  <span className="text-foreground">{formatPreviewDate(date)}</span>
                   <span
                     className={cn(
                       'rounded-full px-2 py-0.5 text-xs font-semibold',
                       baseline.baselineStatus === 'available'
                         ? 'bg-[var(--success-subtle)] text-[var(--success-text)]'
-                        : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
+                        : baseline.baselineStatus === 'off'
+                          ? 'bg-[var(--muted)] text-[var(--muted-foreground)]'
+                          : 'bg-background text-muted-foreground ring-1 ring-border/60'
                     )}
                   >
-                    {baseline.baselineStatus === 'available' ? 'Available' : 'Off'}
+                    {baseline.baselineStatus === 'available'
+                      ? 'Work day'
+                      : baseline.baselineStatus === 'off'
+                        ? 'Off day'
+                        : 'Not set'}
                   </span>
                 </div>
               ))}

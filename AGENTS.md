@@ -58,6 +58,8 @@ Keep runtime marker contracts stable and non-destructive when overlays are appli
 - No new dependencies without explicit request.
 - Keep diffs small, reviewable, and reversible.
 - Run lint, typecheck, tests, and static analysis after changes.
+- For therapist/staff UI work, include a real browser validation pass whenever local auth/env makes it possible; do not stop at source-only or screenshot-free verification when the route can be exercised.
+- Prefer a disposable automation-only auth path for browser validation: use repo-local Supabase env/cookie auth or a temporary seeded therapist account instead of depending on a human's signed-in browser tab, and clean up any temporary auth user after the run.
 - Final reports must include changed files, simplifications made, and remaining risks.
 
 <lore_commit_protocol>

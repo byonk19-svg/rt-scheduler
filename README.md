@@ -224,6 +224,14 @@ Run:
 npm run test:e2e
 ```
 
+Therapist visual validation shortcut:
+
+```bash
+npm run screens:therapist
+```
+
+That script prefers `SHOT_STAFF_EMAIL` / `SHOT_PASSWORD` when they work, but if the seeded staff login is stale it falls back to creating a temporary therapist user, authenticating Playwright with Supabase cookies, capturing the therapist routes, and deleting the temporary user afterward.
+
 Recommended lane:
 
 - `npm run test:e2e` against `next dev` for routine regression coverage

@@ -11,7 +11,8 @@ const source = fs.readFileSync(
 describe('therapist recurring-pattern route', () => {
   it('exposes a dedicated recurring-pattern page with therapist-specific copy', () => {
     expect(source).toContain('Recurring Work Pattern')
-    expect(source).toContain('future availability cycles will use first')
+    expect(source).toContain('Set your normal repeating schedule.')
+    expect(source).toContain('Use Future Availability when one cycle is different.')
     expect(source).toContain('RecurringPatternEditor')
     expect(source).toContain('saveRecurringPatternAction')
   })

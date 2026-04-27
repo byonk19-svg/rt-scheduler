@@ -273,7 +273,7 @@ export function normalizeWorkPattern(raw: Partial<WorkPattern> & { therapist_id:
 }
 
 export function describeWorkPatternSummary(pattern: WorkPattern | null): string {
-  if (!pattern || pattern.pattern_type === 'none') return 'No recurring pattern saved.'
+  if (!pattern || pattern.pattern_type === 'none') return 'No normal schedule saved yet.'
 
   if (pattern.pattern_type === 'repeating_cycle') {
     const cycleLength = pattern.cycle_segments.reduce((total, segment) => total + segment.length_days, 0)

@@ -64,7 +64,7 @@ function getPatternModeLabel(pattern: WorkPattern): string {
 export function WorkPatternCard(props: Props) {
   const pattern = normalizePatternFromProps(props)
   if (!pattern) {
-    return <p className="text-sm text-muted-foreground">No recurring pattern saved yet.</p>
+    return <p className="text-sm text-muted-foreground">No normal schedule saved yet.</p>
   }
 
   const worksDow = pattern.works_dow

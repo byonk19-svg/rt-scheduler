@@ -220,8 +220,9 @@ export default async function TherapistRecurringPatternPage({
           <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">
             Recurring Work Pattern
           </h1>
+          <p className="mt-1 text-sm text-muted-foreground">Set your normal repeating schedule.</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Define the default schedule template that future availability cycles will use first.
+            Use Future Availability when one cycle is different.
           </p>
         </div>
         <Button asChild variant="outline">

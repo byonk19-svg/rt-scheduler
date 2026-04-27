@@ -6,7 +6,7 @@ import {
 } from '@/lib/coverage/work-patterns'
 
 export type GeneratedAvailabilityBaselineDay = {
-  baselineStatus: 'available' | 'off'
+  baselineStatus: 'available' | 'off' | 'neutral'
   baselineSource: 'recurring_pattern' | 'none'
   reason: PatternDecisionReason | 'none'
 }
@@ -29,7 +29,7 @@ export function buildCycleAvailabilityBaseline(params: {
     const date = toIsoDate(addDays(startDate, index))
     if (!params.pattern || params.pattern.pattern_type === 'none') {
       baseline[date] = {
-        baselineStatus: 'off',
+        baselineStatus: 'neutral',
         baselineSource: 'none',
         reason: 'none',
       }

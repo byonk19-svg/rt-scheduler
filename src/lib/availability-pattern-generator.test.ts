@@ -52,7 +52,7 @@ describe('buildCycleAvailabilityBaseline', () => {
     expect(baseline['2026-05-06']?.baselineStatus).toBe('off')
   })
 
-  it('returns blank baseline when no recurring pattern is saved', () => {
+  it('returns neutral baseline when no recurring pattern is saved', () => {
     const pattern = normalizeWorkPattern({
       therapist_id: 'therapist-1',
       pattern_type: 'none',
@@ -65,7 +65,7 @@ describe('buildCycleAvailabilityBaseline', () => {
     })
 
     expect(baseline['2026-05-01']?.baselineSource).toBe('none')
-    expect(baseline['2026-05-01']?.baselineStatus).toBe('off')
-    expect(baseline['2026-05-03']?.baselineStatus).toBe('off')
+    expect(baseline['2026-05-01']?.baselineStatus).toBe('neutral')
+    expect(baseline['2026-05-03']?.baselineStatus).toBe('neutral')
   })
 })

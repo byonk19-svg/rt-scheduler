@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { CalendarCheck, CalendarX2, RotateCcw, Send } from 'lucide-react'
+import { CalendarCheck, CalendarX2, Send } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 
 import type { AvailabilityEntryTableRow } from '@/app/availability/availability-requests-table'
@@ -179,11 +179,6 @@ export function TherapistAvailabilityWorkspace({
     [draftNotesByDate, draftStatusByDate]
   )
 
-  const baselineAvailableCount = useMemo(
-    () => cycleDays.filter((date) => baselineByDate[date]?.baselineStatus === 'available').length,
-    [baselineByDate, cycleDays]
-  )
-
   const hasUnsavedChanges = useMemo(() => {
     const allStatusDates = new Set([
       ...Object.keys(initialStatusByDate),
@@ -230,8 +225,13 @@ export function TherapistAvailabilityWorkspace({
     )
   }, [selectedCycle, submissionUi])
 
-  function getBaselineStatus(date: string): 'available' | 'off' {
-    return baselineByDate[date]?.baselineStatus ?? 'off'
+  const hasRecurringPattern = useMemo(
+    () => Object.values(baselineByDate).some((day) => day.baselineSource === 'recurring_pattern'),
+    [baselineByDate]
+  )
+
+  function getBaselineStatus(date: string): 'available' | 'off' | 'neutral' {
+    return baselineByDate[date]?.baselineStatus ?? 'neutral'
   }
 
   function setOverride(date: string, status: DayStatus | null) {
@@ -306,7 +306,7 @@ export function TherapistAvailabilityWorkspace({
     return range
   }, [selectedCycle])
 
-  const selectedBaselineStatus = selectedDate ? getBaselineStatus(selectedDate) : 'off'
+  const selectedBaselineStatus = selectedDate ? getBaselineStatus(selectedDate) : 'neutral'
   const selectedOverride = selectedDate ? (draftStatusByDate[selectedDate] ?? null) : null
 
   if (cycles.length === 0) {
@@ -364,23 +364,23 @@ export function TherapistAvailabilityWorkspace({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">
               <p className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Based on your recurring pattern
+                Starting point for this cycle
               </p>
               <p className="text-sm font-semibold text-foreground">{recurringPatternSummary}</p>
               <p className="text-sm text-muted-foreground">
-                Changes here apply to this cycle only.
+                {hasRecurringPattern
+                  ? 'We used your normal schedule to fill this cycle. Changes here stay in this cycle only.'
+                  : "This cycle starts blank. Add the days you can or can't work. Changes here stay in this cycle only."}
               </p>
             </div>
             <Button asChild variant="outline" size="sm">
-              <Link href="/therapist/recurring-pattern">Change recurring pattern</Link>
+              <Link href="/therapist/recurring-pattern">
+                {hasRecurringPattern ? 'Edit normal schedule' : 'Set normal schedule'}
+              </Link>
             </Button>
           </div>
         </div>
 
-        <p className="text-xs tabular-nums text-muted-foreground">
-          Availability summary: {baselineAvailableCount} baseline available ·{' '}
-          {cannotWorkDates.length} need off · {canWorkDates.length} request to work
-        </p>
         {hasUnsavedChanges ? (
           <p className="text-xs font-medium text-[var(--warning-text)]">
             You have unsaved changes for this cycle.
@@ -429,23 +429,7 @@ export function TherapistAvailabilityWorkspace({
               </select>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={clearOverrides}>
-                Clear overrides
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={clearOverrides}>
-                <RotateCcw className="mr-1 h-3.5 w-3.5" aria-hidden />
-                Reapply pattern
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={copyPreviousCycleOverrides}
-              >
-                Copy previous cycle
-              </Button>
-            </div>
+            <div className="flex flex-wrap gap-2" />
           </div>
         </div>
 
@@ -455,64 +439,90 @@ export function TherapistAvailabilityWorkspace({
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    Generated from your recurring pattern
+                    {hasRecurringPattern ? 'From your normal schedule' : 'This cycle starts blank'}
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Review the generated cycle, then add overrides only where this cycle differs.
+                    {hasRecurringPattern
+                      ? 'Click a day to make a change.'
+                      : 'Choose the days you can or cannot work.'}
                   </p>
                 </div>
                 <div className="rounded-full border border-border/70 bg-background px-3 py-1 text-xs font-semibold text-muted-foreground">
                   This cycle only
                 </div>
               </div>
-
-              <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
-                <div className="space-y-1">
-                  <Label htmlFor="range-start">Range start</Label>
-                  <input
-                    id="range-start"
-                    type="date"
-                    min={selectedCycle?.start_date}
-                    max={selectedCycle?.end_date}
-                    value={rangeStart}
-                    onChange={(event) => setRangeStart(event.target.value)}
-                    className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
-                  />
+              <details className="mt-4 rounded-xl border border-border/70 bg-background px-3 py-3">
+                <summary className="cursor-pointer text-sm font-semibold text-foreground">
+                  Edit several days
+                </summary>
+                <div className="mt-3 space-y-3">
+                  <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+                    <div className="space-y-1">
+                      <Label htmlFor="range-start">Start date</Label>
+                      <input
+                        id="range-start"
+                        type="date"
+                        min={selectedCycle?.start_date}
+                        max={selectedCycle?.end_date}
+                        value={rangeStart}
+                        onChange={(event) => setRangeStart(event.target.value)}
+                        className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="range-end">End date</Label>
+                      <input
+                        id="range-end"
+                        type="date"
+                        min={selectedCycle?.start_date}
+                        max={selectedCycle?.end_date}
+                        value={rangeEnd}
+                        onChange={(event) => setRangeEnd(event.target.value)}
+                        className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                      />
+                    </div>
+                    <div className="flex flex-wrap items-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => applyRange('force_off')}
+                      >
+                        Mark as cannot work
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => applyRange('force_on')}
+                      >
+                        Mark as can work
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => applyRange(null)}
+                      >
+                        Clear changes
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={copyPreviousCycleOverrides}
+                    >
+                      Use last cycle as a starting point
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={clearOverrides}>
+                      Reset this cycle to normal schedule
+                    </Button>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="range-end">Range end</Label>
-                  <input
-                    id="range-end"
-                    type="date"
-                    min={selectedCycle?.start_date}
-                    max={selectedCycle?.end_date}
-                    value={rangeEnd}
-                    onChange={(event) => setRangeEnd(event.target.value)}
-                    className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
-                  />
-                </div>
-                <div className="flex flex-wrap items-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => applyRange('force_off')}
-                  >
-                    Mark range unavailable
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => applyRange('force_on')}
-                  >
-                    Request range to work
-                  </Button>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => applyRange(null)}>
-                    Clear range
-                  </Button>
-                </div>
-              </div>
+              </details>
             </div>
 
             <div className="grid grid-cols-7 gap-1.5 border-y border-border/70 py-2">
@@ -562,6 +572,9 @@ export function TherapistAvailabilityWorkspace({
                             baselineStatus === 'off' &&
                               !overrideStatus &&
                               'border-border/40 bg-muted/15',
+                            baselineStatus === 'neutral' &&
+                              !overrideStatus &&
+                              'border-border/70 bg-background',
                             overrideStatus === 'force_off' &&
                               'border-[var(--error-border)] bg-[var(--error-subtle)]',
                             overrideStatus === 'force_on' &&
@@ -591,16 +604,21 @@ export function TherapistAvailabilityWorkspace({
                                 'bg-[var(--success-subtle)] text-[var(--success-text)]',
                               !overrideStatus &&
                                 baselineStatus === 'off' &&
-                                'bg-[var(--muted)] text-[var(--muted-foreground)]'
+                                'bg-[var(--muted)] text-[var(--muted-foreground)]',
+                              !overrideStatus &&
+                                baselineStatus === 'neutral' &&
+                                'bg-background text-muted-foreground ring-1 ring-border/60'
                             )}
                           >
                             {overrideStatus === 'force_off'
-                              ? 'Need Off'
+                              ? "Can't work"
                               : overrideStatus === 'force_on'
-                                ? 'Request'
+                                ? 'Can work'
                                 : baselineStatus === 'available'
-                                  ? 'Available'
-                                  : 'Off'}
+                                  ? 'Work day'
+                                  : baselineStatus === 'off'
+                                    ? 'Off day'
+                                    : 'Not set'}
                           </span>
                         </button>
                       )
@@ -618,18 +636,25 @@ export function TherapistAvailabilityWorkspace({
               </h3>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[var(--success-text)]" />
+                  <span
+                    className={cn(
+                      'h-2.5 w-2.5 rounded-full',
+                      hasRecurringPattern
+                        ? 'bg-[var(--success-text)]'
+                        : 'bg-[var(--muted-foreground)]'
+                    )}
+                  />
                   <span className="text-xs text-muted-foreground">
-                    Generated from your recurring pattern
+                    {hasRecurringPattern ? 'From your normal schedule' : 'Not set yet'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-[var(--error-text)]" />
-                  <span className="text-xs text-muted-foreground">Need Off override</span>
+                  <span className="text-xs text-muted-foreground">Changed to cannot work</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-[var(--info-text)]" />
-                  <span className="text-xs text-muted-foreground">Request to Work override</span>
+                  <span className="text-xs text-muted-foreground">Changed to can work</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
@@ -642,10 +667,10 @@ export function TherapistAvailabilityWorkspace({
             <div className="space-y-3">
               <div>
                 <h3 className="text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                  Day Notes
+                  Optional note
                 </h3>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Add optional details to any cycle-specific override.
+                  Add a note only when this cycle is different.
                 </p>
               </div>
 
@@ -655,8 +680,7 @@ export function TherapistAvailabilityWorkspace({
                 </h3>
                 {!selectedDate ? (
                   <p className="mt-1 text-xs italic text-muted-foreground">
-                    Select a date to review the generated baseline and add an override in the panel
-                    on the right.
+                    Click a day to review it and make a change.
                   </p>
                 ) : (
                   <div className="mt-2 space-y-3 rounded-xl border border-border/70 bg-muted/10 px-3 py-3">
@@ -665,12 +689,14 @@ export function TherapistAvailabilityWorkspace({
                     </p>
                     <div className="space-y-1">
                       <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                        Baseline
+                        Normally
                       </p>
                       <p className="text-sm text-muted-foreground">
                         {selectedBaselineStatus === 'available'
-                          ? 'Available from your recurring pattern'
-                          : 'Off in your recurring pattern'}
+                          ? 'Work day in your normal schedule'
+                          : selectedBaselineStatus === 'off'
+                            ? 'Off day in your normal schedule'
+                            : 'Not set from a normal schedule'}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -686,10 +712,10 @@ export function TherapistAvailabilityWorkspace({
                             )
                           }
                         >
-                          <CalendarX2 className="mr-1 h-3.5 w-3.5" aria-hidden />
-                          Need off this day
+                          <CalendarX2 className="mr-1 h-3.5 w-3.5" aria-hidden />I cannot work this
+                          day
                         </Button>
-                      ) : (
+                      ) : selectedBaselineStatus === 'off' ? (
                         <Button
                           type="button"
                           variant={selectedOverride === 'force_on' ? 'default' : 'outline'}
@@ -701,9 +727,40 @@ export function TherapistAvailabilityWorkspace({
                             )
                           }
                         >
-                          <CalendarCheck className="mr-1 h-3.5 w-3.5" aria-hidden />
-                          Request to work this day
+                          <CalendarCheck className="mr-1 h-3.5 w-3.5" aria-hidden />I can work this
+                          day
                         </Button>
+                      ) : (
+                        <>
+                          <Button
+                            type="button"
+                            variant={selectedOverride === 'force_on' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() =>
+                              setOverride(
+                                selectedDate,
+                                selectedOverride === 'force_on' ? null : 'force_on'
+                              )
+                            }
+                          >
+                            <CalendarCheck className="mr-1 h-3.5 w-3.5" aria-hidden />I can work
+                            this day
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={selectedOverride === 'force_off' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() =>
+                              setOverride(
+                                selectedDate,
+                                selectedOverride === 'force_off' ? null : 'force_off'
+                              )
+                            }
+                          >
+                            <CalendarX2 className="mr-1 h-3.5 w-3.5" aria-hidden />I cannot work
+                            this day
+                          </Button>
+                        </>
                       )}
                       {selectedOverride ? (
                         <Button
@@ -717,20 +774,20 @@ export function TherapistAvailabilityWorkspace({
                       ) : null}
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor={`therapist-day-note-${selectedDate}`}>Day Notes</Label>
-                      {/* Persisted notes only exist for Need Off or Request to Work days. */}
+                      <Label htmlFor={`therapist-day-note-${selectedDate}`}>Optional note</Label>
+                      {/* Persisted notes only exist for days you change for this cycle. */}
                       <textarea
                         id={`therapist-day-note-${selectedDate}`}
                         ref={noteTextareaRef}
                         value={draftNotesByDate[selectedDate] ?? ''}
                         onChange={(event) => updateSelectedDateNote(event.target.value)}
-                        placeholder="Add a note for this override..."
+                        placeholder="Add a note for this change..."
                         disabled={!selectedOverride}
                         className="min-h-[84px] w-full rounded-lg border border-border/15 bg-background px-2.5 py-1.5 text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                       />
                       {!selectedOverride ? (
                         <p className="text-xs text-muted-foreground">
-                          Notes are only saved for Need Off or Request to Work days.
+                          Notes are only saved for days you change for this cycle.
                         </p>
                       ) : null}
                     </div>
@@ -743,8 +800,7 @@ export function TherapistAvailabilityWorkspace({
 
         <div className="flex flex-col gap-2 border-t border-border/70 bg-muted/10 px-5 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6">
           <p className="text-xs text-muted-foreground sm:mr-auto">
-            Save progress keeps a draft. Submit availability marks this cycle as officially
-            submitted.
+            Save draft now. Submit when this cycle is ready.
           </p>
           <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
             {!submissionUi.isSubmitted ? (

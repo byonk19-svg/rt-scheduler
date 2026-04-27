@@ -82,6 +82,7 @@ Key additions from PR `#43`: centralized therapist workflow state (`src/lib/ther
 ### Verification Baseline
 
 - As of 2026-04-25 on `main`, `npm run lint`, `npm run test:unit`, `npm run build`, and `npx tsc --noEmit` all pass (729+ unit tests).
+- **Therapist browser validation path:** for `/therapist/settings`, `/therapist/recurring-pattern`, and `/therapist/availability`, prefer an automation-only auth setup over a human session. The validated local pattern is: read repo `.env.local`, create a temporary therapist user with the service-role client, authenticate Playwright/headless browser via Supabase SSR cookies on `127.0.0.1:3000`, capture the therapist routes, then delete the temporary user. Treat `SHOT_STAFF_EMAIL` / `SHOT_PASSWORD` as optional shortcuts only; if they fail, fall back to temp-user creation instead of giving up on the visual pass.
 - `npm run lint`
 - `npm run build`
 - `npm run test:unit`

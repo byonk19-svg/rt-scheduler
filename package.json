@@ -14,6 +14,7 @@
     "seed:demo": "node --env-file=.env.local scripts/seed-demo.mjs",
     "seed:functional": "node --env-file=.env.local scripts/seed-functional-demo.mjs",
     "screens:all": "node --env-file=.env.local scripts/capture-all-screens.mjs",
+    "screens:therapist": "node --env-file=.env.local scripts/capture-therapist-validation.mjs",
     "seed:users": "node --env-file=.env.local scripts/seed-users.mjs",
     "cleanup:seed-users": "node --env-file=.env.local scripts/cleanup-seed-users.mjs",
     "sync:roster": "node --env-file=.env.local scripts/sync-team-roster.mjs",

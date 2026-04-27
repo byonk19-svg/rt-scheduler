@@ -230,6 +230,7 @@ export default async function TherapistSettingsPage({
   const defaultLandingPage = profile.default_landing_page === 'coverage' ? 'coverage' : 'dashboard'
   const pattern = toPatternRecord(profile.id, profile.work_patterns)
   const patternSummary = describeWorkPatternSummary(pattern)
+  const hasRecurringPattern = Boolean(pattern && pattern.pattern_type !== 'none')
 
   return (
     <div className="space-y-6">
@@ -262,10 +263,10 @@ export default async function TherapistSettingsPage({
 
       <Card className="border-border/90">
         <CardHeader>
-          <CardTitle>Recurring Pattern</CardTitle>
+          <CardTitle>Recurring Work Pattern</CardTitle>
           <CardDescription>
-            This is your default schedule template. Future availability starts from this pattern and
-            then lets you add cycle-only overrides.
+            This is your normal repeating schedule. Future Availability starts here and lets you
+            make cycle-only changes separately.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -273,16 +274,22 @@ export default async function TherapistSettingsPage({
             <WorkPatternCard pattern={pattern} />
             <div className="rounded-xl border border-dashed border-border/70 bg-muted/10 px-3.5 py-3">
               <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                What this controls
+                {hasRecurringPattern ? 'What this controls' : 'What happens next'}
               </p>
-              <p className="mt-1 text-sm text-muted-foreground">{patternSummary}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {hasRecurringPattern
+                  ? patternSummary
+                  : 'Future Availability will start blank until you save a normal schedule.'}
+              </p>
               <p className="mt-2 text-sm text-muted-foreground">
                 Editing future availability will not change this recurring pattern.
               </p>
             </div>
           </div>
           <Button asChild>
-            <Link href="/therapist/recurring-pattern">Edit recurring pattern</Link>
+            <Link href="/therapist/recurring-pattern">
+              {hasRecurringPattern ? 'Edit normal schedule' : 'Set normal schedule'}
+            </Link>
           </Button>
         </CardContent>
       </Card>
