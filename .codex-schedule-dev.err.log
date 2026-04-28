@@ -119,3 +119,1045 @@ https://react.dev/link/hydration-mismatch
 ⚠ Fast Refresh had to perform a full reload due to a runtime error.
 ⚠ Fast Refresh had to perform a full reload due to a runtime error.
 ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <LoadingBoundary name="/" loading={null}>
+      <HTTPAccessFallbackBoundary notFound={<SegmentViewNode>} forbidden={undefined} unauthorized={undefined}>
+        <HTTPAccessFallbackErrorBoundary pathname="/schedule" notFound={<SegmentViewNode>} forbidden={undefined} ...>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/schedule" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="layout" pagePath="(app)/layo...">
+                  <SegmentTrieNode>
+                  <AuthenticatedLayout>
+                    <AppShell user={{fullName:"...", ...}}>
+                      <ThemeProvider>
+                        <div className="min-h-scre...">
+                          <a>
+                          <AppHeader>
+                          <div className="min-h-scre...">
+                            <main
+                              id="main-content"
+                              tabIndex={-1}
++                             className="w-full print:max-w-none mx-auto max-w-7xl px-4 md:px-6 py-5 md:py-7 print:mx-..."
+-                             className="w-full print:max-w-none py-4 md:py-5"
+                            >
+                              <div
++                               className="mb-4 border-b border-border/60 pb-3"
+-                               className="mx-auto flex w-full max-w-[1580px] flex-col px-2 py-2 sm:px-3 lg:px-5"
+                              >
+                                <LocalSectionNav ariaLabel="Schedule s..." items={[...]}>
++                                 <nav aria-label="Schedule section navigation" className={undefined}>
+-                                 <section
+-                                   className="overflow-hidden rounded-[26px] border border-border/70 bg-card shadow-[..."
+-                                 >
+                              ...
+                          ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at nav (<anonymous>)
+    at LocalSectionNav (src\components\shell\LocalSectionNav.tsx:20:5)
+    at AppShell (src\components\AppShell.tsx:312:14)
+    at AuthenticatedLayout (src\app\(app)\layout.tsx:52:10)
+  18 | export function LocalSectionNav({ ariaLabel, items, className }: LocalSectionNavProps) {
+  19 |   return (
+> 20 |     <nav aria-label={ariaLabel} className={className}>
+     |     ^
+  21 |       <div className="inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-aut...
+  22 |         {items.map((item) => (
+  23 |           <Link
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <LoadingBoundary name="/" loading={null}>
+      <HTTPAccessFallbackBoundary notFound={<SegmentViewNode>} forbidden={undefined} unauthorized={undefined}>
+        <HTTPAccessFallbackErrorBoundary pathname="/schedule" notFound={<SegmentViewNode>} forbidden={undefined} ...>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/schedule" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="layout" pagePath="(app)/layo...">
+                  <SegmentTrieNode>
+                  <AuthenticatedLayout>
+                    <AppShell user={{fullName:"...", ...}}>
+                      <ThemeProvider>
+                        <div className="min-h-scre...">
+                          <a>
+                          <AppHeader>
+                          <div className="min-h-scre...">
+                            <main
+                              id="main-content"
+                              tabIndex={-1}
++                             className="w-full print:max-w-none mx-auto max-w-7xl px-4 md:px-6 py-5 md:py-7 print:mx-..."
+-                             className="w-full print:max-w-none py-4 md:py-5"
+                            >
+                              <div
++                               className="mb-4 border-b border-border/60 pb-3"
+-                               className="mx-auto flex w-full max-w-[1580px] flex-col px-2 py-2 sm:px-3 lg:px-5"
+                              >
+                                <LocalSectionNav ariaLabel="Schedule s..." items={[...]}>
++                                 <nav aria-label="Schedule section navigation" className={undefined}>
+-                                 <section
+-                                   className="overflow-hidden rounded-[26px] border border-border/70 bg-card shadow-[..."
+-                                 >
+                              ...
+                          ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at nav (<anonymous>)
+    at LocalSectionNav (src\components\shell\LocalSectionNav.tsx:20:5)
+    at AppShell (src\components\AppShell.tsx:312:14)
+    at AuthenticatedLayout (src\app\(app)\layout.tsx:52:10)
+  18 | export function LocalSectionNav({ ariaLabel, items, className }: LocalSectionNavProps) {
+  19 |   return (
+> 20 |     <nav aria-label={ariaLabel} className={className}>
+     |     ^
+  21 |       <div className="inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-aut...
+  22 |         {items.map((item) => (
+  23 |           <Link
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <LoadingBoundary name="/" loading={null}>
+      <HTTPAccessFallbackBoundary notFound={<SegmentViewNode>} forbidden={undefined} unauthorized={undefined}>
+        <HTTPAccessFallbackErrorBoundary pathname="/schedule" notFound={<SegmentViewNode>} forbidden={undefined} ...>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/schedule" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="layout" pagePath="(app)/layo...">
+                  <SegmentTrieNode>
+                  <AuthenticatedLayout>
+                    <AppShell user={{fullName:"...", ...}}>
+                      <ThemeProvider>
+                        <div className="min-h-scre...">
+                          <a>
+                          <AppHeader>
+                          <div className="min-h-scre...">
+                            <main
+                              id="main-content"
+                              tabIndex={-1}
++                             className="w-full print:max-w-none mx-auto max-w-7xl px-4 md:px-6 py-5 md:py-7 print:mx-..."
+-                             className="w-full print:max-w-none py-4 md:py-5"
+                            >
+                              <div
++                               className="mb-4 border-b border-border/60 pb-3"
+-                               className="mx-auto flex w-full max-w-[1580px] flex-col px-2 py-2 sm:px-3 lg:px-5"
+                              >
+                                <LocalSectionNav ariaLabel="Schedule s..." items={[...]}>
++                                 <nav aria-label="Schedule section navigation" className={undefined}>
+-                                 <section
+-                                   className="overflow-hidden rounded-[26px] border border-border/70 bg-card shadow-[..."
+-                                 >
+                              ...
+                          ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at nav (<anonymous>)
+    at LocalSectionNav (src\components\shell\LocalSectionNav.tsx:20:5)
+    at AppShell (src\components\AppShell.tsx:312:14)
+    at AuthenticatedLayout (src\app\(app)\layout.tsx:52:10)
+  18 | export function LocalSectionNav({ ariaLabel, items, className }: LocalSectionNavProps) {
+  19 |   return (
+> 20 |     <nav aria-label={ariaLabel} className={className}>
+     |     ^
+  21 |       <div className="inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-aut...
+  22 |         {items.map((item) => (
+  23 |           <Link
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <LoadingBoundary name="/" loading={null}>
+      <HTTPAccessFallbackBoundary notFound={<SegmentViewNode>} forbidden={undefined} unauthorized={undefined}>
+        <HTTPAccessFallbackErrorBoundary pathname="/schedule" notFound={<SegmentViewNode>} forbidden={undefined} ...>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/schedule" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="layout" pagePath="(app)/layo...">
+                  <SegmentTrieNode>
+                  <AuthenticatedLayout>
+                    <AppShell user={{fullName:"...", ...}}>
+                      <ThemeProvider>
+                        <div className="min-h-scre...">
+                          <a>
+                          <AppHeader>
+                          <div className="min-h-scre...">
+                            <main
+                              id="main-content"
+                              tabIndex={-1}
++                             className="w-full print:max-w-none mx-auto max-w-7xl px-4 md:px-6 py-5 md:py-7 print:mx-..."
+-                             className="w-full print:max-w-none py-4 md:py-5"
+                            >
+                              <div
++                               className="mb-4 border-b border-border/60 pb-3"
+-                               className="mx-auto flex w-full max-w-[1580px] flex-col px-2 py-2 sm:px-3 lg:px-5"
+                              >
+                                <LocalSectionNav ariaLabel="Schedule s..." items={[...]}>
++                                 <nav aria-label="Schedule section navigation" className={undefined}>
+-                                 <section
+-                                   className="overflow-hidden rounded-[26px] border border-border/70 bg-card shadow-[..."
+-                                 >
+                              ...
+                          ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at nav (<anonymous>)
+    at LocalSectionNav (src\components\shell\LocalSectionNav.tsx:20:5)
+    at AppShell (src\components\AppShell.tsx:312:14)
+    at AuthenticatedLayout (src\app\(app)\layout.tsx:52:10)
+  18 | export function LocalSectionNav({ ariaLabel, items, className }: LocalSectionNavProps) {
+  19 |   return (
+> 20 |     <nav aria-label={ariaLabel} className={className}>
+     |     ^
+  21 |       <div className="inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-aut...
+  22 |         {items.map((item) => (
+  23 |           <Link
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <LoadingBoundary name="/" loading={null}>
+      <HTTPAccessFallbackBoundary notFound={<SegmentViewNode>} forbidden={undefined} unauthorized={undefined}>
+        <HTTPAccessFallbackErrorBoundary pathname="/schedule" notFound={<SegmentViewNode>} forbidden={undefined} ...>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/schedule" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="layout" pagePath="(app)/layo...">
+                  <SegmentTrieNode>
+                  <AuthenticatedLayout>
+                    <AppShell user={{fullName:"...", ...}}>
+                      <ThemeProvider>
+                        <div className="min-h-scre...">
+                          <a>
+                          <AppHeader>
+                          <div className="min-h-scre...">
+                            <main
+                              id="main-content"
+                              tabIndex={-1}
++                             className="w-full print:max-w-none mx-auto max-w-7xl px-4 md:px-6 py-5 md:py-7 print:mx-..."
+-                             className="w-full print:max-w-none py-4 md:py-5"
+                            >
+                              <div
++                               className="mb-4 border-b border-border/60 pb-3"
+-                               className="mx-auto flex w-full max-w-[1580px] flex-col px-2 py-2 sm:px-3 lg:px-5"
+                              >
+                                <LocalSectionNav ariaLabel="Schedule s..." items={[...]}>
++                                 <nav aria-label="Schedule section navigation" className={undefined}>
+-                                 <section
+-                                   className="overflow-hidden rounded-[26px] border border-border/70 bg-card shadow-[..."
+-                                 >
+                              ...
+                          ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at nav (<anonymous>)
+    at LocalSectionNav (src\components\shell\LocalSectionNav.tsx:20:5)
+    at AppShell (src\components\AppShell.tsx:312:14)
+    at AuthenticatedLayout (src\app\(app)\layout.tsx:52:10)
+  18 | export function LocalSectionNav({ ariaLabel, items, className }: LocalSectionNavProps) {
+  19 |   return (
+> 20 |     <nav aria-label={ariaLabel} className={className}>
+     |     ^
+  21 |       <div className="inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-aut...
+  22 |         {items.map((item) => (
+  23 |           <Link
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <LoadingBoundary name="/" loading={null}>
+      <HTTPAccessFallbackBoundary notFound={<SegmentViewNode>} forbidden={undefined} unauthorized={undefined}>
+        <HTTPAccessFallbackErrorBoundary pathname="/schedule" notFound={<SegmentViewNode>} forbidden={undefined} ...>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/schedule" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="layout" pagePath="(app)/layo...">
+                  <SegmentTrieNode>
+                  <AuthenticatedLayout>
+                    <AppShell user={{fullName:"...", ...}}>
+                      <ThemeProvider>
+                        <div className="min-h-scre...">
+                          <a>
+                          <AppHeader>
+                          <div className="min-h-scre...">
+                            <main
+                              id="main-content"
+                              tabIndex={-1}
++                             className="w-full print:max-w-none mx-auto max-w-7xl px-4 md:px-6 py-5 md:py-7 print:mx-..."
+-                             className="w-full print:max-w-none py-4 md:py-5"
+                            >
+                              <div
++                               className="mb-4 border-b border-border/60 pb-3"
+-                               className="mx-auto flex w-full max-w-[1460px] flex-col px-6 pb-7 pt-5 max-[1280px]:px-..."
+                              >
+                                <LocalSectionNav ariaLabel="Schedule s..." items={[...]}>
++                                 <nav aria-label="Schedule section navigation" className={undefined}>
+-                                 <section
+-                                   className="overflow-hidden rounded-[28px] border border-border/70 bg-card shadow-[..."
+-                                 >
+                              ...
+                          ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at nav (<anonymous>)
+    at LocalSectionNav (src\components\shell\LocalSectionNav.tsx:20:5)
+    at AppShell (src\components\AppShell.tsx:312:14)
+    at AuthenticatedLayout (src\app\(app)\layout.tsx:52:10)
+  18 | export function LocalSectionNav({ ariaLabel, items, className }: LocalSectionNavProps) {
+  19 |   return (
+> 20 |     <nav aria-label={ariaLabel} className={className}>
+     |     ^
+  21 |       <div className="inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-aut...
+  22 |         {items.map((item) => (
+  23 |           <Link
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <LoadingBoundary name="/" loading={null}>
+      <HTTPAccessFallbackBoundary notFound={<SegmentViewNode>} forbidden={undefined} unauthorized={undefined}>
+        <HTTPAccessFallbackErrorBoundary pathname="/schedule" notFound={<SegmentViewNode>} forbidden={undefined} ...>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/schedule" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="layout" pagePath="(app)/layo...">
+                  <SegmentTrieNode>
+                  <AuthenticatedLayout>
+                    <AppShell user={{fullName:"...", ...}}>
+                      <ThemeProvider>
+                        <div className="min-h-scre...">
+                          <a>
+                          <AppHeader>
+                          <div className="min-h-scre...">
+                            <main
+                              id="main-content"
+                              tabIndex={-1}
++                             className="w-full print:max-w-none mx-auto max-w-7xl px-4 md:px-6 py-5 md:py-7 print:mx-..."
+-                             className="w-full print:max-w-none py-4 md:py-5"
+                            >
+                              <div
++                               className="mb-4 border-b border-border/60 pb-3"
+-                               className="mx-auto flex w-full max-w-[1460px] flex-col px-6 pb-[26px] pt-[18px] max-[1..."
+                              >
+                                <LocalSectionNav ariaLabel="Schedule s..." items={[...]}>
++                                 <nav aria-label="Schedule section navigation" className={undefined}>
+-                                 <section
+-                                   className="overflow-hidden rounded-[28px] border border-border/70 bg-card shadow-[..."
+-                                 >
+                              ...
+                          ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at nav (<anonymous>)
+    at LocalSectionNav (src\components\shell\LocalSectionNav.tsx:20:5)
+    at AppShell (src\components\AppShell.tsx:312:14)
+    at AuthenticatedLayout (src\app\(app)\layout.tsx:52:10)
+  18 | export function LocalSectionNav({ ariaLabel, items, className }: LocalSectionNavProps) {
+  19 |   return (
+> 20 |     <nav aria-label={ariaLabel} className={className}>
+     |     ^
+  21 |       <div className="inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-aut...
+  22 |         {items.map((item) => (
+  23 |           <Link
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <LoadingBoundary name="/" loading={null}>
+      <HTTPAccessFallbackBoundary notFound={<SegmentViewNode>} forbidden={undefined} unauthorized={undefined}>
+        <HTTPAccessFallbackErrorBoundary pathname="/schedule" notFound={<SegmentViewNode>} forbidden={undefined} ...>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/schedule" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="layout" pagePath="(app)/layo...">
+                  <SegmentTrieNode>
+                  <AuthenticatedLayout>
+                    <AppShell user={{fullName:"...", ...}}>
+                      <ThemeProvider>
+                        <div className="min-h-scre...">
+                          <a>
+                          <AppHeader>
+                          <div className="min-h-scre...">
+                            <main
+                              id="main-content"
+                              tabIndex={-1}
++                             className="w-full print:max-w-none mx-auto max-w-7xl px-4 md:px-6 py-5 md:py-7 print:mx-..."
+-                             className="w-full print:max-w-none py-4 md:py-5"
+                            >
+                              <div
++                               className="mb-4 border-b border-border/60 pb-3"
+-                               className="mx-auto flex w-full max-w-[1460px] flex-col px-6 pb-6 pt-[18px] max-[1280px..."
+                              >
+                                <LocalSectionNav ariaLabel="Schedule s..." items={[...]}>
++                                 <nav aria-label="Schedule section navigation" className={undefined}>
+-                                 <section
+-                                   className="overflow-hidden rounded-[28px] border border-border/70 bg-card shadow-[..."
+-                                 >
+                              ...
+                          ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at nav (<anonymous>)
+    at LocalSectionNav (src\components\shell\LocalSectionNav.tsx:20:5)
+    at AppShell (src\components\AppShell.tsx:312:14)
+    at AuthenticatedLayout (src\app\(app)\layout.tsx:52:10)
+  18 | export function LocalSectionNav({ ariaLabel, items, className }: LocalSectionNavProps) {
+  19 |   return (
+> 20 |     <nav aria-label={ariaLabel} className={className}>
+     |     ^
+  21 |       <div className="inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-aut...
+  22 |         {items.map((item) => (
+  23 |           <Link
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <LoadingBoundary name="/" loading={null}>
+      <HTTPAccessFallbackBoundary notFound={<SegmentViewNode>} forbidden={undefined} unauthorized={undefined}>
+        <HTTPAccessFallbackErrorBoundary pathname="/schedule" notFound={<SegmentViewNode>} forbidden={undefined} ...>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/schedule" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="layout" pagePath="(app)/layo...">
+                  <SegmentTrieNode>
+                  <AuthenticatedLayout>
+                    <AppShell user={{fullName:"...", ...}}>
+                      <ThemeProvider>
+                        <div className="min-h-scre...">
+                          <a>
+                          <AppHeader>
+                          <div className="min-h-scre...">
+                            <main
+                              id="main-content"
+                              tabIndex={-1}
++                             className="w-full print:max-w-none mx-auto max-w-7xl px-4 md:px-6 py-5 md:py-7 print:mx-..."
+-                             className="w-full print:max-w-none py-4 md:py-5"
+                            >
+                              <div
++                               className="mb-4 border-b border-border/60 pb-3"
+-                               className="mx-auto flex w-full max-w-[1460px] flex-col px-6 pb-[22px] pt-[18px] max-[1..."
+                              >
+                                <LocalSectionNav ariaLabel="Schedule s..." items={[...]}>
++                                 <nav aria-label="Schedule section navigation" className={undefined}>
+-                                 <section
+-                                   className="overflow-hidden rounded-[28px] border border-border/70 bg-card shadow-[..."
+-                                 >
+                              ...
+                          ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at nav (<anonymous>)
+    at LocalSectionNav (src\components\shell\LocalSectionNav.tsx:20:5)
+    at AppShell (src\components\AppShell.tsx:312:14)
+    at AuthenticatedLayout (src\app\(app)\layout.tsx:52:10)
+  18 | export function LocalSectionNav({ ariaLabel, items, className }: LocalSectionNavProps) {
+  19 |   return (
+> 20 |     <nav aria-label={ariaLabel} className={className}>
+     |     ^
+  21 |       <div className="inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-aut...
+  22 |         {items.map((item) => (
+  23 |           <Link
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <LoadingBoundary name="/" loading={null}>
+      <HTTPAccessFallbackBoundary notFound={<SegmentViewNode>} forbidden={undefined} unauthorized={undefined}>
+        <HTTPAccessFallbackErrorBoundary pathname="/schedule" notFound={<SegmentViewNode>} forbidden={undefined} ...>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/schedule" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="layout" pagePath="(app)/layo...">
+                  <SegmentTrieNode>
+                  <AuthenticatedLayout>
+                    <AppShell user={{fullName:"...", ...}}>
+                      <ThemeProvider>
+                        <div className="min-h-scre...">
+                          <a>
+                          <AppHeader>
+                          <div className="min-h-scre...">
+                            <main
+                              id="main-content"
+                              tabIndex={-1}
++                             className="w-full print:max-w-none mx-auto max-w-7xl px-4 md:px-6 py-5 md:py-7 print:mx-..."
+-                             className="w-full print:max-w-none py-4 md:py-5"
+                            >
+                              <div
++                               className="mb-4 border-b border-border/60 pb-3"
+-                               className="mx-auto flex w-full max-w-[1460px] flex-col px-6 pb-[22px] pt-[18px] max-[1..."
+                              >
+                                <LocalSectionNav ariaLabel="Schedule s..." items={[...]}>
++                                 <nav aria-label="Schedule section navigation" className={undefined}>
+-                                 <section
+-                                   className="overflow-hidden rounded-[28px] border border-border/70 bg-card shadow-[..."
+-                                 >
+                              ...
+                          ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at nav (<anonymous>)
+    at LocalSectionNav (src\components\shell\LocalSectionNav.tsx:20:5)
+    at AppShell (src\components\AppShell.tsx:312:14)
+    at AuthenticatedLayout (src\app\(app)\layout.tsx:52:10)
+  18 | export function LocalSectionNav({ ariaLabel, items, className }: LocalSectionNavProps) {
+  19 |   return (
+> 20 |     <nav aria-label={ariaLabel} className={className}>
+     |     ^
+  21 |       <div className="inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-aut...
+  22 |         {items.map((item) => (
+  23 |           <Link
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <LoadingBoundary name="/" loading={null}>
+      <HTTPAccessFallbackBoundary notFound={<SegmentViewNode>} forbidden={undefined} unauthorized={undefined}>
+        <HTTPAccessFallbackErrorBoundary pathname="/schedule" notFound={<SegmentViewNode>} forbidden={undefined} ...>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/schedule" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="layout" pagePath="(app)/layo...">
+                  <SegmentTrieNode>
+                  <AuthenticatedLayout>
+                    <AppShell user={{fullName:"...", ...}}>
+                      <ThemeProvider>
+                        <div className="min-h-scre...">
+                          <a>
+                          <AppHeader>
+                          <div className="min-h-scre...">
+                            <main
+                              id="main-content"
+                              tabIndex={-1}
++                             className="w-full print:max-w-none mx-auto max-w-7xl px-4 md:px-6 py-5 md:py-7 print:mx-..."
+-                             className="w-full print:max-w-none py-4 md:py-5"
+                            >
+                              <div
++                               className="mb-4 border-b border-border/60 pb-3"
+-                               className="mx-auto flex w-full max-w-[1460px] flex-col px-6 pb-[22px] pt-[18px] max-[1..."
+                              >
+                                <LocalSectionNav ariaLabel="Schedule s..." items={[...]}>
++                                 <nav aria-label="Schedule section navigation" className={undefined}>
+-                                 <section
+-                                   className="overflow-hidden rounded-[28px] border border-border/70 bg-card shadow-[..."
+-                                 >
+                              ...
+                          ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at nav (<anonymous>)
+    at LocalSectionNav (src\components\shell\LocalSectionNav.tsx:20:5)
+    at AppShell (src\components\AppShell.tsx:312:14)
+    at AuthenticatedLayout (src\app\(app)\layout.tsx:52:10)
+  18 | export function LocalSectionNav({ ariaLabel, items, className }: LocalSectionNavProps) {
+  19 |   return (
+> 20 |     <nav aria-label={ariaLabel} className={className}>
+     |     ^
+  21 |       <div className="inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-aut...
+  22 |         {items.map((item) => (
+  23 |           <Link
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <LoadingBoundary name="/" loading={null}>
+      <HTTPAccessFallbackBoundary notFound={<SegmentViewNode>} forbidden={undefined} unauthorized={undefined}>
+        <HTTPAccessFallbackErrorBoundary pathname="/schedule" notFound={<SegmentViewNode>} forbidden={undefined} ...>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/schedule" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="layout" pagePath="(app)/layo...">
+                  <SegmentTrieNode>
+                  <AuthenticatedLayout>
+                    <AppShell user={{fullName:"...", ...}}>
+                      <ThemeProvider>
+                        <div className="min-h-scre...">
+                          <a>
+                          <AppHeader>
+                          <div className="min-h-scre...">
+                            <main
+                              id="main-content"
+                              tabIndex={-1}
++                             className="w-full print:max-w-none mx-auto max-w-7xl px-4 md:px-6 py-5 md:py-7 print:mx-..."
+-                             className="w-full print:max-w-none py-4 md:py-5"
+                            >
+                              <div
++                               className="mb-4 border-b border-border/60 pb-3"
+-                               className="mx-auto flex w-full max-w-[1460px] flex-col px-6 pb-[22px] pt-[18px] max-[1..."
+                              >
+                                <LocalSectionNav ariaLabel="Schedule s..." items={[...]}>
++                                 <nav aria-label="Schedule section navigation" className={undefined}>
+-                                 <section
+-                                   className="overflow-hidden rounded-[28px] border border-border/70 bg-card shadow-[..."
+-                                 >
+                              ...
+                          ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at nav (<anonymous>)
+    at LocalSectionNav (src\components\shell\LocalSectionNav.tsx:20:5)
+    at AppShell (src\components\AppShell.tsx:312:14)
+    at AuthenticatedLayout (src\app\(app)\layout.tsx:52:10)
+  18 | export function LocalSectionNav({ ariaLabel, items, className }: LocalSectionNavProps) {
+  19 |   return (
+> 20 |     <nav aria-label={ariaLabel} className={className}>
+     |     ^
+  21 |       <div className="inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-aut...
+  22 |         {items.map((item) => (
+  23 |           <Link
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <LoadingBoundary name="/" loading={null}>
+      <HTTPAccessFallbackBoundary notFound={<SegmentViewNode>} forbidden={undefined} unauthorized={undefined}>
+        <HTTPAccessFallbackErrorBoundary pathname="/schedule" notFound={<SegmentViewNode>} forbidden={undefined} ...>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/schedule" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="layout" pagePath="(app)/layo...">
+                  <SegmentTrieNode>
+                  <AuthenticatedLayout>
+                    <AppShell user={{fullName:"...", ...}}>
+                      <ThemeProvider>
+                        <div className="min-h-scre...">
+                          <a>
+                          <AppHeader>
+                          <div className="min-h-scre...">
+                            <main
+                              id="main-content"
+                              tabIndex={-1}
++                             className="w-full print:max-w-none mx-auto max-w-7xl px-4 md:px-6 py-5 md:py-7 print:mx-..."
+-                             className="w-full print:max-w-none py-4 md:py-5"
+                            >
+                              <div
++                               className="mb-4 border-b border-border/60 pb-3"
+-                               className="mx-auto flex w-full max-w-[1460px] flex-col px-6 pb-[22px] pt-[18px] max-[1..."
+                              >
+                                <LocalSectionNav ariaLabel="Schedule s..." items={[...]}>
++                                 <nav aria-label="Schedule section navigation" className={undefined}>
+-                                 <section
+-                                   className="overflow-hidden rounded-[28px] border border-border/70 bg-card shadow-[..."
+-                                 >
+                              ...
+                          ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at nav (<anonymous>)
+    at LocalSectionNav (src\components\shell\LocalSectionNav.tsx:20:5)
+    at AppShell (src\components\AppShell.tsx:312:14)
+    at AuthenticatedLayout (src\app\(app)\layout.tsx:52:10)
+  18 | export function LocalSectionNav({ ariaLabel, items, className }: LocalSectionNavProps) {
+  19 |   return (
+> 20 |     <nav aria-label={ariaLabel} className={className}>
+     |     ^
+  21 |       <div className="inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-aut...
+  22 |         {items.map((item) => (
+  23 |           <Link
+TypeError: fetch failed
+    at ignore-listed frames {
+  [cause]: Error: getaddrinfo ENOTFOUND fjbkfgvdzidvfaxrqzjz.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fjbkfgvdzidvfaxrqzjz.supabase.co'
+  }
+}
+TypeError: fetch failed
+    at ignore-listed frames {
+  [cause]: Error: getaddrinfo ENOTFOUND fjbkfgvdzidvfaxrqzjz.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fjbkfgvdzidvfaxrqzjz.supabase.co'
+  }
+}
+TypeError: fetch failed
+    at ignore-listed frames {
+  [cause]: Error: getaddrinfo ENOTFOUND fjbkfgvdzidvfaxrqzjz.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fjbkfgvdzidvfaxrqzjz.supabase.co'
+  }
+}
+TypeError: fetch failed
+    at ignore-listed frames {
+  [cause]: Error: getaddrinfo ENOTFOUND fjbkfgvdzidvfaxrqzjz.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fjbkfgvdzidvfaxrqzjz.supabase.co'
+  }
+}
+TypeError: fetch failed
+    at ignore-listed frames {
+  [cause]: Error: getaddrinfo ENOTFOUND fjbkfgvdzidvfaxrqzjz.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fjbkfgvdzidvfaxrqzjz.supabase.co'
+  }
+}
+TypeError: fetch failed
+    at ignore-listed frames {
+  [cause]: Error: getaddrinfo ENOTFOUND fjbkfgvdzidvfaxrqzjz.supabase.co
+      at ignore-listed frames {
+    errno: -3008,
+    code: 'ENOTFOUND',
+    syscall: 'getaddrinfo',
+    hostname: 'fjbkfgvdzidvfaxrqzjz.supabase.co'
+  }
+}
+TypeError: fetch failed
+    at ignore-listed frames {
+  [cause]: Error: Hostname/IP does not match certificate's altnames: Host: fjbkfgvdzidvfaxrqzjz.supabase.co. is not in the cert's altnames: DNS:guest.pgn.medcity.net
+      at ignore-listed frames {
+    code: 'ERR_TLS_CERT_ALTNAME_INVALID',
+    reason: "Host: fjbkfgvdzidvfaxrqzjz.supabase.co. is not in the cert's altnames: DNS:guest.pgn.medcity.net",
+    host: 'fjbkfgvdzidvfaxrqzjz.supabase.co',
+    cert: {
+      subject: [Object: null prototype],
+      issuer: [Object: null prototype],
+      subjectaltname: 'DNS:guest.pgn.medcity.net',
+      infoAccess: [Object: null prototype],
+      ca: false,
+      modulus: 'A178839784765309EEDFAE1BC968C036AD231BEE4214B7185166797512811C927B052F51445B61522BD1459DA700399B1A29AE790DB42A52CB5B202995104ADB7BB351053F28E38527F39D9A4210F5D0084955BB73648C2BBD42CFE96EFC0D2A0BE40D58775F1C39E90C228EA2D5D9B531A1C43A5FCD46A8374B67D2C144CE8872305A1A3D07F510315D69FBD329858899C555DF88415ED5A16AECDDE18B2ED16896454D4CA59E2A30802DEA03379C7CA9718D95718E69750A6B7B21447CF1E8D7698BC1433CAFABCC3B5FBD1F134EE94186929CA5613369F1CDABC5CF9069A747EC4B285F8C38DB1D568FE3C9F97AB8E0DFA56F181CED0B92EAB1D01EAD7329',
+      exponent: '0x10001',
+      pubkey: <Buffer 30 82 01 22 30 0d 06 09 2a 86 48 86 f7 0d 01 01 01 05 00 03 82 01 0f 00 30 82 01 0a 02 82 01 01 00 a1 78 83 97 84 76 53 09 ee df ae 1b c9 68 c0 36 ad ... 244 more bytes>,
+      bits: 2048,
+      valid_from: 'Jan 26 22:03:13 2026 GMT',
+      valid_to: 'Jan 21 22:02:13 2027 GMT',
+      fingerprint: 'D7:99:31:89:84:A5:1F:33:16:53:F6:98:81:64:30:49:89:30:93:8B',
+      fingerprint256: '43:CC:27:B1:CF:91:68:94:DD:1F:7B:91:08:F7:81:28:96:DC:F7:EE:A6:D9:68:3A:4F:DE:22:A2:E0:F3:F2:17',
+      fingerprint512: 'F4:A1:77:41:A7:CB:63:F6:5E:A5:F1:7B:7B:39:91:2C:AB:EC:6C:5D:57:C3:BC:7A:E6:A3:94:5F:98:0E:89:D3:1F:9D:DA:4F:C5:47:12:3A:8A:C8:2E:5A:0C:9D:E0:D0:E0:84:41:43:55:1F:BB:E6:05:7D:2E:30:75:24:10:57',
+      ext_key_usage: [Array],
+      serialNumber: '40019BFC551862B08AE7285C9C30B16B',
+      raw: <Buffer 30 82 06 a3 30 82 05 8b a0 03 02 01 02 02 10 40 01 9b fc 55 18 62 b0 8a e7 28 5c 9c 30 b1 6b 30 0d 06 09 2a 86 48 86 f7 0d 01 01 0b 05 00 30 72 31 0b ... 1653 more bytes>,
+      asn1Curve: undefined,
+      nistCurve: undefined,
+      issuerCertificate: [Object]
+    }
+  }
+}
+TypeError: fetch failed
+    at ignore-listed frames {
+  [cause]: Error: Hostname/IP does not match certificate's altnames: Host: fjbkfgvdzidvfaxrqzjz.supabase.co. is not in the cert's altnames: DNS:guest.pgn.medcity.net
+      at ignore-listed frames {
+    code: 'ERR_TLS_CERT_ALTNAME_INVALID',
+    reason: "Host: fjbkfgvdzidvfaxrqzjz.supabase.co. is not in the cert's altnames: DNS:guest.pgn.medcity.net",
+    host: 'fjbkfgvdzidvfaxrqzjz.supabase.co',
+    cert: {
+      subject: [Object: null prototype],
+      issuer: [Object: null prototype],
+      subjectaltname: 'DNS:guest.pgn.medcity.net',
+      infoAccess: [Object: null prototype],
+      ca: false,
+      modulus: 'A178839784765309EEDFAE1BC968C036AD231BEE4214B7185166797512811C927B052F51445B61522BD1459DA700399B1A29AE790DB42A52CB5B202995104ADB7BB351053F28E38527F39D9A4210F5D0084955BB73648C2BBD42CFE96EFC0D2A0BE40D58775F1C39E90C228EA2D5D9B531A1C43A5FCD46A8374B67D2C144CE8872305A1A3D07F510315D69FBD329858899C555DF88415ED5A16AECDDE18B2ED16896454D4CA59E2A30802DEA03379C7CA9718D95718E69750A6B7B21447CF1E8D7698BC1433CAFABCC3B5FBD1F134EE94186929CA5613369F1CDABC5CF9069A747EC4B285F8C38DB1D568FE3C9F97AB8E0DFA56F181CED0B92EAB1D01EAD7329',
+      exponent: '0x10001',
+      pubkey: <Buffer 30 82 01 22 30 0d 06 09 2a 86 48 86 f7 0d 01 01 01 05 00 03 82 01 0f 00 30 82 01 0a 02 82 01 01 00 a1 78 83 97 84 76 53 09 ee df ae 1b c9 68 c0 36 ad ... 244 more bytes>,
+      bits: 2048,
+      valid_from: 'Jan 26 22:03:13 2026 GMT',
+      valid_to: 'Jan 21 22:02:13 2027 GMT',
+      fingerprint: 'D7:99:31:89:84:A5:1F:33:16:53:F6:98:81:64:30:49:89:30:93:8B',
+      fingerprint256: '43:CC:27:B1:CF:91:68:94:DD:1F:7B:91:08:F7:81:28:96:DC:F7:EE:A6:D9:68:3A:4F:DE:22:A2:E0:F3:F2:17',
+      fingerprint512: 'F4:A1:77:41:A7:CB:63:F6:5E:A5:F1:7B:7B:39:91:2C:AB:EC:6C:5D:57:C3:BC:7A:E6:A3:94:5F:98:0E:89:D3:1F:9D:DA:4F:C5:47:12:3A:8A:C8:2E:5A:0C:9D:E0:D0:E0:84:41:43:55:1F:BB:E6:05:7D:2E:30:75:24:10:57',
+      ext_key_usage: [Array],
+      serialNumber: '40019BFC551862B08AE7285C9C30B16B',
+      raw: <Buffer 30 82 06 a3 30 82 05 8b a0 03 02 01 02 02 10 40 01 9b fc 55 18 62 b0 8a e7 28 5c 9c 30 b1 6b 30 0d 06 09 2a 86 48 86 f7 0d 01 01 0b 05 00 30 72 31 0b ... 1653 more bytes>,
+      asn1Curve: undefined,
+      nistCurve: undefined,
+      issuerCertificate: [Object]
+    }
+  }
+}
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <InnerLayoutRouter url="/login?red..." tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} segmentPath={[...]} ...>
+      <SegmentViewNode type="page" pagePath="(public)/l...">
+        <SegmentTrieNode>
+        <ClientPageRoot Component={function LoginPage} serverProvidedParams={{...}}>
+          <LoginPage params={Promise} searchParams={Promise}>
+            <Suspense fallback={<LoginPageFallback>}>
+              <LoginPageClient>
+                <main className="flex min-h...">
+                  <aside>
+                  <div className="flex flex-...">
+                    <section className="w-full max...">
+                      <h1>
+                      <p>
+                      <form onSubmit={function handleSubmit} className="mt-6 space...">
+                        <div className="space-y-1.5">
+                          <Label>
+                          <Input id="email" name="email" type="email" autoComplete="email" inputMode="email" ...>
+                            <input
+                              type="email"
+                              data-slot="input"
+                              className="file:text-foreground placeholder:text-muted-foreground selection:bg-primary s..."
+                              id="email"
+                              name="email"
+                              autoComplete="email"
+                              inputMode="email"
+                              spellCheck={false}
+                              value=""
+                              onChange={function onChange}
+                              required={true}
+                              aria-required="true"
+-                             style={{caret-color:"transparent"}}
+                            >
+                        <div className="space-y-1.5">
+                          <div>
+                          <div className="relative">
+                            <Input id="password" name="password" type="password" autoComplete="current-pa..." value="" ...>
+                              <input
+                                type="password"
+                                data-slot="input"
+                                className="file:text-foreground placeholder:text-muted-foreground selection:bg-primary..."
+                                id="password"
+                                name="password"
+                                autoComplete="current-password"
+                                value=""
+                                onChange={function onChange}
+                                onKeyDown={function updateCapsFromEvent}
+                                onKeyUp={function updateCapsFromEvent}
+                                onFocus={function onFocus}
+                                required={true}
+                                aria-required="true"
+-                               style={{caret-color:"transparent"}}
+                              >
+                            ...
+                        ...
+                      ...
+      ...
+ 
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <LoadingBoundary name="/" loading={null}>
+      <HTTPAccessFallbackBoundary notFound={<SegmentViewNode>} forbidden={undefined} unauthorized={undefined}>
+        <HTTPAccessFallbackErrorBoundary pathname="/schedule" notFound={<SegmentViewNode>} forbidden={undefined} ...>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/schedule" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                <SegmentViewNode type="layout" pagePath="(app)/layo...">
+                  <SegmentTrieNode>
+                  <AuthenticatedLayout>
+                    <AppShell user={{fullName:"...", ...}}>
+                      <ThemeProvider>
+                        <div className="min-h-scre...">
+                          <a>
+                          <AppHeader>
+                          <div className="min-h-scre...">
+                            <main
+                              id="main-content"
+                              tabIndex={-1}
++                             className="w-full print:max-w-none mx-auto max-w-7xl px-4 md:px-6 py-5 md:py-7 print:mx-..."
+-                             className="w-full print:max-w-none py-4 md:py-5"
+                            >
+                              <div
++                               className="mb-4 border-b border-border/60 pb-3"
+-                               className="mx-auto flex w-full max-w-[1580px] flex-col px-2 py-2 sm:px-3 lg:px-5"
+                              >
+                                <LocalSectionNav ariaLabel="Schedule s..." items={[...]}>
++                                 <nav aria-label="Schedule section navigation" className={undefined}>
+-                                 <section
+-                                   className="overflow-hidden rounded-[26px] border border-border/70 bg-card shadow-[..."
+-                                 >
+                              ...
+                          ...
+              ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at nav (<anonymous>)
+    at LocalSectionNav (src\components\shell\LocalSectionNav.tsx:20:5)
+    at AppShell (src\components\AppShell.tsx:312:14)
+    at AuthenticatedLayout (src\app\(app)\layout.tsx:52:10)
+  18 | export function LocalSectionNav({ ariaLabel, items, className }: LocalSectionNavProps) {
+  19 |   return (
+> 20 |     <nav aria-label={ariaLabel} className={className}>
+     |     ^
+  21 |       <div className="inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-aut...
+  22 |         {items.map((item) => (
+  23 |           <Link
+Error [AuthApiError]: Invalid Refresh Token: Refresh Token Not Found
+    at ignore-listed frames {
+  __isAuthError: true,
+  status: 400,
+  code: 'refresh_token_not_found'
+}
+Error [AuthApiError]: Invalid Refresh Token: Refresh Token Not Found
+    at ignore-listed frames {
+  __isAuthError: true,
+  status: 400,
+  code: 'refresh_token_not_found'
+}
+[browser] AuthApiError: Invalid Refresh Token: Refresh Token Not Found
+[browser] Failed to fetch RSC payload for http://127.0.0.1:3000/therapist/availability. Falling back to browser navigation. TypeError: Failed to fetch
+    at handleSubmit (src\app\(public)\login\page.tsx:156:14)
+  154 |
+  155 |       const redirectTarget = sanitizeRedirectTo(searchParams.get('redirectTo')) ?? '/dash...
+> 156 |       router.push(redirectTarget)
+      |              ^
+  157 |       router.refresh()
+  158 |     } catch (requestError) {
+  159 |       const message = requestError instanceof Error ? requestError.message : 'Could not s...
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
