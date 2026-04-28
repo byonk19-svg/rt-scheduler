@@ -53,14 +53,14 @@
   /* --font-geist-mono: set on <html> via next/font (layout.tsx) */
   --radius: 0.625rem;
 
-  /* Lovable core theme */
-  --background: hsl(38 18% 96%);
+  /* Lovable core theme — values mirror the Refined design handoff (hue 174 teal, paper #f0ebe1) */
+  --background: hsl(38 24% 91%);
   --foreground: hsl(220 25% 12%);
   --card: hsl(38 14% 99%);
   --card-foreground: hsl(220 25% 12%);
   --popover: hsl(0 0% 100%);
   --popover-foreground: hsl(220 25% 12%);
-  --primary: hsl(187 55% 28%);
+  --primary: hsl(174 48% 29%);
   --primary-foreground: hsl(0 0% 100%);
   --secondary: hsl(32 18% 91%);
   --secondary-foreground: hsl(220 25% 12%);
@@ -73,7 +73,7 @@
   --border: hsl(32 14% 86%);
   --input: hsl(32 14% 86%);
   --input-background: hsl(38 14% 99%);
-  --ring: hsl(187 55% 28%);
+  --ring: hsl(174 48% 29%);
 
   --sidebar: hsl(192 28% 20%);
   --sidebar-foreground: hsl(190 12% 82%);
@@ -85,7 +85,7 @@
   --sidebar-ring: hsl(38 90% 55%);
   --sidebar-muted: hsl(192 16% 58%);
 
-  --chart-1: hsl(187 55% 28%);
+  --chart-1: hsl(174 48% 29%);
   --chart-2: hsl(192 35% 28%);
   --chart-3: hsl(38 90% 55%);
   --chart-4: hsl(220 25% 12%);
@@ -103,20 +103,24 @@
   --error-subtle: hsl(0 70% 94%);
   --error-border: hsl(0 60% 83%);
   --error-text: hsl(0 55% 38%);
-  --info: hsl(187 55% 35%);
-  --info-subtle: hsl(187 50% 92%);
-  --info-border: hsl(187 35% 80%);
-  --info-text: hsl(187 60% 30%);
+  --info: hsl(174 48% 35%);
+  --info-subtle: hsl(174 45% 92%);
+  --info-border: hsl(174 32% 80%);
+  --info-text: hsl(174 55% 25%);
 
-  --highlight: hsl(187 55% 28%);
+  --highlight: hsl(174 48% 29%);
   --attention: hsl(38 90% 55%);
 
-  /* Homepage luminous marketing shell */
-  --home-glow-warm: color-mix(in srgb, var(--attention) 22%, transparent);
-  --home-glow-cool: color-mix(in srgb, var(--primary) 16%, transparent);
-  --home-panel: color-mix(in srgb, var(--card) 82%, transparent);
-  --home-panel-border: color-mix(in srgb, white 72%, var(--card) 28%);
-  --home-shadow: color-mix(in srgb, var(--foreground) 18%, transparent);
+  /* Marketing/auth deep-teal hero — distinct from --primary (button teal) so the hero gets the
+     near-black-green #1b3836 from the design handoff while buttons stay at the lifted #276e66. */
+  --marketing-hero-bg: hsl(174 35% 16%);
+
+  /* Auth right-side form-panel surface (slightly grayer than --background, matches design's --bg-form #f5f4f1) */
+  --auth-form-bg: hsl(40 12% 95%);
+
+  /* Modal scrim — tinted overlay using foreground; resolves correctly in dark mode */
+  --scrim: color-mix(in srgb, var(--foreground) 50%, transparent);
+
   --logo-mark-background: hsl(220 24% 14%);
   --logo-mark-primary: hsl(38 90% 55%);
   --logo-mark-secondary: hsl(35 84% 48%);
@@ -140,8 +144,8 @@
   --card-foreground: hsl(220 10% 92%);
   --popover: hsl(220 15% 14%);
   --popover-foreground: hsl(220 10% 92%);
-  --primary: hsl(203 93% 35%);
-  --primary-foreground: hsl(0 0% 100%);
+  --primary: hsl(174 60% 50%);
+  --primary-foreground: hsl(220 25% 12%);
   --secondary: hsl(220 15% 18%);
   --secondary-foreground: hsl(220 10% 92%);
   --muted: hsl(220 15% 18%);
@@ -153,7 +157,7 @@
   --border: hsl(220 15% 22%);
   --input: hsl(220 15% 22%);
   --input-background: hsl(220 15% 14%);
-  --ring: hsl(203 93% 35%);
+  --ring: hsl(174 60% 50%);
 
   --sidebar: hsl(220 18% 12%);
   --sidebar-foreground: hsl(220 10% 86%);
@@ -165,7 +169,7 @@
   --sidebar-ring: hsl(38 75% 52%);
   --sidebar-muted: hsl(220 10% 68%);
 
-  --chart-1: hsl(203 80% 44%);
+  --chart-1: hsl(174 60% 50%);
   --chart-2: hsl(192 30% 42%);
   --chart-3: hsl(38 75% 52%);
   --chart-4: hsl(220 10% 92%);
@@ -183,19 +187,14 @@
   --error-subtle: hsl(0 28% 18%);
   --error-border: hsl(0 24% 28%);
   --error-text: hsl(0 60% 78%);
-  --info: hsl(187 42% 34%);
-  --info-subtle: hsl(187 24% 18%);
-  --info-border: hsl(187 22% 28%);
-  --info-text: hsl(187 48% 76%);
+  --info: hsl(174 42% 34%);
+  --info-subtle: hsl(174 24% 18%);
+  --info-border: hsl(174 22% 28%);
+  --info-text: hsl(174 48% 76%);
 
-  --highlight: hsl(203 93% 35%);
+  --highlight: hsl(174 60% 50%);
   --attention: hsl(38 75% 52%);
 
-  --home-glow-warm: color-mix(in srgb, var(--attention) 18%, transparent);
-  --home-glow-cool: color-mix(in srgb, var(--highlight) 14%, transparent);
-  --home-panel: color-mix(in srgb, var(--card) 78%, transparent);
-  --home-panel-border: color-mix(in srgb, var(--sidebar-primary) 12%, transparent);
-  --home-shadow: color-mix(in srgb, var(--foreground) 38%, transparent);
   --logo-mark-background: hsl(220 12% 92%);
   --logo-mark-primary: hsl(38 75% 52%);
   --logo-mark-secondary: hsl(35 72% 46%);
@@ -286,49 +285,8 @@
     );
 }
 
-.teamwise-home-luminous {
-  background-image:
-    radial-gradient(circle at 12% 18%, var(--home-glow-warm), transparent 28%),
-    radial-gradient(circle at 82% 16%, var(--home-glow-cool), transparent 34%),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, white 62%, transparent) 0%,
-      color-mix(in srgb, var(--background) 16%, transparent) 42%,
-      transparent 100%
-    );
-}
-
-.teamwise-home-grid {
-  background-image:
-    linear-gradient(color-mix(in srgb, var(--primary) 8%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--primary) 8%, transparent) 1px, transparent 1px);
-  background-size: 28px 28px;
-  mask-image: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--foreground) 70%, transparent) 0%,
-    color-mix(in srgb, var(--foreground) 18%, transparent) 62%,
-    transparent 100%
-  );
-}
-
-.teamwise-home-preview-shell {
-  background: linear-gradient(
-    180deg,
-    var(--home-panel) 0%,
-    color-mix(in srgb, var(--card) 92%, transparent) 100%
-  );
-  border: 1px solid var(--home-panel-border);
-  box-shadow:
-    0 32px 72px -28px var(--home-shadow),
-    inset 0 1px 0 color-mix(in srgb, white 74%, transparent);
-}
-
 .teamwise-marketing-header {
   background: color-mix(in srgb, var(--card) 92%, transparent);
-}
-
-.teamwise-home-preview-sheen {
-  background: linear-gradient(180deg, color-mix(in srgb, white 45%, transparent), transparent);
 }
 
 /* ─── Typography ──────────────────────────────────────────────────────────── */
@@ -569,13 +527,13 @@
 
   .dark {
     color-scheme: light;
-    --background: hsl(38 18% 96%);
+    --background: hsl(38 24% 91%);
     --foreground: hsl(220 25% 12%);
     --card: hsl(38 14% 99%);
     --card-foreground: hsl(220 25% 12%);
     --popover: hsl(0 0% 100%);
     --popover-foreground: hsl(220 25% 12%);
-    --primary: hsl(187 55% 28%);
+    --primary: hsl(174 48% 29%);
     --primary-foreground: hsl(0 0% 100%);
     --secondary: hsl(32 18% 91%);
     --secondary-foreground: hsl(220 25% 12%);
@@ -588,7 +546,7 @@
     --border: hsl(32 14% 86%);
     --input: hsl(32 14% 86%);
     --input-background: hsl(38 14% 99%);
-    --ring: hsl(187 55% 28%);
+    --ring: hsl(174 48% 29%);
     --sidebar: hsl(192 28% 20%);
     --sidebar-foreground: hsl(190 12% 82%);
     --sidebar-primary: hsl(38 25% 98%);
@@ -610,11 +568,11 @@
     --error-subtle: hsl(0 70% 94%);
     --error-border: hsl(0 60% 83%);
     --error-text: hsl(0 55% 38%);
-    --info: hsl(187 55% 35%);
-    --info-subtle: hsl(187 50% 92%);
-    --info-border: hsl(187 35% 80%);
-    --info-text: hsl(187 60% 30%);
-    --highlight: hsl(187 55% 28%);
+    --info: hsl(174 48% 35%);
+    --info-subtle: hsl(174 45% 92%);
+    --info-border: hsl(174 32% 80%);
+    --info-text: hsl(174 55% 25%);
+    --highlight: hsl(174 48% 29%);
     --attention: hsl(38 90% 55%);
   }
 

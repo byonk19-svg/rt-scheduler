@@ -21,14 +21,19 @@ describe('public homepage redesign contract', () => {
     expect(publicHeaderSource).toContain("ctaLabel: 'Create account'")
   })
 
-  it('keeps the approval note and feature bullets visible', () => {
+  it('keeps the approval note and the design handoff feature strip', () => {
+    // Source of truth: Refined.html design handoff. The 3-up feature strip is
+    // part of the canonical landing page, not removable polish.
     expect(pageSource).toContain('Manager approval required.')
     expect(pageSource).toContain('Availability stays visible before the next handoff')
     expect(pageSource).toContain('Coverage changes stay clear without the back-and-forth.')
   })
 
-  it('uses the dark teal hero with decorative elements', () => {
-    expect(pageSource).toContain('bg-[var(--primary)]')
+  it('renders the hero on the deep --marketing-hero-bg teal, not the lighter --primary', () => {
+    // The design handoff specifies #1b3836 (--marketing-hero-bg) for the hero —
+    // bg-[var(--primary)] would produce the wrong (lighter) teal users complained about.
+    expect(pageSource).toContain('bg-[var(--marketing-hero-bg)]')
+    expect(pageSource).not.toMatch(/<section[^>]+bg-\[var\(--primary\)\]/)
     expect(pageSource).toContain('bg-[var(--attention)]')
     expect(pageSource).toContain('Scheduling for RT teams')
   })

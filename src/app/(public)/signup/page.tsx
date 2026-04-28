@@ -150,7 +150,7 @@ export default function SignUpPage() {
             <p className="font-display text-[2.625rem] font-normal leading-[1.08] tracking-[-0.02em] text-white">
               Scheduling that keeps care moving.
             </p>
-            <p className="text-sm leading-relaxed text-white/42">
+            <p className="text-sm leading-relaxed text-white/[0.42]">
               Coverage planning, availability, and shift management — built for RT departments.
             </p>
           </div>

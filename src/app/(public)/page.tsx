@@ -27,9 +27,9 @@ const features = [
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-background">
-      {/* ── Hero: dark teal ── */}
-      <section className="relative overflow-hidden bg-[var(--primary)]">
-        {/* subtle grid texture */}
+      {/* ── Hero: full-bleed dark teal (--marketing-hero-bg, hue 174 16%) ── */}
+      <section className="relative overflow-hidden bg-[var(--marketing-hero-bg)]">
+        {/* grid texture */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 opacity-[0.04]"
@@ -70,7 +70,7 @@ export default function HomePage() {
             <Button
               asChild
               size="lg"
-              className="h-[52px] min-w-[140px] rounded-lg bg-[var(--attention)] px-8 text-base font-bold text-[var(--primary)] shadow-none hover:bg-[var(--attention)]/90"
+              className="h-[52px] min-w-[140px] rounded-lg bg-[var(--attention)] px-8 text-base font-bold text-[var(--marketing-hero-bg)] shadow-none hover:bg-[var(--attention)]/90"
             >
               <Link href="/login">Sign in</Link>
             </Button>
@@ -78,7 +78,7 @@ export default function HomePage() {
               asChild
               variant="outline"
               size="lg"
-              className="h-[52px] min-w-[140px] rounded-lg border-[1.5px] border-white/22 bg-transparent px-8 text-base font-medium text-white hover:bg-white/8 hover:text-white"
+              className="h-[52px] min-w-[140px] rounded-lg border-[1.5px] border-white/[0.22] bg-transparent px-8 text-base font-medium text-white hover:bg-white/[0.08] hover:text-white"
             >
               <Link href="/signup">Request access</Link>
             </Button>
@@ -86,13 +86,13 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* section break with amber dot */}
-        <div className="relative h-px bg-white/7">
+        {/* section break with amber dot — exact match to design */}
+        <div className="relative h-px bg-white/[0.07]">
           <div className="absolute left-12 top-[-4px] h-2 w-2 rounded-full bg-[var(--attention)]" />
         </div>
       </section>
 
-      {/* ── Feature strip ── */}
+      {/* ── Feature strip (per design handoff) ── */}
       <section className="bg-background">
         <div className="mx-auto w-full max-w-5xl px-12 py-14">
           <div className="grid grid-cols-1 gap-12 sm:grid-cols-3">
