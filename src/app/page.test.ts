@@ -21,10 +21,13 @@ describe('public homepage redesign contract', () => {
     expect(publicHeaderSource).toContain("ctaLabel: 'Create account'")
   })
 
-  it('keeps the approval note and feature bullets visible', () => {
+  it('keeps the approval note in the hero', () => {
     expect(pageSource).toContain('Manager approval required.')
-    expect(pageSource).toContain('Availability stays visible before the next handoff')
-    expect(pageSource).toContain('Coverage changes stay clear without the back-and-forth.')
+  })
+
+  it('does not include the legacy three-up marketing feature strip', () => {
+    expect(pageSource).not.toContain('Availability stays visible before the next handoff')
+    expect(pageSource).not.toContain('Coverage changes stay clear without the back-and-forth.')
   })
 
   it('uses the dark teal hero with decorative elements', () => {

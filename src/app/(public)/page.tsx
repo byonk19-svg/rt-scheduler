@@ -9,21 +9,6 @@ export const metadata: Metadata = {
     "Coverage planning, availability, and shift management — built for RT departments that can't afford gaps.",
 }
 
-const features = [
-  {
-    title: 'Shift coverage',
-    body: 'Availability stays visible before the next handoff — no chasing threads.',
-  },
-  {
-    title: 'Manager control',
-    body: "Sign-in and roster access stay under your manager's control at all times.",
-  },
-  {
-    title: 'Clear handoffs',
-    body: 'Coverage changes stay clear without the back-and-forth.',
-  },
-]
-
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-background">
@@ -49,7 +34,7 @@ export default function HomePage() {
           {/* eyebrow */}
           <div className="mb-8 flex items-center gap-3">
             <div className="h-[2.5px] w-8 shrink-0 rounded-full bg-[var(--attention)]" />
-            <p className="text-[0.65rem] font-bold uppercase tracking-[0.18em] text-white/45">
+            <p className="text-[0.65rem] font-bold uppercase tracking-[0.18em] text-white/70">
               Scheduling for RT teams
             </p>
           </div>
@@ -60,7 +45,7 @@ export default function HomePage() {
           </h1>
 
           {/* subtext */}
-          <p className="mb-12 max-w-[34ch] text-[1.06rem] leading-[1.65] text-white/50">
+          <p className="mb-12 max-w-[34ch] text-[1.06rem] leading-[1.65] text-white/85">
             Coverage planning, availability, and shift management — built for RT departments that
             can&apos;t afford gaps.
           </p>
@@ -78,31 +63,11 @@ export default function HomePage() {
               asChild
               variant="outline"
               size="lg"
-              className="h-[52px] min-w-[140px] rounded-lg border-[1.5px] border-white/22 bg-transparent px-8 text-base font-medium text-white hover:bg-white/8 hover:text-white"
+              className="h-[52px] min-w-[140px] rounded-lg border-[1.5px] border-white/40 bg-transparent px-8 text-base font-medium text-white hover:bg-white/10 hover:text-white"
             >
               <Link href="/signup">Request access</Link>
             </Button>
-            <span className="text-sm text-white/30">Manager approval required.</span>
-          </div>
-        </div>
-
-        {/* section break with amber dot */}
-        <div className="relative h-px bg-white/7">
-          <div className="absolute left-12 top-[-4px] h-2 w-2 rounded-full bg-[var(--attention)]" />
-        </div>
-      </section>
-
-      {/* ── Feature strip ── */}
-      <section className="bg-background">
-        <div className="mx-auto w-full max-w-5xl px-12 py-14">
-          <div className="grid grid-cols-1 gap-12 sm:grid-cols-3">
-            {features.map(({ title, body }) => (
-              <div key={title}>
-                <div className="mb-3.5 h-[3px] w-7 rounded-full bg-[var(--attention)]" />
-                <p className="mb-2 text-sm font-bold text-foreground">{title}</p>
-                <p className="text-[0.81rem] leading-[1.65] text-muted-foreground">{body}</p>
-              </div>
-            ))}
+            <span className="text-sm text-white/85">Manager approval required.</span>
           </div>
         </div>
       </section>

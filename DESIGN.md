@@ -119,12 +119,27 @@ All elevation uses **named classes** in `src/app/globals.css` (search for `Eleva
 - **Data density:** Inbox metric card values use `tabular-nums` (`ManagerTriageDashboard`); extend the same class anywhere counts and dates should align in columns.
 - **2026-04-11 (pass 2):** `tabular-nums` on `StatsCard` and shift-board `KpiTile` values; `Geist_Mono` loaded in `layout.tsx` with `--font-geist-mono` (see `@theme` `--font-mono`); decorative backgrounds in `globals.css` (`.teamwise-grid-bg*`, `.teamwise-aurora-bg`, table row hover, new `.teamwise-hero-grid-bg`) use `color-mix` with `var(--primary)` / `var(--muted)` instead of hardcoded RGB; homepage hero grid uses `.teamwise-hero-grid-bg`; `StatsCard` shadow uses `color-mix` with `var(--foreground)`.
 - **2026-04-11 (pass 3 — elevation):** Legacy arbitrary slate shadows removed; canonical list and usage guidance is **Shadow map** above (source: `globals.css` → `Elevation shadows`).
-- **2026-04-12 (homepage — luminous shell):** Public `/` adds `--home-glow-warm`, `--home-glow-cool`, `--home-panel`, `--home-panel-border`, and `--home-shadow` plus utilities `.teamwise-home-luminous`, `.teamwise-home-grid`, `.teamwise-home-preview-shell`, and `.teamwise-home-preview-sheen` in `globals.css`. The glass preview frame’s depth is defined **in CSS** on `.teamwise-home-preview-shell` (not as arbitrary Tailwind `shadow-[…]` in JSX). On-page CTAs use existing map entries **`shadow-tw-primary-glow`** and **`shadow-tw-md-soft`** (`src/app/page.tsx`).
+- **2026-04-12 (homepage — luminous shell):** Public `/` originally added `--home-glow-warm`, `--home-glow-cool`, `--home-panel`, `--home-panel-border`, `--home-shadow` plus `.teamwise-home-luminous`, `.teamwise-home-grid`, `.teamwise-home-preview-shell`, `.teamwise-home-preview-sheen` utilities. **Removed 2026-04-27** when the homepage was redesigned to the dark-teal hero — these utilities are no longer present in `globals.css`.
+
+### Shipped wiring (2026-04-25)
+
+- **Typography reversal:** `DM_Sans` + `Fraunces` swapped back to **Plus Jakarta Sans** (body/UI, `--font-plus-jakarta-sans`) + **Instrument Serif** (display, `--font-display`). Reflects the updated typography section above; replaces the 2026-04-11 wiring entry.
+
+### Shipped wiring (2026-04-27)
+
+- **Public surface trim:** Homepage feature strip removed (no longer markets to a public audience — this is an internal RT-dept tool); auth-page brand panels stop duplicating the homepage hero copy. `/login` left panel says "Welcome back."; `/signup` left panel says "New here?" + the manager-approval explanation.
+- **New tokens in `:root`:** `--marketing-hero-bg: var(--primary)` (single alias used by `/`, `/login`, `/signup` brand panels) and `--scrim: color-mix(in srgb, var(--foreground) 50%, transparent)` (used by `<DialogOverlay>` instead of `bg-black/50`).
+- **Dark-mode brand color fix:** `--primary` (and `--ring`, `--highlight`, `--chart-1`) in `.dark` moved from `hsl(203 93% 35%)` (blue) → `hsl(187 60% 50%)` (lifted teal). Brand identity now stays in the 187° hue family across light/dark; `--primary-foreground` flipped to dark text in dark mode for AA contrast on the lighter teal.
+- **Dead CSS removed:** `--home-glow-warm`, `--home-glow-cool`, `--home-panel`, `--home-panel-border`, `--home-shadow` tokens and `.teamwise-home-luminous`, `.teamwise-home-grid`, `.teamwise-home-preview-shell`, `.teamwise-home-preview-sheen` utilities deleted from `globals.css` (unused outside tests).
+- **On-dark contrast pass:** All ad-hoc `text-white/22..50` opacity values on the dark teal hero/auth panels raised to `/70` (eyebrow / large-tracked) or `/85` (body) so on-dark text passes WCAG AA on `--primary`. Outline-button border bumped from `/22` to `/40`.
 
 ## Decisions Log
 
-| Date       | Decision                                     | Rationale                                                                 |
-| ---------- | -------------------------------------------- | ------------------------------------------------------------------------- |
-| 2026-04-11 | Initial design system created                | `/design-consultation` — product context + healthcare scheduling research |
-| 2026-04-11 | Fraunces for display; DM Sans for UI         | Split keeps marketing memorable and grids fast to read                    |
-| 2026-04-11 | Warm canvas + teal primary + amber attention | Matches category trust signals while staying distinct from cold gray SaaS |
+| Date       | Decision                                                   | Rationale                                                                                                                                  |
+| ---------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-04-11 | Initial design system created                              | `/design-consultation` — product context + healthcare scheduling research                                                                  |
+| 2026-04-11 | Fraunces for display; DM Sans for UI                       | Split keeps marketing memorable and grids fast to read                                                                                     |
+| 2026-04-11 | Warm canvas + teal primary + amber attention               | Matches category trust signals while staying distinct from cold gray SaaS                                                                  |
+| 2026-04-25 | Plus Jakarta Sans + Instrument Serif (reverses 2026-04-11) | Plus Jakarta reads better in dense schedule grids; Instrument Serif gives the hero a more editorial voice than Fraunces at the chosen size |
+| 2026-04-27 | Stop marketing on public surfaces                          | Internal RT-dept tool, not a SaaS — homepage feature strip and auth-panel marketing copy were addressed at an audience that doesn't exist  |
+| 2026-04-27 | Dark-mode primary stays in teal hue family                 | Brand should not flip hues across light/dark; previous `hsl(203 …)` blue was a different color, not a darker teal                          |

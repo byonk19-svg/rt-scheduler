@@ -74,7 +74,7 @@ export default function PublicHeader({ className }: { className?: string }) {
             <span
               className={cn(
                 'block text-[0.72rem] font-medium',
-                isDark ? 'text-white/60' : 'text-muted-foreground'
+                isDark ? 'text-white/75' : 'text-muted-foreground'
               )}
             >
               Respiratory Therapy
