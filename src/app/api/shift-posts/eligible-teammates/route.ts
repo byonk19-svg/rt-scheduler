@@ -40,7 +40,9 @@ export async function GET(request: Request) {
 
   const { data: shift, error: shiftError } = await admin
     .from('shifts')
-    .select('id, user_id, date, shift_type, role, status, assignment_status, schedule_cycles!inner(published)')
+    .select(
+      'id, user_id, date, shift_type, role, status, assignment_status, schedule_cycles!inner(published)'
+    )
     .eq('id', shiftId)
     .maybeSingle()
 

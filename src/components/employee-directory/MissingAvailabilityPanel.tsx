@@ -5,7 +5,14 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 type MissingAvailabilityRow = {
   therapistId: string
@@ -45,7 +52,11 @@ export function MissingAvailabilityPanel({
             onClick={onToggleCollapsed}
             className="inline-flex items-center gap-1 text-sm font-semibold text-foreground hover:text-muted-foreground"
           >
-            {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            {collapsed ? (
+              <ChevronRight className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5" />
+            )}
             Missing availability ({rows.length})
           </button>
           {collapsed ? (
@@ -101,12 +112,20 @@ export function MissingAvailabilityPanel({
                     <TableCell>{row.overridesCount}</TableCell>
                     <TableCell>{formatDateTime(row.lastUpdatedAt)}</TableCell>
                     <TableCell>
-                      <Badge variant={row.submitted ? 'outline' : 'destructive'} className="whitespace-nowrap">
+                      <Badge
+                        variant={row.submitted ? 'outline' : 'destructive'}
+                        className="whitespace-nowrap"
+                      >
                         {row.submitted ? 'Submitted' : 'Not submitted'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button type="button" variant="outline" size="sm" onClick={() => onEditAvailability(row.therapistId)}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onEditAvailability(row.therapistId)}
+                      >
                         Enter availability
                       </Button>
                     </TableCell>

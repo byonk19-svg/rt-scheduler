@@ -105,14 +105,14 @@ test.describe.serial('requests workflow', () => {
     createdCycleIds.push(cycleInsert.data.id)
 
     const shiftsInsert = await ctx!.supabase.from('shifts').insert({
-        cycle_id: cycleInsert.data.id,
-        user_id: ctx!.requester.id,
-        date: cycleKey,
-        shift_type: 'day',
-        status: 'scheduled',
-        assignment_status: 'scheduled',
-        role: 'staff',
-      })
+      cycle_id: cycleInsert.data.id,
+      user_id: ctx!.requester.id,
+      date: cycleKey,
+      shift_type: 'day',
+      status: 'scheduled',
+      assignment_status: 'scheduled',
+      role: 'staff',
+    })
 
     if (shiftsInsert.error) {
       throw new Error(shiftsInsert.error.message)

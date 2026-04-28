@@ -123,9 +123,10 @@ export async function loadEligibleRequestTeammates(shiftId: string): Promise<Tea
       cache: 'no-store',
     }
   )
-  const payload = (await response.json().catch(() => null)) as
-    | { error?: string; teammates?: TeamMember[] }
-    | null
+  const payload = (await response.json().catch(() => null)) as {
+    error?: string
+    teammates?: TeamMember[]
+  } | null
 
   if (!response.ok) {
     throw new Error(payload?.error ?? 'Could not load eligible teammates.')
@@ -215,7 +216,10 @@ async function mapOpenRequests(params: {
       .in('id', requestedPartnerIds)
 
     partnerById = new Map(
-      ((partnerRows ?? []) as ProfileRow[]).map((row) => [row.id, row.full_name ?? 'Unknown therapist'])
+      ((partnerRows ?? []) as ProfileRow[]).map((row) => [
+        row.id,
+        row.full_name ?? 'Unknown therapist',
+      ])
     )
   }
 
