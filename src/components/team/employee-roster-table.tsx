@@ -198,7 +198,7 @@ export function EmployeeRosterTable({
       </div>
       <Table>
         <TableHeader>
-          <TableRow>
+          <TableRow className="bg-muted text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
             <TableHead className="min-w-[140px]">
               <RosterSortHeader
                 column="full_name"
@@ -279,10 +279,10 @@ export function EmployeeRosterTable({
               <TableCell>
                 <span
                   className={cn(
-                    'rounded-full px-2 py-0.5 text-xs font-medium',
+                    'rounded-full px-2 py-0.5 text-[11px] font-semibold',
                     hasRealSignupLink(row)
                       ? 'bg-[var(--success-subtle)] text-[var(--success-text)]'
-                      : 'bg-muted text-muted-foreground'
+                      : 'text-[var(--warning)]'
                   )}
                 >
                   {hasRealSignupLink(row) ? 'Account linked' : 'Pending'}
@@ -295,7 +295,7 @@ export function EmployeeRosterTable({
                     type="submit"
                     variant="ghost"
                     size="sm"
-                    className="h-7 px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    className="h-7 px-2 text-xs text-[var(--error)] hover:bg-destructive/10 hover:text-[var(--error)]"
                   >
                     Remove
                   </Button>

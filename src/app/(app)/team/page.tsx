@@ -300,7 +300,7 @@ export default async function TeamPage({
 
   const feedback = getTeamFeedback(params)
   const initialEditProfileId = getSearchParam(params?.edit_profile) ?? null
-  const initialTab = getSearchParam(params?.tab) === 'roster' ? 'roster' : 'directory'
+  const initialTab = getSearchParam(params?.tab) === 'directory' ? 'directory' : 'roster'
 
   return (
     <div className="max-w-6xl space-y-4 py-5">

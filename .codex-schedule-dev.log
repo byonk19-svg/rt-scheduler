@@ -1,0 +1,78 @@
+
+> rt-scheduler@0.1.0 dev
+> next dev --webpack
+
+▲ Next.js 16.2.4 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://172.26.64.1:3000
+- Environments: .env.local
+✓ Ready in 1447ms
+
+○ Compiling proxy ...
+○ Compiling /schedule ...
+ GET /login?redirectTo=%2Fschedule 200 in 1537ms (next.js: 107ms, proxy.ts: 314ms, application-code: 1116ms)
+ GET /login?cycle=82e08293-5652-411d-8c55-8fffa49b7dc6&redirectTo=%2Ftherapist%2Favailability%3Fcycle%3D82e08293-5652-411d-8c55-8fffa49b7dc6 200 in 44s (next.js: 38.7s, proxy.ts: 1043ms, application-code: 4.3s)
+ GET /login?redirectTo=%2Ftherapist%2Frecurring-pattern 200 in 44s (next.js: 38.7s, proxy.ts: 1043ms, application-code: 4.3s)
+ GET /login?redirectTo=%2Ftherapist%2Frecurring-pattern 200 in 44s (next.js: 38.7s, proxy.ts: 1044ms, application-code: 4.3s)
+ GET /login?redirectTo=%2Fdashboard%2Fstaff 200 in 44s (next.js: 38.7s, proxy.ts: 1044ms, application-code: 4.3s)
+ GET /schedule 200 in 44s (next.js: 36.8s, proxy.ts: 2.9s, application-code: 4.6s)
+○ Compiling /_not-found ...
+ GET /sw.js 404 in 6.8s (next.js: 5.8s, proxy.ts: 449ms, application-code: 605ms)
+ GET / 200 in 2.4s (next.js: 1703ms, proxy.ts: 296ms, application-code: 359ms)
+ GET /login?cycle=82e08293-5652-411d-8c55-8fffa49b7dc6&redirectTo=%2Ftherapist%2Favailability%3Fcycle%3D82e08293-5652-411d-8c55-8fffa49b7dc6 200 in 1619ms (next.js: 27ms, proxy.ts: 15ms, application-code: 1577ms)
+ GET /login?redirectTo=%2Ftherapist%2Frecurring-pattern 200 in 1624ms (next.js: 94ms, proxy.ts: 15ms, application-code: 1515ms)
+ GET /login?redirectTo=%2Fdashboard%2Fstaff 200 in 1621ms (next.js: 306ms, proxy.ts: 18ms, application-code: 1297ms)
+ GET /login?redirectTo=%2Ftherapist%2Frecurring-pattern 200 in 1626ms (next.js: 375ms, proxy.ts: 18ms, application-code: 1233ms)
+ GET /api/requests/user-access?summary=1 200 in 3.1s (next.js: 1898ms, proxy.ts: 810ms, application-code: 440ms)
+ GET /api/requests/user-access?summary=1 200 in 3.2s (next.js: 1984ms, proxy.ts: 727ms, application-code: 522ms)
+ GET /schedule 200 in 3.9s (next.js: 2.2s, proxy.ts: 463ms, application-code: 1296ms)
+ GET /api/requests/user-access?summary=1 200 in 539ms (next.js: 20ms, proxy.ts: 229ms, application-code: 289ms)
+ GET /login?redirectTo=%2Ftherapist%2Frecurring-pattern 200 in 960ms (next.js: 555ms, proxy.ts: 69ms, application-code: 336ms)
+ GET /login?cycle=82e08293-5652-411d-8c55-8fffa49b7dc6&redirectTo=%2Ftherapist%2Favailability%3Fcycle%3D82e08293-5652-411d-8c55-8fffa49b7dc6 200 in 963ms (next.js: 266ms, proxy.ts: 69ms, application-code: 629ms)
+ GET /login?redirectTo=%2Fdashboard%2Fstaff 200 in 977ms (next.js: 636ms, proxy.ts: 69ms, application-code: 272ms)
+ GET /login?redirectTo=%2Ftherapist%2Frecurring-pattern 200 in 1007ms (next.js: 449ms, proxy.ts: 69ms, application-code: 489ms)
+ GET /schedule 200 in 1628ms (next.js: 35ms, proxy.ts: 1376ms, application-code: 217ms)
+ GET /sw.js 404 in 488ms (next.js: 20ms, proxy.ts: 331ms, application-code: 137ms)
+ GET /schedule?_shot=1777336894241 200 in 1271ms (next.js: 13ms, proxy.ts: 355ms, application-code: 902ms)
+ GET /login?redirectTo=%2Ftherapist%2Frecurring-pattern 200 in 6.4s (next.js: 556ms, proxy.ts: 75ms, application-code: 5.8s)
+ GET /login?redirectTo=%2Fdashboard%2Fstaff 200 in 6.5s (next.js: 34ms, proxy.ts: 70ms, application-code: 6.4s)
+ GET /login?redirectTo=%2Ftherapist%2Frecurring-pattern 200 in 6.5s (next.js: 220ms, proxy.ts: 70ms, application-code: 6.2s)
+ GET /login?cycle=82e08293-5652-411d-8c55-8fffa49b7dc6&redirectTo=%2Ftherapist%2Favailability%3Fcycle%3D82e08293-5652-411d-8c55-8fffa49b7dc6 200 in 6.5s (next.js: 1074ms, proxy.ts: 75ms, application-code: 5.3s)
+ GET /schedule 200 in 7.0s (next.js: 79ms, proxy.ts: 4.6s, application-code: 2.3s)
+ GET /sw.js 404 in 366ms (next.js: 8ms, proxy.ts: 296ms, application-code: 63ms)
+ GET /api/requests/user-access?summary=1 200 in 567ms (next.js: 18ms, proxy.ts: 226ms, application-code: 323ms)
+ GET /api/requests/user-access?summary=1 200 in 592ms (next.js: 6ms, proxy.ts: 308ms, application-code: 278ms)
+ GET /sw.js 404 in 366ms (next.js: 7ms, proxy.ts: 307ms, application-code: 51ms)
+ GET / 200 in 307ms (next.js: 40ms, proxy.ts: 21ms, application-code: 245ms)
+ GET /sw.js 404 in 1021ms (next.js: 16ms, proxy.ts: 897ms, application-code: 109ms)
+ GET /login 200 in 110ms (next.js: 9ms, proxy.ts: 16ms, application-code: 84ms)
+○ Compiling /dashboard ...
+ GET /dashboard 200 in 6.2s (next.js: 4.6s, proxy.ts: 558ms, application-code: 1055ms)
+ GET /dashboard 200 in 722ms (next.js: 8ms, proxy.ts: 349ms, application-code: 364ms)
+○ Compiling /dashboard/manager ...
+ GET /api/requests/user-access?summary=1 200 in 6.9s (next.js: 5.7s, proxy.ts: 214ms, application-code: 937ms)
+ GET /api/requests/user-access?summary=1 200 in 6.9s (next.js: 5.6s, proxy.ts: 287ms, application-code: 995ms)
+ GET /dashboard/manager 200 in 7.9s (next.js: 5.7s, proxy.ts: 261ms, application-code: 1931ms)
+ GET /dashboard/manager 200 in 1549ms (next.js: 12ms, proxy.ts: 415ms, application-code: 1122ms)
+ GET /schedule 200 in 812ms (next.js: 51ms, proxy.ts: 255ms, application-code: 505ms)
+ GET /sw.js 404 in 713ms (next.js: 24ms, proxy.ts: 527ms, application-code: 162ms)
+ GET /login?redirectTo=%2Fdashboard%2Fstaff 200 in 679ms (next.js: 142ms, proxy.ts: 12ms, application-code: 525ms)
+ GET /login?redirectTo=%2Ftherapist%2Frecurring-pattern 200 in 686ms (next.js: 329ms, proxy.ts: 12ms, application-code: 345ms)
+ GET /login?redirectTo=%2Ftherapist%2Frecurring-pattern 200 in 689ms (next.js: 396ms, proxy.ts: 12ms, application-code: 281ms)
+ GET /login?cycle=82e08293-5652-411d-8c55-8fffa49b7dc6&redirectTo=%2Ftherapist%2Favailability%3Fcycle%3D82e08293-5652-411d-8c55-8fffa49b7dc6 200 in 692ms (next.js: 459ms, proxy.ts: 12ms, application-code: 221ms)
+ GET /schedule 200 in 2.6s (next.js: 17ms, proxy.ts: 1772ms, application-code: 788ms)
+ GET /sw.js 404 in 3.4s (next.js: 1369ms, proxy.ts: 1774ms, application-code: 212ms)
+ GET /login?cycle=82e08293-5652-411d-8c55-8fffa49b7dc6&redirectTo=%2Ftherapist%2Favailability%3Fcycle%3D82e08293-5652-411d-8c55-8fffa49b7dc6 200 in 281ms (next.js: 16ms, proxy.ts: 46ms, application-code: 219ms)
+ GET /login?redirectTo=%2Ftherapist%2Frecurring-pattern 200 in 288ms (next.js: 51ms, proxy.ts: 46ms, application-code: 192ms)
+ GET /login?redirectTo=%2Ftherapist%2Frecurring-pattern 200 in 290ms (next.js: 75ms, proxy.ts: 46ms, application-code: 169ms)
+ GET /login?redirectTo=%2Fdashboard%2Fstaff 200 in 291ms (next.js: 99ms, proxy.ts: 46ms, application-code: 146ms)
+ GET /schedule 200 in 1083ms (next.js: 44ms, proxy.ts: 526ms, application-code: 513ms)
+ GET /schedule 200 in 486ms (next.js: 2ms, proxy.ts: 195ms, application-code: 288ms)
+ GET /login?redirectTo=%2Fschedule 200 in 152ms (next.js: 4ms, proxy.ts: 5ms, application-code: 144ms)
+ GET /login?redirectTo=%2Ftherapist%2Frecurring-pattern 200 in 531ms (next.js: 4ms, proxy.ts: 13ms, application-code: 513ms)
+ GET /login?redirectTo=%2Ftherapist%2Frecurring-pattern 200 in 533ms (next.js: 79ms, proxy.ts: 13ms, application-code: 440ms)
+ GET /login?cycle=82e08293-5652-411d-8c55-8fffa49b7dc6&redirectTo=%2Ftherapist%2Favailability%3Fcycle%3D82e08293-5652-411d-8c55-8fffa49b7dc6 200 in 535ms (next.js: 39ms, proxy.ts: 13ms, application-code: 482ms)
+ GET /login?redirectTo=%2Fdashboard%2Fstaff 200 in 537ms (next.js: 148ms, proxy.ts: 13ms, application-code: 376ms)
+ GET /api/requests/user-access?summary=1 200 in 3.3s (next.js: 2.5s, proxy.ts: 168ms, application-code: 625ms)
+ GET /api/requests/user-access?summary=1 200 in 874ms (next.js: 4ms, proxy.ts: 605ms, application-code: 266ms)
+ GET /sw.js 404 in 470ms (next.js: 59ms, proxy.ts: 258ms, application-code: 153ms)

@@ -129,28 +129,23 @@ function CoverageMetric({
   label,
   value,
   detail,
-  tone = 'neutral',
+  valueClassName,
 }: {
   label: string
   value: string
   detail: string
-  tone?: WorkspaceMetricTone
+  valueClassName?: string
 }) {
-  const toneClasses: Record<WorkspaceMetricTone, string> = {
-    neutral: 'border-border/70 bg-card text-foreground',
-    success: 'border-[var(--success-border)]/55 bg-[var(--success-subtle)]/28 text-[var(--success-text)]',
-    warning: 'border-[var(--warning-border)]/60 bg-[var(--warning-subtle)]/25 text-[var(--warning-text)]',
-    critical: 'border-[var(--error-border)]/60 bg-[var(--error-subtle)]/28 text-[var(--error-text)]',
-  }
-
   return (
-    <div className={cn('rounded-lg border px-3 py-2.5 shadow-sm', toneClasses[tone])}>
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+    <div className="rounded-lg border border-border-light bg-card px-3 py-2.5">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
         {label}
       </p>
       <div className="mt-0.5 flex items-end justify-between gap-3">
-        <span className="text-[1.6rem] font-semibold tracking-[-0.04em]">{value}</span>
-        <span className="text-[11px] font-medium text-muted-foreground">{detail}</span>
+        <span className={cn('text-[1.6rem] font-semibold tracking-[-0.04em]', valueClassName)}>
+          {value}
+        </span>
+        <span className="text-[11px] text-muted-foreground">{detail}</span>
       </div>
     </div>
   )
@@ -210,11 +205,7 @@ function CoverageSegmentedControl<T extends string>({
       >
         {label}
       </p>
-      <div
-        role="group"
-        aria-labelledby={labelId}
-        className="inline-flex overflow-hidden rounded-lg border border-border/70 bg-background"
-      >
+      <div role="group" aria-labelledby={labelId} className="flex gap-0.5 rounded-[7px] bg-muted p-0.5">
         {options.map((option) => (
           <button
             key={option.value}
@@ -223,10 +214,10 @@ function CoverageSegmentedControl<T extends string>({
             aria-pressed={value === option.value}
             onClick={() => onChange(option.value)}
             className={cn(
-              'px-3 py-1.5 text-xs font-medium transition-colors',
+              'rounded-[5px] px-3 py-1 text-xs font-medium transition-colors',
               value === option.value
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground'
+                ? 'bg-sidebar text-white'
+                : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'
             )}
           >
             {option.label}
@@ -1237,24 +1228,25 @@ export function CoverageClientPage({
                 label="Active staff"
                 value={String(rosterMembers.length)}
                 detail={`${shiftTab.toLowerCase()} shift roster`}
+                valueClassName="text-foreground"
               />
               <CoverageMetric
                 label="Priority gaps"
                 value={String(coverageSummary.priorityGapDays)}
                 detail="critical days"
-                tone={coverageSummary.priorityGapDays > 0 ? 'critical' : 'success'}
+                valueClassName="text-[var(--error)]"
               />
               <CoverageMetric
                 label="Days missing lead"
                 value={String(issueCount)}
                 detail="lead coverage"
-                tone={issueCount > 0 ? 'warning' : 'success'}
+                valueClassName="text-[var(--warning)]"
               />
               <CoverageMetric
                 label="Unassigned days"
                 value={String(coverageSummary.unassignedDays)}
                 detail={`${coverageSummary.staffedDays} fully staffed`}
-                tone={coverageSummary.unassignedDays > 0 ? 'warning' : 'neutral'}
+                valueClassName="text-[var(--warning)]"
               />
             </section>
           ) : null}

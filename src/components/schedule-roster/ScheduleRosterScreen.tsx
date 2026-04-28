@@ -1,164 +1,192 @@
 'use client'
 
-import Link from 'next/link'
-import { useMemo, useState, useTransition } from 'react'
+import {
+  CalendarDays,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Printer,
+} from 'lucide-react'
+import { useMemo, useState } from 'react'
 
 import type { ScheduleRosterLivePayload } from '@/app/(app)/schedule/schedule-roster-live-data'
-import { ActionBar } from '@/components/schedule-roster/ActionBar'
-import { RosterTable } from '@/components/schedule-roster/RosterTable'
-import { ScheduleCycleSelect } from '@/components/schedule-roster/ScheduleCycleSelect'
-import { ScheduleHeader } from '@/components/schedule-roster/ScheduleHeader'
-import { SegmentedControl } from '@/components/schedule-roster/SegmentedControl'
-import { Badge } from '@/components/ui/badge'
-import { buildRosterWeeks, type ShiftType } from '@/lib/mock-coverage-roster'
-import { splitStaffByRosterAndShift } from '@/lib/schedule-roster-data'
-
-type ViewMode = 'grid' | 'roster'
-
-const VIEW_OPTIONS = [
-  { value: 'grid', label: 'Grid' },
-  { value: 'roster', label: 'Roster' },
-] as const
-
-const SHIFT_OPTIONS = [
-  { value: 'day', label: 'Day shift' },
-  { value: 'night', label: 'Night shift' },
-] as const
+import {
+  getMockScheduleDataset,
+  SCHEDULE_LEGEND,
+  type ScheduleCode,
+} from '@/components/schedule-roster/mock-schedule-data'
+import { PaperScheduleGrid } from '@/components/schedule-roster/PaperScheduleGrid'
+import { Button } from '@/components/ui/button'
+import type { ShiftType } from '@/lib/mock-coverage-roster'
+import { cn } from '@/lib/utils'
 
 export type ScheduleRosterScreenProps = {
-  live: ScheduleRosterLivePayload
+  live?: ScheduleRosterLivePayload
 }
 
-export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('roster')
+const CODE_BADGE_CLASS: Record<Exclude<ScheduleCode, ''>, string> = {
+  '1': 'border border-border bg-background text-foreground',
+  OFF: 'bg-muted text-muted-foreground',
+  PTO: 'bg-[var(--success-subtle)] text-[var(--success-text)]',
+  OC: 'bg-[var(--info-subtle)] text-[var(--info-text)]',
+  CX: 'bg-[var(--error-subtle)] text-[var(--error-text)]',
+  CI: 'bg-[color:color-mix(in_srgb,var(--attention)_18%,white)] text-[color:color-mix(in_srgb,var(--foreground)_84%,var(--attention))]',
+  LE: 'bg-[color:color-mix(in_srgb,var(--attention)_24%,white)] text-[color:color-mix(in_srgb,var(--foreground)_78%,var(--attention))]',
+  N: 'bg-[color:color-mix(in_srgb,var(--primary)_14%,white)] text-primary',
+  '*': 'bg-background text-foreground',
+}
+
+const SHIFT_OPTIONS: Array<{ value: ShiftType; label: string }> = [
+  { value: 'day', label: 'Day Shift' },
+  { value: 'night', label: 'Night Shift' },
+]
+
+export function ScheduleRosterScreen({ live: _live }: ScheduleRosterScreenProps) {
+  void _live
   const [selectedShift, setSelectedShift] = useState<ShiftType>('day')
-  const [, startTransition] = useTransition()
-
-  const weeks = useMemo(() => buildRosterWeeks(live.startDate, live.endDate), [live])
-
-  const sections = useMemo(
-    () => splitStaffByRosterAndShift(live.staff, selectedShift),
-    [live.staff, selectedShift]
-  )
-
-  const helperText =
-    'Read-only roster for the selected cycle: coverage assignments and therapist availability that has been officially submitted. x = submitted need off; 1 = submitted request to work and/or a coverage assignment. Edit staffing in Coverage.'
+  const dataset = useMemo(() => getMockScheduleDataset(selectedShift), [selectedShift])
 
   return (
-    <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-      <section className="rounded-[2rem] border border-border/80 bg-card/80 px-5 py-5 shadow-tw-md-soft sm:px-6 sm:py-6">
-        <div className="flex flex-col gap-5">
+    <div className="mx-auto flex w-full max-w-[1580px] flex-col px-2 py-2 sm:px-3 lg:px-5">
+      <section className="overflow-hidden rounded-[26px] border border-border/70 bg-card shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
+        <div className="flex flex-col gap-4 px-4 py-4 sm:px-5 sm:py-4">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <ScheduleHeader
-              title="Schedule"
-              status="READ ONLY"
-              dateRange={live.shortLabel}
-              helperText={helperText}
-            />
-            <ActionBar showMockWorkflow={false} />
-          </div>
-
-          <div className="flex flex-col gap-4 rounded-[1.75rem] border border-border/80 bg-background/60 px-4 py-4">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-              <div className="flex flex-wrap items-center gap-3">
-                <Badge
-                  variant="outline"
-                  className="rounded-full border-border/80 bg-card px-3 py-1 text-sm font-medium text-foreground"
-                >
-                  Schedule cycle
-                </Badge>
-                <span className="rounded-full border border-border/80 bg-card px-3 py-1 text-sm font-medium text-foreground">
-                  {live.label}
-                </span>
-                <ScheduleCycleSelect cycles={live.availableCycles} activeCycleId={live.cycleId} />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <SegmentedControl
-                  ariaLabel="Schedule view"
-                  options={VIEW_OPTIONS}
-                  value={viewMode}
-                  onChange={(nextView) => {
-                    startTransition(() => setViewMode(nextView))
-                  }}
-                />
-                <SegmentedControl
-                  ariaLabel="Shift type"
-                  options={SHIFT_OPTIONS}
-                  value={selectedShift}
-                  onChange={(nextShift) => {
-                    startTransition(() => setSelectedShift(nextShift))
-                  }}
-                />
+            <div className="space-y-1.5">
+              <h1 className="font-heading text-[1.75rem] font-semibold tracking-[-0.04em] text-foreground sm:text-[1.9rem]">
+                Respiratory Therapy - {selectedShift === 'day' ? 'Day' : 'Night'} Shift
+              </h1>
+              <p className="text-[13px] text-muted-foreground">{dataset.cycleLabel}</p>
+              <div className="inline-flex items-center rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-900">
+                Build Marker: browser-pass-v1
               </div>
             </div>
 
-            {viewMode === 'grid' ? (
-              <section className="rounded-[1.75rem] border border-border/80 bg-card/90 px-5 py-6">
-                <div className="space-y-2">
-                  <h2 className="text-xl font-semibold tracking-[-0.03em] text-foreground">
-                    Grid editing is in Coverage
-                  </h2>
-                  <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-                    This page is a roster matrix for reading assignments and submitted availability.
-                    Use the coverage workspace to add, move, or remove shifts.
-                  </p>
-                </div>
-                <div className="mt-4">
-                  <Link
-                    href="/coverage?view=week"
-                    className="inline-flex rounded-full border border-border/80 bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/60 hover:no-underline"
+            <div className="flex flex-wrap items-center gap-2.5 xl:justify-end">
+              <span className="inline-flex h-9 items-center rounded-xl bg-[color:color-mix(in_srgb,var(--attention)_14%,white)] px-3 text-[12px] font-semibold text-foreground">
+                DRAFT
+              </span>
+              <span className="text-[13px] text-muted-foreground">Last saved: 2:04 PM</span>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 gap-2 rounded-xl px-3.5 text-[14px]"
+              >
+                <Printer className="h-4 w-4" />
+                Print
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 gap-2 rounded-xl px-3.5 text-[14px]"
+              >
+                <Download className="h-4 w-4" />
+                Export
+              </Button>
+              <Button type="button" className="h-10 rounded-xl px-4 text-[14px]">
+                Publish
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-border/70 pt-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex rounded-xl border border-border/80 bg-background shadow-sm">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-10 rounded-r-none border-r border-border/80 px-2.5"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-10 rounded-none px-4 text-[14px]"
+                >
+                  Today
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-10 rounded-l-none border-l border-border/80 px-2.5"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 gap-2 rounded-xl px-3.5 text-[14px]"
+              >
+                <CalendarDays className="h-4 w-4" />
+                Go to Date
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 min-w-[126px] justify-between gap-2 rounded-xl px-3.5 text-[14px]"
+              >
+                6 Weeks
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </div>
+
+            <div className="inline-flex rounded-xl border border-border/80 bg-background p-1 shadow-sm">
+              {SHIFT_OPTIONS.map((option) => {
+                const isActive = option.value === selectedShift
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setSelectedShift(option.value)}
+                    className={cn(
+                      'rounded-[10px] px-3.5 py-1.5 text-[14px] font-medium transition-colors',
+                      isActive
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+                    )}
                   >
-                    Open Coverage
-                  </Link>
-                </div>
-              </section>
-            ) : (
-              <section className="space-y-3">
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    Coverage roster
-                  </p>
-                  <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">
-                    Respiratory Therapy {selectedShift === 'day' ? 'Day' : 'Night'} Shift
-                  </h2>
-                </div>
+                    {option.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
 
-                <RosterTable
-                  title="Core roster"
-                  subtitle="Lead and regular coverage staff"
-                  badge={`${sections.core.length} staff`}
-                  staff={sections.core}
-                  weeks={weeks}
-                  assignments={live.assignments}
-                  availabilityApprovals={live.availabilityApprovals}
-                  selectedShift={selectedShift}
-                  selectedCell={null}
-                  onSelectedCellChange={() => {}}
-                  onAssign={() => {}}
-                  onUnassign={() => {}}
-                  readOnly
-                />
+          <div className="space-y-3">
+            <PaperScheduleGrid dataset={dataset} />
 
-                <div className="border-t-2 border-foreground/90 pt-3">
-                  <RosterTable
-                    title="PRN coverage"
-                    subtitle="Additional staff available for open coverage"
-                    badge={`${sections.prn.length} staff`}
-                    staff={sections.prn}
-                    weeks={weeks}
-                    assignments={live.assignments}
-                    availabilityApprovals={live.availabilityApprovals}
-                    selectedShift={selectedShift}
-                    selectedCell={null}
-                    onSelectedCellChange={() => {}}
-                    onAssign={() => {}}
-                    onUnassign={() => {}}
-                    readOnly
-                  />
+            <section
+              id="schedule-legend"
+              className="rounded-[16px] border border-border/75 bg-card px-3.5 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
+            >
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
+                  {SCHEDULE_LEGEND.map((item) => (
+                    <div
+                      key={item.code}
+                      className="inline-flex items-center gap-1.5 text-[11px] text-foreground"
+                    >
+                      <span
+                        className={cn(
+                          'inline-flex min-w-[1.5rem] items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none',
+                          CODE_BADGE_CLASS[item.code]
+                        )}
+                      >
+                        {item.code}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">{item.label}</span>
+                    </div>
+                  ))}
                 </div>
-              </section>
-            )}
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground xl:justify-end">
+                  <span>* Click any cell to edit</span>
+                  <span>Bold vertical lines separate weeks</span>
+                  <span>Weekends shaded</span>
+                </div>
+              </div>
+            </section>
           </div>
         </div>
       </section>

@@ -145,20 +145,6 @@ function cellToneClassName(tone: CellTone): string {
   }
 }
 
-function badgeToneClassName(tone: CellTone): string {
-  switch (tone) {
-    case 'critical':
-      return 'bg-[var(--error-subtle)] text-[var(--error-text)]'
-    case 'warning':
-      return 'bg-[var(--warning-subtle)] text-[var(--warning-text)]'
-    case 'healthy':
-      return 'bg-[var(--success-subtle)] text-[var(--success-text)]'
-    case 'empty':
-    default:
-      return 'bg-muted/60 text-foreground/75'
-  }
-}
-
 function renderShiftPill(
   dayId: string,
   shift: ShiftItem,
@@ -273,26 +259,26 @@ export function CalendarGrid({
         />
 
         <div className="pointer-events-none relative z-10 flex h-full flex-col gap-1.5">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="text-[1.15rem] font-semibold leading-none tracking-[-0.04em] text-foreground">
-                {day.date}
-              </span>
-              {showMonthTag ? (
-                <span className="rounded-full border border-border/70 bg-background/90 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                  {formatMonthShort(day.isoDate)}
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[17px] font-semibold leading-none tracking-[-0.04em] text-foreground">
+                  {day.date}
                 </span>
-              ) : null}
+                {showMonthTag ? (
+                  <span className="text-xs text-muted-foreground">
+                    {formatMonthShort(day.isoDate)}
+                  </span>
+                ) : null}
+              </div>
+              <span
+                className={cn(
+                  'text-xs font-semibold',
+                  activeCount < TARGET_HEADCOUNT ? 'text-[var(--error)]' : 'text-muted-foreground'
+                )}
+              >
+                {activeCount}/{TARGET_HEADCOUNT} staffed
+              </span>
             </div>
-            <span
-              className={cn(
-                'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                badgeToneClassName(tone)
-              )}
-            >
-              {activeCount}/{TARGET_HEADCOUNT} staffed
-            </span>
-          </div>
 
           <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
             <div className="pointer-events-auto">

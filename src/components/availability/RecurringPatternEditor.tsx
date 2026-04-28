@@ -229,21 +229,21 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
               Start with the scheduling model that matches how you normally work.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2">
+          <CardContent className="grid grid-cols-2 gap-3">
             {PATTERN_OPTIONS.map((option) => (
               <button
                 key={option.type}
                 type="button"
                 onClick={() => setPatternType(option.type)}
                 className={cn(
-                  'rounded-2xl border px-4 py-4 text-left transition-colors',
+                  'cursor-pointer rounded-lg border p-4 text-left text-sm transition-colors',
                   patternType === option.type
-                    ? 'border-primary bg-primary/5 shadow-tw-sm'
-                    : 'border-border/70 bg-card hover:border-border'
+                    ? 'border-primary bg-[var(--info-subtle)] font-semibold text-primary'
+                    : 'border-border bg-card text-muted-foreground hover:border-primary/50'
                 )}
               >
-                <p className="text-sm font-semibold text-foreground">{option.title}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{option.description}</p>
+                <p className="font-semibold">{option.title}</p>
+                <p className="mt-1 text-muted-foreground">{option.description}</p>
               </button>
             ))}
           </CardContent>
@@ -267,10 +267,10 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
                       type="button"
                       onClick={() => toggleWeekday(day.value)}
                       className={cn(
-                        'rounded-full border px-3 py-2 text-sm font-medium transition-colors',
+                        'flex h-12 w-12 items-center justify-center rounded-full text-sm font-medium transition-colors',
                         weeklyWeekdays.includes(day.value)
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                          ? 'bg-primary text-white'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
                       )}
                     >
                       {day.label}
@@ -517,19 +517,13 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
                   <span className="text-foreground">{formatPreviewDate(date)}</span>
                   <span
                     className={cn(
-                      'rounded-full px-2 py-0.5 text-xs font-semibold',
+                      'rounded px-2 py-0.5 text-[10px] font-medium',
                       baseline.baselineStatus === 'available'
                         ? 'bg-[var(--success-subtle)] text-[var(--success-text)]'
-                        : baseline.baselineStatus === 'off'
-                          ? 'bg-[var(--muted)] text-[var(--muted-foreground)]'
-                          : 'bg-background text-muted-foreground ring-1 ring-border/60'
+                        : 'bg-muted text-muted-foreground'
                     )}
                   >
-                    {baseline.baselineStatus === 'available'
-                      ? 'Work day'
-                      : baseline.baselineStatus === 'off'
-                        ? 'Off day'
-                        : 'Not set'}
+                    {baseline.baselineStatus === 'available' ? 'Work day' : 'Off day'}
                   </span>
                 </div>
               ))}

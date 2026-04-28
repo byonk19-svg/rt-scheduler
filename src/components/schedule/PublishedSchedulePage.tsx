@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { CalendarDays } from 'lucide-react'
 
 import { MyScheduleCard } from '@/components/schedule/MyScheduleCard'
 import { Button } from '@/components/ui/button'
@@ -28,7 +29,7 @@ function weekRangeLabel(shifts: MyScheduleShiftRow[]): string {
 }
 
 export async function PublishedSchedulePage({
-  title = 'My Schedule',
+  title = 'My Shifts',
   backHref = '/dashboard/staff',
 }: {
   title?: string
@@ -86,19 +87,12 @@ export async function PublishedSchedulePage({
       </div>
 
       {weekKeys.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-muted/20 px-6 py-10 text-center">
-          <p className="text-sm font-semibold text-foreground">No upcoming published shifts</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            When your manager publishes a schedule that includes you, your shifts will appear here.
-          </p>
-          <div className="mt-4 flex justify-center gap-2">
-            <Button asChild size="sm" variant="outline" className="text-xs">
-              <Link href="/therapist/availability">Future Availability</Link>
-            </Button>
-            <Button asChild size="sm" className="text-xs">
-              <Link href="/therapist/swaps">Shift Swaps &amp; Pickups</Link>
-            </Button>
-          </div>
+        <div className="flex flex-col items-center gap-3 py-16 text-center">
+          <CalendarDays className="h-12 w-12 text-muted-foreground" />
+          <p className="text-base font-semibold text-foreground">No published shifts yet</p>
+          <Button asChild variant="default">
+            <Link href="/therapist/swaps">Browse open pickups</Link>
+          </Button>
         </div>
       ) : (
         <div className="space-y-8">

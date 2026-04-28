@@ -299,7 +299,7 @@ describe('approvals preliminary queue', () => {
 
     expect(html).toContain('No pending preliminary requests')
     expect(html).toContain('Send a preliminary schedule from Coverage to open this queue.')
-    expect(html).toContain('Send preliminary from Coverage')
+    expect(html).toContain('Open Coverage')
     expect(html).not.toContain('Approve')
   })
 

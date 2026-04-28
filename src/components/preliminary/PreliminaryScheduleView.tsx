@@ -141,27 +141,23 @@ export function PreliminaryScheduleView({
                   {group.items.map((shift) => (
                     <div
                       key={shift.shiftId}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2.5"
+                      className="flex items-center justify-between border-b border-border-light py-3 last:border-0"
                     >
                       <div>
-                        <p className="text-sm font-medium text-foreground">
+                        <span className="text-sm text-muted-foreground">
                           {formatShiftDate(shift.shiftDate)}
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {' · '}
                           {shift.shiftType === 'day' ? 'Day' : 'Night'}
-                          {shift.shiftRole === 'lead' ? ' · Lead' : ''}
-                        </p>
+                        </span>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-foreground">
+                      <div className="flex items-center gap-2 text-right">
+                        <p className="text-sm font-semibold text-foreground">
                           {shift.assignedName ?? 'Open slot'}
                           {shift.isCurrentUser ? ' · You' : ''}
                         </p>
-                        <p className="mt-0.5 text-xs capitalize text-muted-foreground">
-                          {shift.pendingApproval
-                            ? 'pending approval'
-                            : shift.state.replaceAll('_', ' ')}
-                        </p>
+                        <span className="rounded-full bg-[var(--warning-subtle)] px-2 py-0.5 text-[11px] font-semibold text-[var(--warning-text)]">
+                          Tentative Assignment
+                        </span>
                       </div>
                     </div>
                   ))}

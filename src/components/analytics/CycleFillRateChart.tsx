@@ -12,12 +12,6 @@ type Props = {
   idealCoveragePerShift: number
 }
 
-function getBarColor(fillPercent: number): string {
-  if (fillPercent >= 80) return 'var(--success-text)'
-  if (fillPercent >= 50) return 'var(--warning-text)'
-  return 'var(--error-text)'
-}
-
 export function CycleFillRateChart({ rows, idealCoveragePerShift }: Props) {
   return (
     <section className="rounded-xl border border-border bg-card shadow-tw-sm">
@@ -37,15 +31,12 @@ export function CycleFillRateChart({ rows, idealCoveragePerShift }: Props) {
                 <p className="text-sm font-semibold text-foreground">{row.label}</p>
                 <p className="text-xs text-muted-foreground">{row.dateRange}</p>
               </div>
-              <p className="text-sm font-semibold text-foreground">{row.fillPercent}% filled</p>
+              <p className="text-sm font-bold text-[var(--error)]">{row.fillPercent}% filled</p>
             </div>
-            <div className="h-3 overflow-hidden rounded-full bg-[var(--muted)]">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-border-light">
               <div
-                className="h-full rounded-full transition-[width]"
-                style={{
-                  width: `${Math.max(0, Math.min(row.fillPercent, 100))}%`,
-                  backgroundColor: getBarColor(row.fillPercent),
-                }}
+                className="h-full rounded-full bg-[var(--error)] transition-[width]"
+                style={{ width: `${Math.max(0, Math.min(row.fillPercent, 100))}%` }}
               />
             </div>
             <p className="text-xs text-muted-foreground">

@@ -61,14 +61,21 @@ function targetCell(row: AuditLogRow) {
   if (row.target_type === 'schedule_cycle') {
     return (
       <Link
-        className="text-primary underline-offset-2 hover:underline"
+        className="max-w-[12ch] truncate font-mono text-xs text-primary underline-offset-2 hover:underline"
         href={`/coverage?cycle=${row.target_id}`}
       >
         {row.target_id}
       </Link>
     )
   }
-  return <span>{row.target_id}</span>
+  return <span className="max-w-[12ch] truncate font-mono text-xs">{row.target_id}</span>
+}
+
+function actionBadgeClass(action: string) {
+  if (action === 'shift_added') return 'bg-[var(--success-subtle)] text-[var(--success-text)]'
+  if (action === 'shift_removed') return 'bg-[var(--error-subtle)] text-[var(--error-text)]'
+  if (action === 'team_profile_updated') return 'bg-[var(--info-subtle)] text-[var(--info-text)]'
+  return 'bg-muted text-muted-foreground'
 }
 
 export default async function AuditLogPage({
@@ -170,7 +177,7 @@ export default async function AuditLogPage({
       <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-tw-sm">
         <table className="w-full border-collapse">
           <thead>
-            <tr className="border-b border-border bg-secondary/40 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b border-border bg-muted text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
               <th className="px-4 py-3">Timestamp</th>
               <th className="px-4 py-3">Actor</th>
               <th className="px-4 py-3">Action</th>
@@ -195,7 +202,13 @@ export default async function AuditLogPage({
                     })}
                   </td>
                   <td className="px-4 py-2.5 text-sm text-muted-foreground">{getActorName(row)}</td>
-                  <td className="px-4 py-2.5 text-sm font-medium text-foreground">{row.action}</td>
+                  <td className="px-4 py-2.5">
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${actionBadgeClass(row.action)}`}
+                    >
+                      {row.action}
+                    </span>
+                  </td>
                   <td className="px-4 py-2.5 text-sm text-muted-foreground">{row.target_type}</td>
                   <td className="px-4 py-2.5 text-sm text-foreground">{targetCell(row)}</td>
                 </tr>
@@ -205,26 +218,26 @@ export default async function AuditLogPage({
         </table>
       </div>
 
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">
+      <div className="flex items-center justify-between pt-3">
+        <span className="text-sm text-muted-foreground">
           Page {currentPage + 1} of {totalPages}
-        </p>
-        <div className="flex items-center gap-2">
+        </span>
+        <div className="flex gap-2">
           {hasPrev ? (
-            <Button asChild size="sm" variant="outline">
+            <Button asChild size="sm" variant="ghost">
               <Link href={getAuditLogHref(query, currentPage - 1)}>Previous</Link>
             </Button>
           ) : (
-            <Button size="sm" variant="outline" disabled>
+            <Button size="sm" variant="ghost" disabled>
               Previous
             </Button>
           )}
           {hasNext ? (
-            <Button asChild size="sm" variant="outline">
+            <Button asChild size="sm" variant="ghost">
               <Link href={getAuditLogHref(query, currentPage + 1)}>Next</Link>
             </Button>
           ) : (
-            <Button size="sm" variant="outline" disabled>
+            <Button size="sm" variant="ghost" disabled>
               Next
             </Button>
           )}

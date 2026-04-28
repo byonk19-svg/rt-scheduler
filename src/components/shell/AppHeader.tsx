@@ -27,7 +27,7 @@ export function AppHeader({
         className
       )}
     >
-      <div className={cn('flex h-14 items-center gap-3', APP_PAGE_MAX_WIDTH_CLASS)}>
+      <div className={cn('flex h-11 items-center gap-3', APP_PAGE_MAX_WIDTH_CLASS)}>
         <div className="shrink-0">{brand}</div>
         <div className="min-w-0 flex-1">{primaryNav}</div>
         <div className="ml-auto flex items-center gap-1">{utilityActions}</div>

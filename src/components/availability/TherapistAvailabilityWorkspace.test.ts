@@ -142,7 +142,7 @@ describe('TherapistAvailabilityWorkspace', () => {
 
     expect(html).toContain('This cycle starts blank.')
     expect(html).toContain('Choose the days you can or cannot work.')
-    expect(html).toContain('Not set yet')
+    expect(html).toContain('Not set')
     expect(html).not.toContain('From your normal schedule')
   })
 

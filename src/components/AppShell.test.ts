@@ -74,6 +74,16 @@ describe('AppShell mobile menu', () => {
     expect(appShellSource).toContain('<LocalSectionNav')
   })
 
+  it('suppresses the local section nav on the read-only schedule surface so the roster can own the page', () => {
+    expect(appShellSource).toContain("const hideLocalSectionNav = pathname === '/schedule'")
+    expect(appShellSource).toContain('shellContext.localNav && !hideLocalSectionNav')
+  })
+
+  it('lets the read-only schedule surface use the full authenticated workspace width', () => {
+    expect(appShellSource).toContain("const isSchedulePage = pathname === '/schedule'")
+    expect(appShellSource).toContain('isCoveragePage || isSchedulePage')
+  })
+
   it('does not keep a second fixed shell bar under the main header', () => {
     expect(appShellSource).not.toContain('app-shell-chrome-secondary fixed top-14')
   })
@@ -113,7 +123,7 @@ describe('AppShell navigation structure', () => {
 
   it('includes the personal schedule route in the flat staff nav', () => {
     expect(shellConfigSource).toContain("href: '/therapist/schedule'")
-    expect(shellConfigSource).toContain("label: 'My Schedule'")
+    expect(shellConfigSource).toContain("label: 'My Shifts'")
     expect(shellConfigSource).toContain("label: 'Team Schedule'")
   })
 

@@ -519,7 +519,7 @@ export default function ShiftBoardClientPage({
               <Link href="/therapist/availability">Future Availability</Link>
             </Button>
             {!canReview && (
-              <Button asChild size="sm" variant="outline" className="text-xs">
+              <Button asChild size="sm" variant="ghost" className="text-xs">
                 <Link href="/staff/history">View history</Link>
               </Button>
             )}
@@ -531,6 +531,12 @@ export default function ShiftBoardClientPage({
           </div>
         </div>
       </div>
+
+      {!canReview ? (
+        <div className="rounded-[10px] bg-muted px-4 py-3 text-sm text-muted-foreground">
+          Published schedule changes only — swaps affect your published shifts.
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-4 px-6 lg:grid-cols-4">
         <KpiTile
@@ -928,8 +934,8 @@ function FilterPill({
       className={cn(
         'h-9 rounded-md border px-3 text-xs font-semibold transition-colors',
         active
-          ? 'border-primary bg-primary/10 text-primary shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--primary)_35%,transparent)]'
-          : 'border-border bg-card text-muted-foreground hover:bg-secondary'
+          ? 'border border-primary bg-transparent text-primary'
+          : 'border border-transparent bg-muted text-muted-foreground hover:bg-secondary'
       )}
     >
       {label}
@@ -1256,29 +1262,22 @@ function EmptyState({ statusFilter, onClear }: { statusFilter: string; onClear: 
   const allClear = statusFilter === 'pending'
   return (
     <div className="rounded-xl border border-border bg-card px-6 py-10 text-center">
-      <div
-        className={cn(
-          'mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full border',
-          allClear
-            ? 'border-[var(--success-border)] bg-[var(--success-subtle)]'
-            : 'border-border bg-muted'
-        )}
-      >
+      <div className="mx-auto mb-4 flex justify-center">
         {allClear ? (
-          <CheckCircle2 className="h-5 w-5 text-[var(--success-text)]" />
+          <CheckCircle2 className="h-10 w-10 text-muted-foreground" />
         ) : (
           <Search className="h-5 w-5 text-muted-foreground" />
         )}
       </div>
-      <p className="mb-1 text-sm font-bold text-foreground">
+      <p className="mb-1 text-base font-semibold text-foreground">
         {allClear ? "You're all caught up" : 'No results found'}
       </p>
-      <p className="mb-4 text-xs text-muted-foreground">
+      <p className="mb-4 text-sm text-muted-foreground">
         {allClear
           ? 'No pending requests right now. Check back later.'
           : 'Try adjusting your search or filters.'}
       </p>
-      <Button size="sm" variant="outline" onClick={onClear}>
+      <Button size="sm" variant="ghost" onClick={onClear}>
         {allClear ? 'View all posts' : 'Clear filters'}
       </Button>
     </div>

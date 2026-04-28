@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { History } from 'lucide-react'
+import { Clock } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
@@ -342,10 +342,8 @@ export default async function StaffSwapHistoryPage({
 
       {rows.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-border/70 bg-card px-6 py-10 text-center shadow-tw-sm">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted">
-            <History className="h-4 w-4 text-muted-foreground" />
-          </div>
-          <p className="text-sm font-semibold text-foreground">No history yet</p>
+          <Clock className="h-10 w-10 text-muted-foreground" />
+          <p className="text-base font-semibold text-foreground">No history yet</p>
           <p className="max-w-sm text-xs text-muted-foreground">
             When you post, claim, or express pickup interest, it will show up here.
           </p>
@@ -358,7 +356,7 @@ export default async function StaffSwapHistoryPage({
           <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-tw-sm">
             <table className="w-full min-w-[640px] border-collapse text-sm">
               <thead>
-                <tr className="border-b border-border bg-secondary/40 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                <tr className="border-b border-border bg-muted text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Shift</th>
                   <th className="px-4 py-3">My role</th>
@@ -367,7 +365,7 @@ export default async function StaffSwapHistoryPage({
                   <th className="px-4 py-3">Message</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody className="divide-y divide-border-light">
                 {rows.map((row) => {
                   const st = row.shiftType ?? ''
                   const chip = statusChipMeta(row.status)
@@ -375,7 +373,10 @@ export default async function StaffSwapHistoryPage({
                     row.message.length > 60 ? `${row.message.slice(0, 60)}…` : row.message
 
                   return (
-                    <tr key={row.id} className="hover:bg-secondary/15">
+                    <tr
+                      key={row.id}
+                      className="border-b border-border-light py-3 last:border-0 hover:bg-secondary/15"
+                    >
                       <td className="whitespace-nowrap px-4 py-2.5 text-foreground">
                         {row.shiftDate ? formatDisplayDate(row.shiftDate) : '—'}
                       </td>
