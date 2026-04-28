@@ -16,7 +16,8 @@ describe('RecurringPatternEditor', () => {
     expect(source).toContain('<CardTitle>What this saves</CardTitle>')
     expect(source).toContain('<CardTitle>Quick preview</CardTitle>')
     expect(source).toContain('Next 2 weeks')
-    expect(source).toContain("'Not set'")
+    expect(source).toContain("'Off day'")
+    expect(source).toContain("'Starts blank'")
     expect(source).toContain("toLocaleDateString('en-US', { month: 'short', day: 'numeric' })")
   })
 
