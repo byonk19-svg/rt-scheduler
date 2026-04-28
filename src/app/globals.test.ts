@@ -22,15 +22,27 @@ describe('global CSS tokens and theme overrides', () => {
     expect(cssSource).toContain('--scrim:')
   })
 
-  it('keeps dark-mode primary in the same teal hue family as light mode', () => {
-    // Light: hsl(187 55% 28%); dark must stay in the 187°/cyan-teal family, not flip to blue.
-    // Regression guard: the previous dark palette used hsl(203 …) which broke brand identity.
+  it('keeps every --primary declaration in the design-handoff teal hue family (174°)', () => {
+    // Source of truth: the Refined.html design handoff defines
+    //   --teal-btn:  #276e66  ≈ hsl(174 48% 29%)  → light-mode --primary
+    //   --teal-dark: #1b3836  ≈ hsl(174 35% 16%)  → --marketing-hero-bg
+    // Any drift toward the older 187° (bluer) or 203° (cobalt) hue is a brand regression.
+    expect(cssSource).not.toMatch(/--primary:\s*hsl\(187\s/)
     expect(cssSource).not.toMatch(/--primary:\s*hsl\(203\s/)
     const primaryMatches = cssSource.match(/--primary:\s*hsl\((\d+)\s/g) ?? []
-    expect(primaryMatches.length).toBeGreaterThanOrEqual(2) // :root + .dark
+    // :root + .dark + @media print .dark — at least three declarations.
+    expect(primaryMatches.length).toBeGreaterThanOrEqual(2)
     for (const match of primaryMatches) {
-      expect(match).toMatch(/--primary:\s*hsl\(187\s/)
+      expect(match).toMatch(/--primary:\s*hsl\(174\s/)
     }
+  })
+
+  it('declares --marketing-hero-bg as a deeper teal independent from --primary', () => {
+    // The hero / auth-left-panel must use the deeper #1b3836 from the design,
+    // not the mid-teal --primary used for buttons. Aliasing back to var(--primary)
+    // is a regression — it produced the wrong (lighter) hero in production.
+    expect(cssSource).toMatch(/--marketing-hero-bg:\s*hsl\(174\s+\d+%?\s+1[0-9]%/)
+    expect(cssSource).not.toMatch(/--marketing-hero-bg:\s*var\(--primary\)/)
   })
 
   it('defines dark theme token overrides and forces light color-scheme in print', () => {
