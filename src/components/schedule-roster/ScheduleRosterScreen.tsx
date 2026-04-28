@@ -57,20 +57,17 @@ export function ScheduleRosterScreen({ live: _live }: ScheduleRosterScreenProps)
                 Respiratory Therapy - {selectedShift === 'day' ? 'Day' : 'Night'} Shift
               </h1>
               <p className="text-[13px] text-muted-foreground">{dataset.cycleLabel}</p>
-              <div className="inline-flex items-center rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-900">
-                Build Marker: browser-pass-v1
-              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2.5 xl:justify-end">
-              <span className="inline-flex h-9 items-center rounded-xl bg-[color:color-mix(in_srgb,var(--attention)_14%,white)] px-3 text-[12px] font-semibold text-foreground">
+            <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+              <span className="inline-flex h-9 items-center rounded-lg bg-[color:color-mix(in_srgb,var(--attention)_14%,white)] px-2.5 text-[12px] font-semibold text-foreground">
                 DRAFT
               </span>
               <span className="text-[13px] text-muted-foreground">Last saved: 2:04 PM</span>
               <Button
                 type="button"
                 variant="outline"
-                className="h-10 gap-2 rounded-xl px-3.5 text-[14px]"
+                className="h-11 gap-2 rounded-lg px-3 text-[14px] shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
               >
                 <Printer className="h-4 w-4" />
                 Print
@@ -78,38 +75,41 @@ export function ScheduleRosterScreen({ live: _live }: ScheduleRosterScreenProps)
               <Button
                 type="button"
                 variant="outline"
-                className="h-10 gap-2 rounded-xl px-3.5 text-[14px]"
+                className="h-11 gap-2 rounded-lg px-3 text-[14px] shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
               >
                 <Download className="h-4 w-4" />
                 Export
               </Button>
-              <Button type="button" className="h-10 rounded-xl px-4 text-[14px]">
+              <Button
+                type="button"
+                className="h-11 rounded-lg px-3.5 text-[14px] shadow-[0_1px_2px_rgba(15,23,42,0.16)]"
+              >
                 Publish
               </Button>
             </div>
           </div>
 
           <div className="flex flex-col gap-3 border-t border-border/70 pt-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex rounded-xl border border-border/80 bg-background shadow-sm">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <div className="inline-flex h-12 items-center rounded-lg border border-border/70 bg-muted/35 p-0.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                 <Button
                   type="button"
                   variant="ghost"
-                  className="h-10 rounded-r-none border-r border-border/80 px-2.5"
+                  className="h-11 w-10 rounded-r-none border-r border-border/70 px-0 text-foreground/85"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <Button
                   type="button"
                   variant="ghost"
-                  className="h-10 rounded-none px-4 text-[14px]"
+                  className="h-11 rounded-none px-3.5 text-[14px]"
                 >
                   Today
                 </Button>
                 <Button
                   type="button"
                   variant="ghost"
-                  className="h-10 rounded-l-none border-l border-border/80 px-2.5"
+                  className="h-11 w-10 rounded-l-none border-l border-border/70 px-0 text-foreground/85"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -117,7 +117,7 @@ export function ScheduleRosterScreen({ live: _live }: ScheduleRosterScreenProps)
               <Button
                 type="button"
                 variant="outline"
-                className="h-10 gap-2 rounded-xl px-3.5 text-[14px]"
+                className="h-12 gap-2 rounded-lg px-3 text-[14px] shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
               >
                 <CalendarDays className="h-4 w-4" />
                 Go to Date
@@ -125,14 +125,14 @@ export function ScheduleRosterScreen({ live: _live }: ScheduleRosterScreenProps)
               <Button
                 type="button"
                 variant="outline"
-                className="h-10 min-w-[126px] justify-between gap-2 rounded-xl px-3.5 text-[14px]"
+                className="h-12 min-w-[124px] justify-between gap-2 rounded-lg px-3 text-[14px] shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
               >
                 6 Weeks
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
               </Button>
             </div>
 
-            <div className="inline-flex rounded-xl border border-border/80 bg-background p-1 shadow-sm">
+            <div className="inline-flex h-[52px] items-center rounded-lg border border-border/70 bg-muted/35 p-1 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
               {SHIFT_OPTIONS.map((option) => {
                 const isActive = option.value === selectedShift
                 return (
@@ -141,9 +141,9 @@ export function ScheduleRosterScreen({ live: _live }: ScheduleRosterScreenProps)
                     type="button"
                     onClick={() => setSelectedShift(option.value)}
                     className={cn(
-                      'rounded-[10px] px-3.5 py-1.5 text-[14px] font-medium transition-colors',
+                      'h-11 rounded-md px-3 text-[14px] font-medium transition-colors',
                       isActive
-                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        ? 'bg-primary text-primary-foreground shadow-[0_1px_2px_rgba(15,23,42,0.18)]'
                         : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
                     )}
                   >

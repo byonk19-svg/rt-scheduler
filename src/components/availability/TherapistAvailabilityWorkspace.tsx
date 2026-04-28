@@ -28,6 +28,7 @@ type Cycle = {
 }
 
 type DayStatus = 'force_on' | 'force_off'
+type DayDisplayState = 'normal_work' | 'normal_off' | 'can_work' | 'cannot_work' | 'not_set'
 
 type Props = {
   cycles: Cycle[]
@@ -89,6 +90,21 @@ function buildCycleDays(cycle: Cycle | null): string[] {
 
 function sortDateKeys(values: string[]): string[] {
   return [...values].sort((left, right) => left.localeCompare(right))
+}
+
+function getDisplayStateLabel(state: DayDisplayState): string {
+  switch (state) {
+    case 'normal_work':
+      return 'Normal work'
+    case 'normal_off':
+      return 'Normal off'
+    case 'can_work':
+      return 'Can work'
+    case 'cannot_work':
+      return "Can't work"
+    default:
+      return 'Not set'
+  }
 }
 
 export function TherapistAvailabilityWorkspace({
@@ -234,6 +250,28 @@ export function TherapistAvailabilityWorkspace({
   function getBaselineStatus(date: string): 'available' | 'off' | 'neutral' {
     return baselineByDate[date]?.baselineStatus ?? 'neutral'
   }
+
+  function getDisplayState(date: string): DayDisplayState {
+    const overrideStatus = draftStatusByDate[date] ?? null
+    if (overrideStatus === 'force_on') return 'can_work'
+    if (overrideStatus === 'force_off') return 'cannot_work'
+
+    const baselineStatus = getBaselineStatus(date)
+    if (baselineStatus === 'available') return 'normal_work'
+    if (baselineStatus === 'off') return 'normal_off'
+    return 'not_set'
+  }
+
+  const baselineSummary = cycleDays.reduce(
+    (totals, date) => {
+      const baselineStatus = getBaselineStatus(date)
+      if (baselineStatus === 'available') totals.normalWork += 1
+      else if (baselineStatus === 'off') totals.normalOff += 1
+      else totals.notSet += 1
+      return totals
+    },
+    { normalWork: 0, normalOff: 0, notSet: 0 }
+  )
 
   function setOverride(date: string, status: DayStatus | null) {
     setDraftStatusByDate((current) => {
@@ -444,7 +482,7 @@ export function TherapistAvailabilityWorkspace({
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {hasRecurringPattern
-                      ? 'Click a day to make a change.'
+                      ? 'Normal work days and normal off days are shown here before you make cycle-only changes.'
                       : 'Choose the days you can or cannot work.'}
                   </p>
                 </div>
@@ -548,7 +586,7 @@ export function TherapistAvailabilityWorkspace({
                   </div>
                   <div className="grid grid-cols-7 gap-1.5">
                     {week.map((date) => {
-                      const overrideStatus = draftStatusByDate[date] ?? null
+                      const displayState = getDisplayState(date)
                       const dayIndex = cycleDays.indexOf(date)
                       const monthRibbon = monthRibbonLabel(
                         date,
@@ -566,11 +604,15 @@ export function TherapistAvailabilityWorkspace({
                           }}
                           className={cn(
                             'min-h-[52px] cursor-pointer rounded-lg border p-1.5 text-center text-[11px]',
-                            overrideStatus === 'force_on'
+                            displayState === 'can_work'
                               ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
-                              : overrideStatus === 'force_off'
+                              : displayState === 'cannot_work'
                                 ? 'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]'
-                                : 'border-border bg-card text-muted-foreground',
+                                : displayState === 'normal_work'
+                                  ? 'border-[color:color-mix(in_srgb,var(--success-border)_55%,transparent)] bg-[color:color-mix(in_srgb,var(--success-subtle)_60%,white)] text-[var(--success-text)]'
+                                  : displayState === 'normal_off'
+                                    ? 'border-border/80 bg-muted/35 text-foreground'
+                                    : 'border-border bg-card text-muted-foreground',
                             selectedDate === date && 'ring-2 ring-primary',
                             date === todayKey && 'ring-2 ring-[var(--attention)]'
                           )}
@@ -587,19 +629,19 @@ export function TherapistAvailabilityWorkspace({
                           <span
                             className={cn(
                               'rounded-full px-1.5 py-px text-[0.5rem] font-semibold uppercase tracking-[0.05em]',
-                              overrideStatus === 'force_off' &&
+                              displayState === 'cannot_work' &&
                                 'bg-[var(--error-subtle)] text-[var(--error-text)] ring-1 ring-[var(--error-border)]/60',
-                              overrideStatus === 'force_on' &&
+                              displayState === 'can_work' &&
                                 'bg-[var(--success-subtle)] text-[var(--success-text)] ring-1 ring-[var(--success-border)]/60',
-                              !overrideStatus &&
+                              displayState === 'normal_work' &&
+                                'bg-[color:color-mix(in_srgb,var(--success-subtle)_70%,white)] text-[var(--success-text)] ring-1 ring-[color:color-mix(in_srgb,var(--success-border)_50%,transparent)]',
+                              displayState === 'normal_off' &&
+                                'bg-muted/60 text-foreground ring-1 ring-border/70',
+                              displayState === 'not_set' &&
                                 'bg-background text-muted-foreground ring-1 ring-border/60'
                             )}
                           >
-                            {overrideStatus === 'force_off'
-                              ? "Can't work"
-                              : overrideStatus === 'force_on'
-                                ? 'Can work'
-                                : 'Not set'}
+                            {getDisplayStateLabel(displayState)}
                           </span>
                         </button>
                       )
@@ -616,6 +658,31 @@ export function TherapistAvailabilityWorkspace({
                 Summary
               </h3>
               <div className="space-y-2 rounded-xl border border-border/70 bg-background px-3 py-3">
+                <p className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  Normal schedule
+                </p>
+                <div className="flex items-center justify-between border-l-2 border-[var(--success)] py-1 pl-3">
+                  <span className="text-sm text-muted-foreground">Normal work</span>
+                  <span className="text-sm font-semibold text-foreground">
+                    {baselineSummary.normalWork}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-l-2 border-[var(--error)] py-1 pl-3">
+                  <span className="text-sm text-muted-foreground">Normal off</span>
+                  <span className="text-sm font-semibold text-foreground">
+                    {baselineSummary.normalOff}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-l-2 border-border py-1 pl-3">
+                  <span className="text-sm text-muted-foreground">Not set</span>
+                  <span className="text-sm font-semibold text-foreground">
+                    {baselineSummary.notSet}
+                  </span>
+                </div>
+                <div className="my-1 h-px bg-border/70" />
+                <p className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  This cycle changes
+                </p>
                 <div className="flex items-center justify-between border-l-2 border-[var(--success)] py-1 pl-3">
                   <span className="text-sm text-muted-foreground">Can work</span>
                   <span className="text-sm font-semibold text-foreground">
@@ -628,15 +695,8 @@ export function TherapistAvailabilityWorkspace({
                     {cannotWorkDates.length}
                   </span>
                 </div>
-                <div className="flex items-center justify-between border-l-2 border-border py-1 pl-3">
-                  <span className="text-sm text-muted-foreground">Not set</span>
-                  <span className="text-sm font-semibold text-foreground">
-                    {Math.max(cycleDays.length - canWorkDates.length - cannotWorkDates.length, 0)}
-                  </span>
-                </div>
               </div>
             </div>
-
             <div>
               <h3 className="mb-2.5 text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                 Legend
@@ -652,21 +712,22 @@ export function TherapistAvailabilityWorkspace({
                     )}
                   />
                   <span className="text-xs text-muted-foreground">
-                    {hasRecurringPattern ? 'From your normal schedule' : 'Not set'}
+                    {hasRecurringPattern ? 'Normal work day' : 'Not set from normal schedule'}
                   </span>
                 </div>
+                {hasRecurringPattern ? (
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full border border-border/80 bg-muted/50" />
+                    <span className="text-xs text-muted-foreground">Normal off day</span>
+                  </div>
+                ) : null}
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-[var(--error-text)]" />
-                  <span className="text-xs text-muted-foreground">Can&apos;t work</span>
+                  <span className="text-xs text-muted-foreground">This cycle: can&apos;t work</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-[var(--success-text)]" />
-                  <span className="text-xs text-muted-foreground">Can work</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full border border-border/70 bg-background px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-                    This cycle only
-                  </span>
+                  <span className="text-xs text-muted-foreground">This cycle: can work</span>
                 </div>
               </div>
             </div>

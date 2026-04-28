@@ -47,6 +47,11 @@ describe('TherapistAvailabilityWorkspace', () => {
           'Works Mon, Tue, Thu, Fri. Every other weekend starting May 2, 2026.',
         generatedBaselineByCycleId: {
           'cycle-1': {
+            '2026-03-22': {
+              baselineStatus: 'off',
+              baselineSource: 'recurring_pattern',
+              reason: 'blocked_outside_works_dow_hard',
+            },
             '2026-03-23': {
               baselineStatus: 'available',
               baselineSource: 'recurring_pattern',
@@ -74,9 +79,17 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('Not submitted')
     expect(html).toContain('Cycle:')
     expect(html).not.toContain('days selected')
-    expect(html).toContain('Click a day to make a change.')
+    expect(html).toContain(
+      'Normal work days and normal off days are shown here before you make cycle-only changes.'
+    )
     expect(html).toContain('From your normal schedule')
     expect(html).toContain('This cycle only')
+    expect(html).toContain('Normal work')
+    expect(html).toContain('Normal off')
+    expect(html).toContain('Normal schedule')
+    expect(html).toContain('This cycle changes')
+    expect(html).toContain('This cycle: can&#x27;t work')
+    expect(html).toContain('This cycle: can work')
     expect(html).not.toContain('panel on the right')
     expect(html).toContain('Optional note')
     expect(html).toContain('Mar')
@@ -143,6 +156,8 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('This cycle starts blank.')
     expect(html).toContain('Choose the days you can or cannot work.')
     expect(html).toContain('Not set')
+    expect(html).toContain('Not set from normal schedule')
+    expect(html).not.toContain('Normal off day')
     expect(html).not.toContain('From your normal schedule')
   })
 

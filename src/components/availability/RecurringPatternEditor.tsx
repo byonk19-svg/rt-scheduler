@@ -520,10 +520,16 @@ export function RecurringPatternEditor({ initialPattern, saveAction }: Props) {
                       'rounded px-2 py-0.5 text-[10px] font-medium',
                       baseline.baselineStatus === 'available'
                         ? 'bg-[var(--success-subtle)] text-[var(--success-text)]'
-                        : 'bg-muted text-muted-foreground'
+                        : baseline.baselineStatus === 'neutral'
+                          ? 'bg-background text-muted-foreground ring-1 ring-border/60'
+                          : 'bg-muted text-muted-foreground'
                     )}
                   >
-                    {baseline.baselineStatus === 'available' ? 'Work day' : 'Off day'}
+                    {baseline.baselineStatus === 'available'
+                      ? 'Work day'
+                      : baseline.baselineStatus === 'neutral'
+                        ? 'Starts blank'
+                        : 'Off day'}
                   </span>
                 </div>
               ))}

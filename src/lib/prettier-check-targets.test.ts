@@ -38,4 +38,11 @@ describe('prettier check target selection', () => {
       ['c.ts', 'd.ts'],
     ])
   })
+
+  it('uses larger default chunks to reduce shell startup overhead', () => {
+    const files = Array.from({ length: 205 }, (_, index) => `file-${index}.ts`)
+
+    expect(chunkPrettierTargets(files)).toHaveLength(3)
+    expect(chunkPrettierTargets(files)[0]).toHaveLength(100)
+  })
 })

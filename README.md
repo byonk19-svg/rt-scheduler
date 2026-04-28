@@ -214,6 +214,20 @@ Optional overrides:
 
 Use archive/inactive status in the Team UI for real staff whose history should remain visible. Use this cleanup command only for seeded/demo auth accounts that should be fully removed.
 
+## Cleanup Local Artifacts
+
+Dry-run local cleanup for generated build output, temp logs, and stale unregistered `.worktrees` helpers:
+
+```bash
+npm run cleanup:local
+```
+
+Apply the cleanup:
+
+```bash
+npm run cleanup:local -- --execute
+```
+
 ## E2E Tests
 
 Playwright smoke tests are in `e2e/`.

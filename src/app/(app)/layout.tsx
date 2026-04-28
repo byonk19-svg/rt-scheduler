@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import AppShell, { type AppShellUser } from '@/components/AppShell'
 import { toUiRole } from '@/lib/auth/roles'
+import { shouldIgnoreAuthenticatedLayoutError } from '@/lib/authenticated-layout-error'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
@@ -33,6 +34,9 @@ async function getAuthenticatedShellData(): Promise<{
       role: toUiRole(profile?.role),
     }
   } catch (error) {
+    if (shouldIgnoreAuthenticatedLayoutError(error)) {
+      return { user: appShellUser }
+    }
     console.warn(
       'Supabase lookup failed in authenticated layout:',
       error instanceof Error ? error.message : error

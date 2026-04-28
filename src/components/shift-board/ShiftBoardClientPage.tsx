@@ -16,6 +16,15 @@ import {
 
 import { can } from '@/lib/auth/can'
 import type { UiRole } from '@/lib/auth/roles'
+import {
+  mutateShiftPost,
+  type RequestKind,
+  type RequestStatus as SharedRequestStatus,
+  type RequestType,
+  type RequestVisibility,
+  type RecipientResponse,
+} from '@/lib/request-workflow'
+import type { ShiftRole, ShiftType } from '@/lib/shift-types'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -24,10 +33,7 @@ import { groupPickupsBySlot } from '@/app/(app)/shift-board/prn-interest-helpers
 import { partitionPickupInterestQueue } from '@/lib/pickup-interest-presentation'
 
 type Role = UiRole
-type RequestType = 'swap' | 'pickup'
-type RequestStatus = 'pending' | 'approved' | 'denied' | 'expired' | 'withdrawn'
-type ShiftType = 'day' | 'night'
-type ShiftRole = 'lead' | 'staff'
+type RequestStatus = Exclude<SharedRequestStatus, 'selected'>
 
 type ProfileLookupRow = {
   id: string
@@ -40,9 +46,9 @@ type ProfileLookupRow = {
 type ShiftBoardRequest = {
   id: string
   type: RequestType
-  visibility: 'team' | 'direct'
-  recipientResponse: 'pending' | 'accepted' | 'declined' | null
-  requestKind: 'standard' | 'call_in'
+  visibility: RequestVisibility
+  recipientResponse: RecipientResponse | null
+  requestKind: RequestKind
   poster: string
   postedById: string | null
   avatar: string
@@ -149,23 +155,6 @@ function formatPickupQueueTimestamp(value: string): string {
     hour: 'numeric',
     minute: '2-digit',
   })
-}
-
-async function mutateShiftPost(body: Record<string, unknown>) {
-  const response = await fetch('/api/shift-posts', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  })
-
-  const payload = (await response.json().catch(() => null)) as { error?: string } | null
-  if (!response.ok) {
-    throw new Error(payload?.error ?? 'Could not update that request.')
-  }
-
-  return payload
 }
 
 function toReviewErrorMessage(message: string): string {
