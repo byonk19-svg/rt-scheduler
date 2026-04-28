@@ -228,6 +228,8 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
   }
 
   const isCoveragePage = pathname === '/coverage'
+  const isSchedulePage = pathname === '/schedule'
+  const hideLocalSectionNav = pathname === '/schedule'
 
   return (
     <ThemeProvider>
@@ -298,18 +300,18 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
           }
         />
 
-        <div className="min-h-screen pt-14">
+        <div className="min-h-screen pt-11">
           <main
             id="main-content"
             tabIndex={-1}
             className={cn(
               'w-full print:max-w-none',
-              isCoveragePage
-                ? 'py-5 md:py-7'
+              isCoveragePage || isSchedulePage
+                ? 'py-4 md:py-5'
                 : cn(APP_PAGE_MAX_WIDTH_CLASS, 'py-5 md:py-7 print:mx-0 print:px-4 print:py-4')
             )}
           >
-            {shellContext.localNav ? (
+            {shellContext.localNav && !hideLocalSectionNav ? (
               <div
                 className={cn(
                   isCoveragePage ? APP_PAGE_MAX_WIDTH_CLASS : '',

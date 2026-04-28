@@ -28,7 +28,7 @@ export function ForcedDateMissTable({ rows }: Props) {
       </div>
       <Table>
         <TableHeader>
-          <TableRow>
+          <TableRow className="bg-muted text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
             <TableHead>Therapist</TableHead>
             <TableHead>Date</TableHead>
             <TableHead>Cycle</TableHead>
@@ -43,22 +43,13 @@ export function ForcedDateMissTable({ rows }: Props) {
               <TableCell>{row.cycleLabel}</TableCell>
               <TableCell>
                 <span
-                  className="inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-                  style={
+                  className={
                     row.missed
-                      ? {
-                          backgroundColor: 'var(--error-subtle)',
-                          color: 'var(--error-text)',
-                          borderColor: 'var(--error-border)',
-                        }
-                      : {
-                          backgroundColor: 'var(--success-subtle)',
-                          color: 'var(--success-text)',
-                          borderColor: 'var(--success-border)',
-                        }
+                      ? 'rounded-full bg-[var(--error-subtle)] px-2 py-0.5 text-[11px] font-semibold text-[var(--error-text)]'
+                      : 'rounded-full bg-[var(--success-subtle)] px-2 py-0.5 text-[11px] font-semibold text-[var(--success-text)]'
                   }
                 >
-                  {row.missed ? 'Missed' : 'Covered'}
+                  {row.missed ? 'Missed' : 'Met'}
                 </span>
               </TableCell>
             </TableRow>

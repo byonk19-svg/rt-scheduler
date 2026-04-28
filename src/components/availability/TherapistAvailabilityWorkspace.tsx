@@ -472,8 +472,8 @@ export function TherapistAvailabilityWorkspace({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 divide-y divide-border/80 xl:grid-cols-[minmax(0,1fr)_20rem] xl:divide-x xl:divide-y-0">
-          <div className="space-y-4 px-5 py-5 sm:px-6 sm:py-6">
+        <div data-slot="availability-workspace-split" className="flex flex-col gap-5 xl:flex-row">
+          <div className="min-w-0 flex-1 space-y-4 px-5 py-5 sm:px-6 sm:py-6">
             <div className="rounded-2xl border border-border/70 bg-muted/[0.05] px-4 py-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -706,7 +706,9 @@ export function TherapistAvailabilityWorkspace({
                   <span
                     className={cn(
                       'h-2.5 w-2.5 rounded-full',
-                      hasRecurringPattern ? 'bg-[var(--success-text)]' : 'bg-[var(--muted-foreground)]'
+                      hasRecurringPattern
+                        ? 'bg-[var(--success-text)]'
+                        : 'bg-[var(--muted-foreground)]'
                     )}
                   />
                   <span className="text-xs text-muted-foreground">

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { CalendarDays, CheckCircle2 } from 'lucide-react'
+import { CalendarDays, Clock } from 'lucide-react'
 
 import {
   approvePreliminaryRequestAction,
@@ -184,7 +184,7 @@ export default async function ApprovalsPage({
         subtitle="Review live claims and schedule change requests before final publish."
         summary={
           <>
-            <span className="rounded-full border border-border/70 bg-muted/15 px-3 py-1 font-medium text-foreground">
+            <span className="rounded-full bg-[var(--warning-subtle)] px-2 py-0.5 text-xs font-semibold text-[var(--warning-text)]">
               {queue.length} pending
             </span>
             {success === 'preliminary_request_approved' && (
@@ -219,24 +219,18 @@ export default async function ApprovalsPage({
 
       {queue.length === 0 ? (
         <div className="rounded-xl border border-border/70 bg-background/70 px-6 py-10 shadow-none">
-          <div className="mx-auto max-w-lg text-center">
-            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)]">
-              <CheckCircle2 className="h-5 w-5 text-[var(--success-text)]" />
-            </div>
-            <p className="mt-4 text-sm font-semibold text-foreground">
+          <div className="flex flex-col items-center gap-3 py-12 text-center">
+            <Clock className="h-10 w-10 text-muted-foreground" />
+            <p className="text-base font-semibold text-foreground">
               No pending preliminary requests
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {hasActivePreliminary
                 ? 'Claims and change requests appear here while the preliminary schedule is live.'
                 : 'Send a preliminary schedule from Coverage to open this queue.'}
             </p>
-          </div>
-          <div className="mt-5 flex justify-center">
-            <Button asChild size="sm" className="text-xs">
-              <Link href="/coverage?view=week">
-                {hasActivePreliminary ? 'Open Coverage' : 'Send preliminary from Coverage'}
-              </Link>
+            <Button asChild variant="default">
+              <Link href="/coverage">Open Coverage</Link>
             </Button>
           </div>
         </div>

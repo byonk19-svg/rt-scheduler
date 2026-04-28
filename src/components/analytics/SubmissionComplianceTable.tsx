@@ -19,28 +19,6 @@ type Props = {
   rows: SubmissionComplianceRow[]
 }
 
-function getBadgeStyle(percent: number) {
-  if (percent >= 80) {
-    return {
-      backgroundColor: 'var(--success-subtle)',
-      color: 'var(--success-text)',
-      borderColor: 'var(--success-border)',
-    }
-  }
-  if (percent >= 50) {
-    return {
-      backgroundColor: 'var(--warning-subtle)',
-      color: 'var(--warning-text)',
-      borderColor: 'var(--warning-border)',
-    }
-  }
-  return {
-    backgroundColor: 'var(--error-subtle)',
-    color: 'var(--error-text)',
-    borderColor: 'var(--error-border)',
-  }
-}
-
 export function SubmissionComplianceTable({ rows }: Props) {
   return (
     <section className="rounded-xl border border-border bg-card shadow-tw-sm">
@@ -51,7 +29,7 @@ export function SubmissionComplianceTable({ rows }: Props) {
       </div>
       <Table>
         <TableHeader>
-          <TableRow>
+          <TableRow className="bg-muted text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
             <TableHead>Cycle</TableHead>
             <TableHead className="text-right">Submitted</TableHead>
             <TableHead className="text-right">Total</TableHead>
@@ -68,14 +46,13 @@ export function SubmissionComplianceTable({ rows }: Props) {
               <TableCell className="text-right tabular-nums">{row.compliancePercent}%</TableCell>
               <TableCell>
                 <span
-                  className="inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-                  style={getBadgeStyle(row.compliancePercent)}
+                  className={
+                    row.submittedCount >= row.totalActive
+                      ? 'inline-flex rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] px-2 py-0.5 text-[11px] font-semibold text-[var(--success-text)]'
+                      : 'inline-flex rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[11px] font-semibold text-[var(--warning-text)]'
+                  }
                 >
-                  {row.compliancePercent >= 80
-                    ? 'Healthy'
-                    : row.compliancePercent >= 50
-                      ? 'Watch'
-                      : 'At risk'}
+                  {row.submittedCount >= row.totalActive ? 'Complete' : 'Pending'}
                 </span>
               </TableCell>
             </TableRow>

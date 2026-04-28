@@ -7,7 +7,6 @@ import { FormSubmitButton } from '@/components/form-submit-button'
 import { ThemePreferenceControl } from '@/components/ThemeProvider'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { StatusBadge } from '@/components/ui/status-badge'
 import { can } from '@/lib/auth/can'
 import { toUiRole } from '@/lib/auth/roles'
 import { EMPLOYEE_META_BADGE_CLASS, LEAD_ELIGIBLE_BADGE_CLASS } from '@/lib/employee-tag-badges'
@@ -212,16 +211,20 @@ export default async function ProfilePage({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge variant="neutral" className="capitalize">
-            {role}
-          </StatusBadge>
-          <StatusBadge variant="neutral" className="capitalize">
-            {shiftType} shift
-          </StatusBadge>
-          <StatusBadge variant="neutral" className="capitalize">
-            {employmentType.replace('_', ' ')}
-          </StatusBadge>
-          {isTherapist && <StatusBadge variant="neutral">Max {weeklyLimit}/week</StatusBadge>}
+          <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+            · {role}
+          </span>
+          <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+            · {shiftType} shift
+          </span>
+          <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+            · {employmentType.replace('_', ' ')}
+          </span>
+          {isTherapist && (
+            <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+              · Max {weeklyLimit}/week
+            </span>
+          )}
         </div>
       </div>
 
@@ -232,173 +235,177 @@ export default async function ProfilePage({
         </p>
       )}
 
-      <Card className="border-border/90">
-        <CardHeader>
-          <CardTitle>{fullName}</CardTitle>
-          <CardDescription>
-            Account and staffing metadata used across scheduling tools.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <div>
-            <p className="text-muted-foreground">Email</p>
-            <p className="font-medium text-foreground">{email}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge
-              variant="outline"
-              className={
-                canAccessManagerUi
-                  ? cn(
-                      'capitalize',
-                      'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
-                    )
-                  : 'capitalize'
-              }
-            >
-              {role}
-            </Badge>
-            <Badge variant="outline" className={cn('capitalize', EMPLOYEE_META_BADGE_CLASS)}>
-              {shiftType} shift
-            </Badge>
-            <Badge variant="outline" className={cn('capitalize', EMPLOYEE_META_BADGE_CLASS)}>
-              {employmentType.replace('_', ' ')}
-            </Badge>
-            {isTherapist && (
-              <Badge
-                variant={profile?.is_lead_eligible ? 'default' : 'outline'}
-                className={profile?.is_lead_eligible ? LEAD_ELIGIBLE_BADGE_CLASS : undefined}
-              >
-                {profile?.is_lead_eligible ? 'Lead' : 'Staff only'}
-              </Badge>
-            )}
-            {isTherapist && <Badge variant="outline">Max {weeklyLimit}/week</Badge>}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-border/90">
-        <CardHeader>
-          <CardTitle>Preferences</CardTitle>
-          <CardDescription>
-            Set your default calendar view and where you land after sign-in.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form action={savePreferencesAction} className="space-y-5">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="space-y-1">
-                <label
-                  htmlFor="default_calendar_view"
-                  className="text-sm font-medium text-foreground"
-                >
-                  Default calendar view
-                </label>
-                <select
-                  id="default_calendar_view"
-                  name="default_calendar_view"
-                  defaultValue={defaultCalendarView}
-                  className="h-9 w-full rounded-md border border-border bg-[var(--input-background)] px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                >
-                  <option value="day">Day</option>
-                  <option value="night">Night</option>
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label
-                  htmlFor="default_schedule_view"
-                  className="text-sm font-medium text-foreground"
-                >
-                  Default schedule layout
-                </label>
-                <select
-                  id="default_schedule_view"
-                  name="default_schedule_view"
-                  defaultValue={defaultScheduleView}
-                  className="h-9 w-full rounded-md border border-border bg-[var(--input-background)] px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                >
-                  <option value="week">Grid</option>
-                  <option value="roster">Roster</option>
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label
-                  htmlFor="default_landing_page"
-                  className="text-sm font-medium text-foreground"
-                >
-                  Default landing page
-                </label>
-                <select
-                  id="default_landing_page"
-                  name="default_landing_page"
-                  defaultValue={defaultLandingPage}
-                  className="h-9 w-full rounded-md border border-border bg-[var(--input-background)] px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                >
-                  <option value="dashboard">Dashboard</option>
-                  <option value="coverage">Coverage</option>
-                </select>
-              </div>
-            </div>
-            <FormSubmitButton type="submit" pendingText="Saving...">
-              Save preferences
-            </FormSubmitButton>
-          </form>
-        </CardContent>
-      </Card>
-
-      <Card className="border-border/90">
-        <CardHeader>
-          <CardTitle>Appearance</CardTitle>
-          <CardDescription>
-            Choose your preferred theme or follow the system setting.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ThemePreferenceControl />
-        </CardContent>
-      </Card>
-
-      {isTherapist && (
+      <div className="mx-auto flex max-w-[780px] flex-col gap-4">
         <Card className="border-border/90">
           <CardHeader>
-            <CardTitle>Preferred Work Days</CardTitle>
+            <CardTitle>Account</CardTitle>
             <CardDescription>
-              Auto-generate will prioritize these weekdays when possible. Leave all unchecked if you
-              have no day-of-week preference.
+              Account and staffing metadata used across scheduling tools.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <form action={savePreferredWorkDaysAction} className="space-y-5">
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {WEEKDAY_OPTIONS.map((option) => (
+          <CardContent className="space-y-3 text-sm">
+            <div>
+              <p className="text-base font-bold">{fullName}</p>
+              <p className="text-sm font-bold text-primary">{email}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge
+                variant="outline"
+                className={
+                  canAccessManagerUi
+                    ? cn(
+                        'capitalize',
+                        'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+                      )
+                    : 'capitalize'
+                }
+              >
+                {role}
+              </Badge>
+              <Badge variant="outline" className={cn('capitalize', EMPLOYEE_META_BADGE_CLASS)}>
+                {shiftType} shift
+              </Badge>
+              <Badge variant="outline" className={cn('capitalize', EMPLOYEE_META_BADGE_CLASS)}>
+                {employmentType.replace('_', ' ')}
+              </Badge>
+              {isTherapist && (
+                <Badge
+                  variant={profile?.is_lead_eligible ? 'default' : 'outline'}
+                  className={profile?.is_lead_eligible ? LEAD_ELIGIBLE_BADGE_CLASS : undefined}
+                >
+                  {profile?.is_lead_eligible ? 'Lead' : 'Staff only'}
+                </Badge>
+              )}
+              {isTherapist && <Badge variant="outline">Max {weeklyLimit}/week</Badge>}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/90">
+          <CardHeader>
+            <CardTitle>Preferences</CardTitle>
+            <CardDescription>
+              Set your default calendar view and where you land after sign-in.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form action={savePreferencesAction} className="space-y-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="space-y-1">
                   <label
-                    key={option.value}
-                    className="flex min-h-10 items-center gap-2 rounded-md border border-border px-3 py-2 text-sm transition-colors hover:bg-secondary/25"
+                    htmlFor="default_calendar_view"
+                    className="text-sm font-medium text-foreground"
                   >
-                    <input
-                      type="checkbox"
-                      name="preferred_work_days"
-                      value={option.value}
-                      className="h-4 w-4 accent-[var(--primary)]"
-                      defaultChecked={preferredWorkDays.includes(option.value)}
-                    />
-                    <span>{option.label}</span>
+                    Default calendar view
                   </label>
-                ))}
+                  <select
+                    id="default_calendar_view"
+                    name="default_calendar_view"
+                    defaultValue={defaultCalendarView}
+                    className="h-9 w-full rounded-md border border-border bg-[var(--input-background)] px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  >
+                    <option value="day">Day</option>
+                    <option value="night">Night</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label
+                    htmlFor="default_schedule_view"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    Default schedule layout
+                  </label>
+                  <select
+                    id="default_schedule_view"
+                    name="default_schedule_view"
+                    defaultValue={defaultScheduleView}
+                    className="h-9 w-full rounded-md border border-border bg-[var(--input-background)] px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  >
+                    <option value="week">Grid</option>
+                    <option value="roster">Roster</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label
+                    htmlFor="default_landing_page"
+                    className="text-sm font-medium text-foreground"
+                  >
+                    Default landing page
+                  </label>
+                  <select
+                    id="default_landing_page"
+                    name="default_landing_page"
+                    defaultValue={defaultLandingPage}
+                    className="h-9 w-full rounded-md border border-border bg-[var(--input-background)] px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  >
+                    <option value="dashboard">Dashboard</option>
+                    <option value="coverage">Coverage</option>
+                  </select>
+                </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <FormSubmitButton type="submit" pendingText="Saving...">
-                  Save preferred days
-                </FormSubmitButton>
-                <p className="text-xs font-medium text-muted-foreground">
-                  Current:{' '}
-                  {preferredDayLabels.length > 0 ? preferredDayLabels.join(', ') : 'None selected'}
-                </p>
-              </div>
+              <FormSubmitButton type="submit" pendingText="Saving...">
+                Save preferences
+              </FormSubmitButton>
             </form>
           </CardContent>
         </Card>
-      )}
+
+        <Card className="border-border/90">
+          <CardHeader>
+            <CardTitle>Appearance</CardTitle>
+            <CardDescription>
+              Choose your preferred theme or follow the system setting.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ThemePreferenceControl />
+          </CardContent>
+        </Card>
+
+        {isTherapist && (
+          <Card className="border-border/90">
+            <CardHeader>
+              <CardTitle>Preferred Work Days</CardTitle>
+              <CardDescription>
+                Auto-generate will prioritize these weekdays when possible. Leave all unchecked if
+                you have no day-of-week preference.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <form action={savePreferredWorkDaysAction} className="space-y-5">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {WEEKDAY_OPTIONS.map((option) => (
+                    <label
+                      key={option.value}
+                      className="flex min-h-10 items-center gap-2 rounded-md border border-border px-3 py-2 text-sm transition-colors hover:bg-secondary/25"
+                    >
+                      <input
+                        type="checkbox"
+                        name="preferred_work_days"
+                        value={option.value}
+                        className="h-4 w-4 accent-[var(--primary)]"
+                        defaultChecked={preferredWorkDays.includes(option.value)}
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <FormSubmitButton type="submit" pendingText="Saving...">
+                    Save preferred days
+                  </FormSubmitButton>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Current:{' '}
+                    {preferredDayLabels.length > 0
+                      ? preferredDayLabels.join(', ')
+                      : 'None selected'}
+                  </p>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   )
 }

@@ -14,7 +14,7 @@ describe('team work-patterns page source contract', () => {
     expect(source).toContain(".in('role', ['therapist', 'lead'])")
     expect(source).toContain(".eq('is_active', true)")
     expect(source).toContain('WorkPatternCard')
-    expect(source).toContain('WorkPatternEditDialog')
+    expect(source).toContain('Open editor')
     expect(source).toContain('No pattern set')
   })
 })

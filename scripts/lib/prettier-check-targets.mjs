@@ -34,7 +34,7 @@ export function selectPrettierCheckTargets(trackedFiles) {
   })
 }
 
-export function chunkPrettierTargets(files, size = 25) {
+export function chunkPrettierTargets(files, size = 100) {
   if (!Number.isInteger(size) || size <= 0) {
     throw new Error(`Chunk size must be a positive integer, received: ${size}`)
   }

@@ -146,7 +146,7 @@ describe('PreliminaryScheduleView', () => {
     expect(html).toContain('Help needed')
     expect(html).toContain('Alex P.')
     expect(html).toContain('Pending manager approval.')
-    expect(html).toContain('pending approval')
+    expect(html).toContain('Tentative Assignment')
     expect(html).toContain('Request history')
     expect(html).toContain('Expressed opposite-shift interest')
     expect(html).toContain('Can cover this PRN shift')

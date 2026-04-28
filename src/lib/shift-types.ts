@@ -1,6 +1,7 @@
 // Core domain primitives shared across /coverage and /schedule pages.
 // src/app/schedule/types.ts re-exports these for backward compatibility.
 
+export type ShiftType = 'day' | 'night'
 export type ShiftStatus = 'scheduled' | 'on_call' | 'sick' | 'called_off'
 export type ShiftRole = 'lead' | 'staff'
 export type AssignmentStatus = 'scheduled' | 'call_in' | 'cancelled' | 'on_call' | 'left_early'

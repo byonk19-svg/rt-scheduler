@@ -314,16 +314,9 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
       )}
 
       {hasDraftCycles && (
-        <div
-          className="rounded-xl border px-4 py-3"
-          style={{
-            borderColor: 'var(--info-border)',
-            backgroundColor: 'var(--info-subtle)',
-            color: 'var(--info-text)',
-          }}
-        >
-          <p className="text-xs font-semibold">Ready to publish a draft?</p>
-          <p className="mt-0.5 text-xs">
+        <div className="rounded-[10px] border border-[var(--info-border)] bg-[var(--info-subtle)] px-4 py-3 text-sm text-[var(--info-text)]">
+          <p className="font-semibold">Ready to publish a draft?</p>
+          <p className="mt-0.5">
             Open the cycle in Schedule using the link below, then click <strong>Publish</strong> in
             the action bar. This page only shows delivery history after publishing.
           </p>
@@ -351,14 +344,14 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                 Create a block from the Schedule page, or archived blocks are hidden here.
               </p>
               <Button asChild size="sm" variant="outline">
-                <Link href="/coverage?view=week">Go to schedule</Link>
+                <Link href="/schedule">Go to schedule</Link>
               </Button>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="border-b border-border bg-secondary/40 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <tr className="border-b border-border bg-muted text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                     <th className="px-4 py-3">Block</th>
                     <th className="px-4 py-3">Dates</th>
                     <th className="px-4 py-3">Status</th>
@@ -389,7 +382,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                         <div className="flex flex-wrap justify-end gap-2">
                           <Link
                             href={`/coverage?cycle=${cycle.id}&view=week`}
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                            className="inline-flex h-8 items-center gap-1 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground no-underline hover:no-underline"
                           >
                             {cycle.published ? 'Open in Schedule' : 'Open to publish'}
                           </Link>
@@ -399,7 +392,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                 <input type="hidden" name="cycle_id" value={cycle.id} />
                                 <button
                                   type="submit"
-                                  className="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80"
+                                  className="inline-flex h-8 items-center rounded-md px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
                                 >
                                   Take offline
                                 </button>
@@ -409,7 +402,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                 <button
                                   type="submit"
                                   title="Draft again and clear all assignments for this block"
-                                  className="inline-flex h-8 items-center rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 text-xs font-semibold text-[var(--warning-text)] transition-opacity hover:opacity-80"
+                                  className="inline-flex h-8 items-center rounded-md px-3 text-xs font-semibold text-[var(--error)] transition-colors hover:bg-muted hover:text-[var(--error)]"
                                 >
                                   Clear & restart
                                 </button>
@@ -421,7 +414,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                 <input type="hidden" name="cycle_id" value={cycle.id} />
                                 <button
                                   type="submit"
-                                  className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80"
+                                  className="inline-flex h-8 items-center gap-1 rounded-md px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
                                 >
                                   <Archive className="h-3.5 w-3.5" />
                                   Archive
@@ -432,7 +425,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                 <input type="hidden" name="return_to" value="publish" />
                                 <button
                                   type="submit"
-                                  className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 text-xs font-semibold text-[var(--error-text)] transition-opacity hover:opacity-80"
+                                  className="inline-flex h-8 items-center gap-1 rounded-md px-3 text-xs font-semibold text-[var(--error)] transition-colors hover:bg-muted hover:text-[var(--error)]"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                   Delete draft
@@ -461,25 +454,18 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
         </div>
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-tw-sm">
           {events.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 px-6 py-14 text-center">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-muted">
-                <Send className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-foreground">No publish events yet</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Publish a schedule from the schedule workspace to see delivery history here.
-                </p>
-              </div>
-              <Button asChild size="sm" variant="outline">
-                <Link href="/coverage?view=week">Go to schedule</Link>
+            <div className="flex flex-col items-center gap-3 py-12 text-center">
+              <Send className="h-12 w-12 text-muted-foreground" />
+              <p className="text-base font-semibold">No publish events yet</p>
+              <Button asChild variant="default">
+                <Link href="/schedule">Go to schedule</Link>
               </Button>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="border-b border-border bg-secondary/40 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <tr className="border-b border-border bg-muted text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                     <th className="px-4 py-3">Published at</th>
                     <th className="px-4 py-3">Cycle</th>
                     <th className="px-4 py-3">Published by</th>
@@ -551,7 +537,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                 <input type="hidden" name="cycle_id" value={event.cycle_id} />
                                 <button
                                   type="submit"
-                                  className="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80"
+                                  className="inline-flex h-8 items-center rounded-md px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
                                 >
                                   Take offline
                                 </button>
@@ -561,7 +547,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                 <button
                                   type="submit"
                                   title="Draft again and clear all assignments for this block"
-                                  className="inline-flex h-8 items-center rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 text-xs font-semibold text-[var(--warning-text)] transition-opacity hover:opacity-80"
+                                  className="inline-flex h-8 items-center rounded-md px-3 text-xs font-semibold text-[var(--error)] transition-colors hover:bg-muted hover:text-[var(--error)]"
                                 >
                                   Clear & restart
                                 </button>
@@ -574,7 +560,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                 <input type="hidden" name="cycle_id" value={event.cycle_id} />
                                 <button
                                   type="submit"
-                                  className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-3 text-xs font-semibold text-foreground transition-opacity hover:opacity-80"
+                                  className="inline-flex h-8 items-center gap-1 rounded-md px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
                                 >
                                   <Archive className="h-3.5 w-3.5" />
                                   Archive cycle
@@ -584,7 +570,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                 <input type="hidden" name="publish_event_id" value={event.id} />
                                 <button
                                   type="submit"
-                                  className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 text-xs font-semibold text-[var(--error-text)] transition-opacity hover:opacity-80"
+                                  className="inline-flex h-8 items-center gap-1 rounded-md px-3 text-xs font-semibold text-[var(--error)] transition-colors hover:bg-muted hover:text-[var(--error)]"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                   Delete history

@@ -170,7 +170,7 @@ describe('pickTherapistForDate', () => {
     expect(pick.therapist?.id).toBe('full-time')
   })
 
-  it('allows weekday assignments even when offs_dow is set', () => {
+  it('blocks assignments on offs_dow dates even when works_dow_mode is soft', () => {
     const therapist = buildTherapist({
       offs_dow: [1],
       works_dow_mode: 'soft',
@@ -188,10 +188,10 @@ describe('pickTherapistForDate', () => {
       new Map([['therapist-1', 3]])
     )
 
-    expect(pick.therapist?.id).toBe('therapist-1')
+    expect(pick.therapist).toBeNull()
   })
 
-  it('allows non-works days even when works_dow_mode is hard', () => {
+  it('blocks non-works days when works_dow_mode is hard', () => {
     const therapist = buildTherapist({
       works_dow: [2],
       works_dow_mode: 'hard',
@@ -209,7 +209,7 @@ describe('pickTherapistForDate', () => {
       new Map([['therapist-1', 3]])
     )
 
-    expect(pick.therapist?.id).toBe('therapist-1')
+    expect(pick.therapist).toBeNull()
   })
 
   it('blocks PRN when no explicit availability override exists for the date', () => {
@@ -256,7 +256,7 @@ describe('pickTherapistForDate', () => {
     expect(pick.therapist).toBeNull()
   })
 
-  it('falls back to cursor order when weekly counts are tied', () => {
+  it('prefers lower-pattern-penalty matches before cursor order when weekly counts are tied', () => {
     const therapists: Therapist[] = [
       buildTherapist({
         id: 'soft-non-match',
@@ -287,10 +287,10 @@ describe('pickTherapistForDate', () => {
       ])
     )
 
-    expect(pick.therapist?.id).toBe('soft-non-match')
+    expect(pick.therapist?.id).toBe('soft-match')
   })
 
-  it('does not block alternating weekend dates without explicit overrides', () => {
+  it('honors every-other-weekend parity without explicit overrides', () => {
     const therapist = buildTherapist({
       weekend_rotation: 'every_other',
       weekend_anchor_date: '2026-02-21',
@@ -323,7 +323,7 @@ describe('pickTherapistForDate', () => {
       new Map([['therapist-1', 3]])
     )
 
-    expect(secondWeekend.therapist?.id).toBe('therapist-1')
+    expect(secondWeekend.therapist).toBeNull()
   })
 
   it('force_on override allows scheduling outside hard recurring pattern', () => {

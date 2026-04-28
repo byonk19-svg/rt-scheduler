@@ -80,7 +80,7 @@ export function ThemePreferenceControl() {
 
   return (
     <div className="space-y-3">
-      <div className="inline-flex overflow-hidden rounded-lg border border-border/70 bg-background">
+      <div className="flex gap-0.5 rounded-[7px] bg-muted p-0.5">
         {(
           [
             { value: 'light', label: 'Light' },
@@ -93,10 +93,10 @@ export function ThemePreferenceControl() {
             type="button"
             onClick={() => setTheme(option.value)}
             className={cn(
-              'px-3 py-1.5 text-sm font-medium transition-colors',
+              'rounded-[5px] px-3 py-1 text-xs font-medium transition-colors',
               theme === option.value
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground'
+                ? 'bg-sidebar text-white'
+                : 'rounded-[6px] text-muted-foreground hover:bg-background/70 hover:text-foreground'
             )}
           >
             {option.label}

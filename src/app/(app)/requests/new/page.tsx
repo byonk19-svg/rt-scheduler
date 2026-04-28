@@ -2,220 +2,21 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { AlertCircle, CalendarDays, CheckCircle2, ChevronLeft, Plus, Star } from 'lucide-react'
 
+import { RequestComposer } from '@/components/requests/RequestComposer'
+import { RequestsHistoryView } from '@/components/requests/RequestsHistoryView'
+import type { MyShift, OpenRequest, TeamMember } from '@/components/requests/request-page-model'
+import { loadEligibleRequestTeammates, loadRequestPageSnapshot } from '@/lib/request-page-data'
 import { dateKeyFromDate } from '@/lib/schedule-helpers'
+import {
+  defaultRequestMessage,
+  mutateShiftPost,
+  requestSlotKey,
+  type RequestType,
+  type RequestVisibility,
+} from '@/lib/request-workflow'
 import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
-import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
 import { SkeletonCard, SkeletonListItem } from '@/components/ui/skeleton'
-import { cn } from '@/lib/utils'
-import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
-import { getPickupInterestTherapistCopy } from '@/lib/pickup-interest-presentation'
-
-type RequestType = 'swap' | 'pickup'
-type PersistedRequestStatus = 'pending' | 'approved' | 'denied' | 'expired' | 'withdrawn'
-type InterestStatus = 'pending' | 'selected' | 'declined' | 'withdrawn'
-type RequestStatus = PersistedRequestStatus | 'expired' | 'selected' | 'withdrawn'
-type ShiftType = 'day' | 'night'
-type ShiftRole = 'lead' | 'staff'
-type ShiftStatus = 'scheduled' | 'on_call' | 'sick' | 'called_off'
-
-type ShiftRow = {
-  id: string
-  date: string
-  shift_type: ShiftType
-  role: ShiftRole
-  status: ShiftStatus
-  schedule_cycles?: { published: boolean } | { published: boolean }[] | null
-}
-
-type ShiftPostRow = {
-  id: string
-  type: RequestType
-  status: PersistedRequestStatus
-  recipient_response: 'pending' | 'accepted' | 'declined' | null
-  request_kind: 'standard' | 'call_in' | null
-  created_at: string
-  shift_id: string | null
-  posted_by: string | null
-  claimed_by: string | null
-  visibility: 'team' | 'direct' | null
-  message: string
-}
-
-type ShiftPostInterestRow = {
-  id: string
-  shift_post_id: string
-  therapist_id: string
-  status: InterestStatus
-  created_at: string
-}
-
-type ProfileRow = {
-  id: string
-  full_name: string | null
-  role?: string | null
-  shift_type: ShiftType | null
-  is_lead_eligible?: boolean | null
-  is_active?: boolean | null
-}
-
-type MyShift = {
-  id: string
-  isoDate: string
-  date: string
-  dow: string
-  type: 'Day' | 'Night'
-  shiftType: ShiftType
-  isLead: boolean
-}
-
-type TeamMember = {
-  id: string
-  name: string
-  avatar: string
-  shift: 'Day' | 'Night'
-  isLead: boolean
-}
-
-type OpenRequest = {
-  id: string
-  createdAt: string
-  type: RequestType
-  visibility: 'team' | 'direct'
-  involvement: 'posted' | 'received_direct' | 'claimed' | 'interest'
-  sourcePostId: string | null
-  recipientResponse: 'pending' | 'accepted' | 'declined' | null
-  requestKind: 'standard' | 'call_in'
-  shift: string
-  status: RequestStatus
-  swapWith: string | null
-  posted: string
-  message: string
-}
-
-const STATUS_META: Record<
-  RequestStatus,
-  { label: string; colorClass: string; bgClass: string; borderClass: string }
-> = {
-  pending: {
-    label: 'Pending',
-    colorClass: 'text-[var(--warning-text)]',
-    bgClass: 'bg-[var(--warning-subtle)]',
-    borderClass: 'border-[var(--warning-border)]',
-  },
-  approved: {
-    label: 'Approved',
-    colorClass: 'text-[var(--success-text)]',
-    bgClass: 'bg-[var(--success-subtle)]',
-    borderClass: 'border-[var(--success-border)]',
-  },
-  denied: {
-    label: 'Denied',
-    colorClass: 'text-[var(--error-text)]',
-    bgClass: 'bg-[var(--error-subtle)]',
-    borderClass: 'border-[var(--error-border)]',
-  },
-  selected: {
-    label: 'Selected',
-    colorClass: 'text-[var(--success-text)]',
-    bgClass: 'bg-[var(--success-subtle)]',
-    borderClass: 'border-[var(--success-border)]',
-  },
-  withdrawn: {
-    label: 'Withdrawn',
-    colorClass: 'text-muted-foreground',
-    bgClass: 'bg-muted',
-    borderClass: 'border-border',
-  },
-  expired: {
-    label: 'Expired',
-    colorClass: 'text-muted-foreground',
-    bgClass: 'bg-muted',
-    borderClass: 'border-border',
-  },
-}
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('')
-}
-
-function formatShortDate(isoDate: string): string {
-  const parsed = new Date(`${isoDate}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return isoDate
-  return parsed.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-}
-
-function formatShiftLabel(isoDate: string, shiftType: ShiftType): string {
-  return `${formatShortDate(isoDate)} - ${shiftType === 'day' ? 'Day' : 'Night'}`
-}
-
-function formatRelativeTime(value: string): string {
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return value
-
-  const seconds = Math.round((parsed.getTime() - Date.now()) / 1000)
-  const absSeconds = Math.abs(seconds)
-  const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
-
-  if (absSeconds < 60) return rtf.format(seconds, 'second')
-  if (absSeconds < 3600) return rtf.format(Math.round(seconds / 60), 'minute')
-  if (absSeconds < 86400) return rtf.format(Math.round(seconds / 3600), 'hour')
-  return rtf.format(Math.round(seconds / 86400), 'day')
-}
-
-function isOlderThanHours(value: string, hours: number): boolean {
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return false
-  return Date.now() - parsed.getTime() >= hours * 60 * 60 * 1000
-}
-
-function toUiStatus(status: PersistedRequestStatus, createdAt: string): RequestStatus {
-  if (status === 'pending' && isOlderThanHours(createdAt, 48)) {
-    return 'expired'
-  }
-  return status
-}
-
-function toInterestUiStatus(status: InterestStatus): RequestStatus {
-  if (status === 'selected') return 'selected'
-  if (status === 'withdrawn') return 'withdrawn'
-  if (status === 'declined') return 'denied'
-  return 'pending'
-}
-
-function defaultMessage(type: RequestType): string {
-  return type === 'swap'
-    ? 'Requesting a swap for this shift.'
-    : 'Requesting pickup coverage for this shift.'
-}
-
-function slotKey(date: string, shiftType: ShiftType): string {
-  return `${date}:${shiftType}`
-}
-
-async function mutateShiftPost(body: Record<string, unknown>) {
-  const response = await fetch('/api/shift-posts', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  })
-
-  const payload = (await response.json().catch(() => null)) as { error?: string } | null
-  if (!response.ok) {
-    throw new Error(payload?.error ?? 'Could not update that request.')
-  }
-
-  return payload
-}
 
 function SwapRequestPageContent() {
   const router = useRouter()
@@ -231,7 +32,7 @@ function SwapRequestPageContent() {
   const [message, setMessage] = useState('')
   const [search, setSearch] = useState('')
   const [step, setStep] = useState<1 | 2 | 3>(1)
-  const [requestVisibility, setRequestVisibility] = useState<'team' | 'direct'>('team')
+  const [requestVisibility, setRequestVisibility] = useState<RequestVisibility>('team')
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -249,7 +50,7 @@ function SwapRequestPageContent() {
   )
   const selectedShiftRequiresLeadEligibleReplacement = useMemo(() => {
     if (!selectedShiftData?.isLead) return false
-    const key = slotKey(selectedShiftData.isoDate, selectedShiftData.shiftType)
+    const key = requestSlotKey(selectedShiftData.isoDate, selectedShiftData.shiftType)
     const leadCount = leadCountsBySlot[key] ?? 0
     return leadCount <= 1
   }, [leadCountsBySlot, selectedShiftData])
@@ -270,216 +71,24 @@ function SwapRequestPageContent() {
     try {
       setLoading(true)
       setError(null)
+      const todayKey = dateKeyFromDate(new Date())
       const {
-        data: { user },
-      } = await supabase.auth.getUser()
+        currentUserId: nextUserId,
+        leadCountsBySlot: nextLeadCountsBySlot,
+        myOpenRequests: nextOpenRequests,
+        myShifts: nextShifts,
+      } = (await loadRequestPageSnapshot(supabase, todayKey)) ?? {}
 
-      if (!user) {
+      if (!nextUserId) {
         router.replace('/login')
         return
       }
 
-      const todayKey = dateKeyFromDate(new Date())
-      setCurrentUserId(user.id)
-
-      const [myShiftsResult, myRequestsResult, myInterestRowsResult] = await Promise.all([
-        supabase
-          .from('shifts')
-          .select('id, date, shift_type, role, status, schedule_cycles!inner(published)')
-          .eq('user_id', user.id)
-          .gte('date', todayKey)
-          .eq('status', 'scheduled')
-          .eq('schedule_cycles.published', true)
-          .order('date', { ascending: true }),
-        supabase
-          .from('shift_posts')
-          .select(
-            'id, type, status, recipient_response, request_kind, created_at, shift_id, posted_by, claimed_by, visibility, message'
-          )
-          .or(`posted_by.eq.${user.id},claimed_by.eq.${user.id}`)
-          .order('created_at', { ascending: false })
-          .order('id', { ascending: false }),
-        supabase
-          .from('shift_post_interests')
-          .select('id, shift_post_id, therapist_id, status, created_at')
-          .eq('therapist_id', user.id)
-          .order('created_at', { ascending: false })
-          .order('id', { ascending: false }),
-      ])
-
       if (!active) return
-
-      const myShiftRows = (myShiftsResult.data ?? []) as ShiftRow[]
-      const activeOperationalCodes = await fetchActiveOperationalCodeMap(
-        supabase,
-        myShiftRows.map((shift) => shift.id)
-      )
-      const mappedMyShifts = myShiftRows
-        .filter((shift) => !activeOperationalCodes.has(shift.id))
-        .map((shift) => {
-          const parsed = new Date(`${shift.date}T00:00:00`)
-          const dow = Number.isNaN(parsed.getTime())
-            ? shift.date
-            : parsed.toLocaleDateString('en-US', { weekday: 'long' })
-
-          return {
-            id: shift.id,
-            isoDate: shift.date,
-            date: formatShortDate(shift.date),
-            dow,
-            type: shift.shift_type === 'day' ? 'Day' : 'Night',
-            shiftType: shift.shift_type,
-            isLead: shift.role === 'lead',
-          } satisfies MyShift
-        })
-
-      const uniqueDates = Array.from(new Set(mappedMyShifts.map((shift) => shift.isoDate)))
-      let leadCounts: Record<string, number> = {}
-      if (uniqueDates.length > 0) {
-        const { data: leadRows, error: leadRowsError } = await supabase
-          .from('shifts')
-          .select('date, shift_type')
-          .eq('role', 'lead')
-          .in('date', uniqueDates)
-
-        if (leadRowsError) {
-          console.error('Failed to load lead coverage for swap form:', leadRowsError)
-        } else {
-          leadCounts = ((leadRows ?? []) as Array<Pick<ShiftRow, 'date' | 'shift_type'>>).reduce(
-            (acc, row) => {
-              const key = slotKey(row.date, row.shift_type)
-              acc[key] = (acc[key] ?? 0) + 1
-              return acc
-            },
-            {} as Record<string, number>
-          )
-        }
-      }
-
-      const requestRows = (myRequestsResult.data ?? []) as ShiftPostRow[]
-      const interestRows = (myInterestRowsResult.data ?? []) as ShiftPostInterestRow[]
-      const requestRowIds = new Set(requestRows.map((row) => row.id))
-      const interestPostIds = Array.from(
-        new Set(interestRows.map((row) => row.shift_post_id).filter((id) => !requestRowIds.has(id)))
-      )
-
-      let interestPostRows: ShiftPostRow[] = []
-      if (interestPostIds.length > 0) {
-        const { data: interestPostData } = await supabase
-          .from('shift_posts')
-          .select(
-            'id, type, status, recipient_response, request_kind, created_at, shift_id, posted_by, claimed_by, visibility, message'
-          )
-          .in('id', interestPostIds)
-
-        interestPostRows = (interestPostData ?? []) as ShiftPostRow[]
-      }
-
-      const allRequestRows = [...requestRows, ...interestPostRows]
-      const shiftIds = Array.from(
-        new Set(
-          allRequestRows
-            .map((row) => row.shift_id)
-            .filter((value): value is string => Boolean(value))
-        )
-      )
-
-      let shiftById = new Map<string, ShiftRow>()
-      if (shiftIds.length > 0) {
-        const { data: shiftRows } = await supabase
-          .from('shifts')
-          .select('id, date, shift_type, role')
-          .in('id', shiftIds)
-
-        shiftById = new Map(((shiftRows ?? []) as ShiftRow[]).map((row) => [row.id, row]))
-      }
-
-      const requestedPartnerIds = Array.from(
-        new Set(
-          allRequestRows
-            .flatMap((row) => [row.claimed_by, row.posted_by])
-            .filter((value): value is string => Boolean(value))
-        )
-      )
-
-      let partnerById = new Map<string, string>()
-      if (requestedPartnerIds.length > 0) {
-        const { data: partnerRows } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .in('id', requestedPartnerIds)
-
-        partnerById = new Map(
-          ((partnerRows ?? []) as ProfileRow[]).map((row) => [
-            row.id,
-            row.full_name ?? 'Unknown therapist',
-          ])
-        )
-      }
-
-      const mappedOpenRequests = requestRows.map((row) => {
-        const shift = row.shift_id ? (shiftById.get(row.shift_id) ?? null) : null
-        const status = toUiStatus(row.status, row.created_at)
-
-        return {
-          id: row.id,
-          type: row.type,
-          visibility: row.visibility ?? 'team',
-          involvement:
-            row.posted_by === user.id
-              ? 'posted'
-              : row.visibility === 'direct'
-                ? 'received_direct'
-                : 'claimed',
-          sourcePostId: row.id,
-          recipientResponse: row.recipient_response ?? null,
-          requestKind: row.request_kind ?? 'standard',
-          shift: shift ? formatShiftLabel(shift.date, shift.shift_type) : 'Shift unavailable',
-          status,
-          createdAt: row.created_at,
-          swapWith: row.claimed_by ? (partnerById.get(row.claimed_by) ?? null) : null,
-          posted: formatRelativeTime(row.created_at),
-          message: row.message,
-        } satisfies OpenRequest
-      })
-      const postById = new Map(allRequestRows.map((row) => [row.id, row]))
-      const interestOnlyRequests = interestRows
-        .filter((interest) => !requestRowIds.has(interest.shift_post_id))
-        .map((interest) => {
-          const row = postById.get(interest.shift_post_id)
-          const shift = row?.shift_id ? (shiftById.get(row.shift_id) ?? null) : null
-
-          return {
-            id: interest.id,
-            type: row?.type ?? 'pickup',
-            visibility: row?.visibility ?? 'team',
-            involvement: 'interest',
-            sourcePostId: row?.id ?? null,
-            recipientResponse: row?.recipient_response ?? null,
-            requestKind: row?.request_kind ?? 'standard',
-            shift: shift ? formatShiftLabel(shift.date, shift.shift_type) : 'Shift unavailable',
-            status: toInterestUiStatus(interest.status),
-            createdAt: interest.created_at,
-            swapWith: row?.posted_by ? (partnerById.get(row.posted_by) ?? null) : null,
-            posted: formatRelativeTime(interest.created_at),
-            message: row?.message ?? 'Pickup interest submitted.',
-          } satisfies OpenRequest
-        })
-
-      if (!active) return
-
-      setMyShifts(mappedMyShifts)
-      setLeadCountsBySlot(leadCounts)
-      setMyOpenRequests(
-        [...mappedOpenRequests, ...interestOnlyRequests].sort((left, right) => {
-          const createdAtComparison = right.createdAt.localeCompare(left.createdAt)
-          if (createdAtComparison !== 0) {
-            return createdAtComparison
-          }
-
-          return right.id.localeCompare(left.id)
-        })
-      )
+      setCurrentUserId(nextUserId)
+      setMyShifts(nextShifts ?? [])
+      setLeadCountsBySlot(nextLeadCountsBySlot ?? {})
+      setMyOpenRequests(nextOpenRequests ?? [])
     } catch (loadError) {
       console.error('Failed to load swap request form data:', loadError)
       if (active) {
@@ -543,41 +152,16 @@ function SwapRequestPageContent() {
         return
       }
 
-      let membersQuery = supabase
-        .from('profiles')
-        .select('id, full_name, role, shift_type, is_lead_eligible, is_active')
-        .in('role', ['therapist', 'lead'])
-        .eq('shift_type', selectedShiftData.shiftType)
-        .eq('is_active', true)
-        .neq('id', currentUserId)
+      try {
+        const mappedMembers = await loadEligibleRequestTeammates(selectedShiftData.id)
 
-      if (selectedShiftRequiresLeadEligibleReplacement) {
-        membersQuery = membersQuery.eq('is_lead_eligible', true)
-      }
-
-      const { data, error: membersError } = await membersQuery
-
-      if (!active) return
-      if (membersError) {
+        if (!active) return
+        setTeamMembers(mappedMembers)
+      } catch (membersError) {
+        if (!active) return
         console.error('Failed to load team members for swap request form:', membersError)
         setError('Could not load eligible team members.')
-        return
       }
-
-      const mappedMembers = ((data ?? []) as ProfileRow[])
-        .filter((row) => row.is_active !== false)
-        .map((row) => {
-          const name = row.full_name ?? 'Unknown therapist'
-          return {
-            id: row.id,
-            name,
-            avatar: initials(name),
-            shift: selectedShiftData.shiftType === 'day' ? 'Day' : 'Night',
-            isLead: row.is_lead_eligible === true,
-          } satisfies TeamMember
-        })
-
-      setTeamMembers(mappedMembers)
     }
 
     void loadTeamMembers()
@@ -629,7 +213,7 @@ function SwapRequestPageContent() {
         requestType,
         visibility: requestVisibility,
         teammateId: swapWith,
-        message: message.trim() || defaultMessage(requestType),
+        message: message.trim() || defaultRequestMessage(requestType),
       })
       await loadData()
     } catch (submitError) {
@@ -744,548 +328,47 @@ function SwapRequestPageContent() {
     }
   }
 
-  return (
-    <div className="space-y-6">
-      {view === 'list' && (
-        <ManagerWorkspaceHeader
-          title="My Requests"
-          subtitle="Track posted, claimed, and direct requests."
-          summary={
-            <div className="flex flex-wrap items-center gap-2 text-foreground">
-              <span className="inline-flex items-center rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold text-foreground">
-                {totalRequests} open total
-              </span>
-              <span className="inline-flex items-center rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2.5 py-1 text-[11px] font-semibold text-[var(--warning-text)]">
-                {pendingCount} pending
-              </span>
-              <span className="inline-flex items-center rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] px-2.5 py-1 text-[11px] font-semibold text-[var(--success-text)]">
-                {approvedCount} approved
-              </span>
-            </div>
-          }
-          actions={
-            <Button size="sm" onClick={handleNew}>
-              <Plus className="mr-1.5 h-3.5 w-3.5" />
-              New request
-            </Button>
-          }
-        />
-      )}
-
-      {view === 'form' && (
-        <div className="rounded-2xl border border-border/90 bg-[color-mix(in_oklch,var(--card)_92%,var(--secondary))] px-4 py-4 shadow-tw-double-panel sm:px-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Button variant="outline" size="sm" onClick={handleBack}>
-                <ChevronLeft className="mr-1 h-3.5 w-3.5" />
-                Back
-              </Button>
-              <div className="flex items-center gap-2">
-                {([1, 2, 3] as const).map((n) => (
-                  <span
-                    key={n}
-                    className={cn(
-                      'flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold',
-                      step >= n
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-border bg-card text-muted-foreground'
-                    )}
-                  >
-                    {n}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Step {step} of 3
-            </span>
-          </div>
-          <p className="mt-3 text-sm font-semibold text-foreground">{stepTitle}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Complete each step to submit your request for manager review.
-          </p>
-        </div>
-      )}
-
-      {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 py-3 text-sm font-medium text-[var(--error-text)]">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          {error}
-        </div>
-      )}
-
-      {/* ── LIST VIEW ── */}
-      {view === 'list' && (
-        <div className="space-y-3">
-          {/* How it works hint */}
-          <div className="rounded-xl border border-border bg-card px-4 py-3">
-            <p className="text-xs font-semibold text-foreground">How requests work</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Submit a swap or pickup request and your manager will review it. Check this page for
-              status updates.
-            </p>
-          </div>
-
-          {loading ? (
-            <div className="space-y-3">
-              <SkeletonListItem />
-              <SkeletonListItem />
-              <SkeletonListItem />
-            </div>
-          ) : myOpenRequests.length === 0 ? (
-            <div className="rounded-xl border border-border bg-card px-6 py-10 text-center">
-              <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full border border-border bg-muted">
-                <CalendarDays className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <p className="mb-1 text-sm font-bold text-foreground">No requests yet</p>
-              <p className="mb-4 text-xs text-muted-foreground">
-                Create a swap, pickup, or direct request to track it here.
-              </p>
-              <Button size="sm" onClick={handleNew}>
-                Start request
-              </Button>
-            </div>
-          ) : (
-            myOpenRequests.map((request) => {
-              const meta = STATUS_META[request.status]
-              const isPending = request.status === 'pending'
-              const pickupInterestCopy =
-                request.involvement === 'interest' &&
-                (request.status === 'pending' || request.status === 'selected')
-                  ? getPickupInterestTherapistCopy(
-                      request.status === 'selected' ? 'selected' : 'pending'
-                    )
-                  : null
-              return (
-                <div
-                  key={request.id}
-                  className={cn(
-                    'rounded-xl border bg-card p-4',
-                    isPending ? 'border-[var(--warning-border)] shadow-sm' : 'border-border'
-                  )}
-                >
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <span
-                      className={cn(
-                        'rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
-                        request.type === 'swap'
-                          ? 'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)]'
-                          : 'border-border bg-secondary text-foreground'
-                      )}
-                    >
-                      {request.type}
-                    </span>
-                    <span
-                      className={cn(
-                        'rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
-                        meta.borderClass,
-                        meta.bgClass,
-                        meta.colorClass
-                      )}
-                    >
-                      {meta.label}
-                    </span>
-                    <span className="rounded-full border border-border/70 bg-muted/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                      {request.visibility === 'direct' ? 'Direct' : 'Team'}
-                    </span>
-                    <span className="rounded-full border border-border/70 bg-muted/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                      {request.involvement === 'posted'
-                        ? 'Posted'
-                        : request.involvement === 'received_direct'
-                          ? 'Received'
-                          : request.involvement === 'interest'
-                            ? (pickupInterestCopy?.roleLabel ?? 'Interested')
-                            : 'Claimed'}
-                    </span>
-                    {request.requestKind === 'call_in' ? (
-                      <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--warning-text)]">
-                        Call-in help
-                      </span>
-                    ) : null}
-                    <span className="ml-auto text-xs text-muted-foreground">{request.posted}</span>
-                  </div>
-
-                  <div className="mb-1.5 inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/60 px-2 py-1">
-                    <CalendarDays className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-xs font-medium text-foreground">{request.shift}</span>
-                  </div>
-
-                  <p className="text-sm text-muted-foreground">{request.message}</p>
-
-                  {request.swapWith && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {request.involvement === 'interest' ? 'Posted by: ' : 'Swap with: '}
-                      <span className="font-medium text-foreground">{request.swapWith}</span>
-                    </p>
-                  )}
-
-                  {request.status === 'approved' && (
-                    <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-[var(--success-text)]">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Approved by manager
-                    </div>
-                  )}
-                  {pickupInterestCopy ? (
-                    <div
-                      className={cn(
-                        'mt-2 flex items-center gap-1.5 text-xs font-medium',
-                        request.status === 'selected'
-                          ? 'text-[var(--success-text)]'
-                          : 'text-muted-foreground'
-                      )}
-                    >
-                      {request.status === 'selected' ? (
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                      ) : null}
-                      {pickupInterestCopy.helperText}
-                    </div>
-                  ) : null}
-                  {request.visibility === 'direct' &&
-                  request.involvement === 'posted' &&
-                  request.recipientResponse === 'pending' ? (
-                    <p className="mt-2 text-xs text-[var(--warning-text)]">
-                      Waiting for the recipient to respond before manager approval.
-                    </p>
-                  ) : null}
-                  {request.visibility === 'direct' &&
-                  request.involvement === 'posted' &&
-                  request.recipientResponse === 'accepted' &&
-                  request.status === 'pending' ? (
-                    <p className="mt-2 text-xs text-[var(--warning-text)]">
-                      Recipient accepted. Waiting for manager approval.
-                    </p>
-                  ) : null}
-                  {request.visibility === 'direct' &&
-                  request.involvement === 'posted' &&
-                  request.recipientResponse === 'declined' ? (
-                    <p className="mt-2 text-xs text-[var(--error-text)]">
-                      Recipient declined this direct request.
-                    </p>
-                  ) : null}
-                  {request.visibility === 'direct' && request.recipientResponse ? (
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Recipient response:{' '}
-                      <span className="font-medium text-foreground capitalize">
-                        {request.recipientResponse}
-                      </span>
-                    </p>
-                  ) : null}
-                  {request.visibility === 'direct' &&
-                  request.involvement === 'received_direct' &&
-                  request.recipientResponse === 'accepted' &&
-                  request.status === 'pending' ? (
-                    <p className="mt-2 text-xs text-[var(--warning-text)]">
-                      You accepted. Waiting for manager approval.
-                    </p>
-                  ) : null}
-                  {request.visibility === 'direct' && request.status === 'withdrawn' ? (
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      This direct request was withdrawn before final approval.
-                    </p>
-                  ) : null}
-                  {request.visibility === 'direct' &&
-                  request.involvement === 'received_direct' &&
-                  request.recipientResponse === 'pending' ? (
-                    <div className="mt-3 flex gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => void handleRecipientDecision(request.id, 'accepted')}
-                      >
-                        Accept
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void handleRecipientDecision(request.id, 'declined')}
-                      >
-                        Decline
-                      </Button>
-                    </div>
-                  ) : request.involvement === 'posted' &&
-                    request.requestKind !== 'call_in' &&
-                    request.status === 'pending' ? (
-                    <div className="mt-3 flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void handleRequestWithdrawal(request.id)}
-                      >
-                        Withdraw request
-                      </Button>
-                    </div>
-                  ) : request.involvement === 'interest' &&
-                    (request.status === 'pending' || request.status === 'selected') ? (
-                    <div className="mt-3 flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void handleInterestWithdrawal(request.id)}
-                      >
-                        {request.status === 'selected'
-                          ? 'Withdraw primary claim'
-                          : 'Withdraw interest'}
-                      </Button>
-                    </div>
-                  ) : null}
-                </div>
-              )
-            })
-          )}
-        </div>
-      )}
-
-      {/* ── FORM VIEW ── */}
-      {view === 'form' && (
-        <div className="space-y-4">
-          <div className="rounded-xl border border-border bg-card p-5">
-            {step === 1 && (
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm font-bold text-foreground">Step 1: Request details</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Choose request type and one of your published shifts.
-                  </p>
-                </div>
-
-                <div className="flex gap-2">
-                  {(['swap', 'pickup'] as const).map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setRequestType(type)}
-                      className={cn(
-                        'rounded-lg border px-4 py-2 text-xs font-semibold capitalize transition-colors',
-                        requestType === type
-                          ? 'border-primary bg-primary/5 text-primary'
-                          : 'border-border bg-card text-muted-foreground hover:bg-secondary'
-                      )}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="space-y-1.5">
-                  <p className="text-xs font-semibold text-foreground">Request visibility</p>
-                  <div className="flex gap-2">
-                    {(['team', 'direct'] as const).map((value) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setRequestVisibility(value)}
-                        className={cn(
-                          'rounded-lg border px-4 py-2 text-xs font-semibold transition-colors capitalize',
-                          requestVisibility === value
-                            ? 'border-primary bg-primary/5 text-primary'
-                            : 'border-border bg-card text-muted-foreground hover:bg-secondary'
-                        )}
-                      >
-                        {value === 'team' ? 'Team board' : 'Direct request'}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {requestVisibility === 'direct'
-                      ? 'Direct requests stay private between you, the selected teammate, and managers.'
-                      : 'Team board requests are visible to the full published-schedule board.'}
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground" htmlFor="selected-shift">
-                    Select shift
-                  </label>
-                  <select
-                    id="selected-shift"
-                    value={selectedShift ?? ''}
-                    onChange={(e) => setSelectedShift(e.target.value || null)}
-                    className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 outline-none"
-                  >
-                    <option value="">Choose an upcoming shift…</option>
-                    {myShifts.map((shift) => (
-                      <option key={shift.id} value={shift.id}>
-                        {shift.date} — {shift.type}
-                        {shift.isLead ? ' (Lead)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {myShifts.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                      No published shifts are available for new requests right now. Swaps and
-                      pickups stay paused while a schedule is reopened in preliminary.
-                    </p>
-                  ) : null}
-                </div>
-
-                {selectedShiftData && (
-                  <div className="rounded-lg border border-border bg-muted/50 px-3 py-2.5">
-                    <p className="text-sm font-semibold text-foreground">
-                      {selectedShiftData.date} — {selectedShiftData.type}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {selectedShiftData.dow}
-                      {selectedShiftData.isLead ? ' · Lead assignment' : ''}
-                    </p>
-                  </div>
-                )}
-
-                {selectedShiftRequiresLeadEligibleReplacement && (
-                  <div className="flex items-start gap-2 rounded-lg border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-2.5">
-                    <Star className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--warning-text)]" />
-                    <p className="text-xs font-semibold text-[var(--warning-text)]">
-                      This is the only lead assignment on this shift. Your replacement must be lead
-                      eligible.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {step === 2 && (
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm font-bold text-foreground">Step 2: Choose teammate</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Team members are filtered by shift type
-                    {selectedShiftRequiresLeadEligibleReplacement ? ' and lead eligibility' : ''}.
-                  </p>
-                </div>
-
-                {selectedShiftRequiresLeadEligibleReplacement && (
-                  <div className="flex items-center gap-1.5 rounded-md border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-1.5">
-                    <Star className="h-3 w-3 text-[var(--warning-text)]" />
-                    <p className="text-xs font-semibold text-[var(--warning-text)]">
-                      Lead filter active — showing lead-eligible staff only
-                    </p>
-                  </div>
-                )}
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground" htmlFor="member-search">
-                    Search teammates
-                  </label>
-                  <input
-                    id="member-search"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search by name…"
-                    className="h-9 w-full rounded-md border border-border bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 outline-none"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  {eligibleMembers.length === 0 ? (
-                    <p className="rounded-md border border-border bg-muted/50 px-3 py-3 text-xs text-muted-foreground">
-                      No eligible teammates found for this shift.
-                    </p>
-                  ) : (
-                    eligibleMembers.map((member) => (
-                      <button
-                        key={member.id}
-                        type="button"
-                        onClick={() => setSwapWith(member.id)}
-                        className={cn(
-                          'flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors',
-                          swapWith === member.id
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border bg-card hover:bg-secondary'
-                        )}
-                      >
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--attention)]">
-                          <span className="text-xs font-bold text-accent-foreground">
-                            {member.avatar}
-                          </span>
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold text-foreground">{member.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {member.shift}
-                            {member.isLead ? ' · Lead eligible' : ''}
-                          </p>
-                        </div>
-                        {member.isLead && <Star className="h-3.5 w-3.5 text-[var(--attention)]" />}
-                      </button>
-                    ))
-                  )}
-                </div>
-
-                <p className="text-xs text-muted-foreground">
-                  {requestVisibility === 'direct'
-                    ? 'Pick the teammate you want to send this request to.'
-                    : requestType === 'swap'
-                      ? 'Selecting a swap partner is optional. Leave blank to post an open swap.'
-                      : 'Pickup requests usually do not need a specific teammate.'}
-                </p>
-              </div>
-            )}
-
-            {step === 3 && (
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm font-bold text-foreground">Step 3: Final message</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Add context before posting your request.
-                  </p>
-                </div>
-
-                <div className="rounded-lg border border-border bg-muted/50 px-3 py-3 space-y-1">
-                  <p className="text-xs font-semibold text-foreground capitalize">
-                    Type: {requestType}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Shift:{' '}
-                    {selectedShiftData
-                      ? `${selectedShiftData.date} — ${selectedShiftData.type}`
-                      : 'Not selected'}
-                  </p>
-                  {requestVisibility === 'direct' ? (
-                    <p className="text-xs text-muted-foreground">
-                      With: {selectedMember ? selectedMember.name : 'No specific teammate'}
-                    </p>
-                  ) : null}
-                  <p className="text-xs text-muted-foreground capitalize">
-                    Visibility: {requestVisibility === 'direct' ? 'Direct request' : 'Team board'}
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label
-                    className="text-xs font-semibold text-foreground"
-                    htmlFor="request-message"
-                  >
-                    Message
-                  </label>
-                  <textarea
-                    id="request-message"
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    rows={4}
-                    placeholder="Add details for your manager and team…"
-                    className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 outline-none"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Nav footer */}
-          <div className="flex justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
-            <Button variant="outline" size="sm" onClick={handlePrevStep}>
-              {step === 1 ? 'Cancel' : 'Back'}
-            </Button>
-            {step < 3 ? (
-              <Button size="sm" onClick={handleNextStep}>
-                Continue
-              </Button>
-            ) : (
-              <Button size="sm" disabled={submitting} onClick={() => void handleSubmit()}>
-                {submitting ? 'Submitting…' : 'Submit request'}
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+  return view === 'list' ? (
+    <RequestsHistoryView
+      approvedCount={approvedCount}
+      error={error}
+      loading={loading}
+      pendingCount={pendingCount}
+      requests={myOpenRequests}
+      totalRequests={totalRequests}
+      onNewRequest={handleNew}
+      onRespondDirectRequest={handleRecipientDecision}
+      onWithdrawInterest={handleInterestWithdrawal}
+      onWithdrawRequest={handleRequestWithdrawal}
+    />
+  ) : (
+    <RequestComposer
+      eligibleMembers={eligibleMembers}
+      error={error}
+      message={message}
+      myShifts={myShifts}
+      requestType={requestType}
+      requestVisibility={requestVisibility}
+      search={search}
+      selectedMember={selectedMember}
+      selectedShift={selectedShift}
+      selectedShiftData={selectedShiftData}
+      selectedShiftRequiresLeadEligibleReplacement={selectedShiftRequiresLeadEligibleReplacement}
+      step={step}
+      stepTitle={stepTitle}
+      submitting={submitting}
+      swapWith={swapWith}
+      onBack={handleBack}
+      onMessageChange={setMessage}
+      onNextStep={handleNextStep}
+      onPrevStep={handlePrevStep}
+      onRequestTypeChange={setRequestType}
+      onRequestVisibilityChange={setRequestVisibility}
+      onSearchChange={setSearch}
+      onSelectedShiftChange={setSelectedShift}
+      onSubmit={handleSubmit}
+      onSwapWithChange={setSwapWith}
+    />
   )
 }
 

@@ -8,7 +8,7 @@ import {
 
 describe('app-shell-config', () => {
   it('uses a single standard authenticated header height token', () => {
-    expect(APP_HEADER_HEIGHT).toBe(56)
+    expect(APP_HEADER_HEIGHT).toBe(44)
   })
 
   it('maps /team into the People section with Team, Requests, and Audit log local items', () => {

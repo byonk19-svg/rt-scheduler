@@ -1,6 +1,6 @@
 import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 
-export const APP_HEADER_HEIGHT = 56
+export const APP_HEADER_HEIGHT = 44
 export const APP_PAGE_MAX_WIDTH_CLASS = 'mx-auto max-w-7xl px-4 md:px-6'
 
 export type ShellNavItem = {
@@ -155,7 +155,7 @@ export function getStaffNavItems(): readonly ShellNavItem[] {
     },
     {
       href: '/therapist/schedule',
-      label: 'My Schedule',
+      label: 'My Shifts',
       active: (pathname) => pathname === '/therapist/schedule' || pathname === '/staff/my-schedule',
     },
     {

@@ -860,12 +860,10 @@ test.describe.serial('role journeys', () => {
     const requestMessage = `Need coverage for family event ${randomString('post')}`
 
     await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
-    await page.goto('/requests/new')
+    await page.goto('/requests/new?new=1')
     await expect(page.getByText('Step 1: Request details').first()).toBeVisible()
     await page.getByRole('button', { name: 'pickup' }).click()
     await page.getByRole('combobox', { name: 'Select shift' }).selectOption({ index: 1 })
-    await page.getByRole('button', { name: 'Continue' }).click()
-    await expect(page.getByText('Step 2: Choose teammate').first()).toBeVisible()
     await page.getByRole('button', { name: 'Continue' }).click()
     await expect(page.getByText('Step 3: Final message').first()).toBeVisible()
     await page.getByLabel('Message').fill(requestMessage)
@@ -921,10 +919,9 @@ test.describe.serial('role journeys', () => {
     const requestMessage = `Claimable pickup ${randomString('pickup')}`
 
     await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
-    await page.goto('/requests/new')
+    await page.goto('/requests/new?new=1')
     await page.getByRole('button', { name: 'pickup' }).click()
     await page.getByRole('combobox', { name: 'Select shift' }).selectOption({ index: 1 })
-    await page.getByRole('button', { name: 'Continue' }).click()
     await page.getByRole('button', { name: 'Continue' }).click()
     await page.getByLabel('Message').fill(requestMessage)
     await page.getByRole('button', { name: 'Submit request' }).click()
@@ -1000,10 +997,9 @@ test.describe.serial('role journeys', () => {
     const overrideReason = `Override accepted ${randomString('reason')}`
 
     await loginAs(page, ctx!.lead.email, ctx!.lead.password)
-    await page.goto('/requests/new')
+    await page.goto('/requests/new?new=1')
     await page.getByRole('button', { name: 'pickup' }).click()
     await page.getByRole('combobox', { name: 'Select shift' }).selectOption({ index: 2 })
-    await page.getByRole('button', { name: 'Continue' }).click()
     await page.getByRole('button', { name: 'Continue' }).click()
     await page.getByLabel('Message').fill(requestMessage)
     await page.getByRole('button', { name: 'Submit request' }).click()

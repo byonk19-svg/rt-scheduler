@@ -133,7 +133,7 @@ test.describe.serial('manager specialized controls', () => {
 
     const requesterPage = page
     await loginAs(requesterPage, ctx!.requester.email, ctx!.requester.password)
-    await requesterPage.goto('/requests/new')
+    await requesterPage.goto('/requests/new?new=1')
     await requesterPage.getByRole('button', { name: 'swap' }).click()
     await requesterPage.getByRole('combobox', { name: 'Select shift' }).selectOption({ index: 1 })
     await requesterPage.getByRole('button', { name: 'Continue' }).click()

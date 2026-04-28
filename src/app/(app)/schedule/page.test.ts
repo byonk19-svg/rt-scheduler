@@ -8,12 +8,14 @@ const source = readFileSync(resolve(process.cwd(), 'src/app/(app)/schedule/page.
 describe('schedule route', () => {
   it('renders the roster screen and only redirects staff on forbidden access', () => {
     expect(source).toContain('ScheduleRosterScreen')
-    expect(source).not.toContain("redirect('/coverage')")
-    expect(source).toContain("if (result.status === 'forbidden')")
+    expect(source).toContain('if (!user)')
+    expect(source).toContain("redirect('/login')")
+    expect(source).toContain("if (role !== 'manager' && role !== 'lead')")
     expect(source).toContain("redirect('/dashboard/staff')")
   })
 
-  it('keeps the screen deterministic by using the mock roster data layer', () => {
+  it('keeps phase one deterministic by rendering the mock-only schedule screen directly', () => {
     expect(source).toContain("from '@/components/schedule-roster/ScheduleRosterScreen'")
+    expect(source).not.toContain('loadScheduleRosterPageData')
   })
 })
