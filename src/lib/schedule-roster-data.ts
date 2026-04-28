@@ -4,6 +4,7 @@ import {
   type AvailabilityApprovalKind,
   type AvailabilityApprovalStore,
   type RosterKind,
+  type RosterShiftStatus,
   type Staff,
   type ShiftType,
 } from '@/lib/mock-coverage-roster'
@@ -13,6 +14,20 @@ export type LiveRosterShiftRow = {
   user_id: string
   date: string
   shift_type: 'day' | 'night'
+  assignment_status?: string | null
+}
+
+const VALID_SHIFT_STATUSES = new Set<string>([
+  'scheduled',
+  'on_call',
+  'cancelled',
+  'left_early',
+  'call_in',
+])
+
+function toRosterShiftStatus(raw: string | null | undefined): RosterShiftStatus | null {
+  if (raw && VALID_SHIFT_STATUSES.has(raw)) return raw as RosterShiftStatus
+  return null
 }
 
 export type LiveRosterOverrideRow = {
@@ -38,6 +53,7 @@ export function buildAssignmentStoreFromShifts(shifts: LiveRosterShiftRow[]): As
       isoDate: row.date,
       shiftType,
       status: 'assigned',
+      assignmentStatus: toRosterShiftStatus(row.assignment_status),
     }
   }
   return store

@@ -37,6 +37,14 @@ type CycleRow = {
   published: boolean
 }
 
+type ShiftQueryRow = {
+  id: string
+  user_id: string
+  date: string
+  shift_type: 'day' | 'night'
+  assignment_status: string | null
+}
+
 type ProfileRosterRow = {
   id: string
   full_name: string | null
@@ -128,7 +136,7 @@ export async function loadScheduleRosterPageData(
       .eq('source', 'therapist'),
     supabase
       .from('shifts')
-      .select('id, user_id, date, shift_type')
+      .select('id, user_id, date, shift_type, assignment_status')
       .eq('cycle_id', selectedCycle.id)
       .not('user_id', 'is', null),
   ])
@@ -145,7 +153,7 @@ export async function loadScheduleRosterPageData(
     submittedTherapistIds
   )
 
-  const shiftRows = (shiftsData ?? []) as LiveRosterShiftRow[]
+  const shiftRows = (shiftsData ?? []) as ShiftQueryRow[] as LiveRosterShiftRow[]
   const assignments = buildAssignmentStoreFromShifts(shiftRows)
 
   const shortLabel = formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)

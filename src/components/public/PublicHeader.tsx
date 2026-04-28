@@ -52,7 +52,7 @@ export default function PublicHeader({ className }: { className?: string }) {
     <header
       className={cn(
         isDark
-          ? 'border-b border-white/10 bg-[var(--primary)]'
+          ? 'border-b border-white/10 bg-[var(--marketing-hero-bg)]'
           : 'border-b border-border/50 bg-background/90',
         className
       )}
@@ -74,7 +74,7 @@ export default function PublicHeader({ className }: { className?: string }) {
             <span
               className={cn(
                 'block text-[0.72rem] font-medium',
-                isDark ? 'text-white/60' : 'text-muted-foreground'
+                isDark ? 'text-white/75' : 'text-muted-foreground'
               )}
             >
               Respiratory Therapy
@@ -101,7 +101,7 @@ export default function PublicHeader({ className }: { className?: string }) {
             className={cn(
               'rounded-lg px-5',
               isDark
-                ? 'bg-[var(--attention)] text-[var(--primary)] hover:bg-[var(--attention)]/90 shadow-none font-bold'
+                ? 'bg-[var(--attention)] text-[var(--marketing-hero-bg)] hover:bg-[var(--attention)]/90 shadow-none font-bold'
                 : 'rounded-xl shadow-tw-primary-glow'
             )}
           >
