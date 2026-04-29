@@ -203,7 +203,7 @@ export default async function ProfilePage({
         <FeedbackToast message={feedback.message} variant={feedback.variant} />
       )}
 
-      <div className="border-b border-border bg-card px-6 pb-4 pt-5">
+      <div className="border-b border-border bg-muted/40 px-6 pb-4 pt-5">
         <div className="mb-3">
           <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">Profile</h1>
           <p className="mt-0.5 text-xs text-muted-foreground">

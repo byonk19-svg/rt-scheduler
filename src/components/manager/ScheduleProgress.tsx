@@ -42,9 +42,9 @@ export function ScheduleProgress({
     {
       label: 'Night Shifts',
       caption: 'Overnight coverage load',
-      indicatorClassName: 'bg-[var(--warning)]',
+      indicatorClassName: 'bg-[var(--night)]',
       badgeClassName:
-        'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]',
+        'border-[var(--night-border)] bg-[var(--night-subtle)] text-[var(--night-text)]',
       ...night,
       filled: nightFilled,
       total: nightTotal,

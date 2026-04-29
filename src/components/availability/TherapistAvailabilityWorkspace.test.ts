@@ -13,7 +13,7 @@ vi.mock('next/link', () => ({
 import { TherapistAvailabilityWorkspace } from '@/components/availability/TherapistAvailabilityWorkspace'
 
 describe('TherapistAvailabilityWorkspace', () => {
-  it('renders therapist-only controls with simpler normal-schedule and cycle-change language', () => {
+  it('renders therapist-only controls with compact quick-edit and consistent state language', () => {
     const html = renderToStaticMarkup(
       createElement(TherapistAvailabilityWorkspace, {
         cycles: [
@@ -78,26 +78,29 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('id="therapist-availability-workspace"')
     expect(html).toContain('Not submitted')
     expect(html).toContain('Cycle:')
-    expect(html).not.toContain('days selected')
-    expect(html).toContain(
-      'Normal work days and normal off days are shown here before you make cycle-only changes.'
-    )
-    expect(html).toContain('From your normal schedule')
-    expect(html).toContain('This cycle only')
-    expect(html).toContain('Normal work')
-    expect(html).toContain('Normal off')
-    expect(html).toContain('Normal schedule')
+    expect(html).toContain('Quick edit')
+    expect(html).toContain('Select one day or several days, then choose a state.')
+    expect(html).toContain('Select a day to make a change.')
+    expect(html).toContain('Summary')
+    expect(html).toContain('Legend')
+    expect(html).toContain('Selected day')
+    expect(html).toContain('Starting point')
     expect(html).toContain('This cycle changes')
-    expect(html).toContain('This cycle: can&#x27;t work')
-    expect(html).toContain('This cycle: can work')
-    expect(html).not.toContain('panel on the right')
-    expect(html).toContain('Optional note')
+    expect(html).toContain('Can work')
+    expect(html).toContain('Can&#x27;t work')
+    expect(html).toContain('Clear')
+    expect(html).toContain('Unmarked')
+    expect(html).not.toContain('Normal work')
+    expect(html).not.toContain('Normal off')
+    expect(html).not.toContain('This cycle: can&#x27;t work')
+    expect(html).not.toContain('This cycle: can work')
+    expect(html).not.toContain('Use normal schedule')
+    expect(html).toContain('Click a day to review it and make a change.')
     expect(html).toContain('Mar')
     expect(html).toContain('Apr')
     expect(html).not.toContain('Request to Work')
     expect(html).not.toContain('Need Off')
-    expect(html).toContain('can work')
-    expect(html).toContain('Reset this cycle to normal schedule')
+    expect(html).toContain('Clear cycle changes')
     expect(html).toContain('Edit several days')
     expect(html).toContain('Week 1')
     expect(html).not.toContain('Must work')
@@ -154,19 +157,30 @@ describe('TherapistAvailabilityWorkspace', () => {
     )
 
     expect(html).toContain('This cycle starts blank.')
-    expect(html).toContain('Choose the days you can or cannot work.')
-    expect(html).toContain('Not set')
-    expect(html).toContain('Not set from normal schedule')
+    expect(html).toContain('Add the days you can or can&#x27;t work.')
+    expect(html).toContain('Unmarked')
+    expect(html).not.toContain('Not set')
     expect(html).not.toContain('Normal off day')
-    expect(html).not.toContain('From your normal schedule')
+    expect(html).not.toContain('Request to Work')
   })
 
-  it('documents that Available days do not persist notes (source)', () => {
+  it('keeps neutral grid cells unlabeled and documents note persistence (source)', () => {
     const src = readFileSync(
       resolve(process.cwd(), 'src/components/availability/TherapistAvailabilityWorkspace.tsx'),
       'utf8'
     )
+    expect(src).not.toContain('Not set')
+    expect(src).not.toContain('Normal work')
+    expect(src).not.toContain('Normal off')
+    expect(src).not.toContain('Use normal schedule')
+    expect(src).not.toContain('This cycle:')
+    expect(src).toContain("displayState === 'can_work' || displayState === 'cannot_work'")
+    expect(src).toContain('{showStatusLabel ? (')
     expect(src).toContain('Notes are only saved for days you change for this cycle.')
     expect(src).toContain('Edit several days')
+    expect(src).toContain('rounded-[0.95rem] border border-border/60 bg-background px-3.5 py-2.5')
+    expect(src).toContain('xl:border-l xl:border-t-0')
+    expect(src).toContain('xl:grid-cols-[minmax(0,1fr)_19rem]')
+    expect(src).toContain('ring-primary/35')
   })
 })

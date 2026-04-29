@@ -360,7 +360,7 @@ export default async function TherapistAvailabilityPage({
         initialFilters={initialFilters}
         returnToPath="/therapist/availability"
         titleOverride="Submitted Availability"
-        descriptionOverride="Day-level availability entries for the selected cycle."
+        descriptionOverride="Once you submit, your availability will appear here."
         emptyMessageOverride="No day-level entries yet for this cycle."
       />
     </div>
