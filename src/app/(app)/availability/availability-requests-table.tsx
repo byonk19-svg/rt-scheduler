@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useMemo, useState } from 'react'
+import { CalendarDays } from 'lucide-react'
 
 import { useAvailabilityPlannerFocus } from '@/components/availability/availability-planner-focus-context'
 import {
@@ -167,13 +168,23 @@ export function AvailabilityEntriesTable({
 
   if (!canManageAvailability && rows.length === 0) {
     return (
-      <section className="rounded-2xl border border-border/80 bg-card px-5 py-4 shadow-tw-xs">
+      <section className="rounded-[1.25rem] border border-border/70 bg-card px-5 py-4 shadow-tw-2xs-soft">
         <h2 className="text-base font-semibold tracking-tight text-foreground">
           {titleOverride ?? 'Submitted Availability'}
         </h2>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          {emptyMessageOverride ?? 'No day-level entries yet for this cycle.'}
-        </p>
+        <div className="mt-3 flex items-center gap-3 rounded-xl border border-dashed border-border/80 bg-background px-4 py-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted/45 text-muted-foreground">
+            <CalendarDays className="h-4 w-4" aria-hidden />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              {emptyMessageOverride ?? 'No day-level entries yet for this cycle.'}
+            </p>
+            {descriptionOverride ? (
+              <p className="mt-0.5 text-sm text-muted-foreground">{descriptionOverride}</p>
+            ) : null}
+          </div>
+        </div>
       </section>
     )
   }

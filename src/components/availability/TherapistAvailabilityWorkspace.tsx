@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { CalendarCheck, CalendarX2, Send } from 'lucide-react'
+import { CalendarCheck, CalendarDays, CalendarX2, Check, Info, Send, X } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 
 import type { AvailabilityEntryTableRow } from '@/app/availability/availability-requests-table'
@@ -95,16 +95,64 @@ function sortDateKeys(values: string[]): string[] {
 function getDisplayStateLabel(state: DayDisplayState): string {
   switch (state) {
     case 'normal_work':
-      return 'Normal work'
-    case 'normal_off':
-      return 'Normal off'
     case 'can_work':
       return 'Can work'
+    case 'normal_off':
     case 'cannot_work':
       return "Can't work"
     default:
-      return 'Not set'
+      return 'Unmarked'
   }
+}
+
+function buildRangeDates(cycleDays: string[], rangeStart: string, rangeEnd: string): string[] {
+  if (!rangeStart || !rangeEnd) return []
+  const ordered = [rangeStart, rangeEnd].sort((left, right) => left.localeCompare(right))
+  return cycleDays.filter((date) => date >= ordered[0] && date <= ordered[1])
+}
+
+function formatMonthDay(isoDate: string, includeYear = false): string {
+  const value = new Date(`${isoDate}T12:00:00`)
+  if (Number.isNaN(value.getTime())) return isoDate
+  return value.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    ...(includeYear ? { year: 'numeric' } : {}),
+  })
+}
+
+function formatWeekRangeLabel(week: string[]): string {
+  const first = week[0]
+  const last = week[week.length - 1]
+  if (!first || !last) return ''
+
+  const firstDate = new Date(`${first}T12:00:00`)
+  const lastDate = new Date(`${last}T12:00:00`)
+  if (Number.isNaN(firstDate.getTime()) || Number.isNaN(lastDate.getTime())) return ''
+
+  if (
+    firstDate.getFullYear() === lastDate.getFullYear() &&
+    firstDate.getMonth() === lastDate.getMonth()
+  ) {
+    return `${firstDate.toLocaleDateString('en-US', { month: 'short' })} ${firstDate.getDate()} - ${lastDate.getDate()}`
+  }
+
+  if (firstDate.getFullYear() === lastDate.getFullYear()) {
+    return `${formatMonthDay(first)} - ${formatMonthDay(last)}`
+  }
+
+  return `${formatMonthDay(first, true)} - ${formatMonthDay(last, true)}`
+}
+
+function formatSelectedDayLabel(isoDate: string): string {
+  const value = new Date(`${isoDate}T12:00:00`)
+  if (Number.isNaN(value.getTime())) return isoDate
+  return value.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
 }
 
 export function TherapistAvailabilityWorkspace({
@@ -273,14 +321,23 @@ export function TherapistAvailabilityWorkspace({
     { normalWork: 0, normalOff: 0, notSet: 0 }
   )
 
+  function normalizeOverride(date: string, status: DayStatus | null): DayStatus | null {
+    if (!status) return null
+    const baselineStatus = getBaselineStatus(date)
+    if (status === 'force_on' && baselineStatus === 'available') return null
+    if (status === 'force_off' && baselineStatus === 'off') return null
+    return status
+  }
+
   function setOverride(date: string, status: DayStatus | null) {
+    const normalizedStatus = normalizeOverride(date, status)
     setDraftStatusByDate((current) => {
       const next = { ...current }
-      if (!status) delete next[date]
-      else next[date] = status
+      if (!normalizedStatus) delete next[date]
+      else next[date] = normalizedStatus
       return next
     })
-    if (!status) {
+    if (!normalizedStatus) {
       setDraftNotesByDate((current) => {
         const next = { ...current }
         delete next[date]
@@ -297,14 +354,18 @@ export function TherapistAvailabilityWorkspace({
     }))
   }
 
-  function getRangeDates(): string[] {
-    if (!rangeStart || !rangeEnd) return []
-    const ordered = [rangeStart, rangeEnd].sort((left, right) => left.localeCompare(right))
-    return cycleDays.filter((date) => date >= ordered[0] && date <= ordered[1])
-  }
+  const rangeDates = useMemo(
+    () => buildRangeDates(cycleDays, rangeStart, rangeEnd),
+    [cycleDays, rangeEnd, rangeStart]
+  )
 
-  function applyRange(status: DayStatus | null) {
-    for (const date of getRangeDates()) {
+  const activeSelectionDates = useMemo(
+    () => (rangeDates.length > 0 ? rangeDates : selectedDate ? [selectedDate] : []),
+    [rangeDates, selectedDate]
+  )
+
+  function applySelection(status: DayStatus | null) {
+    for (const date of activeSelectionDates) {
       setOverride(date, status)
     }
   }
@@ -329,8 +390,14 @@ export function TherapistAvailabilityWorkspace({
       const previousIndex = previousDays.indexOf(row.date)
       if (previousIndex < 0 || previousIndex >= cycleDays.length) continue
       const nextDate = cycleDays[previousIndex]
-      nextStatus[nextDate] = row.entryType === 'force_off' ? 'force_off' : 'force_on'
-      if (row.reason?.trim()) nextNotes[nextDate] = row.reason.trim()
+      const normalizedStatus = normalizeOverride(
+        nextDate,
+        row.entryType === 'force_off' ? 'force_off' : 'force_on'
+      )
+      if (normalizedStatus) {
+        nextStatus[nextDate] = normalizedStatus
+        if (row.reason?.trim()) nextNotes[nextDate] = row.reason.trim()
+      }
     }
     setDraftStatusByDate(nextStatus)
     setDraftNotesByDate(nextNotes)
@@ -345,8 +412,31 @@ export function TherapistAvailabilityWorkspace({
     return range
   }, [selectedCycle])
 
-  const selectedBaselineStatus = selectedDate ? getBaselineStatus(selectedDate) : 'neutral'
   const selectedOverride = selectedDate ? (draftStatusByDate[selectedDate] ?? null) : null
+  const selectedNote = selectedDate ? (draftNotesByDate[selectedDate] ?? '') : ''
+  const hasActiveSelection = activeSelectionDates.length > 0
+  const activeSelectionSummary =
+    rangeDates.length > 0
+      ? `${rangeDates.length} ${rangeDates.length === 1 ? 'day' : 'days'} selected`
+      : selectedDate
+        ? formatDateLabel(selectedDate)
+        : 'Select a day to make a change.'
+  const dueDateLabel = selectedCycle?.availability_due_at
+    ? formatDateLabel(selectedCycle.availability_due_at.slice(0, 10))
+    : null
+  const submissionStatusDetail = submissionUi.isSubmitted
+    ? 'Submitted for this cycle'
+    : dueDateLabel
+      ? `Due ${dueDateLabel}`
+      : (deadlinePresentation?.deadlineHeadline ?? 'Save progress until you are ready to submit.')
+  const selectedDayOptionClass = (active: boolean, tone: 'can' | 'cant' | 'neutral') =>
+    cn(
+      'flex min-h-10 w-full items-center gap-3 px-3 py-2.5 text-left transition-colors',
+      active && tone === 'can' && 'bg-[color:color-mix(in_srgb,var(--success-subtle)_55%,white)]',
+      active && tone === 'cant' && 'bg-[color:color-mix(in_srgb,var(--error-subtle)_55%,white)]',
+      active && tone === 'neutral' && 'bg-[color:color-mix(in_srgb,var(--muted)_46%,white)]',
+      !active && 'bg-background hover:bg-muted/[0.08]'
+    )
 
   if (cycles.length === 0) {
     return (
@@ -363,20 +453,27 @@ export function TherapistAvailabilityWorkspace({
 
   return (
     <section id="therapist-availability-workspace" className="space-y-4">
-      <header className="space-y-3 border-b border-border/70 pb-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <h1 className="app-page-title">Future Availability</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{cyclePageSubtitle}</p>
+      <header className="space-y-3">
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_18rem]">
+          <div className="space-y-1.5">
+            <div className="space-y-1">
+              <h1 className="app-page-title">Future Availability</h1>
+              <p className="text-sm text-muted-foreground">{cyclePageSubtitle}</p>
+            </div>
+            {hasUnsavedChanges ? (
+              <div className="inline-flex items-center rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-1 text-xs font-semibold text-[var(--warning-text)]">
+                Draft changes not yet saved
+              </div>
+            ) : null}
           </div>
 
-          <div className="shrink-0 text-right">
-            <p className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              Submission Status
+          <section className="rounded-[1.15rem] border border-border/70 bg-card px-4 py-3.5 shadow-tw-2xs-soft">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Submission status
             </p>
             <span
               className={cn(
-                'mt-1 inline-flex w-fit items-center rounded-full border px-3 py-1 text-[11px] font-semibold',
+                'mt-2.5 inline-flex w-fit items-center rounded-full border px-3 py-1 text-[11px] font-semibold',
                 submissionUi.isSubmitted
                   ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
                   : 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
@@ -384,47 +481,50 @@ export function TherapistAvailabilityWorkspace({
             >
               {submissionUi.isSubmitted ? 'Submitted' : 'Not submitted'}
             </span>
-            {deadlinePresentation?.deadlineHeadline && !submissionUi.isSubmitted ? (
-              <p
-                className={cn(
-                  'mt-1 text-xs font-medium',
-                  deadlinePresentation.emphasis === 'past' && 'text-[var(--error-text)]',
-                  deadlinePresentation.emphasis === 'urgent' && 'text-[var(--warning-text)]',
-                  deadlinePresentation.emphasis === 'neutral' && 'text-muted-foreground'
-                )}
-              >
-                {deadlinePresentation.deadlineHeadline}
-              </p>
-            ) : null}
-          </div>
+            <p
+              className={cn(
+                'mt-2.5 text-sm',
+                !submissionUi.isSubmitted &&
+                  deadlinePresentation?.emphasis === 'past' &&
+                  'text-[var(--error-text)]',
+                !submissionUi.isSubmitted &&
+                  deadlinePresentation?.emphasis === 'urgent' &&
+                  'text-[var(--warning-text)]',
+                (!deadlinePresentation || deadlinePresentation.emphasis === 'neutral') &&
+                  'text-muted-foreground'
+              )}
+            >
+              {submissionStatusDetail}
+            </p>
+          </section>
         </div>
 
-        <div className="rounded-2xl border border-border/70 bg-muted/[0.08] px-4 py-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-1">
-              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Starting point for this cycle
-              </p>
-              <p className="text-sm font-semibold text-foreground">{recurringPatternSummary}</p>
-              <p className="text-sm text-muted-foreground">
-                {hasRecurringPattern
-                  ? 'We used your normal schedule to fill this cycle. Changes here stay in this cycle only.'
-                  : "This cycle starts blank. Add the days you can or can't work. Changes here stay in this cycle only."}
-              </p>
+        <section className="rounded-[1.25rem] border border-border/70 bg-card px-5 py-4 shadow-tw-2xs-soft">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[color:color-mix(in_srgb,var(--success-subtle)_55%,white)] text-[var(--primary)]">
+                <CalendarDays className="h-5 w-5" aria-hidden />
+              </div>
+              <div className="space-y-1">
+                <p className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  Starting point for this cycle
+                </p>
+                <p className="text-lg font-semibold text-foreground">{recurringPatternSummary}</p>
+                <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+                  {hasRecurringPattern
+                    ? 'We used your normal schedule to fill this cycle. Changes here stay in this cycle only.'
+                    : "This cycle starts blank. Add the days you can or can't work. Changes here stay in this cycle only."}
+                </p>
+              </div>
             </div>
-            <Button asChild variant="outline" size="sm">
+
+            <Button asChild variant="outline" size="sm" className="min-h-11 px-4">
               <Link href="/therapist/recurring-pattern">
                 {hasRecurringPattern ? 'Edit normal schedule' : 'Set normal schedule'}
               </Link>
             </Button>
           </div>
-        </div>
-
-        {hasUnsavedChanges ? (
-          <p className="text-xs font-medium text-[var(--warning-text)]">
-            You have unsaved changes for this cycle.
-          </p>
-        ) : null}
+        </section>
       </header>
 
       {conflicts.length > 0 ? (
@@ -433,7 +533,7 @@ export function TherapistAvailabilityWorkspace({
 
       <form
         action={submitTherapistAvailabilityGridAction}
-        className="overflow-hidden rounded-[20px] border border-border/80 bg-card shadow-tw-2xs-soft"
+        className="overflow-hidden rounded-[1.5rem] border border-border/70 bg-card shadow-tw-2xs-soft"
       >
         <input type="hidden" name="cycle_id" value={selectedCycleId} />
         <input type="hidden" name="return_to" value={returnToPath} />
@@ -445,12 +545,12 @@ export function TherapistAvailabilityWorkspace({
           <input key={`cannot-${date}`} type="hidden" name="cannot_work_dates" value={date} />
         ))}
 
-        <div className="border-b border-border/80 px-5 py-3 sm:px-6">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div className="w-full max-w-[17rem] space-y-1">
+        <div className="space-y-2 border-b border-border/60 bg-[color:color-mix(in_srgb,var(--background)_42%,white)] px-5 py-3 sm:px-6">
+          <div className="grid overflow-hidden rounded-[1rem] border border-border/70 bg-background xl:grid-cols-[15.5rem_minmax(0,1fr)]">
+            <section className="px-3.5 py-3">
               <Label
                 htmlFor="therapist_cycle_id"
-                className="text-[0.6rem] font-medium uppercase tracking-[0.08em] text-muted-foreground/75"
+                className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
               >
                 Cycle
               </Label>
@@ -458,7 +558,7 @@ export function TherapistAvailabilityWorkspace({
                 id="therapist_cycle_id"
                 value={selectedCycleId}
                 onChange={(event) => handleCycleChange(event.target.value)}
-                className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground"
+                className="mt-2 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground"
               >
                 {cycles.map((cycle) => (
                   <option key={cycle.id} value={cycle.id}>
@@ -466,127 +566,151 @@ export function TherapistAvailabilityWorkspace({
                   </option>
                 ))}
               </select>
-            </div>
+            </section>
 
-            <div className="flex flex-wrap gap-2" />
-          </div>
-        </div>
-
-        <div data-slot="availability-workspace-split" className="flex flex-col gap-5 xl:flex-row">
-          <div className="min-w-0 flex-1 space-y-4 px-5 py-5 sm:px-6 sm:py-6">
-            <div className="rounded-2xl border border-border/70 bg-muted/[0.05] px-4 py-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    {hasRecurringPattern ? 'From your normal schedule' : 'This cycle starts blank'}
+            <section className="border-t border-border/70 px-3.5 py-3 xl:border-l xl:border-t-0">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-[13rem]">
+                  <p className="text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Quick edit
                   </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {hasRecurringPattern
-                      ? 'Normal work days and normal off days are shown here before you make cycle-only changes.'
-                      : 'Choose the days you can or cannot work.'}
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Select one day or several days, then choose a state.
                   </p>
                 </div>
-                <div className="rounded-full border border-border/70 bg-background px-3 py-1 text-xs font-semibold text-muted-foreground">
-                  This cycle only
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <p className="rounded-full bg-muted/50 px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                    {activeSelectionSummary}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!hasActiveSelection}
+                    onClick={() => applySelection('force_on')}
+                    className="min-h-9 rounded-xl border-[var(--success-border)] bg-[var(--success-subtle)]/35 px-3 text-[var(--success-text)] hover:bg-[var(--success-subtle)]"
+                  >
+                    <CalendarCheck className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                    Can work
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!hasActiveSelection}
+                    onClick={() => applySelection('force_off')}
+                    className="min-h-9 rounded-xl border-[var(--error-border)] bg-[var(--error-subtle)]/35 px-3 text-[var(--error-text)] hover:bg-[var(--error-subtle)]"
+                  >
+                    <CalendarX2 className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                    Can&apos;t work
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!hasActiveSelection}
+                    onClick={() => applySelection(null)}
+                    className="min-h-9 rounded-xl px-3"
+                  >
+                    Clear
+                  </Button>
                 </div>
               </div>
-              <details className="mt-4 rounded-xl border border-border/70 bg-background px-3 py-3">
-                <summary className="cursor-pointer text-sm font-semibold text-foreground">
-                  Edit several days
-                </summary>
-                <div className="mt-3 space-y-3">
-                  <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
-                    <div className="space-y-1">
-                      <Label htmlFor="range-start">Start date</Label>
-                      <input
-                        id="range-start"
-                        type="date"
-                        min={selectedCycle?.start_date}
-                        max={selectedCycle?.end_date}
-                        value={rangeStart}
-                        onChange={(event) => setRangeStart(event.target.value)}
-                        className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="range-end">End date</Label>
-                      <input
-                        id="range-end"
-                        type="date"
-                        min={selectedCycle?.start_date}
-                        max={selectedCycle?.end_date}
-                        value={rangeEnd}
-                        onChange={(event) => setRangeEnd(event.target.value)}
-                        className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
-                      />
-                    </div>
-                    <div className="flex flex-wrap items-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => applyRange('force_off')}
-                      >
-                        Mark as cannot work
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => applyRange('force_on')}
-                      >
-                        Mark as can work
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => applyRange(null)}
-                      >
-                        Clear changes
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={copyPreviousCycleOverrides}
-                    >
-                      Use last cycle as a starting point
-                    </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={clearOverrides}>
-                      Reset this cycle to normal schedule
-                    </Button>
-                  </div>
-                </div>
-              </details>
-            </div>
+            </section>
+          </div>
 
-            <div className="grid grid-cols-7 gap-1.5 border-y border-border/70 py-2">
-              {DOW.map((dow) => (
-                <p
-                  key={dow}
-                  className="text-center text-[0.68rem] font-semibold tracking-[0.1em] text-muted-foreground"
-                >
-                  {dow}
+          <details className="rounded-[0.95rem] border border-border/60 bg-background px-3.5 py-2.5">
+            <summary className="cursor-pointer text-sm font-semibold text-foreground">
+              Edit several days
+            </summary>
+            <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="range-start">Start date</Label>
+                  <input
+                    id="range-start"
+                    type="date"
+                    min={selectedCycle?.start_date}
+                    max={selectedCycle?.end_date}
+                    value={rangeStart}
+                    onChange={(event) => setRangeStart(event.target.value)}
+                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="range-end">End date</Label>
+                  <input
+                    id="range-end"
+                    type="date"
+                    min={selectedCycle?.start_date}
+                    max={selectedCycle?.end_date}
+                    value={rangeEnd}
+                    onChange={(event) => setRangeEnd(event.target.value)}
+                    className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs text-muted-foreground lg:max-w-[16rem]">
+                  Dates selected here use the quick edit buttons above.
                 </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={copyPreviousCycleOverrides}
+                  className="min-h-9 rounded-xl px-3"
+                >
+                  Use last cycle
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={clearOverrides}
+                  className="min-h-9 rounded-xl px-3"
+                >
+                  Clear cycle changes
+                </Button>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <div
+          data-slot="availability-workspace-split"
+          className="grid items-start gap-4 px-5 py-4 sm:px-6 xl:grid-cols-[minmax(0,1fr)_19rem]"
+        >
+          <div className="min-w-0 space-y-3">
+            <div className="hidden grid-cols-[5.4rem_repeat(7,minmax(0,1fr))] gap-1.5 text-center text-[0.66rem] font-semibold tracking-[0.1em] text-muted-foreground sm:grid">
+              <span />
+              {DOW.map((dow) => (
+                <p key={dow}>{dow}</p>
               ))}
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-2.5">
               {weeks.map((week, weekIndex) => (
-                <div key={`week-${weekIndex}`} className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <p className="text-[0.68rem] font-semibold uppercase tracking-[0.09em] text-muted-foreground">
-                      Week {weekIndex + 1}
-                    </p>
-                    <div className="h-px flex-1 bg-border/80" />
+                <div
+                  key={`week-${weekIndex}`}
+                  className="rounded-[1rem] border border-border/55 bg-card p-2.5 sm:grid sm:grid-cols-[5.4rem_repeat(7,minmax(0,1fr))] sm:gap-1.5"
+                >
+                  <div className="mb-3 flex items-end justify-between sm:mb-0 sm:block sm:pr-2">
+                    <div>
+                      <p className="text-[0.82rem] font-semibold text-foreground">
+                        Week {weekIndex + 1}
+                      </p>
+                      <p className="mt-0.5 text-[0.72rem] text-muted-foreground">
+                        {formatWeekRangeLabel(week)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-7 gap-1.5">
+
+                  <div className="grid grid-cols-7 gap-1.5 sm:col-span-7 sm:contents">
                     {week.map((date) => {
                       const displayState = getDisplayState(date)
+                      const showStatusLabel =
+                        displayState === 'can_work' || displayState === 'cannot_work'
                       const dayIndex = cycleDays.indexOf(date)
                       const monthRibbon = monthRibbonLabel(
                         date,
@@ -598,51 +722,60 @@ export function TherapistAvailabilityWorkspace({
                         <button
                           key={date}
                           type="button"
+                          aria-label={formatDateLabel(date)}
+                          aria-pressed={selectedDate === date}
                           onClick={() => {
                             setSelectedDate(date)
+                            setRangeStart('')
+                            setRangeEnd('')
                             requestAnimationFrame(() => noteTextareaRef.current?.focus())
                           }}
                           className={cn(
-                            'min-h-[52px] cursor-pointer rounded-lg border p-1.5 text-center text-[11px]',
+                            'flex min-h-[4.25rem] flex-col items-start justify-between rounded-[0.85rem] border px-1.5 py-1.5 text-left transition-all duration-150 hover:-translate-y-px hover:shadow-tw-day-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:min-h-[4.95rem] sm:px-2.5',
                             displayState === 'can_work'
-                              ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
+                              ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)] hover:border-[var(--success-text)]'
                               : displayState === 'cannot_work'
-                                ? 'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]'
+                                ? 'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)] hover:border-[var(--error-text)]'
                                 : displayState === 'normal_work'
-                                  ? 'border-[color:color-mix(in_srgb,var(--success-border)_55%,transparent)] bg-[color:color-mix(in_srgb,var(--success-subtle)_60%,white)] text-[var(--success-text)]'
+                                  ? 'border-[color:color-mix(in_srgb,var(--success-border)_22%,var(--border))] bg-[color:color-mix(in_srgb,var(--success-subtle)_10%,white)] text-foreground hover:border-[var(--success-border)] hover:bg-[color:color-mix(in_srgb,var(--success-subtle)_24%,white)]'
                                   : displayState === 'normal_off'
-                                    ? 'border-border/80 bg-muted/35 text-foreground'
-                                    : 'border-border bg-card text-muted-foreground',
-                            selectedDate === date && 'ring-2 ring-primary',
-                            date === todayKey && 'ring-2 ring-[var(--attention)]'
+                                    ? 'border-border/60 bg-[color:color-mix(in_srgb,var(--muted)_22%,white)] text-foreground hover:border-[var(--error-border)] hover:bg-[color:color-mix(in_srgb,var(--error-subtle)_18%,white)]'
+                                    : 'border-border/55 bg-background text-foreground hover:border-primary/40 hover:bg-[color:color-mix(in_srgb,var(--primary)_5%,white)]',
+                            selectedDate === date &&
+                              'border-primary bg-[color:color-mix(in_srgb,var(--primary)_8%,white)] shadow-tw-day-selected ring-2 ring-primary/35',
+                            date === todayKey && selectedDate !== date && 'shadow-tw-ring-attention'
                           )}
-                          aria-label={formatDateLabel(date)}
                         >
-                          {monthRibbon ? (
-                            <span className="text-[0.5rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground/60">
-                              {monthRibbon}
-                            </span>
-                          ) : (
-                            <span className="h-[0.5rem]" aria-hidden />
-                          )}
-                          <span className="text-[1.15rem] font-bold text-foreground">{dayNum}</span>
-                          <span
-                            className={cn(
-                              'rounded-full px-1.5 py-px text-[0.5rem] font-semibold uppercase tracking-[0.05em]',
-                              displayState === 'cannot_work' &&
-                                'bg-[var(--error-subtle)] text-[var(--error-text)] ring-1 ring-[var(--error-border)]/60',
-                              displayState === 'can_work' &&
-                                'bg-[var(--success-subtle)] text-[var(--success-text)] ring-1 ring-[var(--success-border)]/60',
-                              displayState === 'normal_work' &&
-                                'bg-[color:color-mix(in_srgb,var(--success-subtle)_70%,white)] text-[var(--success-text)] ring-1 ring-[color:color-mix(in_srgb,var(--success-border)_50%,transparent)]',
-                              displayState === 'normal_off' &&
-                                'bg-muted/60 text-foreground ring-1 ring-border/70',
-                              displayState === 'not_set' &&
-                                'bg-background text-muted-foreground ring-1 ring-border/60'
+                          <div className="space-y-1">
+                            {monthRibbon ? (
+                              <span className="text-[0.55rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">
+                                {monthRibbon}
+                              </span>
+                            ) : (
+                              <span className="block h-[0.65rem]" aria-hidden />
                             )}
-                          >
-                            {getDisplayStateLabel(displayState)}
-                          </span>
+                            <span className="text-[1.25rem] font-bold leading-none text-foreground sm:text-[1.48rem]">
+                              {dayNum}
+                            </span>
+                          </div>
+                          {showStatusLabel ? (
+                            <span
+                              className={cn(
+                                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.58rem] font-semibold tracking-[0.04em]',
+                                displayState === 'can_work' &&
+                                  'bg-[color:color-mix(in_srgb,var(--success-subtle)_80%,white)] text-[var(--success-text)]',
+                                displayState === 'cannot_work' &&
+                                  'bg-[color:color-mix(in_srgb,var(--error-subtle)_80%,white)] text-[var(--error-text)]'
+                              )}
+                            >
+                              {displayState === 'can_work' ? (
+                                <Check className="h-3 w-3" aria-hidden />
+                              ) : (
+                                <X className="h-3 w-3" aria-hidden />
+                              )}
+                              {getDisplayStateLabel(displayState)}
+                            </span>
+                          ) : null}
                         </button>
                       )
                     })}
@@ -650,266 +783,220 @@ export function TherapistAvailabilityWorkspace({
                 </div>
               ))}
             </div>
-          </div>
 
-          <div className="w-60 shrink-0 space-y-6 border-t border-border/80 px-4 py-5 xl:border-l xl:border-t-0">
-            <div>
-              <h3 className="mb-2.5 text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                Summary
-              </h3>
-              <div className="space-y-2 rounded-xl border border-border/70 bg-background px-3 py-3">
-                <p className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  Normal schedule
-                </p>
-                <div className="flex items-center justify-between border-l-2 border-[var(--success)] py-1 pl-3">
-                  <span className="text-sm text-muted-foreground">Normal work</span>
-                  <span className="text-sm font-semibold text-foreground">
-                    {baselineSummary.normalWork}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between border-l-2 border-[var(--error)] py-1 pl-3">
-                  <span className="text-sm text-muted-foreground">Normal off</span>
-                  <span className="text-sm font-semibold text-foreground">
-                    {baselineSummary.normalOff}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between border-l-2 border-border py-1 pl-3">
-                  <span className="text-sm text-muted-foreground">Not set</span>
-                  <span className="text-sm font-semibold text-foreground">
-                    {baselineSummary.notSet}
-                  </span>
-                </div>
-                <div className="my-1 h-px bg-border/70" />
-                <p className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  This cycle changes
-                </p>
-                <div className="flex items-center justify-between border-l-2 border-[var(--success)] py-1 pl-3">
-                  <span className="text-sm text-muted-foreground">Can work</span>
-                  <span className="text-sm font-semibold text-foreground">
-                    {canWorkDates.length}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between border-l-2 border-[var(--error)] py-1 pl-3">
-                  <span className="text-sm text-muted-foreground">Can&apos;t work</span>
-                  <span className="text-sm font-semibold text-foreground">
-                    {cannotWorkDates.length}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div>
-              <h3 className="mb-2.5 text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                Legend
-              </h3>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={cn(
-                      'h-2.5 w-2.5 rounded-full',
-                      hasRecurringPattern
-                        ? 'bg-[var(--success-text)]'
-                        : 'bg-[var(--muted-foreground)]'
-                    )}
-                  />
-                  <span className="text-xs text-muted-foreground">
-                    {hasRecurringPattern ? 'Normal work day' : 'Not set from normal schedule'}
-                  </span>
-                </div>
-                {hasRecurringPattern ? (
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full border border-border/80 bg-muted/50" />
-                    <span className="text-xs text-muted-foreground">Normal off day</span>
-                  </div>
-                ) : null}
-                <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[var(--error-text)]" />
-                  <span className="text-xs text-muted-foreground">This cycle: can&apos;t work</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[var(--success-text)]" />
-                  <span className="text-xs text-muted-foreground">This cycle: can work</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <h3 className="text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                  Optional note
-                </h3>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Add a note only when this cycle is different.
-                </p>
-              </div>
-
-              <div>
-                <h3 className="text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                  Selected day
-                </h3>
-                {!selectedDate ? (
-                  <p className="mt-1 text-xs italic text-muted-foreground">
-                    Click a day to review it and make a change.
-                  </p>
+            <div className="flex flex-col gap-3 rounded-[1rem] border border-border/55 bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Save progress now. Submit when this cycle is ready.
+              </p>
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
+                {!submissionUi.isSubmitted ? (
+                  <>
+                    <FormSubmitButton
+                      type="submit"
+                      name="workflow"
+                      value="draft"
+                      variant="outline"
+                      size="sm"
+                      pendingText="Saving..."
+                      className="min-h-10 rounded-xl px-4 font-semibold sm:min-w-[9rem]"
+                    >
+                      Save progress
+                    </FormSubmitButton>
+                    <FormSubmitButton
+                      type="submit"
+                      name="workflow"
+                      value="submit"
+                      size="sm"
+                      pendingText="Saving..."
+                      className="min-h-10 gap-2 rounded-xl px-4 font-semibold shadow-sm sm:min-w-[10.5rem]"
+                    >
+                      <Send className="h-3.5 w-3.5" aria-hidden />
+                      Submit availability
+                    </FormSubmitButton>
+                  </>
                 ) : (
-                  <div className="mt-2 space-y-3 rounded-xl border border-border/70 bg-muted/10 px-3 py-3">
-                    <p className="text-sm font-semibold text-foreground">
-                      {formatDateLabel(selectedDate)}
-                    </p>
-                    <div className="space-y-1">
-                      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                        Normally
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedBaselineStatus === 'available'
-                          ? 'Work day in your normal schedule'
-                          : selectedBaselineStatus === 'off'
-                            ? 'Off day in your normal schedule'
-                            : 'Not set from a normal schedule'}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedBaselineStatus === 'available' ? (
-                        <Button
-                          type="button"
-                          variant={selectedOverride === 'force_off' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() =>
-                            setOverride(
-                              selectedDate,
-                              selectedOverride === 'force_off' ? null : 'force_off'
-                            )
-                          }
-                        >
-                          <CalendarX2 className="mr-1 h-3.5 w-3.5" aria-hidden />I cannot work this
-                          day
-                        </Button>
-                      ) : selectedBaselineStatus === 'off' ? (
-                        <Button
-                          type="button"
-                          variant={selectedOverride === 'force_on' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() =>
-                            setOverride(
-                              selectedDate,
-                              selectedOverride === 'force_on' ? null : 'force_on'
-                            )
-                          }
-                        >
-                          <CalendarCheck className="mr-1 h-3.5 w-3.5" aria-hidden />I can work this
-                          day
-                        </Button>
-                      ) : (
-                        <>
-                          <Button
-                            type="button"
-                            variant={selectedOverride === 'force_on' ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() =>
-                              setOverride(
-                                selectedDate,
-                                selectedOverride === 'force_on' ? null : 'force_on'
-                              )
-                            }
-                          >
-                            <CalendarCheck className="mr-1 h-3.5 w-3.5" aria-hidden />I can work
-                            this day
-                          </Button>
-                          <Button
-                            type="button"
-                            variant={selectedOverride === 'force_off' ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() =>
-                              setOverride(
-                                selectedDate,
-                                selectedOverride === 'force_off' ? null : 'force_off'
-                              )
-                            }
-                          >
-                            <CalendarX2 className="mr-1 h-3.5 w-3.5" aria-hidden />I cannot work
-                            this day
-                          </Button>
-                        </>
-                      )}
-                      {selectedOverride ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setOverride(selectedDate, null)}
-                        >
-                          Clear override
-                        </Button>
-                      ) : null}
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor={`therapist-day-note-${selectedDate}`}>Optional note</Label>
-                      {/* Persisted notes only exist for days you change for this cycle. */}
-                      <textarea
-                        id={`therapist-day-note-${selectedDate}`}
-                        ref={noteTextareaRef}
-                        value={draftNotesByDate[selectedDate] ?? ''}
-                        onChange={(event) => updateSelectedDateNote(event.target.value)}
-                        placeholder="Add a note for this change..."
-                        disabled={!selectedOverride}
-                        className="min-h-[84px] w-full rounded-lg border border-border/15 bg-background px-2.5 py-1.5 text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-                      />
-                      {!selectedOverride ? (
-                        <p className="text-xs text-muted-foreground">
-                          Notes are only saved for days you change for this cycle.
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
+                  <FormSubmitButton
+                    type="submit"
+                    name="workflow"
+                    value="submit"
+                    size="sm"
+                    pendingText="Saving..."
+                    className="min-h-10 gap-2 rounded-xl px-4 font-semibold shadow-sm"
+                  >
+                    <Send className="h-3.5 w-3.5" aria-hidden />
+                    Save changes
+                  </FormSubmitButton>
                 )}
               </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex flex-col gap-2 border-t border-border/70 bg-muted/10 px-5 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6">
-          <p className="text-xs text-muted-foreground sm:mr-auto">
-            Save draft now. Submit when this cycle is ready.
-          </p>
-          <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
-            {!submissionUi.isSubmitted ? (
-              <>
-                <FormSubmitButton
-                  type="submit"
-                  name="workflow"
-                  value="draft"
-                  variant="outline"
-                  size="sm"
-                  pendingText="Saving..."
-                  className="min-h-11 shrink-0 px-4 font-semibold sm:min-w-[8.5rem]"
-                >
-                  Save progress
-                </FormSubmitButton>
-                <FormSubmitButton
-                  type="submit"
-                  name="workflow"
-                  value="submit"
-                  size="sm"
-                  pendingText="Saving..."
-                  className="min-h-11 shrink-0 gap-2 px-5 font-semibold shadow-sm sm:min-w-[10.5rem]"
-                >
-                  <Send className="h-3.5 w-3.5" aria-hidden />
-                  Submit availability
-                </FormSubmitButton>
-              </>
-            ) : (
-              <FormSubmitButton
-                type="submit"
-                name="workflow"
-                value="submit"
-                size="sm"
-                pendingText="Saving..."
-                className="min-h-11 shrink-0 gap-2 px-5 font-semibold shadow-sm"
-              >
-                <Send className="h-3.5 w-3.5" aria-hidden />
-                Save changes
-              </FormSubmitButton>
-            )}
-          </div>
+          <aside className="space-y-3 xl:self-start">
+            <section className="rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,white)] px-4 py-4 shadow-tw-sm">
+              <h3 className="text-[0.95rem] font-semibold text-foreground">Summary</h3>
+              <div className="mt-3 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="inline-flex items-center gap-3 text-muted-foreground">
+                    <span className="h-6 w-0.5 rounded-full bg-[var(--success-text)]" />
+                    Can work
+                  </span>
+                  <span className="font-semibold tabular-nums text-foreground">
+                    {baselineSummary.normalWork}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="inline-flex items-center gap-3 text-muted-foreground">
+                    <span className="h-6 w-0.5 rounded-full bg-[var(--error-text)]" />
+                    Can&apos;t work
+                  </span>
+                  <span className="font-semibold tabular-nums text-foreground">
+                    {baselineSummary.normalOff}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="inline-flex items-center gap-3 text-muted-foreground">
+                    <span className="h-6 w-0.5 rounded-full bg-border" />
+                    Unmarked
+                  </span>
+                  <span className="font-semibold tabular-nums text-foreground">
+                    {baselineSummary.notSet}
+                  </span>
+                </div>
+              </div>
+
+              <div className="my-3 h-px bg-border/70" />
+
+              <h3 className="text-[0.95rem] font-semibold text-foreground">This cycle changes</h3>
+              <div className="mt-3 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="inline-flex items-center gap-3 text-muted-foreground">
+                    <span className="h-6 w-0.5 rounded-full bg-[var(--success-text)]" />
+                    Can work
+                  </span>
+                  <span className="font-semibold tabular-nums text-foreground">
+                    {canWorkDates.length}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="inline-flex items-center gap-3 text-muted-foreground">
+                    <span className="h-6 w-0.5 rounded-full bg-[var(--error-text)]" />
+                    Can&apos;t work
+                  </span>
+                  <span className="font-semibold tabular-nums text-foreground">
+                    {cannotWorkDates.length}
+                  </span>
+                </div>
+              </div>
+
+              <div className="my-3 h-px bg-border/70" />
+
+              <div className="flex items-center justify-between">
+                <h3 className="text-[0.95rem] font-semibold text-foreground">Legend</h3>
+                <Info className="h-4 w-4 text-muted-foreground" aria-hidden />
+              </div>
+              <div className="mt-3 space-y-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-[var(--success-text)]" />
+                  <span>Can work</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-[var(--error-text)]" />
+                  <span>Can&apos;t work</span>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,white)] px-4 py-4 shadow-tw-sm">
+              <h3 className="text-[0.95rem] font-semibold text-foreground">Selected day</h3>
+              {!selectedDate ? (
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Click a day to review it and make a change.
+                </p>
+              ) : (
+                <div className="mt-3 space-y-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      {formatSelectedDayLabel(selectedDate)}
+                    </p>
+                  </div>
+
+                  <div className="overflow-hidden rounded-xl border border-border/70 bg-background">
+                    <button
+                      type="button"
+                      onClick={() => setOverride(selectedDate, 'force_on')}
+                      className={selectedDayOptionClass(selectedOverride === 'force_on', 'can')}
+                    >
+                      <span className="flex h-[1.125rem] w-[1.125rem] items-center justify-center rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]">
+                        {selectedOverride === 'force_on' ? (
+                          <Check className="h-3 w-3" aria-hidden />
+                        ) : null}
+                      </span>
+                      <span className="text-sm font-medium text-foreground">Can work</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setOverride(selectedDate, 'force_off')}
+                      className={cn(
+                        selectedDayOptionClass(selectedOverride === 'force_off', 'cant'),
+                        'border-t border-border/70'
+                      )}
+                    >
+                      <span className="flex h-[1.125rem] w-[1.125rem] items-center justify-center rounded-full border border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]">
+                        {selectedOverride === 'force_off' ? (
+                          <X className="h-3 w-3" aria-hidden />
+                        ) : null}
+                      </span>
+                      <span className="text-sm font-medium text-foreground">Can&apos;t work</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setOverride(selectedDate, null)}
+                      className={cn(
+                        selectedDayOptionClass(selectedOverride === null, 'neutral'),
+                        'border-t border-border/70'
+                      )}
+                    >
+                      <span className="flex h-[1.125rem] w-[1.125rem] items-center justify-center rounded-full border border-border/70 bg-background">
+                        {selectedOverride === null ? (
+                          <span className="h-2 w-2 rounded-full bg-primary" />
+                        ) : null}
+                      </span>
+                      <span className="text-sm font-medium text-foreground">Unmarked</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor={`therapist-day-note-${selectedDate}`} className="text-sm">
+                        Add a note (optional)
+                      </Label>
+                      <span className="text-xs text-muted-foreground">
+                        {selectedNote.length} / 200
+                      </span>
+                    </div>
+                    {/* Persisted notes only exist for days you change for this cycle. */}
+                    <textarea
+                      id={`therapist-day-note-${selectedDate}`}
+                      ref={noteTextareaRef}
+                      value={selectedNote}
+                      maxLength={200}
+                      onChange={(event) => updateSelectedDateNote(event.target.value)}
+                      placeholder="Add a note for this day..."
+                      disabled={!selectedOverride}
+                      className="min-h-[86px] w-full rounded-xl border border-border/70 bg-background px-3 py-2 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+                    {!selectedOverride ? (
+                      <p className="text-xs text-muted-foreground">
+                        Notes are only saved for days you change for this cycle.
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+            </section>
+          </aside>
         </div>
       </form>
     </section>
