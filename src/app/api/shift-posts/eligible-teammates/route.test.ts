@@ -24,7 +24,7 @@ describe('eligible request teammates API', () => {
     vi.clearAllMocks()
   })
 
-  it('loads therapist teammates through the server route', async () => {
+  it('loads therapist teammates when the published cycle join is returned as an object', async () => {
     createClientMock.mockResolvedValue({
       auth: {
         getUser: vi.fn(async () => ({
@@ -77,7 +77,7 @@ describe('eligible request teammates API', () => {
                       role: 'lead',
                       status: 'scheduled',
                       assignment_status: 'scheduled',
-                      schedule_cycles: [{ published: true }],
+                      schedule_cycles: { published: true },
                     },
                     error: null,
                   }),
