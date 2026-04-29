@@ -25,6 +25,8 @@ import { POST } from '@/app/api/shift-posts/route'
 type ServerContext = {
   userId?: string | null
   role?: string | null
+  isActive?: boolean | null
+  archivedAt?: string | null
 }
 
 function makeServerClient(context: ServerContext) {
@@ -49,8 +51,8 @@ function makeServerClient(context: ServerContext) {
                 maybeSingle: async () => ({
                   data: {
                     role: context.role ?? null,
-                    is_active: true,
-                    archived_at: null,
+                    is_active: context.isActive ?? true,
+                    archived_at: context.archivedAt ?? null,
                   },
                   error: null,
                 }),
@@ -181,6 +183,28 @@ describe('shift-post mutation API', () => {
 
     expect(response.status).toBe(200)
     expect(insertSingle).toHaveBeenCalled()
+  })
+
+  it('blocks inactive staff from expressing pickup interest before admin writes', async () => {
+    const fromMock = vi.fn()
+
+    createClientMock.mockResolvedValue(
+      makeServerClient({ userId: 'therapist-1', role: 'therapist', isActive: false })
+    )
+    createAdminClientMock.mockReturnValue({
+      rpc: vi.fn(),
+      from: fromMock,
+    })
+
+    const response = await POST(
+      makeRequest({
+        action: 'express_interest',
+        requestId: 'post-1',
+      })
+    )
+
+    expect(response.status).toBe(403)
+    expect(fromMock).not.toHaveBeenCalled()
   })
 
   it('blocks review actions for non-managers before calling the review function', async () => {

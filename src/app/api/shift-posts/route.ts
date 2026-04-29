@@ -108,6 +108,15 @@ function toErrorResponse(message: string): NextResponse {
   return NextResponse.json({ error: 'request_mutation_failed' }, { status: 500 })
 }
 
+function canExpressPickupInterest(profile: ProfileRow | null): boolean {
+  const role = parseRole(profile?.role)
+  return (
+    (role === 'therapist' || role === 'lead') &&
+    profile?.is_active !== false &&
+    !profile?.archived_at
+  )
+}
+
 async function getActorProfile(userId: string): Promise<ProfileRow | null> {
   const supabase = await createClient()
   const { data } = await supabase
@@ -229,6 +238,11 @@ export async function POST(request: Request) {
       const requestId = asTrimmedString(payload.requestId)
       if (!requestId) {
         return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
+      }
+
+      const actorProfile = await getActorProfile(user.id)
+      if (!canExpressPickupInterest(actorProfile)) {
+        return NextResponse.json({ error: 'forbidden' }, { status: 403 })
       }
 
       const { data: post, error: postError } = await admin
