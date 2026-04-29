@@ -242,7 +242,9 @@ export function RequestComposer({
               <div className="space-y-2">
                 {eligibleMembers.length === 0 ? (
                   <p className="rounded-md border border-border bg-muted/50 px-3 py-3 text-xs text-muted-foreground">
-                    No eligible teammates found for this shift.
+                    {requestType === 'swap'
+                      ? 'No teammates on the same date and shift type are available for a direct swap.'
+                      : 'No teammates without a scheduled shift on this date are available for a direct pickup.'}
                   </p>
                 ) : (
                   eligibleMembers.map((member) => (
@@ -279,7 +281,9 @@ export function RequestComposer({
 
               <p className="text-xs text-muted-foreground">
                 {requestVisibility === 'direct'
-                  ? 'Pick the teammate you want to send this request to.'
+                  ? requestType === 'swap'
+                    ? 'Pick a teammate who is already scheduled on this same date and shift type.'
+                    : 'Pick a teammate on your shift type who is not already scheduled on this date.'
                   : requestType === 'swap'
                     ? 'Selecting a swap partner is optional. Leave blank to post an open swap.'
                     : 'Pickup requests usually do not need a specific teammate.'}

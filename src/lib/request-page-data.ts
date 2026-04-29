@@ -116,9 +116,12 @@ export async function loadRequestPageSnapshot(
   }
 }
 
-export async function loadEligibleRequestTeammates(shiftId: string): Promise<TeamMember[]> {
+export async function loadEligibleRequestTeammates(
+  shiftId: string,
+  requestType: 'swap' | 'pickup'
+): Promise<TeamMember[]> {
   const response = await fetch(
-    `/api/shift-posts/eligible-teammates?shiftId=${encodeURIComponent(shiftId)}`,
+    `/api/shift-posts/eligible-teammates?shiftId=${encodeURIComponent(shiftId)}&requestType=${encodeURIComponent(requestType)}`,
     {
       cache: 'no-store',
     }
@@ -140,9 +143,12 @@ async function loadLeadCountsBySlot(supabase: SupabaseLike, uniqueDates: string[
 
   const { data: leadRows, error: leadRowsError } = await supabase
     .from('shifts')
-    .select('date, shift_type')
+    .select('date, shift_type, status, assignment_status, schedule_cycles!inner(published)')
     .eq('role', 'lead')
     .in('date', uniqueDates)
+    .eq('status', 'scheduled')
+    .eq('assignment_status', 'scheduled')
+    .eq('schedule_cycles.published', true)
 
   if (leadRowsError) {
     console.error('Failed to load lead coverage for swap form:', leadRowsError)

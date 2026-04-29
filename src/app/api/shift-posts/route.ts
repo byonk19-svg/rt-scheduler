@@ -95,6 +95,8 @@ function toErrorResponse(message: string): NextResponse {
     lowered.includes('only pending') ||
     lowered.includes('require') ||
     lowered.includes('cannot') ||
+    lowered.includes('lead coverage gap') ||
+    lowered.includes('double booking') ||
     lowered.includes('no pickup interest') ||
     lowered.includes('requests can only') ||
     lowered.includes('recipient is not available') ||

@@ -14,6 +14,8 @@ export const OPERATIONAL_CODE_VALUES = [
   'left_early',
 ] as const satisfies ReadonlyArray<OperationalCode>
 
+const OPERATIONAL_ENTRY_BATCH_SIZE = 100
+
 export function isOperationalCode(value: string): value is OperationalCode {
   return OPERATIONAL_CODE_VALUES.includes(value as OperationalCode)
 }
@@ -46,21 +48,27 @@ export async function fetchActiveOperationalCodeMap(
     }
   }
 
-  const { data, error } = await client
-    .from('shift_operational_entries')
-    .select('shift_id, code')
-    .eq('active', true)
-    .in('shift_id', shiftIds)
-
-  if (error) {
-    console.error('Could not load active operational entries:', error)
-    return new Map()
-  }
-
   const map = new Map<string, OperationalCode>()
-  for (const row of (data ?? []) as ActiveOperationalEntryRow[]) {
-    if (!row.shift_id || !row.code) continue
-    map.set(row.shift_id, row.code)
+
+  const uniqueShiftIds = Array.from(new Set(shiftIds))
+  for (let index = 0; index < uniqueShiftIds.length; index += OPERATIONAL_ENTRY_BATCH_SIZE) {
+    const batch = uniqueShiftIds.slice(index, index + OPERATIONAL_ENTRY_BATCH_SIZE)
+    const { data, error } = await client
+      .from('shift_operational_entries')
+      .select('shift_id, code')
+      .eq('active', true)
+      .in('shift_id', batch)
+
+    if (error) {
+      console.error('Could not load active operational entries:', error)
+      continue
+    }
+
+    for (const row of (data ?? []) as ActiveOperationalEntryRow[]) {
+      if (!row.shift_id || !row.code) continue
+      map.set(row.shift_id, row.code)
+    }
   }
+
   return map
 }
