@@ -263,6 +263,30 @@ describe('shift-post mutation API', () => {
     })
   })
 
+  it('returns lead-coverage review failures as client-visible validation errors', async () => {
+    const rpcMock = vi.fn(async () => ({
+      data: null,
+      error: { message: 'Lead coverage gap: this shift would have no lead after approval.' },
+    }))
+
+    createClientMock.mockResolvedValue(makeServerClient({ userId: 'manager-1', role: 'manager' }))
+    createAdminClientMock.mockReturnValue({
+      rpc: rpcMock,
+    })
+
+    const response = await POST(
+      makeRequest({
+        action: 'review_request',
+        requestId: 'post-1',
+        decision: 'approve',
+      })
+    )
+    const body = await response.json()
+
+    expect(response.status).toBe(400)
+    expect(body.error).toContain('Lead coverage gap')
+  })
+
   it('denies pickup claimants through the transactional claimant function', async () => {
     const rpcMock = vi.fn(async () => ({
       data: [{ denied_interest_id: 'interest-1', promoted_interest_id: 'interest-2' }],

@@ -76,5 +76,6 @@ export async function fetchActiveOperationalCodeMap(
     if (!row.shift_id || !row.code) continue
     map.set(row.shift_id, row.code)
   }
+
   return map
 }

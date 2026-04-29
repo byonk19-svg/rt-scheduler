@@ -1,5 +1,4 @@
 BEGIN;
-
 create or replace function public.apply_approved_shift_post()
 returns trigger
 language plpgsql
@@ -216,13 +215,10 @@ begin
   return new;
 end;
 $$;
-
 drop trigger if exists on_shift_post_approved_apply_assignment on public.shift_posts;
-
 create trigger on_shift_post_approved_apply_assignment
   after update of status
   on public.shift_posts
   for each row
   execute function public.apply_approved_shift_post();
-
 COMMIT;

@@ -47,7 +47,30 @@ function createSupabaseMock() {
 
       if (column === 'role') {
         return {
-          in: async () => ({ data: [{ date: '2026-05-01', shift_type: 'day' }], error: null }),
+          in() {
+            return {
+              eq() {
+                return {
+                  eq() {
+                    return {
+                      eq: async () => ({
+                        data: [
+                          {
+                            date: '2026-05-01',
+                            shift_type: 'day',
+                            status: 'scheduled',
+                            assignment_status: 'scheduled',
+                            schedule_cycles: { published: true },
+                          },
+                        ],
+                        error: null,
+                      }),
+                    }
+                  },
+                }
+              },
+            }
+          },
         }
       }
 
@@ -163,25 +186,23 @@ describe('request page data', () => {
   })
 
   it('filters eligible direct-request teammates by shift and lead requirement', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => ({
-          teammates: [
-            {
-              id: 'therapist-2',
-              name: 'Therapist Two',
-              avatar: 'TT',
-              shift: 'Day',
-              isLead: true,
-            },
-          ],
-        }),
-      }))
-    )
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        teammates: [
+          {
+            id: 'therapist-2',
+            name: 'Therapist Two',
+            avatar: 'TT',
+            shift: 'Day',
+            isLead: true,
+          },
+        ],
+      }),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
 
-    const teammates = await loadEligibleRequestTeammates('shift-1')
+    const teammates = await loadEligibleRequestTeammates('shift-1', 'swap')
 
     expect(teammates).toEqual([
       {
@@ -192,5 +213,9 @@ describe('request page data', () => {
         isLead: true,
       },
     ])
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/shift-posts/eligible-teammates?shiftId=shift-1&requestType=swap',
+      { cache: 'no-store' }
+    )
   })
 })

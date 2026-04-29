@@ -1,5 +1,4 @@
 BEGIN;
-
 create or replace function public.app_review_shift_post(
   p_actor_id uuid,
   p_post_id uuid,
@@ -189,10 +188,8 @@ begin
   return reviewed_post;
 end;
 $$;
-
 revoke all on function public.app_review_shift_post(uuid, uuid, text, uuid, uuid, boolean, text)
   from public, anon, authenticated;
 grant execute on function public.app_review_shift_post(uuid, uuid, text, uuid, uuid, boolean, text)
   to service_role;
-
 COMMIT;

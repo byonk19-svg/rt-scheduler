@@ -153,7 +153,7 @@ function SwapRequestPageContent() {
       }
 
       try {
-        const mappedMembers = await loadEligibleRequestTeammates(selectedShiftData.id)
+        const mappedMembers = await loadEligibleRequestTeammates(selectedShiftData.id, requestType)
 
         if (!active) return
         setTeamMembers(mappedMembers)
@@ -171,6 +171,7 @@ function SwapRequestPageContent() {
     }
   }, [
     currentUserId,
+    requestType,
     requestVisibility,
     selectedShiftData,
     selectedShiftRequiresLeadEligibleReplacement,
