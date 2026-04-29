@@ -218,8 +218,8 @@ export default async function ApprovalsPage({
       )}
 
       {queue.length === 0 ? (
-        <div className="rounded-xl border border-border/70 bg-background/70 px-6 py-10 shadow-none">
-          <div className="flex flex-col items-center gap-3 py-12 text-center">
+        <div className="rounded-xl border border-border/70 bg-background/70 px-6 py-6 shadow-none">
+          <div className="flex flex-col items-center gap-3 py-6 text-center">
             <Clock className="h-10 w-10 text-muted-foreground" />
             <p className="text-base font-semibold text-foreground">
               No pending preliminary requests

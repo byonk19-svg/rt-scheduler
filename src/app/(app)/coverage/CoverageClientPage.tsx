@@ -1234,19 +1234,27 @@ export function CoverageClientPage({
                 label="Priority gaps"
                 value={String(coverageSummary.priorityGapDays)}
                 detail="critical days"
-                valueClassName="text-[var(--error)]"
+                valueClassName={
+                  coverageSummary.priorityGapDays === 0
+                    ? 'text-foreground'
+                    : 'text-[var(--error)]'
+                }
               />
               <CoverageMetric
                 label="Days missing lead"
                 value={String(issueCount)}
                 detail="lead coverage"
-                valueClassName="text-[var(--warning)]"
+                valueClassName={issueCount === 0 ? 'text-foreground' : 'text-[var(--warning)]'}
               />
               <CoverageMetric
                 label="Unassigned days"
                 value={String(coverageSummary.unassignedDays)}
                 detail={`${coverageSummary.staffedDays} fully staffed`}
-                valueClassName="text-[var(--warning)]"
+                valueClassName={
+                  coverageSummary.unassignedDays === 0
+                    ? 'text-foreground'
+                    : 'text-[var(--warning)]'
+                }
               />
             </section>
           ) : null}
@@ -1293,12 +1301,21 @@ export function CoverageClientPage({
               />
             ) : null}
             {activeCyclePublished ? (
-              <>
-                <CoverageSurfaceBanner
-                  tone="success"
-                  title="Live schedule"
-                  description="Staff see operational status updates as you save. Operational updates visible to everyone: on-call, leave early, cancelled, and call-in."
-                  actions={
+              <CoverageSurfaceBanner
+                tone="success"
+                title="Live schedule"
+                description="Staff see operational status updates as you save."
+                actions={
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground">
+                        Operational updates visible to everyone:
+                      </span>
+                      <StatusPill status="oncall" />
+                      <StatusPill status="leave_early" />
+                      <StatusPill status="cancelled" />
+                      <StatusPill status="call_in" />
+                    </div>
                     <Link
                       href={weekRosterHref}
                       className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold text-[var(--success-text)] underline-offset-2 transition-colors hover:underline"
@@ -1306,18 +1323,9 @@ export function CoverageClientPage({
                       View published schedule
                       <ChevronRight className="h-3.5 w-3.5 opacity-90" aria-hidden />
                     </Link>
-                  }
-                />
-                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-card px-3 py-2 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">
-                    Operational updates visible to everyone:
-                  </span>
-                  <StatusPill status="oncall" />
-                  <StatusPill status="leave_early" />
-                  <StatusPill status="cancelled" />
-                  <StatusPill status="call_in" />
-                </div>
-              </>
+                  </div>
+                }
+              />
             ) : null}
 
             {showPlanningDetails && planningNotices.length > 0 ? (
