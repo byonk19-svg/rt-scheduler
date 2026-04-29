@@ -54,8 +54,8 @@
   /* --font-geist-mono: set on <html> via next/font (layout.tsx) */
   --radius: 0.625rem;
 
-  /* Lovable core theme — values mirror the Refined design handoff (hue 174 teal, paper #f0ebe1) */
-  --background: hsl(38 24% 91%);
+  /* Lovable core theme — values mirror the Refined design handoff (hue 174 teal); background is white (#ffffff) */
+  --background: hsl(0 0% 100%);
   --foreground: hsl(220 25% 12%);
   --card: hsl(38 14% 99%);
   --card-foreground: hsl(220 25% 12%);
@@ -529,7 +529,7 @@
 
   .dark {
     color-scheme: light;
-    --background: hsl(38 24% 91%);
+    --background: hsl(0 0% 100%);
     --foreground: hsl(220 25% 12%);
     --card: hsl(38 14% 99%);
     --card-foreground: hsl(220 25% 12%);
