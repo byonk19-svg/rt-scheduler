@@ -64,10 +64,9 @@ shots/
 security_best_practices_report.md
 .tmp_lovable_import_*/
 .cursor/mcp.json
-.codex-dev.log
-.codex-dev.err.log
-.codex-start.log
-.codex-start.err.log
+.codex-*.log
+.codex-*.err.log
+.codex-*.out.log
 .tmp-dev*.log
 .tmp-prod*.log
 .omx/

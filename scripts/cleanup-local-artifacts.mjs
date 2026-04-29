@@ -87,6 +87,7 @@ async function main() {
     rootEntries,
     worktreeHelperPaths,
     registeredWorktreePaths,
+    repoRootPath: cwd,
   })
 
   if (plan.targets.length === 0) {
