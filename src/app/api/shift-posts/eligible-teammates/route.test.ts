@@ -41,6 +41,17 @@ type TestState = {
   shifts: TestShiftRow[]
 }
 
+function isPublishedScheduleCycle(
+  cycle: TestShiftRow['schedule_cycles'],
+  expected: unknown
+): boolean {
+  if (Array.isArray(cycle)) {
+    return cycle.some((row) => row.published === expected)
+  }
+
+  return cycle?.published === expected
+}
+
 function makeRequest(shiftId: string, requestType: 'swap' | 'pickup') {
   return new Request(
     `https://teamwise.test/api/shift-posts/eligible-teammates?shiftId=${shiftId}&requestType=${requestType}`
@@ -65,11 +76,7 @@ function createAdminClient(state: TestState) {
       filters.every((filter) => {
         const cell =
           filter.key === 'schedule_cycles.published'
-            ? Array.isArray((row as TestShiftRow).schedule_cycles)
-              ? (row as TestShiftRow).schedule_cycles?.some(
-                  (cycle) => cycle.published === filter.value
-                )
-              : (row as TestShiftRow).schedule_cycles?.published === filter.value
+            ? isPublishedScheduleCycle((row as TestShiftRow).schedule_cycles, filter.value)
             : (row as Record<string, unknown>)[filter.key]
 
         if (filter.op === 'eq') {
