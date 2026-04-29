@@ -8,6 +8,7 @@ describe('buildLocalArtifactCleanupPlan', () => {
       rootEntries: Array<{ name: string; kind: 'directory' | 'file' }>
       worktreeHelperPaths: string[]
       registeredWorktreePaths: string[]
+      repoRootPath?: string
     }) => {
       directories: string[]
       files: string[]
@@ -27,7 +28,11 @@ describe('buildLocalArtifactCleanupPlan', () => {
         { name: 'package.json', kind: 'file' as const },
       ],
       worktreeHelperPaths: ['.worktrees/active-lane', '.worktrees/stale-lane'],
-      registeredWorktreePaths: ['.worktrees/active-lane'],
+      registeredWorktreePaths: [
+        'C:/dev/rt-scheduler-off-onedrive/.worktrees/active-lane',
+        'C:/Users/byonk/.codex/worktrees/cf43/rt-scheduler-off-onedrive',
+      ],
+      repoRootPath: 'C:/dev/rt-scheduler-off-onedrive',
     }
 
     expect(buildPlan(planInput)).toEqual({
@@ -43,6 +48,40 @@ describe('buildLocalArtifactCleanupPlan', () => {
         'tsconfig.tsbuildinfo',
         '.worktrees/stale-lane',
       ],
+    })
+  })
+
+  it('matches current codex log names and does not mark registered worktrees as stale', () => {
+    const buildPlan = buildLocalArtifactCleanupPlan as unknown as (args: {
+      rootEntries: Array<{ name: string; kind: 'directory' | 'file' }>
+      worktreeHelperPaths: string[]
+      registeredWorktreePaths: string[]
+      repoRootPath?: string
+    }) => {
+      directories: string[]
+      files: string[]
+      staleWorktrees: string[]
+      targets: string[]
+    }
+
+    expect(
+      buildPlan({
+        rootEntries: [
+          { name: '.codex-schedule-dev.log', kind: 'file' as const },
+          { name: '.codex-schedule-dev.err.log', kind: 'file' as const },
+          { name: 'README.md', kind: 'file' as const },
+        ],
+        worktreeHelperPaths: ['.worktrees/therapist-blank-state-clarity'],
+        registeredWorktreePaths: [
+          'C:/dev/rt-scheduler-off-onedrive/.worktrees/therapist-blank-state-clarity',
+        ],
+        repoRootPath: 'C:/dev/rt-scheduler-off-onedrive',
+      })
+    ).toEqual({
+      directories: [],
+      files: ['.codex-schedule-dev.err.log', '.codex-schedule-dev.log'],
+      staleWorktrees: [],
+      targets: ['.codex-schedule-dev.err.log', '.codex-schedule-dev.log'],
     })
   })
 })
