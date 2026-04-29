@@ -3,22 +3,32 @@ import { resolve } from 'node:path'
 
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { getTableSizing } from '@/components/schedule-roster/PaperScheduleGrid'
 import { ScheduleRosterScreen } from '@/components/schedule-roster/ScheduleRosterScreen'
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    replace: vi.fn(),
+  }),
+}))
+
 describe('ScheduleRosterScreen', () => {
-  it('renders the paper schedule shell with the fixed grid, controls, and legend copy', () => {
+  it('renders the paper schedule shell with live cycle metadata, fixed grid, controls, and legend copy', () => {
     const html = renderToStaticMarkup(
       createElement(ScheduleRosterScreen, {
         live: {
           cycleId: 'cycle-1',
-          label: 'Ignored',
-          startDate: '2026-03-22',
-          endDate: '2026-05-02',
-          shortLabel: 'Ignored',
-          availableCycles: [],
+          label: 'Cycle Alpha',
+          startDate: '2026-05-03',
+          endDate: '2026-05-09',
+          shortLabel: 'May 3 - May 9, 2026',
+          isPublished: false,
+          availableCycles: [
+            { id: 'cycle-1', label: 'Cycle Alpha' },
+            { id: 'cycle-2', label: 'Cycle Beta' },
+          ],
           staff: [],
           assignments: {},
           availabilityApprovals: {},
@@ -27,6 +37,9 @@ describe('ScheduleRosterScreen', () => {
     )
 
     expect(html).toContain('Respiratory Therapy - Day Shift')
+    expect(html).toContain('Cycle Alpha')
+    expect(html).toContain('May 3 - May 9, 2026')
+    expect(html).not.toContain('March 22, 2026')
     expect(html).toContain('DRAFT')
     expect(html).toContain('Print')
     expect(html).toContain('Export')
