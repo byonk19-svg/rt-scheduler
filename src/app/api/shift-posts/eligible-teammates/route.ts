@@ -11,7 +11,7 @@ type ShiftRow = {
   role: 'lead' | 'staff'
   status: string | null
   assignment_status: string | null
-  schedule_cycles?: { published: boolean }[] | null
+  schedule_cycles?: { published: boolean } | { published: boolean }[] | null
 }
 
 type ProfileRow = {
@@ -19,6 +19,11 @@ type ProfileRow = {
   full_name: string | null
   is_lead_eligible: boolean | null
   is_active: boolean | null
+}
+
+function isPublishedCycle(cycle: ShiftRow['schedule_cycles']): boolean {
+  if (Array.isArray(cycle)) return cycle[0]?.published === true
+  return cycle?.published === true
 }
 
 export async function GET(request: Request) {
@@ -47,13 +52,12 @@ export async function GET(request: Request) {
     .maybeSingle()
 
   const requestShift = (shift ?? null) as ShiftRow | null
-  const published = requestShift?.schedule_cycles?.[0]?.published
 
   if (
     shiftError ||
     !requestShift ||
     requestShift.user_id !== user.id ||
-    published !== true ||
+    !isPublishedCycle(requestShift.schedule_cycles) ||
     requestShift.status !== 'scheduled' ||
     requestShift.assignment_status !== 'scheduled'
   ) {
