@@ -217,7 +217,13 @@ Use archive/inactive status in the Team UI for real staff whose history should r
 
 ## Cleanup Local Artifacts
 
-Dry-run local cleanup for generated build output, temp logs, and stale unregistered `.worktrees` helpers:
+Dry-run cleanup for repo-local generated output only:
+
+- generated directories under the current checkout root: `.next`, `.next-dev`, `.tmp`, `artifacts`, `playwright-report`, `shots`, `test-results`
+- root temp/log files that match local Codex or temp naming (`.codex-*.log`, `.codex-*.err.log`, `.codex-*.out.log`, `.tmp-*`, legacy root `tsconfig.tsbuildinfo`)
+- stale `.worktrees/*` helper directories whose absolute path is no longer registered with `git worktree list`
+
+Command:
 
 ```bash
 npm run cleanup:local

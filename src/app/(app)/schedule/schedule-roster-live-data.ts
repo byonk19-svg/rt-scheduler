@@ -18,6 +18,7 @@ export type ScheduleRosterLivePayload = {
   startDate: string
   endDate: string
   shortLabel: string
+  isPublished: boolean
   availableCycles: Array<{ id: string; label: string }>
   staff: ScheduleRosterStaff[]
   assignments: AssignmentStore
@@ -26,6 +27,7 @@ export type ScheduleRosterLivePayload = {
 
 export type ScheduleRosterPageData =
   | { status: 'ok'; data: ScheduleRosterLivePayload }
+  | { status: 'unauthenticated' }
   | { status: 'forbidden' }
   | { status: 'no_cycle' }
 
@@ -76,7 +78,7 @@ export async function loadScheduleRosterPageData(
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return { status: 'forbidden' }
+    return { status: 'unauthenticated' }
   }
 
   const { data: profile } = await supabase
@@ -166,6 +168,7 @@ export async function loadScheduleRosterPageData(
       startDate: selectedCycle.start_date,
       endDate: selectedCycle.end_date,
       shortLabel,
+      isPublished: selectedCycle.published,
       availableCycles: cycles.map((c) => ({ id: c.id, label: c.label })),
       staff,
       assignments,

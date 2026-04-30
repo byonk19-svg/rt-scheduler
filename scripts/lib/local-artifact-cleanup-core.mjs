@@ -1,3 +1,5 @@
+import path from 'node:path'
+
 const GENERATED_DIRECTORY_NAMES = new Set([
   '.next',
   '.next-dev',
@@ -21,10 +23,23 @@ function normalizeForComparison(value) {
     .toLowerCase()
 }
 
+function resolveRepoLocalPath(repoRootPath, candidatePath) {
+  if (!repoRootPath || !candidatePath) {
+    return normalizeForComparison(candidatePath)
+  }
+
+  if (path.isAbsolute(candidatePath)) {
+    return normalizeForComparison(candidatePath)
+  }
+
+  return normalizeForComparison(path.resolve(repoRootPath, candidatePath))
+}
+
 export function buildLocalArtifactCleanupPlan({
   rootEntries,
   worktreeHelperPaths = [],
   registeredWorktreePaths = [],
+  repoRootPath = null,
 }) {
   const directories = rootEntries
     .filter((entry) => entry.kind === 'directory' && GENERATED_DIRECTORY_NAMES.has(entry.name))
@@ -39,9 +54,13 @@ export function buildLocalArtifactCleanupPlan({
     .map((entry) => entry.name)
     .sort((left, right) => left.localeCompare(right))
 
-  const registered = new Set(registeredWorktreePaths.map(normalizeForComparison))
+  const registered = new Set(
+    registeredWorktreePaths.map((registeredPath) =>
+      resolveRepoLocalPath(repoRootPath, registeredPath)
+    )
+  )
   const staleWorktrees = worktreeHelperPaths
-    .filter((worktreePath) => !registered.has(normalizeForComparison(worktreePath)))
+    .filter((worktreePath) => !registered.has(resolveRepoLocalPath(repoRootPath, worktreePath)))
     .sort((left, right) => left.localeCompare(right))
 
   return {

@@ -1,8 +1,8 @@
-import { expect, test, type Page } from '@playwright/test'
-import { createClient as createSupabaseClient, type SupabaseClient } from '@supabase/supabase-js'
+import { expect, test, type Browser, type Page } from '@playwright/test'
+import { type SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
-import { addDays, formatDateKey, getEnv, randomString } from './helpers/env'
+import { addDays, formatDateKey, randomString } from './helpers/env'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type RoleJourneysContext = {
@@ -206,23 +206,79 @@ async function expectStaffRedirect(page: Page, path: string) {
   await expect(page).toHaveURL(/\/dashboard\/staff(?:[/?].*)?$/, { timeout: 20_000 })
 }
 
-async function createAuthenticatedClient(email: string, password: string): Promise<SupabaseClient> {
-  const supabaseUrl = getEnv('NEXT_PUBLIC_SUPABASE_URL')
-  const anonKey = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
-  if (!supabaseUrl || !anonKey) {
-    throw new Error('Missing Supabase env for authenticated test client.')
+async function seedSelectedPickupInterest(params: {
+  supabase: SupabaseClient
+  postId: string
+  therapistId: string
+}): Promise<string> {
+  const { supabase, postId, therapistId } = params
+  const result = await supabase
+    .from('shift_post_interests')
+    .insert({
+      shift_post_id: postId,
+      therapist_id: therapistId,
+      status: 'selected',
+    })
+    .select('id')
+    .single()
+
+  if (result.error || !result.data) {
+    throw new Error(result.error?.message ?? 'Could not seed pickup claimant interest.')
   }
 
-  const client = createSupabaseClient(supabaseUrl, anonKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
+  return result.data.id
+}
 
-  const signIn = await client.auth.signInWithPassword({ email, password })
-  if (signIn.error) {
-    throw new Error(`Could not sign in test client ${email}: ${signIn.error.message}`)
+async function approvePickupFromShiftBoard(params: {
+  browser: Browser
+  requestId: string
+  selectedInterestId: string
+  requestMessage: string
+  manager: { email: string; password: string }
+  overrideReason?: string
+}) {
+  const { browser, requestId, selectedInterestId, requestMessage, manager, overrideReason } = params
+  const managerContext = await browser.newContext()
+  const managerPage = await managerContext.newPage()
+
+  try {
+    await loginAs(managerPage, manager.email, manager.password)
+    await managerPage.goto('/shift-board')
+
+    const requestCard = managerPage
+      .locator('div.rounded-xl')
+      .filter({ has: managerPage.getByText(requestMessage) })
+      .first()
+    await expect(requestCard).toBeVisible({ timeout: 20_000 })
+
+    const result = await managerPage.evaluate(
+      async ({ requestId, selectedInterestId, overrideReason }) => {
+        const response = await fetch('/api/shift-posts', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            action: 'review_request',
+            requestId,
+            decision: 'approve',
+            selectedInterestId,
+            override: typeof overrideReason === 'string',
+            overrideReason: overrideReason ?? null,
+          }),
+        })
+        const body = (await response.json().catch(() => null)) as unknown
+        return { body, ok: response.ok, status: response.status }
+      },
+      { requestId, selectedInterestId, overrideReason }
+    )
+
+    if (!result.ok) {
+      throw new Error(
+        `Manager pickup approval failed (${result.status}): ${JSON.stringify(result.body)}`
+      )
+    }
+  } finally {
+    await managerContext.close()
   }
-
-  return client
 }
 
 test.describe.serial('role journeys', () => {
@@ -913,7 +969,10 @@ test.describe.serial('role journeys', () => {
     }
   })
 
-  test('pickup request can be approved and transfer the shift to a claimant', async ({ page }) => {
+  test('pickup request can be approved and transfer the shift to a claimant', async ({
+    page,
+    browser,
+  }) => {
     test.skip(!ctx, 'Supabase service env values are required to run role journeys.')
 
     const requestMessage = `Claimable pickup ${randomString('pickup')}`
@@ -927,39 +986,36 @@ test.describe.serial('role journeys', () => {
     await page.getByRole('button', { name: 'Submit request' }).click()
 
     let postId: string | null = null
+    let shiftId: string | null = null
     await expect
       .poll(async () => {
         const post = await ctx!.supabase
           .from('shift_posts')
-          .select('id')
+          .select('id, shift_id')
           .eq('posted_by', ctx!.therapist.id)
           .eq('message', requestMessage)
           .maybeSingle()
 
         if (post.error) throw new Error(post.error.message)
         postId = post.data?.id ?? null
+        shiftId = post.data?.shift_id ?? null
         return postId !== null
       })
       .toBe(true)
 
-    const seedClaim = await ctx!.supabase
-      .from('shift_posts')
-      .update({ claimed_by: ctx!.claimant.id })
-      .eq('id', postId!)
+    const interestId = await seedSelectedPickupInterest({
+      supabase: ctx!.supabase,
+      postId: postId!,
+      therapistId: ctx!.claimant.id,
+    })
 
-    if (seedClaim.error) {
-      throw new Error(seedClaim.error.message)
-    }
-
-    const managerClient = await createAuthenticatedClient(ctx!.manager.email, ctx!.manager.password)
-    const approveResult = await managerClient
-      .from('shift_posts')
-      .update({ status: 'approved' })
-      .eq('id', postId!)
-
-    if (approveResult.error) {
-      throw new Error(approveResult.error.message)
-    }
+    await approvePickupFromShiftBoard({
+      browser,
+      requestId: postId!,
+      selectedInterestId: interestId,
+      requestMessage,
+      manager: ctx!.manager,
+    })
 
     await expect
       .poll(async () => {
@@ -980,8 +1036,7 @@ test.describe.serial('role journeys', () => {
         const shift = await ctx!.supabase
           .from('shifts')
           .select('user_id')
-          .eq('cycle_id', ctx!.publishedCycle.id)
-          .eq('date', ctx!.publishedCycle.requestShiftDate)
+          .eq('id', shiftId!)
           .maybeSingle()
 
         if (shift.error) throw new Error(shift.error.message)
@@ -990,7 +1045,10 @@ test.describe.serial('role journeys', () => {
       .toBe(ctx!.claimant.id)
   })
 
-  test('manager can force approve a lead-gap pickup with an override reason', async ({ page }) => {
+  test('manager can force approve a lead-gap pickup with an override reason', async ({
+    page,
+    browser,
+  }) => {
     test.skip(!ctx, 'Supabase service env values are required to run role journeys.')
 
     const requestMessage = `Lead override pickup ${randomString('override')}`
@@ -1005,57 +1063,37 @@ test.describe.serial('role journeys', () => {
     await page.getByRole('button', { name: 'Submit request' }).click()
 
     let postId: string | null = null
+    let shiftId: string | null = null
     await expect
       .poll(async () => {
         const post = await ctx!.supabase
           .from('shift_posts')
-          .select('id')
+          .select('id, shift_id')
           .eq('posted_by', ctx!.lead.id)
           .eq('message', requestMessage)
           .maybeSingle()
 
         if (post.error) throw new Error(post.error.message)
         postId = post.data?.id ?? null
+        shiftId = post.data?.shift_id ?? null
         return postId !== null
       })
       .toBe(true)
 
-    const seedClaim = await ctx!.supabase
-      .from('shift_posts')
-      .update({ claimed_by: ctx!.claimant.id })
-      .eq('id', postId!)
+    const interestId = await seedSelectedPickupInterest({
+      supabase: ctx!.supabase,
+      postId: postId!,
+      therapistId: ctx!.claimant.id,
+    })
 
-    if (seedClaim.error) {
-      throw new Error(seedClaim.error.message)
-    }
-
-    await expect
-      .poll(async () => {
-        const post = await ctx!.supabase
-          .from('shift_posts')
-          .select('claimed_by')
-          .eq('posted_by', ctx!.lead.id)
-          .eq('message', requestMessage)
-          .maybeSingle()
-
-        if (post.error) throw new Error(post.error.message)
-        return post.data?.claimed_by ?? null
-      })
-      .toBe(ctx!.claimant.id)
-
-    const managerClient = await createAuthenticatedClient(ctx!.manager.email, ctx!.manager.password)
-    const approveResult = await managerClient
-      .from('shift_posts')
-      .update({
-        manager_override: true,
-        override_reason: overrideReason,
-        status: 'approved',
-      })
-      .eq('id', postId!)
-
-    if (approveResult.error) {
-      throw new Error(approveResult.error.message)
-    }
+    await approvePickupFromShiftBoard({
+      browser,
+      requestId: postId!,
+      selectedInterestId: interestId,
+      requestMessage,
+      manager: ctx!.manager,
+      overrideReason,
+    })
 
     await expect
       .poll(async () => {
@@ -1082,8 +1120,7 @@ test.describe.serial('role journeys', () => {
         const shift = await ctx!.supabase
           .from('shifts')
           .select('user_id')
-          .eq('cycle_id', ctx!.publishedCycle.id)
-          .eq('date', ctx!.publishedCycle.leadRequestShiftDate)
+          .eq('id', shiftId!)
           .maybeSingle()
 
         if (shift.error) throw new Error(shift.error.message)

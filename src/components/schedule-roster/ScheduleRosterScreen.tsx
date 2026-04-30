@@ -11,12 +11,10 @@ import {
 import { useMemo, useState } from 'react'
 
 import type { ScheduleRosterLivePayload } from '@/app/(app)/schedule/schedule-roster-live-data'
-import {
-  getMockScheduleDataset,
-  SCHEDULE_LEGEND,
-  type ScheduleCode,
-} from '@/components/schedule-roster/mock-schedule-data'
+import { buildLiveScheduleDataset } from '@/components/schedule-roster/live-schedule-dataset'
+import { SCHEDULE_LEGEND, type ScheduleCode } from '@/components/schedule-roster/mock-schedule-data'
 import { PaperScheduleGrid } from '@/components/schedule-roster/PaperScheduleGrid'
+import { ScheduleCycleSelect } from '@/components/schedule-roster/ScheduleCycleSelect'
 import { Button } from '@/components/ui/button'
 import type { ShiftType } from '@/lib/mock-coverage-roster'
 import { cn } from '@/lib/utils'
@@ -42,10 +40,32 @@ const SHIFT_OPTIONS: Array<{ value: ShiftType; label: string }> = [
   { value: 'night', label: 'Night Shift' },
 ]
 
-export function ScheduleRosterScreen({ live: _live }: ScheduleRosterScreenProps) {
-  void _live
+export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
   const [selectedShift, setSelectedShift] = useState<ShiftType>('day')
-  const dataset = useMemo(() => getMockScheduleDataset(selectedShift), [selectedShift])
+  const dataset = useMemo(
+    () => (live ? buildLiveScheduleDataset(live, selectedShift) : null),
+    [live, selectedShift]
+  )
+
+  if (!live || !dataset) {
+    return (
+      <div className="mx-auto flex w-full max-w-[960px] flex-col px-2 py-2 sm:px-3 lg:px-5">
+        <section className="rounded-[26px] border border-border/70 bg-card px-6 py-8 shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
+          <h1 className="font-heading text-[1.75rem] font-semibold tracking-[-0.04em] text-foreground sm:text-[1.9rem]">
+            Schedule roster
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Schedule data is unavailable right now. Refresh after a cycle is selected.
+          </p>
+        </section>
+      </div>
+    )
+  }
+
+  const statusLabel = live.isPublished ? 'LIVE' : 'DRAFT'
+  const statusClassName = live.isPublished
+    ? 'bg-[var(--success-subtle)] text-[var(--success-text)]'
+    : 'bg-[color:color-mix(in_srgb,var(--attention)_14%,white)] text-foreground'
 
   return (
     <div className="mx-auto flex w-full max-w-[1580px] flex-col px-2 py-2 sm:px-3 lg:px-5">
@@ -56,14 +76,22 @@ export function ScheduleRosterScreen({ live: _live }: ScheduleRosterScreenProps)
               <h1 className="font-heading text-[1.75rem] font-semibold tracking-[-0.04em] text-foreground sm:text-[1.9rem]">
                 Respiratory Therapy - {selectedShift === 'day' ? 'Day' : 'Night'} Shift
               </h1>
-              <p className="text-[13px] text-muted-foreground">{dataset.cycleLabel}</p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+                <p className="text-[13px] text-muted-foreground">{dataset.cycleLabel}</p>
+                <ScheduleCycleSelect cycles={live.availableCycles} activeCycleId={live.cycleId} />
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-              <span className="inline-flex h-9 items-center rounded-lg bg-[color:color-mix(in_srgb,var(--attention)_14%,white)] px-2.5 text-[12px] font-semibold text-foreground">
-                DRAFT
+              <span
+                className={cn(
+                  'inline-flex h-9 items-center rounded-lg px-2.5 text-[12px] font-semibold',
+                  statusClassName
+                )}
+              >
+                {statusLabel}
               </span>
-              <span className="text-[13px] text-muted-foreground">Last saved: 2:04 PM</span>
+              <span className="text-[13px] text-muted-foreground">Read-only roster view</span>
               <Button
                 type="button"
                 variant="outline"

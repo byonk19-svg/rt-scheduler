@@ -4,11 +4,18 @@ import { existsSync, rmSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 
-const cwd = process.cwd()
-const buildInfoPath = path.join(cwd, 'tsconfig.tsbuildinfo')
+import { resolveTypecheckArtifactTargets } from './lib/typecheck-artifact-core.mjs'
 
-if (existsSync(buildInfoPath)) {
-  rmSync(buildInfoPath, { force: true })
+const cwd = process.cwd()
+const tsconfigPath = path.join(cwd, 'tsconfig.json')
+
+for (const artifactPath of resolveTypecheckArtifactTargets({
+  repoRootPath: cwd,
+  tsconfigPath,
+})) {
+  if (existsSync(artifactPath)) {
+    rmSync(artifactPath, { force: true })
+  }
 }
 
 const command = process.platform === 'win32' ? 'npx.cmd tsc --noEmit' : 'npx tsc --noEmit'

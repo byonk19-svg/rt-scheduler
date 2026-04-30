@@ -47,6 +47,11 @@ function toTeammate(profile: ProfileRow, shiftType: ShiftRow['shift_type']) {
   }
 }
 
+function isPublishedCycle(cycle: ShiftRow['schedule_cycles']): boolean {
+  if (Array.isArray(cycle)) return cycle[0]?.published === true
+  return cycle?.published === true
+}
+
 export async function GET(request: Request) {
   const supabase = await createClient()
   const {
@@ -79,9 +84,6 @@ export async function GET(request: Request) {
   ])
 
   const requestShift = (shift ?? null) as ShiftRow | null
-  const published = Array.isArray(requestShift?.schedule_cycles)
-    ? requestShift.schedule_cycles[0]?.published
-    : requestShift?.schedule_cycles?.published
   const actorIsLeadEligible =
     ((requesterProfile ?? null) as Pick<ProfileRow, 'is_lead_eligible'> | null)
       ?.is_lead_eligible === true
@@ -90,7 +92,7 @@ export async function GET(request: Request) {
     shiftError ||
     !requestShift ||
     requestShift.user_id !== user.id ||
-    published !== true ||
+    !isPublishedCycle(requestShift.schedule_cycles) ||
     requestShift.status !== 'scheduled' ||
     requestShift.assignment_status !== 'scheduled'
   ) {

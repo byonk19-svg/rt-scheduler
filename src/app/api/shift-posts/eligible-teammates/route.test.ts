@@ -23,7 +23,7 @@ type TestShiftRow = {
   role: 'lead' | 'staff'
   status: string | null
   assignment_status: string | null
-  schedule_cycles?: { published: boolean }[] | null
+  schedule_cycles?: { published: boolean } | { published: boolean }[] | null
 }
 
 type TestProfileRow = {
@@ -39,6 +39,17 @@ type TestProfileRow = {
 type TestState = {
   profiles: TestProfileRow[]
   shifts: TestShiftRow[]
+}
+
+function isPublishedScheduleCycle(
+  cycle: TestShiftRow['schedule_cycles'],
+  expected: unknown
+): boolean {
+  if (Array.isArray(cycle)) {
+    return cycle.some((row) => row.published === expected)
+  }
+
+  return cycle?.published === expected
 }
 
 function makeRequest(shiftId: string, requestType: 'swap' | 'pickup') {
@@ -65,10 +76,7 @@ function createAdminClient(state: TestState) {
       filters.every((filter) => {
         const cell =
           filter.key === 'schedule_cycles.published'
-            ? Array.isArray((row as TestShiftRow).schedule_cycles) &&
-              (row as TestShiftRow).schedule_cycles?.some(
-                (cycle) => cycle.published === filter.value
-              )
+            ? isPublishedScheduleCycle((row as TestShiftRow).schedule_cycles, filter.value)
             : (row as Record<string, unknown>)[filter.key]
 
         if (filter.op === 'eq') {
@@ -141,6 +149,67 @@ describe('eligible request teammates API', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     createClientMock.mockResolvedValue(createServerClient())
+  })
+
+  it('loads therapist teammates when the published cycle join is returned as an object', async () => {
+    createAdminClientMock.mockReturnValue(
+      createAdminClient({
+        profiles: [
+          {
+            id: 'therapist-1',
+            full_name: 'Lead Requester',
+            is_lead_eligible: true,
+            is_active: true,
+            role: 'lead',
+            shift_type: 'day',
+          },
+          {
+            id: 'therapist-2',
+            full_name: 'Therapist Two',
+            is_lead_eligible: true,
+            is_active: true,
+            role: 'therapist',
+            shift_type: 'day',
+          },
+        ],
+        shifts: [
+          {
+            id: 'shift-1',
+            user_id: 'therapist-1',
+            date: '2026-05-01',
+            shift_type: 'day',
+            role: 'lead',
+            status: 'scheduled',
+            assignment_status: 'scheduled',
+            schedule_cycles: { published: true },
+          },
+          {
+            id: 'shift-2',
+            user_id: 'therapist-2',
+            date: '2026-05-01',
+            shift_type: 'day',
+            role: 'staff',
+            status: 'scheduled',
+            assignment_status: 'scheduled',
+            schedule_cycles: { published: true },
+          },
+        ],
+      })
+    )
+
+    const response = await GET(makeRequest('shift-1', 'swap'))
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body.teammates).toEqual([
+      {
+        id: 'therapist-2',
+        name: 'Therapist Two',
+        avatar: 'TT',
+        shift: 'Day',
+        isLead: true,
+      },
+    ])
   })
 
   it('returns only same-date same-shift teammates for direct swaps', async () => {

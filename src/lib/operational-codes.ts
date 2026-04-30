@@ -13,8 +13,7 @@ export const OPERATIONAL_CODE_VALUES = [
   'cancelled',
   'left_early',
 ] as const satisfies ReadonlyArray<OperationalCode>
-
-const OPERATIONAL_ENTRY_BATCH_SIZE = 100
+const OPERATIONAL_CODE_SHIFT_ID_BATCH_SIZE = 100
 
 export function isOperationalCode(value: string): value is OperationalCode {
   return OPERATIONAL_CODE_VALUES.includes(value as OperationalCode)
@@ -34,6 +33,7 @@ export async function fetchActiveOperationalCodeMap(
   shiftIds: string[]
 ): Promise<Map<string, OperationalCode>> {
   if (shiftIds.length === 0) return new Map()
+  const uniqueShiftIds = Array.from(new Set(shiftIds))
 
   const client = supabase as {
     from: (table: string) => {
@@ -48,11 +48,14 @@ export async function fetchActiveOperationalCodeMap(
     }
   }
 
-  const map = new Map<string, OperationalCode>()
+  const rows: ActiveOperationalEntryRow[] = []
 
-  const uniqueShiftIds = Array.from(new Set(shiftIds))
-  for (let index = 0; index < uniqueShiftIds.length; index += OPERATIONAL_ENTRY_BATCH_SIZE) {
-    const batch = uniqueShiftIds.slice(index, index + OPERATIONAL_ENTRY_BATCH_SIZE)
+  for (
+    let start = 0;
+    start < uniqueShiftIds.length;
+    start += OPERATIONAL_CODE_SHIFT_ID_BATCH_SIZE
+  ) {
+    const batch = uniqueShiftIds.slice(start, start + OPERATIONAL_CODE_SHIFT_ID_BATCH_SIZE)
     const { data, error } = await client
       .from('shift_operational_entries')
       .select('shift_id, code')
@@ -61,13 +64,16 @@ export async function fetchActiveOperationalCodeMap(
 
     if (error) {
       console.error('Could not load active operational entries:', error)
-      continue
+      return new Map()
     }
 
-    for (const row of (data ?? []) as ActiveOperationalEntryRow[]) {
-      if (!row.shift_id || !row.code) continue
-      map.set(row.shift_id, row.code)
-    }
+    rows.push(...((data ?? []) as ActiveOperationalEntryRow[]))
+  }
+
+  const map = new Map<string, OperationalCode>()
+  for (const row of rows) {
+    if (!row.shift_id || !row.code) continue
+    map.set(row.shift_id, row.code)
   }
 
   return map
