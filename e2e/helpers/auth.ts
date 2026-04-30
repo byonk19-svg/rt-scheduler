@@ -61,3 +61,69 @@ export async function loginAs(page: Page, email: string, password: string) {
     timeout: 30_000,
   })
 }
+
+export async function loginAsAndGoTo(
+  page: Page,
+  email: string,
+  password: string,
+  targetPath: string,
+  expectedUrl: RegExp
+) {
+  const supabaseUrl = getEnv('NEXT_PUBLIC_SUPABASE_URL')
+  const anonKey = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+  if (!supabaseUrl || !anonKey) {
+    throw new Error(
+      'Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY for e2e auth.'
+    )
+  }
+
+  const cookieJar = new Map<string, { value: string; options: Record<string, unknown> }>()
+  const supabase = createServerClient(supabaseUrl, anonKey, {
+    cookies: {
+      getAll() {
+        return [...cookieJar.entries()].map(([name, row]) => ({ name, value: row.value }))
+      },
+      setAll(cookiesToSet) {
+        for (const cookie of cookiesToSet) {
+          if (cookie.value) {
+            cookieJar.set(cookie.name, { value: cookie.value, options: cookie.options ?? {} })
+          } else {
+            cookieJar.delete(cookie.name)
+          }
+        }
+      },
+    },
+  })
+
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error) {
+    throw new Error(`Could not sign in ${email}: ${error.message}`)
+  }
+
+  await page.context().addCookies(
+    [...cookieJar.entries()].map(([name, row]) => ({
+      name,
+      value: row.value,
+      domain: '127.0.0.1',
+      path: typeof row.options.path === 'string' ? row.options.path : '/',
+      httpOnly: Boolean(row.options.httpOnly),
+      secure: Boolean(row.options.secure),
+      sameSite: 'Lax' as const,
+    }))
+  )
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await page.goto(targetPath, { waitUntil: 'domcontentloaded' })
+      break
+    } catch (error) {
+      if (attempt === 1) {
+        throw error
+      }
+    }
+  }
+
+  await expect(page).toHaveURL(expectedUrl, {
+    timeout: 30_000,
+  })
+}

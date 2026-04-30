@@ -28,7 +28,20 @@ type ProxyScenario = {
     is_active: boolean | null
     archived_at: string | null
     staff_onboarding_required: boolean | null
+    preferred_work_days_mode: 'unset' | 'specific_days' | 'no_preference' | null
+    staff_onboarding_preferences_confirmed_at: string | null
+    staff_onboarding_theme_confirmed_at: string | null
     staff_onboarding_completed_at: string | null
+    work_patterns:
+      | {
+          pattern_type:
+            | 'weekly_fixed'
+            | 'weekly_with_weekend_rotation'
+            | 'repeating_cycle'
+            | 'none'
+            | null
+        }[]
+      | null
   } | null
 }
 
@@ -44,6 +57,10 @@ function makeSupabaseMock(scenario: ProxyScenario) {
         archived_at: null,
         staff_onboarding_required: false,
         staff_onboarding_completed_at: null,
+        preferred_work_days_mode: 'unset',
+        staff_onboarding_preferences_confirmed_at: null,
+        staff_onboarding_theme_confirmed_at: null,
+        work_patterns: null,
       } satisfies NonNullable<ProxyScenario['profile']>)
 
   return {
@@ -120,7 +137,11 @@ describe('proxy onboarding and pending gates', () => {
           is_active: true,
           archived_at: null,
           staff_onboarding_required: true,
+          preferred_work_days_mode: 'unset',
+          staff_onboarding_preferences_confirmed_at: null,
+          staff_onboarding_theme_confirmed_at: null,
           staff_onboarding_completed_at: null,
+          work_patterns: null,
         },
       })
     )
@@ -133,6 +154,54 @@ describe('proxy onboarding and pending gates', () => {
     )
   })
 
+  it('keeps onboarding step routes reachable while required setup is still incomplete', async () => {
+    createServerClientMock.mockReturnValue(
+      makeSupabaseMock({
+        profile: {
+          role: 'therapist',
+          is_active: true,
+          archived_at: null,
+          staff_onboarding_required: true,
+          preferred_work_days_mode: 'unset',
+          staff_onboarding_preferences_confirmed_at: null,
+          staff_onboarding_theme_confirmed_at: null,
+          staff_onboarding_completed_at: null,
+          work_patterns: null,
+        },
+      })
+    )
+
+    const response = await proxy(
+      makeRequest('/therapist/recurring-pattern?return_to=%2Fonboarding')
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('location')).toBeNull()
+  })
+
+  it('allows future availability from onboarding once the required setup steps are complete', async () => {
+    createServerClientMock.mockReturnValue(
+      makeSupabaseMock({
+        profile: {
+          role: 'therapist',
+          is_active: true,
+          archived_at: null,
+          staff_onboarding_required: true,
+          preferred_work_days_mode: 'no_preference',
+          staff_onboarding_preferences_confirmed_at: '2026-04-29T12:00:00.000Z',
+          staff_onboarding_theme_confirmed_at: '2026-04-29T12:05:00.000Z',
+          staff_onboarding_completed_at: null,
+          work_patterns: [{ pattern_type: 'none' }],
+        },
+      })
+    )
+
+    const response = await proxy(makeRequest('/therapist/availability'))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('location')).toBeNull()
+  })
+
   it('preserves success query params when sending staff from /dashboard to /dashboard/staff', async () => {
     createServerClientMock.mockReturnValue(
       makeSupabaseMock({
@@ -141,7 +210,11 @@ describe('proxy onboarding and pending gates', () => {
           is_active: true,
           archived_at: null,
           staff_onboarding_required: false,
+          preferred_work_days_mode: 'unset',
+          staff_onboarding_preferences_confirmed_at: null,
+          staff_onboarding_theme_confirmed_at: null,
           staff_onboarding_completed_at: '2026-04-29T12:00:00.000Z',
+          work_patterns: null,
         },
       })
     )
@@ -162,7 +235,11 @@ describe('proxy onboarding and pending gates', () => {
           is_active: true,
           archived_at: null,
           staff_onboarding_required: true,
+          preferred_work_days_mode: 'unset',
+          staff_onboarding_preferences_confirmed_at: null,
+          staff_onboarding_theme_confirmed_at: null,
           staff_onboarding_completed_at: null,
+          work_patterns: null,
         },
       })
     )
@@ -181,7 +258,11 @@ describe('proxy onboarding and pending gates', () => {
           is_active: true,
           archived_at: null,
           staff_onboarding_required: false,
+          preferred_work_days_mode: 'unset',
+          staff_onboarding_preferences_confirmed_at: null,
+          staff_onboarding_theme_confirmed_at: null,
           staff_onboarding_completed_at: null,
+          work_patterns: null,
         },
       })
     )
@@ -200,7 +281,11 @@ describe('proxy onboarding and pending gates', () => {
           is_active: true,
           archived_at: null,
           staff_onboarding_required: false,
+          preferred_work_days_mode: 'unset',
+          staff_onboarding_preferences_confirmed_at: null,
+          staff_onboarding_theme_confirmed_at: null,
           staff_onboarding_completed_at: null,
+          work_patterns: null,
         },
       })
     )

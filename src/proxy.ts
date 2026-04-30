@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { isValidPublishWorkerRequest } from '@/lib/security/worker-auth'
+import { getStaffOnboardingStatus, type PreferredWorkDaysMode } from '@/lib/staff-onboarding'
 
 const PUBLIC_ROUTES = [
   '/',
@@ -37,7 +38,20 @@ type ProfileAccessRow = {
   is_active: boolean | null
   archived_at: string | null
   staff_onboarding_required: boolean | null
+  preferred_work_days_mode: PreferredWorkDaysMode | null
+  staff_onboarding_preferences_confirmed_at: string | null
+  staff_onboarding_theme_confirmed_at: string | null
   staff_onboarding_completed_at: string | null
+  work_patterns:
+    | {
+        pattern_type:
+          | 'weekly_fixed'
+          | 'weekly_with_weekend_rotation'
+          | 'repeating_cycle'
+          | 'none'
+          | null
+      }[]
+    | null
 }
 
 function matchesRoute(pathname: string, route: string): boolean {
@@ -63,6 +77,11 @@ function buildRedirectUrl(request: NextRequest, pathname: string): URL {
   const url = request.nextUrl.clone()
   url.pathname = pathname
   return url
+}
+
+function getOne<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null
+  return value ?? null
 }
 
 export async function proxy(request: NextRequest) {
@@ -138,7 +157,7 @@ export async function proxy(request: NextRequest) {
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select(
-      'role, is_active, archived_at, staff_onboarding_required, staff_onboarding_completed_at'
+      'role, is_active, archived_at, staff_onboarding_required, preferred_work_days_mode, staff_onboarding_preferences_confirmed_at, staff_onboarding_theme_confirmed_at, staff_onboarding_completed_at, work_patterns(pattern_type)'
     )
     .eq('id', user.id)
     .maybeSingle()
@@ -156,6 +175,22 @@ export async function proxy(request: NextRequest) {
   }
 
   const role = normalizeRole(profileRow?.role ?? claimRole)
+  const onboardingStatus =
+    role === 'staff' && profileRow
+      ? getStaffOnboardingStatus({
+          role: profileRow.role,
+          onboardingRequired: profileRow.staff_onboarding_required === true,
+          preferredWorkDaysMode: profileRow.preferred_work_days_mode ?? 'unset',
+          preferencesConfirmedAt: profileRow.staff_onboarding_preferences_confirmed_at,
+          themeConfirmedAt: profileRow.staff_onboarding_theme_confirmed_at,
+          completedAt: profileRow.staff_onboarding_completed_at,
+          workPattern: (() => {
+            const row = getOne(profileRow.work_patterns)
+            return row?.pattern_type ? { pattern_type: row.pattern_type } : null
+          })(),
+          hasActionableAvailabilityCycle: false,
+        })
+      : null
 
   if (!role) {
     if (!matchesRoute(pathname, '/pending-setup')) {
@@ -174,12 +209,16 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse
   }
 
-  if (
-    role === 'staff' &&
-    profileRow?.staff_onboarding_required === true &&
-    !profileRow?.staff_onboarding_completed_at
-  ) {
-    return NextResponse.redirect(buildRedirectUrl(request, '/onboarding'))
+  if (role === 'staff' && onboardingStatus?.isRequired && !onboardingStatus.hasRecordedCompletion) {
+    const isOnboardingStepRoute =
+      matchesRoute(pathname, '/therapist/recurring-pattern') ||
+      matchesRoute(pathname, '/therapist/settings')
+    const isRecommendedAvailabilityRoute =
+      onboardingStatus.isComplete && matchesRoute(pathname, '/therapist/availability')
+
+    if (!isOnboardingStepRoute && !isRecommendedAvailabilityRoute) {
+      return NextResponse.redirect(buildRedirectUrl(request, '/onboarding'))
+    }
   }
 
   if (role === 'staff' && pathname === '/dashboard') {

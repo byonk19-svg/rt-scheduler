@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { addDays, formatDateKey, randomString } from './helpers/env'
+import { loginAsAndGoTo } from './helpers/auth'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type StaffOnboardingContext = {
@@ -104,17 +105,18 @@ test.describe.serial('staff onboarding gate', () => {
   }) => {
     test.skip(!ctx, 'Supabase service env values are required.')
 
-    await page.goto('/login')
-    await page.getByLabel(/^Email address$/).fill(ctx!.therapist.email)
-    await page.getByLabel(/^Password$/).fill(ctx!.therapist.password)
-    await page.getByRole('button', { name: 'Sign In' }).click()
-
-    await expect(page).toHaveURL(/\/onboarding(?:[/?].*)?$/, { timeout: 30_000 })
+    await loginAsAndGoTo(
+      page,
+      ctx!.therapist.email,
+      ctx!.therapist.password,
+      '/dashboard',
+      /\/onboarding(?:[/?].*)?$/
+    )
     await expect(page.getByText('Setup your account')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Finish setup' })).toBeDisabled()
 
     await page.getByRole('link', { name: 'Open step' }).nth(0).click()
-    await expect(page).toHaveURL(/\/therapist\/recurring-pattern\?return_to=%2Fonboarding/)
+    await expect(page).toHaveURL(/\/therapist\/recurring-pattern\?return_to=(?:%2F|\/)onboarding/)
     await page.getByRole('button', { name: /No repeating schedule/i }).click()
     await page.getByRole('button', { name: /Save recurring pattern/i }).click()
     await page.waitForURL(/\/onboarding\?success=work_pattern_saved/, { timeout: 45_000 })
@@ -124,8 +126,20 @@ test.describe.serial('staff onboarding gate', () => {
       .getByRole('link', { name: /Open step/i })
       .nth(0)
       .click()
-    await expect(page).toHaveURL(/\/therapist\/settings\?setup=preferences&return_to=%2Fonboarding/)
+    await expect(page).toHaveURL(
+      /\/therapist\/settings\?setup=preferences&return_to=(?:%2F|\/)onboarding/
+    )
     await page.getByLabel('No preference').check()
+    await page.getByRole('button', { name: /Save settings/i }).click()
+    await page.waitForURL(/\/onboarding\?success=settings_saved/, { timeout: 45_000 })
+
+    await page
+      .getByRole('link', { name: /Open step/i })
+      .nth(0)
+      .click()
+    await expect(page).toHaveURL(
+      /\/therapist\/settings\?setup=notifications&return_to=(?:%2F|\/)onboarding/
+    )
     await page.getByRole('button', { name: 'System' }).click()
     await page.getByRole('button', { name: /Save settings/i }).click()
     await page.waitForURL(/\/onboarding\?success=settings_saved/, { timeout: 45_000 })
@@ -137,13 +151,10 @@ test.describe.serial('staff onboarding gate', () => {
     await expect(page.getByRole('button', { name: 'Finish setup' })).toBeEnabled()
 
     await page.getByRole('button', { name: 'Finish setup' }).click()
-    await expect(page).toHaveURL(/\/dashboard\/staff\?success=onboarding_complete/, {
+    await expect(page).toHaveURL(/\/dashboard(?:\/staff)?\?success=onboarding_complete/, {
       timeout: 45_000,
     })
-    await expect(
-      page.getByText('Setup complete. You can use the staff dashboard now.')
-    ).toBeVisible()
     await expect(page.getByRole('heading', { name: /Welcome, Onboarding/i })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Start availability' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Future Availability' })).toBeVisible()
   })
 })
