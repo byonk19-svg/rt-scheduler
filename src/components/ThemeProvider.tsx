@@ -75,11 +75,16 @@ export function useTheme() {
   return context
 }
 
-export function ThemePreferenceControl() {
+export function ThemePreferenceControl({
+  inputName = 'theme_preference',
+}: {
+  inputName?: string | null
+}) {
   const { theme, resolvedTheme, setTheme } = useTheme()
 
   return (
     <div className="space-y-3">
+      {inputName ? <input type="hidden" name={inputName} value={theme} /> : null}
       <div className="flex gap-0.5 rounded-[7px] bg-muted p-0.5">
         {(
           [

@@ -36,6 +36,8 @@ type ProfileAccessRow = {
   role: string | null
   is_active: boolean | null
   archived_at: string | null
+  staff_onboarding_required: boolean | null
+  staff_onboarding_completed_at: string | null
 }
 
 function matchesRoute(pathname: string, route: string): boolean {
@@ -55,6 +57,12 @@ function normalizeRole(value: unknown): AppRole | null {
   if (role === 'manager') return 'manager'
   if (role === 'therapist' || role === 'lead') return 'staff'
   return null
+}
+
+function buildRedirectUrl(request: NextRequest, pathname: string): URL {
+  const url = request.nextUrl.clone()
+  url.pathname = pathname
+  return url
 }
 
 export async function proxy(request: NextRequest) {
@@ -129,7 +137,9 @@ export async function proxy(request: NextRequest) {
   const claimRole = user.app_metadata?.user_role ?? user.user_metadata?.user_role
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('role, is_active, archived_at')
+    .select(
+      'role, is_active, archived_at, staff_onboarding_required, staff_onboarding_completed_at'
+    )
     .eq('id', user.id)
     .maybeSingle()
 
@@ -160,8 +170,20 @@ export async function proxy(request: NextRequest) {
     )
   }
 
+  if (matchesRoute(pathname, '/onboarding')) {
+    return supabaseResponse
+  }
+
+  if (
+    role === 'staff' &&
+    profileRow?.staff_onboarding_required === true &&
+    !profileRow?.staff_onboarding_completed_at
+  ) {
+    return NextResponse.redirect(buildRedirectUrl(request, '/onboarding'))
+  }
+
   if (role === 'staff' && pathname === '/dashboard') {
-    return NextResponse.redirect(new URL('/dashboard/staff', request.url))
+    return NextResponse.redirect(buildRedirectUrl(request, '/dashboard/staff'))
   }
 
   if (

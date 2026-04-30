@@ -1,24 +1,213 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { describe, expect, it } from 'vitest'
+const { createServerClientMock, isValidPublishWorkerRequestMock } = vi.hoisted(() => ({
+  createServerClientMock: vi.fn(),
+  isValidPublishWorkerRequestMock: vi.fn(async () => false),
+}))
 
-describe('proxy public route allowlist', () => {
-  it('keeps inbound availability webhook public for provider delivery', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/proxy.ts'), 'utf8')
+vi.mock('@supabase/ssr', () => ({
+  createServerClient: createServerClientMock,
+}))
 
-    expect(source).toContain(
-      "const PUBLIC_API_ROUTES = ['/api/inbound/availability-email'] as const"
-    )
-    expect(source).toContain('[...PUBLIC_ROUTES, ...PUBLIC_API_ROUTES]')
+vi.mock('@/lib/security/worker-auth', () => ({
+  isValidPublishWorkerRequest: isValidPublishWorkerRequestMock,
+}))
+
+import { NextRequest } from 'next/server'
+
+import { proxy } from '@/proxy'
+
+type ProxyScenario = {
+  user?: {
+    id: string
+    app_metadata?: Record<string, unknown>
+    user_metadata?: Record<string, unknown>
+  } | null
+  profile?: {
+    role: string | null
+    is_active: boolean | null
+    archived_at: string | null
+    staff_onboarding_required: boolean | null
+    staff_onboarding_completed_at: string | null
+  } | null
+}
+
+function makeSupabaseMock(scenario: ProxyScenario) {
+  const resolvedUser = Object.prototype.hasOwnProperty.call(scenario, 'user')
+    ? scenario.user
+    : { id: 'user-1' }
+  const resolvedProfile = Object.prototype.hasOwnProperty.call(scenario, 'profile')
+    ? scenario.profile
+    : ({
+        role: 'therapist',
+        is_active: true,
+        archived_at: null,
+        staff_onboarding_required: false,
+        staff_onboarding_completed_at: null,
+      } satisfies NonNullable<ProxyScenario['profile']>)
+
+  return {
+    auth: {
+      getUser: async () => ({
+        data: {
+          user: resolvedUser,
+        },
+      }),
+    },
+    from(table: string) {
+      if (table !== 'profiles') {
+        throw new Error(`Unexpected table ${table}`)
+      }
+
+      return {
+        select() {
+          return {
+            eq() {
+              return {
+                maybeSingle: async () => ({
+                  data: resolvedProfile,
+                  error: null,
+                }),
+              }
+            },
+          }
+        },
+      }
+    },
+  } as never
+}
+
+function makeRequest(path: string) {
+  return new NextRequest(`https://teamwise.test${path}`)
+}
+
+describe('proxy onboarding and pending gates', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    isValidPublishWorkerRequestMock.mockResolvedValue(false)
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://supabase.test'
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon-key'
   })
 
-  it('keeps the read-only schedule roster behind authenticated app-shell routes', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/proxy.ts'), 'utf8')
+  it('keeps the inbound availability webhook public and bypasses auth middleware', async () => {
+    const response = await proxy(makeRequest('/api/inbound/availability-email'))
 
-    expect(source).not.toContain("'/schedule'")
-    expect(source).toContain(
-      "const STAFF_ROUTES = ['/staff', '/dashboard/staff', '/requests/new'] as const"
+    expect(response.status).toBe(200)
+    expect(response.headers.get('location')).toBeNull()
+    expect(createServerClientMock).not.toHaveBeenCalled()
+  })
+
+  it('redirects unauthenticated schedule access to login with a return path', async () => {
+    createServerClientMock.mockReturnValue(
+      makeSupabaseMock({
+        user: null,
+      })
     )
+
+    const response = await proxy(makeRequest('/schedule'))
+
+    expect(response.status).toBe(307)
+    expect(response.headers.get('location')).toBe(
+      'https://teamwise.test/login?redirectTo=%2Fschedule'
+    )
+  })
+
+  it('redirects incomplete required staff to onboarding and preserves current search params', async () => {
+    createServerClientMock.mockReturnValue(
+      makeSupabaseMock({
+        profile: {
+          role: 'therapist',
+          is_active: true,
+          archived_at: null,
+          staff_onboarding_required: true,
+          staff_onboarding_completed_at: null,
+        },
+      })
+    )
+
+    const response = await proxy(makeRequest('/dashboard?success=signed_in'))
+
+    expect(response.status).toBe(307)
+    expect(response.headers.get('location')).toBe(
+      'https://teamwise.test/onboarding?success=signed_in'
+    )
+  })
+
+  it('preserves success query params when sending staff from /dashboard to /dashboard/staff', async () => {
+    createServerClientMock.mockReturnValue(
+      makeSupabaseMock({
+        profile: {
+          role: 'therapist',
+          is_active: true,
+          archived_at: null,
+          staff_onboarding_required: false,
+          staff_onboarding_completed_at: '2026-04-29T12:00:00.000Z',
+        },
+      })
+    )
+
+    const response = await proxy(makeRequest('/dashboard?success=onboarding_complete'))
+
+    expect(response.status).toBe(307)
+    expect(response.headers.get('location')).toBe(
+      'https://teamwise.test/dashboard/staff?success=onboarding_complete'
+    )
+  })
+
+  it('does not redirect managers to onboarding', async () => {
+    createServerClientMock.mockReturnValue(
+      makeSupabaseMock({
+        profile: {
+          role: 'manager',
+          is_active: true,
+          archived_at: null,
+          staff_onboarding_required: true,
+          staff_onboarding_completed_at: null,
+        },
+      })
+    )
+
+    const response = await proxy(makeRequest('/dashboard?success=signed_in'))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('location')).toBeNull()
+  })
+
+  it('redirects signed-in users without a role to pending setup', async () => {
+    createServerClientMock.mockReturnValue(
+      makeSupabaseMock({
+        profile: {
+          role: null,
+          is_active: true,
+          archived_at: null,
+          staff_onboarding_required: false,
+          staff_onboarding_completed_at: null,
+        },
+      })
+    )
+
+    const response = await proxy(makeRequest('/dashboard'))
+
+    expect(response.status).toBe(307)
+    expect(response.headers.get('location')).toBe('https://teamwise.test/pending-setup')
+  })
+
+  it('redirects managers away from staff-only routes', async () => {
+    createServerClientMock.mockReturnValue(
+      makeSupabaseMock({
+        profile: {
+          role: 'manager',
+          is_active: true,
+          archived_at: null,
+          staff_onboarding_required: false,
+          staff_onboarding_completed_at: null,
+        },
+      })
+    )
+
+    const response = await proxy(makeRequest('/requests/new'))
+
+    expect(response.status).toBe(307)
+    expect(response.headers.get('location')).toBe('https://teamwise.test/dashboard')
   })
 })

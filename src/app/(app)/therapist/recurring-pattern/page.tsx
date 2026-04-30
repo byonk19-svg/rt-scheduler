@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase/server'
 type SearchParams = {
   success?: string | string[]
   error?: string | string[]
+  return_to?: string | string[]
 }
 
 type WorkPatternRow = {
@@ -32,6 +33,26 @@ type WorkPatternRow = {
 function getSearchParam(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0]
   return value
+}
+
+function sanitizeInternalReturnTo(value: string | null | undefined): '/onboarding' | null {
+  return value === '/onboarding' ? '/onboarding' : null
+}
+
+function buildRecurringPatternRedirectPath(
+  result: 'success' | 'error',
+  value: 'work_pattern_saved' | 'invalid_pattern' | 'save_failed',
+  returnTo: '/onboarding' | null
+) {
+  if (result === 'success' && returnTo) {
+    return `${returnTo}?${result}=${value}`
+  }
+
+  if (returnTo) {
+    return `/therapist/recurring-pattern?${result}=${value}&return_to=${encodeURIComponent(returnTo)}`
+  }
+
+  return `/therapist/recurring-pattern?${result}=${value}`
 }
 
 function getFeedback(
@@ -71,98 +92,6 @@ function parseDowValues(values: FormDataEntryValue[]): number[] {
   ).sort((left, right) => left - right)
 }
 
-async function saveRecurringPatternAction(formData: FormData) {
-  'use server'
-
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) redirect('/login')
-
-  const patternType = String(
-    formData.get('pattern_type') ?? 'weekly_fixed'
-  ).trim() as WorkPattern['pattern_type']
-  const worksDowMode = String(
-    formData.get('works_dow_mode') ?? 'hard'
-  ).trim() as WorkPattern['works_dow_mode']
-  const weekendRule = String(
-    formData.get('weekend_rule') ?? 'none'
-  ).trim() as WorkPattern['weekend_rule']
-  const weekendAnchorDate = String(formData.get('weekend_anchor_date') ?? '').trim() || null
-  const cycleAnchorDate = String(formData.get('cycle_anchor_date') ?? '').trim() || null
-  const weeklyWeekdays = parseDowValues(formData.getAll('weekly_weekdays'))
-  const cycleSegmentsJson = String(formData.get('cycle_segments_json') ?? '[]').trim()
-
-  let cycleSegments: WorkPattern['cycle_segments'] = []
-  try {
-    const parsed = JSON.parse(cycleSegmentsJson) as unknown
-    cycleSegments = Array.isArray(parsed) ? (parsed as WorkPattern['cycle_segments']) : []
-  } catch {
-    redirect('/therapist/recurring-pattern?error=invalid_pattern')
-  }
-
-  const normalized = normalizeWorkPattern({
-    therapist_id: user.id,
-    pattern_type: patternType,
-    works_dow_mode: worksDowMode,
-    weekly_weekdays:
-      patternType === 'repeating_cycle' || patternType === 'none' ? [] : weeklyWeekdays,
-    weekend_rule: patternType === 'weekly_with_weekend_rotation' ? weekendRule : 'none',
-    weekend_anchor_date:
-      patternType === 'weekly_with_weekend_rotation' && weekendRule === 'every_other_weekend'
-        ? weekendAnchorDate
-        : null,
-    cycle_anchor_date: patternType === 'repeating_cycle' ? cycleAnchorDate : null,
-    cycle_segments: patternType === 'repeating_cycle' ? cycleSegments : [],
-  })
-
-  const invalidWeeklyPattern =
-    (normalized.pattern_type === 'weekly_fixed' ||
-      normalized.pattern_type === 'weekly_with_weekend_rotation') &&
-    normalized.weekly_weekdays.length === 0
-  const invalidWeekendPattern =
-    normalized.pattern_type === 'weekly_with_weekend_rotation' &&
-    normalized.weekend_rule === 'every_other_weekend' &&
-    !normalized.weekend_anchor_date
-  const invalidCyclePattern =
-    normalized.pattern_type === 'repeating_cycle' &&
-    (!normalized.cycle_anchor_date || normalized.cycle_segments.length === 0)
-
-  if (invalidWeeklyPattern || invalidWeekendPattern || invalidCyclePattern) {
-    redirect('/therapist/recurring-pattern?error=invalid_pattern')
-  }
-
-  const { error } = await supabase.from('work_patterns').upsert(
-    {
-      therapist_id: user.id,
-      pattern_type: normalized.pattern_type,
-      works_dow: normalized.works_dow,
-      offs_dow: normalized.offs_dow,
-      weekend_rotation: normalized.weekend_rotation,
-      weekend_anchor_date: normalized.weekend_anchor_date,
-      works_dow_mode: normalized.works_dow_mode,
-      shift_preference: normalized.shift_preference ?? 'either',
-      weekly_weekdays: normalized.weekly_weekdays,
-      weekend_rule: normalized.weekend_rule,
-      cycle_anchor_date: normalized.cycle_anchor_date,
-      cycle_segments: normalized.cycle_segments,
-    },
-    { onConflict: 'therapist_id' }
-  )
-
-  if (error) {
-    console.error('Failed to save recurring pattern:', error)
-    redirect('/therapist/recurring-pattern?error=save_failed')
-  }
-
-  revalidatePath('/therapist/recurring-pattern')
-  revalidatePath('/therapist/settings')
-  revalidatePath('/therapist/availability')
-  redirect('/therapist/recurring-pattern?success=work_pattern_saved')
-}
-
 export default async function TherapistRecurringPatternPage({
   searchParams,
 }: {
@@ -177,6 +106,7 @@ export default async function TherapistRecurringPatternPage({
 
   const params = searchParams ? await searchParams : undefined
   const feedback = getFeedback(params)
+  const returnTo = sanitizeInternalReturnTo(getSearchParam(params?.return_to))
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -211,6 +141,99 @@ export default async function TherapistRecurringPatternPage({
       })
     : null
 
+  async function saveRecurringPatternAction(formData: FormData) {
+    'use server'
+
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) redirect('/login')
+
+    const patternType = String(
+      formData.get('pattern_type') ?? 'weekly_fixed'
+    ).trim() as WorkPattern['pattern_type']
+    const worksDowMode = String(
+      formData.get('works_dow_mode') ?? 'hard'
+    ).trim() as WorkPattern['works_dow_mode']
+    const weekendRule = String(
+      formData.get('weekend_rule') ?? 'none'
+    ).trim() as WorkPattern['weekend_rule']
+    const weekendAnchorDate = String(formData.get('weekend_anchor_date') ?? '').trim() || null
+    const cycleAnchorDate = String(formData.get('cycle_anchor_date') ?? '').trim() || null
+    const weeklyWeekdays = parseDowValues(formData.getAll('weekly_weekdays'))
+    const cycleSegmentsJson = String(formData.get('cycle_segments_json') ?? '[]').trim()
+
+    let cycleSegments: WorkPattern['cycle_segments'] = []
+    try {
+      const parsed = JSON.parse(cycleSegmentsJson) as unknown
+      cycleSegments = Array.isArray(parsed) ? (parsed as WorkPattern['cycle_segments']) : []
+    } catch {
+      redirect(buildRecurringPatternRedirectPath('error', 'invalid_pattern', returnTo))
+    }
+
+    const normalized = normalizeWorkPattern({
+      therapist_id: user.id,
+      pattern_type: patternType,
+      works_dow_mode: worksDowMode,
+      weekly_weekdays:
+        patternType === 'repeating_cycle' || patternType === 'none' ? [] : weeklyWeekdays,
+      weekend_rule: patternType === 'weekly_with_weekend_rotation' ? weekendRule : 'none',
+      weekend_anchor_date:
+        patternType === 'weekly_with_weekend_rotation' && weekendRule === 'every_other_weekend'
+          ? weekendAnchorDate
+          : null,
+      cycle_anchor_date: patternType === 'repeating_cycle' ? cycleAnchorDate : null,
+      cycle_segments: patternType === 'repeating_cycle' ? cycleSegments : [],
+    })
+
+    const invalidWeeklyPattern =
+      (normalized.pattern_type === 'weekly_fixed' ||
+        normalized.pattern_type === 'weekly_with_weekend_rotation') &&
+      normalized.weekly_weekdays.length === 0
+    const invalidWeekendPattern =
+      normalized.pattern_type === 'weekly_with_weekend_rotation' &&
+      normalized.weekend_rule === 'every_other_weekend' &&
+      !normalized.weekend_anchor_date
+    const invalidCyclePattern =
+      normalized.pattern_type === 'repeating_cycle' &&
+      (!normalized.cycle_anchor_date || normalized.cycle_segments.length === 0)
+
+    if (invalidWeeklyPattern || invalidWeekendPattern || invalidCyclePattern) {
+      redirect(buildRecurringPatternRedirectPath('error', 'invalid_pattern', returnTo))
+    }
+
+    const { error } = await supabase.from('work_patterns').upsert(
+      {
+        therapist_id: user.id,
+        pattern_type: normalized.pattern_type,
+        works_dow: normalized.works_dow,
+        offs_dow: normalized.offs_dow,
+        weekend_rotation: normalized.weekend_rotation,
+        weekend_anchor_date: normalized.weekend_anchor_date,
+        works_dow_mode: normalized.works_dow_mode,
+        shift_preference: normalized.shift_preference ?? 'either',
+        weekly_weekdays: normalized.weekly_weekdays,
+        weekend_rule: normalized.weekend_rule,
+        cycle_anchor_date: normalized.cycle_anchor_date,
+        cycle_segments: normalized.cycle_segments,
+      },
+      { onConflict: 'therapist_id' }
+    )
+
+    if (error) {
+      console.error('Failed to save recurring pattern:', error)
+      redirect(buildRecurringPatternRedirectPath('error', 'save_failed', returnTo))
+    }
+
+    revalidatePath('/therapist/recurring-pattern')
+    revalidatePath('/therapist/settings')
+    revalidatePath('/therapist/availability')
+    revalidatePath('/onboarding')
+    redirect(buildRecurringPatternRedirectPath('success', 'work_pattern_saved', returnTo))
+  }
+
   return (
     <div className="space-y-6">
       {feedback ? <FeedbackToast message={feedback.message} variant={feedback.variant} /> : null}
@@ -226,7 +249,9 @@ export default async function TherapistRecurringPatternPage({
           </p>
         </div>
         <Button asChild variant="outline">
-          <Link href="/therapist/settings">Back to settings</Link>
+          <Link href={returnTo ?? '/therapist/settings'}>
+            {returnTo ? 'Back to onboarding' : 'Back to settings'}
+          </Link>
         </Button>
       </div>
 
