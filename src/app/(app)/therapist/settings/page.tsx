@@ -5,6 +5,7 @@ import { AlertCircle } from 'lucide-react'
 
 import { FeedbackToast } from '@/components/feedback-toast'
 import { FormSubmitButton } from '@/components/form-submit-button'
+import { PreferredWorkDaysFieldset } from '@/components/PreferredWorkDaysFieldset'
 import { ThemePreferenceControl } from '@/components/ThemeProvider'
 import { WorkPatternCard } from '@/components/team/WorkPatternCard'
 import { Badge } from '@/components/ui/badge'
@@ -18,12 +19,19 @@ import {
   normalizeWorkPattern,
   type WorkPattern,
 } from '@/lib/coverage/work-patterns'
+import {
+  parsePreferredWorkDaysSelection,
+  resolvePreferredWorkDaysMode,
+} from '@/lib/preferred-work-days'
 import { normalizeDefaultScheduleView } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/server'
+import { isTheme } from '@/lib/theme'
 
 type SearchParams = {
   success?: string | string[]
   error?: string | string[]
+  return_to?: string | string[]
+  setup?: string | string[]
 }
 
 type WorkPatternRow = {
@@ -50,6 +58,9 @@ type ProfileRow = {
   max_work_days_per_week: number | null
   max_consecutive_days: number | null
   preferred_work_days: number[] | null
+  preferred_work_days_mode: string | null
+  staff_onboarding_preferences_confirmed_at: string | null
+  staff_onboarding_theme_confirmed_at: string | null
   default_calendar_view: string | null
   default_schedule_view: string | null
   default_landing_page: string | null
@@ -73,14 +84,39 @@ function getSearchParam(value: string | string[] | undefined): string | undefine
   return value
 }
 
-function parseDowValues(values: FormDataEntryValue[]): number[] {
-  return Array.from(
-    new Set(
-      values
-        .map((value) => Number.parseInt(String(value), 10))
-        .filter((value) => Number.isInteger(value) && value >= 0 && value <= 6)
-    )
-  ).sort((left, right) => left - right)
+function sanitizeInternalReturnTo(value: string | null | undefined): '/onboarding' | null {
+  return value === '/onboarding' ? '/onboarding' : null
+}
+
+function sanitizeSetupScope(
+  value: string | null | undefined
+): 'preferences' | 'notifications' | null {
+  return value === 'preferences' || value === 'notifications' ? value : null
+}
+
+function buildSettingsRedirectPath(
+  result: 'success' | 'error',
+  value: 'settings_saved' | 'settings_failed',
+  returnTo: '/onboarding' | null,
+  setupScope: 'preferences' | 'notifications' | null
+) {
+  if (result === 'success' && returnTo) {
+    return `${returnTo}?${result}=${value}`
+  }
+
+  const query = new URLSearchParams([[result, value]])
+  if (returnTo) {
+    query.set('return_to', returnTo)
+  }
+  if (setupScope) {
+    query.set('setup', setupScope)
+  }
+
+  if (returnTo) {
+    return `/therapist/settings?${query.toString()}`
+  }
+
+  return `/therapist/settings?${query.toString()}`
 }
 
 function getOne<T>(value: T | T[] | null | undefined): T | null {
@@ -146,46 +182,79 @@ async function saveTherapistSettingsAction(formData: FormData) {
 
   if (!user) redirect('/login')
 
-  const preferredWorkDays = parseDowValues(formData.getAll('preferred_work_days'))
+  const preferredWorkDays = parsePreferredWorkDaysSelection(formData)
   const maxConsecutiveDays = Number.parseInt(String(formData.get('max_consecutive_days') ?? ''), 10)
   const defaultCalendarView = String(formData.get('default_calendar_view') ?? '').trim()
   const defaultScheduleView = String(formData.get('default_schedule_view') ?? '').trim()
   const defaultLandingPage = String(formData.get('default_landing_page') ?? '').trim()
   const notificationInAppEnabled = formData.get('notification_in_app_enabled') === 'on'
   const notificationEmailEnabled = formData.get('notification_email_enabled') === 'on'
+  const selectedTheme = String(formData.get('theme_preference') ?? '').trim()
+  const returnTo = sanitizeInternalReturnTo(String(formData.get('return_to') ?? '').trim())
+  const setupScope = sanitizeSetupScope(String(formData.get('setup_scope') ?? '').trim())
 
   if (
+    preferredWorkDays.mode === 'unset' ||
+    (preferredWorkDays.mode === 'specific_days' && preferredWorkDays.days.length === 0) ||
     !Number.isInteger(maxConsecutiveDays) ||
     maxConsecutiveDays < 1 ||
     maxConsecutiveDays > 7 ||
     (defaultCalendarView !== 'day' && defaultCalendarView !== 'night') ||
     (defaultScheduleView !== 'week' && defaultScheduleView !== 'roster') ||
-    (defaultLandingPage !== 'dashboard' && defaultLandingPage !== 'coverage')
+    (defaultLandingPage !== 'dashboard' && defaultLandingPage !== 'coverage') ||
+    !isTheme(selectedTheme)
   ) {
-    redirect('/therapist/settings?error=settings_failed')
+    redirect(buildSettingsRedirectPath('error', 'settings_failed', returnTo, setupScope))
   }
 
+  const { data: existingProfile, error: existingProfileError } = await supabase
+    .from('profiles')
+    .select('staff_onboarding_preferences_confirmed_at, staff_onboarding_theme_confirmed_at')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (existingProfileError || !existingProfile) {
+    console.error(
+      'Failed to load existing therapist settings confirmation state:',
+      existingProfileError
+    )
+    redirect(buildSettingsRedirectPath('error', 'settings_failed', returnTo, setupScope))
+  }
+
+  const confirmedAt = new Date().toISOString()
+  const nextPreferencesConfirmedAt =
+    setupScope === 'preferences'
+      ? (existingProfile.staff_onboarding_preferences_confirmed_at ?? confirmedAt)
+      : existingProfile.staff_onboarding_preferences_confirmed_at
+  const nextThemeConfirmedAt =
+    setupScope === 'notifications'
+      ? (existingProfile.staff_onboarding_theme_confirmed_at ?? confirmedAt)
+      : existingProfile.staff_onboarding_theme_confirmed_at
   const { error } = await supabase
     .from('profiles')
     .update({
-      preferred_work_days: preferredWorkDays,
+      preferred_work_days: preferredWorkDays.days,
+      preferred_work_days_mode: preferredWorkDays.mode,
       max_consecutive_days: maxConsecutiveDays,
       default_calendar_view: defaultCalendarView,
       default_schedule_view: defaultScheduleView,
       default_landing_page: defaultLandingPage,
       notification_in_app_enabled: notificationInAppEnabled,
       notification_email_enabled: notificationEmailEnabled,
+      staff_onboarding_preferences_confirmed_at: nextPreferencesConfirmedAt,
+      staff_onboarding_theme_confirmed_at: nextThemeConfirmedAt,
     })
     .eq('id', user.id)
 
   if (error) {
     console.error('Failed to update therapist settings:', error)
-    redirect('/therapist/settings?error=settings_failed')
+    redirect(buildSettingsRedirectPath('error', 'settings_failed', returnTo, setupScope))
   }
 
   revalidatePath('/therapist/settings')
   revalidatePath('/profile')
-  redirect('/therapist/settings?success=settings_saved')
+  revalidatePath('/onboarding')
+  redirect(buildSettingsRedirectPath('success', 'settings_saved', returnTo, setupScope))
 }
 
 export default async function TherapistSettingsPage({
@@ -202,11 +271,13 @@ export default async function TherapistSettingsPage({
 
   const params = searchParams ? await searchParams : undefined
   const feedback = getFeedback(params)
+  const returnTo = sanitizeInternalReturnTo(getSearchParam(params?.return_to))
+  const setupScope = sanitizeSetupScope(getSearchParam(params?.setup))
 
   const { data: profile } = await supabase
     .from('profiles')
     .select(
-      'id, full_name, role, shift_type, employment_type, is_lead_eligible, max_work_days_per_week, max_consecutive_days, preferred_work_days, default_calendar_view, default_schedule_view, default_landing_page, notification_in_app_enabled, notification_email_enabled, work_patterns(pattern_type, works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode, weekly_weekdays, weekend_rule, cycle_anchor_date, cycle_segments, shift_preference)'
+      'id, full_name, role, shift_type, employment_type, is_lead_eligible, max_work_days_per_week, max_consecutive_days, preferred_work_days, preferred_work_days_mode, staff_onboarding_preferences_confirmed_at, staff_onboarding_theme_confirmed_at, default_calendar_view, default_schedule_view, default_landing_page, notification_in_app_enabled, notification_email_enabled, work_patterns(pattern_type, works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode, weekly_weekdays, weekend_rule, cycle_anchor_date, cycle_segments, shift_preference)'
     )
     .eq('id', user.id)
     .maybeSingle()
@@ -223,6 +294,10 @@ export default async function TherapistSettingsPage({
         .map((value) => Number(value))
         .filter((value) => Number.isInteger(value) && value >= 0 && value <= 6)
     : []
+  const preferredWorkDaysMode = resolvePreferredWorkDaysMode(
+    profile.preferred_work_days_mode,
+    preferredWorkDays
+  )
   const defaultCalendarView = profile.default_calendar_view === 'night' ? 'night' : 'day'
   const defaultScheduleView = normalizeDefaultScheduleView(
     profile.default_schedule_view ?? undefined
@@ -231,6 +306,9 @@ export default async function TherapistSettingsPage({
   const pattern = toPatternRecord(profile.id, profile.work_patterns)
   const patternSummary = describeWorkPatternSummary(pattern)
   const hasRecurringPattern = Boolean(pattern && pattern.pattern_type !== 'none')
+  const recurringPatternHref = returnTo
+    ? `/therapist/recurring-pattern?return_to=${encodeURIComponent(returnTo)}`
+    : '/therapist/recurring-pattern'
 
   return (
     <div className="space-y-6">
@@ -287,22 +365,26 @@ export default async function TherapistSettingsPage({
             </div>
           </div>
           <Button asChild>
-            <Link href="/therapist/recurring-pattern">
+            <Link href={recurringPatternHref}>
               {hasRecurringPattern ? 'Edit normal schedule' : 'Set normal schedule'}
             </Link>
           </Button>
         </CardContent>
       </Card>
 
-      <Card className="border-border/90">
-        <CardHeader>
-          <CardTitle>Schedule Preferences</CardTitle>
-          <CardDescription>
-            Set your preferred days, viewing defaults, and your maximum consecutive-day preference.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form action={saveTherapistSettingsAction} className="space-y-5">
+      <form action={saveTherapistSettingsAction} className="space-y-6">
+        {returnTo ? <input type="hidden" name="return_to" value={returnTo} /> : null}
+        {setupScope ? <input type="hidden" name="setup_scope" value={setupScope} /> : null}
+
+        <Card className="border-border/90">
+          <CardHeader>
+            <CardTitle>Schedule Preferences</CardTitle>
+            <CardDescription>
+              Set your preferred days, viewing defaults, and your maximum consecutive-day
+              preference.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="max_consecutive_days">Max consecutive days</Label>
@@ -319,26 +401,13 @@ export default async function TherapistSettingsPage({
                   ))}
                 </select>
               </div>
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground">Preferred work days</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {WEEKDAY_OPTIONS.map((option) => (
-                    <label
-                      key={option.value}
-                      className="flex min-h-10 items-center gap-2 rounded-md border border-border px-3 py-2 text-sm transition-colors hover:bg-secondary/25"
-                    >
-                      <input
-                        type="checkbox"
-                        name="preferred_work_days"
-                        value={option.value}
-                        className="h-4 w-4 accent-[var(--primary)]"
-                        defaultChecked={preferredWorkDays.includes(option.value)}
-                      />
-                      <span>{option.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
+              <PreferredWorkDaysFieldset
+                legend="Preferred work days"
+                description="Choose specific weekdays or tell us you have no day-of-week preference."
+                initialMode={preferredWorkDaysMode}
+                initialSelectedDays={preferredWorkDays}
+                weekdayOptions={WEEKDAY_OPTIONS}
+              />
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -421,25 +490,24 @@ export default async function TherapistSettingsPage({
                 Email notifications
               </label>
             </div>
+          </CardContent>
+        </Card>
 
+        <Card className="border-border/90">
+          <CardHeader>
+            <CardTitle>Appearance</CardTitle>
+            <CardDescription>
+              Choose your preferred theme or follow the system setting.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <ThemePreferenceControl />
             <FormSubmitButton type="submit" pendingText="Saving...">
               Save settings
             </FormSubmitButton>
-          </form>
-        </CardContent>
-      </Card>
-
-      <Card className="border-border/90">
-        <CardHeader>
-          <CardTitle>Appearance</CardTitle>
-          <CardDescription>
-            Choose your preferred theme or follow the system setting.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ThemePreferenceControl />
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </form>
     </div>
   )
 }

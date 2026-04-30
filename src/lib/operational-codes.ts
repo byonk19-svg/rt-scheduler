@@ -13,7 +13,6 @@ export const OPERATIONAL_CODE_VALUES = [
   'cancelled',
   'left_early',
 ] as const satisfies ReadonlyArray<OperationalCode>
-
 const OPERATIONAL_CODE_SHIFT_ID_BATCH_SIZE = 100
 
 export function isOperationalCode(value: string): value is OperationalCode {

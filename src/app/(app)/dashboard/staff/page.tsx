@@ -21,9 +21,7 @@ import { createClient } from '@/lib/supabase/server'
 import { fetchMyPublishedUpcomingShifts } from '@/lib/staff-my-schedule'
 import { cn } from '@/lib/utils'
 
-type StaffDashboardSearchParams = {
-  success?: string | string[]
-}
+type StaffDashboardSearchParams = Record<string, string | string[] | undefined>
 
 type SubmissionRow = {
   schedule_cycle_id: string
@@ -36,6 +34,28 @@ function getSearchParam(value: string | string[] | undefined): string | undefine
   return value
 }
 
+function toSearchSuffix(params?: StaffDashboardSearchParams): string {
+  if (!params) return ''
+
+  const query = new URLSearchParams()
+
+  for (const [key, value] of Object.entries(params)) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        query.append(key, item)
+      }
+      continue
+    }
+
+    if (typeof value === 'string') {
+      query.set(key, value)
+    }
+  }
+
+  const encoded = query.toString()
+  return encoded ? `?${encoded}` : ''
+}
+
 function getStaffDashboardFeedback(
   params?: StaffDashboardSearchParams
 ): { message: string; variant: 'success' } | null {
@@ -43,6 +63,9 @@ function getStaffDashboardFeedback(
   if (success === 'signed_in') return { message: 'Signed in successfully.', variant: 'success' }
   if (success === 'access_requested') {
     return { message: 'Access request submitted and signed in.', variant: 'success' }
+  }
+  if (success === 'onboarding_complete') {
+    return { message: 'Setup complete. You can use the staff dashboard now.', variant: 'success' }
   }
   return null
 }
@@ -69,6 +92,7 @@ export default async function StaffDashboardPage({
   const supabase = await createClient()
   const admin = createAdminClient()
   const params = searchParams ? await searchParams : undefined
+  const redirectSuffix = toSearchSuffix(params)
   const feedback = getStaffDashboardFeedback(params)
   const {
     data: { user },
@@ -80,12 +104,16 @@ export default async function StaffDashboardPage({
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('full_name, role')
+    .select('full_name, role, staff_onboarding_required, staff_onboarding_completed_at')
     .eq('id', user.id)
     .maybeSingle()
 
   if (can(parseRole(profile?.role), 'access_manager_ui')) {
     redirect('/dashboard/manager')
+  }
+
+  if (profile?.staff_onboarding_required === true && !profile?.staff_onboarding_completed_at) {
+    redirect(`/onboarding${redirectSuffix}`)
   }
 
   const fullName = profile?.full_name ?? user.user_metadata?.full_name ?? 'Staff member'

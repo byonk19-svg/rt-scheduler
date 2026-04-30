@@ -7,6 +7,10 @@ const source = fs.readFileSync(
   path.join(process.cwd(), 'src/app/(app)/therapist/settings/page.tsx'),
   'utf8'
 )
+const preferredWorkDaysControlSource = fs.readFileSync(
+  path.join(process.cwd(), 'src/components/PreferredWorkDaysFieldset.tsx'),
+  'utf8'
+)
 
 describe('therapist settings route', () => {
   it('renders a therapist-owned preferences and work rules page', () => {
@@ -23,5 +27,14 @@ describe('therapist settings route', () => {
     expect(source).toContain('Max consecutive days')
     expect(source).toContain('Notification preferences')
     expect(source).not.toContain("export { default } from '../../profile/page'")
+  })
+
+  it('offers an explicit no-preference option for preferred work days', () => {
+    expect(source).toContain('PreferredWorkDaysFieldset')
+    expect(source).toContain('legend="Preferred work days"')
+    expect(preferredWorkDaysControlSource).toContain('name={modeInputName}')
+    expect(preferredWorkDaysControlSource).toContain('value="no_preference"')
+    expect(preferredWorkDaysControlSource).toContain('No preference')
+    expect(preferredWorkDaysControlSource).toContain('disabled={!usesSpecificDays}')
   })
 })

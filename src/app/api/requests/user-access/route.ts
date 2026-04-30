@@ -168,12 +168,31 @@ export async function POST(request: Request) {
         role: assignedRole,
         is_active: true,
         archived_at: null,
+        staff_onboarding_required: true,
+        staff_onboarding_completed_at: null,
+        staff_onboarding_preferences_confirmed_at: null,
+        staff_onboarding_theme_confirmed_at: null,
+        preferred_work_days: [],
+        preferred_work_days_mode: 'unset',
       })
       .eq('id', profileId)
       .is('role', null)
 
     if (updateError) {
       console.error('Failed to approve access request:', updateError)
+      return NextResponse.json({ error: 'approve_failed' }, { status: 500 })
+    }
+
+    const { error: workPatternResetError } = await admin
+      .from('work_patterns')
+      .delete()
+      .eq('therapist_id', profileId)
+
+    if (workPatternResetError) {
+      console.error(
+        'Failed to reset onboarding work patterns during approval:',
+        workPatternResetError
+      )
       return NextResponse.json({ error: 'approve_failed' }, { status: 500 })
     }
 
