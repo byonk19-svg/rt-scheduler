@@ -9,7 +9,13 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { DeferredNotificationBell } from '@/components/DeferredNotificationBell'
 import { AppHeader } from '@/components/shell/AppHeader'
 import { LocalSectionNav } from '@/components/shell/LocalSectionNav'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   APP_PAGE_MAX_WIDTH_CLASS,
   buildManagerSections,
@@ -335,6 +341,10 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
           >
             <DialogHeader className="sr-only">
               <DialogTitle>Navigation menu</DialogTitle>
+              <DialogDescription>
+                Browse the main Teamwise sections and switch between manager or therapist workflow
+                pages.
+              </DialogDescription>
             </DialogHeader>
             <aside id="app-shell-mobile-nav" className="flex h-full flex-col overscroll-contain">
               <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-4">

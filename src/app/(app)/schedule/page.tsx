@@ -1,9 +1,15 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 import { loadScheduleRosterPageData } from '@/app/(app)/schedule/schedule-roster-live-data'
 import { ScheduleRosterScreen } from '@/components/schedule-roster/ScheduleRosterScreen'
 import { Button } from '@/components/ui/button'
+
+export const metadata: Metadata = {
+  title: 'Schedule Roster',
+  description: 'Review the live staffing roster for the active schedule block.',
+}
 
 type SchedulePageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>
@@ -34,7 +40,7 @@ export default async function SchedulePage(props: SchedulePageProps) {
           </p>
           <div className="mt-5">
             <Button asChild>
-              <Link href="/coverage">Open Coverage</Link>
+              <Link href="/coverage">Open schedule workspace</Link>
             </Button>
           </div>
         </section>

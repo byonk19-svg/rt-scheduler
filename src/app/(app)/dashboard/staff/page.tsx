@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { ArrowLeftRight, CalendarClock, Clock, History, Send } from 'lucide-react'
@@ -20,6 +21,11 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { fetchMyPublishedUpcomingShifts } from '@/lib/staff-my-schedule'
 import { cn } from '@/lib/utils'
+
+export const metadata: Metadata = {
+  title: 'Dashboard',
+  description: 'Therapist dashboard for schedule, requests, and next-step workflow.',
+}
 
 type StaffDashboardSearchParams = Record<string, string | string[] | undefined>
 
@@ -226,6 +232,10 @@ export default async function StaffDashboardPage({
           false
         )
       : null
+  const workflowAlreadyLinksToSchedule = [
+    workflow.primaryAction.href,
+    workflow.secondaryAction?.href ?? null,
+  ].some((href) => href?.startsWith('/therapist/schedule'))
 
   return (
     <div className="space-y-4">
@@ -263,9 +273,11 @@ export default async function StaffDashboardPage({
                 <Link href={workflow.secondaryAction.href}>{workflow.secondaryAction.label}</Link>
               </Button>
             ) : null}
-            <Button asChild size="sm" variant="outline">
-              <Link href="/therapist/schedule">View my shifts</Link>
-            </Button>
+            {!workflowAlreadyLinksToSchedule ? (
+              <Button asChild size="sm" variant="outline">
+                <Link href="/therapist/schedule">View my shifts</Link>
+              </Button>
+            ) : null}
           </div>
         </div>
       </section>

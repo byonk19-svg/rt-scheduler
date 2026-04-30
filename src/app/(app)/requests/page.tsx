@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { KeyRound, Repeat } from 'lucide-react'
@@ -7,6 +8,11 @@ import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
+
+export const metadata: Metadata = {
+  title: 'Requests',
+  description: 'Manage shift swap, pickup, and user access requests.',
+}
 
 export default async function RequestsPage() {
   const supabase = await createClient()

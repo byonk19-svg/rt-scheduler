@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest'
 
 import { getCandidatePriority } from '@/components/coverage/ShiftEditorDialog'
 import { shiftEditorDialogLayout } from '@/components/coverage/shift-editor-dialog-layout'
+import fs from 'node:fs'
+import path from 'node:path'
+
+const shiftEditorSource = fs.readFileSync(
+  path.join(process.cwd(), 'src/components/coverage/ShiftEditorDialog.tsx'),
+  'utf8'
+)
 
 describe('shiftEditorDialogLayout', () => {
   it('uses even compact dialog sizing tokens', () => {
@@ -23,6 +30,11 @@ describe('shiftEditorDialogLayout', () => {
     expect(shiftEditorDialogLayout.action).toContain('h-9')
     expect(shiftEditorDialogLayout.action).toContain('min-w-[82px]')
     expect(shiftEditorDialogLayout.meta).toContain('text-[11px]')
+  })
+
+  it('uses explicit staffing-edit wording and a dialog description', () => {
+    expect(shiftEditorSource).toContain('Edit staffing')
+    expect(shiftEditorSource).toContain('Review and update lead and staff coverage assignments for this shift.')
   })
 })
 

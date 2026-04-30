@@ -151,4 +151,25 @@ describe('PreliminaryScheduleView', () => {
     expect(html).toContain('Expressed opposite-shift interest')
     expect(html).toContain('Can cover this PRN shift')
   })
+
+  it('uses the calmer empty-state wording for live preliminary previews', () => {
+    const html = renderToStaticMarkup(
+      createElement(PreliminaryScheduleView, {
+        snapshotId: 'snapshot-1',
+        cycleLabel: 'April schedule',
+        snapshotSentAt: '2026-03-19T10:00:00.000Z',
+        currentUserId: 'therapist-1',
+        cards: [],
+        historyItems: [],
+        teamShifts: [],
+        claimAction: async () => {},
+        requestChangeAction: async () => {},
+        directEditAction: async () => {},
+        cancelAction: async () => {},
+      })
+    )
+
+    expect(html).toContain('No preliminary items need your attention right now.')
+    expect(html).toContain('Open shifts and your tentative assignments appear here')
+  })
 })

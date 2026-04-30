@@ -283,8 +283,6 @@ function SwapRequestPageContent() {
     (request) => request.status === 'approved' || request.status === 'selected'
   ).length
   const totalRequests = myOpenRequests.length
-  const stepTitle =
-    step === 1 ? 'Request details' : step === 2 ? 'Choose teammate' : 'Final message'
 
   const handleRecipientDecision = async (requestId: string, decision: 'accepted' | 'declined') => {
     setError(null)
@@ -356,7 +354,6 @@ function SwapRequestPageContent() {
       selectedShiftData={selectedShiftData}
       selectedShiftRequiresLeadEligibleReplacement={selectedShiftRequiresLeadEligibleReplacement}
       step={step}
-      stepTitle={stepTitle}
       submitting={submitting}
       swapWith={swapWith}
       onBack={handleBack}

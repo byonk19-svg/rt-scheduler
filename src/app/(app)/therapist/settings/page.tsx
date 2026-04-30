@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { revalidatePath } from 'next/cache'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -26,6 +27,11 @@ import {
 import { normalizeDefaultScheduleView } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/server'
 import { isTheme } from '@/lib/theme'
+
+export const metadata: Metadata = {
+  title: 'My Schedule Preferences',
+  description: 'Manage recurring pattern, preferences, and notifications.',
+}
 
 type SearchParams = {
   success?: string | string[]
@@ -366,7 +372,7 @@ export default async function TherapistSettingsPage({
           </div>
           <Button asChild>
             <Link href={recurringPatternHref}>
-              {hasRecurringPattern ? 'Edit normal schedule' : 'Set normal schedule'}
+              {hasRecurringPattern ? 'Edit recurring pattern' : 'Set recurring pattern'}
             </Link>
           </Button>
         </CardContent>

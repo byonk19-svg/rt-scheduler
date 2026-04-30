@@ -514,7 +514,7 @@ export default function ShiftBoardClientPage({
             )}
             {canReview && (
               <Button asChild size="sm" variant="outline" className="text-xs">
-                <Link href="/coverage">Open coverage</Link>
+                <Link href="/coverage">Open schedule</Link>
               </Button>
             )}
           </div>
@@ -596,18 +596,7 @@ export default function ShiftBoardClientPage({
             </div>
           </div>
         </div>
-      ) : (
-        <div
-          className="fade-up rounded-xl border border-border bg-card px-5 py-4 shadow-sm"
-          style={{ animationDelay: '0.05s' }}
-        >
-          <p className="text-sm font-semibold text-foreground">Published schedule changes only</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            This board is not for future-cycle planning. For the next schedule cycle, open Future
-            Availability.
-          </p>
-        </div>
-      )}
+      ) : null}
       {/* Tabs */}
       <div className="fade-up flex gap-1" style={{ animationDelay: '0.08s' }}>
         {(

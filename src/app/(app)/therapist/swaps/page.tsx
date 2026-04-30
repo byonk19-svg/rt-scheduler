@@ -1,8 +1,14 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import ShiftBoardClientPage from '@/components/shift-board/ShiftBoardClientPage'
 import { loadShiftBoardSnapshot } from '@/lib/shift-board-snapshot'
 import { createClient } from '@/lib/supabase/server'
+
+export const metadata: Metadata = {
+  title: 'Shift Swaps & Pickups',
+  description: 'Post and track your shift swap and pickup requests.',
+}
 
 export default async function TherapistSwapsPage() {
   const supabase = await createClient()

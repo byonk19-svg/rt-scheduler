@@ -520,7 +520,7 @@ export function TherapistAvailabilityWorkspace({
 
             <Button asChild variant="outline" size="sm" className="min-h-11 px-4">
               <Link href="/therapist/recurring-pattern">
-                {hasRecurringPattern ? 'Edit normal schedule' : 'Set normal schedule'}
+                {hasRecurringPattern ? 'Edit recurring pattern' : 'Set recurring pattern'}
               </Link>
             </Button>
           </div>

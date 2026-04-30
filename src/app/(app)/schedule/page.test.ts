@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -130,5 +133,13 @@ describe('schedule route', () => {
 
     expect(html).toContain('No active schedule block yet')
     expect(html).toContain('Create or reopen a cycle in Coverage')
+    expect(html).toContain('Open schedule workspace')
+  })
+
+  it('sets route-specific schedule-roster metadata', async () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/app/(app)/schedule/page.tsx'), 'utf8')
+
+    expect(source).toContain("title: 'Schedule Roster'")
+    expect(source).toContain('live staffing roster for the active schedule block')
   })
 })

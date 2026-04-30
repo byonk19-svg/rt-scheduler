@@ -16,4 +16,9 @@ describe('therapist recurring-pattern route', () => {
     expect(source).toContain('RecurringPatternEditor')
     expect(source).toContain('saveRecurringPatternAction')
   })
+
+  it('sets route-specific metadata', () => {
+    expect(source).toContain("title: 'Recurring Work Pattern'")
+    expect(source).toContain('normal repeating work schedule')
+  })
 })

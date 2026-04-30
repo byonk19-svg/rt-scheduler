@@ -90,7 +90,7 @@ export function RequestsHistoryView({
             Create a swap, pickup, or direct request to track it here.
           </p>
           <Button size="sm" onClick={onNewRequest}>
-            Start request
+            New request
           </Button>
         </div>
       ) : (

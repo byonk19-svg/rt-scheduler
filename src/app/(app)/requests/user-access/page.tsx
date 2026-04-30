@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
@@ -10,6 +11,11 @@ import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
+
+export const metadata: Metadata = {
+  title: 'User Access Requests',
+  description: 'Approve or decline pending Teamwise account requests.',
+}
 
 type SearchParams = Record<string, string | string[] | undefined>
 

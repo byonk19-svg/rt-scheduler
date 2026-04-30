@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
@@ -8,6 +9,11 @@ import { parseRole } from '@/lib/auth/roles'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { AuditLogFilters } from './AuditLogFilters'
+
+export const metadata: Metadata = {
+  title: 'Audit Log',
+  description: 'Manager-visible history for scheduling and staffing actions.',
+}
 
 type AuditLogSearchParams = {
   page?: string | string[]
@@ -181,8 +187,8 @@ export default async function AuditLogPage({
               <th className="px-4 py-3">Timestamp</th>
               <th className="px-4 py-3">Actor</th>
               <th className="px-4 py-3">Action</th>
-              <th className="px-4 py-3">Target type</th>
-              <th className="px-4 py-3">Target ID</th>
+              <th className="hidden px-4 py-3 md:table-cell">Target type</th>
+              <th className="hidden px-4 py-3 md:table-cell">Target ID</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -209,8 +215,12 @@ export default async function AuditLogPage({
                       {row.action}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 text-sm text-muted-foreground">{row.target_type}</td>
-                  <td className="px-4 py-2.5 text-sm text-foreground">{targetCell(row)}</td>
+                  <td className="hidden px-4 py-2.5 text-sm text-muted-foreground md:table-cell">
+                    {row.target_type}
+                  </td>
+                  <td className="hidden px-4 py-2.5 text-sm text-foreground md:table-cell">
+                    {targetCell(row)}
+                  </td>
                 </tr>
               ))
             )}

@@ -209,7 +209,7 @@ export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
                   ))}
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground xl:justify-end">
-                  <span>* Click any cell to edit</span>
+                  <span>Roster view only</span>
                   <span>Bold vertical lines separate weeks</span>
                   <span>Weekends shaded</span>
                 </div>

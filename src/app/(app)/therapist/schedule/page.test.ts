@@ -16,4 +16,9 @@ describe('therapist schedule route', () => {
       "redirect(query ? `/coverage?${query}` : '/coverage')"
     )
   })
+
+  it('sets route-specific metadata for the therapist schedule surface', () => {
+    expect(therapistScheduleSource).toContain("title: 'My Shifts'")
+    expect(therapistScheduleSource).toContain('upcoming published shifts')
+  })
 })

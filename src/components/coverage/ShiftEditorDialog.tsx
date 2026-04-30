@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { AlertCircle, AlertTriangle, Check, Clock, MinusCircle } from 'lucide-react'
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { DialogDescription } from '@/components/ui/dialog'
 import { shiftEditorDialogLayout } from '@/components/coverage/shift-editor-dialog-layout'
 import { countActive, type DayItem, type ShiftTab } from '@/lib/coverage/selectors'
 import {
@@ -404,6 +405,9 @@ export function ShiftEditorDialog({
                   <DialogTitle className={shiftEditorDialogLayout.title}>
                     {selectedDay.label}
                   </DialogTitle>
+                  <DialogDescription className="sr-only">
+                    Review and update lead and staff coverage assignments for this shift.
+                  </DialogDescription>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
                     <p className={shiftEditorDialogLayout.shiftLabel}>{selectedDay.shiftType} Shift</p>
                     <span className={cn('text-[12px] font-semibold', coverageStatusColorClass)}>
@@ -417,7 +421,7 @@ export function ShiftEditorDialog({
                     ) : null}
                   </div>
                 </div>
-                <p className={shiftEditorDialogLayout.activeSummary}>Plan day</p>
+                <p className={shiftEditorDialogLayout.activeSummary}>Edit staffing</p>
               </div>
             </DialogHeader>
 

@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -9,6 +10,11 @@ import { normalizeWorkPattern, type WorkPattern } from '@/lib/coverage/work-patt
 import { can } from '@/lib/auth/can'
 import { toUiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
+
+export const metadata: Metadata = {
+  title: 'Recurring Work Pattern',
+  description: 'Set your normal repeating work schedule.',
+}
 
 type SearchParams = {
   success?: string | string[]

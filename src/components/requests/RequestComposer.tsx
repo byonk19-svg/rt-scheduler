@@ -18,7 +18,6 @@ type RequestComposerProps = {
   selectedShiftData: MyShift | null
   selectedShiftRequiresLeadEligibleReplacement: boolean
   step: 1 | 2 | 3
-  stepTitle: string
   submitting: boolean
   swapWith: string | null
   onBack: () => void
@@ -46,7 +45,6 @@ export function RequestComposer({
   selectedShiftData,
   selectedShiftRequiresLeadEligibleReplacement,
   step,
-  stepTitle,
   submitting,
   swapWith,
   onBack,
@@ -60,6 +58,25 @@ export function RequestComposer({
   onSubmit,
   onSwapWithChange,
 }: RequestComposerProps) {
+  const canContinue =
+    step === 1
+      ? selectedShift !== null
+      : step === 2
+        ? requestVisibility !== 'direct' || swapWith !== null
+        : true
+  const teammateGuidance =
+    requestVisibility === 'direct'
+      ? eligibleMembers.length === 0
+        ? requestType === 'swap'
+          ? 'This shift does not have an eligible direct-swap teammate right now.'
+          : 'This date does not have an eligible direct pickup teammate right now.'
+        : requestType === 'swap'
+          ? 'Pick a teammate who is already scheduled on this same date and shift type.'
+          : 'Pick a teammate on your shift type who is not already scheduled on this date.'
+      : requestType === 'swap'
+        ? 'Selecting a swap partner is optional. Leave blank to post an open swap.'
+        : 'Pickup requests usually do not need a specific teammate.'
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-border/90 bg-[color-mix(in_oklch,var(--card)_92%,var(--secondary))] px-4 py-4 shadow-tw-double-panel sm:px-5">
@@ -89,7 +106,7 @@ export function RequestComposer({
             Step {step} of 3
           </span>
         </div>
-        <p className="mt-3 text-sm font-semibold text-foreground">{stepTitle}</p>
+        <p className="mt-3 text-sm font-semibold text-foreground">Create request</p>
         <p className="mt-0.5 text-xs text-muted-foreground">
           Complete each step to submit your request for manager review.
         </p>
@@ -279,15 +296,9 @@ export function RequestComposer({
                 )}
               </div>
 
-              <p className="text-xs text-muted-foreground">
-                {requestVisibility === 'direct'
-                  ? requestType === 'swap'
-                    ? 'Pick a teammate who is already scheduled on this same date and shift type.'
-                    : 'Pick a teammate on your shift type who is not already scheduled on this date.'
-                  : requestType === 'swap'
-                    ? 'Selecting a swap partner is optional. Leave blank to post an open swap.'
-                    : 'Pickup requests usually do not need a specific teammate.'}
-              </p>
+              {!(requestVisibility === 'direct' && eligibleMembers.length === 0) ? (
+                <p className="text-xs text-muted-foreground">{teammateGuidance}</p>
+              ) : null}
             </div>
           ) : null}
 
@@ -342,7 +353,7 @@ export function RequestComposer({
             {step === 1 ? 'Cancel' : 'Back'}
           </Button>
           {step < 3 ? (
-            <Button size="sm" onClick={onNextStep}>
+            <Button size="sm" disabled={!canContinue} onClick={onNextStep}>
               Continue
             </Button>
           ) : (

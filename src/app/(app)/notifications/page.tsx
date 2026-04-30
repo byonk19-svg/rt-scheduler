@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -8,6 +9,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
+
+export const metadata: Metadata = {
+  title: 'Notifications',
+  description: 'Schedule, request, and preliminary updates in one place.',
+}
 
 type NotificationRow = {
   id: string
@@ -72,6 +78,15 @@ function includesFilter(item: NotificationRow, filter: NotificationFilter): bool
       item.event_type === 'shift_reminder'
     )
   return true
+}
+
+function getEmptyStateDescription(filter: NotificationFilter): string {
+  if (filter === 'all') return 'No notifications yet.'
+  if (filter === 'unread') return 'No unread notifications right now.'
+  if (filter === 'schedule') return 'No schedule notifications right now.'
+  if (filter === 'requests') return 'No request notifications right now.'
+  if (filter === 'preliminary') return 'No preliminary notifications right now.'
+  return 'No notifications yet.'
 }
 
 async function markAllReadAction() {
@@ -238,9 +253,7 @@ export default async function NotificationsPage({
               <CheckCircle2 className="h-4 w-4 text-[var(--success-text)]" />
               You&apos;re all caught up
             </CardTitle>
-            <CardDescription>
-              {filter === 'all' ? 'No notifications yet.' : 'No notifications for this filter.'}
-            </CardDescription>
+            <CardDescription>{getEmptyStateDescription(filter)}</CardDescription>
           </CardHeader>
         </Card>
       ) : (

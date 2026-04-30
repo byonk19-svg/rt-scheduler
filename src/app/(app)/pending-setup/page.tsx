@@ -1,5 +1,11 @@
+import type { Metadata } from 'next'
 import { TeamwiseLogo } from '@/components/teamwise-logo'
 import { Button } from '@/components/ui/button'
+
+export const metadata: Metadata = {
+  title: 'Waiting for approval',
+  description: 'Your Teamwise account is pending manager approval.',
+}
 
 type PendingSetupSearchParams = {
   success?: string | string[]

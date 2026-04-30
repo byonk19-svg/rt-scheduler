@@ -37,4 +37,9 @@ describe('staff history page', () => {
     expect(source).toContain('href="/therapist/swaps"')
     expect(source).not.toContain('href="/shift-board">Back to Shift Swaps & Pickups</Link>')
   })
+
+  it('sets route-specific therapist history metadata', () => {
+    expect(source).toContain("title: 'Shift Swaps & Pickups History'")
+    expect(source).toContain('Review earlier swap, pickup, and request outcomes.')
+  })
 })
