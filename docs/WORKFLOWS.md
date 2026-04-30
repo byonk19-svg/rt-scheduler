@@ -4,7 +4,7 @@ Operational workflows as implemented in the current codebase.
 
 ## 0) Public Auth + Access Approval
 
-1. User lands on `/` and chooses `Sign in` or `Create account`.
+1. User lands on `/` and chooses `Sign in` or `Request access`.
 2. Therapist self-signup at `/signup` creates an auth user. The `handle_new_user` trigger inserts `profiles`:
    - If the new user's normalized full name matches an active row in `employee_roster` (managed on `/team`), the profile is created with the roster's role, shift, employment, max-work-days, and lead-eligibility defaults. The roster row stores `matched_profile_id`.
    - If there is no match, `profiles.role` stays `null` and the user remains pending.
@@ -12,8 +12,12 @@ Operational workflows as implemented in the current codebase.
 3. Pending users (`role = null`) are routed to `/pending-setup` and have no operational dashboard access.
 4. Manager reviews pending users at `/requests/user-access`.
 5. Manager approves with required role selection (`therapist` or `lead`) or declines.
-6. Approve activates access and sends approval email; decline deletes the pending auth account.
-7. E2E auth smoke uses a dedicated real account via `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` and verifies both login and logout.
+6. Approve activates access, resets onboarding-owned schedule/preference state for the approved staff role, and sends approval email; decline deletes the pending auth account.
+7. Newly approved or roster-matched therapists and leads are routed to `/onboarding` before they enter the normal app.
+   - Required steps are `Set your normal schedule`, `Choose schedule preferences`, and `Choose notifications and appearance`.
+   - `Review Future Availability` appears as a recommended next step when an actionable cycle exists, but it does not block completion.
+   - `No preference` is a valid first-run answer for preferred work days and counts as complete.
+8. E2E auth smoke uses a dedicated real account via `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` and verifies both login and logout.
 
 Manager preload:
 On `/team`, use Employee roster (single add or bulk paste) so names match what staff type at signup. Use `/team/work-patterns` for dedicated recurring pattern administration. For an ops-only email-list-to-auth/profile sync, use `npm run sync:roster`.
@@ -71,6 +75,7 @@ On `/team`, use Employee roster (single add or bulk paste) so names match what s
   - `Future Availability` = a generated cycle view derived from that template
   - cycle overrides = date or range exceptions for that cycle only
 - Editing future availability must not change the saved recurring pattern.
+- First-run onboarding links into `/therapist/recurring-pattern` and `/therapist/settings` with `return_to=/onboarding` so required setup stays in the onboarding loop until the user finishes.
 - Therapist recurring-pattern editor lives at `/therapist/recurring-pattern`.
 - Manager advanced recurring-pattern editor lives at `/team/work-patterns/[therapistId]`.
 - Legacy quick-edit and legacy work-pattern dialogs are weekly-only surfaces; advanced repeating-cycle patterns should be edited through the dedicated recurring-pattern pages.

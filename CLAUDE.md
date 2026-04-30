@@ -215,6 +215,7 @@ E2E specs:
 - `/login`, `/signup`
 - `/auth/signout`
 - `/pending-setup` post-signup onboarding gate
+- `/onboarding` authenticated first-run setup gate for therapists and leads
 - `/dashboard` role redirect
 - `/dashboard/manager`, `/dashboard/staff`
   - `/dashboard/manager` is the manager **Inbox** — h1 and nav label both read "Inbox"
@@ -239,10 +240,24 @@ Role source: `profiles.role`.
 - `lead`: therapist experience plus assignment-status updates
 - `therapist`: standard staff experience
 - `null` role: pending-access user; can sign in but is gated to `/pending-setup` until manager approval
+- `therapist` / `lead` with `staff_onboarding_required = true` and no `staff_onboarding_completed_at`: authenticated staff user gated to `/onboarding` until required first-run setup is finished
 
 Coverage lead eligibility remains separate at `profiles.is_lead_eligible`.
 On the `/team` surface, lead eligibility is derived from the selected role when saving quick edit.
 All permission checks go through `can(role, permission)` in `src/lib/auth/can.ts`, and inactive or archived users should be denied there.
+
+## Staff Onboarding
+
+- Required first-run route: `/onboarding`
+- Applies to: `therapist` and `lead` only; managers skip it entirely
+- Required steps:
+  - `Set your normal schedule`
+  - `Choose schedule preferences`
+  - `Choose notifications and appearance`
+- Recommended but non-blocking:
+  - `Review Future Availability`
+- Therapist settings now treat `No preference` as a first-class preferred-work-days answer. It must not be treated as missing setup.
+- Approval resets onboarding-owned state (`preferred_work_days`, `preferred_work_days_mode`, onboarding confirmation timestamps, and `work_patterns`) so a re-approved staff account starts clean.
 
 ## Key Shared Components
 

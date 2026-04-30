@@ -2,7 +2,7 @@
 
 Web app for respiratory therapy scheduling with role-based workflows:
 
-- Auth + role-aware dashboard with pending-access onboarding
+- Auth + role-aware dashboard with pending-access approval plus required first-run staff onboarding
 - Availability requests
 - 6-week schedule cycle management
 - **Canonical staff schedule:** [`/coverage`](<./src/app/(app)/coverage/page.tsx>) supports both `Grid` and `Roster` layouts; server entry is `page.tsx`, initial snapshot loading lives in [`coverage-page-data.ts`](<./src/app/(app)/coverage/coverage-page-data.ts>), and interactive client logic lives in [`CoverageClientPage.tsx`](<./src/app/(app)/coverage/CoverageClientPage.tsx>). The therapist compatibility route (`/therapist/schedule`) still redirects there and preserves explicit `view` params
@@ -13,12 +13,13 @@ Web app for respiratory therapy scheduling with role-based workflows:
 
 ## Auth + Access Model
 
-- Public homepage (`/`) is therapist-first marketing: luminous background, trust-forward copy, product preview frame, and clear CTAs — **Get started** + **Sign in** in the header, **Sign in** + **Create account** in the hero (Vitest contracts in `src/app/page.test.ts`).
+- Public homepage (`/`) is therapist-first marketing: luminous background, trust-forward copy, product preview frame, and clear CTAs — **Get started** + **Sign in** in the header, **Sign in** + **Request access** in the hero (Vitest contracts in `src/app/page.test.ts`).
 - Therapists request access via `/signup` (first/last name, optional phone, email, password).
 - Managers are **not** created via public signup; they are provisioned admin-side.
 - After a successful request, users are redirected to `/login?status=requested` (no automatic session). The public signup flow now always uses that generic redirect rather than disclosing whether the submitted name matched an internal roster row. Server-side roster auto-match can still provision role/settings immediately for matched users; unmatched signups stay pending (`profiles.role = null`) until manager approval.
 - Pending users can authenticate but are gated away from app workflows until manager approval.
 - Manager approves pending users in `Requests -> User Access Requests` and assigns role at approval time (`therapist` or `lead`).
+- Newly approved or roster-matched therapists and leads are then routed through `/onboarding` before entering the normal app. Required first-run steps are normal schedule, schedule preferences, and notifications/appearance; `Future Availability` is recommended but non-blocking.
 - Declining an access request deletes the pending account.
 
 Current architecture and quality snapshot: [`docs/REPO_HEALTH.md`](docs/REPO_HEALTH.md)
