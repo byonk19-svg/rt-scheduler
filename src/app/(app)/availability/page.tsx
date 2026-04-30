@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -24,6 +25,11 @@ import { buildMissingAvailabilityRows } from '@/lib/employee-directory'
 import { toUiRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 import { cn } from '@/lib/utils'
+
+export const metadata: Metadata = {
+  title: 'Availability Planning',
+  description: 'Plan staffing inputs, review requests, and manage intake for schedule cycles.',
+}
 
 const AvailabilityEntriesTable = dynamic(() =>
   import('@/app/availability/availability-requests-table').then(

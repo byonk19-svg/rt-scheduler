@@ -1,8 +1,14 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
+
+export const metadata: Metadata = {
+  title: 'Dashboard',
+  description: 'Route users to the right Teamwise dashboard for their role.',
+}
 
 type DashboardSearchParams = Record<string, string | string[] | undefined>
 

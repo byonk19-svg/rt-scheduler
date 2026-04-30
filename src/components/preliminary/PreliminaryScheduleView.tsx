@@ -185,8 +185,8 @@ export function PreliminaryScheduleView({
                 No preliminary items need your attention right now.
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Open help-needed shifts and your tentative assignments will appear here while the
-                preliminary schedule is live.
+                Open shifts and your tentative assignments appear here while the preliminary
+                schedule is live.
               </p>
             </div>
           ) : (

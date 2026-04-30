@@ -77,7 +77,7 @@ export async function PublishedSchedulePage({
               {title}
             </h1>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Upcoming shifts from published schedules only ({shifts.length} shown, next 30 max).
+              Upcoming shifts from published schedules only.
             </p>
           </div>
           <Button asChild size="sm" variant="outline" className="text-xs">

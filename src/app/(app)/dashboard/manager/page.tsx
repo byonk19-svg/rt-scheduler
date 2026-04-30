@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import type { Cycle } from '@/app/schedule/types'
@@ -9,6 +10,11 @@ import { getNextCyclePlanningWindow } from '@/lib/manager-inbox'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import { createClient } from '@/lib/supabase/server'
 import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
+
+export const metadata: Metadata = {
+  title: 'Inbox',
+  description: 'Manager workflow inbox for schedule, approval, and coverage follow-up.',
+}
 
 type ManagerProfileRow = {
   role: string | null

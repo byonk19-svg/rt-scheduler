@@ -56,13 +56,14 @@ describe('AppShell mobile menu', () => {
 
   it('uses the shared dialog primitive for the mobile drawer so focus is trapped and restored', () => {
     expect(appShellSource).toContain(
-      "import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'"
+      "import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'"
     )
     expect(appShellSource).toContain(
       '<Dialog open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>'
     )
     expect(appShellSource).toContain('<DialogContent')
     expect(appShellSource).toContain('<DialogTitle>Navigation menu</DialogTitle>')
+    expect(appShellSource).toContain('Browse the main Teamwise sections')
   })
 
   it('contains overscroll within the mobile drawer', () => {

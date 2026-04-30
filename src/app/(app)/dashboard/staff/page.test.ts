@@ -21,6 +21,11 @@ describe('staff dashboard future availability links', () => {
     expect(staffDashboardSource).not.toContain('href="/shift-board"')
     expect(staffDashboardSource).not.toContain('href="/staff/my-schedule"')
   })
+
+  it('avoids rendering a duplicate schedule CTA when the workflow already points to the therapist schedule', () => {
+    expect(staffDashboardSource).toContain('workflowAlreadyLinksToSchedule')
+    expect(staffDashboardSource).toContain("href?.startsWith('/therapist/schedule')")
+  })
 })
 
 describe('staff dashboard therapist action-center copy', () => {

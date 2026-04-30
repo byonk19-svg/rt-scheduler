@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import {
@@ -25,6 +26,11 @@ import { fetchScheduleCyclesForCoverage } from '@/lib/coverage/fetch-schedule-cy
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { createClient } from '@/lib/supabase/server'
+
+export const metadata: Metadata = {
+  title: 'Publish History',
+  description: 'Manage schedule blocks and review publish email delivery history.',
+}
 
 type PublishEventRow = {
   id: string

@@ -1,3 +1,6 @@
+import fs from 'node:fs'
+import path from 'node:path'
+
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -53,6 +56,16 @@ describe('therapist swaps route', () => {
 
     expect(loadShiftBoardSnapshotMock).toHaveBeenCalledWith({ supabase, tab: 'open' })
     expect(html).toContain('Therapist swaps for therapist-2')
+  })
+
+  it('sets route-specific therapist swaps metadata', async () => {
+    const source = fs.readFileSync(
+      path.join(process.cwd(), 'src/app/(app)/therapist/swaps/page.tsx'),
+      'utf8'
+    )
+
+    expect(source).toContain("title: 'Shift Swaps & Pickups'")
+    expect(source).toContain('shift swap and pickup requests')
   })
 
   it('redirects to login when the shared shift-board snapshot is unauthorized', async () => {

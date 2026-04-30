@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import {
@@ -20,6 +21,11 @@ import type {
 } from '@/lib/preliminary-schedule/types'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+
+export const metadata: Metadata = {
+  title: 'Preliminary Schedule',
+  description: 'Review tentative shifts, claims, and change requests before publish.',
+}
 
 type PreliminarySearchParams = Record<string, string | string[] | undefined>
 

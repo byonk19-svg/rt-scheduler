@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Clock } from 'lucide-react'
@@ -8,6 +9,11 @@ import { parseRole } from '@/lib/auth/roles'
 import { getOne } from '@/lib/csv-utils'
 import { getPickupInterestTherapistCopy } from '@/lib/pickup-interest-presentation'
 import { createClient } from '@/lib/supabase/server'
+
+export const metadata: Metadata = {
+  title: 'Shift Swaps & Pickups History',
+  description: 'Review earlier swap, pickup, and request outcomes.',
+}
 
 const PAGE_SIZE = 25
 

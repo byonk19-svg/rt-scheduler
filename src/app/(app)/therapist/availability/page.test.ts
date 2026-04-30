@@ -37,6 +37,20 @@ describe('therapist availability route', () => {
     expect(pageSource).toContain('therapist_availability_submissions')
   })
 
+  it('sets route-specific metadata and recurring-pattern wording', () => {
+    const pagePath = resolve(process.cwd(), 'src/app/(app)/therapist/availability/page.tsx')
+    const workspacePath = resolve(
+      process.cwd(),
+      'src/components/availability/TherapistAvailabilityWorkspace.tsx'
+    )
+    const pageSource = readFileSync(pagePath, 'utf8')
+    const workspaceSource = readFileSync(workspacePath, 'utf8')
+
+    expect(pageSource).toContain("title: 'Future Availability'")
+    expect(workspaceSource).toContain('Edit recurring pattern')
+    expect(workspaceSource).toContain('Set recurring pattern')
+  })
+
   it('keeps therapist future availability focused on upcoming non-published cycles', () => {
     const filePath = resolve(process.cwd(), 'src/app/(app)/therapist/availability/page.tsx')
     const source = readFileSync(filePath, 'utf8')

@@ -17,8 +17,8 @@ describe('therapist settings route', () => {
     expect(source).toContain('My Schedule Preferences')
     expect(source).toContain('Recurring Work Pattern')
     expect(source).toContain('This is your normal repeating schedule.')
-    expect(source).toContain('Edit normal schedule')
-    expect(source).toContain('Set normal schedule')
+    expect(source).toContain('Edit recurring pattern')
+    expect(source).toContain('Set recurring pattern')
     expect(source).toContain(
       'Future Availability will start blank until you save a normal schedule.'
     )
@@ -27,6 +27,11 @@ describe('therapist settings route', () => {
     expect(source).toContain('Max consecutive days')
     expect(source).toContain('Notification preferences')
     expect(source).not.toContain("export { default } from '../../profile/page'")
+  })
+
+  it('sets route-specific metadata', () => {
+    expect(source).toContain("title: 'My Schedule Preferences'")
+    expect(source).toContain('Manage recurring pattern, preferences, and notifications.')
   })
 
   it('offers an explicit no-preference option for preferred work days', () => {

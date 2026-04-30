@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import {
@@ -23,6 +24,11 @@ import {
 import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveTherapistAvailabilityCycleId } from '@/lib/therapist-workflow'
 import { createClient } from '@/lib/supabase/server'
+
+export const metadata: Metadata = {
+  title: 'Future Availability',
+  description: 'Plan and submit your availability for upcoming schedule cycles.',
+}
 
 type ToastVariant = 'success' | 'error'
 type AvailabilityPageSearchParams = {

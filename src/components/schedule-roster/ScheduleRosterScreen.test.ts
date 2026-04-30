@@ -48,6 +48,7 @@ describe('ScheduleRosterScreen', () => {
     expect(html).toContain('Staffing Count')
     expect(html).toContain('On Call')
     expect(html).toContain('Call In')
+    expect(html).toContain('Roster view only')
     expect(html).toContain('Bold vertical lines separate weeks')
     expect(html).toContain('Weekends shaded')
     expect(html).toContain('<colgroup>')
