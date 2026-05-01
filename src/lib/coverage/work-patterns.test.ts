@@ -76,6 +76,7 @@ describe('work-patterns', () => {
       therapist_id: 'therapist-1',
       pattern_type: 'weekly_with_weekend_rotation',
       weekly_weekdays: [1, 2, 4, 5],
+      offs_dow: [2],
       works_dow_mode: 'hard',
       weekend_rule: 'every_other_weekend',
       weekend_anchor_date: '2026-05-02',
@@ -83,9 +84,15 @@ describe('work-patterns', () => {
 
     expect(pattern.pattern_type).toBe('weekly_with_weekend_rotation')
     expect(pattern.weekend_rule).toBe('every_other_weekend')
-    expect(pattern.weekly_weekdays).toEqual([1, 2, 4, 5])
+    expect(pattern.offs_dow).toEqual([2])
+    expect(pattern.works_dow).not.toContain(2)
+    expect(isAllowedByPattern(pattern, '2026-05-05')).toMatchObject({
+      allowed: false,
+      reason: 'blocked_offs_dow',
+    })
+    expect(pattern.weekly_weekdays).toEqual([1, 4, 5])
     expect(describeWorkPatternSummary(pattern)).toBe(
-      'Works Mon, Tue, Thu, Fri. Every other weekend starting May 2, 2026.'
+      'Works Mon, Thu, Fri. Every other weekend starting May 2, 2026.'
     )
   })
 
@@ -108,6 +115,22 @@ describe('work-patterns', () => {
     expect(describeWorkPatternSummary(pattern)).toBe(
       'Repeats every 13 days starting May 1, 2026.'
     )
+  })
+
+  it('applies never-work days before repeating cycle work segments', () => {
+    const pattern = normalizeWorkPattern({
+      therapist_id: 'therapist-1',
+      pattern_type: 'repeating_cycle',
+      cycle_anchor_date: '2026-05-01',
+      cycle_segments: [{ kind: 'work', length_days: 7 }],
+      offs_dow: [1],
+    })
+
+    expect(pattern.offs_dow).toEqual([1])
+    expect(isAllowedByPattern(pattern, '2026-05-04')).toMatchObject({
+      allowed: false,
+      reason: 'blocked_offs_dow',
+    })
   })
 
   it('rebuilds weekly works_dow from weekly_weekdays when legacy works_dow is empty', () => {

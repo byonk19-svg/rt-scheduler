@@ -28,6 +28,16 @@ export function buildCycleAvailabilityBaseline(params: {
   for (let index = 0; index < dayCount; index += 1) {
     const date = toIsoDate(addDays(startDate, index))
     if (!params.pattern || params.pattern.pattern_type === 'none') {
+      const weekday = new Date(`${date}T00:00:00`).getDay()
+      if (params.pattern?.offs_dow.includes(weekday)) {
+        baseline[date] = {
+          baselineStatus: 'off',
+          baselineSource: 'recurring_pattern',
+          reason: 'blocked_offs_dow',
+        }
+        continue
+      }
+
       baseline[date] = {
         baselineStatus: 'neutral',
         baselineSource: 'none',

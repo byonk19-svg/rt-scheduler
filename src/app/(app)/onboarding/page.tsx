@@ -2,36 +2,95 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 import {
-  completeStaffOnboardingAction,
+  completeScheduleSetupOnboardingAction,
   loadStaffOnboardingContext,
 } from '@/app/(app)/onboarding/actions'
+import { OnboardingScheduleSetup } from '@/app/(app)/onboarding/OnboardingScheduleSetup'
 import { FeedbackToast } from '@/components/feedback-toast'
-import { FormSubmitButton } from '@/components/form-submit-button'
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import type { StaffOnboardingStepStatus } from '@/lib/staff-onboarding'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { normalizeWorkPattern, type WorkPattern } from '@/lib/coverage/work-patterns'
+import type { PreferredWorkDaysMode } from '@/lib/staff-onboarding'
 
 type OnboardingSearchParams = Record<string, string | string[] | undefined>
+
+type WorkPatternRow = {
+  pattern_type: WorkPattern['pattern_type'] | null
+  works_dow: number[] | null
+  offs_dow: number[] | null
+  weekend_rotation: string | null
+  weekend_anchor_date: string | null
+  works_dow_mode: string | null
+  weekly_weekdays: number[] | null
+  weekend_rule: WorkPattern['weekend_rule'] | null
+  cycle_anchor_date: string | null
+  cycle_segments: WorkPattern['cycle_segments'] | null
+  shift_preference: WorkPattern['shift_preference'] | null
+}
 
 function getSearchParam(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0]
   return value
 }
 
+function getOne<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null
+  return value ?? null
+}
+
+function normalizePreferredDays(value: number[] | null | undefined): number[] {
+  if (!Array.isArray(value)) return []
+
+  return Array.from(
+    new Set(
+      value.map((day) => Number(day)).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+    )
+  ).sort((left, right) => left - right)
+}
+
+function normalizePreferredWorkDaysMode(value: string | null | undefined): PreferredWorkDaysMode {
+  return value === 'specific_days' || value === 'no_preference' ? value : 'unset'
+}
+
+function toPatternRecord(
+  therapistId: string,
+  value: WorkPatternRow | WorkPatternRow[] | null
+): WorkPattern | null {
+  const row = getOne(value)
+  if (!row) return null
+
+  return normalizeWorkPattern({
+    therapist_id: therapistId,
+    pattern_type: row.pattern_type ?? undefined,
+    works_dow: row.works_dow ?? [],
+    offs_dow: row.offs_dow ?? [],
+    weekend_rotation: row.weekend_rotation === 'every_other' ? 'every_other' : undefined,
+    weekend_anchor_date: row.weekend_anchor_date ?? null,
+    works_dow_mode: row.works_dow_mode === 'soft' ? 'soft' : undefined,
+    weekly_weekdays: row.weekly_weekdays ?? row.works_dow ?? [],
+    weekend_rule: row.weekend_rule ?? undefined,
+    cycle_anchor_date: row.cycle_anchor_date ?? null,
+    cycle_segments: row.cycle_segments ?? [],
+    shift_preference: row.shift_preference ?? 'either',
+  })
+}
+
 function getOnboardingFeedback(
   params?: OnboardingSearchParams
-): { message: string; variant: 'error' } | null {
+): { message: string; variant: 'error' | 'success' } | null {
+  const success = getSearchParam(params?.success)
   const error = getSearchParam(params?.error)
+
+  if (success === 'setup_complete') {
+    return {
+      message: 'Schedule setup complete.',
+      variant: 'success',
+    }
+  }
+
   if (error === 'incomplete') {
     return {
-      message: 'Finish setup is only available after the required steps are complete.',
+      message: 'Finish setup after choosing a valid schedule and preferences.',
       variant: 'error',
     }
   }
@@ -46,54 +105,23 @@ function getOnboardingFeedback(
   return null
 }
 
-function StepStatusBadge({ complete }: { complete: boolean }) {
+function CompletionScreen() {
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
-        complete
-          ? 'bg-[var(--success-subtle)] text-[var(--success-text)]'
-          : 'bg-secondary text-secondary-foreground'
-      }`}
-    >
-      {complete ? 'Complete' : 'Required'}
-    </span>
-  )
-}
-
-function OnboardingStepCard({
-  title,
-  description,
-  step,
-}: {
-  title: string
-  description: string
-  step: StaffOnboardingStepStatus
-}) {
-  return (
-    <Card className="border-border/90">
-      <CardHeader className="gap-3 sm:grid-cols-[1fr_auto]">
-        <div className="space-y-1">
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
-        </div>
-        <CardAction>
-          <StepStatusBadge complete={step.complete} />
-        </CardAction>
-      </CardHeader>
-      <CardFooter className="justify-between gap-3 border-t border-border/70">
-        <p className="text-sm text-muted-foreground">
-          {step.complete
-            ? 'This step is ready. You can reopen it any time.'
-            : 'Complete this step before you finish setup.'}
-        </p>
-        <Link
-          href={step.href}
-          className="inline-flex h-9 items-center justify-center rounded-md border border-border px-4 text-sm font-medium transition-colors hover:bg-secondary/30"
-        >
-          {step.complete ? 'Review step' : 'Open step'}
-        </Link>
-      </CardFooter>
-    </Card>
+    <div className="mx-auto max-w-2xl space-y-5">
+      <Card className="border-primary/25 shadow-tw-md">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold tracking-tight">{"You're all set"}</CardTitle>
+          <CardDescription>
+            Your schedule is ready. You can adjust anything anytime.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-3">
+          <Button asChild>
+            <Link href="/therapist/schedule">View my schedule</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 
@@ -105,6 +133,16 @@ export default async function OnboardingPage({
   const context = await loadStaffOnboardingContext()
   const params = searchParams ? await searchParams : undefined
   const feedback = getOnboardingFeedback(params)
+  const success = getSearchParam(params?.success)
+
+  if (success === 'setup_complete') {
+    return (
+      <div className="space-y-6">
+        {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
+        <CompletionScreen />
+      </div>
+    )
+  }
 
   if (!context.status.isRequired) {
     redirect('/dashboard')
@@ -114,76 +152,30 @@ export default async function OnboardingPage({
     redirect('/dashboard?success=onboarding_complete')
   }
 
+  const initialPattern = toPatternRecord(
+    context.profile.id,
+    context.profile.work_patterns as WorkPatternRow | WorkPatternRow[] | null
+  )
+  const initialPreferredDays = normalizePreferredDays(context.profile.preferred_work_days)
+  const initialPreferredWorkDaysMode = normalizePreferredWorkDaysMode(
+    context.profile.preferred_work_days_mode
+  )
+  const initialMaxConsecutiveDays =
+    typeof context.profile.max_consecutive_days === 'number'
+      ? Math.min(7, Math.max(1, context.profile.max_consecutive_days))
+      : 3
+
   return (
     <div className="space-y-6">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
-      <Card className="border-border/90">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold tracking-tight">Setup your account</CardTitle>
-          <CardDescription>
-            Before you use Teamwise, tell us your normal schedule and the defaults you want us to
-            use.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-
-      <OnboardingStepCard
-        title="Set your normal schedule"
-        description="Save the repeating schedule you normally work so the rest of the app starts from the right baseline."
-        step={context.status.steps.schedule}
+      <OnboardingScheduleSetup
+        initialPattern={initialPattern}
+        initialMaxConsecutiveDays={initialMaxConsecutiveDays}
+        initialPreferredWorkDays={initialPreferredDays}
+        initialPreferredWorkDaysMode={initialPreferredWorkDaysMode}
+        saveAction={completeScheduleSetupOnboardingAction}
       />
-      <OnboardingStepCard
-        title="Choose schedule preferences"
-        description="Confirm your preferred work-day defaults and schedule-view preferences."
-        step={context.status.steps.preferences}
-      />
-      <OnboardingStepCard
-        title="Choose notifications and appearance"
-        description="Pick your notification defaults and confirm the theme you want to use."
-        step={context.status.steps.notificationsAppearance}
-      />
-
-      {context.status.shouldRecommendAvailability ? (
-        <Card className="border-border/90">
-          <CardHeader>
-            <CardTitle>Review Future Availability</CardTitle>
-            <CardDescription>
-              This is recommended next, but you can finish setup without it.
-            </CardDescription>
-          </CardHeader>
-          <CardFooter className="justify-end border-t border-border/70">
-            <Link
-              href="/therapist/availability"
-              className="inline-flex h-9 items-center justify-center rounded-md border border-border px-4 text-sm font-medium transition-colors hover:bg-secondary/30"
-            >
-              Open Future Availability
-            </Link>
-          </CardFooter>
-        </Card>
-      ) : null}
-
-      <Card className="border-border/90">
-        <CardHeader>
-          <CardTitle>Finish setup</CardTitle>
-          <CardDescription>
-            {context.status.isComplete
-              ? 'All required steps are complete. Finish setup to continue into the app.'
-              : 'Finish setup becomes available after the three required steps are complete.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form action={completeStaffOnboardingAction}>
-            <FormSubmitButton
-              type="submit"
-              pendingText="Finishing setup..."
-              disabled={!context.status.isComplete}
-            >
-              Finish setup
-            </FormSubmitButton>
-          </form>
-        </CardContent>
-      </Card>
     </div>
   )
 }

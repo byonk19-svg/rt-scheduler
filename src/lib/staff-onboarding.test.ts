@@ -39,7 +39,7 @@ describe('getStaffOnboardingStatus', () => {
     ).toBe(true)
   })
 
-  it('keeps lead onboarding incomplete until schedule, preferences, and theme are all explicit', async () => {
+  it('keeps lead onboarding incomplete until schedule and preferences are explicit', async () => {
     const { getStaffOnboardingStatus } = await loadHelper()
     const status = getStaffOnboardingStatus({
       role: 'lead',
@@ -56,5 +56,22 @@ describe('getStaffOnboardingStatus', () => {
     expect(status.steps.preferences.complete).toBe(false)
     expect(status.steps.notificationsAppearance.complete).toBe(false)
     expect(status.isComplete).toBe(false)
+  })
+
+  it('does not require notification or appearance settings for onboarding completion', async () => {
+    const { getStaffOnboardingStatus } = await loadHelper()
+    const status = getStaffOnboardingStatus({
+      role: 'therapist',
+      onboardingRequired: true,
+      preferredWorkDaysMode: 'no_preference',
+      preferencesConfirmedAt: '2026-04-29T12:00:00Z',
+      themeConfirmedAt: null,
+      completedAt: null,
+      workPattern: { pattern_type: 'weekly_fixed' },
+      hasActionableAvailabilityCycle: false,
+    })
+
+    expect(status.steps.notificationsAppearance.complete).toBe(false)
+    expect(status.isComplete).toBe(true)
   })
 })

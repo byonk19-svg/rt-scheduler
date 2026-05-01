@@ -11,6 +11,12 @@ type StaffOnboardingContext = {
   cycleId: string
 }
 
+function nextSaturdayKey() {
+  const today = new Date()
+  const daysUntilSaturday = (6 - today.getDay() + 7) % 7
+  return formatDateKey(addDays(today, daysUntilSaturday))
+}
+
 test.describe.serial('staff onboarding gate', () => {
   test.setTimeout(120_000)
 
@@ -100,7 +106,7 @@ test.describe.serial('staff onboarding gate', () => {
     }
   })
 
-  test('new therapist is routed through onboarding before entering the normal app', async ({
+  test('new therapist sets rotating weekends and hard never-work days during onboarding', async ({
     page,
   }) => {
     test.skip(!ctx, 'Supabase service env values are required.')
@@ -112,49 +118,79 @@ test.describe.serial('staff onboarding gate', () => {
       '/dashboard',
       /\/onboarding(?:[/?].*)?$/
     )
-    await expect(page.getByText('Setup your account')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Finish setup' })).toBeDisabled()
+    await expect(page.getByRole('heading', { name: 'Pick how you usually work.' })).toBeVisible()
+    await expect(page.getByText('Pick your work days on the next step.')).toBeVisible()
+    await page.waitForLoadState('networkidle')
 
-    await page.getByRole('link', { name: 'Open step' }).nth(0).click()
-    await expect(page).toHaveURL(/\/therapist\/recurring-pattern\?return_to=(?:%2F|\/)onboarding/)
-    await page.getByRole('button', { name: /No repeating schedule/i }).click()
-    await page.getByRole('button', { name: /Save recurring pattern/i }).click()
-    await page.waitForURL(/\/onboarding\?success=work_pattern_saved/, { timeout: 45_000 })
-
-    await expect(page.getByText('Set your normal schedule')).toBeVisible()
-    await page
-      .getByRole('link', { name: /Open step/i })
-      .nth(0)
-      .click()
-    await expect(page).toHaveURL(
-      /\/therapist\/settings\?setup=preferences&return_to=(?:%2F|\/)onboarding/
-    )
-    await page.getByLabel('No preference').check()
-    await page.getByRole('button', { name: /Save settings/i }).click()
-    await page.waitForURL(/\/onboarding\?success=settings_saved/, { timeout: 45_000 })
-
-    await page
-      .getByRole('link', { name: /Open step/i })
-      .nth(0)
-      .click()
-    await expect(page).toHaveURL(
-      /\/therapist\/settings\?setup=notifications&return_to=(?:%2F|\/)onboarding/
-    )
-    await page.getByRole('button', { name: 'System' }).click()
-    await page.getByRole('button', { name: /Save settings/i }).click()
-    await page.waitForURL(/\/onboarding\?success=settings_saved/, { timeout: 45_000 })
-
-    await expect(page.getByText('Review Future Availability')).toBeVisible()
-    await expect(
-      page.getByText('This is recommended next, but you can finish setup without it.')
-    ).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Finish setup' })).toBeEnabled()
-
-    await page.getByRole('button', { name: 'Finish setup' }).click()
-    await expect(page).toHaveURL(/\/dashboard(?:\/staff)?\?success=onboarding_complete/, {
-      timeout: 45_000,
+    const rotatingWeekendsOption = page.getByRole('button', {
+      name: /Weekdays \+ rotating weekends/i,
     })
-    await expect(page.getByRole('heading', { name: /Welcome, Onboarding/i })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Future Availability' })).toBeVisible()
+    await rotatingWeekendsOption.click()
+    await expect(rotatingWeekendsOption).toHaveAttribute('aria-pressed', 'true')
+    await page.getByRole('button', { name: 'Next', exact: true }).click()
+
+    await expect(page.getByRole('heading', { name: 'Tap your work days' })).toBeVisible()
+    await page.getByRole('button', { name: /^Mon$/ }).click()
+    await page.getByRole('button', { name: /^Tue$/ }).click()
+    await page.getByRole('button', { name: /^Wed$/ }).click()
+    await page.getByRole('button', { name: /^Thu$/ }).click()
+    await page.getByRole('button', { name: /^Fri$/ }).click()
+    await expect(page.getByText('Too many consecutive days')).toHaveCount(1)
+    await expect(
+      page.getByRole('complementary').getByText('Too many consecutive days')
+    ).toHaveCount(0)
+    await expect(page.getByText('Turn off 2 work days in this streak')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Fix it for me' })).toHaveCount(0)
+    await page.getByRole('button', { name: /^Thu$/ }).click()
+    await expect(page.getByText('Too many consecutive days')).toHaveCount(0)
+    await page.getByRole('button', { name: /^Tue$/ }).click()
+
+    const anchorDate = nextSaturdayKey()
+    await page.getByLabel('First weekend you work').fill(anchorDate)
+
+    const neverWorkGroup = page.getByRole('group', { name: 'Days you never work' })
+    await neverWorkGroup.getByLabel('Tue').check()
+
+    await expect(page.getByText('Never: Tue')).toBeVisible()
+    await expect(page.getByText('Mon, Wed, Fri + rotating weekends')).toBeVisible()
+    await page.getByRole('button', { name: 'Next', exact: true }).click()
+
+    await expect(page.getByRole('heading', { name: 'Preferences' })).toBeVisible()
+    await page.getByLabel('Max consecutive days').selectOption('4')
+    await page.getByRole('button', { name: 'Next', exact: true }).click()
+
+    await expect(page.getByRole('heading', { name: "You're all set" })).toBeVisible()
+    await page.getByRole('button', { name: 'View my schedule' }).click()
+    await expect(page).toHaveURL(/\/onboarding\?success=setup_complete/, { timeout: 45_000 })
+    await expect(page.getByRole('link', { name: 'View my schedule' })).toBeVisible()
+
+    const patternResult = await ctx!.supabase
+      .from('work_patterns')
+      .select(
+        'pattern_type, weekly_weekdays, works_dow, offs_dow, weekend_rule, weekend_anchor_date'
+      )
+      .eq('therapist_id', ctx!.therapist.id)
+      .single()
+
+    expect(patternResult.error).toBeNull()
+    expect(patternResult.data).toMatchObject({
+      pattern_type: 'weekly_with_weekend_rotation',
+      weekly_weekdays: [1, 3, 5],
+      offs_dow: [2],
+      weekend_rule: 'every_other_weekend',
+      weekend_anchor_date: anchorDate,
+    })
+    expect(patternResult.data?.works_dow).not.toContain(2)
+
+    const profileResult = await ctx!.supabase
+      .from('profiles')
+      .select('max_consecutive_days, preferred_work_days_mode, staff_onboarding_completed_at')
+      .eq('id', ctx!.therapist.id)
+      .single()
+
+    expect(profileResult.error).toBeNull()
+    expect(profileResult.data?.max_consecutive_days).toBe(4)
+    expect(profileResult.data?.preferred_work_days_mode).toBe('no_preference')
+    expect(profileResult.data?.staff_onboarding_completed_at).toBeTruthy()
   })
 })
