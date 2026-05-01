@@ -211,6 +211,9 @@ export default async function TherapistAvailabilityPage({
         shift_preference: workPatternSource.shift_preference ?? 'either',
       })
     : null
+  const hasSavedRecurringPattern = Boolean(
+    recurringPattern && recurringPattern.pattern_type !== 'none'
+  )
   const recurringPatternSummary = describeWorkPatternSummary(recurringPattern)
 
   const today = new Date()
@@ -352,6 +355,7 @@ export default async function TherapistAvailabilityPage({
         availabilityRows={availabilityRows}
         conflicts={conflicts}
         initialCycleId={selectedCycleId}
+        hasSavedRecurringPattern={hasSavedRecurringPattern}
         recurringPatternSummary={recurringPatternSummary}
         generatedBaselineByCycleId={generatedBaselineByCycleId}
         submissionsByCycleId={submissionsByCycleId}
