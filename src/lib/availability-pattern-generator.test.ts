@@ -69,6 +69,24 @@ describe('buildCycleAvailabilityBaseline', () => {
     expect(baseline['2026-05-03']?.baselineStatus).toBe('neutral')
   })
 
+  it('keeps never-work days off even when no repeating pattern is saved', () => {
+    const pattern = normalizeWorkPattern({
+      therapist_id: 'therapist-1',
+      pattern_type: 'none',
+      offs_dow: [1],
+    })
+
+    const baseline = buildCycleAvailabilityBaseline({
+      cycleStart: '2026-05-03',
+      cycleEnd: '2026-05-05',
+      pattern,
+    })
+
+    expect(baseline['2026-05-04']?.baselineStatus).toBe('off')
+    expect(baseline['2026-05-04']?.reason).toBe('blocked_offs_dow')
+    expect(baseline['2026-05-05']?.baselineStatus).toBe('neutral')
+  })
+
   it('treats soft-mode days outside the usual weekdays as neutral, not normal work days', () => {
     const pattern = normalizeWorkPattern({
       therapist_id: 'therapist-1',

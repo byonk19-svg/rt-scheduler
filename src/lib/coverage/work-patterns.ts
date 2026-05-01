@@ -194,6 +194,10 @@ function buildLegacyWeeklyMirror(params: {
   }
 }
 
+function mergeDowValues(...groups: number[][]): number[] {
+  return normalizeDowValues(groups.flat())
+}
+
 function weekdaySummary(weekdays: number[]): string {
   return weekdays.map((day) => WEEKDAY_LABELS[day] ?? String(day)).join(', ')
 }
@@ -248,6 +252,7 @@ export function normalizeWorkPattern(raw: Partial<WorkPattern> & { therapist_id:
     weeklyWeekdays,
     weekendRule,
   })
+  const hardOffsDow = mergeDowValues(legacyWeeklyMirror.offs_dow, normalizedOffsDow)
 
   return {
     therapist_id: raw.therapist_id,
@@ -256,12 +261,9 @@ export function normalizeWorkPattern(raw: Partial<WorkPattern> & { therapist_id:
       patternType === 'none'
         ? []
         : normalizedWorksDow.length > 0
-          ? normalizedWorksDow
-          : legacyWeeklyMirror.works_dow,
-    offs_dow:
-      patternType === 'weekly_fixed'
-        ? normalizedOffsDow
-        : legacyWeeklyMirror.offs_dow,
+          ? normalizedWorksDow.filter((day) => !hardOffsDow.includes(day))
+          : legacyWeeklyMirror.works_dow.filter((day) => !hardOffsDow.includes(day)),
+    offs_dow: hardOffsDow,
     weekend_rotation: legacyWeeklyMirror.weekend_rotation,
     weekend_anchor_date: raw.weekend_anchor_date ?? null,
     works_dow_mode: worksDowMode,
@@ -269,7 +271,10 @@ export function normalizeWorkPattern(raw: Partial<WorkPattern> & { therapist_id:
       raw.shift_preference === 'day' || raw.shift_preference === 'night' || raw.shift_preference === 'either'
         ? raw.shift_preference
         : 'either',
-    weekly_weekdays: patternType === 'none' || patternType === 'repeating_cycle' ? [] : weeklyWeekdays,
+    weekly_weekdays:
+      patternType === 'none' || patternType === 'repeating_cycle'
+        ? []
+        : weeklyWeekdays.filter((day) => !hardOffsDow.includes(day)),
     weekend_rule: patternType === 'weekly_with_weekend_rotation' ? weekendRule : 'none',
     cycle_anchor_date: patternType === 'repeating_cycle' ? raw.cycle_anchor_date ?? null : null,
     cycle_segments: patternType === 'repeating_cycle' ? cycleSegments : [],
@@ -328,6 +333,15 @@ export function isWeekendOn(pattern: WorkPattern, date: string): boolean {
 }
 
 export function isAllowedByPattern(pattern: WorkPattern, date: string): PatternDecision {
+  const weekday = getWeekdayIndex(date)
+  if (weekday === null) {
+    return { allowed: false, reason: 'blocked_offs_dow', penalty: 0 }
+  }
+
+  if (pattern.offs_dow.includes(weekday)) {
+    return { allowed: false, reason: 'blocked_offs_dow', penalty: 0 }
+  }
+
   if (pattern.pattern_type === 'none') {
     return { allowed: true, reason: 'allowed', penalty: 0 }
   }
@@ -339,15 +353,6 @@ export function isAllowedByPattern(pattern: WorkPattern, date: string): PatternD
       return { allowed: false, reason: 'blocked_repeating_cycle_off_segment', penalty: 0 }
     }
     return { allowed: true, reason: 'allowed', penalty: 0 }
-  }
-
-  const weekday = getWeekdayIndex(date)
-  if (weekday === null) {
-    return { allowed: false, reason: 'blocked_offs_dow', penalty: 0 }
-  }
-
-  if (pattern.offs_dow.includes(weekday)) {
-    return { allowed: false, reason: 'blocked_offs_dow', penalty: 0 }
   }
 
   const weekendSaturday = getWeekendSaturday(date)

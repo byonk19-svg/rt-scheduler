@@ -55,8 +55,7 @@ export function getStaffOnboardingStatus(input: StaffOnboardingStatusInput): Sta
     input.preferredWorkDaysMode !== 'unset' && Boolean(input.preferencesConfirmedAt)
   const notificationsAppearanceComplete = Boolean(input.themeConfirmedAt)
   const hasRecordedCompletion = Boolean(input.completedAt)
-  const isComplete =
-    !isRequired || (scheduleComplete && preferencesComplete && notificationsAppearanceComplete)
+  const isComplete = !isRequired || (scheduleComplete && preferencesComplete)
 
   return {
     isRequired,
