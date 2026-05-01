@@ -1,33 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { getVisibleWeek, nextIndex, resolveSwipeDirection } from './CalendarGrid'
-import { getCoverageHealth } from '@/lib/coverage/selectors'
-import type { DayItem, ShiftItem } from '@/lib/coverage/selectors'
-
-function makeShift(overrides: Partial<ShiftItem> = {}): ShiftItem {
-  return {
-    id: 'shift-1',
-    userId: 'user-1',
-    name: 'Test User',
-    status: 'active',
-    log: [],
-    ...overrides,
-  }
-}
-
-function makeDay(overrides: Partial<DayItem> = {}): DayItem {
-  return {
-    id: 'day-1',
-    isoDate: '2026-03-01',
-    date: 1,
-    label: 'Sun, Mar 1',
-    dayStatus: 'published',
-    constraintBlocked: false,
-    leadShift: null,
-    staffShifts: [],
-    ...overrides,
-  }
-}
+import {
+  buildStaffDisplayLines,
+  getVisibleWeek,
+  nextIndex,
+  resolveDayBoardStatus,
+  resolveSwipeDirection,
+} from './CalendarGrid'
 
 describe('CalendarGrid keyboard navigation index', () => {
   it('moves right by 1', () => {
@@ -83,67 +62,47 @@ describe('CalendarGrid mobile week helpers', () => {
   })
 })
 
-describe('coverage health helpers', () => {
-  it('keeps active staffing critical when assigned rows include non-active statuses', () => {
-    const health = getCoverageHealth(
-      makeDay({
-        leadShift: makeShift({ id: 'lead-1', userId: 'lead-1', name: 'Lead One', status: 'active' }),
-        staffShifts: [
-          makeShift({ id: 'staff-1', userId: 'staff-1', name: 'Staff One', status: 'active' }),
-          makeShift({
-            id: 'staff-2',
-            userId: 'staff-2',
-            name: 'Staff Two',
-            status: 'cancelled',
-          }),
-          makeShift({ id: 'staff-3', userId: 'staff-3', name: 'Staff Three', status: 'call_in' }),
-        ],
-      })
-    )
-
-    expect(health.activeCount).toBe(2)
-    expect(health.assignedCount).toBe(4)
-    expect(health.tone).toBe('critical')
-    expect(health.activeStaffingLabel).toBe('2/4 active staffing')
-    expect(health.assignedRowsLabel).toBe('4/5 assigned rows')
-    expect(health.statusLabel).toBe('2 gaps')
+describe('CalendarGrid roster helpers', () => {
+  it('groups compact staff names into short text rows before overflowing', () => {
+    expect(
+      buildStaffDisplayLines(['Alyece Smith', 'Barbara Jones', 'Denise Long', 'Patricia Moss'])
+    ).toEqual({
+      lines: ['Alyece · Barbara', 'Denise · Patricia'],
+      remaining: 0,
+    })
   })
 
-  it('marks assigned but non-active shifts as unstaffed instead of healthy', () => {
-    const health = getCoverageHealth(
-      makeDay({
-        leadShift: makeShift({
-          id: 'lead-1',
-          userId: 'lead-1',
-          name: 'Lead One',
-          status: 'cancelled',
-        }),
-        staffShifts: [
-          makeShift({ id: 'staff-1', userId: 'staff-1', name: 'Staff One', status: 'cancelled' }),
-          makeShift({ id: 'staff-2', userId: 'staff-2', name: 'Staff Two', status: 'call_in' }),
-        ],
-      })
-    )
+  it('uses quiet healthy copy and explicit gap copy for board tiles', () => {
+    expect(
+      resolveDayBoardStatus(
+        {
+          id: '2026-04-20',
+          isoDate: '2026-04-20',
+          date: 20,
+          label: 'Sun Apr 20',
+          dayStatus: 'published',
+          constraintBlocked: false,
+          leadShift: { id: 'lead', userId: 'lead-1', name: 'Demo', status: 'active', log: [] },
+          staffShifts: [],
+        },
+        4
+      )
+    ).toEqual({ tone: 'healthy', label: 'Fully staffed' })
 
-    expect(health.activeCount).toBe(0)
-    expect(health.assignedCount).toBe(3)
-    expect(health.tone).toBe('critical')
-    expect(health.activeStaffingLabel).toBe('0/4 active staffing')
-    expect(health.assignedRowsLabel).toBe('3/5 assigned rows')
-    expect(health.statusLabel).toBe('Unstaffed')
-  })
-
-  it('keeps no-lead days unstaffed when nobody active is left on the shift', () => {
-    const health = getCoverageHealth(
-      makeDay({
-        leadShift: null,
-        staffShifts: [makeShift({ id: 'staff-1', userId: 'staff-1', status: 'cancelled' })],
-      })
-    )
-
-    expect(health.activeCount).toBe(0)
-    expect(health.assignedCount).toBe(1)
-    expect(health.tone).toBe('critical')
-    expect(health.statusLabel).toBe('Unstaffed')
+    expect(
+      resolveDayBoardStatus(
+        {
+          id: '2026-04-21',
+          isoDate: '2026-04-21',
+          date: 21,
+          label: 'Mon Apr 21',
+          dayStatus: 'published',
+          constraintBlocked: false,
+          leadShift: { id: 'lead', userId: 'lead-1', name: 'Demo', status: 'active', log: [] },
+          staffShifts: [],
+        },
+        2
+      )
+    ).toEqual({ tone: 'warning', label: '2 gaps' })
   })
 })

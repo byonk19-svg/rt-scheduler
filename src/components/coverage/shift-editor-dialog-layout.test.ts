@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
 import { getCandidatePriority } from '@/components/coverage/ShiftEditorDialog'
-import { shiftEditorDialogLayout } from '@/components/coverage/shift-editor-dialog-layout'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -10,38 +9,22 @@ const shiftEditorSource = fs.readFileSync(
   'utf8'
 )
 
-describe('shiftEditorDialogLayout', () => {
-  it('uses even compact dialog sizing tokens', () => {
-    expect(shiftEditorDialogLayout.dialogContent).toContain('sm:max-w-[560px]')
-    expect(shiftEditorDialogLayout.dialogContent).toContain('flex-col')
-    expect(shiftEditorDialogLayout.header).toContain('px-4')
-    expect(shiftEditorDialogLayout.header).toContain('sticky')
-    expect(shiftEditorDialogLayout.header).toContain('pb-2.5')
-    expect(shiftEditorDialogLayout.header).toContain('pt-3')
-    expect(shiftEditorDialogLayout.title).toContain('text-[1.25rem]')
+describe('ShiftEditorDialog layout', () => {
+  it('renders as a right-side drawer with compact staffing rows', () => {
+    expect(shiftEditorSource).toContain('right-0 top-0 flex h-dvh')
+    expect(shiftEditorSource).toContain("w-[min(460px,100vw)]")
+    expect(shiftEditorSource).toContain('rounded-none')
+    expect(shiftEditorSource).toContain('rounded-[16px]')
+    expect(shiftEditorSource).toContain('min-w-[82px]')
   })
 
-  it('compresses rows, avatars, and controls evenly', () => {
-    expect(shiftEditorDialogLayout.row).toContain('rounded-[16px]')
-    expect(shiftEditorDialogLayout.row).toContain('px-3')
-    expect(shiftEditorDialogLayout.row).toContain('py-2')
-    expect(shiftEditorDialogLayout.avatar).toContain('h-7')
-    expect(shiftEditorDialogLayout.avatar).toContain('w-7')
-    expect(shiftEditorDialogLayout.action).toContain('h-9')
-    expect(shiftEditorDialogLayout.action).toContain('min-w-[82px]')
-    expect(shiftEditorDialogLayout.meta).toContain('text-[11px]')
-  })
-
-  it('uses explicit staffing-edit wording and a dialog description', () => {
+  it('uses explicit staffing-edit wording and a detail-drawer description', () => {
     expect(shiftEditorSource).toContain('Edit staffing')
-    expect(shiftEditorSource).toContain('Review and update lead and staff coverage assignments for this shift.')
-  })
-
-  it('shows active staffing first and keeps assigned rows as secondary context', () => {
-    expect(shiftEditorSource).toContain('activeStaffingLabel')
-    expect(shiftEditorSource).toContain('assignedRowsLabel')
-    expect(shiftEditorSource).toContain('getCoverageHealth')
-    expect(shiftEditorSource).not.toContain('covered')
+    expect(shiftEditorSource).toContain(
+      'Review daily staffing details, operational statuses, notes, and edit actions for this shift.'
+    )
+    expect(shiftEditorSource).toContain('Operational statuses')
+    expect(shiftEditorSource).toContain('Managers edit staffing assignments.')
   })
 })
 

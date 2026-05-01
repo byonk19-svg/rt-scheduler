@@ -7,6 +7,17 @@ export type ActiveOperationalEntryRow = {
   code: OperationalCode
 }
 
+export type ActiveOperationalDetail = {
+  code: OperationalCode
+  note: string | null
+  leftEarlyTime: string | null
+}
+
+type ActiveOperationalEntryDetailRow = ActiveOperationalEntryRow & {
+  note: string | null
+  left_early_time: string | null
+}
+
 export const OPERATIONAL_CODE_VALUES = [
   'on_call',
   'call_in',
@@ -32,6 +43,14 @@ export async function fetchActiveOperationalCodeMap(
   supabase: unknown,
   shiftIds: string[]
 ): Promise<Map<string, OperationalCode>> {
+  const detailMap = await fetchActiveOperationalDetailMap(supabase, shiftIds)
+  return new Map(Array.from(detailMap.entries(), ([shiftId, detail]) => [shiftId, detail.code]))
+}
+
+export async function fetchActiveOperationalDetailMap(
+  supabase: unknown,
+  shiftIds: string[]
+): Promise<Map<string, ActiveOperationalDetail>> {
   if (shiftIds.length === 0) return new Map()
   const uniqueShiftIds = Array.from(new Set(shiftIds))
 
@@ -48,7 +67,7 @@ export async function fetchActiveOperationalCodeMap(
     }
   }
 
-  const rows: ActiveOperationalEntryRow[] = []
+  const rows: ActiveOperationalEntryDetailRow[] = []
 
   for (
     let start = 0;
@@ -58,7 +77,7 @@ export async function fetchActiveOperationalCodeMap(
     const batch = uniqueShiftIds.slice(start, start + OPERATIONAL_CODE_SHIFT_ID_BATCH_SIZE)
     const { data, error } = await client
       .from('shift_operational_entries')
-      .select('shift_id, code')
+      .select('shift_id, code, note, left_early_time')
       .eq('active', true)
       .in('shift_id', batch)
 
@@ -67,13 +86,17 @@ export async function fetchActiveOperationalCodeMap(
       return new Map()
     }
 
-    rows.push(...((data ?? []) as ActiveOperationalEntryRow[]))
+    rows.push(...((data ?? []) as ActiveOperationalEntryDetailRow[]))
   }
 
-  const map = new Map<string, OperationalCode>()
+  const map = new Map<string, ActiveOperationalDetail>()
   for (const row of rows) {
     if (!row.shift_id || !row.code) continue
-    map.set(row.shift_id, row.code)
+    map.set(row.shift_id, {
+      code: row.code,
+      note: row.note ?? null,
+      leftEarlyTime: row.left_early_time ?? null,
+    })
   }
 
   return map

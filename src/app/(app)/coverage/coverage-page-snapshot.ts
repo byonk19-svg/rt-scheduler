@@ -2,6 +2,7 @@ import type { RosterMemberRow } from '@/components/coverage/RosterScheduleView'
 import type { Role } from '@/lib/auth/roles'
 import type { CoverageRiskAlert } from '@/lib/coverage/proactive-risk'
 import type { CoverageScheduleCycleRow } from '@/lib/coverage/fetch-schedule-cycles'
+import type { ActiveOperationalDetail } from '@/lib/operational-codes'
 import type { DayItem, ShiftTab } from '@/lib/coverage/selectors'
 import type { ShiftStatus } from '@/lib/shift-types'
 
@@ -50,6 +51,7 @@ export type CoveragePageSnapshot = {
   rosterProfiles: RosterMemberRow[]
   rosterProfilesByShift: Record<'day' | 'night', RosterMemberRow[]>
   activeOpCodes: Record<string, string>
+  activeOperationalDetails: Record<string, ActiveOperationalDetail>
   dayDays: DayItem[]
   nightDays: DayItem[]
   proactiveCoverageRisk: CoverageRiskAlert | null
