@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  countPendingRequestRows,
   defaultRequestMessage,
   formatRequestShiftLabel,
+  isRequestVisibleInHistoryView,
+  isRequestVisibleInOpenView,
   mutateShiftPost,
   requestInitials,
   requestSlotKey,
@@ -25,6 +28,15 @@ describe('request workflow helpers', () => {
     expect(toRequestUiStatus('pending', '2026-04-26T11:59:59.000Z')).toBe('expired')
     expect(toRequestUiStatus('pending', '2026-04-27T18:00:00.000Z')).toBe('pending')
     expect(toRequestUiStatus('approved', '2026-04-20T12:00:00.000Z')).toBe('approved')
+    expect(isRequestVisibleInOpenView('pending', '2026-04-26T11:59:59.000Z')).toBe(false)
+    expect(isRequestVisibleInHistoryView('pending', '2026-04-26T11:59:59.000Z')).toBe(true)
+    expect(
+      countPendingRequestRows([
+        { status: 'pending', created_at: '2026-04-27T18:00:00.000Z' },
+        { status: 'pending', created_at: '2026-04-26T11:59:59.000Z' },
+        { status: 'approved', created_at: '2026-04-20T12:00:00.000Z' },
+      ])
+    ).toBe(1)
   })
 
   it('maps pickup interest states into the request status vocabulary', () => {
@@ -32,6 +44,12 @@ describe('request workflow helpers', () => {
     expect(toInterestRequestStatus('withdrawn')).toBe('withdrawn')
     expect(toInterestRequestStatus('declined')).toBe('denied')
     expect(toInterestRequestStatus('pending')).toBe('pending')
+    expect(
+      toInterestRequestStatus('pending', {
+        status: 'pending',
+        createdAt: '2026-04-26T11:59:59.000Z',
+      })
+    ).toBe('expired')
   })
 
   it('formats request defaults consistently', () => {

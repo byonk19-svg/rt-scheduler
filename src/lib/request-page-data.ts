@@ -2,6 +2,7 @@ import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import {
   formatRequestRelativeTime,
   formatRequestShiftLabel,
+  isRequestVisibleInOpenView,
   requestSlotKey,
   toInterestRequestStatus,
   toRequestUiStatus,
@@ -269,7 +270,15 @@ async function mapOpenRequests(params: {
         recipientResponse: row?.recipient_response ?? null,
         requestKind: row?.request_kind ?? 'standard',
         shift: shift ? formatRequestShiftLabel(shift.date, shift.shift_type) : 'Shift unavailable',
-        status: toInterestRequestStatus(interest.status),
+        status: toInterestRequestStatus(
+          interest.status,
+          row
+            ? {
+                status: row.status,
+                createdAt: row.created_at,
+              }
+            : null
+        ),
         createdAt: interest.created_at,
         swapWith: row?.posted_by ? (partnerById.get(row.posted_by) ?? null) : null,
         posted: formatRequestRelativeTime(interest.created_at),
@@ -277,14 +286,24 @@ async function mapOpenRequests(params: {
       } satisfies OpenRequest
     })
 
-  return [...mappedOpenRequests, ...interestOnlyRequests].sort((left, right) => {
-    const createdAtComparison = right.createdAt.localeCompare(left.createdAt)
-    if (createdAtComparison !== 0) {
-      return createdAtComparison
-    }
+  return [...mappedOpenRequests, ...interestOnlyRequests]
+    .filter((request) => {
+      if (request.involvement === 'interest') {
+        return request.status !== 'expired' && request.status !== 'withdrawn'
+      }
 
-    return right.id.localeCompare(left.id)
-  })
+      const sourceRow = postById.get(request.sourcePostId ?? request.id)
+      if (!sourceRow) return true
+      return isRequestVisibleInOpenView(sourceRow.status, sourceRow.created_at)
+    })
+    .sort((left, right) => {
+      const createdAtComparison = right.createdAt.localeCompare(left.createdAt)
+      if (createdAtComparison !== 0) {
+        return createdAtComparison
+      }
+
+      return right.id.localeCompare(left.id)
+    })
 }
 
 function formatRequestDate(isoDate: string) {

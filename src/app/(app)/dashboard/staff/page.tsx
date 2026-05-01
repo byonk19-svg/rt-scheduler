@@ -23,6 +23,7 @@ import {
   type TherapistWorkflowCycle,
   type TherapistWorkflowPreliminarySnapshot,
 } from '@/lib/therapist-workflow'
+import { countPendingRequestRows, type PersistedRequestStatus } from '@/lib/request-workflow'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { fetchMyPublishedUpcomingShifts } from '@/lib/staff-my-schedule'
@@ -162,7 +163,7 @@ export default async function StaffDashboardPage({
       : Promise.resolve({ data: [] }),
     supabase
       .from('shift_posts')
-      .select('id, status')
+      .select('id, status, created_at')
       .or(`posted_by.eq.${user.id},claimed_by.eq.${user.id}`),
   ])
 
@@ -182,7 +183,10 @@ export default async function StaffDashboardPage({
 
   const preliminarySnapshots =
     ((preliminarySnapshotsResult.data ?? []) as TherapistWorkflowPreliminarySnapshot[]) ?? []
-  const relevantShiftPosts = (relevantShiftPostsResult.data ?? []) as Array<{ status: string }>
+  const relevantShiftPosts = (relevantShiftPostsResult.data ?? []) as Array<{
+    status: PersistedRequestStatus
+    created_at: string
+  }>
 
   const workflow = resolveTherapistWorkflow({
     todayKey,
@@ -195,7 +199,7 @@ export default async function StaffDashboardPage({
       date: shift.date,
     })),
     relevantShiftPostSummary: {
-      pendingCount: relevantShiftPosts.filter((post) => post.status === 'pending').length,
+      pendingCount: countPendingRequestRows(relevantShiftPosts),
       totalCount: relevantShiftPosts.length,
     },
   })

@@ -2,6 +2,12 @@ import { toUiRole, type UiRole } from '@/lib/auth/roles'
 import { resolveCoverageCycle } from '@/lib/coverage/active-cycle'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import { sortPickupInterestCandidates } from '@/lib/pickup-interest-presentation'
+import {
+  countPendingRequestRows,
+  isRequestVisibleInHistoryView,
+  isRequestVisibleInOpenView,
+  toRequestUiStatus,
+} from '@/lib/request-workflow'
 import { buildDateRange, dateKeyFromDate } from '@/lib/schedule-helpers'
 import { canUserSeeShiftPost } from '@/lib/shift-post-visibility'
 
@@ -40,6 +46,11 @@ type ShiftPostInterestRow = {
   status: 'pending' | 'withdrawn' | 'selected' | 'declined'
   created_at: string
 }
+
+type PendingCountShiftPostRow = Pick<
+  ShiftPostRow,
+  'id' | 'posted_by' | 'claimed_by' | 'visibility' | 'status' | 'created_at'
+>
 
 type ShiftLookupRow = {
   id: string
@@ -126,8 +137,6 @@ export type ShiftBoardAuthorizedSnapshot = {
 
 export type ShiftBoardSnapshot = { unauthorized: true } | ShiftBoardAuthorizedSnapshot
 
-const HISTORY_STATUSES: ShiftBoardRequestStatus[] = ['approved', 'denied', 'expired', 'withdrawn']
-
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return 'TM'
@@ -168,22 +177,6 @@ function countsTowardCoverage(status: ShiftBoardShiftStatus): boolean {
   return status === 'scheduled'
 }
 
-function isOlderThanHours(value: string, hours: number): boolean {
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return false
-  return Date.now() - parsed.getTime() >= hours * 60 * 60 * 1000
-}
-
-function toUiStatus(
-  status: ShiftBoardPersistedRequestStatus,
-  createdAt: string
-): ShiftBoardRequestStatus {
-  if (status === 'pending' && isOlderThanHours(createdAt, 48)) {
-    return 'expired'
-  }
-  return status
-}
-
 export async function loadShiftBoardSnapshot({
   supabase,
   tab,
@@ -213,10 +206,9 @@ export async function loadShiftBoardSnapshot({
     .order('id', { ascending: false })
 
   if (tab === 'open') {
-    postsQuery = postsQuery.neq('status', 'expired')
     postsQuery = postsQuery.neq('status', 'withdrawn')
   } else {
-    postsQuery = postsQuery.in('status', HISTORY_STATUSES).limit(50)
+    postsQuery = postsQuery.limit(100)
   }
 
   const [therapistsResult, profileResult, cyclesResult, pendingPostsResult, postsResult] =
@@ -239,7 +231,7 @@ export async function loadShiftBoardSnapshot({
         .limit(24),
       supabase
         .from('shift_posts')
-        .select('id', { head: true, count: 'exact' })
+        .select('id, posted_by, claimed_by, visibility, status, created_at')
         .eq('status', 'pending'),
       postsQuery,
     ])
@@ -247,7 +239,6 @@ export async function loadShiftBoardSnapshot({
   const profile = (profileResult.data ?? null) as ShiftBoardProfileLookupRow | null
   const role = toUiRole(profile?.role)
   const therapists = (therapistsResult.data ?? []) as ShiftBoardProfileLookupRow[]
-  const pendingCount = pendingPostsResult.count ?? 0
 
   const cycles = (cyclesResult.data ?? []) as CycleRow[]
   const activeCycle = resolveCoverageCycle({
@@ -368,6 +359,11 @@ export async function loadShiftBoardSnapshot({
 
   const visiblePostRows = postRows
     .filter((row) => canUserSeeShiftPost(row, user.id, role))
+    .filter((row) =>
+      tab === 'open'
+        ? isRequestVisibleInOpenView(row.status, row.created_at)
+        : isRequestVisibleInHistoryView(row.status, row.created_at)
+    )
     .sort((left, right) => {
       const createdAtComparison = right.created_at.localeCompare(left.created_at)
       if (createdAtComparison !== 0) {
@@ -383,6 +379,11 @@ export async function loadShiftBoardSnapshot({
     bucket.push(row)
     interestsByPostId.set(row.shift_post_id, bucket)
   }
+
+  const pendingVisiblePostRows = ((pendingPostsResult.data ?? []) as PendingCountShiftPostRow[])
+    .filter((row) => canUserSeeShiftPost(row, user.id, role))
+    .filter((row) => isRequestVisibleInOpenView(row.status, row.created_at))
+  const pendingCount = countPendingRequestRows(pendingVisiblePostRows)
 
   const requests = visiblePostRows.map((row) => {
     const shift = row.shift_id ? shiftsById.get(row.shift_id) : null
@@ -419,7 +420,7 @@ export async function loadShiftBoardSnapshot({
       shiftDate: shift?.date ?? null,
       shiftId: row.shift_id ?? null,
       message: row.message,
-      status: toUiStatus(row.status, row.created_at),
+      status: toRequestUiStatus(row.status, row.created_at) as ShiftBoardRequestStatus,
       posted: formatRelativeTime(row.created_at),
       postedAt: row.created_at,
       swapWithName: row.claimed_by ? (namesById.get(row.claimed_by) ?? null) : null,

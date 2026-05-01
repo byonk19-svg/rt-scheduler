@@ -8,6 +8,12 @@ import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { getOne } from '@/lib/csv-utils'
 import { getPickupInterestTherapistCopy } from '@/lib/pickup-interest-presentation'
+import {
+  type PersistedRequestStatus,
+  toInterestRequestStatus,
+  toRequestUiStatus,
+  type RequestStatus,
+} from '@/lib/request-workflow'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
@@ -23,7 +29,7 @@ type HistorySearchParams = {
 
 type ShiftPostHistoryRow = {
   id: string
-  status: string
+  status: PersistedRequestStatus
   visibility: 'team' | 'direct' | null
   recipient_response: 'pending' | 'accepted' | 'declined' | null
   request_kind: 'standard' | 'call_in' | null
@@ -63,7 +69,7 @@ type HistoryItem = {
     | 'Primary claimant'
     | 'Backup interest'
   partnerName: string | null
-  status: string
+  status: RequestStatus
   visibilityLabel: 'Direct' | 'Team'
   requestKind: 'standard' | 'call_in'
   recipientResponse: 'pending' | 'accepted' | 'declined' | null
@@ -75,7 +81,7 @@ function getSearchParam(value: string | string[] | undefined): string | undefine
   return value
 }
 
-function statusChipMeta(status: string): {
+function statusChipMeta(status: RequestStatus): {
   label: string
   color: string
   bg: string
@@ -274,7 +280,7 @@ export default async function StaffSwapHistoryPage({
         shiftType: shift?.shift_type ?? null,
         roleLabel,
         partnerName: iPosted ? (claimer?.full_name ?? null) : (poster?.full_name ?? null),
-        status: row.status,
+        status: toRequestUiStatus(row.status, row.created_at),
         visibilityLabel,
         requestKind: row.request_kind ?? 'standard',
         recipientResponse: row.recipient_response ?? null,
@@ -286,9 +292,18 @@ export default async function StaffSwapHistoryPage({
       .map<HistoryItem>((row) => {
         const post = postById.get(row.shift_post_id) ?? null
         const shift = getOne(post?.shifts) as { date: string; shift_type: string } | null
+        const status = toInterestRequestStatus(
+          row.status,
+          post
+            ? {
+                status: post.status,
+                createdAt: post.created_at,
+              }
+            : null
+        )
         const pickupInterestCopy =
-          row.status === 'selected' || row.status === 'pending'
-            ? getPickupInterestTherapistCopy(row.status)
+          status === 'selected' || status === 'pending'
+            ? getPickupInterestTherapistCopy(status === 'selected' ? 'selected' : 'pending')
             : null
         const visibilityLabel: HistoryItem['visibilityLabel'] =
           post?.visibility === 'direct' ? 'Direct' : 'Team'
@@ -300,14 +315,7 @@ export default async function StaffSwapHistoryPage({
           shiftType: shift?.shift_type ?? null,
           roleLabel: pickupInterestCopy?.roleLabel ?? 'Interested',
           partnerName: post?.posted_by ? (postedByNames.get(post.posted_by) ?? null) : null,
-          status:
-            row.status === 'selected'
-              ? 'selected'
-              : row.status === 'withdrawn'
-                ? 'withdrawn'
-                : row.status === 'declined'
-                  ? 'denied'
-                  : 'pending',
+          status,
           visibilityLabel,
           requestKind: post?.request_kind ?? 'standard',
           recipientResponse: post?.recipient_response ?? null,

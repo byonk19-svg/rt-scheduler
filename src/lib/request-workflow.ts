@@ -8,6 +8,9 @@ export type RequestVisibility = 'team' | 'direct'
 export type RecipientResponse = 'pending' | 'accepted' | 'declined'
 export type RequestKind = 'standard' | 'call_in'
 
+export const REQUEST_EXPIRATION_HOURS = 48
+export const REQUEST_HISTORY_STATUSES = ['approved', 'denied', 'expired', 'withdrawn'] as const
+
 export type RequestShiftRow = {
   id: string
   date: string
@@ -82,16 +85,47 @@ export function toRequestUiStatus(
   status: PersistedRequestStatus,
   createdAt: string
 ): RequestStatus {
-  if (status === 'pending' && isRequestOlderThanHours(createdAt, 48)) {
+  if (status === 'pending' && isRequestOlderThanHours(createdAt, REQUEST_EXPIRATION_HOURS)) {
     return 'expired'
   }
   return status
 }
 
-export function toInterestRequestStatus(status: InterestStatus): RequestStatus {
+export function isRequestVisibleInOpenView(
+  status: PersistedRequestStatus,
+  createdAt: string
+): boolean {
+  const uiStatus = toRequestUiStatus(status, createdAt)
+  return uiStatus !== 'expired' && uiStatus !== 'withdrawn'
+}
+
+export function isRequestVisibleInHistoryView(
+  status: PersistedRequestStatus,
+  createdAt: string
+): boolean {
+  const uiStatus = toRequestUiStatus(status, createdAt)
+  return REQUEST_HISTORY_STATUSES.includes(uiStatus as (typeof REQUEST_HISTORY_STATUSES)[number])
+}
+
+export function countPendingRequestRows<
+  TRow extends { status: PersistedRequestStatus; created_at: string },
+>(rows: TRow[]): number {
+  return rows.filter((row) => toRequestUiStatus(row.status, row.created_at) === 'pending').length
+}
+
+export function toInterestRequestStatus(
+  status: InterestStatus,
+  requestContext?: { status: PersistedRequestStatus; createdAt: string } | null
+): RequestStatus {
   if (status === 'selected') return 'selected'
   if (status === 'withdrawn') return 'withdrawn'
   if (status === 'declined') return 'denied'
+  const requestStatus = requestContext
+    ? toRequestUiStatus(requestContext.status, requestContext.createdAt)
+    : null
+  if (requestStatus === 'expired' || requestStatus === 'withdrawn') {
+    return requestStatus
+  }
   return 'pending'
 }
 

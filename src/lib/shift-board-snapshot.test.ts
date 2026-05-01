@@ -1,8 +1,29 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { loadShiftBoardSnapshot } from '@/lib/shift-board-snapshot'
 
-function makeSupabaseMock() {
+type ShiftPostFixture = {
+  id: string
+  shift_id: string | null
+  posted_by: string | null
+  claimed_by: string | null
+  visibility: 'team' | 'direct' | null
+  recipient_response: 'pending' | 'accepted' | 'declined' | null
+  request_kind?: 'standard' | 'call_in' | null
+  message: string
+  type: 'swap' | 'pickup'
+  status: 'pending' | 'approved' | 'denied' | 'expired' | 'withdrawn'
+  created_at: string
+  override_reason: string | null
+}
+
+function makeSupabaseMock({
+  posts,
+  pendingPosts = posts.filter((post) => post.status === 'pending'),
+}: {
+  posts: ShiftPostFixture[]
+  pendingPosts?: ShiftPostFixture[]
+}) {
   return {
     auth: {
       getUser: async () => ({ data: { user: { id: 'therapist-1' } } }),
@@ -51,9 +72,15 @@ function makeSupabaseMock() {
 
       if (table === 'shift_posts') {
         const builder = {
-          select() {
+          select(columns?: string) {
+            if (columns?.includes('message')) {
+              builder.__mode = 'posts'
+            } else {
+              builder.__mode = 'pending'
+            }
             return builder
           },
+          __mode: 'posts' as 'posts' | 'pending',
           order() {
             return builder
           },
@@ -67,52 +94,15 @@ function makeSupabaseMock() {
             return builder
           },
           eq() {
-            return Promise.resolve({ count: 0, data: [], error: null })
+            return Promise.resolve({
+              data: builder.__mode === 'pending' ? pendingPosts : posts,
+              error: null,
+            })
           },
           then(resolve: (value: unknown) => unknown) {
             return Promise.resolve(
               resolve({
-                data: [
-                  {
-                    id: 'team-2',
-                    shift_id: null,
-                    posted_by: 'other-2',
-                    claimed_by: null,
-                    visibility: 'team',
-                    recipient_response: null,
-                    message: 'Open pickup second',
-                    type: 'pickup',
-                    status: 'pending',
-                    created_at: '2026-04-24T12:00:00.000Z',
-                    override_reason: null,
-                  },
-                  {
-                    id: 'team-1',
-                    shift_id: null,
-                    posted_by: 'other-1',
-                    claimed_by: null,
-                    visibility: 'team',
-                    recipient_response: null,
-                    message: 'Open pickup',
-                    type: 'pickup',
-                    status: 'pending',
-                    created_at: '2026-04-24T12:00:00.000Z',
-                    override_reason: null,
-                  },
-                  {
-                    id: 'direct-1',
-                    shift_id: null,
-                    posted_by: 'other-1',
-                    claimed_by: 'recipient-1',
-                    visibility: 'direct',
-                    recipient_response: 'pending',
-                    message: 'Private request',
-                    type: 'swap',
-                    status: 'pending',
-                    created_at: '2026-04-24T12:00:00.000Z',
-                    override_reason: null,
-                  },
-                ],
+                data: builder.__mode === 'pending' ? pendingPosts : posts,
                 error: null,
               })
             )
@@ -185,14 +175,148 @@ function makeSupabaseMock() {
 }
 
 describe('loadShiftBoardSnapshot', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-04-28T12:00:00.000Z'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('hides direct requests from unrelated therapists on the shared board', async () => {
     const snapshot = await loadShiftBoardSnapshot({
-      supabase: makeSupabaseMock(),
+      supabase: makeSupabaseMock({
+        posts: [
+          {
+            id: 'team-2',
+            shift_id: null,
+            posted_by: 'other-2',
+            claimed_by: null,
+            visibility: 'team',
+            recipient_response: null,
+            message: 'Open pickup second',
+            type: 'pickup',
+            status: 'pending',
+            created_at: '2026-04-27T12:00:00.000Z',
+            override_reason: null,
+          },
+          {
+            id: 'team-1',
+            shift_id: null,
+            posted_by: 'other-1',
+            claimed_by: null,
+            visibility: 'team',
+            recipient_response: null,
+            message: 'Open pickup',
+            type: 'pickup',
+            status: 'pending',
+            created_at: '2026-04-27T11:00:00.000Z',
+            override_reason: null,
+          },
+          {
+            id: 'direct-1',
+            shift_id: null,
+            posted_by: 'other-1',
+            claimed_by: 'recipient-1',
+            visibility: 'direct',
+            recipient_response: 'pending',
+            message: 'Private request',
+            type: 'swap',
+            status: 'pending',
+            created_at: '2026-04-27T10:00:00.000Z',
+            override_reason: null,
+          },
+        ],
+      }),
       tab: 'open',
     })
 
     expect(snapshot.unauthorized).toBe(false)
     if (snapshot.unauthorized) return
     expect(snapshot.requests.map((request) => request.id)).toEqual(['team-2', 'team-1'])
+  })
+
+  it('removes UI-expired pending requests from the open board and pending count', async () => {
+    const snapshot = await loadShiftBoardSnapshot({
+      supabase: makeSupabaseMock({
+        posts: [
+          {
+            id: 'recent-pending',
+            shift_id: null,
+            posted_by: 'other-1',
+            claimed_by: null,
+            visibility: 'team',
+            recipient_response: null,
+            message: 'Still open',
+            type: 'pickup',
+            status: 'pending',
+            created_at: '2026-04-27T18:00:00.000Z',
+            override_reason: null,
+          },
+          {
+            id: 'old-pending',
+            shift_id: null,
+            posted_by: 'other-2',
+            claimed_by: null,
+            visibility: 'team',
+            recipient_response: null,
+            message: 'Should expire',
+            type: 'pickup',
+            status: 'pending',
+            created_at: '2026-04-26T11:59:59.000Z',
+            override_reason: null,
+          },
+        ],
+      }),
+      tab: 'open',
+    })
+
+    expect(snapshot.unauthorized).toBe(false)
+    if (snapshot.unauthorized) return
+    expect(snapshot.requests.map((request) => request.id)).toEqual(['recent-pending'])
+    expect(snapshot.pendingCount).toBe(1)
+  })
+
+  it('routes UI-expired pending requests into history as expired', async () => {
+    const snapshot = await loadShiftBoardSnapshot({
+      supabase: makeSupabaseMock({
+        posts: [
+          {
+            id: 'recent-pending',
+            shift_id: null,
+            posted_by: 'other-1',
+            claimed_by: null,
+            visibility: 'team',
+            recipient_response: null,
+            message: 'Still open',
+            type: 'pickup',
+            status: 'pending',
+            created_at: '2026-04-27T18:00:00.000Z',
+            override_reason: null,
+          },
+          {
+            id: 'old-pending',
+            shift_id: null,
+            posted_by: 'other-2',
+            claimed_by: null,
+            visibility: 'team',
+            recipient_response: null,
+            message: 'Should expire',
+            type: 'pickup',
+            status: 'pending',
+            created_at: '2026-04-26T11:59:59.000Z',
+            override_reason: null,
+          },
+        ],
+      }),
+      tab: 'history',
+    })
+
+    expect(snapshot.unauthorized).toBe(false)
+    if (snapshot.unauthorized) return
+    expect(snapshot.requests.map((request) => [request.id, request.status])).toEqual([
+      ['old-pending', 'expired'],
+    ])
   })
 })

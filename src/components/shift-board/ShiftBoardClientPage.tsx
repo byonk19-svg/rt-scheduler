@@ -297,8 +297,7 @@ export default function ShiftBoardClientPage({
 
       if (
         activeTab === 'open' &&
-        (request.status === 'expired' || request.status === 'withdrawn') &&
-        statusFilter !== 'all'
+        (request.status === 'expired' || request.status === 'withdrawn')
       ) {
         return false
       }

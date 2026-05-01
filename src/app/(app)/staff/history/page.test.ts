@@ -24,7 +24,10 @@ describe('staff history page', () => {
   it('includes pickup-interest lifecycle statuses in history rows', () => {
     expect(source).toContain("case 'selected'")
     expect(source).toContain("case 'withdrawn'")
-    expect(source).toContain('getPickupInterestTherapistCopy(row.status)')
+    expect(source).toContain('const status = toInterestRequestStatus(')
+    expect(source).toContain(
+      "getPickupInterestTherapistCopy(status === 'selected' ? 'selected' : 'pending')"
+    )
   })
 
   it('keeps merged history rows sorted deterministically when timestamps match', () => {

@@ -13,6 +13,44 @@ afterEach(() => {
 })
 
 function createSupabaseMock() {
+  const requestRows = [
+    {
+      id: 'post-1',
+      type: 'pickup',
+      status: 'pending',
+      recipient_response: null,
+      request_kind: 'standard',
+      created_at: '2026-04-28T12:00:00.000Z',
+      shift_id: 'shift-1',
+      posted_by: 'therapist-1',
+      claimed_by: null,
+      visibility: 'team',
+      message: 'Need coverage',
+    },
+    {
+      id: 'post-expired',
+      type: 'pickup',
+      status: 'pending',
+      recipient_response: null,
+      request_kind: 'standard',
+      created_at: '2026-04-26T11:59:59.000Z',
+      shift_id: 'shift-1',
+      posted_by: 'therapist-1',
+      claimed_by: null,
+      visibility: 'team',
+      message: 'Old coverage request',
+    },
+  ]
+  const interestRows = [
+    {
+      id: 'interest-expired',
+      shift_post_id: 'interest-post-expired',
+      therapist_id: 'therapist-1',
+      status: 'pending',
+      created_at: '2026-04-28T11:00:00.000Z',
+    },
+  ]
+
   const shiftQuery = {
     eq(column: string) {
       if (column === 'user_id') {
@@ -92,21 +130,6 @@ function createSupabaseMock() {
       }
 
       if (table === 'shift_posts') {
-        const baseRows = [
-          {
-            id: 'post-1',
-            type: 'pickup',
-            status: 'pending',
-            recipient_response: null,
-            request_kind: 'standard',
-            created_at: '2026-04-28T12:00:00.000Z',
-            shift_id: 'shift-1',
-            posted_by: 'therapist-1',
-            claimed_by: null,
-            visibility: 'team',
-            message: 'Need coverage',
-          },
-        ]
         return {
           select() {
             return {
@@ -114,12 +137,29 @@ function createSupabaseMock() {
                 return {
                   order() {
                     return {
-                      order: async () => ({ data: baseRows, error: null }),
+                      order: async () => ({ data: requestRows, error: null }),
                     }
                   },
                 }
               },
-              in: async () => ({ data: [], error: null }),
+              in: async () => ({
+                data: [
+                  {
+                    id: 'interest-post-expired',
+                    type: 'pickup',
+                    status: 'pending',
+                    recipient_response: null,
+                    request_kind: 'standard',
+                    created_at: '2026-04-26T11:59:59.000Z',
+                    shift_id: 'shift-1',
+                    posted_by: 'therapist-2',
+                    claimed_by: null,
+                    visibility: 'team',
+                    message: 'Expired interest source',
+                  },
+                ],
+                error: null,
+              }),
             }
           },
         }
@@ -133,7 +173,7 @@ function createSupabaseMock() {
                 return {
                   order() {
                     return {
-                      order: async () => ({ data: [], error: null }),
+                      order: async () => ({ data: interestRows, error: null }),
                     }
                   },
                 }
@@ -183,6 +223,14 @@ describe('request page data', () => {
     expect(snapshot?.myShifts).toHaveLength(1)
     expect(snapshot?.myOpenRequests.map((request) => request.message)).toEqual(['Need coverage'])
     expect(snapshot?.leadCountsBySlot).toEqual({ '2026-05-01:day': 1 })
+  })
+
+  it('hides UI-expired pending requests and expired pickup interests from My Requests', async () => {
+    const snapshot = await loadRequestPageSnapshot(createSupabaseMock(), '2026-04-28')
+
+    expect(snapshot).not.toBeNull()
+    expect(snapshot?.myOpenRequests.map((request) => request.id)).toEqual(['post-1'])
+    expect(snapshot?.myOpenRequests.map((request) => request.status)).toEqual(['pending'])
   })
 
   it('filters eligible direct-request teammates by shift and lead requirement', async () => {
