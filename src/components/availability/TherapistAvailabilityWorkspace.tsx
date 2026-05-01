@@ -35,6 +35,7 @@ type Props = {
   availabilityRows: AvailabilityEntryTableRow[]
   conflicts?: ConflictItem[]
   initialCycleId: string
+  hasSavedRecurringPattern: boolean
   recurringPatternSummary: string
   generatedBaselineByCycleId: Record<string, Record<string, GeneratedAvailabilityBaselineDay>>
   /** Official submission timestamps from therapist_availability_submissions (not inferred from overrides). */
@@ -160,6 +161,7 @@ export function TherapistAvailabilityWorkspace({
   availabilityRows,
   conflicts = [],
   initialCycleId,
+  hasSavedRecurringPattern,
   recurringPatternSummary,
   generatedBaselineByCycleId,
   submissionsByCycleId,
@@ -289,11 +291,6 @@ export function TherapistAvailabilityWorkspace({
       submissionUi
     )
   }, [selectedCycle, submissionUi])
-
-  const hasRecurringPattern = useMemo(
-    () => Object.values(baselineByDate).some((day) => day.baselineSource === 'recurring_pattern'),
-    [baselineByDate]
-  )
 
   function getBaselineStatus(date: string): 'available' | 'off' | 'neutral' {
     return baselineByDate[date]?.baselineStatus ?? 'neutral'
@@ -511,7 +508,7 @@ export function TherapistAvailabilityWorkspace({
                 </p>
                 <p className="text-lg font-semibold text-foreground">{recurringPatternSummary}</p>
                 <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                  {hasRecurringPattern
+                  {hasSavedRecurringPattern
                     ? 'We used your normal schedule to fill this cycle. Changes here stay in this cycle only.'
                     : "This cycle starts blank. Add the days you can or can't work. Changes here stay in this cycle only."}
                 </p>
@@ -520,7 +517,7 @@ export function TherapistAvailabilityWorkspace({
 
             <Button asChild variant="outline" size="sm" className="min-h-11 px-4">
               <Link href="/therapist/recurring-pattern">
-                {hasRecurringPattern ? 'Edit recurring pattern' : 'Set recurring pattern'}
+                {hasSavedRecurringPattern ? 'Edit recurring pattern' : 'Set recurring pattern'}
               </Link>
             </Button>
           </div>

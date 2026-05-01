@@ -43,6 +43,7 @@ describe('TherapistAvailabilityWorkspace', () => {
         ],
         conflicts: [],
         initialCycleId: 'cycle-1',
+        hasSavedRecurringPattern: true,
         recurringPatternSummary:
           'Works Mon, Tue, Thu, Fri. Every other weekend starting May 2, 2026.',
         generatedBaselineByCycleId: {
@@ -122,6 +123,7 @@ describe('TherapistAvailabilityWorkspace', () => {
         availabilityRows: [],
         conflicts: [{ date: '2026-04-20', shiftType: 'day' }],
         initialCycleId: 'cycle-1',
+        hasSavedRecurringPattern: false,
         recurringPatternSummary: 'No normal schedule saved yet.',
         generatedBaselineByCycleId: { 'cycle-1': {} },
         submissionsByCycleId: {},
@@ -149,6 +151,7 @@ describe('TherapistAvailabilityWorkspace', () => {
         availabilityRows: [],
         conflicts: [],
         initialCycleId: 'cycle-1',
+        hasSavedRecurringPattern: false,
         recurringPatternSummary: 'No normal schedule saved yet.',
         generatedBaselineByCycleId: { 'cycle-1': {} },
         submissionsByCycleId: {},
@@ -162,6 +165,45 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).not.toContain('Not set')
     expect(html).not.toContain('Normal off day')
     expect(html).not.toContain('Request to Work')
+  })
+
+  it('keeps blank-start copy when onboarding only saved never-work blocks', () => {
+    const html = renderToStaticMarkup(
+      createElement(TherapistAvailabilityWorkspace, {
+        cycles: [
+          {
+            id: 'cycle-1',
+            label: 'May 2026',
+            start_date: '2026-05-03',
+            end_date: '2026-05-09',
+            published: false,
+          },
+        ],
+        availabilityRows: [],
+        conflicts: [],
+        initialCycleId: 'cycle-1',
+        hasSavedRecurringPattern: false,
+        recurringPatternSummary: 'No normal schedule saved yet.',
+        generatedBaselineByCycleId: {
+          'cycle-1': {
+            '2026-05-04': {
+              baselineStatus: 'off',
+              baselineSource: 'recurring_pattern',
+              reason: 'blocked_offs_dow',
+            },
+          },
+        },
+        submissionsByCycleId: {},
+        submitTherapistAvailabilityGridAction: async () => {},
+      })
+    )
+
+    expect(html).toContain('No normal schedule saved yet.')
+    expect(html).toContain('This cycle starts blank.')
+    expect(html).toContain('Add the days you can or can&#x27;t work.')
+    expect(html).toContain('Set recurring pattern')
+    expect(html).not.toContain('Edit recurring pattern')
+    expect(html).not.toContain('We used your normal schedule to fill this cycle.')
   })
 
   it('keeps neutral grid cells unlabeled and documents note persistence (source)', () => {
