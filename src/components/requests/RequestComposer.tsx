@@ -1,6 +1,7 @@
 import { AlertCircle, ChevronLeft, Star } from 'lucide-react'
 
 import type { MyShift, TeamMember } from '@/components/requests/request-page-model'
+import { getRequestComposerDisplayState } from '@/components/requests/request-composer-steps'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { RequestType, RequestVisibility } from '@/lib/request-workflow'
@@ -58,6 +59,8 @@ export function RequestComposer({
   onSubmit,
   onSwapWithChange,
 }: RequestComposerProps) {
+  const stepState = getRequestComposerDisplayState(requestVisibility, step)
+  const reviewStep = stepState.steps.find((item) => item.id === 3) ?? stepState.currentStep
   const canContinue =
     step === 1
       ? selectedShift !== null
@@ -86,24 +89,36 @@ export function RequestComposer({
               <ChevronLeft className="mr-1 h-3.5 w-3.5" />
               Back
             </Button>
-            <div className="flex items-center gap-2">
-              {([1, 2, 3] as const).map((n) => (
-                <span
-                  key={n}
-                  className={cn(
-                    'flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold',
-                    step >= n
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-border bg-card text-muted-foreground'
-                  )}
-                >
-                  {n}
-                </span>
+            <div className="flex flex-wrap items-center gap-3">
+              {stepState.steps.map((item) => (
+                <div key={item.id} className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      'flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold',
+                      stepState.currentStep.displayStep >= item.displayStep
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-border bg-card text-muted-foreground'
+                    )}
+                    aria-current={stepState.currentStep.id === item.id ? 'step' : undefined}
+                  >
+                    {item.displayStep}
+                  </span>
+                  <span
+                    className={cn(
+                      'text-xs font-semibold',
+                      stepState.currentStep.id === item.id
+                        ? 'text-foreground'
+                        : 'text-muted-foreground'
+                    )}
+                  >
+                    {item.label}
+                  </span>
+                </div>
               ))}
             </div>
           </div>
           <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Step {step} of 3
+            Step {stepState.currentStep.displayStep} of {stepState.totalSteps}
           </span>
         </div>
         <p className="mt-3 text-sm font-semibold text-foreground">Create request</p>
@@ -169,8 +184,8 @@ export function RequestComposer({
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {requestVisibility === 'direct'
-                    ? 'Direct requests stay private between you, the selected teammate, and managers.'
-                    : 'Team board requests are visible to the full published-schedule board.'}
+                    ? 'Direct requests add a teammate step and stay private between you, the selected teammate, and managers.'
+                    : 'Team board requests skip teammate selection and post to the shared board after review.'}
                 </p>
               </div>
 
@@ -227,7 +242,7 @@ export function RequestComposer({
           {step === 2 ? (
             <div className="space-y-4">
               <div>
-                <p className="text-sm font-bold text-foreground">Step 2: Choose teammate</p>
+                <p className="text-sm font-bold text-foreground">{stepState.currentStepTitle}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Team members are filtered by shift type
                   {selectedShiftRequiresLeadEligibleReplacement ? ' and lead eligibility' : ''}.
@@ -305,9 +320,11 @@ export function RequestComposer({
           {step === 3 ? (
             <div className="space-y-4">
               <div>
-                <p className="text-sm font-bold text-foreground">Step 3: Final message</p>
+                <p className="text-sm font-bold text-foreground">
+                  Step {reviewStep.displayStep}: {reviewStep.label}
+                </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Add context before posting your request.
+                  Review your request and add context before posting.
                 </p>
               </div>
 

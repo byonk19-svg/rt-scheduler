@@ -27,8 +27,19 @@ describe('requests composer route source contract', () => {
     expect(composerSource).toContain('selectedShift !== null')
     expect(composerSource).toContain("requestVisibility !== 'direct' || swapWith !== null")
     expect(composerSource).toContain('disabled={!canContinue}')
+    expect(composerSource).toContain('getRequestComposerDisplayState')
+    expect(composerSource).toContain(
+      'Step {stepState.currentStep.displayStep} of {stepState.totalSteps}'
+    )
+    expect(composerSource).toContain(
+      'Direct requests add a teammate step and stay private between you, the selected teammate, and managers.'
+    )
+    expect(composerSource).toContain(
+      'Team board requests skip teammate selection and post to the shared board after review.'
+    )
     expect(composerSource).toContain(
       'This shift does not have an eligible direct-swap teammate right now.'
     )
+    expect(historySource).toContain('Team board requests go to the shared board after review.')
   })
 })

@@ -69,8 +69,8 @@ export function RequestsHistoryView({
       <div className="rounded-xl border border-border bg-card px-4 py-3">
         <p className="text-xs font-semibold text-foreground">How requests work</p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Submit a swap or pickup request and your manager will review it. Check this page for
-          status updates.
+          Team board requests go to the shared board after review. Direct requests go to one
+          teammate first, then managers. Check this page for status updates.
         </p>
       </div>
 
