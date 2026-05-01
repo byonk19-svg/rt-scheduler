@@ -81,4 +81,33 @@ describe('AvailabilityStatusSummary', () => {
     expect(html).toContain('max-h-[420px]')
     expect(html).not.toMatch(/flex-1.*overflow-y-auto|overflow-y-auto.*flex-1/)
   })
+
+  it('highlights the selected planner therapist and exposes a missing-response jump action', () => {
+    const html = renderToStaticMarkup(
+      createElement(AvailabilityStatusSummary, {
+        submittedRows: [
+          {
+            therapistId: 'submitted-1',
+            therapistName: 'Adrienne S.',
+            overridesCount: 2,
+            lastUpdatedAt: '2026-03-15T12:00:00.000Z',
+          },
+        ],
+        missingRows: [
+          {
+            therapistId: 'missing-1',
+            therapistName: 'Layne P.',
+            overridesCount: 0,
+            lastUpdatedAt: null,
+          },
+        ],
+        selectedTherapistId: 'missing-1',
+      })
+    )
+
+    expect(html).toContain('Active in planner')
+    expect(html).toContain('Focus missing responders')
+    expect(html).toContain('Review next')
+    expect(html).toContain('aria-current="true"')
+  })
 })

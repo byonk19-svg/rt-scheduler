@@ -12,6 +12,7 @@ type TestContext = {
   therapist: { id: string; fullName: string }
   prnTherapist: { id: string; fullName: string }
   cycle: { id: string; startDate: string; endDate: string }
+  secondCycle: { id: string; startDate: string; endDate: string }
   therapistWillWorkDate: string
   therapistCannotWorkDate: string
   prnWillWorkDate: string
@@ -23,6 +24,25 @@ function formatCalendarLabel(isoDate: string): string {
     day: 'numeric',
     year: 'numeric',
   })
+}
+
+function monthStartKey(isoDate: string): string {
+  return `${isoDate.slice(0, 7)}-01`
+}
+
+async function selectCalendarDay(root: Locator, isoDate: string) {
+  const target = root.getByRole('button', { name: formatCalendarLabel(isoDate) })
+  const nextMonthButton = root.getByRole('button', { name: 'Next month' })
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (await target.isVisible()) {
+      await target.click()
+      return
+    }
+    await nextMonthButton.click()
+  }
+
+  throw new Error(`Could not find calendar day button for ${isoDate}.`)
 }
 
 async function createCycle(supabase: SupabaseClient) {
@@ -55,6 +75,7 @@ test.describe.serial('/availability manager planner', () => {
   test.setTimeout(90_000)
   let ctx: TestContext | null = null
   const createdUserIds: string[] = []
+  const createdCycleIds: string[] = []
 
   test.beforeAll(async () => {
     const supabase = createServiceRoleClientOrNull()
@@ -105,12 +126,25 @@ test.describe.serial('/availability manager planner', () => {
     })
 
     const cycle = await createCycle(supabase)
+    const secondCycle = await createCycle(supabase)
     const cycleStartDate = new Date(`${cycle.startDate}T00:00:00`)
     const therapistWillWorkDate = formatDateKey(addDays(cycleStartDate, 2))
     const therapistCannotWorkDate = formatDateKey(addDays(cycleStartDate, 4))
     const prnWillWorkDate = formatDateKey(addDays(cycleStartDate, 3))
 
     createdUserIds.push(manager.id, leadTherapist.id, therapist.id, prnTherapist.id)
+    createdCycleIds.push(cycle.id, secondCycle.id)
+    const submissionInsert = await supabase.from('therapist_availability_submissions').insert({
+      therapist_id: therapist.id,
+      schedule_cycle_id: cycle.id,
+      submitted_at: new Date().toISOString(),
+      last_edited_at: new Date().toISOString(),
+    })
+
+    if (submissionInsert.error) {
+      throw new Error(`Could not seed planner submission state: ${submissionInsert.error.message}`)
+    }
+
     ctx = {
       supabase,
       manager: { id: manager.id, email: managerEmail, password: managerPassword },
@@ -118,6 +152,7 @@ test.describe.serial('/availability manager planner', () => {
       therapist: { id: therapist.id, fullName: therapistFullName },
       prnTherapist: { id: prnTherapist.id, fullName: prnFullName },
       cycle,
+      secondCycle,
       therapistWillWorkDate,
       therapistCannotWorkDate,
       prnWillWorkDate,
@@ -126,12 +161,70 @@ test.describe.serial('/availability manager planner', () => {
 
   test.afterAll(async () => {
     if (!ctx) return
-    await ctx.supabase.from('availability_overrides').delete().eq('cycle_id', ctx.cycle.id)
-    await ctx.supabase.from('shifts').delete().eq('cycle_id', ctx.cycle.id)
-    await ctx.supabase.from('schedule_cycles').delete().eq('id', ctx.cycle.id)
+    await ctx.supabase.from('availability_overrides').delete().in('cycle_id', createdCycleIds)
+    await ctx.supabase.from('shifts').delete().in('cycle_id', createdCycleIds)
+    await ctx.supabase
+      .from('therapist_availability_submissions')
+      .delete()
+      .in('schedule_cycle_id', createdCycleIds)
+    await ctx.supabase.from('schedule_cycles').delete().in('id', createdCycleIds)
     for (const userId of createdUserIds) {
       await ctx.supabase.auth.admin.deleteUser(userId)
     }
+  })
+
+  test('manager can focus a missing responder from the roster and switch cycles without a hard reload', async ({
+    page,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    await loginAs(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto(
+      `/availability?tab=planner&cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}`,
+      {
+        waitUntil: 'networkidle',
+      }
+    )
+
+    await expect(page.getByRole('heading', { name: 'Availability Planning' })).toBeVisible({
+      timeout: 20_000,
+    })
+    await expect(page.locator('#planner_therapist_id')).toHaveValue(ctx!.therapist.id)
+    await expect(page.locator('#planner_cycle_id')).toHaveValue(ctx!.cycle.id)
+
+    const initialNavigationCount = await page.evaluate(
+      () => performance.getEntriesByType('navigation').length
+    )
+
+    const roster = page.locator('section[aria-labelledby="availability-response-heading"]')
+    await roster.getByRole('button', { name: new RegExp(ctx!.prnTherapist.fullName) }).click()
+
+    await expect
+      .poll(() => page.url(), { timeout: 20_000 })
+      .toContain(`therapist=${ctx!.prnTherapist.id}`)
+    await expect(page.locator('#planner_therapist_id')).toHaveValue(ctx!.prnTherapist.id)
+    await expect(
+      roster.locator('[aria-current="true"]').filter({ hasText: ctx!.prnTherapist.fullName })
+    ).toBeVisible()
+    await expect(roster.getByText('Active in planner')).toBeVisible()
+
+    const afterTherapistNavigationCount = await page.evaluate(
+      () => performance.getEntriesByType('navigation').length
+    )
+    expect(afterTherapistNavigationCount).toBe(initialNavigationCount)
+
+    await page.locator('#planner_cycle_id').selectOption(ctx!.secondCycle.id)
+
+    await expect
+      .poll(() => page.url(), { timeout: 20_000 })
+      .toContain(`cycle=${ctx!.secondCycle.id}`)
+    await expect(page.locator('#planner_cycle_id')).toHaveValue(ctx!.secondCycle.id)
+    await expect(page.locator('#planner_therapist_id')).toHaveValue(ctx!.prnTherapist.id)
+
+    const afterCycleNavigationCount = await page.evaluate(
+      () => performance.getEntriesByType('navigation').length
+    )
+    expect(afterCycleNavigationCount).toBe(initialNavigationCount)
   })
 
   test('manager can save hard dates and auto-draft honors them', async ({ page }) => {
@@ -146,11 +239,15 @@ test.describe.serial('/availability manager planner', () => {
     await expect(page.getByRole('heading', { name: 'Planner controls' }).first()).toBeVisible({
       timeout: 20_000,
     })
-    const calendarDay = (root: Locator, isoDate: string) =>
-      root.getByRole('button', { name: formatCalendarLabel(isoDate) })
+    const expectedMonthStart = monthStartKey(ctx!.therapistWillWorkDate)
+    const currentMonthStart = await page.evaluate(() => {
+      const params = new URLSearchParams(window.location.search)
+      return params.get('monthStart')
+    })
+    expect(currentMonthStart === null || currentMonthStart === expectedMonthStart).toBe(true)
 
-    await calendarDay(planner, ctx!.therapistWillWorkDate).click()
-    await calendarDay(planner, ctx!.therapistCannotWorkDate).click()
+    await selectCalendarDay(planner, ctx!.therapistWillWorkDate)
+    await selectCalendarDay(planner, ctx!.therapistCannotWorkDate)
     await planner.getByRole('button', { name: 'Save 2 will-work dates' }).click()
 
     await expect
@@ -178,9 +275,12 @@ test.describe.serial('/availability manager planner', () => {
     const refreshedPlanner = page.locator('#staff-scheduling-inputs')
     await refreshedPlanner.getByRole('button', { name: /^Cannot work$/ }).click()
     await expect(
+      refreshedPlanner.getByRole('button', { name: 'Select dates to save' })
+    ).toBeVisible()
+    await selectCalendarDay(refreshedPlanner, ctx!.therapistCannotWorkDate)
+    await expect(
       refreshedPlanner.getByRole('button', { name: 'Save 1 blocked date' })
     ).toBeVisible()
-    await calendarDay(refreshedPlanner, ctx!.therapistCannotWorkDate).click()
     await refreshedPlanner.getByRole('button', { name: 'Save 1 blocked date' }).click()
 
     await expect
@@ -204,7 +304,7 @@ test.describe.serial('/availability manager planner', () => {
       waitUntil: 'networkidle',
     })
     const prnPlanner = page.locator('#staff-scheduling-inputs')
-    await calendarDay(prnPlanner, ctx!.prnWillWorkDate).click()
+    await selectCalendarDay(prnPlanner, ctx!.prnWillWorkDate)
     await prnPlanner.getByRole('button', { name: 'Save 1 will-work date' }).click()
 
     await expect
@@ -226,7 +326,9 @@ test.describe.serial('/availability manager planner', () => {
 
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
     await page.getByRole('button', { name: 'Auto-draft' }).first().click()
-    await page.getByRole('button', { name: 'Generate draft' }).click()
+    const autoDialog = page.getByRole('dialog')
+    await expect(autoDialog).toBeVisible()
+    await autoDialog.getByRole('button', { name: 'Generate draft' }).click()
 
     await expect
       .poll(

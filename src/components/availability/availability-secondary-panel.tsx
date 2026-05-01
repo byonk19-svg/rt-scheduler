@@ -10,14 +10,28 @@ type AvailabilitySecondaryPanelProps = {
   roster: ReactNode
   inbox: ReactNode
   defaultTab?: AvailabilitySecondaryTab
+  activeTab?: AvailabilitySecondaryTab
+  onTabChange?: (tab: AvailabilitySecondaryTab) => void
 }
 
 export function AvailabilitySecondaryPanel({
   roster,
   inbox,
   defaultTab = 'roster',
+  activeTab,
+  onTabChange,
 }: AvailabilitySecondaryPanelProps) {
-  const [activeTab, setActiveTab] = useState<AvailabilitySecondaryTab>(defaultTab)
+  const [uncontrolledActiveTab, setUncontrolledActiveTab] =
+    useState<AvailabilitySecondaryTab>(defaultTab)
+
+  const resolvedActiveTab = activeTab ?? uncontrolledActiveTab
+
+  function handleTabChange(nextTab: AvailabilitySecondaryTab) {
+    if (!activeTab) {
+      setUncontrolledActiveTab(nextTab)
+    }
+    onTabChange?.(nextTab)
+  }
 
   return (
     <section aria-label="Availability secondary workflows" className="flex flex-col">
@@ -33,11 +47,11 @@ export function AvailabilitySecondaryPanel({
             type="button"
             className={cn(
               'min-h-11 rounded-full px-3 py-2 text-sm font-semibold transition-colors sm:min-h-10 sm:px-2.5 sm:py-1 sm:text-[11px]',
-              activeTab === 'roster'
+              resolvedActiveTab === 'roster'
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground'
             )}
-            onClick={() => setActiveTab('roster')}
+            onClick={() => handleTabChange('roster')}
           >
             Response roster
           </button>
@@ -45,18 +59,18 @@ export function AvailabilitySecondaryPanel({
             type="button"
             className={cn(
               'min-h-11 rounded-full px-3 py-2 text-sm font-semibold transition-colors sm:min-h-10 sm:px-2.5 sm:py-1 sm:text-[11px]',
-              activeTab === 'inbox'
+              resolvedActiveTab === 'inbox'
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground'
             )}
-            onClick={() => setActiveTab('inbox')}
+            onClick={() => handleTabChange('inbox')}
           >
             Request inbox
           </button>
         </div>
       </div>
 
-      <div className="min-h-0">{activeTab === 'roster' ? roster : inbox}</div>
+      <div className="min-h-0">{resolvedActiveTab === 'roster' ? roster : inbox}</div>
     </section>
   )
 }

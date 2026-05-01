@@ -3,7 +3,15 @@ import { resolve } from 'node:path'
 
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/availability',
+  useRouter: () => ({
+    replace: vi.fn(),
+  }),
+  useSearchParams: () => new URLSearchParams('tab=planner'),
+}))
 
 import { ManagerSchedulingInputs } from '@/components/availability/ManagerSchedulingInputs'
 
@@ -143,5 +151,42 @@ describe('ManagerSchedulingInputs', () => {
 
     expect(plannerRailSource).toContain("if (count === 0) return 'Select dates to save'")
     expect(plannerRailSource).not.toContain('Save 0 will-work dates')
+  })
+
+  it('uses Next router state instead of forcing a full page reload for planner selection changes', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/components/availability/ManagerSchedulingInputs.tsx'),
+      'utf8'
+    )
+
+    expect(source).toContain("from 'next/navigation'")
+    expect(source).toContain('useRouter()')
+    expect(source).toContain('usePathname()')
+    expect(source).toContain('useSearchParams()')
+    expect(source).toContain('router.replace(')
+    expect(source).toContain('{ scroll: false }')
+    expect(source).not.toContain('window.location.assign')
+  })
+
+  it('surfaces a compact missing-response workflow in the planner controls', () => {
+    const plannerRailSource = readFileSync(
+      resolve(process.cwd(), 'src/components/availability/planner-control-rail.tsx'),
+      'utf8'
+    )
+
+    expect(plannerRailSource).toContain('Not submitted')
+    expect(plannerRailSource).toContain('Focus missing responders')
+    expect(plannerRailSource).toContain('Review next')
+  })
+
+  it('keeps the response roster synced to the active planner therapist', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/components/availability/ManagerSchedulingInputs.tsx'),
+      'utf8'
+    )
+
+    expect(source).toContain('selectedTherapistId={selectedTherapistId}')
+    expect(source).toContain('activeFilter={activeRosterFilter}')
+    expect(source).toContain('activeTab={activeSecondaryTab}')
   })
 })
