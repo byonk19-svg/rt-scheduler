@@ -1,21 +1,17 @@
 'use client'
 
-import {
-  CalendarDays,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  Printer,
-} from 'lucide-react'
+import Link from 'next/link'
+import { CalendarDays } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import type { ScheduleRosterLivePayload } from '@/app/(app)/schedule/schedule-roster-live-data'
 import { buildLiveScheduleDataset } from '@/components/schedule-roster/live-schedule-dataset'
 import { SCHEDULE_LEGEND, type ScheduleCode } from '@/components/schedule-roster/mock-schedule-data'
 import { PaperScheduleGrid } from '@/components/schedule-roster/PaperScheduleGrid'
+import { PrintButton } from '@/components/print-button'
 import { ScheduleCycleSelect } from '@/components/schedule-roster/ScheduleCycleSelect'
 import { Button } from '@/components/ui/button'
+import { buildCycleRoute } from '@/lib/cycle-route'
 import type { ShiftType } from '@/lib/mock-coverage-roster'
 import { cn } from '@/lib/utils'
 
@@ -46,6 +42,7 @@ export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
     () => (live ? buildLiveScheduleDataset(live, selectedShift) : null),
     [live, selectedShift]
   )
+  const coverageHref = live ? buildCycleRoute('/coverage', live.cycleId) : '/coverage?view=week'
 
   if (!live || !dataset) {
     return (
@@ -92,72 +89,24 @@ export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
                 {statusLabel}
               </span>
               <span className="text-[13px] text-muted-foreground">Read-only roster view</span>
-              <Button
-                type="button"
+              <PrintButton
+                label="Print"
                 variant="outline"
                 className="h-11 gap-2 rounded-lg px-3 text-[14px] shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
-              >
-                <Printer className="h-4 w-4" />
-                Print
-              </Button>
+              />
               <Button
-                type="button"
-                variant="outline"
-                className="h-11 gap-2 rounded-lg px-3 text-[14px] shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
-              >
-                <Download className="h-4 w-4" />
-                Export
-              </Button>
-              <Button
-                type="button"
+                asChild
                 className="h-11 rounded-lg px-3.5 text-[14px] shadow-[0_1px_2px_rgba(15,23,42,0.16)]"
               >
-                Publish
+                <Link href={coverageHref}>Open schedule workspace</Link>
               </Button>
             </div>
           </div>
 
           <div className="flex flex-col gap-3 border-t border-border/70 pt-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <div className="inline-flex h-12 items-center rounded-lg border border-border/70 bg-muted/35 p-0.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-11 w-10 rounded-r-none border-r border-border/70 px-0 text-foreground/85"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-11 rounded-none px-3.5 text-[14px]"
-                >
-                  Today
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-11 w-10 rounded-l-none border-l border-border/70 px-0 text-foreground/85"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-12 gap-2 rounded-lg px-3 text-[14px] shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
-              >
-                <CalendarDays className="h-4 w-4" />
-                Go to Date
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-12 min-w-[124px] justify-between gap-2 rounded-lg px-3 text-[14px] shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
-              >
-                6 Weeks
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              </Button>
+            <div className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/20 px-3.5 py-3 text-sm text-muted-foreground">
+              <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-foreground/75" />
+              <p>Use Coverage to edit staffing, auto-draft, or publish this cycle.</p>
             </div>
 
             <div className="inline-flex h-[52px] items-center rounded-lg border border-border/70 bg-muted/35 p-1 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">

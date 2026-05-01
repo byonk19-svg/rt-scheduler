@@ -213,7 +213,7 @@ export default async function ManagerDashboardPage() {
     .select('id, date')
     .gte('date', todayKey)
     .lte('date', toIsoDate(addDays(today, 14)))
-  let todayActiveShiftsQuery = supabase
+  let todayStaffedShiftsQuery = supabase
     .from('shifts')
     .select('id, shift_type, role, profiles:profiles!shifts_user_id_fkey(full_name)')
     .eq('date', todayKey)
@@ -223,7 +223,7 @@ export default async function ManagerDashboardPage() {
   if (activeCycle) {
     todayCoverageQuery = todayCoverageQuery.eq('cycle_id', activeCycle.id)
     upcomingShiftsQuery = upcomingShiftsQuery.eq('cycle_id', activeCycle.id)
-    todayActiveShiftsQuery = todayActiveShiftsQuery.eq('cycle_id', activeCycle.id)
+    todayStaffedShiftsQuery = todayStaffedShiftsQuery.eq('cycle_id', activeCycle.id)
   }
 
   const shiftCountQuery = activeCycle
@@ -234,11 +234,11 @@ export default async function ManagerDashboardPage() {
         .in('shift_type', ['day', 'night'])
     : Promise.resolve({ data: [], error: null })
 
-  const [todayCoverageResult, upcomingShiftsResult, todayActiveShiftsResult, shiftCountResult] =
+  const [todayCoverageResult, upcomingShiftsResult, todayStaffedShiftsResult, shiftCountResult] =
     await Promise.all([
       todayCoverageQuery,
       upcomingShiftsQuery,
-      todayActiveShiftsQuery,
+      todayStaffedShiftsQuery,
       shiftCountQuery,
     ])
 
@@ -248,8 +248,8 @@ export default async function ManagerDashboardPage() {
   if (upcomingShiftsResult.error) {
     console.error('Failed to load upcoming shifts metric:', upcomingShiftsResult.error)
   }
-  if (todayActiveShiftsResult.error) {
-    console.error('Failed to load active shifts list:', todayActiveShiftsResult.error)
+  if (todayStaffedShiftsResult.error) {
+    console.error('Failed to load staffed shifts list:', todayStaffedShiftsResult.error)
   }
   if (shiftCountResult.error) {
     console.error('Failed to load shift completion counts:', shiftCountResult.error)
@@ -257,7 +257,7 @@ export default async function ManagerDashboardPage() {
 
   const todayRows = (todayCoverageResult.data ?? []) as ShiftStatusRow[]
   const upcomingRows = (upcomingShiftsResult.data ?? []) as ShiftDateRow[]
-  const todayShiftRows = (todayActiveShiftsResult.data ?? []) as ShiftAssignmentRow[]
+  const todayShiftRows = (todayStaffedShiftsResult.data ?? []) as ShiftAssignmentRow[]
   const shiftCountRows = (shiftCountResult.data ?? []) as ShiftCountRow[]
 
   const activeOperationalCodesByShiftId = await fetchActiveOperationalCodeMap(supabase, [
@@ -285,7 +285,7 @@ export default async function ManagerDashboardPage() {
       count,
     }))
 
-  const todayActiveShifts = todayShiftRows
+  const todayStaffedShifts = todayShiftRows
     .filter((row) => isWorkingScheduled(row.id))
     .slice(0, 6)
     .map(formatShiftLine)
@@ -341,7 +341,7 @@ export default async function ManagerDashboardPage() {
         0
       )}
       upcomingShiftDays={upcomingShiftDays}
-      todayActiveShifts={todayActiveShifts}
+      todayStaffedShifts={todayStaffedShifts}
       recentActivity={recentActivity}
       pendingRequests={pendingApprovalsResult.count ?? 0}
       approvalsWaiting={pendingApprovalsResult.count ?? 0}

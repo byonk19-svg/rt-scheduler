@@ -55,8 +55,8 @@ describe('AppShell mobile menu', () => {
   })
 
   it('uses the shared dialog primitive for the mobile drawer so focus is trapped and restored', () => {
-    expect(appShellSource).toContain(
-      "import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'"
+    expect(appShellSource).toMatch(
+      /import\s*\{[\s\S]*Dialog,[\s\S]*DialogContent,[\s\S]*DialogDescription,[\s\S]*DialogHeader,[\s\S]*DialogTitle,[\s\S]*\}\s*from\s*'@\/components\/ui\/dialog'/
     )
     expect(appShellSource).toContain(
       '<Dialog open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>'
@@ -103,11 +103,14 @@ describe('AppShell navigation structure', () => {
     expect(scheduleSection?.isActive('/schedule')).toBe(true)
   })
 
-  it('sends the manager Schedule entry to the mock roster screen while leaving live coverage routable', () => {
+  it('sends the manager Schedule entry to the editable coverage workspace and keeps roster as a separate local item', () => {
     const scheduleSection = buildManagerSections(0).find((section) => section.key === 'schedule')
 
-    expect(scheduleSection?.href).toBe('/schedule')
-    expect(scheduleSection?.subItems.find((item) => item.label === 'Coverage')?.href).toBe(
+    expect(scheduleSection?.href).toBe('/coverage')
+    expect(
+      scheduleSection?.subItems.find((item) => item.label === 'Schedule workspace')?.href
+    ).toBe('/coverage')
+    expect(scheduleSection?.subItems.find((item) => item.label === 'Roster view')?.href).toBe(
       '/schedule'
     )
   })
@@ -139,8 +142,9 @@ describe('AppShell navigation structure', () => {
     expect(shellConfigSource).toContain("key: 'people'")
   })
 
-  it('puts Coverage, Availability, Publish, and Approvals under the Schedule section', () => {
-    expect(shellConfigSource).toContain("label: 'Coverage'")
+  it('puts Schedule workspace, Roster view, Availability, Publish, and Approvals under the Schedule section', () => {
+    expect(shellConfigSource).toContain("label: 'Schedule workspace'")
+    expect(shellConfigSource).toContain("label: 'Roster view'")
     expect(shellConfigSource).toContain("label: 'Availability'")
     expect(shellConfigSource).toContain("label: 'Publish'")
     expect(shellConfigSource).toContain("label: 'Approvals'")

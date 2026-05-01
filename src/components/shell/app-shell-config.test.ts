@@ -55,4 +55,25 @@ describe('app-shell-config', () => {
       '/analytics'
     )
   })
+
+  it('separates the editable schedule workspace from the read-only roster view', () => {
+    const sections = buildManagerSections(0)
+    const scheduleSection = sections.find((section) => section.key === 'schedule')
+
+    expect(scheduleSection?.href).toBe('/coverage')
+    expect(scheduleSection?.subItems.map((item) => item.label)).toEqual([
+      'Schedule workspace',
+      'Roster view',
+      'Analytics',
+      'Availability',
+      'Publish',
+      'Approvals',
+    ])
+    expect(
+      scheduleSection?.subItems.find((item) => item.label === 'Schedule workspace')?.href
+    ).toBe('/coverage')
+    expect(scheduleSection?.subItems.find((item) => item.label === 'Roster view')?.href).toBe(
+      '/schedule'
+    )
+  })
 })
