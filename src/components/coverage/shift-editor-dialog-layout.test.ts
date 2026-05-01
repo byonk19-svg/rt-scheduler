@@ -36,6 +36,13 @@ describe('shiftEditorDialogLayout', () => {
     expect(shiftEditorSource).toContain('Edit staffing')
     expect(shiftEditorSource).toContain('Review and update lead and staff coverage assignments for this shift.')
   })
+
+  it('shows active staffing first and keeps assigned rows as secondary context', () => {
+    expect(shiftEditorSource).toContain('activeStaffingLabel')
+    expect(shiftEditorSource).toContain('assignedRowsLabel')
+    expect(shiftEditorSource).toContain('getCoverageHealth')
+    expect(shiftEditorSource).not.toContain('covered')
+  })
 })
 
 describe('guardrail props', () => {

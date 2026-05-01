@@ -6,7 +6,7 @@ import { AlertCircle, AlertTriangle, Check, Clock, MinusCircle } from 'lucide-re
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DialogDescription } from '@/components/ui/dialog'
 import { shiftEditorDialogLayout } from '@/components/coverage/shift-editor-dialog-layout'
-import { countActive, type DayItem, type ShiftTab } from '@/lib/coverage/selectors'
+import { getCoverageHealth, type DayItem, type ShiftTab } from '@/lib/coverage/selectors'
 import {
   getDefaultWeeklyLimitForEmploymentType,
   sanitizeWeeklyLimit,
@@ -333,12 +333,11 @@ export function ShiftEditorDialog({
   }, [selectedDay])
 
   const hasLead = Boolean(selectedDay?.leadShift)
-  const assignedCount = (selectedDay?.leadShift ? 1 : 0) + (selectedDay?.staffShifts.length ?? 0)
-  const activeCount = selectedDay ? countActive(selectedDay) : 0
+  const coverageHealth = selectedDay ? getCoverageHealth(selectedDay) : null
   const coverageStatusColorClass =
-    assignedCount < 3
+    coverageHealth?.tone === 'critical'
       ? 'text-[var(--error-text)]'
-      : assignedCount > 5
+      : coverageHealth?.tone === 'warning'
         ? 'text-[var(--warning-text)]'
         : 'text-[var(--success-text)]'
 
@@ -411,12 +410,19 @@ export function ShiftEditorDialog({
                   <div className="mt-1 flex flex-wrap items-center gap-2">
                     <p className={shiftEditorDialogLayout.shiftLabel}>{selectedDay.shiftType} Shift</p>
                     <span className={cn('text-[12px] font-semibold', coverageStatusColorClass)}>
-                      {assignedCount} / 5 covered
+                      {coverageHealth?.activeStaffingLabel}
                     </span>
-                    <span className="text-[12px] text-muted-foreground">{activeCount} active</span>
+                    <span className="text-[12px] text-muted-foreground">
+                      {coverageHealth?.assignedRowsLabel}
+                    </span>
                     {!hasLead ? (
                       <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--warning-text)]">
                         No lead
+                      </span>
+                    ) : null}
+                    {coverageHealth?.statusLabel === 'Unstaffed' ? (
+                      <span className="rounded-full border border-[var(--error-border)] bg-[var(--error-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--error-text)]">
+                        Unstaffed
                       </span>
                     ) : null}
                   </div>

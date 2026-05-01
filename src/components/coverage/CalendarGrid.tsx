@@ -9,15 +9,12 @@ import {
 } from '@/components/coverage/AssignmentStatusPopover'
 import type { DayItem, ShiftItem, UiStatus } from '@/lib/coverage/selectors'
 import {
-  countActive,
-  headcountThreshold,
+  getCoverageHealth,
   shouldShowMonthTag,
 } from '@/lib/coverage/selectors'
 import { cn } from '@/lib/utils'
 
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const TARGET_HEADCOUNT = 4
-
 export function nextIndex(current: number, key: string, total: number): number {
   const cols = 7
 
@@ -48,7 +45,7 @@ type CalendarGridProps = {
   onChangeStatus: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
 }
 
-type CellTone = 'critical' | 'warning' | 'healthy' | 'empty'
+type CellTone = 'critical' | 'warning' | 'healthy'
 
 function formatMonthShort(value: string): string {
   const parsed = new Date(`${value}T00:00:00`)
@@ -109,28 +106,6 @@ function isUnavailableStatus(status: UiStatus): boolean {
   return status === 'cancelled' || status === 'call_in'
 }
 
-function resolveCellTone(day: DayItem, activeCount: number): CellTone {
-  if (day.constraintBlocked) return 'critical'
-  if (!day.leadShift) return activeCount > 0 ? 'warning' : 'critical'
-  const threshold = headcountThreshold(activeCount)
-  if (threshold === 'green') return 'healthy'
-  if (threshold === 'yellow') return 'warning'
-  return activeCount === 0 ? 'empty' : 'critical'
-}
-
-function buildCoverageLabel(day: DayItem, activeCount: number): string {
-  if (day.constraintBlocked) return 'No eligible therapists'
-  if (!day.leadShift) return 'No lead'
-  if (activeCount === 0) return 'Untouched'
-
-  const openSlots = Math.max(TARGET_HEADCOUNT - activeCount, 0)
-  if (openSlots > 0) {
-    return `${openSlots} ${openSlots === 1 ? 'gap' : 'gaps'}`
-  }
-
-  return 'Set'
-}
-
 function cellToneClassName(tone: CellTone): string {
   switch (tone) {
     case 'critical':
@@ -139,9 +114,20 @@ function cellToneClassName(tone: CellTone): string {
       return 'border-[var(--warning-border)]/70 bg-[var(--warning-subtle)]/28'
     case 'healthy':
       return 'border-[var(--success-border)]/50 bg-[var(--success-subtle)]/30'
-    case 'empty':
     default:
       return 'border-border/70 bg-card'
+  }
+}
+
+function activeStaffingClassName(tone: CellTone): string {
+  switch (tone) {
+    case 'critical':
+      return 'text-[var(--error)]'
+    case 'warning':
+      return 'text-[var(--warning-text)]'
+    case 'healthy':
+    default:
+      return 'text-muted-foreground'
   }
 }
 
@@ -215,8 +201,8 @@ export function CalendarGrid({
   )
 
   function renderDayCard(day: DayItem, absoluteIndex: number) {
-    const activeCount = countActive(day)
-    const tone = resolveCellTone(day, activeCount)
+    const coverageHealth = getCoverageHealth(day)
+    const tone = coverageHealth.tone
     const showMonthTag = shouldShowMonthTag(absoluteIndex, day.isoDate)
     const visibleStaff = day.staffShifts.slice(0, 2)
     const extraStaffCount = Math.max(day.staffShifts.length - visibleStaff.length, 0)
@@ -259,26 +245,21 @@ export function CalendarGrid({
         />
 
         <div className="pointer-events-none relative z-10 flex h-full flex-col gap-1.5">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-[17px] font-semibold leading-none tracking-[-0.04em] text-foreground">
-                  {day.date}
-                </span>
-                {showMonthTag ? (
-                  <span className="text-xs text-muted-foreground">
-                    {formatMonthShort(day.isoDate)}
-                  </span>
-                ) : null}
-              </div>
-              <span
-                className={cn(
-                  'text-xs font-semibold',
-                  activeCount < TARGET_HEADCOUNT ? 'text-[var(--error)]' : 'text-muted-foreground'
-                )}
-              >
-                {activeCount}/{TARGET_HEADCOUNT} staffed
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[17px] font-semibold leading-none tracking-[-0.04em] text-foreground">
+                {day.date}
               </span>
+              {showMonthTag ? (
+                <span className="text-xs text-muted-foreground">
+                  {formatMonthShort(day.isoDate)}
+                </span>
+              ) : null}
             </div>
+            <span className={cn('text-xs font-semibold', activeStaffingClassName(tone))}>
+              {coverageHealth.activeStaffingLabel}
+            </span>
+          </div>
 
           <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
             <div className="pointer-events-auto">
@@ -300,8 +281,13 @@ export function CalendarGrid({
               {day.constraintBlocked ? (
                 <AlertTriangle className="h-3.5 w-3.5 text-[var(--error-text)]" aria-hidden />
               ) : null}
-              {buildCoverageLabel(day, activeCount)}
+              {coverageHealth.statusLabel}
             </span>
+            {coverageHealth.showAssignedRowsContext ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background/80 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                {coverageHealth.assignedRowsLabel}
+              </span>
+            ) : null}
           </div>
 
           <div className="mt-auto space-y-1">
