@@ -28,12 +28,11 @@ import {
 } from '@/lib/coverage/selectors'
 import { normalizeWorkPattern, type WorkPattern } from '@/lib/coverage/work-patterns'
 import {
-  fetchActiveOperationalCodeMap,
+  fetchActiveOperationalDetailMap,
   toLegacyShiftStatusFromOperationalCode,
 } from '@/lib/operational-codes'
 import {
   getWeekBoundsForDate,
-  normalizeDefaultScheduleView,
   normalizeViewMode,
 } from '@/lib/schedule-helpers'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -260,6 +259,7 @@ function createEmptySnapshot(): CoveragePageSnapshot {
     rosterProfiles: [],
     rosterProfilesByShift: { day: [], night: [] },
     activeOpCodes: {},
+    activeOperationalDetails: {},
     dayDays: [],
     nightDays: [],
     proactiveCoverageRisk: null,
@@ -302,12 +302,7 @@ export async function getCoveragePageServerData({
     archivedAt: profile?.archived_at ?? null,
   }
   const actorScheduleShift = normalizeActorShiftType(profile?.shift_type)
-  const initialViewMode = viewRaw
-    ? normalizeViewMode(viewRaw)
-    : normalizeDefaultScheduleView(
-        (profile as { default_schedule_view?: string | null } | null)?.default_schedule_view ??
-          undefined
-      )
+  const initialViewMode = viewRaw ? normalizeViewMode(viewRaw) : 'week'
   const initialShiftTab = urlShiftTab ?? defaultCoverageShiftTabFromProfileShift(actorScheduleShift)
   const shiftTabLockedFromUrl = urlShiftTab != null
   const initialShiftType = initialShiftTab === 'Night' ? 'night' : 'day'
@@ -575,11 +570,17 @@ export async function getCoveragePageServerData({
     constraintBlockedSlotKeys.delete(key)
   }
 
-  const activeOperationalCodesByShiftId = await fetchActiveOperationalCodeMap(
+  const activeOperationalDetailsByShiftId = await fetchActiveOperationalDetailMap(
     supabase,
     assignmentRows.map((row) => row.id)
   )
-  snapshot.activeOpCodes = Object.fromEntries(activeOperationalCodesByShiftId.entries())
+  snapshot.activeOperationalDetails = Object.fromEntries(activeOperationalDetailsByShiftId.entries())
+  snapshot.activeOpCodes = Object.fromEntries(
+    Array.from(activeOperationalDetailsByShiftId.entries(), ([shiftId, detail]) => [
+      shiftId,
+      detail.code,
+    ])
+  )
 
   const therapistTallies = new Map<
     string,
@@ -618,7 +619,7 @@ export async function getCoveragePageServerData({
     }
     therapistTallies.set(row.user_id, current)
     printShiftByUserDate[`${row.user_id}:${row.date}`] = toLegacyShiftStatusFromOperationalCode(
-      activeOperationalCodesByShiftId.get(row.id) ?? null,
+      activeOperationalDetailsByShiftId.get(row.id)?.code ?? null,
       row.status
     )
   }
@@ -648,7 +649,8 @@ export async function getCoveragePageServerData({
     shift_type: row.shift_type,
     role: row.role,
     status: row.status,
-    assignment_status: activeOperationalCodesByShiftId.get(row.id) ?? row.assignment_status ?? null,
+    assignment_status:
+      activeOperationalDetailsByShiftId.get(row.id)?.code ?? row.assignment_status ?? null,
     name: getOne(row.profiles)?.full_name ?? namesByUserId[row.user_id] ?? 'Unknown',
   }))
 

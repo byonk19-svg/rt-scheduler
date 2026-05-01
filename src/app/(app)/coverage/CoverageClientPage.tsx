@@ -18,6 +18,7 @@ import { ChevronRight, Printer, Send, Sparkles } from 'lucide-react'
 import { MoreActionsMenu } from '@/components/more-actions-menu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import type { ActiveOperationalDetail, OperationalCode } from '@/lib/operational-codes'
 import { cn } from '@/lib/utils'
 
 import {
@@ -61,7 +62,6 @@ import { getScheduleFeedback, getWeekBoundsForDate } from '@/lib/schedule-helper
 import { createClient } from '@/lib/supabase/client'
 import type { AssignmentStatus, ShiftStatus } from '@/lib/shift-types'
 import type { ScheduleSearchParams } from '@/app/schedule/types'
-import type { OperationalCode } from '@/lib/operational-codes'
 import {
   COVERAGE_SHIFT_QUERY_KEY,
   parseCoverageShiftSearchParam,
@@ -111,7 +111,7 @@ type DayStatus = DayItem['dayStatus']
 type CoverageViewMode = 'week' | 'calendar' | 'roster'
 type RenderedCoverageViewMode = 'week' | 'roster'
 const VIEW_OPTIONS = [
-  { value: 'week', label: 'Grid' },
+  { value: 'week', label: 'Cycle board' },
   { value: 'roster', label: 'Roster' },
 ] as const
 
@@ -124,32 +124,6 @@ function toRenderedCoverageViewMode(viewMode: CoverageViewMode): RenderedCoverag
 }
 
 type WorkspaceMetricTone = 'neutral' | 'success' | 'warning' | 'critical'
-
-function CoverageMetric({
-  label,
-  value,
-  detail,
-  valueClassName,
-}: {
-  label: string
-  value: string
-  detail: string
-  valueClassName?: string
-}) {
-  return (
-    <div className="rounded-lg border border-border-light bg-card px-3 py-2.5">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-        {label}
-      </p>
-      <div className="mt-0.5 flex items-end justify-between gap-3">
-        <span className={cn('text-[1.6rem] font-semibold tracking-[-0.04em]', valueClassName)}>
-          {value}
-        </span>
-        <span className="text-[11px] text-muted-foreground">{detail}</span>
-      </div>
-    </div>
-  )
-}
 
 function CoverageSurfaceBanner({
   tone = 'neutral',
@@ -179,6 +153,32 @@ function CoverageSurfaceBanner({
         {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
     </section>
+  )
+}
+
+function CoverageSummaryItem({
+  value,
+  label,
+  tone = 'neutral',
+  emphasize = false,
+}: {
+  value: string | number
+  label: string
+  tone?: WorkspaceMetricTone
+  emphasize?: boolean
+}) {
+  const toneClassName: Record<WorkspaceMetricTone, string> = {
+    neutral: emphasize ? 'text-foreground' : 'text-muted-foreground',
+    success: emphasize ? 'text-[var(--success-text)]' : 'text-muted-foreground',
+    warning: emphasize ? 'text-[var(--warning-text)]' : 'text-muted-foreground',
+    critical: emphasize ? 'text-[var(--error-text)]' : 'text-muted-foreground',
+  }
+
+  return (
+    <span className={cn('inline-flex items-center gap-1.5', toneClassName[tone])}>
+      <span className="tabular-nums font-semibold">{value}</span>
+      <span>{label}</span>
+    </span>
   )
 }
 
@@ -282,6 +282,9 @@ export function CoverageClientPage({
   const [activeOpCodes, setActiveOpCodes] = useState<Map<string, string>>(
     () => new Map(Object.entries(initialSnapshot.activeOpCodes))
   )
+  const [activeOperationalDetails, setActiveOperationalDetails] = useState<
+    Map<string, ActiveOperationalDetail>
+  >(() => new Map(Object.entries(initialSnapshot.activeOperationalDetails)))
   const [assigning, setAssigning] = useState(false)
   const [unassigningShiftId, setUnassigningShiftId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -378,7 +381,7 @@ export function CoverageClientPage({
     [days]
   )
 
-  const syncOperationalCodeState = useCallback((shiftId: string, nextStatus: UiStatus) => {
+  const syncOperationalState = useCallback((shiftId: string, nextStatus: UiStatus) => {
     const assignmentStatus = toCoverageAssignmentPayload(nextStatus).assignment_status
 
     setActiveOpCodes((current) => {
@@ -387,6 +390,19 @@ export function CoverageClientPage({
         next.delete(shiftId)
       } else {
         next.set(shiftId, assignmentStatus as OperationalCode)
+      }
+      return next
+    })
+    setActiveOperationalDetails((current) => {
+      const next = new Map(current)
+      if (assignmentStatus === 'scheduled') {
+        next.delete(shiftId)
+      } else {
+        next.set(shiftId, {
+          code: assignmentStatus as OperationalCode,
+          note: null,
+          leftEarlyTime: null,
+        })
       }
       return next
     })
@@ -421,6 +437,7 @@ export function CoverageClientPage({
     setAllTherapists(initialSnapshot.allTherapists)
     setRosterProfiles(initialSnapshot.rosterProfiles)
     setActiveOpCodes(new Map(Object.entries(initialSnapshot.activeOpCodes)))
+    setActiveOperationalDetails(new Map(Object.entries(initialSnapshot.activeOperationalDetails)))
     setLoading(false)
     setSelectedId(null)
     setWeekOffset(0)
@@ -482,6 +499,20 @@ export function CoverageClientPage({
     () => (selectedDayBase ? { ...selectedDayBase, shiftType: shiftTab } : null),
     [selectedDayBase, shiftTab]
   )
+  const selectedDayAssignments = useMemo(
+    () => (selectedDay ? flatten(selectedDay) : []),
+    [selectedDay]
+  )
+  const selectedDayNotes = useMemo(() => {
+    const notes = selectedDayAssignments
+      .map((assignment) => {
+        const detail = activeOperationalDetails.get(assignment.id)
+        return detail?.note?.trim() || null
+      })
+      .filter((note): note is string => Boolean(note))
+
+    return Array.from(new Set(notes))
+  }, [activeOperationalDetails, selectedDayAssignments])
   const noCycleSelected = !loading && !activeCycleId
   const showEmptyDraftState = !loading && Boolean(activeCycleId) && !selectedCycleHasShiftRows
   const proactiveCoverageRisk = initialSnapshot.proactiveCoverageRisk
@@ -911,10 +942,10 @@ export function CoverageClientPage({
       })
 
       if (updated) {
-        syncOperationalCodeState(targetShift.id, nextStatus)
+        syncOperationalState(targetShift.id, nextStatus)
       }
     },
-    [canUpdateAssignmentStatus, days, setDays, shiftTab, supabase, syncOperationalCodeState]
+    [canUpdateAssignmentStatus, days, setDays, shiftTab, supabase, syncOperationalState]
   )
 
   const handleUnassign = useCallback(
@@ -944,6 +975,16 @@ export function CoverageClientPage({
       })
 
       if (!deleteError) {
+        setActiveOpCodes((current) => {
+          const next = new Map(current)
+          next.delete(shiftId)
+          return next
+        })
+        setActiveOperationalDetails((current) => {
+          const next = new Map(current)
+          next.delete(shiftId)
+          return next
+        })
         setUnassigningShiftId(null)
         return
       }
@@ -987,7 +1028,7 @@ export function CoverageClientPage({
             <div className="min-w-0 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="font-heading text-[1.35rem] font-semibold tracking-tight text-foreground">
-                  Schedule
+                  Team Schedule
                 </h1>
                 <Badge
                   variant="outline"
@@ -1025,7 +1066,7 @@ export function CoverageClientPage({
                 ) : canManageCoverage ? (
                   'Compact planning workspace for staffing, lead coverage, and publish readiness.'
                 ) : canUpdateAssignmentStatus ? (
-                  'View staffing and assignment status — click a therapist token to update status.'
+                  'View staffing and operational status. Open a day to review details and update statuses.'
                 ) : (
                   'Read-only team staffing view. Use My Schedule for your own shifts and Future Availability for the next cycle.'
                 )}
@@ -1224,39 +1265,54 @@ export function CoverageClientPage({
           ) : null}
 
           {!noCycleSelected ? (
-            <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <CoverageMetric
-                label="Active staff"
-                value={String(rosterMembers.length)}
-                detail={`${shiftTab.toLowerCase()} shift roster`}
-                valueClassName="text-foreground"
-              />
-              <CoverageMetric
-                label="Priority gaps"
-                value={String(coverageSummary.priorityGapDays)}
-                detail="critical days"
-                valueClassName={
-                  coverageSummary.priorityGapDays === 0
-                    ? 'text-foreground'
-                    : 'text-[var(--error)]'
-                }
-              />
-              <CoverageMetric
-                label="Days missing lead"
-                value={String(issueCount)}
-                detail="lead coverage"
-                valueClassName={issueCount === 0 ? 'text-foreground' : 'text-[var(--warning)]'}
-              />
-              <CoverageMetric
-                label="Unassigned days"
-                value={String(coverageSummary.unassignedDays)}
-                detail={`${coverageSummary.staffedDays} fully staffed`}
-                valueClassName={
-                  coverageSummary.unassignedDays === 0
-                    ? 'text-foreground'
-                    : 'text-[var(--warning)]'
-                }
-              />
+            <section className="rounded-xl border border-border/70 bg-card/65 px-3 py-2.5 shadow-tw-2xs">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
+                <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                  {shiftTab} shift
+                </span>
+                <span className={cn('inline-flex items-center gap-1.5', workspaceStatusTone === 'success' && 'text-[var(--success-text)]')}>
+                  <span
+                    className={cn(
+                      'h-1.5 w-1.5 rounded-full bg-muted-foreground/45',
+                      workspaceStatusTone === 'success' && 'bg-[var(--success-text)]',
+                      workspaceStatusTone === 'warning' && 'bg-[var(--warning-text)]'
+                    )}
+                  />
+                  <span>{workspaceStatusLabel}</span>
+                </span>
+                <span className="text-foreground/80">{cycleRangeLabel}</span>
+                <CoverageSummaryItem
+                  value={coverageSummary.staffedDays}
+                  label="fully staffed"
+                  tone="success"
+                  emphasize={coverageSummary.staffedDays > 0}
+                />
+                <CoverageSummaryItem
+                  value={coverageSummary.priorityGapDays}
+                  label="priority gaps"
+                  tone="warning"
+                  emphasize={coverageSummary.priorityGapDays > 0}
+                />
+                <CoverageSummaryItem
+                  value={issueCount}
+                  label="missing leads"
+                  tone="critical"
+                  emphasize={issueCount > 0}
+                />
+                <CoverageSummaryItem
+                  value={coverageSummary.unassignedDays}
+                  label="unassigned days"
+                  tone="critical"
+                  emphasize={coverageSummary.unassignedDays > 0}
+                />
+                <span className="text-muted-foreground">
+                  <span className="tabular-nums font-semibold text-foreground">
+                    {rosterMembers.length}
+                  </span>{' '}
+                  therapists on this roster
+                </span>
+              </div>
             </section>
           ) : null}
 
@@ -1495,11 +1551,9 @@ export function CoverageClientPage({
                   selectedId={selectedId}
                   weekOffset={weekOffset}
                   schedulingViewOnly={!canManageCoverage}
-                  allowAssignmentStatusEdits={canUpdateAssignmentStatus}
                   onSwipeLeft={() => setWeekOffset((w) => Math.min(w + 1, totalWeeks - 1))}
                   onSwipeRight={() => setWeekOffset((w) => Math.max(w - 1, 0))}
                   onSelect={handleSelect}
-                  onChangeStatus={handleChangeStatus}
                 />
               )}
             </section>
@@ -1513,9 +1567,12 @@ export function CoverageClientPage({
           selectedDay={selectedDay}
           therapists={allTherapists}
           canEdit={Boolean(canManageCoverage && activeCycleId)}
+          canUpdateAssignmentStatus={canUpdateAssignmentStatus}
           coverageCycleId={activeCycleId}
           isPastDate={isPastDate}
           hasOperationalEntries={hasOperationalEntries}
+          activeOperationalDetails={activeOperationalDetails}
+          selectedDayNotes={selectedDayNotes}
           assigning={assigning}
           unassigningShiftId={unassigningShiftId}
           weeklyTherapistCounts={weeklyTherapistCounts}
@@ -1523,6 +1580,7 @@ export function CoverageClientPage({
             if (!open) handleClose()
           }}
           onAssignTherapist={handleAssignTherapist}
+          onChangeStatus={handleChangeStatus}
           assignError={assignError}
           onUnassign={handleUnassign}
         />

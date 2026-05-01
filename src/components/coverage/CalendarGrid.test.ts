@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { getVisibleWeek, nextIndex, resolveSwipeDirection } from './CalendarGrid'
+import {
+  buildStaffDisplayLines,
+  getVisibleWeek,
+  nextIndex,
+  resolveDayBoardStatus,
+  resolveSwipeDirection,
+} from './CalendarGrid'
 
 describe('CalendarGrid keyboard navigation index', () => {
   it('moves right by 1', () => {
@@ -53,5 +59,50 @@ describe('CalendarGrid mobile week helpers', () => {
     expect(resolveSwipeDirection(80, 150)).toBe('right')
     expect(resolveSwipeDirection(100, 70)).toBeNull()
     expect(resolveSwipeDirection(null, 70)).toBeNull()
+  })
+})
+
+describe('CalendarGrid roster helpers', () => {
+  it('groups compact staff names into short text rows before overflowing', () => {
+    expect(
+      buildStaffDisplayLines(['Alyece Smith', 'Barbara Jones', 'Denise Long', 'Patricia Moss'])
+    ).toEqual({
+      lines: ['Alyece · Barbara', 'Denise · Patricia'],
+      remaining: 0,
+    })
+  })
+
+  it('uses quiet healthy copy and explicit gap copy for board tiles', () => {
+    expect(
+      resolveDayBoardStatus(
+        {
+          id: '2026-04-20',
+          isoDate: '2026-04-20',
+          date: 20,
+          label: 'Sun Apr 20',
+          dayStatus: 'published',
+          constraintBlocked: false,
+          leadShift: { id: 'lead', userId: 'lead-1', name: 'Demo', status: 'active', log: [] },
+          staffShifts: [],
+        },
+        4
+      )
+    ).toEqual({ tone: 'healthy', label: 'Fully staffed' })
+
+    expect(
+      resolveDayBoardStatus(
+        {
+          id: '2026-04-21',
+          isoDate: '2026-04-21',
+          date: 21,
+          label: 'Mon Apr 21',
+          dayStatus: 'published',
+          constraintBlocked: false,
+          leadShift: { id: 'lead', userId: 'lead-1', name: 'Demo', status: 'active', log: [] },
+          staffShifts: [],
+        },
+        2
+      )
+    ).toEqual({ tone: 'warning', label: '2 gaps' })
   })
 })

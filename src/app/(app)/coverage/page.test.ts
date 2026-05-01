@@ -58,6 +58,7 @@ describe('coverage publish override affordance', () => {
     expect(server).toContain('defaultCoverageShiftTabFromProfileShift')
     expect(server).toContain('getCoveragePageServerData')
     expect(server).toContain('shiftTabLockedFromUrl')
+    expect(server).toContain("const initialViewMode = viewRaw ? normalizeViewMode(viewRaw) : 'week'")
     expect(client).toContain('initialShiftTab')
     expect(client).toContain('COVERAGE_SHIFT_QUERY_KEY')
     expect(client).toContain('router.replace')
@@ -85,6 +86,10 @@ describe('coverage publish override affordance', () => {
     expect(source).toContain(
       'Read-only team staffing view. Use My Schedule for your own shifts and Future Availability for the next cycle.'
     )
+    expect(source).toContain('Team Schedule')
+    expect(source).toContain('fully staffed')
+    expect(source).toContain('priority gaps')
+    expect(source).toContain('missing leads')
   })
 
   it('surfaces a proactive coverage-risk warning in the manager workflow before auto-draft runs', () => {
@@ -138,6 +143,17 @@ describe('coverage publish override affordance', () => {
     expect(source).toContain('{preFlightDialogOpen ? (')
     expect(source).toContain('{clearDraftDialogOpen ? (')
     expect(source).toContain('{cycleDialogOpen ? (')
+  })
+
+  it('passes operational detail metadata into the selected-day drawer', () => {
+    const client = readFileSync(coverageClientPath, 'utf8')
+    const server = readFileSync(coverageServerDataPath, 'utf8')
+
+    expect(server).toContain('fetchActiveOperationalDetailMap')
+    expect(server).toContain('snapshot.activeOperationalDetails')
+    expect(client).toContain('const [activeOperationalDetails, setActiveOperationalDetails]')
+    expect(client).toContain('activeOperationalDetails={activeOperationalDetails}')
+    expect(client).toContain('selectedDayNotes={selectedDayNotes}')
   })
 
   it('declares each lazy-loaded dialog exactly once', () => {

@@ -1,22 +1,15 @@
 'use client'
 
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, ArrowUpRight } from 'lucide-react'
 
-import {
-  AssignmentStatusPopover,
-  StatusPill,
-} from '@/components/coverage/AssignmentStatusPopover'
-import type { DayItem, ShiftItem, UiStatus } from '@/lib/coverage/selectors'
-import {
-  countActive,
-  headcountThreshold,
-  shouldShowMonthTag,
-} from '@/lib/coverage/selectors'
+import type { DayItem } from '@/lib/coverage/selectors'
+import { countActive } from '@/lib/coverage/selectors'
 import { cn } from '@/lib/utils'
 
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const TARGET_HEADCOUNT = 4
+const STAFF_NAMES_PER_LINE = 2
+const MAX_STAFF_LINES = 3
 
 export function nextIndex(current: number, key: string, total: number): number {
   const cols = 7
@@ -41,19 +34,16 @@ type CalendarGridProps = {
   selectedId: string | null
   weekOffset?: number
   schedulingViewOnly?: boolean
-  allowAssignmentStatusEdits?: boolean
   onSwipeLeft?: () => void
   onSwipeRight?: () => void
   onSelect: (id: string) => void
-  onChangeStatus: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
 }
 
-type CellTone = 'critical' | 'warning' | 'healthy' | 'empty'
+type DayBoardTone = 'critical' | 'warning' | 'healthy' | 'empty'
 
-function formatMonthShort(value: string): string {
-  const parsed = new Date(`${value}T00:00:00`)
-  if (Number.isNaN(parsed.getTime())) return value
-  return parsed.toLocaleDateString('en-US', { month: 'short' })
+type DayBoardStatus = {
+  tone: DayBoardTone
+  label: string
 }
 
 function formatWeekLabel(week: DayItem[]): string {
@@ -78,6 +68,12 @@ function formatWeekLabel(week: DayItem[]): string {
 
 function compactName(value: string): string {
   return value.trim().split(/\s+/)[0] ?? value
+}
+
+function formatDateHeader(isoDate: string): string {
+  const parsed = new Date(`${isoDate}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return isoDate
+  return parsed.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' })
 }
 
 function chunkWeeks(days: DayItem[]): DayItem[][] {
@@ -105,81 +101,86 @@ export function resolveSwipeDirection(
   return null
 }
 
-function isUnavailableStatus(status: UiStatus): boolean {
-  return status === 'cancelled' || status === 'call_in'
-}
-
-function resolveCellTone(day: DayItem, activeCount: number): CellTone {
-  if (day.constraintBlocked) return 'critical'
-  if (!day.leadShift) return activeCount > 0 ? 'warning' : 'critical'
-  const threshold = headcountThreshold(activeCount)
-  if (threshold === 'green') return 'healthy'
-  if (threshold === 'yellow') return 'warning'
-  return activeCount === 0 ? 'empty' : 'critical'
-}
-
-function buildCoverageLabel(day: DayItem, activeCount: number): string {
-  if (day.constraintBlocked) return 'No eligible therapists'
-  if (!day.leadShift) return 'No lead'
-  if (activeCount === 0) return 'Untouched'
-
-  const openSlots = Math.max(TARGET_HEADCOUNT - activeCount, 0)
-  if (openSlots > 0) {
-    return `${openSlots} ${openSlots === 1 ? 'gap' : 'gaps'}`
+export function resolveDayBoardStatus(day: DayItem, activeCount: number): DayBoardStatus {
+  if (day.constraintBlocked) {
+    return { tone: 'critical', label: 'No eligible therapists' }
   }
 
-  return 'Set'
+  if (!day.leadShift && activeCount === 0) {
+    return { tone: 'critical', label: 'Unassigned' }
+  }
+
+  if (!day.leadShift) {
+    return { tone: 'critical', label: 'Missing lead' }
+  }
+
+  const gapCount = Math.max(TARGET_HEADCOUNT - activeCount, 0)
+  if (gapCount > 0) {
+    return {
+      tone: 'warning',
+      label: `${gapCount} ${gapCount === 1 ? 'gap' : 'gaps'}`,
+    }
+  }
+
+  return { tone: 'healthy', label: 'Fully staffed' }
 }
 
-function cellToneClassName(tone: CellTone): string {
+export function buildStaffDisplayLines(
+  names: string[],
+  namesPerLine = STAFF_NAMES_PER_LINE,
+  maxLines = MAX_STAFF_LINES
+): { lines: string[]; remaining: number } {
+  const compactNames = names.map(compactName)
+  const visibleNames = compactNames.slice(0, namesPerLine * maxLines)
+  const lines: string[] = []
+
+  for (let index = 0; index < visibleNames.length; index += namesPerLine) {
+    lines.push(visibleNames.slice(index, index + namesPerLine).join(' · '))
+  }
+
+  return {
+    lines,
+    remaining: Math.max(compactNames.length - visibleNames.length, 0),
+  }
+}
+
+function toneClasses(tone: DayBoardTone): {
+  card: string
+  badge: string
+  label: string
+  dot: string
+} {
   switch (tone) {
     case 'critical':
-      return 'border-[var(--error-border)]/75 bg-[var(--error-subtle)]/40'
+      return {
+        card: 'border-[var(--error-border)]/60 bg-[var(--error-subtle)]/10',
+        badge: 'border-[var(--error-border)]/45 text-[var(--error-text)]',
+        label: 'text-[var(--error-text)]',
+        dot: 'bg-[var(--error-text)]',
+      }
     case 'warning':
-      return 'border-[var(--warning-border)]/70 bg-[var(--warning-subtle)]/28'
+      return {
+        card: 'border-[var(--warning-border)]/60 bg-[var(--warning-subtle)]/10',
+        badge: 'border-[var(--warning-border)]/45 text-[var(--warning-text)]',
+        label: 'text-[var(--warning-text)]',
+        dot: 'bg-[var(--warning-text)]',
+      }
     case 'healthy':
-      return 'border-[var(--success-border)]/50 bg-[var(--success-subtle)]/30'
+      return {
+        card: 'border-border/70 bg-card',
+        badge: 'border-border/70 text-muted-foreground',
+        label: 'text-[var(--success-text)]',
+        dot: 'bg-[var(--success-text)]',
+      }
     case 'empty':
     default:
-      return 'border-border/70 bg-card'
+      return {
+        card: 'border-border/70 bg-card',
+        badge: 'border-border/70 text-muted-foreground',
+        label: 'text-muted-foreground',
+        dot: 'bg-muted-foreground/50',
+      }
   }
-}
-
-function renderShiftPill(
-  dayId: string,
-  shift: ShiftItem,
-  isLead: boolean,
-  allowAssignmentStatusEdits: boolean,
-  onChangeStatus: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => void
-) {
-  const content = (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1 rounded-full border border-border/70 bg-background/95 px-2 py-1 text-[10px] font-medium text-foreground/85',
-        isUnavailableStatus(shift.status) &&
-          'border-[var(--error-border)]/55 text-[var(--error-text)] line-through decoration-[var(--error-text)]/50'
-      )}
-    >
-      <span>{compactName(shift.name)}</span>
-      <StatusPill status={shift.status} />
-    </span>
-  )
-
-  if (!allowAssignmentStatusEdits) {
-    return <span className="pointer-events-auto">{content}</span>
-  }
-
-  return (
-    <AssignmentStatusPopover
-      therapistName={shift.name}
-      currentStatus={shift.status}
-      isLead={isLead}
-      triggerTestId={`coverage-assignment-trigger-${dayId}-${shift.userId}`}
-      onChangeStatus={(nextStatus) => onChangeStatus(dayId, shift.id, isLead, nextStatus)}
-    >
-      {content}
-    </AssignmentStatusPopover>
-  )
 }
 
 export function CalendarGrid({
@@ -188,11 +189,9 @@ export function CalendarGrid({
   selectedId,
   weekOffset = 0,
   schedulingViewOnly = false,
-  allowAssignmentStatusEdits = true,
   onSwipeLeft,
   onSwipeRight,
   onSelect,
-  onChangeStatus,
 }: CalendarGridProps) {
   const weeks = useMemo(() => chunkWeeks(days), [days])
   const visibleWeek = useMemo(() => getVisibleWeek(weeks, weekOffset), [weekOffset, weeks])
@@ -216,10 +215,9 @@ export function CalendarGrid({
 
   function renderDayCard(day: DayItem, absoluteIndex: number) {
     const activeCount = countActive(day)
-    const tone = resolveCellTone(day, activeCount)
-    const showMonthTag = shouldShowMonthTag(absoluteIndex, day.isoDate)
-    const visibleStaff = day.staffShifts.slice(0, 2)
-    const extraStaffCount = Math.max(day.staffShifts.length - visibleStaff.length, 0)
+    const dayStatus = resolveDayBoardStatus(day, activeCount)
+    const staffDisplay = buildStaffDisplayLines(day.staffShifts.map((shift) => shift.name))
+    const dayTone = toneClasses(dayStatus.tone)
 
     return (
       <article
@@ -227,9 +225,9 @@ export function CalendarGrid({
         role="gridcell"
         data-testid={`coverage-day-panel-${day.id}`}
         className={cn(
-          'relative min-h-[108px] rounded-xl border px-2.5 py-2.5 shadow-tw-2xs transition-transform duration-150',
-          'hover:-translate-y-px',
-          cellToneClassName(tone),
+          'relative min-h-[116px] rounded-[14px] border px-2.5 py-2 shadow-tw-2xs transition-colors',
+          'hover:border-primary/40',
+          dayTone.card,
           selectedId === day.id && 'border-primary/65 ring-2 ring-primary/15',
           'coverage-calendar-mobile-day'
         )}
@@ -245,8 +243,8 @@ export function CalendarGrid({
           }}
           tabIndex={absoluteIndex === 0 ? 0 : -1}
           data-testid={`coverage-day-cell-button-${day.id}`}
-          aria-label={`${schedulingViewOnly ? 'View' : 'Edit'} ${day.label}`}
-          className="absolute inset-0 z-0 rounded-xl"
+          aria-label={`${schedulingViewOnly ? 'View' : 'Open'} ${day.label}`}
+          className="absolute inset-0 z-0 rounded-[14px]"
           onClick={() => onSelect(day.id)}
           onKeyDown={(event) => {
             if (!['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
@@ -259,79 +257,44 @@ export function CalendarGrid({
         />
 
         <div className="pointer-events-none relative z-10 flex h-full flex-col gap-1.5">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-[17px] font-semibold leading-none tracking-[-0.04em] text-foreground">
-                  {day.date}
-                </span>
-                {showMonthTag ? (
-                  <span className="text-xs text-muted-foreground">
-                    {formatMonthShort(day.isoDate)}
-                  </span>
-                ) : null}
-              </div>
-              <span
-                className={cn(
-                  'text-xs font-semibold',
-                  activeCount < TARGET_HEADCOUNT ? 'text-[var(--error)]' : 'text-muted-foreground'
-                )}
-              >
-                {activeCount}/{TARGET_HEADCOUNT} staffed
-              </span>
-            </div>
-
-          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-            <div className="pointer-events-auto">
-              {day.leadShift
-                ? renderShiftPill(
-                    day.id,
-                    day.leadShift,
-                    true,
-                    allowAssignmentStatusEdits,
-                    onChangeStatus
-                  )
-                : (
-                  <span className="rounded-full border border-dashed border-[var(--warning-border)]/70 px-2 py-0.5 text-[10px] font-medium text-[var(--warning-text)]">
-                    No lead
-                  </span>
-                )}
-            </div>
-            <span className="inline-flex items-center gap-1">
-              {day.constraintBlocked ? (
-                <AlertTriangle className="h-3.5 w-3.5 text-[var(--error-text)]" aria-hidden />
-              ) : null}
-              {buildCoverageLabel(day, activeCount)}
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[12px] font-semibold leading-none text-foreground">
+              {formatDateHeader(day.isoDate)}
+            </p>
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 rounded-full border bg-background/90 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
+                dayTone.badge
+              )}
+            >
+              {activeCount}/{TARGET_HEADCOUNT}
             </span>
           </div>
 
-          <div className="mt-auto space-y-1">
-            {visibleStaff.length > 0 ? (
-              <div className="pointer-events-auto flex flex-wrap gap-1.5">
-                {visibleStaff.map((shift) => (
-                  <div key={shift.id}>
-                    {renderShiftPill(
-                      day.id,
-                      shift,
-                      false,
-                      allowAssignmentStatusEdits,
-                      onChangeStatus
-                    )}
-                  </div>
-                ))}
-                {extraStaffCount > 0 ? (
-                  <span className="inline-flex items-center rounded-full border border-border/70 bg-background/80 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                    +{extraStaffCount} more
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
+          <p className="text-[11px] font-medium leading-4 text-foreground/82">
+            {day.leadShift ? `Lead: ${compactName(day.leadShift.name)}` : 'Lead: Unassigned'}
+          </p>
 
-            <div className="flex items-center justify-end gap-2 text-[10px] text-muted-foreground">
-              <span className="font-medium">Open day editor</span>
-              <span className="inline-flex items-center gap-1 font-medium text-foreground/70">
-                <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
-              </span>
-            </div>
+          <div className="min-h-[3.4rem] space-y-0.5">
+            {staffDisplay.lines.length > 0 ? (
+              staffDisplay.lines.map((line) => (
+                <p key={`${day.id}-${line}`} className="text-[11px] leading-[1.15rem] text-foreground/78">
+                  {line}
+                </p>
+              ))
+            ) : (
+              <p className="text-[11px] leading-[1.15rem] text-muted-foreground">No staff assigned</p>
+            )}
+            {staffDisplay.remaining > 0 ? (
+              <p className="text-[10px] font-medium text-muted-foreground">
+                +{staffDisplay.remaining} more
+              </p>
+            ) : null}
+          </div>
+
+          <div className="mt-auto flex items-center gap-1.5">
+            <span className={cn('h-1.5 w-1.5 rounded-full', dayTone.dot)} />
+            <span className={cn('text-[10px] font-medium', dayTone.label)}>{dayStatus.label}</span>
           </div>
         </div>
       </article>
@@ -340,7 +303,7 @@ export function CalendarGrid({
 
   return (
     <>
-      <div className="coverage-calendar-mobile xl:hidden">
+      <div className="coverage-calendar-mobile lg:hidden">
         <div className="coverage-calendar-mobile-header mb-3 flex items-center justify-between">
           <button
             type="button"
@@ -348,7 +311,7 @@ export function CalendarGrid({
             disabled={weekOffset <= 0}
             className="min-h-11 rounded-md border border-border/70 bg-card px-3 py-1.5 text-sm font-medium text-foreground disabled:opacity-40"
           >
-            ← Prev week
+            Prev week
           </button>
           <span className="text-sm font-medium text-foreground">
             Week {totalWeeks === 0 ? 0 : Math.min(weekOffset + 1, totalWeeks)} of {totalWeeks}
@@ -359,7 +322,7 @@ export function CalendarGrid({
             disabled={totalWeeks === 0 || weekOffset >= totalWeeks - 1}
             className="min-h-11 rounded-md border border-border/70 bg-card px-3 py-1.5 text-sm font-medium text-foreground disabled:opacity-40"
           >
-            Next week →
+            Next week
           </button>
         </div>
 
@@ -377,9 +340,7 @@ export function CalendarGrid({
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Week {totalWeeks === 0 ? 0 : Math.min(weekOffset + 1, totalWeeks)}
               </p>
-              <p className="mt-1 text-xs font-medium text-foreground">
-                {formatWeekLabel(visibleWeek)}
-              </p>
+              <p className="mt-1 text-xs font-medium text-foreground">{formatWeekLabel(visibleWeek)}</p>
             </div>
 
             {visibleWeek.map((day) => renderDayCard(day, flatDayIds.indexOf(day.id)))}
@@ -387,15 +348,15 @@ export function CalendarGrid({
         )}
       </div>
 
-      <div className="coverage-calendar-desktop hidden xl:block">
-        <div role="grid" aria-label="Coverage calendar" className="pb-2">
-          <div className="coverage-calendar-desktop-grid space-y-2.5">
-            <div className="grid grid-cols-[80px_repeat(7,minmax(0,1fr))] gap-2">
+      <div className="coverage-calendar-desktop hidden lg:block">
+        <div role="grid" aria-label="Coverage calendar" className="overflow-x-auto pb-2">
+          <div className="min-w-[980px] space-y-2">
+            <div className="sticky top-0 z-10 grid grid-cols-[112px_repeat(7,minmax(0,1fr))] gap-1.5 bg-background/95 pb-1 backdrop-blur">
               <div />
               {DOW.map((day) => (
                 <div
                   key={day}
-                  className="flex h-9 items-center justify-center rounded-lg border border-border/60 bg-muted/30 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+                  className="flex h-8 items-center justify-center rounded-md border border-border/60 bg-muted/28 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
                 >
                   {day}
                 </div>
@@ -411,18 +372,18 @@ export function CalendarGrid({
                 <section
                   key={`week-${weekIndex}`}
                   role="row"
-                  className="grid grid-cols-[80px_repeat(7,minmax(0,1fr))] gap-1.5"
+                  className="grid grid-cols-[112px_repeat(7,minmax(0,1fr))] gap-1.5"
                 >
-                  <div className="rounded-xl border border-border/70 bg-muted/18 px-2.5 py-2.5">
+                  <div className="rounded-[14px] border border-border/70 bg-muted/18 px-2.5 py-2.5">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                       Week {weekIndex + 1}
                     </p>
-                    <p className="mt-1 text-xs font-medium text-foreground">{formatWeekLabel(week)}</p>
+                    <p className="mt-1 text-xs font-medium leading-5 text-foreground">
+                      {formatWeekLabel(week)}
+                    </p>
                   </div>
 
-                  {week.map((day, dayOffset) =>
-                    renderDayCard(day, weekIndex * 7 + dayOffset)
-                  )}
+                  {week.map((day, dayOffset) => renderDayCard(day, weekIndex * 7 + dayOffset))}
                 </section>
               ))
             )}
