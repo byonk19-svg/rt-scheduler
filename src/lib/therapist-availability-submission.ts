@@ -108,6 +108,19 @@ function resolveAvailabilityDeadline(cycle: TherapistAvailabilityCycleDeadlineIn
   }
 }
 
+function resolveExplicitAvailabilityDeadline(cycle: TherapistAvailabilityCycleDeadlineInput): {
+  deadlineDateKey: string
+  deadlineInstant: Date
+} | null {
+  if (!cycle.availability_due_at) return null
+  const parsed = new Date(cycle.availability_due_at)
+  if (Number.isNaN(parsed.getTime())) return null
+  return {
+    deadlineDateKey: localDateKey(parsed),
+    deadlineInstant: parsed,
+  }
+}
+
 export type TherapistAvailabilityWritePermission =
   | { allowed: true; reason: 'ok' }
   | { allowed: false; reason: 'deadline_passed' | 'cycle_ended' }
@@ -151,6 +164,13 @@ export type TherapistDeadlinePresentation = {
   emphasis: TherapistDeadlineEmphasis
 }
 
+export type TherapistAvailabilityDueStatusTone = 'neutral' | 'urgent' | 'past' | 'muted'
+
+export type TherapistAvailabilityDueStatus = {
+  label: string
+  tone: TherapistAvailabilityDueStatusTone
+}
+
 function resolveNotSubmittedHeadline(
   cycle: TherapistAvailabilityCycleDeadlineInput,
   now: Date
@@ -162,7 +182,7 @@ function resolveNotSubmittedHeadline(
 
   if (isPast) {
     return {
-      headline: `Past due — final deadline was ${formatDateLabel(deadlineDateKey)}`,
+      headline: `Past due - final deadline was ${formatDateLabel(deadlineDateKey)}`,
       emphasis: 'past',
     }
   }
@@ -219,15 +239,58 @@ export function resolveTherapistDeadlinePresentation(
 }
 
 /**
+ * Short due-status chip for the staff dashboard.
+ * Unlike the full availability workspace, this only reports an explicit posted deadline.
+ */
+export function resolveAvailabilityDueStatus(
+  cycle: TherapistAvailabilityCycleDeadlineInput,
+  submitted: boolean,
+  now?: Date
+): TherapistAvailabilityDueStatus | null {
+  if (submitted) return null
+
+  const explicitDeadline = resolveExplicitAvailabilityDeadline(cycle)
+  if (!explicitDeadline) {
+    return {
+      label: 'No deadline set',
+      tone: 'muted',
+    }
+  }
+
+  const clock = now ?? new Date()
+  if (clock.getTime() > explicitDeadline.deadlineInstant.getTime()) {
+    return {
+      label: 'Past due',
+      tone: 'past',
+    }
+  }
+
+  const dayDiff = daysBetweenDateKeys(localDateKey(clock), explicitDeadline.deadlineDateKey)
+  if (dayDiff <= 0) {
+    return {
+      label: 'Due today',
+      tone: 'urgent',
+    }
+  }
+  if (dayDiff === 1) {
+    return {
+      label: 'Due tomorrow',
+      tone: 'urgent',
+    }
+  }
+  return {
+    label: `Due in ${dayDiff} day${dayDiff === 1 ? '' : 's'}`,
+    tone: 'neutral',
+  }
+}
+
+/**
  * Short due line for staff dashboard when availability is not officially submitted.
- * Uses the same deadline rules as the therapist availability page.
  */
 export function resolveAvailabilityDueSupportLine(
   cycle: TherapistAvailabilityCycleDeadlineInput,
   submitted: boolean,
   now?: Date
 ): string | null {
-  if (submitted) return null
-  const clock = now ?? new Date()
-  return resolveNotSubmittedHeadline(cycle, clock).headline
+  return resolveAvailabilityDueStatus(cycle, submitted, now)?.label ?? null
 }

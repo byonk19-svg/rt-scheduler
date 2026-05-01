@@ -9,8 +9,9 @@ const staffDashboardSource = fs.readFileSync(
 )
 
 describe('staff dashboard future availability links', () => {
-  it('sends staff users to the dedicated therapist availability route', () => {
-    expect(staffDashboardSource).toContain('href={workflow.primaryAction.href}')
+  it('sends staff users to the dedicated therapist availability route through the attention card seam', () => {
+    expect(staffDashboardSource).toContain('StaffAttentionCard')
+    expect(staffDashboardSource).toContain('resolveAvailabilityDueStatus')
     expect(staffDashboardSource).toContain('resolveAvailabilityDueSupportLine')
     expect(staffDashboardSource).toContain("'therapist_availability_submissions'")
   })
@@ -29,8 +30,9 @@ describe('staff dashboard future availability links', () => {
 })
 
 describe('staff dashboard therapist action-center copy', () => {
-  it('uses the therapist workflow wording from the accuracy pass', () => {
-    expect(staffDashboardSource).toContain('What needs your attention now')
+  it('keeps the staff page wired to the extracted next-step surface and therapist-owned destinations', () => {
+    expect(staffDashboardSource).toContain('Next step')
+    expect(staffDashboardSource).toContain('StaffAttentionCard')
     expect(staffDashboardSource).toContain('My Schedule')
     expect(staffDashboardSource).toContain('Shift Swaps &amp; Pickups')
     expect(staffDashboardSource).toContain('Past requests and outcomes')

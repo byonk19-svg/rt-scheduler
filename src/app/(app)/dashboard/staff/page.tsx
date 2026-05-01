@@ -1,8 +1,13 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowLeftRight, CalendarClock, Clock, History, Send } from 'lucide-react'
+import { ArrowLeftRight, CalendarClock, Clock, History } from 'lucide-react'
 
+import {
+  StaffAttentionCard,
+  badgeToneClasses,
+  dueChipToneClasses,
+} from '@/components/dashboard/StaffAttentionCard'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { MyScheduleCard } from '@/components/schedule/MyScheduleCard'
 import { Button } from '@/components/ui/button'
@@ -10,6 +15,7 @@ import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import {
   buildTherapistSubmissionUiState,
+  resolveAvailabilityDueStatus,
   resolveAvailabilityDueSupportLine,
 } from '@/lib/therapist-availability-submission'
 import {
@@ -74,20 +80,6 @@ function getStaffDashboardFeedback(
     return { message: 'Setup complete. You can use the staff dashboard now.', variant: 'success' }
   }
   return null
-}
-
-function badgeToneClasses(state: string): string {
-  switch (state) {
-    case 'published_schedule_available':
-      return 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
-    case 'preliminary_review_available':
-      return 'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)]'
-    case 'availability_draft':
-    case 'availability_not_started':
-      return 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
-    default:
-      return 'border-border/70 bg-muted/20 text-foreground'
-  }
 }
 
 export default async function StaffDashboardPage({
@@ -221,6 +213,18 @@ export default async function StaffDashboardPage({
       : null
   )
 
+  const availabilityDueStatus =
+    workflow.actionCycle &&
+    (workflow.state === 'availability_not_started' || workflow.state === 'availability_draft')
+      ? resolveAvailabilityDueStatus(
+          {
+            start_date: workflow.actionCycle.start_date,
+            availability_due_at: workflow.actionCycle.availability_due_at ?? null,
+          },
+          false
+        )
+      : null
+
   const availabilityDueLine =
     workflow.actionCycle &&
     (workflow.state === 'availability_not_started' || workflow.state === 'availability_draft')
@@ -232,6 +236,7 @@ export default async function StaffDashboardPage({
           false
         )
       : null
+
   const workflowAlreadyLinksToSchedule = [
     workflow.primaryAction.href,
     workflow.secondaryAction?.href ?? null,
@@ -242,93 +247,51 @@ export default async function StaffDashboardPage({
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
 
       <section className="rounded-2xl border border-border bg-card px-5 py-5 shadow-tw-float-lg">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                Welcome, {firstName}
-              </h1>
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Welcome, {firstName}
+            </h1>
+            <span
+              className={cn(
+                'rounded-full border px-2.5 py-1 text-[11px] font-semibold',
+                badgeToneClasses(workflow.state)
+              )}
+            >
+              {workflow.stateLabel}
+            </span>
+            {availabilityDueStatus ? (
               <span
                 className={cn(
                   'rounded-full border px-2.5 py-1 text-[11px] font-semibold',
-                  badgeToneClasses(workflow.state)
+                  dueChipToneClasses(availabilityDueStatus.tone)
                 )}
               >
-                {workflow.stateLabel}
+                {availabilityDueStatus.label}
               </span>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Your dashboard always shows the next therapist-safe action for the current workflow.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild size="sm">
-              <Link href={workflow.primaryAction.href}>
-                <Send className="mr-1.5 h-3.5 w-3.5" />
-                {workflow.primaryAction.label}
-              </Link>
-            </Button>
-            {workflow.secondaryAction ? (
-              <Button asChild size="sm" variant="outline">
-                <Link href={workflow.secondaryAction.href}>{workflow.secondaryAction.label}</Link>
-              </Button>
-            ) : null}
-            {!workflowAlreadyLinksToSchedule ? (
-              <Button asChild size="sm" variant="outline">
-                <Link href="/therapist/schedule">View my shifts</Link>
-              </Button>
             ) : null}
           </div>
+          <p className="text-sm text-muted-foreground">
+            Start with the next-step card below. The other cards are where you check shifts, swaps,
+            and history.
+          </p>
         </div>
       </section>
 
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-[1.2fr_1fr_1fr]">
-        <article className="rounded-2xl border border-border bg-card px-5 py-5 shadow-tw-sm">
+        <div className="space-y-2">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             <CalendarClock className="h-3.5 w-3.5" />
-            What needs your attention now
+            Next step
           </div>
-          <h2 className="mt-3 text-xl font-semibold tracking-tight text-foreground">
-            {workflow.primaryTitle}
-          </h2>
-          {workflow.cycleLabel && workflow.cycleRangeLabel ? (
-            <div className="mt-3 rounded-xl border border-border/70 bg-muted/15 px-3 py-3">
-              <p className="text-sm font-semibold text-foreground">{workflow.cycleLabel}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">{workflow.cycleRangeLabel}</p>
-              {workflow.cycleReason ? (
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                  {workflow.cycleReason}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-          <p className="mt-4 text-sm leading-6 text-muted-foreground">
-            {workflow.primaryDescription}
-          </p>
-          {availabilityDueLine ? (
-            <p className="mt-3 text-sm font-medium text-foreground">{availabilityDueLine}</p>
-          ) : null}
-          {submissionUi.isSubmitted && submissionUi.submittedAtDisplay ? (
-            <p className="mt-3 text-sm text-muted-foreground">
-              Submitted {submissionUi.submittedAtDisplay}
-            </p>
-          ) : null}
-          {submissionUi.isSubmitted && submissionUi.lastEditedDisplay ? (
-            <p className="mt-1 text-sm text-muted-foreground">
-              Updated after submit {submissionUi.lastEditedDisplay}
-            </p>
-          ) : null}
-          <div className="mt-5 flex flex-wrap gap-2">
-            <Button asChild size="sm">
-              <Link href={workflow.primaryAction.href}>{workflow.primaryAction.label}</Link>
-            </Button>
-            {workflow.secondaryAction ? (
-              <Button asChild size="sm" variant="outline">
-                <Link href={workflow.secondaryAction.href}>{workflow.secondaryAction.label}</Link>
-              </Button>
-            ) : null}
-          </div>
-        </article>
+          <StaffAttentionCard
+            workflow={workflow}
+            submissionUi={submissionUi}
+            availabilityDueStatus={availabilityDueStatus}
+            availabilityDueLine={availabilityDueLine}
+            workflowAlreadyLinksToSchedule={workflowAlreadyLinksToSchedule}
+          />
+        </div>
 
         <article className="rounded-2xl border border-border bg-card px-5 py-5 shadow-tw-sm">
           <div className="flex items-center justify-between gap-3">
@@ -344,8 +307,8 @@ export default async function StaffDashboardPage({
             <Clock className="h-4 w-4 text-muted-foreground" />
           </div>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
-            Published shifts only. Draft and preliminary assignments stay out of this view until the
-            schedule is finalized.
+            This is where your published shifts show up. Draft and preliminary assignments stay out
+            of this view.
           </p>
           {upcomingPublishedWidget.length > 0 ? (
             <div className="mt-4 space-y-2">
@@ -386,8 +349,7 @@ export default async function StaffDashboardPage({
               <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
             </div>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Relevant request activity includes both posts you created and pickups or swaps you
-              claimed.
+              Use this to post, claim, or track swap and pickup requests that involve you.
             </p>
             <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
               <span className="rounded-full border border-border/70 bg-muted/20 px-2 py-0.5">
@@ -417,8 +379,8 @@ export default async function StaffDashboardPage({
               <History className="h-4 w-4 text-muted-foreground" />
             </div>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Review earlier swaps, pickups, and request outcomes without mixing them into the
-              active workflow.
+              Use this to review earlier swaps, pickups, and request results without mixing them
+              into what needs attention today.
             </p>
             <div className="mt-4">
               <Button asChild size="sm" variant="outline">

@@ -163,7 +163,7 @@ export function resolveTherapistWorkflow(params: {
   const scheduleAction = publishedSchedule.cycle
     ? {
         href: `/therapist/schedule?cycle=${publishedSchedule.cycle.id}`,
-        label: 'View my schedule',
+        label: 'View my shifts',
       }
     : null
 
@@ -203,8 +203,10 @@ export function resolveTherapistWorkflow(params: {
       Boolean(submission),
       params.now
     )
+    const availabilityPastDue =
+      !submission && !writePermission.allowed && writePermission.reason === 'deadline_passed'
 
-    if (!writePermission.allowed && !submission) {
+    if (!writePermission.allowed && !submission && writePermission.reason === 'cycle_ended') {
       return {
         state: 'cycle_closed',
         stateLabel: 'Cycle closed',
@@ -233,16 +235,16 @@ export function resolveTherapistWorkflow(params: {
       return {
         state: 'availability_submitted',
         stateLabel: 'Submitted',
-        primaryTitle: 'Waiting on preliminary',
+        primaryTitle: 'Availability sent',
         primaryDescription:
-          'Your availability is officially submitted. You can review it here while the manager prepares the preliminary schedule.',
+          'Your availability is in for the next schedule. You can review it here while the schedule is being built.',
         actionCycle,
         cycleLabel: actionCycle.label,
         cycleRangeLabel,
         cycleReason: 'This is the next 6-week cycle waiting on manager scheduling work.',
         primaryAction: {
           href: cycleLink,
-          label: 'Review future availability',
+          label: 'Review submitted availability',
         },
         secondaryAction: scheduleAction,
         scheduleAction,
@@ -258,16 +260,19 @@ export function resolveTherapistWorkflow(params: {
       return {
         state: 'availability_draft',
         stateLabel: 'Draft saved',
-        primaryTitle: 'Needs your availability',
-        primaryDescription:
-          'You have a saved draft for the next cycle, but it is not officially submitted yet.',
+        primaryTitle: availabilityPastDue
+          ? 'Availability is past due'
+          : 'Finish and send your availability',
+        primaryDescription: availabilityPastDue
+          ? 'You have a saved draft, but it was not sent before the deadline. Review it and contact your manager if you still need changes.'
+          : 'You already started the next schedule. Finish it and send it so it counts.',
         actionCycle,
         cycleLabel: actionCycle.label,
         cycleRangeLabel,
-        cycleReason: 'This is the next 6-week cycle still accepting therapist availability.',
+        cycleReason: 'This is the next 6-week cycle still waiting on your response.',
         primaryAction: {
           href: cycleLink,
-          label: 'Continue availability',
+          label: availabilityPastDue ? 'Review draft availability' : 'Finish and send availability',
         },
         secondaryAction: scheduleAction,
         scheduleAction,
@@ -282,16 +287,17 @@ export function resolveTherapistWorkflow(params: {
     return {
       state: 'availability_not_started',
       stateLabel: 'Not started',
-      primaryTitle: 'Needs your availability',
-      primaryDescription:
-        'The next schedule cycle is open for therapist input. Start your future availability now.',
+      primaryTitle: availabilityPastDue ? 'Availability is past due' : 'Tell us when you can work',
+      primaryDescription: availabilityPastDue
+        ? 'The due date passed before you sent this availability. Review the cycle and contact your manager if you still need changes.'
+        : 'The next schedule is open. Add your availability so the manager can build it.',
       actionCycle,
       cycleLabel: actionCycle.label,
       cycleRangeLabel,
       cycleReason: 'This is the next 6-week cycle that still needs your response.',
       primaryAction: {
         href: cycleLink,
-        label: 'Start availability',
+        label: availabilityPastDue ? 'Review availability' : 'Start availability',
       },
       secondaryAction: scheduleAction,
       scheduleAction,
@@ -321,7 +327,7 @@ export function resolveTherapistWorkflow(params: {
       cycleReason: 'This is the current published schedule available to therapists.',
       primaryAction: {
         href: `/therapist/schedule?cycle=${publishedSchedule.cycle.id}`,
-        label: 'View my schedule',
+        label: 'View my shifts',
       },
       secondaryAction: {
         href: '/therapist/swaps',

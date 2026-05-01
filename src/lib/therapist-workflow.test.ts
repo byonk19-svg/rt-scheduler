@@ -27,9 +27,119 @@ describe('therapist-workflow', () => {
 
     expect(workflow.state).toBe('availability_draft')
     expect(workflow.stateLabel).toBe('Draft saved')
-    expect(workflow.primaryTitle).toBe('Needs your availability')
+    expect(workflow.primaryTitle).toBe('Finish and send your availability')
     expect(workflow.primaryAction.href).toBe('/therapist/availability?cycle=cycle-draft')
-    expect(workflow.primaryAction.label).toBe('Continue availability')
+    expect(workflow.primaryAction.label).toBe('Finish and send availability')
+  })
+
+  it('uses plain-language copy for a not-started availability workflow', () => {
+    const workflow = resolveTherapistWorkflow({
+      todayKey,
+      cycles: [
+        {
+          id: 'cycle-open',
+          label: 'May 2026',
+          start_date: '2026-05-10',
+          end_date: '2026-06-20',
+          published: false,
+          availability_due_at: '2026-05-01T23:59:59.000Z',
+        },
+      ],
+      availabilityEntryCountsByCycleId: {},
+      submissionsByCycleId: {},
+      preliminarySnapshots: [],
+      publishedShifts: [],
+      relevantShiftPostSummary: { pendingCount: 0, totalCount: 0 },
+    })
+
+    expect(workflow.state).toBe('availability_not_started')
+    expect(workflow.primaryTitle).toBe('Tell us when you can work')
+    expect(workflow.primaryAction.label).toBe('Start availability')
+  })
+
+  it('keeps an overdue not-started cycle in the therapist workflow instead of collapsing it to closed', () => {
+    const workflow = resolveTherapistWorkflow({
+      todayKey,
+      now: new Date('2026-05-03T12:00:00.000Z'),
+      cycles: [
+        {
+          id: 'cycle-past-due',
+          label: 'May 2026',
+          start_date: '2026-05-10',
+          end_date: '2026-06-20',
+          published: false,
+          availability_due_at: '2026-05-01T23:59:59.000Z',
+        },
+      ],
+      availabilityEntryCountsByCycleId: {},
+      submissionsByCycleId: {},
+      preliminarySnapshots: [],
+      publishedShifts: [],
+      relevantShiftPostSummary: { pendingCount: 0, totalCount: 0 },
+    })
+
+    expect(workflow.state).toBe('availability_not_started')
+    expect(workflow.stateLabel).toBe('Not started')
+    expect(workflow.primaryTitle).toBe('Availability is past due')
+    expect(workflow.primaryAction.label).toBe('Review availability')
+  })
+
+  it('keeps submitted availability visually and textually distinct from draft state copy', () => {
+    const workflow = resolveTherapistWorkflow({
+      todayKey,
+      cycles: [
+        {
+          id: 'cycle-submitted',
+          label: 'May 2026',
+          start_date: '2026-05-10',
+          end_date: '2026-06-20',
+          published: false,
+          availability_due_at: '2026-05-01T23:59:59.000Z',
+        },
+      ],
+      availabilityEntryCountsByCycleId: { 'cycle-submitted': 4 },
+      submissionsByCycleId: {
+        'cycle-submitted': {
+          submittedAt: '2026-04-20T12:00:00.000Z',
+          lastEditedAt: '2026-04-20T12:00:00.000Z',
+        },
+      },
+      preliminarySnapshots: [],
+      publishedShifts: [],
+      relevantShiftPostSummary: { pendingCount: 0, totalCount: 0 },
+    })
+
+    expect(workflow.state).toBe('availability_submitted')
+    expect(workflow.stateLabel).toBe('Submitted')
+    expect(workflow.primaryTitle).toBe('Availability sent')
+    expect(workflow.primaryAction.label).toBe('Review submitted availability')
+  })
+
+  it('keeps an overdue draft visible instead of treating it as a closed cycle', () => {
+    const workflow = resolveTherapistWorkflow({
+      todayKey,
+      now: new Date('2026-05-03T12:00:00.000Z'),
+      cycles: [
+        {
+          id: 'cycle-draft-overdue',
+          label: 'May 2026',
+          start_date: '2026-05-10',
+          end_date: '2026-06-20',
+          published: false,
+          availability_due_at: '2026-05-01T23:59:59.000Z',
+        },
+      ],
+      availabilityEntryCountsByCycleId: { 'cycle-draft-overdue': 3 },
+      submissionsByCycleId: {},
+      preliminarySnapshots: [],
+      publishedShifts: [],
+      relevantShiftPostSummary: { pendingCount: 0, totalCount: 0 },
+    })
+
+    expect(workflow.state).toBe('availability_draft')
+    expect(workflow.stateLabel).toBe('Draft saved')
+    expect(workflow.primaryTitle).toBe('Availability is past due')
+    expect(workflow.primaryAction.label).toBe('Review draft availability')
   })
 
   it('prioritizes preliminary review when an active preliminary snapshot exists', () => {
