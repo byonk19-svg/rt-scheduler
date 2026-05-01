@@ -1,6 +1,12 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import { CycleFillRateChart } from '@/components/analytics/CycleFillRateChart'
+
+export const metadata: Metadata = {
+  title: 'Analytics',
+  description: 'Cycle fill rates, submission compliance, and forced-date miss patterns.',
+}
 import { ForcedDateMissTable } from '@/components/analytics/ForcedDateMissTable'
 import { SubmissionComplianceTable } from '@/components/analytics/SubmissionComplianceTable'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'

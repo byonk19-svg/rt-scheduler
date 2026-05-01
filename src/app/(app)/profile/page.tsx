@@ -1,6 +1,12 @@
+import type { Metadata } from 'next'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { AlertCircle } from 'lucide-react'
+
+export const metadata: Metadata = {
+  title: 'Profile',
+  description: 'Manage your account, schedule preferences, and notification settings.',
+}
 
 import { FeedbackToast } from '@/components/feedback-toast'
 import { FormSubmitButton } from '@/components/form-submit-button'

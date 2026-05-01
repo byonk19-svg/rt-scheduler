@@ -1,6 +1,12 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { CalendarDays, Clock } from 'lucide-react'
+
+export const metadata: Metadata = {
+  title: 'Approvals',
+  description: 'Review preliminary shift claims and schedule change requests.',
+}
 
 import {
   approvePreliminaryRequestAction,
