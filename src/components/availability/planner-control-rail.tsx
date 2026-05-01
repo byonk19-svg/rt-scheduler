@@ -35,6 +35,10 @@ type PlannerControlRailProps = {
   onModeChange: (value: PlannerMode) => void
   onClearSelectedDates: () => void
   onRemoveSelectedDate: (date: string) => void
+  missingSubmissionCount?: number
+  nextMissingResponderName?: string | null
+  onFocusMissingResponders?: () => void
+  onReviewNextMissingResponder?: () => void
   copyAction: (formData: FormData) => void | Promise<void>
   saveAction: (formData: FormData) => void | Promise<void>
   footer?: ReactNode
@@ -67,6 +71,10 @@ export function PlannerControlRail({
   onModeChange,
   onClearSelectedDates,
   onRemoveSelectedDate,
+  missingSubmissionCount = 0,
+  nextMissingResponderName = null,
+  onFocusMissingResponders,
+  onReviewNextMissingResponder,
   copyAction,
   saveAction,
   footer,
@@ -150,6 +158,53 @@ export function PlannerControlRail({
           <p className="mt-2 text-sm text-muted-foreground">
             Planner changes apply to {selectedTherapist.full_name}&apos;s scheduled shift pattern.
           </p>
+        </div>
+      ) : null}
+
+      {missingSubmissionCount > 0 ? (
+        <div className="rounded-[1.1rem] border border-[var(--warning-border)]/60 bg-[var(--warning-subtle)]/25 px-3 py-2.5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--warning-text)]">
+                Not submitted
+              </p>
+              <p className="mt-1 text-sm font-medium text-foreground">
+                {missingSubmissionCount} therapist
+                {missingSubmissionCount === 1 ? '' : 's'} still need an official submission.
+              </p>
+              {nextMissingResponderName ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Review next: {nextMissingResponderName}
+                </p>
+              ) : null}
+            </div>
+            <Badge
+              variant="outline"
+              className="border-[var(--warning-border)] bg-background/80 text-[var(--warning-text)]"
+            >
+              {missingSubmissionCount}
+            </Badge>
+          </div>
+
+          <div className="mt-2 grid gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-10 w-full justify-center border-border/70 bg-background/85 text-xs text-foreground hover:bg-background"
+              onClick={onFocusMissingResponders}
+            >
+              Focus missing responders
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-h-10 w-full justify-center text-xs text-muted-foreground hover:bg-background hover:text-foreground"
+              onClick={onReviewNextMissingResponder}
+              disabled={!onReviewNextMissingResponder}
+            >
+              Review next
+            </Button>
+          </div>
         </div>
       ) : null}
 

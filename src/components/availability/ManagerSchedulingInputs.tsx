@@ -1,7 +1,8 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useMemo, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useMemo, useState, useTransition } from 'react'
 import type { ReactNode } from 'react'
 
 import { useAvailabilityPlannerFocus } from '@/components/availability/availability-planner-focus-context'
@@ -121,12 +122,21 @@ export function ManagerSchedulingInputs({
   reviewRequestsPanel,
 }: Props) {
   const plannerFocus = useAvailabilityPlannerFocus()
+  const pathname = usePathname()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const [, startTransition] = useTransition()
 
   const initialSelectedCycleId = initialCycleId || cycles[0]?.id || ''
   const initialSelectedTherapistId = initialTherapistId || therapists[0]?.id || ''
 
   const [selectedCycleId, setSelectedCycleId] = useState(initialSelectedCycleId)
   const [selectedTherapistId, setSelectedTherapistId] = useState(initialSelectedTherapistId)
+  const [activeRosterFilter, setActiveRosterFilter] =
+    useState<AvailabilityRosterFilter>(initialRosterFilter)
+  const [activeSecondaryTab, setActiveSecondaryTab] = useState<'roster' | 'inbox'>(
+    defaultSecondaryTab
+  )
   const [mode, setMode] = useState<PlannerMode>('will_work')
   const [selectedDates, setSelectedDates] = useState<string[]>(() => {
     const initialBuckets = getSavedBucketsForSelection(
@@ -186,21 +196,59 @@ export function ManagerSchedulingInputs({
       }
     : null
 
+  const nextMissingResponderId = useMemo(() => {
+    if (missingRows.length === 0) return null
+    const currentIndex = missingRows.findIndex((row) => row.therapistId === selectedTherapistId)
+    if (currentIndex === -1) return missingRows[0]?.therapistId ?? null
+    return missingRows[(currentIndex + 1) % missingRows.length]?.therapistId ?? null
+  }, [missingRows, selectedTherapistId])
+
+  const nextMissingResponderName =
+    missingRows.find((row) => row.therapistId === nextMissingResponderId)?.therapistName ?? null
+
   function syncSelection(nextMode: PlannerMode, cycleId: string, therapistId: string) {
     const nextBuckets = getSavedBucketsForSelection(overrides, cycleId, therapistId)
     setSelectedDates(nextMode === 'will_work' ? nextBuckets.willWork : nextBuckets.cannotWork)
   }
 
   function replacePlannerQuery(nextCycleId: string, nextTherapistId: string) {
-    if (typeof window === 'undefined') return
-    const currentUrl = new URL(window.location.href)
-    const params = new URLSearchParams(currentUrl.search)
+    const params = new URLSearchParams(searchParams.toString())
     params.set('tab', 'planner')
-    if (nextCycleId) params.set('cycle', nextCycleId)
-    if (nextTherapistId) params.set('therapist', nextTherapistId)
+    if (nextCycleId) {
+      params.set('cycle', nextCycleId)
+    } else {
+      params.delete('cycle')
+    }
+    if (nextTherapistId) {
+      params.set('therapist', nextTherapistId)
+    } else {
+      params.delete('therapist')
+    }
     params.delete('search')
     const query = params.toString()
-    window.location.assign(query ? `${currentUrl.pathname}?${query}` : currentUrl.pathname)
+    startTransition(() => {
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+    })
+  }
+
+  function applyTherapistSelection(
+    nextTherapistId: string,
+    options?: {
+      rosterFilter?: AvailabilityRosterFilter
+      secondaryTab?: 'roster' | 'inbox'
+    }
+  ) {
+    setSelectedTherapistId(nextTherapistId)
+    if (options?.rosterFilter) {
+      setActiveRosterFilter(options.rosterFilter)
+    }
+    if (options?.secondaryTab) {
+      setActiveSecondaryTab(options.secondaryTab)
+    }
+    const nextTherapist = therapists.find((therapist) => therapist.id === nextTherapistId) ?? null
+    plannerFocus?.setFocusedTherapistName(nextTherapist?.full_name ?? null)
+    syncSelection(mode, selectedCycleId, nextTherapistId)
+    replacePlannerQuery(selectedCycleId, nextTherapistId)
   }
 
   function handleCycleChange(nextCycleId: string) {
@@ -214,11 +262,20 @@ export function ManagerSchedulingInputs({
   }
 
   function handleTherapistChange(nextTherapistId: string) {
-    setSelectedTherapistId(nextTherapistId)
-    const nextTherapist = therapists.find((therapist) => therapist.id === nextTherapistId) ?? null
-    plannerFocus?.setFocusedTherapistName(nextTherapist?.full_name ?? null)
-    syncSelection(mode, selectedCycleId, nextTherapistId)
-    replacePlannerQuery(selectedCycleId, nextTherapistId)
+    applyTherapistSelection(nextTherapistId)
+  }
+
+  function focusMissingResponders() {
+    setActiveSecondaryTab('roster')
+    setActiveRosterFilter('missing')
+  }
+
+  function reviewNextMissingResponder() {
+    if (!nextMissingResponderId) return
+    applyTherapistSelection(nextMissingResponderId, {
+      rosterFilter: 'missing',
+      secondaryTab: 'roster',
+    })
   }
 
   function handleModeChange(nextMode: PlannerMode) {
@@ -319,6 +376,10 @@ export function ManagerSchedulingInputs({
             onRemoveSelectedDate={(date) =>
               setSelectedDates((current) => current.filter((value) => value !== date))
             }
+            missingSubmissionCount={missingRows.length}
+            nextMissingResponderName={nextMissingResponderName}
+            onFocusMissingResponders={focusMissingResponders}
+            onReviewNextMissingResponder={reviewNextMissingResponder}
             copyAction={copyAvailabilityFromPreviousCycleAction}
             saveAction={saveManagerPlannerDatesAction}
           />
@@ -359,12 +420,22 @@ export function ManagerSchedulingInputs({
         secondaryContent={
           <AvailabilitySecondaryPanel
             defaultTab={defaultSecondaryTab}
+            activeTab={activeSecondaryTab}
+            onTabChange={setActiveSecondaryTab}
             roster={
               <AvailabilityStatusSummary
                 submittedRows={submittedRows}
                 missingRows={missingRows}
                 initialFilter={initialRosterFilter}
-                onPickTherapist={handleTherapistChange}
+                activeFilter={activeRosterFilter}
+                selectedTherapistId={selectedTherapistId}
+                onPickTherapist={(therapistId) =>
+                  applyTherapistSelection(therapistId, { secondaryTab: 'roster' })
+                }
+                onFilterChange={setActiveRosterFilter}
+                onFocusMissingResponders={focusMissingResponders}
+                onReviewNextMissingResponder={reviewNextMissingResponder}
+                nextMissingResponderName={nextMissingResponderName}
                 embedded
               />
             }

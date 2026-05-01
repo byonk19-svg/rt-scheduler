@@ -58,6 +58,7 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('Manager Inbox')
     expect(html).toContain('Recent Activity')
     expect(html).toContain('Brianna approved a shift swap')
+    expect(html).toContain('href="/requests"')
     expect(html).toContain('Publish by Apr 27')
   })
 
@@ -164,6 +165,43 @@ describe('ManagerTriageDashboard', () => {
     expect(scheduleProgressIndex).toBeGreaterThan(-1)
     expect(recentActivityIndex).toBeGreaterThan(-1)
     expect(scheduleProgressIndex).toBeLessThan(recentActivityIndex)
+  })
+
+  it('renders recent activity items as navigable links using the provided href', () => {
+    const html = renderToStaticMarkup(
+      createElement(ManagerTriageDashboard, {
+        todayCoverageCovered: 15,
+        todayCoverageTotal: 17,
+        upcomingShiftCount: 12,
+        upcomingShiftDays: [],
+        todayStaffedShifts: [],
+        recentActivity: [
+          { title: 'Schedule published', timeLabel: '5 minutes ago', href: '/coverage?view=week' },
+          { title: 'New preliminary request', timeLabel: '1 hour ago', href: '/approvals' },
+        ],
+        pendingRequests: 0,
+        approvalsWaiting: 0,
+        currentCycleStatus: 'Published',
+        currentCycleDetail: 'Live',
+        nextCycleLabel: 'Collect availability Apr 1',
+        nextCycleDetail: 'Publish by May 11',
+        needsReviewCount: 0,
+        needsReviewDetail: 'You are caught up.',
+        dayShiftsFilled: 18,
+        dayShiftsTotal: 21,
+        nightShiftsFilled: 15,
+        nightShiftsTotal: 21,
+        approvalsHref: '/approvals',
+        scheduleHref: '/coverage',
+        reviewHref: '/approvals',
+        activeCycleDateRange: 'Mar 17 – Apr 13',
+      })
+    )
+
+    expect(html).toContain('Schedule published')
+    expect(html).toContain('href="/coverage?view=week"')
+    expect(html).toContain('New preliminary request')
+    expect(html).toContain('href="/approvals"')
   })
 
   it('renders cycle date range pill when provided', () => {

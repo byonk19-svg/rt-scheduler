@@ -504,7 +504,9 @@ export default function ShiftBoardClientPage({
               {!canReview && employmentType === 'prn' ? 'Express interest' : 'Post request'}
             </Button>
             <Button asChild size="sm" variant="outline" className="text-xs">
-              <Link href="/therapist/availability">Future Availability</Link>
+              <Link href={canReview ? '/availability' : '/therapist/availability'}>
+                Future Availability
+              </Link>
             </Button>
             {!canReview && (
               <Button asChild size="sm" variant="ghost" className="text-xs">

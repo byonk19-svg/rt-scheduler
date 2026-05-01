@@ -706,6 +706,7 @@ export default async function AvailabilityPage({
         initialFocusedTherapistName={plannerTherapistNameForDefault}
       >
         <ManagerSchedulingInputs
+          key={`${selectedCycleId}:${selectedPlannerTherapistId}:${initialRoster ?? 'missing'}:${defaultSecondaryTab}`}
           cycles={cycles}
           therapists={plannerTherapists}
           overrides={plannerOverrides}
