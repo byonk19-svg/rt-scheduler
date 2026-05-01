@@ -242,13 +242,14 @@ export function ManagerTriageDashboard({
             <CardContent className="space-y-2.5 pb-4">
               {recentActivity.length > 0 ? (
                 recentActivity.map((item, index) => (
-                  <div
+                  <Link
                     key={`${item.title}-${index}`}
-                    className="flex items-center justify-between gap-3"
+                    href={item.href}
+                    className="-mx-2 flex items-center justify-between gap-3 rounded-md px-2 py-0.5 transition-colors hover:bg-muted/50"
                   >
                     <p className="text-sm text-foreground">{item.title}</p>
                     <p className="text-xs text-muted-foreground">{item.timeLabel}</p>
-                  </div>
+                  </Link>
                 ))
               ) : (
                 <p className="rounded-lg border border-dashed border-border px-3 py-5 text-center text-xs text-muted-foreground">
