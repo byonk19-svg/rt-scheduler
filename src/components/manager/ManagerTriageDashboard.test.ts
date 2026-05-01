@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { ManagerTriageDashboard } from '@/components/manager/ManagerTriageDashboard'
 
 describe('ManagerTriageDashboard', () => {
-  it('renders feature cards, schedule overview, and manager inbox sections', () => {
+  it('renders feature cards, schedule overview, and manager inbox sections with accurate workflow labels', () => {
     const html = renderToStaticMarkup(
       createElement(ManagerTriageDashboard, {
         todayCoverageCovered: 15,
@@ -15,7 +15,7 @@ describe('ManagerTriageDashboard', () => {
           { label: 'Mar 26', count: 4 },
           { label: 'Mar 27', count: 5 },
         ],
-        todayActiveShifts: [
+        todayStaffedShifts: [
           { label: 'Adrienne S.', detail: 'Day shift | Lead' },
           { label: 'Alyce L.', detail: 'Day shift | Staff' },
         ],
@@ -46,9 +46,15 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('Coverage Issues')
     expect(html).toContain('Pending Approvals')
     expect(html).toContain('Upcoming Shifts')
+    expect(html).toContain('Open schedule workspace')
+    expect(html).toContain('Review approvals')
+    expect(html).not.toContain('Publish flow')
     expect(html).toContain('Mar 26')
     expect(html).toContain('4 shifts')
     expect(html).toContain('Adrienne S.')
+    expect(html).toContain('Staffed Shifts')
+    expect(html).toContain('Staffed')
+    expect(html).not.toContain('Coverage Risks')
     expect(html).toContain('Manager Inbox')
     expect(html).toContain('Recent Activity')
     expect(html).toContain('Brianna approved a shift swap')
@@ -62,7 +68,7 @@ describe('ManagerTriageDashboard', () => {
         todayCoverageTotal: '--',
         upcomingShiftCount: '--',
         upcomingShiftDays: [],
-        todayActiveShifts: [],
+        todayStaffedShifts: [],
         recentActivity: [],
         pendingRequests: '--',
         approvalsWaiting: '--',
@@ -98,7 +104,7 @@ describe('ManagerTriageDashboard', () => {
         todayCoverageTotal: 0,
         upcomingShiftCount: 0,
         upcomingShiftDays: [],
-        todayActiveShifts: [],
+        todayStaffedShifts: [],
         recentActivity: [],
         pendingRequests: 0,
         approvalsWaiting: 0,
@@ -131,7 +137,7 @@ describe('ManagerTriageDashboard', () => {
         todayCoverageTotal: 17,
         upcomingShiftCount: 12,
         upcomingShiftDays: [],
-        todayActiveShifts: [],
+        todayStaffedShifts: [],
         recentActivity: [{ title: 'Some activity', timeLabel: '1 hour ago', href: '/coverage' }],
         pendingRequests: 0,
         approvalsWaiting: 0,
@@ -167,7 +173,7 @@ describe('ManagerTriageDashboard', () => {
         todayCoverageTotal: 17,
         upcomingShiftCount: 12,
         upcomingShiftDays: [],
-        todayActiveShifts: [],
+        todayStaffedShifts: [],
         recentActivity: [],
         pendingRequests: 0,
         approvalsWaiting: 0,

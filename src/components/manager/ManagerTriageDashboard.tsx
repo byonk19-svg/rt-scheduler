@@ -1,15 +1,6 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
-import {
-  AlertTriangle,
-  ArrowRight,
-  CalendarDays,
-  FileCheck,
-  Send,
-  Shield,
-  Sparkles,
-  Users,
-} from 'lucide-react'
+import { ArrowRight, CalendarDays, FileCheck, Send, Shield, Sparkles, Users } from 'lucide-react'
 
 import { ScheduleProgress } from '@/components/manager/ScheduleProgress'
 import { Button } from '@/components/ui/button'
@@ -23,7 +14,7 @@ type ManagerTriageDashboardProps = {
   todayCoverageTotal: number | '--'
   upcomingShiftCount: number | '--'
   upcomingShiftDays: Array<{ label: string; count: number }>
-  todayActiveShifts: Array<{ label: string; detail: string }>
+  todayStaffedShifts: Array<{ label: string; detail: string }>
   recentActivity: Array<{ title: string; timeLabel: string; href: string }>
   pendingRequests: number | '--'
   approvalsWaiting: number | '--'
@@ -50,7 +41,7 @@ export function ManagerTriageDashboard({
   todayCoverageTotal,
   upcomingShiftCount,
   upcomingShiftDays,
-  todayActiveShifts,
+  todayStaffedShifts,
   recentActivity,
   pendingRequests,
   approvalsWaiting,
@@ -134,13 +125,13 @@ export function ManagerTriageDashboard({
             <Button variant="outline" size="sm" className="min-h-11 px-4" asChild>
               <Link href={scheduleHref}>
                 <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
-                Open schedule
+                Open schedule workspace
               </Link>
             </Button>
             <Button size="sm" className="min-h-11 px-4" asChild>
               <Link href={approvalsHref}>
                 <Send className="mr-1.5 h-3.5 w-3.5" />
-                Publish flow
+                Review approvals
               </Link>
             </Button>
           </div>
@@ -204,37 +195,37 @@ export function ManagerTriageDashboard({
           <Card className="rounded-2xl border-border/70 bg-card shadow-tw-float-tight">
             <CardHeader className="pb-2 pt-4">
               <CardTitle className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-                Coverage Risks
+                Today&apos;s Staffed Shifts
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 pb-4">
-              {todayActiveShifts.length > 0 ? (
-                todayActiveShifts.map((shift, index) => (
+              {todayStaffedShifts.length > 0 ? (
+                todayStaffedShifts.map((shift, index) => (
                   <div
                     key={`${shift.label}-${shift.detail}-${index}`}
                     className="flex items-center justify-between rounded-lg border border-border/70 bg-card px-3 py-2.5"
                   >
                     <div className="flex items-center gap-2.5">
-                      <AlertTriangle className="h-4 w-4 text-[var(--warning-text)]" />
+                      <CalendarDays className="h-4 w-4 text-primary" />
                       <div>
                         <p className="text-sm font-medium text-foreground">{shift.label}</p>
                         <p className="text-xs text-muted-foreground">{shift.detail}</p>
                       </div>
                     </div>
-                    <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--warning-text)]">
-                      Review
+                    <span className="rounded-full border border-border/70 bg-muted/30 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                      Staffed
                     </span>
                   </div>
                 ))
               ) : (
                 <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
-                  {isLoading ? LOADING_LABEL : 'No active shift risks right now.'}
+                  {isLoading ? LOADING_LABEL : "No staffed shifts on today's schedule."}
                 </p>
               )}
-              {todayActiveShifts.length > 0 && (
+              {todayStaffedShifts.length > 0 && (
                 <Button variant="ghost" size="sm" className="min-h-11 gap-1 px-0 text-xs" asChild>
                   <Link href={scheduleHref}>
-                    Fix coverage
+                    Open schedule workspace
                     <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
                 </Button>

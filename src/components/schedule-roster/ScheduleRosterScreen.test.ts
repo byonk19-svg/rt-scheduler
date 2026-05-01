@@ -15,7 +15,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 describe('ScheduleRosterScreen', () => {
-  it('renders the paper schedule shell with live cycle metadata, fixed grid, controls, and legend copy', () => {
+  it('renders the paper schedule shell with live cycle metadata, working read-only actions, and legend copy', () => {
     const html = renderToStaticMarkup(
       createElement(ScheduleRosterScreen, {
         live: {
@@ -42,13 +42,15 @@ describe('ScheduleRosterScreen', () => {
     expect(html).not.toContain('March 22, 2026')
     expect(html).toContain('DRAFT')
     expect(html).toContain('Print')
-    expect(html).toContain('Export')
-    expect(html).toContain('Publish')
+    expect(html).toContain('Open schedule workspace')
+    expect(html).not.toContain('Export')
+    expect(html).not.toContain('Publish')
     expect(html).toContain('PRN / Extra staff')
     expect(html).toContain('Staffing Count')
     expect(html).toContain('On Call')
     expect(html).toContain('Call In')
     expect(html).toContain('Roster view only')
+    expect(html).toContain('Use Coverage to edit staffing, auto-draft, or publish this cycle.')
     expect(html).toContain('Bold vertical lines separate weeks')
     expect(html).toContain('Weekends shaded')
     expect(html).toContain('<colgroup>')
@@ -56,6 +58,7 @@ describe('ScheduleRosterScreen', () => {
     expect(html).not.toContain('Pending Requests')
     expect(html).not.toContain('Coverage Warnings')
     expect(html).not.toContain('Schedule Summary')
+    expect(html).not.toContain('Go to Date')
   })
 
   it('keeps the schedule matrix adaptive: measured container, fixed therapist rail, and scroll fallback', () => {
