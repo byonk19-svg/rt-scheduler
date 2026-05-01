@@ -326,6 +326,7 @@ export function CoverageClientPage({
       added: search.get('added') ?? undefined,
       unfilled: search.get('unfilled') ?? undefined,
       constraints_unfilled: search.get('constraints_unfilled') ?? undefined,
+      forced_misses: search.get('forced_misses') ?? undefined,
       dropped: search.get('dropped') ?? undefined,
       removed: search.get('removed') ?? undefined,
       week_start: search.get('week_start') ?? undefined,

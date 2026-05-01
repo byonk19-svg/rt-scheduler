@@ -99,6 +99,14 @@ describe('coverage publish override affordance', () => {
     expect(client).toContain('Review pre-flight')
   })
 
+  it('passes forced must-work misses into the final auto-draft feedback params', () => {
+    const source = readFileSync(coverageClientPath, 'utf8')
+
+    expect(source).toContain("forced_misses: search.get('forced_misses') ?? undefined")
+    expect(source).toContain('const autoDraftFeedback = useMemo(() => {')
+    expect(source).toContain('return getScheduleFeedback(scheduleFeedbackParams)')
+  })
+
   it('exposes segmented-control and planning-disclosure state to assistive technology', () => {
     const source = readFileSync(coverageClientPath, 'utf8')
 

@@ -19,7 +19,7 @@ describe('coverage pre-flight', () => {
     expect(runPreFlight(BASE_INPUT)).toEqual(generateDraftForCycle(BASE_INPUT))
   })
 
-  it('summarizes unfilled, missing-lead, and forced-miss counts', () => {
+  it('summarizes actual missing assignments, missing-lead slots, and forced-miss counts', () => {
     const result: GenerateDraftResult = {
       draftShiftsToInsert: [],
       pendingLeadUpdates: [],
@@ -34,7 +34,7 @@ describe('coverage pre-flight', () => {
     }
 
     expect(summarizePreFlight(result)).toEqual({
-      unfilledSlots: 2,
+      unfilledSlots: 3,
       missingLeadSlots: 2,
       forcedMustWorkMisses: 1,
       details: [

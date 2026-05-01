@@ -6,8 +6,11 @@ export function runPreFlight(input: GenerateDraftInput): GenerateDraftResult {
 }
 
 export function summarizePreFlight(result: GenerateDraftResult) {
+  const predictedUnfilledAssignments =
+    result.unfilledConstraintSlots?.reduce((total, slot) => total + slot.missingCount, 0) ?? 0
+
   return {
-    unfilledSlots: result.unfilledConstraintSlots?.length ?? 0,
+    unfilledSlots: predictedUnfilledAssignments,
     missingLeadSlots: result.missingLeadSlots ?? 0,
     forcedMustWorkMisses: result.forcedMustWorkMisses ?? 0,
     details: result.unfilledConstraintSlots ?? [],
