@@ -716,9 +716,7 @@ export default async function AvailabilityPage({
           submittedRows={submittedAvailabilityRows}
           missingRows={missingAvailabilityRows}
           initialRosterFilter={
-            initialRoster === 'all' ||
-            initialRoster === 'submitted' ||
-            initialRoster === 'has_requests'
+            initialRoster === 'submitted' || initialRoster === 'has_requests'
               ? initialRoster
               : 'missing'
           }

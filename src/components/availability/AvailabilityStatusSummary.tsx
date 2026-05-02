@@ -83,18 +83,14 @@ export function AvailabilityStatusSummary({
   )
 
   const filteredRows = useMemo(() => {
-    if (resolvedActiveFilter === 'all') return allRows
     if (resolvedActiveFilter === 'missing') return allRows.filter((row) => !row.submitted)
     if (resolvedActiveFilter === 'submitted') return allRows.filter((row) => row.submitted)
-    return allRows.filter((row) => row.overridesCount > 0)
+    if (resolvedActiveFilter === 'has_requests') {
+      return allRows.filter((row) => row.overridesCount > 0)
+    }
+    return allRows.filter((row) => !row.submitted)
   }, [resolvedActiveFilter, allRows])
-
-  const filterCounts = {
-    all: allRows.length,
-    missing: missingRows.length,
-    submitted: submittedRows.length,
-    has_requests: allRows.filter((row) => row.overridesCount > 0).length,
-  }
+  const requestCount = allRows.filter((row) => row.overridesCount > 0).length
 
   return (
     <section className="flex h-full flex-col" aria-labelledby="availability-response-heading">
@@ -120,7 +116,6 @@ export function AvailabilityStatusSummary({
       >
         {(
           [
-            ['all', 'All'],
             ['missing', 'Not submitted'],
             ['submitted', 'Submitted'],
             ['has_requests', 'Has requests'],
@@ -139,7 +134,11 @@ export function AvailabilityStatusSummary({
           >
             <span>{label}</span>
             <span className="rounded-full bg-background/75 px-1.5 py-0.5 text-[10px] text-foreground">
-              {filterCounts[value]}
+              {value === 'missing'
+                ? missingRows.length
+                : value === 'submitted'
+                  ? submittedRows.length
+                  : requestCount}
             </span>
           </button>
         ))}

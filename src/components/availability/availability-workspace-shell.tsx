@@ -24,17 +24,21 @@ export function AvailabilityWorkspaceShell({
         {primaryHeader ? (
           <div className="border-b border-border/60 px-5 py-3">{primaryHeader}</div>
         ) : null}
-        <div className="grid gap-3 p-3 xl:grid-cols-[17.5rem_minmax(0,1.18fr)_19rem]">
-          <div className="rounded-[1.15rem] bg-muted/[0.18] px-3.5 py-3.5">{controls}</div>
+        <div className="grid gap-3 p-3 xl:grid-cols-[19rem_minmax(0,1fr)]">
+          <div className="space-y-3">
+            <section className="rounded-[1.15rem] bg-muted/[0.18] px-3.5 py-3.5">
+              {controls}
+            </section>
+            <section
+              data-slot="availability-workspace-context"
+              className="min-w-0 rounded-[1.15rem] border border-border/60 bg-background/75 px-3.5 py-3.5"
+            >
+              {context}
+            </section>
+          </div>
           <div className="rounded-[1.25rem] border border-border/60 bg-card px-4 py-4 shadow-tw-panel-inner-soft">
             {calendar}
           </div>
-          <section
-            data-slot="availability-workspace-context"
-            className="min-w-0 rounded-[1.15rem] bg-background/75 px-3.5 py-3.5"
-          >
-            {context}
-          </section>
         </div>
       </section>
 

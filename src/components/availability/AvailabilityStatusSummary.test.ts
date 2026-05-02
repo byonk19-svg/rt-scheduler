@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { AvailabilityStatusSummary } from '@/components/availability/AvailabilityStatusSummary'
 
 describe('AvailabilityStatusSummary', () => {
-  it('renders a compact response roster with dense filters and submission metadata', () => {
+  it('renders a compact response roster with focused filters and submission metadata', () => {
     const html = renderToStaticMarkup(
       createElement(AvailabilityStatusSummary, {
         submittedRows: [
@@ -48,12 +48,11 @@ describe('AvailabilityStatusSummary', () => {
             lastUpdatedAt: null,
           },
         ],
-        initialFilter: 'all',
+        initialFilter: 'submitted',
       })
     )
 
     expect(html).toContain('Response roster')
-    expect(html).toContain('All')
     expect(html).toContain('Not submitted')
     expect(html).toContain('Submitted')
     expect(html).toContain('Has requests')

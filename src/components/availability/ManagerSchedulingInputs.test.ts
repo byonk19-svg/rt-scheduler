@@ -105,7 +105,7 @@ describe('ManagerSchedulingInputs', () => {
 
     expect(html).toContain('data-slot="availability-workspace-primary"')
     expect(html).toContain('Planning workspace')
-    expect(html).toContain('Plan staffing')
+    expect(html).toContain('Plan one therapist at a time')
     expect(html).toContain('data-slot="availability-workspace-context"')
     expect(html).toContain('data-slot="availability-workspace-secondary"')
     expect(source).toContain('PlannerControlRail')
@@ -114,6 +114,10 @@ describe('ManagerSchedulingInputs', () => {
     expect(source).toContain('AvailabilitySecondaryPanel')
     expect(plannerRailSource).toContain('Schedule cycle')
     expect(plannerRailSource).toContain('Therapist')
+    expect(plannerRailSource).toContain('Step 1')
+    expect(plannerRailSource).toContain('Choose a therapist')
+    expect(plannerRailSource).toContain('Step 2')
+    expect(plannerRailSource).toContain('Step 3')
     expect(plannerRailSource).toContain('Will work')
     expect(plannerRailSource).toContain('Cannot work')
     expect(plannerRailSource).toContain('Copy from last block')
@@ -168,15 +172,20 @@ describe('ManagerSchedulingInputs', () => {
     expect(source).not.toContain('window.location.assign')
   })
 
-  it('surfaces a compact missing-response workflow in the planner controls', () => {
+  it('keeps the missing-response workflow in the follow-up queue instead of duplicating it in planner controls', () => {
     const plannerRailSource = readFileSync(
       resolve(process.cwd(), 'src/components/availability/planner-control-rail.tsx'),
       'utf8'
     )
+    const rosterSource = readFileSync(
+      resolve(process.cwd(), 'src/components/availability/AvailabilityStatusSummary.tsx'),
+      'utf8'
+    )
 
-    expect(plannerRailSource).toContain('Not submitted')
-    expect(plannerRailSource).toContain('Focus missing responders')
-    expect(plannerRailSource).toContain('Review next')
+    expect(plannerRailSource).not.toContain('Focus missing responders')
+    expect(plannerRailSource).not.toContain('Review next')
+    expect(rosterSource).toContain('Focus missing responders')
+    expect(rosterSource).toContain('Review next')
   })
 
   it('keeps the response roster synced to the active planner therapist', () => {

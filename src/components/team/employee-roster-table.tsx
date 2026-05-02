@@ -293,9 +293,9 @@ export function EmployeeRosterTable({
                   <input type="hidden" name="roster_id" value={row.id} />
                   <Button
                     type="submit"
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    className="h-7 px-2 text-xs text-[var(--error)] hover:bg-destructive/10 hover:text-[var(--error)]"
+                    className="h-7 border-border/70 px-2 text-xs text-muted-foreground hover:border-[var(--error-border)] hover:bg-[var(--error-subtle)] hover:text-[var(--error-text)]"
                   >
                     Remove
                   </Button>

@@ -355,7 +355,8 @@ export function ManagerSchedulingInputs({
                 Planning workspace
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Plan staffing for the selected therapist inside the current schedule cycle.
+                Plan one therapist at a time, then use the follow-up queue below for responses and
+                request review.
               </p>
             </div>
           </div>
@@ -376,10 +377,6 @@ export function ManagerSchedulingInputs({
             onRemoveSelectedDate={(date) =>
               setSelectedDates((current) => current.filter((value) => value !== date))
             }
-            missingSubmissionCount={missingRows.length}
-            nextMissingResponderName={nextMissingResponderName}
-            onFocusMissingResponders={focusMissingResponders}
-            onReviewNextMissingResponder={reviewNextMissingResponder}
             copyAction={copyAvailabilityFromPreviousCycleAction}
             saveAction={saveManagerPlannerDatesAction}
           />

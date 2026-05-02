@@ -37,9 +37,10 @@ export function AvailabilitySecondaryPanel({
     <section aria-label="Availability secondary workflows" className="flex flex-col">
       <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border/70 px-4 py-3">
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold text-foreground">Secondary workflow</h2>
+          <h2 className="text-sm font-semibold text-foreground">Follow-up queue</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Follow up on responses and requests without leaving the planner.
+            After you choose a therapist, use this area to review missing responses and request
+            traffic without losing your place in the planner.
           </p>
         </div>
         <div className="inline-flex shrink-0 rounded-full border border-border/70 bg-muted/[0.08] p-0.5">

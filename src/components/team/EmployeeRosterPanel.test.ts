@@ -22,9 +22,10 @@ describe('EmployeeRosterPanel', () => {
     expect(rosterPanelSource).toContain('name="phone_number"')
     expect(rosterPanelSource).toContain('Replace therapist roster')
     expect(rosterPanelSource).toContain('name="therapist_roster_source"')
+    expect(rosterPanelSource).toContain('Bulk tools')
   })
 
-  it('renders roster table, import tools, and danger zone in markup', () => {
+  it('renders roster table, import tools, and the grouped high-risk utility area in markup', () => {
     const html = renderToStaticMarkup(
       createElement(EmployeeRosterPanel, {
         roster: [
@@ -55,6 +56,8 @@ describe('EmployeeRosterPanel', () => {
     expect(html).toContain('Brooks, Tannie 903-217-7833')
     expect(html).toContain('Add employee')
     expect(html).toContain('Import tools')
+    expect(html).toContain('Bulk tools')
+    expect(html).toContain('High-risk utility')
   })
 })
 

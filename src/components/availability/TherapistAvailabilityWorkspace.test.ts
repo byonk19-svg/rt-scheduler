@@ -82,7 +82,7 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('Quick edit')
     expect(html).toContain('Select one day or several days, then choose a state.')
     expect(html).toContain('Select a day to make a change.')
-    expect(html).toContain('Summary')
+    expect(html).toContain('Current starting point')
     expect(html).toContain('Legend')
     expect(html).toContain('Selected day')
     expect(html).toContain('Starting point')
@@ -167,6 +167,41 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).not.toContain('Request to Work')
   })
 
+  it('explains submitted blank-state cycles without implying missing work', () => {
+    const html = renderToStaticMarkup(
+      createElement(TherapistAvailabilityWorkspace, {
+        cycles: [
+          {
+            id: 'cycle-1',
+            label: 'May 2026',
+            start_date: '2026-05-03',
+            end_date: '2026-05-09',
+            published: false,
+          },
+        ],
+        availabilityRows: [],
+        conflicts: [],
+        initialCycleId: 'cycle-1',
+        hasSavedRecurringPattern: false,
+        recurringPatternSummary: 'No normal schedule saved yet.',
+        generatedBaselineByCycleId: { 'cycle-1': {} },
+        submissionsByCycleId: {
+          'cycle-1': {
+            submittedAt: '2026-05-01T12:00:00.000Z',
+            lastEditedAt: '2026-05-01T12:00:00.000Z',
+          },
+        },
+        submitTherapistAvailabilityGridAction: async () => {},
+      })
+    )
+
+    expect(html).toContain('Submitted')
+    expect(html).toContain(
+      'Submitted with no day-level changes. This cycle is currently blank unless you add dates.'
+    )
+    expect(html).toContain('You already submitted this cycle with a blank response.')
+  })
+
   it('keeps blank-start copy when onboarding only saved never-work blocks', () => {
     const html = renderToStaticMarkup(
       createElement(TherapistAvailabilityWorkspace, {
@@ -216,6 +251,12 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(src).not.toContain('Normal off')
     expect(src).not.toContain('Use normal schedule')
     expect(src).not.toContain('This cycle:')
+    expect(src).toContain(
+      'Submitted with no cycle-only changes. Your normal schedule is your current response.'
+    )
+    expect(src).toContain(
+      'Submitted with no day-level changes. This cycle is currently blank unless you add dates.'
+    )
     expect(src).toContain("displayState === 'can_work' || displayState === 'cannot_work'")
     expect(src).toContain('{showStatusLabel ? (')
     expect(src).toContain('Notes are only saved for days you change for this cycle.')

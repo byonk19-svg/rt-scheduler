@@ -233,6 +233,7 @@ export function TherapistAvailabilityWorkspace({
       ),
     [draftStatusByDate]
   )
+  const hasCycleSpecificChanges = canWorkDates.length > 0 || cannotWorkDates.length > 0
 
   const notesPayload = useMemo(
     () =>
@@ -422,7 +423,11 @@ export function TherapistAvailabilityWorkspace({
     ? formatDateLabel(selectedCycle.availability_due_at.slice(0, 10))
     : null
   const submissionStatusDetail = submissionUi.isSubmitted
-    ? 'Submitted for this cycle'
+    ? hasCycleSpecificChanges
+      ? 'Submitted with cycle-specific changes.'
+      : hasSavedRecurringPattern
+        ? 'Submitted with no cycle-only changes. Your normal schedule is your current response.'
+        : 'Submitted with no day-level changes. This cycle is currently blank unless you add dates.'
     : dueDateLabel
       ? `Due ${dueDateLabel}`
       : (deadlinePresentation?.deadlineHeadline ?? 'Save progress until you are ready to submit.')
@@ -512,6 +517,13 @@ export function TherapistAvailabilityWorkspace({
                     ? 'We used your normal schedule to fill this cycle. Changes here stay in this cycle only.'
                     : "This cycle starts blank. Add the days you can or can't work. Changes here stay in this cycle only."}
                 </p>
+                {submissionUi.isSubmitted && !hasCycleSpecificChanges ? (
+                  <p className="text-sm font-medium text-foreground">
+                    {hasSavedRecurringPattern
+                      ? 'You already submitted this cycle without adding overrides.'
+                      : 'You already submitted this cycle with a blank response.'}
+                  </p>
+                ) : null}
               </div>
             </div>
 
@@ -830,7 +842,14 @@ export function TherapistAvailabilityWorkspace({
 
           <aside className="space-y-3 xl:self-start">
             <section className="rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,white)] px-4 py-4 shadow-tw-sm">
-              <h3 className="text-[0.95rem] font-semibold text-foreground">Summary</h3>
+              <h3 className="text-[0.95rem] font-semibold text-foreground">
+                Current starting point
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {hasSavedRecurringPattern
+                  ? 'These counts come from your normal schedule before cycle-only changes.'
+                  : 'These counts show how many days still start blank before you add cycle-only changes.'}
+              </p>
               <div className="mt-3 space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="inline-flex items-center gap-3 text-muted-foreground">
@@ -899,6 +918,10 @@ export function TherapistAvailabilityWorkspace({
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-[var(--error-text)]" />
                   <span>Can&apos;t work</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-border" />
+                  <span>Unmarked</span>
                 </div>
               </div>
             </section>

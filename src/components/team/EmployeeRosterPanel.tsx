@@ -92,11 +92,9 @@ function DangerZoneRosterReplace({
           <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-destructive transition-transform group-open:rotate-180" />
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
           <div>
-            <h3 className="text-sm font-semibold text-destructive">
-              Advanced tools · Replace therapist roster
-            </h3>
+            <h3 className="text-sm font-semibold text-destructive">High-risk utility</h3>
             <p className="text-xs text-muted-foreground">
-              High-risk bulk replacement for therapist/lead rows only.
+              Replace therapist roster data only when you intend to re-source the full staff list.
             </p>
           </div>
         </summary>
@@ -286,9 +284,18 @@ export function EmployeeRosterPanel({
         </div>
       </section>
 
-      <ImportToolsPanel bulkUpsertEmployeeRosterAction={bulkUpsertEmployeeRosterAction} />
+      <section className="space-y-2">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">Bulk tools</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Use import and replacement utilities after routine roster review, not during it.
+          </p>
+        </div>
 
-      <DangerZoneRosterReplace replaceTherapistRosterAction={replaceTherapistRosterAction} />
+        <ImportToolsPanel bulkUpsertEmployeeRosterAction={bulkUpsertEmployeeRosterAction} />
+
+        <DangerZoneRosterReplace replaceTherapistRosterAction={replaceTherapistRosterAction} />
+      </section>
     </div>
   )
 }

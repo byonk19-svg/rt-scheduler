@@ -78,6 +78,10 @@ export function ManagerTriageDashboard({
     pendingRequests === '--' ? LOADING_LABEL : `${pendingRequests} pending`
   const teamLoadLabel =
     upcomingShiftCount === '--' ? LOADING_LABEL : `${upcomingShiftCount} upcoming shifts`
+  const needsReviewLabel =
+    needsReviewCount === '--'
+      ? LOADING_LABEL
+      : `${needsReviewCount} update${needsReviewCount === 1 ? '' : 's'} need review`
   const metricCards = [
     {
       title: 'Coverage Issues',
@@ -104,12 +108,54 @@ export function ManagerTriageDashboard({
       tone: 'info' as const,
     },
   ]
+  const nextAction =
+    pendingRequests !== '--' && pendingRequests > 0
+      ? {
+          eyebrow: 'Needs attention now',
+          title: `${pendingRequests} approval${pendingRequests === 1 ? '' : 's'} waiting`,
+          detail: 'Clear approvals first so access requests and workflow changes do not stall.',
+          primaryHref: approvalsHref,
+          primaryLabel: 'Review approvals',
+          secondaryHref: scheduleHref,
+          secondaryLabel: 'Open schedule workspace',
+        }
+      : riskCount !== '--' && riskCount > 0
+        ? {
+            eyebrow: 'Needs attention now',
+            title: `${riskCount} coverage issue${riskCount === 1 ? '' : 's'} to resolve`,
+            detail:
+              'Open the schedule workspace and fix unstaffed or unstable days before the next handoff.',
+            primaryHref: scheduleHref,
+            primaryLabel: 'Open schedule workspace',
+            secondaryHref: reviewHref,
+            secondaryLabel: 'Review updates',
+          }
+        : needsReviewCount !== '--' && needsReviewCount > 0
+          ? {
+              eyebrow: 'Needs attention now',
+              title: needsReviewLabel,
+              detail: needsReviewDetail,
+              primaryHref: reviewHref,
+              primaryLabel: 'Review updates',
+              secondaryHref: scheduleHref,
+              secondaryLabel: 'Open schedule workspace',
+            }
+          : {
+              eyebrow: 'Good standing',
+              title: 'No urgent issues right now',
+              detail:
+                'The current schedule is stable. Use the workspace to keep the next cycle moving.',
+              primaryHref: scheduleHref,
+              primaryLabel: 'Open schedule workspace',
+              secondaryHref: approvalsHref,
+              secondaryLabel: 'Check approvals',
+            }
 
   return (
     <div className="max-w-[1120px] space-y-4 px-5 py-5 xl:px-7">
       <div className="relative overflow-hidden rounded-[26px] border border-border/70 bg-card p-5 shadow-tw-inbox-hero">
         <div className="relative flex flex-wrap items-start justify-between gap-3">
-          <div>
+          <div className="space-y-3">
             <div className="flex items-center gap-3">
               <h1 className="font-heading text-5xl font-bold tracking-[-0.05em] text-foreground">
                 Inbox
@@ -120,18 +166,27 @@ export function ManagerTriageDashboard({
                 </span>
               )}
             </div>
+            <div className="space-y-1">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {nextAction.eyebrow}
+              </p>
+              <p className="text-lg font-semibold tracking-[-0.02em] text-foreground">
+                {nextAction.title}
+              </p>
+              <p className="max-w-[40rem] text-sm text-muted-foreground">{nextAction.detail}</p>
+            </div>
           </div>
-          <div className="relative flex gap-2">
-            <Button variant="outline" size="sm" className="min-h-11 px-4" asChild>
-              <Link href={scheduleHref}>
-                <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
-                Open schedule workspace
+          <div className="relative flex flex-wrap gap-2">
+            <Button size="sm" className="min-h-11 px-4" asChild>
+              <Link href={nextAction.primaryHref}>
+                <Send className="mr-1.5 h-3.5 w-3.5" />
+                {nextAction.primaryLabel}
               </Link>
             </Button>
-            <Button size="sm" className="min-h-11 px-4" asChild>
-              <Link href={approvalsHref}>
-                <Send className="mr-1.5 h-3.5 w-3.5" />
-                Review approvals
+            <Button variant="outline" size="sm" className="min-h-11 px-4" asChild>
+              <Link href={nextAction.secondaryHref}>
+                <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
+                {nextAction.secondaryLabel}
               </Link>
             </Button>
           </div>
@@ -266,7 +321,7 @@ export function ManagerTriageDashboard({
           <Card className="rounded-2xl border-border/70 bg-card shadow-tw-float-tight">
             <CardHeader className="pb-2 pt-4">
               <CardTitle className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-                Manager Inbox
+                Cycle status
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 pb-4">

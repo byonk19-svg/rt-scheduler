@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { ManagerTriageDashboard } from '@/components/manager/ManagerTriageDashboard'
 
 describe('ManagerTriageDashboard', () => {
-  it('renders feature cards, schedule overview, and manager inbox sections with accurate workflow labels', () => {
+  it('renders feature cards, schedule overview, and a clear next-action hierarchy', () => {
     const html = renderToStaticMarkup(
       createElement(ManagerTriageDashboard, {
         todayCoverageCovered: 15,
@@ -46,8 +46,10 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('Coverage Issues')
     expect(html).toContain('Pending Approvals')
     expect(html).toContain('Upcoming Shifts')
-    expect(html).toContain('Open schedule workspace')
+    expect(html).toContain('Needs attention now')
+    expect(html).toContain('5 approvals waiting')
     expect(html).toContain('Review approvals')
+    expect(html).toContain('Open schedule workspace')
     expect(html).not.toContain('Publish flow')
     expect(html).toContain('Mar 26')
     expect(html).toContain('4 shifts')
@@ -55,7 +57,7 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('Staffed Shifts')
     expect(html).toContain('Staffed')
     expect(html).not.toContain('Coverage Risks')
-    expect(html).toContain('Manager Inbox')
+    expect(html).toContain('Cycle status')
     expect(html).toContain('Recent Activity')
     expect(html).toContain('Brianna approved a shift swap')
     expect(html).toContain('href="/requests"')
