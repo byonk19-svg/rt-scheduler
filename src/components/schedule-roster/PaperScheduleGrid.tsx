@@ -154,7 +154,7 @@ function renderRow(row: ScheduleRow, days: ScheduleDay[]) {
     <tr key={row.id} className="bg-white">
       <th
         scope="row"
-        className="sticky left-0 z-20 border-b border-r border-border/80 bg-[#fcfbf8] px-4 py-1.5 text-left text-[13px] font-medium text-foreground shadow-[1px_0_0_0_rgba(0,0,0,0.04)]"
+        className="sticky left-0 z-20 border-b border-r border-border/80 bg-card px-4 py-1.5 text-left text-[13px] font-medium text-foreground shadow-tw-2xs"
       >
         {row.name}
       </th>
@@ -173,7 +173,7 @@ function renderRow(row: ScheduleRow, days: ScheduleDay[]) {
 function renderCountRow(label: string, counts: number[], days: ScheduleDay[]) {
   return (
     <tr className="bg-white">
-      <th className="sticky left-0 z-20 border-b border-r border-border/80 bg-[#fcfbf8] px-4 py-1.5 text-left text-[13px] font-semibold text-primary shadow-[1px_0_0_0_rgba(0,0,0,0.04)]">
+      <th className="sticky left-0 z-20 border-b border-r border-border/80 bg-card px-4 py-1.5 text-left text-[13px] font-semibold text-primary shadow-tw-2xs">
         {label}
       </th>
       {counts.map((count, index) => {
@@ -215,7 +215,7 @@ export function PaperScheduleGrid({ dataset }: { dataset: ScheduleDataset }) {
             <tr>
               <th
                 rowSpan={2}
-                className="sticky left-0 top-0 z-50 border-b border-r border-border/80 bg-[#fcfbf8] px-4 text-left text-[13px] font-semibold text-foreground shadow-[1px_0_0_0_rgba(0,0,0,0.04)]"
+                className="sticky left-0 top-0 z-50 border-b border-r border-border/80 bg-card px-4 text-left text-[13px] font-semibold text-foreground shadow-tw-2xs"
               >
                 Therapist
               </th>
@@ -257,7 +257,7 @@ export function PaperScheduleGrid({ dataset }: { dataset: ScheduleDataset }) {
             <tr>
               <td
                 colSpan={days.length + 1}
-                className="border-b border-border/80 bg-[#f5f2eb] px-3 py-1.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-primary/80"
+                className="border-b border-border/80 bg-muted px-3 py-1.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-primary/80"
               >
                 Core staff
               </td>
@@ -265,12 +265,12 @@ export function PaperScheduleGrid({ dataset }: { dataset: ScheduleDataset }) {
             {dataset.coreRows.map((row) => renderRow(row, days))}
             {renderCountRow('Staffing Count', dataset.coreCounts, days)}
             <tr>
-              <td colSpan={days.length + 1} className="h-2 bg-[#fbfaf7]" />
+              <td colSpan={days.length + 1} className="h-2 bg-card" />
             </tr>
             <tr>
               <td
                 colSpan={days.length + 1}
-                className="border-y border-border/80 bg-[#f5f2eb] px-3 py-1.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-primary/80"
+                className="border-y border-border/80 bg-muted px-3 py-1.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-primary/80"
               >
                 PRN / Extra staff
               </td>

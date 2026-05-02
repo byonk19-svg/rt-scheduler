@@ -43,13 +43,39 @@
   - Error: red family for blockers and validation failures
   - Info: blue family for neutral informational callouts  
     Map to existing CSS variables (`--success-*`, `--warning-*`, etc.) and keep pairs legible in WCAG-ish terms.
-- **Dark mode:** Reduce saturation ~10–20% on large fields; lift contrast on sidebar text; keep primary legible on dark surfaces (lighter teal is acceptable).
+- **Dark mode:** Surfaces dim, teal stays teal.
+  - **Surface ladder (4 steps):** `--background` `hsl(220 15% 10%)` → `--card/--popover` `hsl(220 15% 14%)` → `--muted/--secondary` `hsl(220 15% 18%)` → `--border/--input` `hsl(220 15% 22%)`. Never skip more than one step when stacking surfaces.
+  - **Primary lifts:** `hsl(174 48% 29%)` (light) → `hsl(174 60% 50%)` (dark). Same 174° hue, higher lightness. `--primary-foreground` flips to dark text for AA contrast on the lighter teal.
+  - **Semantic families desaturate ~10–15%:** `*-subtle` backgrounds at lightness ~18%; `*-border` at ~28%; `*-text` lifted to ~74–78% for legibility.
+  - **Sidebar shell** uses its own 192° hue family (`--sidebar: hsl(192 25% 8%)`) — distinct from the 174° content teal so navigation vs content is unmistakeable at a glance.
+  - **Rules:** (1) Never hardcode `dark:text-white` in JSX — `--foreground` handles this. If a surface needs an ad-hoc override, the token is wrong. (2) `@media print` forces light tokens — do not add dark-mode print classes. (3) `color-scheme: dark` on `.dark` adapts native scrollbars and form elements automatically.
 
 ## Spacing
 
 - **Base unit:** 8px (Tailwind default); prefer multiples of 4 only for fine alignment inside components.
-- **Density:** Comfortable default for manager surfaces; consider a future “compact” calendar mode rather than shrinking global padding everywhere.
 - **Scale:** `2xs` 4 · `xs` 8 · `sm` 12–16 · `md` 16–24 · `lg` 24–32 · `xl` 32–40 · `2xl` 48 · `3xl` 64 (map to Tailwind tokens in implementation).
+
+## Density Levels
+
+“Fast and clear” means compact at exactly the right level — not universal tightening. The coverage calendar earns compact because it is a spatial navigation tool; forms and analytics stay comfortable because users are reading, not scanning.
+
+| Level           | Padding | Type scale              | Use on                                                                                                     |
+| --------------- | ------- | ----------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Comfortable** | 16–24px | `text-sm` / `text-base` | Analytics, team directory, approval queues, onboarding, forms                                              |
+| **Compact**     | 8–12px  | `text-xs` / `text-sm`   | Coverage calendar grid, shift editor candidate rows, six-week roster board                                 |
+| **Ultra-dense** | 4–8px   | `text-xs`               | Six-week roster matrix at full width — earned only when row/column structure is the primary navigation aid |
+
+**Rules:**
+
+- A page may mix levels (comfortable header + compact data grid is correct).
+- Never go ultra-dense on a surface without an explicit grid/column structure providing the visual context.
+- Do not globally tighten padding to make something feel faster. Density signals a mode shift.
+
+**Chip sizing by density level:**
+
+- Comfortable: `px-2.5 py-1 text-xs rounded-md`
+- Compact: `px-1.5 py-0.5 text-[10px] rounded`
+- Ultra-dense: `px-1 py-px text-[9px] rounded-sm`
 
 ## Layout
 
@@ -107,6 +133,52 @@ All elevation uses **named classes** in `src/app/globals.css` (search for `Eleva
 | `shadow-tw-cell-info`        | Slightly lighter depth           | **Therapist availability grid** — info / neutral emphasis cell.                     |
 | `shadow-tw-primary-glow`     | Primary-colored glow             | **Primary CTA emphasis** — high-impact actions (e.g. generate draft).               |
 | `shadow-tw-inset-highlight`  | Inset top gloss                  | **Inset “specular”** on tinted callout surfaces (warning panel top edge).           |
+
+## Component Patterns
+
+### Availability status chips
+
+Three states map to `availability_overrides.type` and therapist submission intent. Color communicates immediately; label confirms for accessibility. Never use color alone.
+
+| State                        | Token family  | Label             | When                                             |
+| ---------------------------- | ------------- | ----------------- | ------------------------------------------------ |
+| Request to work (`force_on`) | `--success-*` | "Request to work" | Therapist wants this date; autodraft prioritizes |
+| Need off (`force_off`)       | `--error-*`   | "Need off"        | Therapist blocked; autodraft excludes            |
+| Neutral (no override row)    | `--muted`     | "Available"       | Default — no override exists                     |
+
+**Interaction rule:** Chips cycle `force_off ↔ force_on` only. Removing a date uses an explicit Remove path with confirmation — no silent third-click delete.
+
+### Coverage day cell anatomy
+
+Day cells in the compact calendar grid follow this visual hierarchy (top → bottom):
+
+1. **Date** (top-left) — `font-medium text-sm`, always visible
+2. **Staffing ratio chip** (top-right) — `<3` → `--error-*`, `3–5` → `--success-*`, `>5` → `--warning-*`
+3. **Lead badge** (middle, conditional) — `text-xs`; shows `Lead: [compact name]` or amber "Lead: Unassigned"
+4. **Gap/status chips** (bottom, compact density) — constraint-blocked chip; summary status
+5. **Warning ring** — `shadow-tw-ring-error-soft` for under-staffed; `shadow-tw-ring-attention` for missing-lead-only
+
+**Constraint warning rule:** `hasCoverageIssue` = `constraintBlocked` only — not `missingLead || constraintBlocked`. Missing-lead-only days surface their warning through the lead sub-section widget inside the cell, not the ring. Restoring `missingLead` to `hasCoverageIssue` makes the calendar read as permanently alarmed on typical demo data.
+
+### Assignment status badges
+
+Informational only — do not affect coverage counts or publish blockers.
+
+| Value        | Color family | Label      |
+| ------------ | ------------ | ---------- |
+| `scheduled`  | Success      | Scheduled  |
+| `call_in`    | Info         | Called in  |
+| `on_call`    | Warning      | On call    |
+| `cancelled`  | Error        | Cancelled  |
+| `left_early` | Warning      | Left early |
+
+### Roster matrix cells
+
+Three visual states for `RosterMatrixTable` and the six-week compact board:
+
+- **Empty** — ghost surface, click opens editor immediately via `onOpenEditor(date)`. Never route empty-cell clicks through the mutation path (causes perceived lag while the assignment waits).
+- **Filled** — therapist initials or compact name; assignment status badge if non-`scheduled`
+- **Lead-designated** — primary ring on the designated lead row only (`shifts.role='lead'`). Lead-eligible staff on the same day show no special ring unless designated.
 
 ## Implementation Alignment
 
@@ -174,3 +246,6 @@ This wiring entry **supersedes everything above for the public/auth surfaces** a
 | 2026-04-27 | Dark-mode primary stays in teal hue family                 | Brand should not flip hues across light/dark; previous `hsl(203 …)` blue was a different color, not a darker teal                                                                                                                                                                                                                                                                                                                                                                                         |
 | 2026-04-27 | **`Refined.html` design handoff is the source of truth**   | User pulled a design out of `claude.ai/design` and asked for it implemented as-shipped. `--primary` shifts 187° → 174°, `--marketing-hero-bg` becomes its own deep teal `hsl(174 35% 16%)` (no longer aliased), the homepage feature strip and auth-panel marketing copy are restored. **Reverses** the two preceding 2026-04-27 decisions where they conflict with the handoff — the handoff wins. Regression guard in `globals.test.ts` locks hue 174° and the deep `--marketing-hero-bg` independence. |
 | 2026-04-28 | White page background (retire warm paper `#f0ebe1`)        | The tan page background created visual competition with card borders and felt heavy on data-dense pages. White lets the cards and inner muted panels do the surface-hierarchy work through borders and subtle warm tints, without the page itself reading as coloured. `--card` and `--muted` are unchanged so depth cues are preserved.                                                                                                                                                                  |
+| 2026-04-30 | Compact coverage workspace                                 | Dense six-week calendar at the `xl` breakpoint needs compact density to show the full horizon without horizontal scrolling. Established three named density levels (comfortable / compact / ultra-dense) — "fast and clear" is the product north star; density is always contextual, never global. Reading surfaces (analytics, forms, team directory) stay comfortable.                                                                                                                                  |
+| 2026-05-01 | Six-week roster board at roster scale (PR #61)             | Compact row treatment keeps the board readable at full roster width without sacrificing the six-week temporal horizon. Future availability and coverage risk remain aligned with saved recurring patterns by design — the board shows pattern-derived state, not one-off overrides.                                                                                                                                                                                                                       |
+| 2026-05-01 | Component Patterns section added to DESIGN.md              | Availability status chips, coverage day cell anatomy, assignment status badges, and roster matrix cells had no design-system-level documentation. Added canonical rules for each — including the constraint-warning rule (hasCoverageIssue = constraintBlocked only) and the empty-cell editor-open rule (never route through mutation path).                                                                                                                                                             |
