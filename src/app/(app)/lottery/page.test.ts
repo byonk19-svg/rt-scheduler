@@ -18,6 +18,29 @@ const { redirectMock, createClientMock, loadLotteryActorMock, loadLotterySnapsho
 
 const LOTTERY_PAGE_SOURCE_PATH = 'src/app/(app)/lottery/page.tsx'
 
+type LotteryPageTestDeps = {
+  nextNavigation: {
+    redirect: typeof redirectMock
+  }
+  supabaseServer: {
+    createClient: typeof createClientMock
+  }
+  lotteryService: {
+    loadLotteryActor: typeof loadLotteryActorMock
+    loadLotterySnapshot: typeof loadLotterySnapshotMock
+  }
+  createElement: typeof createElement
+  LotteryClientPage: ({
+    initialSnapshot,
+  }: {
+    initialSnapshot: { actor: { userId: string }; selectedShift: 'day' | 'night' }
+  }) => ReturnType<typeof createElement>
+}
+
+declare global {
+  var __lotteryPageTestDeps: LotteryPageTestDeps
+}
+
 function replaceOrThrow(source: string, label: string, pattern: RegExp, replacement: string) {
   const matches = [
     ...source.matchAll(
