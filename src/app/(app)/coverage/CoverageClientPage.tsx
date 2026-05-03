@@ -68,10 +68,12 @@ import {
   shiftTabToQueryValue,
 } from '@/lib/coverage/coverage-shift-tab'
 
-const ClearDraftConfirmDialog = dynamic(() =>
-  import('@/components/coverage/ClearDraftConfirmDialog').then(
-    (module) => module.ClearDraftConfirmDialog ?? (() => null)
-  )
+const ClearDraftConfirmDialog = dynamic(
+  () =>
+    import('@/components/coverage/ClearDraftConfirmDialog').then(
+      (module) => module.ClearDraftConfirmDialog ?? (() => null)
+    ),
+  { ssr: false }
 )
 const CalendarGrid = dynamic(() =>
   import('@/components/coverage/CalendarGrid').then((module) => module.CalendarGrid ?? (() => null))
@@ -81,29 +83,42 @@ const RosterScheduleView = dynamic(() =>
     (module) => module.RosterScheduleView ?? (() => null)
   )
 )
-const PreFlightDialog = dynamic(() =>
-  import('@/components/coverage/PreFlightDialog').then((module) => module.PreFlightDialog ?? (() => null))
+const PreFlightDialog = dynamic(
+  () =>
+    import('@/components/coverage/PreFlightDialog').then((module) => module.PreFlightDialog ?? (() => null)),
+  { ssr: false }
 )
-const PrintSchedule = dynamic(() =>
-  import('@/components/print-schedule').then((module) => module.PrintSchedule ?? (() => null))
+const PrintSchedule = dynamic(
+  () => import('@/components/print-schedule').then((module) => module.PrintSchedule ?? (() => null)),
+  { ssr: false }
 )
-const SaveAsTemplateDialog = dynamic(() =>
-  import('@/components/coverage/SaveAsTemplateDialog').then((module) => module.SaveAsTemplateDialog ?? (() => null))
+const SaveAsTemplateDialog = dynamic(
+  () =>
+    import('@/components/coverage/SaveAsTemplateDialog').then(
+      (module) => module.SaveAsTemplateDialog ?? (() => null)
+    ),
+  { ssr: false }
 )
-const StartFromTemplateDialog = dynamic(() =>
-  import('@/components/coverage/StartFromTemplateDialog').then(
-    (module) => module.StartFromTemplateDialog ?? (() => null)
-  )
+const StartFromTemplateDialog = dynamic(
+  () =>
+    import('@/components/coverage/StartFromTemplateDialog').then(
+      (module) => module.StartFromTemplateDialog ?? (() => null)
+    ),
+  { ssr: false }
 )
-const CycleManagementDialog = dynamic(() =>
-  import('@/components/coverage/CycleManagementDialog').then(
-    (module) => module.CycleManagementDialog ?? (() => null)
-  )
+const CycleManagementDialog = dynamic(
+  () =>
+    import('@/components/coverage/CycleManagementDialog').then(
+      (module) => module.CycleManagementDialog ?? (() => null)
+    ),
+  { ssr: false }
 )
-const ShiftEditorDialog = dynamic(() =>
-  import('@/components/coverage/ShiftEditorDialog').then(
-    (module) => module.ShiftEditorDialog ?? (() => null)
-  )
+const ShiftEditorDialog = dynamic(
+  () =>
+    import('@/components/coverage/ShiftEditorDialog').then(
+      (module) => module.ShiftEditorDialog ?? (() => null)
+    ),
+  { ssr: false }
 )
 
 type DayStatus = DayItem['dayStatus']
@@ -248,6 +263,22 @@ export function CoverageClientPage({
   const draftParam = search.get('draft')
   const overrideWeeklyRulesParam = search.get('override_weekly_rules')
   const overrideShiftRulesParam = search.get('override_shift_rules')
+  const addedParam = search.get('added')
+  const unfilledParam = search.get('unfilled')
+  const constraintsUnfilledParam = search.get('constraints_unfilled')
+  const forcedMissesParam = search.get('forced_misses')
+  const droppedParam = search.get('dropped')
+  const removedParam = search.get('removed')
+  const weekStartParam = search.get('week_start')
+  const weekEndParam = search.get('week_end')
+  const violationsParam = search.get('violations')
+  const underParam = search.get('under')
+  const overParam = search.get('over')
+  const underCoverageParam = search.get('under_coverage')
+  const overCoverageParam = search.get('over_coverage')
+  const leadMissingParam = search.get('lead_missing')
+  const leadMultipleParam = search.get('lead_multiple')
+  const leadIneligibleParam = search.get('lead_ineligible')
   const supabase = useMemo(() => createClient(), [])
   const therapistOptionsByShift = initialSnapshot.allTherapistsByShift
   const rosterProfilesByShift = initialSnapshot.rosterProfilesByShift
@@ -326,24 +357,30 @@ export function CoverageClientPage({
       error: errorParam ?? undefined,
       auto: autoParam ?? undefined,
       draft: draftParam ?? undefined,
-      added: search.get('added') ?? undefined,
-      unfilled: search.get('unfilled') ?? undefined,
-      constraints_unfilled: search.get('constraints_unfilled') ?? undefined,
-      forced_misses: search.get('forced_misses') ?? undefined,
-      dropped: search.get('dropped') ?? undefined,
-      removed: search.get('removed') ?? undefined,
-      week_start: search.get('week_start') ?? undefined,
-      week_end: search.get('week_end') ?? undefined,
-      violations: search.get('violations') ?? undefined,
-      under: search.get('under') ?? undefined,
-      over: search.get('over') ?? undefined,
-      under_coverage: search.get('under_coverage') ?? undefined,
-      over_coverage: search.get('over_coverage') ?? undefined,
-      lead_missing: search.get('lead_missing') ?? undefined,
-      lead_multiple: search.get('lead_multiple') ?? undefined,
-      lead_ineligible: search.get('lead_ineligible') ?? undefined,
+      added: addedParam ?? undefined,
+      unfilled: unfilledParam ?? undefined,
+      constraints_unfilled: constraintsUnfilledParam ?? undefined,
+      forced_misses: forcedMissesParam ?? undefined,
+      dropped: droppedParam ?? undefined,
+      removed: removedParam ?? undefined,
+      week_start: weekStartParam ?? undefined,
+      week_end: weekEndParam ?? undefined,
+      violations: violationsParam ?? undefined,
+      under: underParam ?? undefined,
+      over: overParam ?? undefined,
+      under_coverage: underCoverageParam ?? undefined,
+      over_coverage: overCoverageParam ?? undefined,
+      lead_missing: leadMissingParam ?? undefined,
+      lead_multiple: leadMultipleParam ?? undefined,
+      lead_ineligible: leadIneligibleParam ?? undefined,
     }),
-    [autoParam, draftParam, errorParam, search, successParam]
+    [
+      autoParam, draftParam, errorParam, successParam,
+      addedParam, unfilledParam, constraintsUnfilledParam, forcedMissesParam,
+      droppedParam, removedParam, weekStartParam, weekEndParam, violationsParam,
+      underParam, overParam, underCoverageParam, overCoverageParam,
+      leadMissingParam, leadMultipleParam, leadIneligibleParam,
+    ]
   )
   const publishErrorMessage = useMemo(() => {
     if (!errorParam) return null
@@ -487,10 +524,7 @@ export function CoverageClientPage({
   }, [activePreliminarySnapshot])
 
   const showFullPrintRoster = canManageCoverage || actorRole === 'lead'
-  const rosterMembers = useMemo<RosterMemberRow[]>(
-    () => rosterProfiles,
-    [rosterProfiles]
-  )
+  const rosterMembers: RosterMemberRow[] = rosterProfiles
   const selectedDayBase = useMemo(
     () => days.find((row) => row.id === selectedId) ?? null,
     [days, selectedId]
