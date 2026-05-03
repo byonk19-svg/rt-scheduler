@@ -29,6 +29,7 @@ type ManagerTriageDashboardProps = {
   nightShiftsFilled: number | '--'
   nightShiftsTotal: number | '--'
   approvalsHref: string
+  lotteryHref: string
   scheduleHref: string
   reviewHref: string
   activeCycleDateRange?: string
@@ -56,6 +57,7 @@ export function ManagerTriageDashboard({
   nightShiftsFilled,
   nightShiftsTotal,
   approvalsHref,
+  lotteryHref,
   scheduleHref,
   reviewHref,
   activeCycleDateRange,
@@ -285,6 +287,29 @@ export function ManagerTriageDashboard({
                   </Link>
                 </Button>
               )}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-2xl border-border/70 bg-card shadow-tw-float-tight">
+            <CardHeader className="pb-2 pt-4">
+              <CardTitle className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                Lottery
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 pb-4">
+              <p className="text-sm font-semibold text-foreground">
+                Run and review lottery decisions
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Use fair claimant selection on eligible published shifts before finalizing pickup
+                outcomes.
+              </p>
+              <Button variant="ghost" size="sm" className="min-h-11 gap-1 px-0 text-xs" asChild>
+                <Link href={lotteryHref}>
+                  Open Lottery
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </Button>
             </CardContent>
           </Card>
 
