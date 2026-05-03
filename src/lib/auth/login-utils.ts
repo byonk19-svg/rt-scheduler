@@ -70,6 +70,9 @@ export function isLoginApprovalBannerMessage(message: string): boolean {
 
 function mapFriendlyAuthMessage(haystack: string): string {
   const h = haystack.toLowerCase()
+  if (h.includes('account_inactive') || h.includes('account inactive')) {
+    return 'This account is inactive. Contact your manager if you still need access.'
+  }
   if (h.includes('email_intake_apply_failed')) {
     return "Your account isn't approved yet or your email isn't allowed. Contact your manager."
   }

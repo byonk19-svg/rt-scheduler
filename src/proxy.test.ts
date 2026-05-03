@@ -273,6 +273,31 @@ describe('proxy onboarding and pending gates', () => {
     expect(response.headers.get('location')).toBe('https://teamwise.test/pending-setup')
   })
 
+  it('signs inactive users out and sends them back to login with an auth error', async () => {
+    createServerClientMock.mockReturnValue(
+      makeSupabaseMock({
+        profile: {
+          role: 'therapist',
+          is_active: false,
+          archived_at: null,
+          staff_onboarding_required: false,
+          preferred_work_days_mode: 'unset',
+          staff_onboarding_preferences_confirmed_at: null,
+          staff_onboarding_theme_confirmed_at: null,
+          staff_onboarding_completed_at: null,
+          work_patterns: null,
+        },
+      })
+    )
+
+    const response = await proxy(makeRequest('/dashboard'))
+
+    expect(response.status).toBe(307)
+    expect(response.headers.get('location')).toBe(
+      'https://teamwise.test/auth/signout?next=%2Flogin%3Ferror%3Daccount_inactive'
+    )
+  })
+
   it('redirects managers away from staff-only routes', async () => {
     createServerClientMock.mockReturnValue(
       makeSupabaseMock({

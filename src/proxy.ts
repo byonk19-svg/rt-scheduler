@@ -170,7 +170,7 @@ export async function proxy(request: NextRequest) {
   if (profileRow && (profileRow.is_active === false || profileRow.archived_at)) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/signout'
-    url.searchParams.set('next', '/?error=account_inactive')
+    url.searchParams.set('next', '/login?error=account_inactive')
     return NextResponse.redirect(url)
   }
 

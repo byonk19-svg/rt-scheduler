@@ -30,7 +30,7 @@ async function getCurrentActiveUser() {
     .maybeSingle()
 
   if (!profile?.is_active || profile.archived_at) {
-    redirect('/?error=account_inactive')
+    redirect('/login?error=account_inactive')
   }
 
   return { supabase, userId: user.id }

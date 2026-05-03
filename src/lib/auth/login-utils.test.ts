@@ -99,6 +99,16 @@ describe('extractAuthErrorFromSearchParams', () => {
     expect(result.shouldCleanUrl).toBe(true)
   })
 
+  it('maps inactive-account redirects to a login-friendly message', () => {
+    const params = new URLSearchParams('error=account_inactive')
+    const result = extractAuthErrorFromSearchParams(params)
+    expect(result.message).toBe(
+      'This account is inactive. Contact your manager if you still need access.'
+    )
+    expect(result.cleanedRedirectTo).toBeNull()
+    expect(result.shouldCleanUrl).toBe(true)
+  })
+
   it('extracts nested error inside redirectTo and yields cleaned redirect', () => {
     const params = new URLSearchParams(
       'redirectTo=%2Favailability%3Ferror%3Demail_intake_apply_failed'

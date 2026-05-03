@@ -118,7 +118,7 @@ export default async function PreliminaryPage({
 
   const currentProfile = (profile ?? null) as PreliminaryProfileRow | null
   if (!currentProfile?.is_active || currentProfile.archived_at) {
-    redirect('/?error=account_inactive')
+    redirect('/login?error=account_inactive')
   }
 
   const { data: snapshotData } = await supabase
