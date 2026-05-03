@@ -93,10 +93,11 @@ export function getPlannerDateValidationError(params: {
   cycle: { start_date: string; end_date: string } | null
   therapistId: string
   dates: string[]
+  allowEmpty?: boolean
 }): string | null {
   if (!params.cycle) return 'Select a schedule cycle first.'
   if (!params.therapistId) return 'Select a therapist first.'
-  if (params.dates.length === 0) return 'Select at least one date.'
+  if (params.dates.length === 0) return params.allowEmpty ? null : 'Select at least one date.'
   if (hasDuplicatePlannerDates(params.dates)) {
     return 'Date selections must be unique before saving.'
   }

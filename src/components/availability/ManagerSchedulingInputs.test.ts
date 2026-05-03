@@ -16,9 +16,13 @@ vi.mock('next/navigation', () => ({
 import { ManagerSchedulingInputs } from '@/components/availability/ManagerSchedulingInputs'
 
 describe('ManagerSchedulingInputs', () => {
-  it('renders the queue-first manager workspace with toolbar, queue, and detail panel', () => {
+  it('renders the queue-first manager workspace with toolbar, queue, detail panel, and inline editor', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/components/availability/ManagerSchedulingInputs.tsx'),
+      'utf8'
+    )
+    const panelSource = readFileSync(
+      resolve(process.cwd(), 'src/components/availability/manager-availability-editor-panel.tsx'),
       'utf8'
     )
 
@@ -103,12 +107,15 @@ describe('ManagerSchedulingInputs', () => {
     expect(html).not.toContain('Selected therapist</span><select')
     expect(source).toContain('AvailabilityStatusSummary')
     expect(source).toContain('TherapistContextPanel')
-    expect(source).toContain('ManagerAvailabilityEditorDialog')
     expect(source).toContain('id="staff-scheduling-inputs"')
     expect(source).not.toContain('AvailabilityCalendarPanel')
     expect(source).toContain('saveManagerAvailabilityRequestsAction')
-    expect(source).toContain('editorOpen')
     expect(source).toContain('activeShift')
+    expect(source).toContain('hasUnsavedChanges')
+    expect(source).not.toContain('ManagerAvailabilityEditorDialog')
+    expect(panelSource).toContain('Edit availability')
+    expect(panelSource).toContain('Save for')
+    expect(panelSource).toContain('data-availability-editor')
   })
 
   it('renders a setup message when no cycles exist', () => {

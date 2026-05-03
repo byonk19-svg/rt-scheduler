@@ -23,7 +23,6 @@ type AvailabilityStatusSummaryProps = {
   selectedTherapistId?: string | null
   onPickTherapist?: (therapistId: string) => void
   onReviewTherapist?: (therapistId: string) => void
-  onEnterTherapist?: (therapistId: string) => void
   onFilterChange?: (filter: AvailabilityRosterFilter) => void
   embedded?: boolean
   searchTerm?: string
@@ -81,7 +80,6 @@ export function AvailabilityStatusSummary({
   selectedTherapistId,
   onPickTherapist,
   onReviewTherapist,
-  onEnterTherapist,
   onFilterChange,
   embedded = false,
   searchTerm = '',
@@ -197,7 +195,7 @@ export function AvailabilityStatusSummary({
       <div className="px-3 py-3">
         {displayedRows.length > 0 ? (
           <div className="space-y-2">
-            <div className="hidden grid-cols-[minmax(0,2.9fr)_6rem_3.25rem_5.75rem_7rem] gap-4 px-2 pb-2 text-[13px] font-medium text-muted-foreground md:grid">
+            <div className="hidden grid-cols-[minmax(0,2.9fr)_6rem_3.25rem_5.75rem_5.75rem] gap-4 px-2 pb-2 text-[13px] font-medium text-muted-foreground md:grid">
               <span>Therapist</span>
               <span>Status</span>
               <span>Requests</span>
@@ -227,7 +225,7 @@ export function AvailabilityStatusSummary({
                     }
                   }}
                 >
-                  <div className="grid gap-4 md:grid-cols-[minmax(0,2.9fr)_6rem_3.25rem_5.75rem_7rem] md:items-center">
+                  <div className="grid gap-4 md:grid-cols-[minmax(0,2.9fr)_6rem_3.25rem_5.75rem_5.75rem] md:items-center">
                     <div className="flex min-w-0 items-center gap-3">
                       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted/55 text-base font-semibold text-foreground">
                         {initialsForName(row.therapistName)}
@@ -262,7 +260,7 @@ export function AvailabilityStatusSummary({
                       {formatLastActivity(row.lastUpdatedAt)}
                     </div>
 
-                    <div className="flex flex-col gap-2 md:justify-end">
+                    <div className="flex md:justify-end">
                       <button
                         type="button"
                         data-review-action={row.therapistId}
@@ -273,17 +271,6 @@ export function AvailabilityStatusSummary({
                         }}
                       >
                         Review
-                      </button>
-                      <button
-                        type="button"
-                        data-enter-action={row.therapistId}
-                        className="inline-flex min-h-9 w-[96px] items-center justify-center rounded-full bg-primary px-3 text-[11px] font-medium text-primary-foreground shadow-sm transition-all duration-150 hover:brightness-110 hover:shadow-md"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          onEnterTherapist?.(row.therapistId)
-                        }}
-                      >
-                        Enter manually
                       </button>
                     </div>
                   </div>

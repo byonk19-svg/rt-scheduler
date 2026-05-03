@@ -528,6 +528,7 @@ export async function saveManagerPlannerDatesAction(formData: FormData) {
     cycle: cycle ? { start_date: cycle.start_date, end_date: cycle.end_date } : null,
     therapistId,
     dates,
+    allowEmpty: true,
   })
 
   if (validationError) {
@@ -656,6 +657,7 @@ export async function saveManagerAvailabilityRequestsAction(formData: FormData) 
     cycle: cycle ? { start_date: cycle.start_date, end_date: cycle.end_date } : null,
     therapistId,
     dates,
+    allowEmpty: true,
   })
 
   if (validationError) {
@@ -672,12 +674,11 @@ export async function saveManagerAvailabilityRequestsAction(formData: FormData) 
   const uniqueDates = [...new Set(dates)].sort((a, b) => a.localeCompare(b))
   const { data: existingRows, error: existingRowsError } = await supabase
     .from('availability_overrides')
-    .select('date, note')
+    .select('id, date, note, override_type')
     .eq('cycle_id', cycleId)
     .eq('therapist_id', therapistId)
     .eq('shift_type', 'both')
     .eq('source', 'therapist')
-    .in('date', uniqueDates)
 
   if (existingRowsError) {
     console.error('Failed to load existing therapist availability request rows:', existingRowsError)
@@ -691,7 +692,9 @@ export async function saveManagerAvailabilityRequestsAction(formData: FormData) 
   }
 
   const notesByDate = new Map(
-    (existingRows ?? []).map((row) => [String(row.date), row.note?.trim() || null])
+    (existingRows ?? [])
+      .filter((row) => uniqueDates.includes(String(row.date)))
+      .map((row) => [String(row.date), row.note?.trim() || null])
   )
 
   const payload = uniqueDates.map((date) => ({
@@ -705,19 +708,44 @@ export async function saveManagerAvailabilityRequestsAction(formData: FormData) 
     source: 'therapist' as const,
   }))
 
-  const { error: upsertError } = await supabase
-    .from('availability_overrides')
-    .upsert(payload, { onConflict: 'cycle_id,therapist_id,date,shift_type' })
+  const keepDates = new Set(uniqueDates)
+  const rowsToDelete = (existingRows ?? [])
+    .filter((row) => String(row.override_type) === overrideType && !keepDates.has(String(row.date)))
+    .map((row) => String(row.id))
 
-  if (upsertError) {
-    console.error('Failed to save manager availability requests:', upsertError)
-    redirect(
-      buildAvailabilityUrl({
-        cycle: cycleId || undefined,
-        therapist: therapistId || undefined,
-        error: 'manager_request_save_failed',
-      })
-    )
+  if (rowsToDelete.length > 0) {
+    const { error: deleteError } = await supabase
+      .from('availability_overrides')
+      .delete()
+      .in('id', rowsToDelete)
+
+    if (deleteError) {
+      console.error('Failed to replace manager availability requests:', deleteError)
+      redirect(
+        buildAvailabilityUrl({
+          cycle: cycleId || undefined,
+          therapist: therapistId || undefined,
+          error: 'manager_request_save_failed',
+        })
+      )
+    }
+  }
+
+  if (payload.length > 0) {
+    const { error: upsertError } = await supabase
+      .from('availability_overrides')
+      .upsert(payload, { onConflict: 'cycle_id,therapist_id,date,shift_type' })
+
+    if (upsertError) {
+      console.error('Failed to save manager availability requests:', upsertError)
+      redirect(
+        buildAvailabilityUrl({
+          cycle: cycleId || undefined,
+          therapist: therapistId || undefined,
+          error: 'manager_request_save_failed',
+        })
+      )
+    }
   }
 
   await upsertTherapistSubmissionAfterOfficialSave(supabase, therapistId, cycleId)

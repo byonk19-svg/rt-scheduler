@@ -43,6 +43,7 @@ import {
   deleteAvailabilityEmailIntakeAction,
   deleteManagerPlannerDateAction,
   reparseAvailabilityEmailIntakeAction,
+  saveManagerAvailabilityRequestsAction,
   saveManagerPlannerDatesAction,
   submitAvailabilityEntryAction,
   submitTherapistAvailabilityGridAction,
@@ -264,6 +265,18 @@ function createSupabaseMock(context: TestContext = {}) {
               })
             )
           }
+          if (
+            table === 'availability_overrides' &&
+            selected.includes('override_type') &&
+            selected.includes('note')
+          ) {
+            return Promise.resolve(
+              resolve({
+                data: state.sourceOverrideRows ?? null,
+                error: null,
+              })
+            )
+          }
           if (table === 'availability_overrides' && selected.includes('id, date')) {
             return Promise.resolve(
               resolve({
@@ -276,14 +289,6 @@ function createSupabaseMock(context: TestContext = {}) {
             return Promise.resolve(
               resolve({
                 data: state.sourceCycleRows ?? null,
-                error: null,
-              })
-            )
-          }
-          if (table === 'availability_overrides' && selected.includes('date, override_type')) {
-            return Promise.resolve(
-              resolve({
-                data: state.sourceOverrideRows ?? null,
                 error: null,
               })
             )
@@ -327,6 +332,15 @@ function makeManagerPlannerFormData() {
   formData.set('mode', 'will_work')
   formData.append('dates', '2026-03-24')
   formData.append('dates', '2026-03-26')
+  return formData
+}
+
+function makeManagerRequestFormData() {
+  const formData = new FormData()
+  formData.set('cycle_id', 'cycle-1')
+  formData.set('therapist_id', 'therapist-1')
+  formData.set('mode', 'need_off')
+  formData.append('dates', '2026-03-24')
   return formData
 }
 
@@ -453,6 +467,114 @@ describe('availability actions', () => {
         source: 'manager',
       },
     ])
+  })
+
+  it('lets a manager clear planner dates for one therapist and mode', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    supabase.state.selectRows = [
+      {
+        id: 'override-old-1',
+        date: '2026-03-22',
+      },
+    ]
+    createClientMock.mockResolvedValue(supabase)
+    const formData = makeManagerPlannerFormData()
+    formData.delete('dates')
+
+    await expect(saveManagerPlannerDatesAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?cycle=cycle-1&therapist=therapist-1&success=planner_saved'
+    )
+
+    expect(supabase.state.deletes).toEqual([
+      {
+        table: 'availability_overrides',
+        filters: {
+          id: ['override-old-1'],
+        },
+      },
+    ])
+    expect(supabase.state.upsertPayloads).toHaveLength(0)
+  })
+
+  it('replaces removed manager-entered therapist request dates for the active mode', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    supabase.state.sourceOverrideRows = [
+      {
+        id: 'request-keep-1',
+        date: '2026-03-24',
+        note: 'existing note',
+        override_type: 'force_off',
+      },
+      {
+        id: 'request-delete-1',
+        date: '2026-03-26',
+        note: null,
+        override_type: 'force_off',
+      },
+      {
+        id: 'request-other-mode-1',
+        date: '2026-03-28',
+        note: null,
+        override_type: 'force_on',
+      },
+    ]
+    createClientMock.mockResolvedValue(supabase)
+
+    await expect(
+      saveManagerAvailabilityRequestsAction(makeManagerRequestFormData())
+    ).rejects.toThrow(
+      'REDIRECT:/availability?cycle=cycle-1&therapist=therapist-1&success=manager_request_saved'
+    )
+
+    expect(supabase.state.deletes).toEqual([
+      {
+        table: 'availability_overrides',
+        filters: {
+          id: ['request-delete-1'],
+        },
+      },
+    ])
+    expect(supabase.state.upsertPayloads[0]).toEqual([
+      {
+        therapist_id: 'therapist-1',
+        cycle_id: 'cycle-1',
+        date: '2026-03-24',
+        shift_type: 'both',
+        override_type: 'force_off',
+        note: 'existing note',
+        created_by: 'manager-1',
+        source: 'therapist',
+      },
+    ])
+  })
+
+  it('lets a manager clear manager-entered therapist request dates for the active mode', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    supabase.state.sourceOverrideRows = [
+      {
+        id: 'request-delete-1',
+        date: '2026-03-26',
+        note: null,
+        override_type: 'force_off',
+      },
+    ]
+    createClientMock.mockResolvedValue(supabase)
+    const formData = makeManagerRequestFormData()
+    formData.delete('dates')
+
+    await expect(saveManagerAvailabilityRequestsAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?cycle=cycle-1&therapist=therapist-1&success=manager_request_saved'
+    )
+
+    expect(supabase.state.deletes).toEqual([
+      {
+        table: 'availability_overrides',
+        filters: {
+          id: ['request-delete-1'],
+        },
+      },
+    ])
+    expect(supabase.state.upsertPayloads).toHaveLength(0)
   })
 
   it('lets a therapist save full-cycle availability with day-level notes', async () => {

@@ -76,7 +76,7 @@ describe('AvailabilityStatusSummary', () => {
     expect(html).toContain('Part-time')
     expect(html).toContain('PRN')
     expect(html).toContain('Review')
-    expect(html).toContain('Enter manually')
+    expect(html).not.toContain('Enter manually')
   })
 
   it('renders a load-more queue instead of forcing an inner scroll region', () => {

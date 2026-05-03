@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 
 import { CalendarDays, ChevronDown, Info, MoreHorizontal } from 'lucide-react'
 
+import { ManagerAvailabilityEditorPanel } from '@/components/availability/manager-availability-editor-panel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatEmployeeDate } from '@/lib/employee-directory'
@@ -32,14 +33,36 @@ type SubmissionStatus = {
   lastUpdatedAt: string | null
 }
 
+type AvailabilityEditorMode = 'will_work' | 'cannot_work' | 'need_off' | 'request_to_work'
+
+type DayState = {
+  draftSelection?: AvailabilityEditorMode
+  savedPlanner?: 'will_work' | 'cannot_work'
+  requestTypes?: Array<'need_off' | 'request_to_work'>
+}
+
 type TherapistContextPanelProps = {
   therapist: TherapistOption | null
   cycleLabel: string
   requestRows: AvailabilityEntryRow[]
   submissionStatus: SubmissionStatus | null
   savedPlannerCount: number
-  onOpenEditor: () => void
   onClose: () => void
+  mode: AvailabilityEditorMode
+  selectedDates: string[]
+  dayStates: Record<string, DayState>
+  hasUnsavedChanges: boolean
+  cycleStart: string
+  cycleEnd: string
+  selectedCycleId: string
+  selectedTherapistId: string
+  onModeChange: (mode: AvailabilityEditorMode) => void
+  onToggleDate: (date: string) => void
+  onClearSelectedDates: () => void
+  onRemoveSelectedDate: (date: string) => void
+  saveManagerPlannerDatesAction: (formData: FormData) => void | Promise<void>
+  saveManagerAvailabilityRequestsAction: (formData: FormData) => void | Promise<void>
+  copyAvailabilityFromPreviousCycleAction: (formData: FormData) => void | Promise<void>
 }
 
 function formatDateTime(value: string | null) {
@@ -79,8 +102,22 @@ export function TherapistContextPanel({
   requestRows,
   submissionStatus,
   savedPlannerCount,
-  onOpenEditor,
   onClose,
+  mode,
+  selectedDates,
+  dayStates,
+  hasUnsavedChanges,
+  cycleStart,
+  cycleEnd,
+  selectedCycleId,
+  selectedTherapistId,
+  onModeChange,
+  onToggleDate,
+  onClearSelectedDates,
+  onRemoveSelectedDate,
+  saveManagerPlannerDatesAction,
+  saveManagerAvailabilityRequestsAction,
+  copyAvailabilityFromPreviousCycleAction,
 }: TherapistContextPanelProps) {
   const [expandedRequests, setExpandedRequests] = useState(false)
 
@@ -110,7 +147,7 @@ export function TherapistContextPanel({
             Select a therapist
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Review a response or enter availability manually from the work queue.
+            Review a response and edit availability inline from the work queue.
           </p>
         </div>
       </section>
@@ -145,17 +182,15 @@ export function TherapistContextPanel({
               </Badge>
             </div>
             <p className="text-[0.88rem] text-muted-foreground">{cycleLabel}</p>
+            {!submissionStatus?.submitted ? (
+              <p className="text-sm text-muted-foreground">
+                No official submission yet. Review requests here or enter dates on their behalf.
+              </p>
+            ) : null}
           </div>
         </div>
 
         <div className="flex min-w-[10.5rem] flex-col gap-3">
-          <Button
-            type="button"
-            className="min-h-11 rounded-xl bg-primary px-4 text-[0.95rem] text-primary-foreground hover:bg-primary/90"
-            onClick={onOpenEditor}
-          >
-            Enter availability
-          </Button>
           <Button
             type="button"
             variant="outline"
@@ -282,20 +317,34 @@ export function TherapistContextPanel({
             <Info className="h-4 w-4" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-foreground">Submission status</h3>
+            <h3 className="text-sm font-semibold text-foreground">Manager note</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              {submissionStatus?.submitted
-                ? `${therapist.full_name} has an official submission for this cycle.`
-                : `${therapist.full_name} has not submitted availability for this cycle yet.`}
+              The grid below keeps therapist requests, saved manager plan dates, and your draft
+              changes visible in one place.
             </p>
-            {!submissionStatus?.submitted ? (
-              <p className="mt-2 text-sm text-muted-foreground">
-                You can enter availability on their behalf or follow up to collect their submission.
-              </p>
-            ) : null}
           </div>
         </div>
       </section>
+
+      <ManagerAvailabilityEditorPanel
+        therapist={therapist}
+        cycleLabel={cycleLabel}
+        cycleStart={cycleStart}
+        cycleEnd={cycleEnd}
+        mode={mode}
+        selectedDates={selectedDates}
+        dayStates={dayStates}
+        hasUnsavedChanges={hasUnsavedChanges}
+        onModeChange={onModeChange}
+        onToggleDate={onToggleDate}
+        onClearSelectedDates={onClearSelectedDates}
+        onRemoveSelectedDate={onRemoveSelectedDate}
+        saveManagerPlannerDatesAction={saveManagerPlannerDatesAction}
+        saveManagerAvailabilityRequestsAction={saveManagerAvailabilityRequestsAction}
+        copyAvailabilityFromPreviousCycleAction={copyAvailabilityFromPreviousCycleAction}
+        selectedCycleId={selectedCycleId}
+        selectedTherapistId={selectedTherapistId}
+      />
     </section>
   )
 }

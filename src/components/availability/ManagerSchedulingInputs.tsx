@@ -26,11 +26,6 @@ const TherapistContextPanel = dynamic(() =>
     (module) => module.TherapistContextPanel ?? (() => null)
   )
 )
-const ManagerAvailabilityEditorDialog = dynamic(() =>
-  import('@/components/availability/manager-availability-editor-dialog').then(
-    (module) => module.ManagerAvailabilityEditorDialog ?? (() => null)
-  )
-)
 
 type Cycle = {
   id: string
@@ -156,7 +151,6 @@ export function ManagerSchedulingInputs({
     )
     return initialBuckets.willWork
   })
-  const [editorOpen, setEditorOpen] = useState(false)
 
   const selectedCycle = useMemo(
     () => cycles.find((cycle) => cycle.id === selectedCycleId) ?? null,
@@ -308,11 +302,6 @@ export function ManagerSchedulingInputs({
     applyTherapistSelection(nextTherapistId)
   }
 
-  function enterTherapist(nextTherapistId: string) {
-    applyTherapistSelection(nextTherapistId)
-    setEditorOpen(true)
-  }
-
   function clearSelectedTherapist() {
     setSelectedTherapistId('')
     plannerFocus?.setFocusedTherapistName(null)
@@ -380,6 +369,11 @@ export function ManagerSchedulingInputs({
 
     return next
   }, [mode, savedBuckets.cannotWork, savedBuckets.willWork, selectedDates, therapistRequestRows])
+
+  const baselineDates = getDatesForMode(mode, selectedCycleId, selectedTherapistId)
+  const hasUnsavedChanges =
+    baselineDates.length !== selectedDates.length ||
+    baselineDates.some((date, index) => date !== selectedDates[index])
 
   if (cycles.length === 0) {
     return (
@@ -475,7 +469,6 @@ export function ManagerSchedulingInputs({
             selectedTherapistId={selectedTherapistId}
             onPickTherapist={applyTherapistSelection}
             onReviewTherapist={reviewTherapist}
-            onEnterTherapist={enterTherapist}
             onFilterChange={setActiveRosterFilter}
             embedded
             activeShift={activeShift}
@@ -493,38 +486,27 @@ export function ManagerSchedulingInputs({
             requestRows={therapistRequestRows}
             submissionStatus={submissionStatus}
             savedPlannerCount={savedOverrides.length}
-            onOpenEditor={() => setEditorOpen(true)}
             onClose={clearSelectedTherapist}
+            mode={mode}
+            selectedDates={selectedDates}
+            dayStates={dayStates}
+            hasUnsavedChanges={hasUnsavedChanges}
+            cycleStart={selectedCycle?.start_date ?? ''}
+            cycleEnd={selectedCycle?.end_date ?? ''}
+            selectedCycleId={selectedCycleId}
+            selectedTherapistId={selectedTherapistId}
+            onModeChange={handleModeChange}
+            onToggleDate={toggleDate}
+            onClearSelectedDates={() => setSelectedDates([])}
+            onRemoveSelectedDate={(date) =>
+              setSelectedDates((current) => current.filter((value) => value !== date))
+            }
+            saveManagerPlannerDatesAction={saveManagerPlannerDatesAction}
+            saveManagerAvailabilityRequestsAction={saveManagerAvailabilityRequestsAction}
+            copyAvailabilityFromPreviousCycleAction={copyAvailabilityFromPreviousCycleAction}
           />
         </div>
       </div>
-
-      <ManagerAvailabilityEditorDialog
-        open={editorOpen}
-        onOpenChange={setEditorOpen}
-        therapist={selectedTherapist}
-        cycleLabel={
-          selectedCycle
-            ? formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)
-            : 'No cycle selected'
-        }
-        cycleStart={selectedCycle?.start_date ?? ''}
-        cycleEnd={selectedCycle?.end_date ?? ''}
-        mode={mode}
-        selectedDates={selectedDates}
-        dayStates={dayStates}
-        onModeChange={handleModeChange}
-        onToggleDate={toggleDate}
-        onClearSelectedDates={() => setSelectedDates([])}
-        onRemoveSelectedDate={(date) =>
-          setSelectedDates((current) => current.filter((value) => value !== date))
-        }
-        saveManagerPlannerDatesAction={saveManagerPlannerDatesAction}
-        saveManagerAvailabilityRequestsAction={saveManagerAvailabilityRequestsAction}
-        copyAvailabilityFromPreviousCycleAction={copyAvailabilityFromPreviousCycleAction}
-        selectedCycleId={selectedCycleId}
-        selectedTherapistId={selectedTherapistId}
-      />
     </section>
   )
 }
