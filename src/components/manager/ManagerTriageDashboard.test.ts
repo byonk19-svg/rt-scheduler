@@ -35,6 +35,7 @@ describe('ManagerTriageDashboard', () => {
         nightShiftsFilled: 15,
         nightShiftsTotal: 21,
         approvalsHref: '/approvals',
+        lotteryHref: '/lottery',
         scheduleHref: '/coverage?view=week',
         reviewHref: '/approvals',
         activeCycleDateRange: 'Mar 17 – Apr 13',
@@ -86,6 +87,7 @@ describe('ManagerTriageDashboard', () => {
         nightShiftsFilled: '--',
         nightShiftsTotal: '--',
         approvalsHref: '/approvals',
+        lotteryHref: '/lottery',
         scheduleHref: '/coverage?view=week',
         reviewHref: '/approvals',
         activeCycleDateRange: undefined,
@@ -98,6 +100,9 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('Coverage Issues')
     expect(html).toContain('href="/approvals"')
     expect(html).toContain('href="/coverage?view=week"')
+    expect(html).toContain('Lottery')
+    expect(html).toContain('Open Lottery')
+    expect(html).toContain('href="/lottery"')
   })
 
   it('shows actionable prompts when loaded metrics are empty', () => {
@@ -122,6 +127,7 @@ describe('ManagerTriageDashboard', () => {
         nightShiftsFilled: 0,
         nightShiftsTotal: 0,
         approvalsHref: '/approvals',
+        lotteryHref: '/lottery',
         scheduleHref: '/coverage?view=week',
         reviewHref: '/approvals',
         activeCycleDateRange: 'Mar 17 – Apr 13',
@@ -155,6 +161,7 @@ describe('ManagerTriageDashboard', () => {
         nightShiftsFilled: 15,
         nightShiftsTotal: 21,
         approvalsHref: '/approvals',
+        lotteryHref: '/lottery',
         scheduleHref: '/coverage?view=week',
         reviewHref: '/approvals',
         activeCycleDateRange: 'Mar 17 – Apr 13',
@@ -194,6 +201,7 @@ describe('ManagerTriageDashboard', () => {
         nightShiftsFilled: 15,
         nightShiftsTotal: 21,
         approvalsHref: '/approvals',
+        lotteryHref: '/lottery',
         scheduleHref: '/coverage',
         reviewHref: '/approvals',
         activeCycleDateRange: 'Mar 17 – Apr 13',
@@ -228,6 +236,7 @@ describe('ManagerTriageDashboard', () => {
         nightShiftsFilled: 15,
         nightShiftsTotal: 21,
         approvalsHref: '/approvals',
+        lotteryHref: '/lottery',
         scheduleHref: '/coverage',
         reviewHref: '/approvals',
         activeCycleDateRange: 'Mar 17 – Apr 13',
@@ -235,5 +244,39 @@ describe('ManagerTriageDashboard', () => {
     )
 
     expect(html).toContain('Mar 17 – Apr 13')
+  })
+  it('renders an always-visible Lottery workflow card with the canonical workflow link', () => {
+    const html = renderToStaticMarkup(
+      createElement(ManagerTriageDashboard, {
+        todayCoverageCovered: 15,
+        todayCoverageTotal: 17,
+        upcomingShiftCount: 12,
+        upcomingShiftDays: [],
+        todayStaffedShifts: [],
+        recentActivity: [],
+        pendingRequests: 0,
+        approvalsWaiting: 0,
+        currentCycleStatus: 'Published',
+        currentCycleDetail: 'Live',
+        nextCycleLabel: 'Collect availability Apr 1',
+        nextCycleDetail: 'Publish by May 11',
+        needsReviewCount: 0,
+        needsReviewDetail: 'You are caught up.',
+        dayShiftsFilled: 18,
+        dayShiftsTotal: 21,
+        nightShiftsFilled: 15,
+        nightShiftsTotal: 21,
+        approvalsHref: '/approvals',
+        lotteryHref: '/lottery',
+        scheduleHref: '/coverage',
+        reviewHref: '/approvals',
+        activeCycleDateRange: 'Mar 17 â€“ Apr 13',
+      })
+    )
+
+    expect(html).toContain('Lottery')
+    expect(html).toContain('fair claimant selection')
+    expect(html).toContain('Open Lottery')
+    expect(html).toContain('href="/lottery"')
   })
 })

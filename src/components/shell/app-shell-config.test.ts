@@ -5,6 +5,7 @@ import {
   buildManagerSections,
   getShellContext,
   getStaffNavItems,
+  usesAppShell,
 } from '@/components/shell/app-shell-config'
 
 describe('app-shell-config', () => {
@@ -69,6 +70,7 @@ describe('app-shell-config', () => {
       'Availability',
       'Publish',
       'Approvals',
+      'Lottery',
     ])
     expect(
       scheduleSection?.subItems.find((item) => item.label === 'Schedule workspace')?.href
@@ -76,6 +78,37 @@ describe('app-shell-config', () => {
     expect(scheduleSection?.subItems.find((item) => item.label === 'Roster view')?.href).toBe(
       '/schedule'
     )
+  })
+
+  it('treats /lottery as a manager Schedule workflow with a local Lottery item', () => {
+    const sections = buildManagerSections(0)
+    const scheduleSection = sections.find((section) => section.key === 'schedule')
+    const context = getShellContext({
+      pathname: '/lottery',
+      canAccessManagerUi: true,
+      pendingCount: 0,
+    })
+
+    expect(scheduleSection?.subItems.map((item) => item.label)).toEqual([
+      'Schedule workspace',
+      'Roster view',
+      'Analytics',
+      'Availability',
+      'Publish',
+      'Approvals',
+      'Lottery',
+    ])
+    expect(scheduleSection?.subItems.find((item) => item.label === 'Lottery')?.href).toBe(
+      '/lottery'
+    )
+    expect(context.primaryKey).toBe('schedule')
+    expect(
+      context.localNav?.items.find((item) => item.label === 'Lottery')?.active('/lottery')
+    ).toBe(true)
+  })
+
+  it('includes /lottery in the shared app shell allowlist', () => {
+    expect(usesAppShell('/lottery')).toBe(true)
   })
 
   it('/shift-board is active under the manager Requests sub-nav item', () => {

@@ -18,6 +18,7 @@ const routes = [
   ['src/app/(app)/requests/page.tsx', "title: 'Requests'"],
   ['src/app/(app)/requests/user-access/page.tsx', "title: 'User Access Requests'"],
   ['src/app/(app)/team/page.tsx', "title: 'Team'"],
+  ['src/app/(app)/lottery/page.tsx', "title: 'Lottery'"],
   // Manager schedule section
   ['src/app/(app)/coverage/page.tsx', "title: 'Schedule Workspace'"],
   ['src/app/(app)/schedule/page.tsx', "title: 'Schedule Roster'"],
