@@ -17,6 +17,17 @@ vi.mock('@/lib/supabase/server', () => ({ createClient: createClientMock }))
 vi.mock('@/app/(app)/schedule/actions/helpers', () => ({
   getRoleForUser: getRoleForUserMock,
   getPanelParam: getPanelParamMock,
+  buildCoverageUrl: (cycleId?: string, params?: Record<string, string | undefined>) => {
+    const search = new URLSearchParams()
+    if (cycleId) search.set('cycle', cycleId)
+    if (params) {
+      for (const [key, value] of Object.entries(params)) {
+        if (value) search.set(key, value)
+      }
+    }
+    const query = search.toString()
+    return query ? `/coverage?${query}` : '/coverage'
+  },
 }))
 
 import { createCycleAction } from '@/app/(app)/schedule/actions/cycle-actions'
@@ -26,12 +37,13 @@ type TestContext = {
   overlappingCycles?: Array<Record<string, unknown>>
 }
 
-function makeFormData(startDate: string, endDate: string) {
+function makeFormData(startDate: string, endDate: string, options?: { returnTo?: 'coverage' }) {
   const fd = new FormData()
   fd.set('label', 'Block 7')
   fd.set('start_date', startDate)
   fd.set('end_date', endDate)
   fd.set('view', 'week')
+  if (options?.returnTo) fd.set('return_to', options.returnTo)
   return fd
 }
 
@@ -116,5 +128,30 @@ describe('createCycleAction', () => {
     )
 
     expect(supabase.state.insertedCycles).toHaveLength(0)
+  })
+
+  it('keeps coverage-origin overlap errors on the coverage route', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      overlappingCycles: [{ id: 'cycle-existing' }],
+    })
+    createClientMock.mockResolvedValue(supabase)
+
+    await expect(
+      createCycleAction(makeFormData('2026-03-20', '2026-05-05', { returnTo: 'coverage' }))
+    ).rejects.toThrow('REDIRECT:/coverage?error=create_cycle_overlap')
+
+    expect(supabase.state.insertedCycles).toHaveLength(0)
+  })
+
+  it('keeps coverage-origin success redirects on the coverage route', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', overlappingCycles: [] })
+    createClientMock.mockResolvedValue(supabase)
+
+    await expect(
+      createCycleAction(makeFormData('2026-05-03', '2026-06-13', { returnTo: 'coverage' }))
+    ).rejects.toThrow('REDIRECT:/coverage?cycle=cycle-new&success=cycle_created')
+
+    expect(supabase.state.insertedCycles).toHaveLength(1)
   })
 })

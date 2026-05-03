@@ -10,8 +10,35 @@ type ControlsCtx = {
   manager: { id: string; email: string; password: string }
 }
 
+async function getLatestCycleRange(supabase: SupabaseClient) {
+  const result = await supabase
+    .from('schedule_cycles')
+    .select('start_date, end_date')
+    .order('end_date', { ascending: false })
+    .order('start_date', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (result.error) {
+    throw new Error(result.error.message)
+  }
+
+  return result.data
+}
+
 async function openCoverageMoreMenu(page: import('@playwright/test').Page) {
   await page.getByText('More').first().click()
+}
+
+async function openNewCycleDialog(page: import('@playwright/test').Page) {
+  const directCreateButton = page.getByRole('button', { name: 'New 6-week block' })
+  if ((await directCreateButton.count()) > 0) {
+    await directCreateButton.first().click()
+    return
+  }
+
+  await openCoverageMoreMenu(page)
+  await page.getByText('New 6-week block').last().click()
 }
 
 test.describe.serial('coverage cycle controls', () => {
@@ -63,7 +90,10 @@ test.describe.serial('coverage cycle controls', () => {
   }) => {
     test.skip(!ctx, 'Supabase service env values are required to run cycle-controls e2e.')
 
-    const startDate = addDays(new Date(), 45)
+    const latestCycle = await getLatestCycleRange(ctx!.supabase)
+    const startDate = latestCycle
+      ? addDays(new Date(`${latestCycle.end_date}T00:00:00`), 1)
+      : addDays(new Date(), 45)
     const startKey = formatDateKey(startDate)
     const endKey = formatDateKey(addDays(startDate, 41))
     const label = `Coverage Dialog ${randomString('cycle')}`
@@ -72,8 +102,7 @@ test.describe.serial('coverage cycle controls', () => {
     await page.goto('/coverage?view=week')
     await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
 
-    await openCoverageMoreMenu(page)
-    await page.getByText('New 6-week block').last().click()
+    await openNewCycleDialog(page)
 
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
@@ -125,6 +154,70 @@ test.describe.serial('coverage cycle controls', () => {
         { timeout: 20_000 }
       )
       .toBeNull()
+  })
+
+  test('coverage create dialog resets to the next valid block after an overlap error', async ({
+    page,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run cycle-controls e2e.')
+
+    const latestCycle = await getLatestCycleRange(ctx!.supabase)
+    if (!latestCycle) {
+      throw new Error('Expected at least one existing cycle to validate overlap recovery.')
+    }
+
+    const previousStartKey = latestCycle.start_date
+    const previousEndKey = latestCycle.end_date
+    const nextStartKey = formatDateKey(addDays(new Date(`${previousEndKey}T00:00:00`), 1))
+    const nextEndKey = formatDateKey(addDays(new Date(`${previousEndKey}T00:00:00`), 42))
+
+    await loginAs(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto('/coverage?view=week')
+    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
+
+    await openNewCycleDialog(page)
+
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByLabel('Start date')).toHaveValue(nextStartKey)
+    await expect(dialog.getByLabel('End date')).toHaveValue(nextEndKey)
+
+    await dialog.getByLabel('Start date').fill(previousStartKey)
+    await dialog.getByLabel('End date').fill(previousEndKey)
+    await dialog.getByLabel('Label').fill(`Overlap Retry ${randomString('cycle')}`)
+    await dialog.getByRole('button', { name: 'Create draft block' }).click()
+
+    await expect(page).toHaveURL(/\/coverage\?error=create_cycle_overlap/)
+
+    await openNewCycleDialog(page)
+
+    const retryDialog = page.getByRole('dialog')
+    await expect(retryDialog).toBeVisible()
+    await expect(retryDialog.getByLabel('Start date')).toHaveValue(nextStartKey)
+    await expect(retryDialog.getByLabel('End date')).toHaveValue(nextEndKey)
+    const nextLabel = await retryDialog.getByLabel('Label').inputValue()
+    await retryDialog.getByRole('button', { name: 'Create draft block' }).click()
+
+    let nextCycleId: string | null = null
+    await expect
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('schedule_cycles')
+            .select('id')
+            .eq('label', nextLabel)
+            .maybeSingle()
+
+          if (result.error) throw new Error(result.error.message)
+          nextCycleId = result.data?.id ?? null
+          return nextCycleId !== null
+        },
+        { timeout: 20_000 }
+      )
+      .toBe(true)
+
+    createdCycleIds.push(nextCycleId!)
+    await expect(page).toHaveURL(/\/coverage\?cycle=.*success=cycle_created/)
   })
 
   test('manager can auto-draft and then clear the draft from coverage', async ({ page }) => {

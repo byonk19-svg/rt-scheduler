@@ -9,7 +9,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import type { ShiftRole, ShiftStatus } from '@/app/schedule/types'
 
-import { getPanelParam, getRoleForUser } from './helpers'
+import { buildCoverageUrl, getPanelParam, getRoleForUser } from './helpers'
 
 type CycleImportSourceRow = {
   id: string
@@ -141,22 +141,23 @@ export async function createCycleAction(formData: FormData) {
   const publishedRequested = String(formData.get('published') ?? '') === 'on'
   const published = copyFromLastCycle ? false : publishedRequested
   const view = String(formData.get('view') ?? '').trim()
+  const returnTo = String(formData.get('return_to') ?? '').trim()
   const panel = getPanelParam(formData)
   const errorViewParams = panel ? { panel } : undefined
+  const buildReturnUrl = (
+    cycleIdOverride: string | undefined,
+    params?: Record<string, string | undefined>
+  ) =>
+    returnTo === 'coverage'
+      ? buildCoverageUrl(cycleIdOverride, params)
+      : buildScheduleUrl(cycleIdOverride, view, params)
 
   if (!label || !startDate || !endDate) {
-    redirect(
-      buildScheduleUrl(undefined, view, { ...errorViewParams, error: 'create_cycle_failed' })
-    )
+    redirect(buildReturnUrl(undefined, { ...errorViewParams, error: 'create_cycle_failed' }))
   }
 
   if (endDate < startDate) {
-    redirect(
-      buildScheduleUrl(undefined, view, {
-        ...errorViewParams,
-        error: 'create_cycle_invalid_range',
-      })
-    )
+    redirect(buildReturnUrl(undefined, { ...errorViewParams, error: 'create_cycle_invalid_range' }))
   }
 
   const { data: overlappingCycles, error: overlapError } = await supabase
@@ -168,18 +169,11 @@ export async function createCycleAction(formData: FormData) {
 
   if (overlapError) {
     console.error('Failed to validate schedule cycle overlap:', overlapError)
-    redirect(
-      buildScheduleUrl(undefined, view, { ...errorViewParams, error: 'create_cycle_failed' })
-    )
+    redirect(buildReturnUrl(undefined, { ...errorViewParams, error: 'create_cycle_failed' }))
   }
 
   if ((overlappingCycles ?? []).length > 0) {
-    redirect(
-      buildScheduleUrl(undefined, view, {
-        ...errorViewParams,
-        error: 'create_cycle_overlap',
-      })
-    )
+    redirect(buildReturnUrl(undefined, { ...errorViewParams, error: 'create_cycle_overlap' }))
   }
 
   const { data, error } = await supabase
@@ -195,9 +189,7 @@ export async function createCycleAction(formData: FormData) {
 
   if (error) {
     console.error('Failed to create schedule cycle:', error)
-    redirect(
-      buildScheduleUrl(undefined, view, { ...errorViewParams, error: 'create_cycle_failed' })
-    )
+    redirect(buildReturnUrl(undefined, { ...errorViewParams, error: 'create_cycle_failed' }))
   }
 
   if (copyFromLastCycle) {
@@ -221,10 +213,7 @@ export async function createCycleAction(formData: FormData) {
       })
       revalidatePath('/schedule')
       redirect(
-        buildScheduleUrl(data.id, view, {
-          ...errorViewParams,
-          error: 'copy_from_last_cycle_failed',
-        })
+        buildReturnUrl(data.id, { ...errorViewParams, error: 'copy_from_last_cycle_failed' })
       )
     }
 
@@ -241,10 +230,7 @@ export async function createCycleAction(formData: FormData) {
         console.error('Failed to load source shifts for cycle import:', sourceShiftsError)
         revalidatePath('/schedule')
         redirect(
-          buildScheduleUrl(data.id, view, {
-            ...errorViewParams,
-            error: 'copy_from_last_cycle_failed',
-          })
+          buildReturnUrl(data.id, { ...errorViewParams, error: 'copy_from_last_cycle_failed' })
         )
       }
 
@@ -270,10 +256,7 @@ export async function createCycleAction(formData: FormData) {
           )
           revalidatePath('/schedule')
           redirect(
-            buildScheduleUrl(data.id, view, {
-              ...errorViewParams,
-              error: 'copy_from_last_cycle_failed',
-            })
+            buildReturnUrl(data.id, { ...errorViewParams, error: 'copy_from_last_cycle_failed' })
           )
         }
 
@@ -322,10 +305,7 @@ export async function createCycleAction(formData: FormData) {
             console.error('Failed to insert imported shifts:', insertedShiftsError)
             revalidatePath('/schedule')
             redirect(
-              buildScheduleUrl(data.id, view, {
-                ...errorViewParams,
-                error: 'copy_from_last_cycle_failed',
-              })
+              buildReturnUrl(data.id, { ...errorViewParams, error: 'copy_from_last_cycle_failed' })
             )
           }
 
@@ -334,7 +314,7 @@ export async function createCycleAction(formData: FormData) {
 
         revalidatePath('/schedule')
         redirect(
-          buildScheduleUrl(data.id, view, {
+          buildReturnUrl(data.id, {
             success: 'cycle_created',
             copied: String(copiedAssignments),
             skipped: String(skippedAssignments),
@@ -344,14 +324,9 @@ export async function createCycleAction(formData: FormData) {
     }
 
     revalidatePath('/schedule')
-    redirect(
-      buildScheduleUrl(data.id, view, {
-        success: 'cycle_created',
-        copied: '0',
-      })
-    )
+    redirect(buildReturnUrl(data.id, { success: 'cycle_created', copied: '0' }))
   }
 
   revalidatePath('/schedule')
-  redirect(buildScheduleUrl(data.id, view, { success: 'cycle_created' }))
+  redirect(buildReturnUrl(data.id, { success: 'cycle_created' }))
 }

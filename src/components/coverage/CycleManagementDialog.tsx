@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CalendarPlus, Copy, Trash2 } from 'lucide-react'
 
 import { FormSubmitButton } from '@/components/form-submit-button'
@@ -64,15 +64,20 @@ export function CycleManagementDialog({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const latestCycle = [...cycles].sort((a, b) => b.end_date.localeCompare(a.end_date))[0] ?? null
   const defaultDraft = buildCycleDraft(latestCycle?.end_date ?? null, toIsoDate(new Date()))
-  const [label, setLabel] = useState(defaultDraft.label)
-  const [startDate, setStartDate] = useState(defaultDraft.startDate)
-  const [endDate, setEndDate] = useState(defaultDraft.endDate)
+  const [draft, setDraft] = useState(() => ({ ...defaultDraft }))
+
+  useEffect(() => {
+    if (!open) return
+    setDraft({ ...defaultDraft })
+  }, [defaultDraft.endDate, defaultDraft.label, defaultDraft.startDate, open])
 
   function handleStartDateChange(nextStartDate: string) {
-    setStartDate(nextStartDate)
     const draft = buildCycleDraft(null, nextStartDate)
-    setEndDate(draft.endDate)
-    setLabel(draft.label)
+    setDraft({
+      label: draft.label,
+      startDate: nextStartDate,
+      endDate: draft.endDate,
+    })
   }
 
   return (
@@ -92,8 +97,9 @@ export function CycleManagementDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form action={createCycleAction} className="space-y-4">
+        <form action={createCycleAction} className="space-y-4" autoComplete="off">
           <input type="hidden" name="view" value="week" />
+          <input type="hidden" name="return_to" value="coverage" />
 
           <div className="rounded-[20px] border border-border/80 bg-muted/15 p-4">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -111,9 +117,12 @@ export function CycleManagementDialog({
             <Input
               id="coverage-cycle-label"
               name="label"
-              value={label}
-              onChange={(event) => setLabel(event.target.value)}
+              value={draft.label}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, label: event.target.value }))
+              }
               placeholder="Apr 6 - May 17"
+              autoComplete="off"
               required
             />
           </div>
@@ -125,8 +134,9 @@ export function CycleManagementDialog({
                 id="coverage-cycle-start-date"
                 name="start_date"
                 type="date"
-                value={startDate}
+                value={draft.startDate}
                 onChange={(event) => handleStartDateChange(event.target.value)}
+                autoComplete="off"
                 required
               />
             </div>
@@ -136,8 +146,11 @@ export function CycleManagementDialog({
                 id="coverage-cycle-end-date"
                 name="end_date"
                 type="date"
-                value={endDate}
-                onChange={(event) => setEndDate(event.target.value)}
+                value={draft.endDate}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, endDate: event.target.value }))
+                }
+                autoComplete="off"
                 required
               />
             </div>
