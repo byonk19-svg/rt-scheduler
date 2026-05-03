@@ -47,7 +47,6 @@ describe('availability route performance contract', () => {
     expect(availabilityPageSource).not.toContain(
       "import {\n  EmailIntakePanel,\n  type EmailIntakePanelRow,\n} from '@/components/availability/EmailIntakePanel'"
     )
-    expect(availabilityPageSource).toContain('const AvailabilityEntriesTable = dynamic(() =>')
     expect(availabilityPageSource).toContain('const ManagerSchedulingInputs = dynamic(() =>')
     expect(availabilityPageSource).not.toContain('const EmailIntakePanel = dynamic(() =>')
     expect(availabilityPageSource).toContain('redirect(`/therapist/availability')

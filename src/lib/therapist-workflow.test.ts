@@ -8,6 +8,7 @@ describe('therapist-workflow', () => {
   it('treats saved overrides without official submission as a draft availability workflow', () => {
     const workflow = resolveTherapistWorkflow({
       todayKey,
+      now: new Date('2026-04-24T12:00:00.000Z'),
       cycles: [
         {
           id: 'cycle-draft',
@@ -35,6 +36,7 @@ describe('therapist-workflow', () => {
   it('uses plain-language copy for a not-started availability workflow', () => {
     const workflow = resolveTherapistWorkflow({
       todayKey,
+      now: new Date('2026-04-24T12:00:00.000Z'),
       cycles: [
         {
           id: 'cycle-open',
