@@ -71,7 +71,6 @@ describe('app-shell-config', () => {
       'Lottery',
       'Publish',
       'Approvals',
-      'Lottery',
     ])
     expect(
       scheduleSection?.subItems.find((item) => item.label === 'Schedule workspace')?.href
@@ -95,9 +94,9 @@ describe('app-shell-config', () => {
       'Roster view',
       'Analytics',
       'Availability',
+      'Lottery',
       'Publish',
       'Approvals',
-      'Lottery',
     ])
     expect(scheduleSection?.subItems.find((item) => item.label === 'Lottery')?.href).toBe(
       '/lottery'

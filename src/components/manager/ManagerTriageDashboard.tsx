@@ -5,7 +5,6 @@ import { ArrowRight, CalendarDays, FileCheck, Send, Shield, Sparkles, Users } fr
 import { ScheduleProgress } from '@/components/manager/ScheduleProgress'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 import { cn } from '@/lib/utils'
 
 const LOADING_LABEL = 'Loading...'
@@ -253,29 +252,6 @@ export function ManagerTriageDashboard({
           <Card className="rounded-2xl border-border/70 bg-card shadow-tw-float-tight">
             <CardHeader className="pb-2 pt-4">
               <CardTitle className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-                Lottery
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 pb-4">
-              <p className="text-sm text-foreground">
-                Use Lottery to fairly select from eligible claimants on published shifts.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Open the workflow to review how the selection works, confirm the prerequisites, and
-                move back into the schedule workspace when shifts are ready.
-              </p>
-              <Button variant="outline" size="sm" className="min-h-11 gap-1 px-3 text-xs" asChild>
-                <Link href={MANAGER_WORKFLOW_LINKS.lottery}>
-                  Open Lottery
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-2xl border-border/70 bg-card shadow-tw-float-tight">
-            <CardHeader className="pb-2 pt-4">
-              <CardTitle className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                 Today&apos;s Staffed Shifts
               </CardTitle>
             </CardHeader>
@@ -325,8 +301,7 @@ export function ManagerTriageDashboard({
                 Run and review lottery decisions
               </p>
               <p className="text-xs text-muted-foreground">
-                Use fair claimant selection on eligible published shifts before finalizing pickup
-                outcomes.
+                Use Lottery to fairly select from eligible claimants on published shifts.
               </p>
               <Button variant="ghost" size="sm" className="min-h-11 gap-1 px-0 text-xs" asChild>
                 <Link href={lotteryHref}>

@@ -42,7 +42,7 @@ test.describe.serial('lottery workflow surface', () => {
     await page.goto('/dashboard/manager')
 
     await expect(page.getByRole('heading', { name: 'Inbox' })).toBeVisible()
-    const openLotteryLink = page.getByRole('link', { name: 'Open Lottery' })
+    const openLotteryLink = page.getByRole('link', { name: 'Open Lottery' }).first()
     await expect(openLotteryLink).toBeVisible()
     await expect(openLotteryLink).toHaveAttribute('href', '/lottery')
 

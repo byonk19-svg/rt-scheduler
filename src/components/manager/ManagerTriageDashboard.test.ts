@@ -198,6 +198,7 @@ describe('ManagerTriageDashboard', () => {
         nightShiftsFilled: 15,
         nightShiftsTotal: 21,
         approvalsHref: '/approvals',
+        lotteryHref: '/lottery',
         scheduleHref: '/coverage?view=week',
         reviewHref: '/approvals',
         activeCycleDateRange: 'Mar 17 â€“ Apr 13',
@@ -316,7 +317,9 @@ describe('ManagerTriageDashboard', () => {
     )
 
     expect(html).toContain('Lottery')
-    expect(html).toContain('fair claimant selection')
+    expect(html).toContain(
+      'Use Lottery to fairly select from eligible claimants on published shifts.'
+    )
     expect(html).toContain('Open Lottery')
     expect(html).toContain('href="/lottery"')
   })
