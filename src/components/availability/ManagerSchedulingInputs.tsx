@@ -10,38 +10,25 @@ import type {
   AvailabilityRosterFilter,
   AvailabilityStatusSummaryRow,
 } from '@/components/availability/AvailabilityStatusSummary'
-import { AvailabilityWorkspaceShell } from '@/components/availability/availability-workspace-shell'
-import {
-  splitPlannerDatesByMode,
-  type PlannerMode,
-  type PlannerOverrideRow,
-} from '@/lib/availability-planner'
-import { formatHumanCycleRange, shiftMonthKey, toMonthStartKey } from '@/lib/calendar-utils'
+import type { PlannerMode, PlannerOverrideRow } from '@/lib/availability-planner'
+import { splitPlannerDatesByMode } from '@/lib/availability-planner'
+import { formatHumanCycleRange } from '@/lib/calendar-utils'
 import { isDateWithinCycle } from '@/lib/employee-directory'
+import { cn } from '@/lib/utils'
 
 const AvailabilityStatusSummary = dynamic(() =>
   import('@/components/availability/AvailabilityStatusSummary').then(
     (module) => module.AvailabilityStatusSummary ?? (() => null)
   )
 )
-const AvailabilityCalendarPanel = dynamic(() =>
-  import('@/components/availability/availability-calendar-panel').then(
-    (module) => module.AvailabilityCalendarPanel ?? (() => null)
-  )
-)
-const AvailabilitySecondaryPanel = dynamic(() =>
-  import('@/components/availability/availability-secondary-panel').then(
-    (module) => module.AvailabilitySecondaryPanel ?? (() => null)
-  )
-)
-const PlannerControlRail = dynamic(() =>
-  import('@/components/availability/planner-control-rail').then(
-    (module) => module.PlannerControlRail ?? (() => null)
-  )
-)
 const TherapistContextPanel = dynamic(() =>
   import('@/components/availability/therapist-context-panel').then(
     (module) => module.TherapistContextPanel ?? (() => null)
+  )
+)
+const ManagerAvailabilityEditorDialog = dynamic(() =>
+  import('@/components/availability/manager-availability-editor-dialog').then(
+    (module) => module.ManagerAvailabilityEditorDialog ?? (() => null)
   )
 )
 
@@ -71,11 +58,16 @@ type AvailabilityEntryRow = {
   cycleId: string
   date: string
   reason: string | null
+  createdById?: string
   createdAt: string
   updatedAt?: string
   requestedBy: string
   entryType: 'force_off' | 'force_on'
+  shiftType: 'day' | 'night' | 'both'
+  source: 'manager' | 'therapist'
 }
+
+type AvailabilityEditorMode = PlannerMode | 'need_off' | 'request_to_work'
 
 type Props = {
   cycles: Cycle[]
@@ -87,12 +79,22 @@ type Props = {
   submittedRows: AvailabilityStatusSummaryRow[]
   missingRows: AvailabilityStatusSummaryRow[]
   initialRosterFilter?: AvailabilityRosterFilter
-  defaultSecondaryTab?: 'roster' | 'inbox'
   saveManagerPlannerDatesAction: (formData: FormData) => void | Promise<void>
-  deleteManagerPlannerDateAction: (formData: FormData) => void | Promise<void>
+  saveManagerAvailabilityRequestsAction: (formData: FormData) => void | Promise<void>
   copyAvailabilityFromPreviousCycleAction: (formData: FormData) => void | Promise<void>
-  reviewRequestsPanel?: ReactNode
+  toolbarUtilities?: ReactNode
 }
+
+type QueueRow = AvailabilityStatusSummaryRow & {
+  submitted: boolean
+  shiftType: TherapistOption['shift_type']
+  employmentType: TherapistOption['employment_type']
+}
+
+const REQUEST_MODE_TO_ENTRY_TYPE = {
+  need_off: 'force_off',
+  request_to_work: 'force_on',
+} as const
 
 function getSavedBucketsForSelection(
   overrides: PlannerOverrideRecord[],
@@ -105,6 +107,10 @@ function getSavedBucketsForSelection(
   )
 }
 
+function uniqueSortedDates(dates: string[]) {
+  return [...new Set(dates)].sort((a, b) => a.localeCompare(b))
+}
+
 export function ManagerSchedulingInputs({
   cycles,
   therapists,
@@ -115,11 +121,10 @@ export function ManagerSchedulingInputs({
   submittedRows,
   missingRows,
   initialRosterFilter = 'missing',
-  defaultSecondaryTab = 'roster',
   saveManagerPlannerDatesAction,
-  deleteManagerPlannerDateAction,
+  saveManagerAvailabilityRequestsAction,
   copyAvailabilityFromPreviousCycleAction,
-  reviewRequestsPanel,
+  toolbarUtilities,
 }: Props) {
   const plannerFocus = useAvailabilityPlannerFocus()
   const pathname = usePathname()
@@ -129,15 +134,20 @@ export function ManagerSchedulingInputs({
 
   const initialSelectedCycleId = initialCycleId || cycles[0]?.id || ''
   const initialSelectedTherapistId = initialTherapistId || therapists[0]?.id || ''
+  const initialTherapist =
+    therapists.find((therapist) => therapist.id === initialSelectedTherapistId) ??
+    therapists[0] ??
+    null
 
   const [selectedCycleId, setSelectedCycleId] = useState(initialSelectedCycleId)
   const [selectedTherapistId, setSelectedTherapistId] = useState(initialSelectedTherapistId)
   const [activeRosterFilter, setActiveRosterFilter] =
     useState<AvailabilityRosterFilter>(initialRosterFilter)
-  const [activeSecondaryTab, setActiveSecondaryTab] = useState<'roster' | 'inbox'>(
-    defaultSecondaryTab
+  const [activeShift, setActiveShift] = useState<TherapistOption['shift_type']>(
+    initialTherapist?.shift_type ?? 'day'
   )
-  const [mode, setMode] = useState<PlannerMode>('will_work')
+  const [therapistSearch, setTherapistSearch] = useState('')
+  const [mode, setMode] = useState<AvailabilityEditorMode>('will_work')
   const [selectedDates, setSelectedDates] = useState<string[]>(() => {
     const initialBuckets = getSavedBucketsForSelection(
       overrides,
@@ -146,10 +156,7 @@ export function ManagerSchedulingInputs({
     )
     return initialBuckets.willWork
   })
-  const [monthStart, setMonthStart] = useState(() => {
-    const cycle = cycles.find((item) => item.id === initialSelectedCycleId)
-    return toMonthStartKey(cycle?.start_date ?? initialSelectedCycleId)
-  })
+  const [editorOpen, setEditorOpen] = useState(false)
 
   const selectedCycle = useMemo(
     () => cycles.find((cycle) => cycle.id === selectedCycleId) ?? null,
@@ -159,6 +166,51 @@ export function ManagerSchedulingInputs({
     () => therapists.find((therapist) => therapist.id === selectedTherapistId) ?? null,
     [selectedTherapistId, therapists]
   )
+
+  const shiftOptions = useMemo(
+    () => Array.from(new Set(therapists.map((therapist) => therapist.shift_type))),
+    [therapists]
+  )
+
+  const queueRows = useMemo<QueueRow[]>(() => {
+    const therapistById = new Map(
+      therapists.map((therapist) => [
+        therapist.id,
+        {
+          shiftType: therapist.shift_type,
+          employmentType: therapist.employment_type,
+        },
+      ])
+    )
+
+    return [...missingRows, ...submittedRows]
+      .map((row) => {
+        const meta = therapistById.get(row.therapistId)
+        return {
+          ...row,
+          submitted: submittedRows.some(
+            (submittedRow) => submittedRow.therapistId === row.therapistId
+          ),
+          shiftType: meta?.shiftType ?? 'day',
+          employmentType: meta?.employmentType ?? 'full_time',
+        }
+      })
+      .sort((a, b) => {
+        if (a.submitted !== b.submitted) return a.submitted ? 1 : -1
+        if (a.overridesCount !== b.overridesCount) return b.overridesCount - a.overridesCount
+        return a.therapistName.localeCompare(b.therapistName)
+      })
+  }, [missingRows, submittedRows, therapists])
+
+  const filteredQueueRows = useMemo(() => {
+    const search = therapistSearch.trim().toLowerCase()
+    return queueRows.filter((row) => {
+      if (row.shiftType !== activeShift) return false
+      if (!search) return true
+      const haystack = `${row.therapistName} ${row.employmentType}`.toLowerCase()
+      return haystack.includes(search)
+    })
+  }, [activeShift, queueRows, therapistSearch])
 
   const savedOverrides = useMemo(
     () =>
@@ -177,38 +229,49 @@ export function ManagerSchedulingInputs({
 
   const therapistRequestRows = useMemo(
     () =>
-      availabilityEntries.filter(
-        (row) => row.cycleId === selectedCycleId && row.therapistId === selectedTherapistId
-      ),
+      availabilityEntries
+        .filter(
+          (row) =>
+            row.cycleId === selectedCycleId &&
+            row.therapistId === selectedTherapistId &&
+            row.source === 'therapist'
+        )
+        .sort((a, b) => a.date.localeCompare(b.date)),
     [availabilityEntries, selectedCycleId, selectedTherapistId]
   )
 
-  const rosterRow =
-    submittedRows.find((row) => row.therapistId === selectedTherapistId) ??
-    missingRows.find((row) => row.therapistId === selectedTherapistId) ??
-    null
+  const rosterRow = queueRows.find((row) => row.therapistId === selectedTherapistId) ?? null
 
   const submissionStatus = rosterRow
     ? {
-        submitted: submittedRows.some((row) => row.therapistId === selectedTherapistId),
+        submitted: rosterRow.submitted,
         overridesCount: rosterRow.overridesCount,
         lastUpdatedAt: rosterRow.lastUpdatedAt,
       }
     : null
 
-  const nextMissingResponderId = useMemo(() => {
-    if (missingRows.length === 0) return null
-    const currentIndex = missingRows.findIndex((row) => row.therapistId === selectedTherapistId)
-    if (currentIndex === -1) return missingRows[0]?.therapistId ?? null
-    return missingRows[(currentIndex + 1) % missingRows.length]?.therapistId ?? null
-  }, [missingRows, selectedTherapistId])
+  function getDatesForMode(nextMode: AvailabilityEditorMode, cycleId: string, therapistId: string) {
+    if (nextMode === 'will_work' || nextMode === 'cannot_work') {
+      const nextBuckets = getSavedBucketsForSelection(overrides, cycleId, therapistId)
+      return nextMode === 'will_work' ? nextBuckets.willWork : nextBuckets.cannotWork
+    }
 
-  const nextMissingResponderName =
-    missingRows.find((row) => row.therapistId === nextMissingResponderId)?.therapistName ?? null
+    const entryType = REQUEST_MODE_TO_ENTRY_TYPE[nextMode]
+    return uniqueSortedDates(
+      availabilityEntries
+        .filter(
+          (row) =>
+            row.cycleId === cycleId &&
+            row.therapistId === therapistId &&
+            row.source === 'therapist' &&
+            row.entryType === entryType
+        )
+        .map((row) => row.date)
+    )
+  }
 
-  function syncSelection(nextMode: PlannerMode, cycleId: string, therapistId: string) {
-    const nextBuckets = getSavedBucketsForSelection(overrides, cycleId, therapistId)
-    setSelectedDates(nextMode === 'will_work' ? nextBuckets.willWork : nextBuckets.cannotWork)
+  function syncSelection(nextMode: AvailabilityEditorMode, cycleId: string, therapistId: string) {
+    setSelectedDates(getDatesForMode(nextMode, cycleId, therapistId))
   }
 
   function replacePlannerQuery(nextCycleId: string, nextTherapistId: string) {
@@ -224,61 +287,54 @@ export function ManagerSchedulingInputs({
     } else {
       params.delete('therapist')
     }
-    params.delete('search')
     const query = params.toString()
     startTransition(() => {
       router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
     })
   }
 
-  function applyTherapistSelection(
-    nextTherapistId: string,
-    options?: {
-      rosterFilter?: AvailabilityRosterFilter
-      secondaryTab?: 'roster' | 'inbox'
-    }
-  ) {
-    setSelectedTherapistId(nextTherapistId)
-    if (options?.rosterFilter) {
-      setActiveRosterFilter(options.rosterFilter)
-    }
-    if (options?.secondaryTab) {
-      setActiveSecondaryTab(options.secondaryTab)
-    }
+  function applyTherapistSelection(nextTherapistId: string) {
     const nextTherapist = therapists.find((therapist) => therapist.id === nextTherapistId) ?? null
-    plannerFocus?.setFocusedTherapistName(nextTherapist?.full_name ?? null)
+    if (!nextTherapist) return
+
+    setSelectedTherapistId(nextTherapistId)
+    setActiveShift(nextTherapist.shift_type)
+    plannerFocus?.setFocusedTherapistName(nextTherapist.full_name)
     syncSelection(mode, selectedCycleId, nextTherapistId)
     replacePlannerQuery(selectedCycleId, nextTherapistId)
   }
 
+  function reviewTherapist(nextTherapistId: string) {
+    applyTherapistSelection(nextTherapistId)
+  }
+
+  function enterTherapist(nextTherapistId: string) {
+    applyTherapistSelection(nextTherapistId)
+    setEditorOpen(true)
+  }
+
+  function clearSelectedTherapist() {
+    setSelectedTherapistId('')
+    plannerFocus?.setFocusedTherapistName(null)
+    replacePlannerQuery(selectedCycleId, '')
+  }
+
   function handleCycleChange(nextCycleId: string) {
     setSelectedCycleId(nextCycleId)
-    const nextCycle = cycles.find((cycle) => cycle.id === nextCycleId)
-    if (nextCycle) {
-      setMonthStart(toMonthStartKey(nextCycle.start_date))
-    }
     syncSelection(mode, nextCycleId, selectedTherapistId)
     replacePlannerQuery(nextCycleId, selectedTherapistId)
   }
 
-  function handleTherapistChange(nextTherapistId: string) {
-    applyTherapistSelection(nextTherapistId)
+  function handleShiftChange(nextShift: TherapistOption['shift_type']) {
+    setActiveShift(nextShift)
+    if (selectedTherapist?.shift_type === nextShift) return
+    const nextTherapist = therapists.find((therapist) => therapist.shift_type === nextShift) ?? null
+    if (nextTherapist) {
+      applyTherapistSelection(nextTherapist.id)
+    }
   }
 
-  function focusMissingResponders() {
-    setActiveSecondaryTab('roster')
-    setActiveRosterFilter('missing')
-  }
-
-  function reviewNextMissingResponder() {
-    if (!nextMissingResponderId) return
-    applyTherapistSelection(nextMissingResponderId, {
-      rosterFilter: 'missing',
-      secondaryTab: 'roster',
-    })
-  }
-
-  function handleModeChange(nextMode: PlannerMode) {
+  function handleModeChange(nextMode: AvailabilityEditorMode) {
     setMode(nextMode)
     syncSelection(nextMode, selectedCycleId, selectedTherapistId)
   }
@@ -288,7 +344,7 @@ export function ManagerSchedulingInputs({
     setSelectedDates((current) =>
       current.includes(date)
         ? current.filter((value) => value !== date)
-        : [...current, date].sort((a, b) => a.localeCompare(b))
+        : uniqueSortedDates([...current, date])
     )
   }
 
@@ -296,8 +352,8 @@ export function ManagerSchedulingInputs({
     const next: Record<
       string,
       {
-        draftSelection?: 'will_work' | 'cannot_work'
-        savedPlanner?: 'will_work' | 'cannot_work'
+        draftSelection?: AvailabilityEditorMode
+        savedPlanner?: PlannerMode
         requestTypes?: Array<'need_off' | 'request_to_work'>
       }
     > = {}
@@ -308,16 +364,18 @@ export function ManagerSchedulingInputs({
     for (const date of savedBuckets.cannotWork) {
       next[date] = { ...(next[date] ?? {}), savedPlanner: 'cannot_work' }
     }
+    for (const row of therapistRequestRows) {
+      const requestType = row.entryType === 'force_off' ? 'need_off' : 'request_to_work'
+      const currentRequestTypes = next[row.date]?.requestTypes ?? []
+      next[row.date] = {
+        ...(next[row.date] ?? {}),
+        requestTypes: currentRequestTypes.includes(requestType)
+          ? currentRequestTypes
+          : [...currentRequestTypes, requestType],
+      }
+    }
     for (const date of selectedDates) {
       next[date] = { ...(next[date] ?? {}), draftSelection: mode }
-    }
-    for (const row of therapistRequestRows) {
-      const current = next[row.date] ?? {}
-      const requestType = row.entryType === 'force_off' ? 'need_off' : 'request_to_work'
-      next[row.date] = {
-        ...current,
-        requestTypes: [...(current.requestTypes ?? []), requestType],
-      }
     }
 
     return next
@@ -325,10 +383,10 @@ export function ManagerSchedulingInputs({
 
   if (cycles.length === 0) {
     return (
-      <section className="rounded-[1.75rem] border border-border/70 bg-card px-6 py-5">
-        <h2 className="text-lg font-semibold text-foreground">Plan staffing</h2>
+      <section className="rounded-[1.5rem] border border-border/70 bg-card px-6 py-5">
+        <h2 className="text-lg font-semibold text-foreground">Availability Manager</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Create a schedule cycle before planning hard staffing dates.
+          Create a schedule cycle before managing therapist availability.
         </p>
       </section>
     )
@@ -336,69 +394,95 @@ export function ManagerSchedulingInputs({
 
   if (therapists.length === 0) {
     return (
-      <section className="rounded-[1.75rem] border border-border/70 bg-card px-6 py-5">
-        <h2 className="text-lg font-semibold text-foreground">Plan staffing</h2>
+      <section className="rounded-[1.5rem] border border-border/70 bg-card px-6 py-5">
+        <h2 className="text-lg font-semibold text-foreground">Availability Manager</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          No active therapists are available to plan right now.
+          No active therapists are available to review right now.
         </p>
       </section>
     )
   }
 
   return (
-    <section id="staff-scheduling-inputs" className="space-y-3">
-      <AvailabilityWorkspaceShell
-        primaryHeader={
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-                Planning workspace
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Plan one therapist at a time, then use the follow-up queue below for responses and
-                request review.
-              </p>
+    <section id="staff-scheduling-inputs" className="space-y-4">
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+        <h1 className="whitespace-nowrap text-[2.8rem] font-semibold tracking-[-0.04em] text-foreground">
+          Availability Manager
+        </h1>
+
+        <div className="flex flex-wrap items-center justify-end gap-3 xl:flex-nowrap">
+          <label className="space-y-1.5">
+            <span className="sr-only">Schedule cycle</span>
+            <select
+              id="planner_cycle_id"
+              className="min-h-11 min-w-[16rem] rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none transition focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              value={selectedCycleId}
+              onChange={(event) => handleCycleChange(event.target.value)}
+            >
+              {cycles.map((cycle) => (
+                <option key={cycle.id} value={cycle.id}>
+                  {formatHumanCycleRange(cycle.start_date, cycle.end_date)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {shiftOptions.length > 1 ? (
+            <div className="space-y-1.5">
+              <span className="sr-only">Shift</span>
+              <div className="inline-flex min-h-11 rounded-full border border-border/70 bg-muted/[0.08] p-1">
+                {shiftOptions.map((shiftType) => (
+                  <button
+                    key={shiftType}
+                    type="button"
+                    className={cn(
+                      'rounded-full px-3 py-2 text-sm font-semibold transition-colors',
+                      activeShift === shiftType
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                    onClick={() => handleShiftChange(shiftType)}
+                  >
+                    {shiftType === 'night' ? 'Night shift' : 'Day shift'}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        }
-        controls={
-          <PlannerControlRail
-            cycles={cycles}
-            therapists={therapists}
-            selectedCycleId={selectedCycleId}
+          ) : null}
+
+          <label className="space-y-1.5">
+            <span className="sr-only">Therapist search</span>
+            <input
+              type="search"
+              value={therapistSearch}
+              onChange={(event) => setTherapistSearch(event.target.value)}
+              placeholder="Search therapists..."
+              className="min-h-11 min-w-[15rem] rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            />
+          </label>
+
+          <div className="flex items-end">{toolbarUtilities}</div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(39rem,1fr)_minmax(0,1fr)]">
+        <div id="availability-work-queue" className="min-h-0">
+          <AvailabilityStatusSummary
+            submittedRows={filteredQueueRows.filter((row) => row.submitted)}
+            missingRows={filteredQueueRows.filter((row) => !row.submitted)}
+            initialFilter={initialRosterFilter}
+            activeFilter={activeRosterFilter}
             selectedTherapistId={selectedTherapistId}
-            selectedTherapist={selectedTherapist}
-            mode={mode}
-            selectedDates={selectedDates}
-            onCycleChange={handleCycleChange}
-            onTherapistChange={handleTherapistChange}
-            onModeChange={handleModeChange}
-            onClearSelectedDates={() => setSelectedDates([])}
-            onRemoveSelectedDate={(date) =>
-              setSelectedDates((current) => current.filter((value) => value !== date))
-            }
-            copyAction={copyAvailabilityFromPreviousCycleAction}
-            saveAction={saveManagerPlannerDatesAction}
+            onPickTherapist={applyTherapistSelection}
+            onReviewTherapist={reviewTherapist}
+            onEnterTherapist={enterTherapist}
+            onFilterChange={setActiveRosterFilter}
+            embedded
+            activeShift={activeShift}
+            searchTerm={therapistSearch}
           />
-        }
-        calendar={
-          <AvailabilityCalendarPanel
-            monthStart={monthStart}
-            cycleStart={selectedCycle?.start_date ?? monthStart}
-            cycleEnd={selectedCycle?.end_date ?? monthStart}
-            selectedTherapistName={selectedTherapist?.full_name ?? 'Select a therapist'}
-            cycleLabel={
-              selectedCycle
-                ? formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)
-                : ''
-            }
-            dayStates={dayStates}
-            onPreviousMonth={() => setMonthStart((current) => shiftMonthKey(current, -1))}
-            onNextMonth={() => setMonthStart((current) => shiftMonthKey(current, 1))}
-            onToggleDate={toggleDate}
-          />
-        }
-        context={
+        </div>
+        <div className="min-h-0 rounded-[1.5rem] border border-border/70 bg-card px-5 py-5 shadow-tw-sm">
           <TherapistContextPanel
             therapist={selectedTherapist}
             cycleLabel={
@@ -407,38 +491,39 @@ export function ManagerSchedulingInputs({
                 : 'No cycle selected'
             }
             requestRows={therapistRequestRows}
-            savedPlannerRows={savedOverrides}
             submissionStatus={submissionStatus}
-            deleteManagerPlannerDateAction={deleteManagerPlannerDateAction}
-            selectedCycleId={selectedCycleId}
-            selectedTherapistId={selectedTherapistId}
+            savedPlannerCount={savedOverrides.length}
+            onOpenEditor={() => setEditorOpen(true)}
+            onClose={clearSelectedTherapist}
           />
+        </div>
+      </div>
+
+      <ManagerAvailabilityEditorDialog
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        therapist={selectedTherapist}
+        cycleLabel={
+          selectedCycle
+            ? formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)
+            : 'No cycle selected'
         }
-        secondaryContent={
-          <AvailabilitySecondaryPanel
-            defaultTab={defaultSecondaryTab}
-            activeTab={activeSecondaryTab}
-            onTabChange={setActiveSecondaryTab}
-            roster={
-              <AvailabilityStatusSummary
-                submittedRows={submittedRows}
-                missingRows={missingRows}
-                initialFilter={initialRosterFilter}
-                activeFilter={activeRosterFilter}
-                selectedTherapistId={selectedTherapistId}
-                onPickTherapist={(therapistId) =>
-                  applyTherapistSelection(therapistId, { secondaryTab: 'roster' })
-                }
-                onFilterChange={setActiveRosterFilter}
-                onFocusMissingResponders={focusMissingResponders}
-                onReviewNextMissingResponder={reviewNextMissingResponder}
-                nextMissingResponderName={nextMissingResponderName}
-                embedded
-              />
-            }
-            inbox={reviewRequestsPanel}
-          />
+        cycleStart={selectedCycle?.start_date ?? ''}
+        cycleEnd={selectedCycle?.end_date ?? ''}
+        mode={mode}
+        selectedDates={selectedDates}
+        dayStates={dayStates}
+        onModeChange={handleModeChange}
+        onToggleDate={toggleDate}
+        onClearSelectedDates={() => setSelectedDates([])}
+        onRemoveSelectedDate={(date) =>
+          setSelectedDates((current) => current.filter((value) => value !== date))
         }
+        saveManagerPlannerDatesAction={saveManagerPlannerDatesAction}
+        saveManagerAvailabilityRequestsAction={saveManagerAvailabilityRequestsAction}
+        copyAvailabilityFromPreviousCycleAction={copyAvailabilityFromPreviousCycleAction}
+        selectedCycleId={selectedCycleId}
+        selectedTherapistId={selectedTherapistId}
       />
     </section>
   )

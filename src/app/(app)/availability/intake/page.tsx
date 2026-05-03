@@ -361,7 +361,7 @@ export default async function AvailabilityIntakePage({
   })
 
   const intakeNeedsReviewCount = emailIntakeRows.reduce((sum, row) => sum + row.needsReviewCount, 0)
-  const plannerHref = `/availability${toSearchString(params)}`
+  const workQueueHref = `/availability${toSearchString(params)}`
 
   return (
     <div className="availability-page-print space-y-5">
@@ -388,7 +388,7 @@ export default async function AvailabilityIntakePage({
               size="sm"
               className="gap-1.5 bg-primary text-xs text-primary-foreground hover:bg-primary/90"
             >
-              <Link href={plannerHref}>Back to planner</Link>
+              <Link href={workQueueHref}>Back to work queue</Link>
             </Button>
             <MoreActionsMenu
               label="Utilities"
@@ -410,12 +410,12 @@ export default async function AvailabilityIntakePage({
       <div className="border-b border-border/70">
         <nav className="-mb-px flex gap-0" aria-label="Availability sections">
           <Link
-            href={plannerHref}
+            href={workQueueHref}
             className={cn(
               'inline-flex h-11 items-center px-4 py-2 text-sm border-b-2 transition-colors border-transparent text-muted-foreground hover:text-foreground'
             )}
           >
-            Planner
+            Work queue
           </Link>
           <span
             className={cn(

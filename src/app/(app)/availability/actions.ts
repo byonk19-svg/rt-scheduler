@@ -621,6 +621,116 @@ export async function saveManagerPlannerDatesAction(formData: FormData) {
   )
 }
 
+export async function saveManagerAvailabilityRequestsAction(formData: FormData) {
+  const { supabase, user, role } = await getAuthenticatedUserWithRole()
+
+  if (!can(role, 'access_manager_ui')) {
+    redirect('/availability')
+  }
+
+  const cycleId = String(formData.get('cycle_id') ?? '').trim()
+  const therapistId = String(formData.get('therapist_id') ?? '').trim()
+  const mode = String(formData.get('mode') ?? '').trim()
+  const dates = formData
+    .getAll('dates')
+    .map((value) => String(value).trim())
+    .filter((value) => value.length > 0)
+
+  const { data: cycle } = await supabase
+    .from('schedule_cycles')
+    .select('start_date, end_date')
+    .eq('id', cycleId)
+    .maybeSingle()
+
+  if (mode !== 'need_off' && mode !== 'request_to_work') {
+    redirect(
+      buildAvailabilityUrl({
+        cycle: cycleId || undefined,
+        therapist: therapistId || undefined,
+        error: 'manager_request_save_failed',
+      })
+    )
+  }
+
+  const validationError = getPlannerDateValidationError({
+    cycle: cycle ? { start_date: cycle.start_date, end_date: cycle.end_date } : null,
+    therapistId,
+    dates,
+  })
+
+  if (validationError) {
+    redirect(
+      buildAvailabilityUrl({
+        cycle: cycleId || undefined,
+        therapist: therapistId || undefined,
+        error: 'manager_request_save_failed',
+      })
+    )
+  }
+
+  const overrideType = mode === 'need_off' ? 'force_off' : 'force_on'
+  const uniqueDates = [...new Set(dates)].sort((a, b) => a.localeCompare(b))
+  const { data: existingRows, error: existingRowsError } = await supabase
+    .from('availability_overrides')
+    .select('date, note')
+    .eq('cycle_id', cycleId)
+    .eq('therapist_id', therapistId)
+    .eq('shift_type', 'both')
+    .eq('source', 'therapist')
+    .in('date', uniqueDates)
+
+  if (existingRowsError) {
+    console.error('Failed to load existing therapist availability request rows:', existingRowsError)
+    redirect(
+      buildAvailabilityUrl({
+        cycle: cycleId || undefined,
+        therapist: therapistId || undefined,
+        error: 'manager_request_save_failed',
+      })
+    )
+  }
+
+  const notesByDate = new Map(
+    (existingRows ?? []).map((row) => [String(row.date), row.note?.trim() || null])
+  )
+
+  const payload = uniqueDates.map((date) => ({
+    therapist_id: therapistId,
+    cycle_id: cycleId,
+    date,
+    shift_type: 'both' as const,
+    override_type: overrideType,
+    note: notesByDate.get(date) ?? null,
+    created_by: user.id,
+    source: 'therapist' as const,
+  }))
+
+  const { error: upsertError } = await supabase
+    .from('availability_overrides')
+    .upsert(payload, { onConflict: 'cycle_id,therapist_id,date,shift_type' })
+
+  if (upsertError) {
+    console.error('Failed to save manager availability requests:', upsertError)
+    redirect(
+      buildAvailabilityUrl({
+        cycle: cycleId || undefined,
+        therapist: therapistId || undefined,
+        error: 'manager_request_save_failed',
+      })
+    )
+  }
+
+  await upsertTherapistSubmissionAfterOfficialSave(supabase, therapistId, cycleId)
+  revalidateTherapistAvailabilitySurfaces()
+  redirect(
+    buildAvailabilityUrl({
+      cycle: cycleId || undefined,
+      therapist: therapistId || undefined,
+      success: 'manager_request_saved',
+    })
+  )
+}
+
 export async function deleteManagerPlannerDateAction(formData: FormData) {
   const { supabase, role } = await getAuthenticatedUserWithRole()
 
@@ -661,6 +771,51 @@ export async function deleteManagerPlannerDateAction(formData: FormData) {
       cycle: cycleId || undefined,
       therapist: therapistId || undefined,
       success: 'planner_deleted',
+    })
+  )
+}
+
+export async function deleteManagerAvailabilityRequestAction(formData: FormData) {
+  const { supabase, role } = await getAuthenticatedUserWithRole()
+
+  if (!can(role, 'access_manager_ui')) {
+    redirect('/availability')
+  }
+
+  const overrideId = String(formData.get('override_id') ?? '').trim()
+  const cycleId = String(formData.get('cycle_id') ?? '').trim()
+  const therapistId = String(formData.get('therapist_id') ?? '').trim()
+
+  if (!overrideId) {
+    redirect(
+      buildAvailabilityUrl({ cycle: cycleId || undefined, therapist: therapistId || undefined })
+    )
+  }
+
+  const { error } = await supabase
+    .from('availability_overrides')
+    .delete()
+    .eq('id', overrideId)
+    .eq('source', 'therapist')
+
+  if (error) {
+    console.error('Failed to delete therapist availability request from manager editor:', error)
+    redirect(
+      buildAvailabilityUrl({
+        cycle: cycleId || undefined,
+        therapist: therapistId || undefined,
+        error: 'manager_request_delete_failed',
+      })
+    )
+  }
+
+  await touchTherapistSubmissionLastEditedIfExists(supabase, therapistId, cycleId)
+  revalidateTherapistAvailabilitySurfaces()
+  redirect(
+    buildAvailabilityUrl({
+      cycle: cycleId || undefined,
+      therapist: therapistId || undefined,
+      success: 'manager_request_deleted',
     })
   )
 }

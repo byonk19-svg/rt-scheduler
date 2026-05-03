@@ -12,7 +12,7 @@ const routes = [
   ['src/app/(app)/dashboard/page.tsx', "title: 'Dashboard'"],
   ['src/app/(app)/dashboard/manager/page.tsx', "title: 'Inbox'"],
   ['src/app/(app)/dashboard/staff/page.tsx', "title: 'Dashboard'"],
-  ['src/app/(app)/availability/page.tsx', "title: 'Availability Planning'"],
+  ['src/app/(app)/availability/page.tsx', "title: 'Availability Manager'"],
   ['src/app/(app)/pending-setup/page.tsx', "title: 'Waiting for approval'"],
   ['src/app/(app)/publish/page.tsx', "title: 'Publish History'"],
   ['src/app/(app)/requests/page.tsx', "title: 'Requests'"],

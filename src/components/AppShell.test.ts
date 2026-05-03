@@ -75,14 +75,17 @@ describe('AppShell mobile menu', () => {
     expect(appShellSource).toContain('<LocalSectionNav')
   })
 
-  it('suppresses the local section nav on the read-only schedule surface so the roster can own the page', () => {
-    expect(appShellSource).toContain("const hideLocalSectionNav = pathname === '/schedule'")
+  it('suppresses the local section nav on schedule and availability surfaces so the page layout can own the space', () => {
+    expect(appShellSource).toContain(
+      "const hideLocalSectionNav = pathname === '/schedule' || pathname.startsWith('/availability')"
+    )
     expect(appShellSource).toContain('shellContext.localNav && !hideLocalSectionNav')
   })
 
   it('lets the read-only schedule surface use the full authenticated workspace width', () => {
     expect(appShellSource).toContain("const isSchedulePage = pathname === '/schedule'")
-    expect(appShellSource).toContain('isCoveragePage || isSchedulePage')
+    expect(appShellSource).toContain("const isAvailabilityPage = pathname === '/availability'")
+    expect(appShellSource).toContain('isCoveragePage || isSchedulePage || isAvailabilityPage')
   })
 
   it('does not keep a second fixed shell bar under the main header', () => {

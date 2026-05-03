@@ -9,22 +9,18 @@ const source = readFileSync(
 )
 
 describe('ManagerSchedulingInputs performance contract', () => {
-  it('lazy-loads the heaviest planner sub-surfaces instead of statically importing them all', () => {
+  it('lazy-loads the queue, review panel, and editor dialog instead of statically importing them into the manager shell', () => {
     expect(source).not.toContain(
-      "import { AvailabilityCalendarPanel } from '@/components/availability/availability-calendar-panel'"
-    )
-    expect(source).not.toContain(
-      "import { AvailabilitySecondaryPanel } from '@/components/availability/availability-secondary-panel'"
-    )
-    expect(source).not.toContain(
-      "import { PlannerControlRail } from '@/components/availability/planner-control-rail'"
+      "import { AvailabilityStatusSummary } from '@/components/availability/AvailabilityStatusSummary'"
     )
     expect(source).not.toContain(
       "import { TherapistContextPanel } from '@/components/availability/therapist-context-panel'"
     )
-    expect(source).toContain('const AvailabilityCalendarPanel = dynamic(() =>')
-    expect(source).toContain('const AvailabilitySecondaryPanel = dynamic(() =>')
-    expect(source).toContain('const PlannerControlRail = dynamic(() =>')
+    expect(source).not.toContain(
+      "import { ManagerAvailabilityEditorDialog } from '@/components/availability/manager-availability-editor-dialog'"
+    )
+    expect(source).toContain('const AvailabilityStatusSummary = dynamic(() =>')
     expect(source).toContain('const TherapistContextPanel = dynamic(() =>')
+    expect(source).toContain('const ManagerAvailabilityEditorDialog = dynamic(() =>')
   })
 })

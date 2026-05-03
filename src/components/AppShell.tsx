@@ -235,7 +235,8 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
 
   const isCoveragePage = pathname === '/coverage'
   const isSchedulePage = pathname === '/schedule'
-  const hideLocalSectionNav = pathname === '/schedule'
+  const isAvailabilityPage = pathname === '/availability'
+  const hideLocalSectionNav = pathname === '/schedule' || pathname.startsWith('/availability')
 
   return (
     <ThemeProvider>
@@ -312,7 +313,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
             tabIndex={-1}
             className={cn(
               'w-full print:max-w-none',
-              isCoveragePage || isSchedulePage
+              isCoveragePage || isSchedulePage || isAvailabilityPage
                 ? 'py-4 md:py-5'
                 : cn(APP_PAGE_MAX_WIDTH_CLASS, 'py-5 md:py-7 print:mx-0 print:px-4 print:py-4')
             )}

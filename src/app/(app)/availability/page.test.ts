@@ -4,12 +4,12 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 describe('availability page role-specific actions', () => {
-  it('uses the therapist workspace anchor instead of the removed submit-entry target', () => {
+  it('removes the old therapist submit-entry anchor from the manager surface', () => {
     const filePath = resolve(process.cwd(), 'src/app/(app)/availability/page.tsx')
     const source = readFileSync(filePath, 'utf8')
 
-    expect(source).toContain('#therapist-availability-workspace')
     expect(source).not.toContain('#submit-entry')
+    expect(source).toContain("title: 'Availability Manager'")
   })
 
   it('uses the therapist relationship when reading availability overrides', () => {
@@ -33,36 +33,37 @@ describe('availability page role-specific actions', () => {
       'utf8'
     )
     expect(source).toContain('updated_at')
+    expect(source).toContain('created_by')
     expect(source).toContain('source')
     expect(source).toContain("entry.source === 'manager' ? 'manager' : 'therapist'")
   })
 
-  it('passes the request inbox into the lower workbench section for managers', () => {
+  it('passes manager request save behavior into the review-and-manual-entry workflow', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/app/(app)/availability/page.tsx'),
       'utf8'
     )
     expect(source).toContain(
-      'reviewRequestsPanel={<div id="availability-request-inbox">{entriesCard}</div>}'
+      'saveManagerAvailabilityRequestsAction={saveManagerAvailabilityRequestsAction}'
     )
-    expect(source).toContain('formatHumanCycleRange')
+    expect(source).toContain(
+      'copyAvailabilityFromPreviousCycleAction={copyAvailabilityFromPreviousCycleAction}'
+    )
+    expect(source).toContain('toolbarUtilities=')
+    expect(source).toContain('Email intake')
   })
 
-  it('uses the tighter manager header copy and summary-chip navigation for planner filters', () => {
+  it('uses the simplified manager shell and work-queue tab label', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/app/(app)/availability/page.tsx'),
       'utf8'
     )
 
-    expect(source).toContain(
-      "title={canManageAvailability ? 'Availability Planning' : 'Availability'}"
-    )
-    expect(source).toContain('AvailabilitySummaryChips')
-    expect(source).not.toContain('selectedCycle.label')
-    expect(source).toContain("roster: 'missing'")
-    expect(source).toContain("roster: 'submitted'")
-    expect(source).toContain("status: 'force_off'")
-    expect(source).toContain("status: 'force_on'")
+    expect(source).toContain("title: 'Availability Manager'")
+    expect(source).not.toContain('AvailabilityOverviewHeader')
+    expect(source).toContain('Email intake')
+    expect(source).toContain('toolbarUtilities=')
+    expect(source).toContain("initialRoster === 'all'")
   })
 
   it('gates therapist scheduled-shift conflict warnings off for managers', () => {

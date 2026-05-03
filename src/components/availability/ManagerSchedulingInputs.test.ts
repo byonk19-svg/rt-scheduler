@@ -16,15 +16,12 @@ vi.mock('next/navigation', () => ({
 import { ManagerSchedulingInputs } from '@/components/availability/ManagerSchedulingInputs'
 
 describe('ManagerSchedulingInputs', () => {
-  it('renders the manager workspace with planner controls, calendar, and roster content', () => {
+  it('renders the queue-first manager workspace with toolbar, queue, and detail panel', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/components/availability/ManagerSchedulingInputs.tsx'),
       'utf8'
     )
-    const plannerRailSource = readFileSync(
-      resolve(process.cwd(), 'src/components/availability/planner-control-rail.tsx'),
-      'utf8'
-    )
+
     const html = renderToStaticMarkup(
       createElement(ManagerSchedulingInputs, {
         cycles: [
@@ -55,16 +52,6 @@ describe('ManagerSchedulingInputs', () => {
             note: null,
             source: 'manager',
           },
-          {
-            id: 'override-2',
-            therapist_id: 'therapist-1',
-            cycle_id: 'cycle-1',
-            date: '2026-03-26',
-            shift_type: 'day',
-            override_type: 'force_off',
-            note: null,
-            source: 'manager',
-          },
         ],
         availabilityEntries: [
           {
@@ -73,10 +60,13 @@ describe('ManagerSchedulingInputs', () => {
             cycleId: 'cycle-1',
             date: '2026-03-24',
             reason: 'Vacation',
+            createdById: 'manager-1',
             createdAt: '2026-03-02T08:00:00.000Z',
             updatedAt: '2026-03-03T08:00:00.000Z',
             requestedBy: 'Barbara C.',
             entryType: 'force_off',
+            shiftType: 'both',
+            source: 'therapist',
           },
         ],
         initialCycleId: 'cycle-1',
@@ -87,6 +77,8 @@ describe('ManagerSchedulingInputs', () => {
             therapistName: 'Kim S.',
             overridesCount: 3,
             lastUpdatedAt: '2026-03-20T09:00:00.000Z',
+            shiftType: 'day',
+            employmentType: 'full_time',
           },
         ],
         missingRows: [
@@ -95,36 +87,28 @@ describe('ManagerSchedulingInputs', () => {
             therapistName: 'Layne P.',
             overridesCount: 0,
             lastUpdatedAt: null,
+            shiftType: 'day',
+            employmentType: 'prn',
           },
         ],
         saveManagerPlannerDatesAction: async () => {},
-        deleteManagerPlannerDateAction: async () => {},
+        saveManagerAvailabilityRequestsAction: async () => {},
         copyAvailabilityFromPreviousCycleAction: async () => {},
       })
     )
 
-    expect(html).toContain('data-slot="availability-workspace-primary"')
-    expect(html).toContain('Planning workspace')
-    expect(html).toContain('Plan one therapist at a time')
-    expect(html).toContain('data-slot="availability-workspace-context"')
-    expect(html).toContain('data-slot="availability-workspace-secondary"')
-    expect(source).toContain('PlannerControlRail')
-    expect(source).toContain('AvailabilityCalendarPanel')
+    expect(html).toContain('Schedule cycle')
+    expect(html).toContain('Therapist search')
+    expect(html).toContain('Availability Manager')
+    expect(html).not.toContain('Selected therapist</span><select')
+    expect(source).toContain('AvailabilityStatusSummary')
     expect(source).toContain('TherapistContextPanel')
-    expect(source).toContain('AvailabilitySecondaryPanel')
-    expect(plannerRailSource).toContain('Schedule cycle')
-    expect(plannerRailSource).toContain('Therapist')
-    expect(plannerRailSource).toContain('Step 1')
-    expect(plannerRailSource).toContain('Choose a therapist')
-    expect(plannerRailSource).toContain('Step 2')
-    expect(plannerRailSource).toContain('Step 3')
-    expect(plannerRailSource).toContain('Will work')
-    expect(plannerRailSource).toContain('Cannot work')
-    expect(plannerRailSource).toContain('Copy from last block')
-    expect(plannerRailSource).toContain('Selected dates')
-    expect(plannerRailSource).toContain(
-      "return `Save ${count} will-work date${count === 1 ? '' : 's'}`"
-    )
+    expect(source).toContain('ManagerAvailabilityEditorDialog')
+    expect(source).toContain('id="staff-scheduling-inputs"')
+    expect(source).not.toContain('AvailabilityCalendarPanel')
+    expect(source).toContain('saveManagerAvailabilityRequestsAction')
+    expect(source).toContain('editorOpen')
+    expect(source).toContain('activeShift')
   })
 
   it('renders a setup message when no cycles exist', () => {
@@ -139,22 +123,12 @@ describe('ManagerSchedulingInputs', () => {
         submittedRows: [],
         missingRows: [],
         saveManagerPlannerDatesAction: async () => {},
-        deleteManagerPlannerDateAction: async () => {},
+        saveManagerAvailabilityRequestsAction: async () => {},
         copyAvailabilityFromPreviousCycleAction: async () => {},
       })
     )
 
-    expect(html).toContain('Create a schedule cycle before planning hard staffing dates.')
-  })
-
-  it('uses a clearer disabled save label when no planner dates are selected', () => {
-    const plannerRailSource = readFileSync(
-      resolve(process.cwd(), 'src/components/availability/planner-control-rail.tsx'),
-      'utf8'
-    )
-
-    expect(plannerRailSource).toContain("if (count === 0) return 'Select dates to save'")
-    expect(plannerRailSource).not.toContain('Save 0 will-work dates')
+    expect(html).toContain('Create a schedule cycle before managing therapist availability.')
   })
 
   it('uses Next router state instead of forcing a full page reload for planner selection changes', () => {
@@ -172,30 +146,15 @@ describe('ManagerSchedulingInputs', () => {
     expect(source).not.toContain('window.location.assign')
   })
 
-  it('keeps the missing-response workflow in the follow-up queue instead of duplicating it in planner controls', () => {
-    const plannerRailSource = readFileSync(
-      resolve(process.cwd(), 'src/components/availability/planner-control-rail.tsx'),
-      'utf8'
-    )
-    const rosterSource = readFileSync(
-      resolve(process.cwd(), 'src/components/availability/AvailabilityStatusSummary.tsx'),
-      'utf8'
-    )
-
-    expect(plannerRailSource).not.toContain('Focus missing responders')
-    expect(plannerRailSource).not.toContain('Review next')
-    expect(rosterSource).toContain('Focus missing responders')
-    expect(rosterSource).toContain('Review next')
-  })
-
-  it('keeps the response roster synced to the active planner therapist', () => {
+  it('keeps the follow-up workflow inside the queue instead of a buried lower panel', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/components/availability/ManagerSchedulingInputs.tsx'),
       'utf8'
     )
 
-    expect(source).toContain('selectedTherapistId={selectedTherapistId}')
-    expect(source).toContain('activeFilter={activeRosterFilter}')
-    expect(source).toContain('activeTab={activeSecondaryTab}')
+    expect(source).not.toContain('AvailabilitySecondaryPanel')
+    expect(source).not.toContain('reviewRequestsPanel')
+    expect(source).toContain('AvailabilityStatusSummary')
+    expect(source).toContain('TherapistContextPanel')
   })
 })

@@ -1,5 +1,6 @@
 'use client'
 
+import { ChevronDown } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
@@ -11,6 +12,8 @@ export type AvailabilityStatusSummaryRow = {
   therapistName: string
   overridesCount: number
   lastUpdatedAt: string | null
+  shiftType?: 'day' | 'night'
+  employmentType?: 'full_time' | 'part_time' | 'prn'
 }
 
 export type AvailabilityRosterFilter = 'all' | 'missing' | 'submitted' | 'has_requests'
@@ -22,22 +25,40 @@ type AvailabilityStatusSummaryProps = {
   activeFilter?: AvailabilityRosterFilter
   selectedTherapistId?: string | null
   onPickTherapist?: (therapistId: string) => void
+  onReviewTherapist?: (therapistId: string) => void
+  onEnterTherapist?: (therapistId: string) => void
   onFilterChange?: (filter: AvailabilityRosterFilter) => void
-  onFocusMissingResponders?: () => void
-  onReviewNextMissingResponder?: () => void
-  nextMissingResponderName?: string | null
   embedded?: boolean
+  searchTerm?: string
+  activeShift?: 'day' | 'night'
 }
 
 type CombinedRosterRow = AvailabilityStatusSummaryRow & {
   submitted: boolean
+  shiftType: 'day' | 'night'
+  employmentType: 'full_time' | 'part_time' | 'prn'
 }
 
 function formatLastActivity(value: string | null) {
-  if (!value) return 'Awaiting submission'
+  if (!value) return 'No activity yet'
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return value
-  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return parsed.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+function employmentLabel(value: CombinedRosterRow['employmentType']) {
+  if (value === 'part_time') return 'Part-time'
+  if (value === 'prn') return 'PRN'
+  return 'Full-time'
+}
+
+function shiftLabel(value: CombinedRosterRow['shiftType']) {
+  return value === 'night' ? 'Night shift' : 'Day shift'
 }
 
 function initialsForName(name: string): string {
@@ -56,14 +77,16 @@ export function AvailabilityStatusSummary({
   activeFilter,
   selectedTherapistId,
   onPickTherapist,
+  onReviewTherapist,
+  onEnterTherapist,
   onFilterChange,
-  onFocusMissingResponders,
-  onReviewNextMissingResponder,
-  nextMissingResponderName,
   embedded = false,
+  searchTerm = '',
+  activeShift,
 }: AvailabilityStatusSummaryProps) {
   const [uncontrolledActiveFilter, setUncontrolledActiveFilter] =
     useState<AvailabilityRosterFilter>(initialFilter)
+  const [visibleCount, setVisibleCount] = useState(5)
 
   const resolvedActiveFilter = activeFilter ?? uncontrolledActiveFilter
 
@@ -75,221 +98,219 @@ export function AvailabilityStatusSummary({
   }
 
   const allRows = useMemo<CombinedRosterRow[]>(
-    () => [
-      ...missingRows.map((row) => ({ ...row, submitted: false })),
-      ...submittedRows.map((row) => ({ ...row, submitted: true })),
-    ],
+    () =>
+      [
+        ...missingRows.map((row) => ({
+          ...row,
+          submitted: false,
+          shiftType: row.shiftType ?? 'day',
+          employmentType: row.employmentType ?? 'full_time',
+        })),
+        ...submittedRows.map((row) => ({
+          ...row,
+          submitted: true,
+          shiftType: row.shiftType ?? 'day',
+          employmentType: row.employmentType ?? 'full_time',
+        })),
+      ].sort((a, b) => {
+        if (a.submitted !== b.submitted) return a.submitted ? 1 : -1
+        if (a.overridesCount !== b.overridesCount) return b.overridesCount - a.overridesCount
+        return a.therapistName.localeCompare(b.therapistName)
+      }),
     [missingRows, submittedRows]
   )
 
+  const visibleRows = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+    return allRows.filter((row) => {
+      if (activeShift && row.shiftType !== activeShift) return false
+      if (!normalizedSearch) return true
+      const haystack = `${row.therapistName} ${row.shiftType} ${row.employmentType}`.toLowerCase()
+      return haystack.includes(normalizedSearch)
+    })
+  }, [activeShift, allRows, searchTerm])
+
   const filteredRows = useMemo(() => {
-    if (resolvedActiveFilter === 'missing') return allRows.filter((row) => !row.submitted)
-    if (resolvedActiveFilter === 'submitted') return allRows.filter((row) => row.submitted)
+    if (resolvedActiveFilter === 'missing') return visibleRows.filter((row) => !row.submitted)
+    if (resolvedActiveFilter === 'submitted') return visibleRows.filter((row) => row.submitted)
     if (resolvedActiveFilter === 'has_requests') {
-      return allRows.filter((row) => row.overridesCount > 0)
+      return visibleRows.filter((row) => row.overridesCount > 0)
     }
-    return allRows.filter((row) => !row.submitted)
-  }, [resolvedActiveFilter, allRows])
-  const requestCount = allRows.filter((row) => row.overridesCount > 0).length
+    return visibleRows
+  }, [resolvedActiveFilter, visibleRows])
+
+  const requestCount = visibleRows.filter((row) => row.overridesCount > 0).length
+  const missingCount = visibleRows.filter((row) => !row.submitted).length
+  const submittedCount = visibleRows.filter((row) => row.submitted).length
+  const displayedRows = filteredRows.slice(0, visibleCount)
+  const canLoadMore = filteredRows.length > visibleCount
 
   return (
-    <section className="flex h-full flex-col" aria-labelledby="availability-response-heading">
-      {!embedded ? (
-        <div className="border-b border-border/70 px-4 py-3">
-          <h2
-            id="availability-response-heading"
-            className="text-sm font-bold tracking-[-0.01em] text-foreground"
-          >
-            Response roster
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Follow up on responses without leaving the planner.
-          </p>
-        </div>
-      ) : null}
-
+    <section
+      aria-labelledby="availability-work-queue-heading"
+      className="flex min-h-0 flex-col overflow-hidden rounded-[1.5rem] border border-border/70 bg-card shadow-tw-sm"
+    >
       <div
         className={cn(
-          'flex flex-wrap gap-1 px-4 py-2',
-          embedded ? 'border-b border-border/60 bg-muted/[0.04]' : 'border-b border-border/70'
+          'flex flex-wrap gap-6 border-b border-border/60 px-4 py-5',
+          embedded ? 'bg-muted/[0.04]' : undefined
         )}
       >
         {(
           [
-            ['missing', 'Not submitted'],
-            ['submitted', 'Submitted'],
-            ['has_requests', 'Has requests'],
+            ['missing', 'Needs attention', missingCount],
+            ['has_requests', 'Has requests', requestCount],
+            ['submitted', 'Submitted', submittedCount],
+            ['all', 'All', visibleRows.length],
           ] as const
-        ).map(([value, label]) => (
+        ).map(([value, label, count]) => (
           <button
             key={value}
             type="button"
+            data-roster-filter={value}
             className={cn(
-              'inline-flex min-h-11 items-center gap-1 rounded-full px-3 py-2 text-sm font-semibold transition-colors sm:min-h-10 sm:px-2.5 sm:py-1 sm:text-[11px]',
+              'inline-flex min-h-11 items-center gap-2 border-b-2 border-transparent px-1 py-2 text-[1.05rem] font-medium tracking-[-0.02em] transition-colors',
               resolvedActiveFilter === value
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                ? 'border-primary text-primary'
+                : 'text-muted-foreground hover:text-foreground'
             )}
             onClick={() => handleFilterChange(value)}
           >
             <span>{label}</span>
-            <span className="rounded-full bg-background/75 px-1.5 py-0.5 text-[10px] text-foreground">
-              {value === 'missing'
-                ? missingRows.length
-                : value === 'submitted'
-                  ? submittedRows.length
-                  : requestCount}
+            <span
+              className={cn(
+                'rounded-full px-2 py-0.5 text-[11px]',
+                resolvedActiveFilter === value
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground'
+              )}
+            >
+              {count}
             </span>
           </button>
         ))}
       </div>
 
-      {missingRows.length > 0 ? (
-        <div
-          className={cn(
-            'border-b border-border/60 px-4 py-3',
-            embedded ? 'bg-[var(--warning-subtle)]/35' : 'bg-[var(--warning-subtle)]/25'
-          )}
-        >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-semibold text-foreground">Not submitted</p>
-                <Badge
-                  variant="outline"
-                  className="border-[var(--warning-border)] text-[var(--warning-text)]"
-                >
-                  {missingRows.length}
-                </Badge>
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Focus the therapists who still need an official availability submission.
-              </p>
-              {nextMissingResponderName ? (
-                <p className="mt-1 text-[11px] font-medium text-foreground">
-                  Review next: {nextMissingResponderName}
-                </p>
-              ) : null}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="min-h-10 border-border/70 bg-background/90 text-xs text-foreground hover:bg-background"
-                onClick={onFocusMissingResponders}
-              >
-                Focus missing responders
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="min-h-10 px-3 text-xs text-muted-foreground hover:bg-background hover:text-foreground"
-                onClick={onReviewNextMissingResponder}
-                disabled={!onReviewNextMissingResponder}
-              >
-                Review next
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <div
-        className={cn('overflow-y-auto px-3 py-2.5', embedded ? 'max-h-[320px]' : 'max-h-[420px]')}
-      >
-        {filteredRows.length > 0 ? (
-          <div className="divide-y divide-border/60 rounded-xl border border-border/60 bg-background/80">
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              <span>Name</span>
+      <div className="px-3 py-3">
+        {displayedRows.length > 0 ? (
+          <div className="space-y-2">
+            <div className="hidden grid-cols-[minmax(0,2.9fr)_6rem_3.25rem_5.75rem_7rem] gap-4 px-2 pb-2 text-[13px] font-medium text-muted-foreground md:grid">
+              <span>Therapist</span>
+              <span>Status</span>
+              <span>Requests</span>
               <span>Last activity</span>
+              <span>Actions</span>
             </div>
-
-            {filteredRows.map((row) => {
+            {displayedRows.map((row) => {
               const isSelected = row.therapistId === selectedTherapistId
-              const content = (
-                <>
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold uppercase text-muted-foreground">
-                      {initialsForName(row.therapistName)}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className="truncate text-sm font-semibold text-foreground">
+              return (
+                <div
+                  key={row.therapistId}
+                  aria-current={isSelected ? 'true' : undefined}
+                  data-therapist-row={row.therapistId}
+                  role="button"
+                  tabIndex={0}
+                  className={cn(
+                    'rounded-[1.1rem] border px-4 py-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
+                    isSelected
+                      ? 'border-primary/45 bg-[color:rgba(15,118,110,0.06)] shadow-tw-inset-highlight-soft'
+                      : 'border-border/60 bg-background/85 hover:border-border'
+                  )}
+                  onClick={() => onPickTherapist?.(row.therapistId)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      onPickTherapist?.(row.therapistId)
+                    }
+                  }}
+                >
+                  <div className="grid gap-4 md:grid-cols-[minmax(0,2.9fr)_6rem_3.25rem_5.75rem_7rem] md:items-center">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted/55 text-base font-semibold text-foreground">
+                        {initialsForName(row.therapistName)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[1.02rem] font-semibold tracking-[-0.02em] text-foreground">
                           {row.therapistName}
                         </p>
-                        {isSelected ? (
-                          <Badge className="h-5 bg-primary/10 px-1.5 text-[10px] text-primary">
-                            Active in planner
-                          </Badge>
-                        ) : null}
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            'h-5 px-1.5 text-[10px]',
-                            row.submitted
-                              ? 'border-[var(--success-border)] text-[var(--success-text)]'
-                              : 'border-[var(--warning-border)] text-[var(--warning-text)]'
-                          )}
-                        >
-                          {row.submitted ? 'Submitted' : 'Awaiting'}
-                        </Badge>
+
+                        <p className="mt-1 text-[12px] text-muted-foreground">
+                          {shiftLabel(row.shiftType)} · {employmentLabel(row.employmentType)}
+                        </p>
                       </div>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">
-                        {row.overridesCount > 0
-                          ? `${row.overridesCount} request${row.overridesCount === 1 ? '' : 's'} on file`
-                          : row.submitted
-                            ? 'No request notes saved'
-                            : 'Waiting for response'}
-                      </p>
+                    </div>
+
+                    <div className="md:text-center">
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          row.submitted
+                            ? 'border-[var(--success-border)] text-[var(--success-text)]'
+                            : 'border-[var(--warning-border)] text-[var(--warning-text)]'
+                        )}
+                      >
+                        {row.submitted ? 'Submitted' : 'Not submitted'}
+                      </Badge>
+                    </div>
+
+                    <div className="text-base font-semibold text-foreground md:text-center">
+                      {row.overridesCount}
+                    </div>
+
+                    <div className="whitespace-nowrap text-[12px] text-muted-foreground md:text-center">
+                      {formatLastActivity(row.lastUpdatedAt)}
+                    </div>
+
+                    <div className="flex flex-col gap-2 md:justify-end">
+                      <Button
+                        type="button"
+                        data-review-action={row.therapistId}
+                        variant="outline"
+                        size="sm"
+                        className="min-h-9 w-[96px] rounded-full px-3 text-[11px]"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          onReviewTherapist?.(row.therapistId)
+                        }}
+                      >
+                        Review
+                      </Button>
+                      <Button
+                        type="button"
+                        data-enter-action={row.therapistId}
+                        size="sm"
+                        className="min-h-9 w-[96px] rounded-full px-3 text-[11px]"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          onEnterTherapist?.(row.therapistId)
+                        }}
+                      >
+                        Enter manually
+                      </Button>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[11px] font-medium text-foreground">Last activity</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {formatLastActivity(row.lastUpdatedAt)}
-                    </p>
-                  </div>
-                </>
-              )
-
-              if (!onPickTherapist) {
-                return (
-                  <div
-                    key={row.therapistId}
-                    aria-current={isSelected ? 'true' : undefined}
-                    className={cn(
-                      'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2',
-                      isSelected ? 'bg-primary/[0.06]' : undefined
-                    )}
-                  >
-                    {content}
-                  </div>
-                )
-              }
-
-              return (
-                <button
-                  key={row.therapistId}
-                  type="button"
-                  aria-current={isSelected ? 'true' : undefined}
-                  className={cn(
-                    'grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-muted/25',
-                    isSelected ? 'bg-primary/[0.06] ring-1 ring-primary/20' : undefined
-                  )}
-                  onClick={() => onPickTherapist(row.therapistId)}
-                >
-                  {content}
-                </button>
+                </div>
               )
             })}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">
-            No therapists match the current roster filter.
-          </p>
+          <div className="rounded-xl border border-dashed border-border/70 bg-muted/10 px-4 py-4 text-sm text-muted-foreground">
+            No therapists match the current work queue view.
+          </div>
         )}
+
+        {canLoadMore ? (
+          <div className="mt-4 flex justify-center border-t border-border/60 pt-4">
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 text-sm font-medium text-primary transition-colors hover:text-primary/80"
+              onClick={() => setVisibleCount((count) => count + 5)}
+            >
+              <ChevronDown className="h-4 w-4" />
+              Load more
+            </button>
+          </div>
+        ) : null}
       </div>
     </section>
   )
