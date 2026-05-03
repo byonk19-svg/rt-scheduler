@@ -33,6 +33,7 @@ const SHELL_ROUTES = [
   '/publish',
   '/profile',
   '/approvals',
+  '/lottery',
   '/preliminary',
   '/requests',
   '/notifications',
@@ -60,7 +61,8 @@ function isManagerScheduleRoute(pathname: string): boolean {
     pathname === '/availability' ||
     pathname === '/publish' ||
     pathname.startsWith('/publish/') ||
-    pathname === '/approvals'
+    pathname === '/approvals' ||
+    pathname === '/lottery'
   )
 }
 
@@ -112,6 +114,11 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
           href: '/approvals',
           label: 'Approvals',
           active: (pathname) => pathname === '/approvals',
+        },
+        {
+          href: MANAGER_WORKFLOW_LINKS.lottery,
+          label: 'Lottery',
+          active: (pathname) => pathname === '/lottery',
         },
       ],
     },
