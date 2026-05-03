@@ -221,4 +221,18 @@ describe('PublishHistoryPage', () => {
     expect(html).toContain('Cycle archived')
     expect(html).toContain('will no longer appear in Coverage')
   })
+
+  it('includes a direct Lottery handoff from publish history', async () => {
+    createClientMock.mockResolvedValue(
+      createSupabaseMock({
+        userId: 'manager-1',
+        role: 'manager',
+      })
+    )
+
+    const html = renderToStaticMarkup(await PublishHistoryPage({}))
+
+    expect(html).toContain('Open Lottery')
+    expect(html).toContain('href="/lottery"')
+  })
 })

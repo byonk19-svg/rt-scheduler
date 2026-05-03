@@ -107,7 +107,8 @@ describe('coverage publish override affordance', () => {
   it('passes forced must-work misses into the final auto-draft feedback params', () => {
     const source = readFileSync(coverageClientPath, 'utf8')
 
-    expect(source).toContain("forced_misses: search.get('forced_misses') ?? undefined")
+    expect(source).toContain("const forcedMissesParam = search.get('forced_misses')")
+    expect(source).toContain('forced_misses: forcedMissesParam ?? undefined')
     expect(source).toContain('const autoDraftFeedback = useMemo(() => {')
     expect(source).toContain('return getScheduleFeedback(scheduleFeedbackParams)')
   })
@@ -130,6 +131,13 @@ describe('coverage publish override affordance', () => {
     expect(source).toContain('<StatusPill status="oncall" />')
     expect(source).toContain('<StatusPill status="cancelled" />')
     expect(source).toContain('<StatusPill status="call_in" />')
+  })
+
+  it('keeps a contextual Lottery handoff on the schedule workspace', () => {
+    const source = readFileSync(coverageClientPath, 'utf8')
+
+    expect(source).toContain('MANAGER_WORKFLOW_LINKS.lottery')
+    expect(source).toContain('Open Lottery')
   })
 
   it('lazy-loads coverage dialogs instead of bundling closed overlays into first paint', () => {

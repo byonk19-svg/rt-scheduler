@@ -26,6 +26,7 @@ import { fetchScheduleCyclesForCoverage } from '@/lib/coverage/fetch-schedule-cy
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { createClient } from '@/lib/supabase/server'
+import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 
 export const metadata: Metadata = {
   title: 'Publish History',
@@ -168,7 +169,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
   return (
     <div className="space-y-5">
       <div className="border-b border-border bg-card px-6 pb-4 pt-5">
-        <div className="mb-3 flex items-start justify-between">
+        <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">
               Publish History
@@ -178,12 +179,20 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
               when you publish.
             </p>
           </div>
-          <Button asChild variant="outline" size="sm" className="text-xs">
-            <Link href="/coverage">
-              <CalendarDays className="h-3.5 w-3.5" />
-              Back to schedule
-            </Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild variant="outline" size="sm" className="text-xs">
+              <Link href="/coverage">
+                <CalendarDays className="h-3.5 w-3.5" />
+                Back to schedule
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm" className="text-xs">
+              <Link href={MANAGER_WORKFLOW_LINKS.lottery}>
+                Open Lottery
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge variant="success">

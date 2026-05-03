@@ -68,6 +68,7 @@ describe('app-shell-config', () => {
       'Roster view',
       'Analytics',
       'Availability',
+      'Lottery',
       'Publish',
       'Approvals',
       'Lottery',
@@ -120,6 +121,20 @@ describe('app-shell-config', () => {
     expect(context.primaryKey).toBe('people')
     const requestsItem = context.localNav?.items.find((item) => item.label === 'Requests')
     expect(requestsItem?.active('/shift-board')).toBe(true)
+  })
+
+  it('promotes /lottery into the manager schedule section and highlights it locally', () => {
+    const context = getShellContext({
+      pathname: '/lottery',
+      canAccessManagerUi: true,
+      pendingCount: 0,
+    })
+
+    expect(context.primaryKey).toBe('schedule')
+    expect(usesAppShell('/lottery')).toBe(true)
+    const lotteryItem = context.localNav?.items.find((item) => item.label === 'Lottery')
+    expect(lotteryItem?.href).toBe('/lottery')
+    expect(lotteryItem?.active('/lottery')).toBe(true)
   })
 })
 

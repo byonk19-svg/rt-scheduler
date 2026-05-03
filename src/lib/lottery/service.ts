@@ -1471,6 +1471,7 @@ export async function updateAssignmentStatusWithLottery(args: {
   shiftId: string
   nextStatus: AssignmentStatus
   note?: string | null
+  leftEarlyTime?: string | null
   decisionId?: string | null
   overrideApplied?: boolean
 }): Promise<
@@ -1492,7 +1493,7 @@ export async function updateAssignmentStatusWithLottery(args: {
     p_assignment_id: args.shiftId,
     p_status: args.nextStatus,
     p_note: args.note ?? null,
-    p_left_early_time: null,
+    p_left_early_time: args.leftEarlyTime ?? null,
   })
 
   if (rpcResult.error) {

@@ -176,6 +176,47 @@ describe('ManagerTriageDashboard', () => {
     expect(scheduleProgressIndex).toBeLessThan(recentActivityIndex)
   })
 
+  it('renders a dedicated lottery workflow card before recent activity', () => {
+    const html = renderToStaticMarkup(
+      createElement(ManagerTriageDashboard, {
+        todayCoverageCovered: 15,
+        todayCoverageTotal: 17,
+        upcomingShiftCount: 12,
+        upcomingShiftDays: [],
+        todayStaffedShifts: [],
+        recentActivity: [{ title: 'Some activity', timeLabel: '1 hour ago', href: '/coverage' }],
+        pendingRequests: 0,
+        approvalsWaiting: 0,
+        currentCycleStatus: 'Draft cycle',
+        currentCycleDetail: 'Publish by Apr 27',
+        nextCycleLabel: 'Collect availability Apr 1',
+        nextCycleDetail: 'Publish by Apr 27',
+        needsReviewCount: 0,
+        needsReviewDetail: 'You are caught up.',
+        dayShiftsFilled: 18,
+        dayShiftsTotal: 21,
+        nightShiftsFilled: 15,
+        nightShiftsTotal: 21,
+        approvalsHref: '/approvals',
+        scheduleHref: '/coverage?view=week',
+        reviewHref: '/approvals',
+        activeCycleDateRange: 'Mar 17 â€“ Apr 13',
+      })
+    )
+
+    const lotteryIndex = html.indexOf('Lottery')
+    const recentActivityIndex = html.indexOf('Recent Activity')
+
+    expect(lotteryIndex).toBeGreaterThan(-1)
+    expect(html).toContain(
+      'Use Lottery to fairly select from eligible claimants on published shifts.'
+    )
+    expect(html).toContain('Open Lottery')
+    expect(html).toContain('href="/lottery"')
+    expect(recentActivityIndex).toBeGreaterThan(-1)
+    expect(lotteryIndex).toBeLessThan(recentActivityIndex)
+  })
+
   it('renders recent activity items as navigable links using the provided href', () => {
     const html = renderToStaticMarkup(
       createElement(ManagerTriageDashboard, {

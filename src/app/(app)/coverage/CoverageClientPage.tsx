@@ -67,6 +67,7 @@ import {
   parseCoverageShiftSearchParam,
   shiftTabToQueryValue,
 } from '@/lib/coverage/coverage-shift-tab'
+import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 
 const ClearDraftConfirmDialog = dynamic(
   () =>
@@ -1120,12 +1121,15 @@ export function CoverageClientPage({
                       <Sparkles className="h-3.5 w-3.5" />
                       New 6-week block
                     </Button>
-                    <Button asChild variant="outline" size="sm" className="text-xs">
-                      <Link href="/publish">Publish history</Link>
-                    </Button>
-                  </>
-                ) : (
-                  <>
+                      <Button asChild variant="outline" size="sm" className="text-xs">
+                        <Link href="/publish">Publish history</Link>
+                      </Button>
+                      <Button asChild variant="outline" size="sm" className="text-xs">
+                        <Link href={MANAGER_WORKFLOW_LINKS.lottery}>Open Lottery</Link>
+                      </Button>
+                    </>
+                  ) : (
+                    <>
                     <Button
                       type="button"
                       variant={showEmptyDraftState ? 'default' : 'outline'}
@@ -1142,8 +1146,8 @@ export function CoverageClientPage({
                         <span className="h-1.5 w-1.5 rounded-full bg-[var(--success-text)]" />
                         Published
                       </span>
-                    ) : (
-                      <form action={toggleCyclePublishedAction}>
+                      ) : (
+                        <form action={toggleCyclePublishedAction}>
                         <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
                         <input type="hidden" name="view" value="week" />
                         <input type="hidden" name="show_unavailable" value="false" />
@@ -1160,10 +1164,13 @@ export function CoverageClientPage({
                         >
                           <Send className="h-3.5 w-3.5" />
                           Publish
-                        </Button>
-                      </form>
-                    )}
-                    <MoreActionsMenu triggerClassName="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs text-foreground transition-colors hover:bg-secondary">
+                          </Button>
+                        </form>
+                      )}
+                      <Button asChild variant="outline" size="sm" className="text-xs">
+                        <Link href={MANAGER_WORKFLOW_LINKS.lottery}>Open Lottery</Link>
+                      </Button>
+                      <MoreActionsMenu triggerClassName="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs text-foreground transition-colors hover:bg-secondary">
                       <form action={sendPreliminaryScheduleAction}>
                         <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
                         <input type="hidden" name="view" value="week" />
@@ -1203,12 +1210,18 @@ export function CoverageClientPage({
                           Save as template
                         </button>
                       ) : null}
-                      <Link
-                        href="/publish"
-                        className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
-                      >
-                        Publish history
-                      </Link>
+                        <Link
+                          href={MANAGER_WORKFLOW_LINKS.lottery}
+                          className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
+                        >
+                          Open Lottery
+                        </Link>
+                        <Link
+                          href="/publish"
+                          className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
+                        >
+                          Publish history
+                        </Link>
                       <button
                         type="button"
                         onClick={() => window.print()}
