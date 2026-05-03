@@ -18,7 +18,7 @@ describe('public homepage redesign contract', () => {
   it('keeps the header and hero CTA roles aligned', () => {
     expect(pageSource).toContain('<Link href="/login">Sign in</Link>')
     expect(pageSource).toContain('<Link href="/signup">Request access</Link>')
-    expect(publicHeaderSource).toContain("ctaLabel: 'Create account'")
+    expect(publicHeaderSource).toContain("ctaLabel: 'Request access'")
   })
 
   it('keeps the approval note and the design handoff feature strip', () => {

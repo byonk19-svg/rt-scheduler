@@ -13,7 +13,7 @@ function getHeaderActions(pathname: string) {
       secondaryHref: '/',
       secondaryLabel: 'Home',
       ctaHref: '/signup',
-      ctaLabel: 'Create account',
+      ctaLabel: 'Request access',
     }
   }
 
@@ -39,7 +39,7 @@ function getHeaderActions(pathname: string) {
     secondaryHref: '/login',
     secondaryLabel: 'Sign in',
     ctaHref: '/signup',
-    ctaLabel: 'Create account',
+    ctaLabel: 'Request access',
   }
 }
 
