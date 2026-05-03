@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { CalendarPlus, Copy, Trash2 } from 'lucide-react'
 
 import { FormSubmitButton } from '@/components/form-submit-button'
@@ -65,11 +65,6 @@ export function CycleManagementDialog({
   const latestCycle = [...cycles].sort((a, b) => b.end_date.localeCompare(a.end_date))[0] ?? null
   const defaultDraft = buildCycleDraft(latestCycle?.end_date ?? null, toIsoDate(new Date()))
   const [draft, setDraft] = useState(() => ({ ...defaultDraft }))
-
-  useEffect(() => {
-    if (!open) return
-    setDraft({ ...defaultDraft })
-  }, [defaultDraft.endDate, defaultDraft.label, defaultDraft.startDate, open])
 
   function handleStartDateChange(nextStartDate: string) {
     const draft = buildCycleDraft(null, nextStartDate)
