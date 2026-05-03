@@ -75,16 +75,13 @@ const ClearDraftConfirmDialog = dynamic(
     ),
   { ssr: false }
 )
-const CalendarGrid = dynamic(
-  () => import('@/components/coverage/CalendarGrid').then((module) => module.CalendarGrid ?? (() => null)),
-  { ssr: false }
+const CalendarGrid = dynamic(() =>
+  import('@/components/coverage/CalendarGrid').then((module) => module.CalendarGrid ?? (() => null))
 )
-const RosterScheduleView = dynamic(
-  () =>
-    import('@/components/coverage/RosterScheduleView').then(
-      (module) => module.RosterScheduleView ?? (() => null)
-    ),
-  { ssr: false }
+const RosterScheduleView = dynamic(() =>
+  import('@/components/coverage/RosterScheduleView').then(
+    (module) => module.RosterScheduleView ?? (() => null)
+  )
 )
 const PreFlightDialog = dynamic(
   () =>
