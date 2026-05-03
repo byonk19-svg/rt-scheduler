@@ -1,10 +1,7 @@
 'use client'
 
-import { ChevronDown } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 export type AvailabilityStatusSummaryRow = {
@@ -68,6 +65,12 @@ function initialsForName(name: string): string {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('')
+}
+
+function statusBadgeClass(submitted: boolean) {
+  return submitted
+    ? 'border-[var(--success-border)] text-[var(--success-text)]'
+    : 'border-[var(--warning-border)] text-[var(--warning-text)]'
 }
 
 export function AvailabilityStatusSummary({
@@ -213,7 +216,7 @@ export function AvailabilityStatusSummary({
                   className={cn(
                     'rounded-[1.1rem] border px-4 py-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
                     isSelected
-                      ? 'border-primary/45 bg-[color:rgba(15,118,110,0.06)] shadow-tw-inset-highlight-soft'
+                      ? 'border-primary/35 bg-[color:rgba(15,118,110,0.045)] shadow-tw-inset-highlight-soft'
                       : 'border-border/60 bg-background/85 hover:border-border'
                   )}
                   onClick={() => onPickTherapist?.(row.therapistId)}
@@ -241,16 +244,14 @@ export function AvailabilityStatusSummary({
                     </div>
 
                     <div className="md:text-center">
-                      <Badge
-                        variant="outline"
+                      <span
                         className={cn(
-                          row.submitted
-                            ? 'border-[var(--success-border)] text-[var(--success-text)]'
-                            : 'border-[var(--warning-border)] text-[var(--warning-text)]'
+                          'inline-flex items-center justify-center rounded-md border bg-secondary px-2 py-0.5 text-xs font-medium whitespace-nowrap',
+                          statusBadgeClass(row.submitted)
                         )}
                       >
                         {row.submitted ? 'Submitted' : 'Not submitted'}
-                      </Badge>
+                      </span>
                     </div>
 
                     <div className="text-base font-semibold text-foreground md:text-center">
@@ -262,31 +263,28 @@ export function AvailabilityStatusSummary({
                     </div>
 
                     <div className="flex flex-col gap-2 md:justify-end">
-                      <Button
+                      <button
                         type="button"
                         data-review-action={row.therapistId}
-                        variant="outline"
-                        size="sm"
-                        className="min-h-9 w-[96px] rounded-full px-3 text-[11px]"
+                        className="inline-flex min-h-9 w-[96px] items-center justify-center rounded-full border border-border bg-card px-3 text-[11px] font-medium text-foreground transition-all duration-150 hover:bg-secondary/70 hover:text-foreground"
                         onClick={(event) => {
                           event.stopPropagation()
                           onReviewTherapist?.(row.therapistId)
                         }}
                       >
                         Review
-                      </Button>
-                      <Button
+                      </button>
+                      <button
                         type="button"
                         data-enter-action={row.therapistId}
-                        size="sm"
-                        className="min-h-9 w-[96px] rounded-full px-3 text-[11px]"
+                        className="inline-flex min-h-9 w-[96px] items-center justify-center rounded-full bg-primary px-3 text-[11px] font-medium text-primary-foreground shadow-sm transition-all duration-150 hover:brightness-110 hover:shadow-md"
                         onClick={(event) => {
                           event.stopPropagation()
                           onEnterTherapist?.(row.therapistId)
                         }}
                       >
                         Enter manually
-                      </Button>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -306,7 +304,7 @@ export function AvailabilityStatusSummary({
               className="inline-flex items-center gap-2 text-sm font-medium text-primary transition-colors hover:text-primary/80"
               onClick={() => setVisibleCount((count) => count + 5)}
             >
-              <ChevronDown className="h-4 w-4" />
+              <span aria-hidden="true">v</span>
               Load more
             </button>
           </div>

@@ -121,11 +121,11 @@ export function TherapistContextPanel({
     <section className="space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-4">
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-muted/45 text-[2rem] font-semibold tracking-[-0.03em] text-foreground">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-muted/45 text-[1.35rem] font-semibold tracking-[-0.03em] text-foreground">
             {initialsForName(therapist.full_name)}
           </div>
           <div className="min-w-0 space-y-2">
-            <h2 className="text-[2.35rem] font-semibold tracking-[-0.045em] text-foreground">
+            <h2 className="text-[1.65rem] font-semibold tracking-[-0.03em] text-foreground">
               {therapist.full_name}
             </h2>
             <div className="flex flex-wrap items-center gap-2">
@@ -144,19 +144,24 @@ export function TherapistContextPanel({
                 {employmentLabel(therapist.employment_type)}
               </Badge>
             </div>
-            <p className="text-[1rem] text-muted-foreground">{cycleLabel}</p>
+            <p className="text-[0.88rem] text-muted-foreground">{cycleLabel}</p>
           </div>
         </div>
 
         <div className="flex min-w-[10.5rem] flex-col gap-3">
           <Button
             type="button"
-            className="min-h-12 rounded-xl bg-primary px-4 text-primary-foreground hover:bg-primary/90"
+            className="min-h-11 rounded-xl bg-primary px-4 text-[0.95rem] text-primary-foreground hover:bg-primary/90"
             onClick={onOpenEditor}
           >
             Enter availability
           </Button>
-          <Button type="button" variant="outline" className="min-h-12 rounded-xl" onClick={onClose}>
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-11 rounded-xl text-[0.95rem]"
+            onClick={onClose}
+          >
             Close
           </Button>
         </div>
@@ -165,35 +170,35 @@ export function TherapistContextPanel({
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-[1rem] border border-border/60 bg-background/80 px-4 py-4">
           <p className="text-[13px] font-medium text-muted-foreground">Need off</p>
-          <p className="mt-3 text-[2rem] font-semibold tracking-[-0.04em] text-[var(--warning-text)]">
+          <p className="mt-3 text-[1.35rem] font-semibold tracking-[-0.02em] text-[var(--warning-text)]">
             {needOffCount}
           </p>
         </div>
 
         <div className="rounded-[1rem] border border-border/60 bg-background/80 px-4 py-4">
           <p className="text-[13px] font-medium text-muted-foreground">Request to work</p>
-          <p className="mt-3 text-[2rem] font-semibold tracking-[-0.04em] text-[color:#7c3aed]">
+          <p className="mt-3 text-[1.35rem] font-semibold tracking-[-0.02em] text-[color:#7c3aed]">
             {requestToWorkCount}
           </p>
         </div>
 
         <div className="rounded-[1rem] border border-border/60 bg-background/80 px-4 py-4">
           <p className="text-[13px] font-medium text-muted-foreground">Manager plan dates</p>
-          <p className="mt-3 text-[2rem] font-semibold tracking-[-0.04em] text-[var(--success-text)]">
+          <p className="mt-3 text-[1.35rem] font-semibold tracking-[-0.02em] text-[var(--success-text)]">
             {savedPlannerCount}
           </p>
         </div>
 
         <div className="rounded-[1rem] border border-border/60 bg-background/80 px-4 py-4">
           <p className="text-[13px] font-medium text-muted-foreground">Latest activity</p>
-          <p className="mt-3 text-[1.2rem] font-semibold tracking-[-0.02em] text-foreground">
+          <p className="mt-3 text-[1rem] font-semibold tracking-[-0.02em] text-foreground">
             {formatDateTime(latestActivity)}
           </p>
         </div>
       </div>
 
       <section className="rounded-[1.1rem] border border-border/60 bg-background/85 px-5 py-4">
-        <h3 className="text-[1rem] font-semibold tracking-[-0.02em] text-foreground">
+        <h3 className="text-[0.95rem] font-semibold tracking-[-0.02em] text-foreground">
           Requests on file
         </h3>
         {visibleRequests.length > 0 ? (
@@ -242,7 +247,7 @@ export function TherapistContextPanel({
                       <MoreHorizontal className="h-4 w-4" />
                     </button>
                   </div>
-                  <p className="mt-2 text-[11px] text-muted-foreground md:text-right">
+                  <p className="mt-2 text-[10px] text-muted-foreground md:text-right">
                     {formatDateTime(row.updatedAt ?? row.createdAt)}
                   </p>
                 </div>

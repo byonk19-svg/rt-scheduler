@@ -406,7 +406,7 @@ export function ManagerSchedulingInputs({
   return (
     <section id="staff-scheduling-inputs" className="space-y-4">
       <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-        <h1 className="whitespace-nowrap text-[2.8rem] font-semibold tracking-[-0.04em] text-foreground">
+        <h1 className="whitespace-nowrap text-[2rem] font-semibold tracking-[-0.03em] text-foreground">
           Availability Manager
         </h1>
 
