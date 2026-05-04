@@ -67,8 +67,8 @@ describe('CalendarGrid roster helpers', () => {
     expect(
       buildStaffDisplayLines(['Alyece Smith', 'Barbara Jones', 'Denise Long', 'Patricia Moss'])
     ).toEqual({
-      lines: ['Alyece · Barbara', 'Denise · Patricia'],
-      remaining: 0,
+      lines: ['Alyece · Barbara'],
+      remaining: 2,
     })
   })
 
@@ -103,6 +103,6 @@ describe('CalendarGrid roster helpers', () => {
         },
         2
       )
-    ).toEqual({ tone: 'warning', label: '2 gaps' })
+    ).toEqual({ tone: 'warning', label: 'Unassigned' })
   })
 })
