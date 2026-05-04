@@ -108,11 +108,24 @@ function LoginPageClient() {
     router.replace(qs ? `/login?${qs}` : '/login', { scroll: false })
   }, [extraction, router, searchParams])
 
+  // On mount, pick up any post-signup banner persisted to sessionStorage before
+  // the router.replace call that stripped ?status from the URL.
+  useEffect(() => {
+    const stored = sessionStorage.getItem('__tw_signup_ack')
+    if (stored) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reading from sessionStorage is an external system sync, same pattern as the error URL effect above
+      setPostSignupBanner(stored)
+      sessionStorage.removeItem('__tw_signup_ack')
+    }
+  }, [])
+
   useEffect(() => {
     const status = searchParams.get('status')
     if (status !== 'requested' && status !== 'matched') return
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- persist post-signup acknowledgement, then strip transient status from URL (preserve redirectTo)
-    setPostSignupBanner(status === 'matched' ? POST_MATCHED_ACK_MESSAGE : POST_SIGNUP_ACK_MESSAGE)
+    const msg = status === 'matched' ? POST_MATCHED_ACK_MESSAGE : POST_SIGNUP_ACK_MESSAGE
+    // Persist to sessionStorage before router.replace so the banner survives the
+    // component remount that App Router triggers when searchParams change.
+    sessionStorage.setItem('__tw_signup_ack', msg)
     const next = new URLSearchParams(searchParams.toString())
     next.delete('status')
     const qs = next.toString()
