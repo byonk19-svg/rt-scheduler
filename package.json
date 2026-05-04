@@ -13,6 +13,8 @@
     "prepare": "husky",
     "seed:demo": "node --env-file=.env.local scripts/seed-demo.mjs",
     "seed:functional": "node --env-file=.env.local scripts/seed-functional-demo.mjs",
+    "reset:e2e": "node --env-file=.env.local scripts/reset-e2e-data.mjs",
+    "reset:e2e:fresh-auth": "node --env-file=.env.local scripts/reset-e2e-data.mjs --delete-auth-users",
     "screens:all": "node --env-file=.env.local scripts/capture-all-screens.mjs",
     "screens:therapist": "node --env-file=.env.local scripts/capture-therapist-validation.mjs",
     "seed:users": "node --env-file=.env.local scripts/seed-users.mjs",
