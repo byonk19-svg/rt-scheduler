@@ -16,6 +16,14 @@
 import { createClient } from '@supabase/supabase-js'
 
 const DEMO_LABEL_PREFIX = 'Teamwise UAT'
+export const FUNCTIONAL_DEMO_DOMAIN = 'teamwise.test'
+export const FUNCTIONAL_DEMO_PASSWORD = 'Teamwise123!'
+export const FUNCTIONAL_DEMO_ACCOUNTS = [
+  `demo-manager@${FUNCTIONAL_DEMO_DOMAIN}`,
+  `demo-lead-day@${FUNCTIONAL_DEMO_DOMAIN}`,
+  `demo-lead-night@${FUNCTIONAL_DEMO_DOMAIN}`,
+  `demo-therapist01@${FUNCTIONAL_DEMO_DOMAIN}`,
+]
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -51,10 +59,10 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 })
 
-const domain = String(process.env.SEED_DOMAIN ?? 'teamwise.test')
+const defaultDomain = String(process.env.SEED_DOMAIN ?? FUNCTIONAL_DEMO_DOMAIN)
   .trim()
   .toLowerCase()
-const defaultPassword = String(process.env.SEED_PASSWORD ?? 'Teamwise123!').trim()
+const defaultPassword = String(process.env.SEED_PASSWORD ?? FUNCTIONAL_DEMO_PASSWORD).trim()
 const extraTherapistCount = Math.max(
   4,
   Math.min(24, Number.parseInt(String(process.env.SEED_THERAPIST_COUNT ?? '12'), 10) || 12)
@@ -134,7 +142,17 @@ async function listAllAuthUsers() {
 async function ensureAuthUser(allUsersByEmail, email, password, userMetadata) {
   const key = email.toLowerCase()
   const existing = allUsersByEmail.get(key)
-  if (existing?.id) return existing.id
+  if (existing?.id) {
+    const { data, error } = await supabase.auth.admin.updateUserById(existing.id, {
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: userMetadata,
+    })
+    if (error) throw error
+    allUsersByEmail.set(key, data.user ?? existing)
+    return existing.id
+  }
 
   const { data, error } = await supabase.auth.admin.createUser({
     email,
@@ -269,7 +287,12 @@ async function seedShiftsForCycle(cycleId, cycleStartIso, cycleEndIso, rosterRow
   return rows.length
 }
 
-async function main() {
+export async function seedFunctionalDemo(options = {}) {
+  const domain = String(options.domain ?? defaultDomain)
+    .trim()
+    .toLowerCase()
+  const password = String(options.password ?? defaultPassword).trim()
+
   console.log('Removing any prior Teamwise UAT demo cycles, then seeding users + schedules.')
   await wipeDemoCycles()
 
@@ -277,7 +300,7 @@ async function main() {
   const userByEmail = new Map(authUsers.map((u) => [String(u.email ?? '').toLowerCase(), u]))
 
   const managerEmail = `demo-manager@${domain}`
-  const managerId = await ensureAuthUser(userByEmail, managerEmail, defaultPassword, {
+  const managerId = await ensureAuthUser(userByEmail, managerEmail, password, {
     full_name: 'Demo Manager',
     role: 'manager',
     shift_type: 'day',
@@ -303,7 +326,7 @@ async function main() {
 
   const leadIds = []
   for (const spec of leadSpecs) {
-    const id = await ensureAuthUser(userByEmail, spec.email, defaultPassword, {
+    const id = await ensureAuthUser(userByEmail, spec.email, password, {
       full_name: spec.name,
       role: 'lead',
       shift_type: spec.shift,
@@ -331,7 +354,7 @@ async function main() {
     const email = `demo-therapist${String(n).padStart(2, '0')}@${domain}`
     const fullName = ROSTER[i] ?? `Demo Therapist ${n}`
     const shiftType = n % 2 === 0 ? 'night' : 'day'
-    const id = await ensureAuthUser(userByEmail, email, defaultPassword, {
+    const id = await ensureAuthUser(userByEmail, email, password, {
       full_name: fullName,
       role: 'therapist',
       shift_type: shiftType,
@@ -429,12 +452,31 @@ async function main() {
   console.log(`  Draft cycle:     ${draftLabel} (${draftCycleId}) — ${draftCount} shift rows`)
   console.log('')
   console.log('Sign in (examples):')
-  console.log(`  Manager:  ${managerEmail} / ${defaultPassword}`)
-  console.log(`  Lead:     ${leadSpecs[0].email} / ${defaultPassword}`)
-  console.log(`  Staff:    demo-therapist01@${domain} / ${defaultPassword}`)
+  console.log(`  Manager:  ${managerEmail} / ${password}`)
+  console.log(`  Lead:     ${leadSpecs[0].email} / ${password}`)
+  console.log(`  Staff:    demo-therapist01@${domain} / ${password}`)
+
+  return {
+    managerEmail,
+    leadEmails: leadSpecs.map((spec) => spec.email),
+    staffEmail: `demo-therapist01@${domain}`,
+    password,
+    publishedLabel,
+    draftLabel,
+    publishedCycleId,
+    draftCycleId,
+    publishedShiftCount: pubCount,
+    draftShiftCount: draftCount,
+  }
 }
 
-main().catch((error) => {
-  console.error('seed-functional-demo failed:', error.message ?? error)
-  process.exit(1)
-})
+async function main() {
+  await seedFunctionalDemo()
+}
+
+if (import.meta.url === new URL(process.argv[1], 'file:').href) {
+  main().catch((error) => {
+    console.error('seed-functional-demo failed:', error.message ?? error)
+    process.exit(1)
+  })
+}
