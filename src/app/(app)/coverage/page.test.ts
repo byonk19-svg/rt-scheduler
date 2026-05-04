@@ -87,21 +87,19 @@ describe('coverage publish override affordance', () => {
       'Read-only team staffing view. Use My Schedule for your own shifts and Future Availability for the next cycle.'
     )
     expect(source).toContain('Team Schedule')
-    expect(source).toContain('fully staffed')
-    expect(source).toContain('priority gaps')
-    expect(source).toContain('missing leads')
+    expect(source).toContain('Setup required')
+    expect(source).toContain('Cycle board')
+    expect(source).not.toContain('title="Next step"')
   })
 
-  it('surfaces a proactive coverage-risk warning in the manager workflow before auto-draft runs', () => {
+  it('keeps proactive risk on the server while rendering a quieter planning surface', () => {
     const client = readFileSync(coverageClientPath, 'utf8')
     const server = readFileSync(coverageServerDataPath, 'utf8')
 
     expect(server).toContain('buildCoverageRiskAlert')
     expect(server).toContain('snapshot.proactiveCoverageRisk')
-    expect(client).toContain('const proactiveCoverageRisk = initialSnapshot.proactiveCoverageRisk')
-    expect(client).toContain('title={proactiveCoverageRisk.title}')
-    expect(client).toContain('description={proactiveCoverageRisk.description}')
-    expect(client).toContain('Review pre-flight')
+    expect(client).toContain('title="Planning note"')
+    expect(client).not.toContain('title="Next step"')
   })
 
   it('passes forced must-work misses into the final auto-draft feedback params', () => {
@@ -113,15 +111,12 @@ describe('coverage publish override affordance', () => {
     expect(source).toContain('return getScheduleFeedback(scheduleFeedbackParams)')
   })
 
-  it('exposes segmented-control and planning-disclosure state to assistive technology', () => {
+  it('exposes segmented-control state to assistive technology', () => {
     const source = readFileSync(coverageClientPath, 'utf8')
 
     expect(source).toContain('role="group"')
     expect(source).toContain('aria-labelledby={labelId}')
     expect(source).toContain('aria-pressed={value === option.value}')
-    expect(source).toContain('aria-expanded={showPlanningDetails}')
-    expect(source).toContain('aria-controls={planningDetailsId}')
-    expect(source).toContain('id={planningDetailsId}')
   })
 
   it('calls out live operational status badges on the published schedule', () => {
@@ -143,10 +138,14 @@ describe('coverage publish override affordance', () => {
   it('lazy-loads coverage dialogs instead of bundling closed overlays into first paint', () => {
     const source = readFileSync(coverageClientPath, 'utf8')
 
-    expect(source).toContain("const ShiftEditorDialog = dynamic(")
-    expect(source).toContain("const PreFlightDialog = dynamic(")
-    expect(source).toContain("const ClearDraftConfirmDialog = dynamic(")
-    expect(source).toContain("const CycleManagementDialog = dynamic(")
+    expect(source).toContain('const ShiftEditorDialog = dynamic<ComponentProps<ShiftEditorDialogComponent>>(')
+    expect(source).toContain('const PreFlightDialog = dynamic<ComponentProps<PreFlightDialogComponent>>(')
+    expect(source).toContain(
+      'const ClearDraftConfirmDialog = dynamic<ComponentProps<ClearDraftConfirmDialogComponent>>('
+    )
+    expect(source).toContain(
+      'const CycleManagementDialog = dynamic<ComponentProps<CycleManagementDialogComponent>>('
+    )
     expect(source).toContain('{selectedDay ? (')
     expect(source).toContain('{preFlightDialogOpen ? (')
     expect(source).toContain('{clearDraftDialogOpen ? (')
@@ -167,8 +166,23 @@ describe('coverage publish override affordance', () => {
   it('declares each lazy-loaded dialog exactly once', () => {
     const source = readFileSync(coverageClientPath, 'utf8')
 
-    expect(source.match(/const PreFlightDialog = dynamic\(/g)).toHaveLength(1)
-    expect(source.match(/const SaveAsTemplateDialog = dynamic\(/g)).toHaveLength(1)
-    expect(source.match(/const StartFromTemplateDialog = dynamic\(/g)).toHaveLength(1)
+    expect(source.match(/const PreFlightDialog = dynamic<ComponentProps<PreFlightDialogComponent>>\(/g)).toHaveLength(1)
+    expect(source.match(/const SaveAsTemplateDialog = dynamic<ComponentProps<SaveAsTemplateDialogComponent>>\(/g)).toHaveLength(1)
+    expect(source.match(/const StartFromTemplateDialog = dynamic<ComponentProps<StartFromTemplateDialogComponent>>\(/g)).toHaveLength(1)
+  })
+
+  it('resolves lazy coverage components from named exports or transpiled default namespaces', () => {
+    const source = readFileSync(coverageClientPath, 'utf8')
+
+    expect(source).toContain('function resolveDynamicExport')
+    expect(source).toContain("module.default?.[exportName as string]")
+    expect(source).toContain("resolveDynamicExport<CalendarGridComponent>(module, 'CalendarGrid')")
+    expect(source).toContain(
+      "resolveDynamicExport<RosterScheduleViewComponent>(module, 'RosterScheduleView')"
+    )
+    expect(source).toContain("resolveDynamicExport<PrintScheduleComponent>(module, 'PrintSchedule')")
+    expect(source).toContain(
+      "resolveDynamicExport<PreFlightDialogComponent>(module, 'PreFlightDialog')"
+    )
   })
 })

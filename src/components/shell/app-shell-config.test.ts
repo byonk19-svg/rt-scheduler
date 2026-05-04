@@ -68,7 +68,6 @@ describe('app-shell-config', () => {
       'Roster view',
       'Analytics',
       'Availability',
-      'Lottery',
       'Publish',
       'Approvals',
     ])
@@ -80,31 +79,22 @@ describe('app-shell-config', () => {
     )
   })
 
-  it('treats /lottery as a manager Schedule workflow with a local Lottery item', () => {
-    const sections = buildManagerSections(0)
-    const scheduleSection = sections.find((section) => section.key === 'schedule')
+  it('treats /lottery as a manager Schedule workflow without surfacing it in the local tab rail', () => {
     const context = getShellContext({
       pathname: '/lottery',
       canAccessManagerUi: true,
       pendingCount: 0,
     })
 
-    expect(scheduleSection?.subItems.map((item) => item.label)).toEqual([
+    expect(context.primaryKey).toBe('schedule')
+    expect(context.localNav?.items.map((item) => item.label)).toEqual([
       'Schedule workspace',
       'Roster view',
       'Analytics',
       'Availability',
-      'Lottery',
       'Publish',
       'Approvals',
     ])
-    expect(scheduleSection?.subItems.find((item) => item.label === 'Lottery')?.href).toBe(
-      '/lottery'
-    )
-    expect(context.primaryKey).toBe('schedule')
-    expect(
-      context.localNav?.items.find((item) => item.label === 'Lottery')?.active('/lottery')
-    ).toBe(true)
   })
 
   it('includes /lottery in the shared app shell allowlist', () => {
@@ -122,7 +112,7 @@ describe('app-shell-config', () => {
     expect(requestsItem?.active('/shift-board')).toBe(true)
   })
 
-  it('promotes /lottery into the manager schedule section and highlights it locally', () => {
+  it('keeps /lottery under the schedule primary section without adding a local tab', () => {
     const context = getShellContext({
       pathname: '/lottery',
       canAccessManagerUi: true,
@@ -131,9 +121,7 @@ describe('app-shell-config', () => {
 
     expect(context.primaryKey).toBe('schedule')
     expect(usesAppShell('/lottery')).toBe(true)
-    const lotteryItem = context.localNav?.items.find((item) => item.label === 'Lottery')
-    expect(lotteryItem?.href).toBe('/lottery')
-    expect(lotteryItem?.active('/lottery')).toBe(true)
+    expect(context.localNav?.items.some((item) => item.label === 'Lottery')).toBe(false)
   })
 })
 

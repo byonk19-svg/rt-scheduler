@@ -265,10 +265,10 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-150',
+                    'relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors duration-150',
                     item.current
-                      ? APP_SHELL_ACTIVE_NAV_CLASS
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground'
+                      ? 'text-sidebar-primary after:absolute after:bottom-[-10px] after:left-3 after:right-3 after:h-0.5 after:rounded-full after:bg-[var(--attention)]'
+                      : 'text-sidebar-foreground hover:text-sidebar-accent-foreground'
                   )}
                   aria-current={item.current ? 'page' : undefined}
                 >

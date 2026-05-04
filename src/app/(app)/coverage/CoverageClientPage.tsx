@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import {
+  type ComponentProps,
   type ReactNode,
   useCallback,
   useDeferredValue,
@@ -69,55 +70,97 @@ import {
 } from '@/lib/coverage/coverage-shift-tab'
 import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 
-const ClearDraftConfirmDialog = dynamic(
+type ClearDraftConfirmDialogComponent =
+  typeof import('@/components/coverage/ClearDraftConfirmDialog').ClearDraftConfirmDialog
+type CalendarGridComponent = typeof import('@/components/coverage/CalendarGrid').CalendarGrid
+type RosterScheduleViewComponent =
+  typeof import('@/components/coverage/RosterScheduleView').RosterScheduleView
+type PreFlightDialogComponent = typeof import('@/components/coverage/PreFlightDialog').PreFlightDialog
+type PrintScheduleComponent = typeof import('@/components/print-schedule').PrintSchedule
+type SaveAsTemplateDialogComponent =
+  typeof import('@/components/coverage/SaveAsTemplateDialog').SaveAsTemplateDialog
+type StartFromTemplateDialogComponent =
+  typeof import('@/components/coverage/StartFromTemplateDialog').StartFromTemplateDialog
+type CycleManagementDialogComponent =
+  typeof import('@/components/coverage/CycleManagementDialog').CycleManagementDialog
+type ShiftEditorDialogComponent = typeof import('@/components/coverage/ShiftEditorDialog').ShiftEditorDialog
+
+function resolveDynamicExport<T, K extends string = string>(
+  module: Record<string, unknown> & { default?: Record<string, unknown> },
+  exportName: K
+): T {
+  const direct = module[exportName as string]
+  if (typeof direct === 'function') {
+    return direct as T
+  }
+
+  const nested = module.default?.[exportName as string]
+  if (typeof nested === 'function') {
+    return nested as T
+  }
+
+  return (() => null) as unknown as T
+}
+
+const ClearDraftConfirmDialog = dynamic<ComponentProps<ClearDraftConfirmDialogComponent>>(
   () =>
     import('@/components/coverage/ClearDraftConfirmDialog').then(
-      (module) => module.ClearDraftConfirmDialog ?? (() => null)
+      (module) => resolveDynamicExport<ClearDraftConfirmDialogComponent>(module, 'ClearDraftConfirmDialog')
     ),
   { ssr: false }
 )
-const CalendarGrid = dynamic(() =>
-  import('@/components/coverage/CalendarGrid').then((module) => module.CalendarGrid ?? (() => null))
-)
-const RosterScheduleView = dynamic(() =>
-  import('@/components/coverage/RosterScheduleView').then(
-    (module) => module.RosterScheduleView ?? (() => null)
+const CalendarGrid = dynamic<ComponentProps<CalendarGridComponent>>(() =>
+  import('@/components/coverage/CalendarGrid').then((module) =>
+    resolveDynamicExport<CalendarGridComponent>(module, 'CalendarGrid')
   )
 )
-const PreFlightDialog = dynamic(
+const RosterScheduleView = dynamic<ComponentProps<RosterScheduleViewComponent>>(() =>
+  import('@/components/coverage/RosterScheduleView').then(
+    (module) => resolveDynamicExport<RosterScheduleViewComponent>(module, 'RosterScheduleView')
+  )
+)
+const PreFlightDialog = dynamic<ComponentProps<PreFlightDialogComponent>>(
   () =>
-    import('@/components/coverage/PreFlightDialog').then((module) => module.PreFlightDialog ?? (() => null)),
+    import('@/components/coverage/PreFlightDialog').then((module) =>
+      resolveDynamicExport<PreFlightDialogComponent>(module, 'PreFlightDialog')
+    ),
   { ssr: false }
 )
-const PrintSchedule = dynamic(
-  () => import('@/components/print-schedule').then((module) => module.PrintSchedule ?? (() => null)),
+const PrintSchedule = dynamic<ComponentProps<PrintScheduleComponent>>(
+  () =>
+    import('@/components/print-schedule').then((module) =>
+      resolveDynamicExport<PrintScheduleComponent>(module, 'PrintSchedule')
+    ),
   { ssr: false }
 )
-const SaveAsTemplateDialog = dynamic(
+const SaveAsTemplateDialog = dynamic<ComponentProps<SaveAsTemplateDialogComponent>>(
   () =>
     import('@/components/coverage/SaveAsTemplateDialog').then(
-      (module) => module.SaveAsTemplateDialog ?? (() => null)
+      (module) =>
+        resolveDynamicExport<SaveAsTemplateDialogComponent>(module, 'SaveAsTemplateDialog')
     ),
   { ssr: false }
 )
-const StartFromTemplateDialog = dynamic(
+const StartFromTemplateDialog = dynamic<ComponentProps<StartFromTemplateDialogComponent>>(
   () =>
     import('@/components/coverage/StartFromTemplateDialog').then(
-      (module) => module.StartFromTemplateDialog ?? (() => null)
+      (module) =>
+        resolveDynamicExport<StartFromTemplateDialogComponent>(module, 'StartFromTemplateDialog')
     ),
   { ssr: false }
 )
-const CycleManagementDialog = dynamic(
+const CycleManagementDialog = dynamic<ComponentProps<CycleManagementDialogComponent>>(
   () =>
     import('@/components/coverage/CycleManagementDialog').then(
-      (module) => module.CycleManagementDialog ?? (() => null)
+      (module) =>
+        resolveDynamicExport<CycleManagementDialogComponent>(module, 'CycleManagementDialog')
     ),
   { ssr: false }
 )
-const ShiftEditorDialog = dynamic(
+const ShiftEditorDialog = dynamic<ComponentProps<ShiftEditorDialogComponent>>(
   () =>
     import('@/components/coverage/ShiftEditorDialog').then(
-      (module) => module.ShiftEditorDialog ?? (() => null)
+      (module) => resolveDynamicExport<ShiftEditorDialogComponent>(module, 'ShiftEditorDialog')
     ),
   { ssr: false }
 )
@@ -172,32 +215,6 @@ function CoverageSurfaceBanner({
   )
 }
 
-function CoverageSummaryItem({
-  value,
-  label,
-  tone = 'neutral',
-  emphasize = false,
-}: {
-  value: string | number
-  label: string
-  tone?: WorkspaceMetricTone
-  emphasize?: boolean
-}) {
-  const toneClassName: Record<WorkspaceMetricTone, string> = {
-    neutral: emphasize ? 'text-foreground' : 'text-muted-foreground',
-    success: emphasize ? 'text-[var(--success-text)]' : 'text-muted-foreground',
-    warning: emphasize ? 'text-[var(--warning-text)]' : 'text-muted-foreground',
-    critical: emphasize ? 'text-[var(--error-text)]' : 'text-muted-foreground',
-  }
-
-  return (
-    <span className={cn('inline-flex items-center gap-1.5', toneClassName[tone])}>
-      <span className="tabular-nums font-semibold">{value}</span>
-      <span>{label}</span>
-    </span>
-  )
-}
-
 function CoverageSegmentedControl<T extends string>({
   label,
   value,
@@ -214,14 +231,18 @@ function CoverageSegmentedControl<T extends string>({
   const labelId = useId()
 
   return (
-    <div className="space-y-1">
+    <div className="flex items-center gap-2.5">
       <p
         id={labelId}
         className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
       >
         {label}
       </p>
-      <div role="group" aria-labelledby={labelId} className="flex gap-0.5 rounded-[7px] bg-muted p-0.5">
+      <div
+        role="group"
+        aria-labelledby={labelId}
+        className="flex gap-1 rounded-[18px] border border-border/70 bg-card p-1 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+      >
         {options.map((option) => (
           <button
             key={option.value}
@@ -230,10 +251,10 @@ function CoverageSegmentedControl<T extends string>({
             aria-pressed={value === option.value}
             onClick={() => onChange(option.value)}
             className={cn(
-              'rounded-[5px] px-3 py-1 text-xs font-medium transition-colors',
+              'rounded-[14px] px-4 py-2 text-sm font-medium transition-colors',
               value === option.value
-                ? 'bg-sidebar text-white'
-                : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'
+                ? 'bg-sidebar text-white shadow-[0_1px_2px_rgba(15,23,42,0.12)]'
+                : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
             )}
           >
             {option.label}
@@ -332,7 +353,6 @@ export function CoverageClientPage({
     null
   )
   const [cycleDialogOpen, setCycleDialogOpen] = useState(false)
-  const [showPlanningDetails, setShowPlanningDetails] = useState(false)
   const [error, setError] = useState<string>(() => initialSnapshot.error)
   const [assignError, setAssignError] = useState<string>('')
   const [rosterCellError, setRosterCellError] = useState<{
@@ -347,7 +367,6 @@ export function CoverageClientPage({
   const [actorRole, setActorRole] = useState<Role | null>(() => initialSnapshot.actorRole)
   const autoDraftFormRef = useRef<HTMLFormElement>(null)
   const clearDraftFormRef = useRef<HTMLFormElement>(null)
-  const planningDetailsId = useId()
   const deferredSelectedId = useDeferredValue(selectedId)
   const days = shiftTab === 'Day' ? dayDays : nightDays
   const setDays = shiftTab === 'Day' ? setDayDays : setNightDays
@@ -414,11 +433,6 @@ export function CoverageClientPage({
 
     return null
   }, [errorParam, overrideShiftRulesParam, overrideWeeklyRulesParam])
-  const issueCount = useMemo(
-    () => days.filter((d) => d.dayStatus === 'missing_lead').length,
-    [days]
-  )
-
   const syncOperationalState = useCallback((shiftId: string, nextStatus: UiStatus) => {
     const assignmentStatus = toCoverageAssignmentPayload(nextStatus).assignment_status
 
@@ -550,7 +564,6 @@ export function CoverageClientPage({
   }, [activeOperationalDetails, selectedDayAssignments])
   const noCycleSelected = !loading && !activeCycleId
   const showEmptyDraftState = !loading && Boolean(activeCycleId) && !selectedCycleHasShiftRows
-  const proactiveCoverageRisk = initialSnapshot.proactiveCoverageRisk
   const today = toIsoDate(new Date())
   const isPastDate = selectedDay !== null && selectedDay.isoDate < today
   const selectedDayShiftIds = [
@@ -561,20 +574,6 @@ export function CoverageClientPage({
   const cycleRangeLabel = printCycle
     ? formatHumanCycleRange(printCycle.start_date, printCycle.end_date)
     : 'No open 6-week block'
-  const workspaceStatusTone: WorkspaceMetricTone = noCycleSelected
-    ? 'neutral'
-    : activeCyclePublished
-      ? 'success'
-      : showEmptyDraftState
-        ? 'warning'
-        : 'neutral'
-  const workspaceStatusLabel = noCycleSelected
-    ? 'No active cycle'
-    : activeCyclePublished
-      ? 'Published'
-      : showEmptyDraftState
-        ? 'Setup required'
-        : 'Draft'
   const coverageSummary = useMemo(() => {
     const missingLeadDays = days.filter((day) => !day.leadShift).length
     const unassignedDays = days.filter((day) => flatten(day).length === 0).length
@@ -590,27 +589,31 @@ export function CoverageClientPage({
       staffedDays,
     }
   }, [days])
+  const scheduleNeedsSetup =
+    !noCycleSelected &&
+    !activeCyclePublished &&
+    (showEmptyDraftState ||
+      coverageSummary.unassignedDays > 0 ||
+      coverageSummary.missingLeadDays > 0)
+  const workspaceStatusTone: WorkspaceMetricTone = noCycleSelected
+    ? 'neutral'
+    : activeCyclePublished
+      ? 'success'
+      : scheduleNeedsSetup
+        ? 'warning'
+        : 'neutral'
+  const workspaceStatusLabel = noCycleSelected
+    ? 'No active cycle'
+    : activeCyclePublished
+      ? 'Published'
+      : scheduleNeedsSetup
+        ? 'Setup required'
+        : 'Draft'
   const hasSchedulingContent = selectedCycleHasShiftRows && days.length > 0
   const canRunAutoDraft = Boolean(activeCycleId) && !activeCyclePublished
   const canSendPreliminary = Boolean(activeCycleId) && !activeCyclePublished && selectedCycleHasShiftRows
   const canPublishCycle = Boolean(activeCycleId) && selectedCycleHasShiftRows
-  const nextActionLabel = noCycleSelected
-    ? canManageCoverage
-      ? 'Create a 6-week block to start planning.'
-      : 'Wait for a manager to open the next cycle.'
-    : showEmptyDraftState
-      ? canManageCoverage
-        ? 'Run Auto-draft or open a day to add the first assignments.'
-        : 'Staffing is being prepared for this cycle.'
-      : activeCyclePublished
-        ? canManageCoverage
-          ? 'Review live staffing and handle exceptions.'
-          : 'View live staffing and operational status.'
-        : canManageCoverage
-          ? 'Finish draft checks, send preliminary if needed, then publish.'
-          : 'Draft staffing is in progress.'
   const planningNotices = [
-    proactiveCoverageRisk?.notice ?? null,
     successParam === 'cycle_published' ? 'Published - visible to employees.' : null,
     successParam === 'preliminary_sent'
       ? 'Preliminary schedule sent. Therapists can now review it in the app.'
@@ -1033,7 +1036,7 @@ export function CoverageClientPage({
   )
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[color:color-mix(in_srgb,var(--background)_92%,white)]">
       <div className="no-print">
         <form
           ref={autoDraftFormRef}
@@ -1058,17 +1061,17 @@ export function CoverageClientPage({
           <input type="hidden" name="return_to" value="coverage" />
         </form>
 
-        <header className="border-b border-border/70 bg-card/80 px-5 py-4 backdrop-blur">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div className="min-w-0 space-y-2">
+        <header className="border-b border-border/70 bg-card px-5 py-4">
+          <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="min-w-0 space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="font-heading text-[1.35rem] font-semibold tracking-tight text-foreground">
+                <h1 className="font-heading text-[1.6rem] font-semibold tracking-[-0.04em] text-foreground">
                   Team Schedule
                 </h1>
                 <Badge
                   variant="outline"
                   className={cn(
-                    'rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]',
+                    'rounded-full px-3 py-1 text-[11px] font-semibold',
                     workspaceStatusTone === 'success' &&
                       'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]',
                     workspaceStatusTone === 'warning' &&
@@ -1088,8 +1091,7 @@ export function CoverageClientPage({
                   </Badge>
                 ) : null}
               </div>
-              <p className="text-sm font-medium text-foreground/85">{cycleRangeLabel}</p>
-              <div className="text-xs text-muted-foreground">
+              <div className="text-[12px] text-muted-foreground">
                 {noCycleSelected ? (
                   canManageCoverage
                     ? 'No open 6-week block — create a new draft block to start staffing.'
@@ -1098,9 +1100,7 @@ export function CoverageClientPage({
                   canManageCoverage
                     ? 'No staffing drafted yet. Auto-draft or open a day to assign the first shifts.'
                     : 'No staffing published yet.'
-                ) : canManageCoverage ? (
-                  'Compact planning workspace for staffing, lead coverage, and publish readiness.'
-                ) : canUpdateAssignmentStatus ? (
+                ) : canManageCoverage ? null : canUpdateAssignmentStatus ? (
                   'View staffing and operational status. Open a day to review details and update statuses.'
                 ) : (
                   'Read-only team staffing view. Use My Schedule for your own shifts and Future Availability for the next cycle.'
@@ -1108,46 +1108,53 @@ export function CoverageClientPage({
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-3 xl:justify-end">
+              {!noCycleSelected ? (
+                <p className="text-sm font-medium text-foreground/72">{cycleRangeLabel}</p>
+              ) : null}
               {canManageCoverage ? (
                 noCycleSelected ? (
                   <>
                     <Button
                       type="button"
                       size="sm"
-                      className="gap-1.5 text-xs"
+                      className="h-12 rounded-[18px] px-5 text-sm shadow-[0_1px_2px_rgba(15,23,42,0.14)]"
                       onClick={() => setCycleDialogOpen(true)}
                     >
-                      <Sparkles className="h-3.5 w-3.5" />
+                      <Sparkles className="h-4 w-4" />
                       New 6-week block
                     </Button>
-                      <Button asChild variant="outline" size="sm" className="text-xs">
-                        <Link href="/publish">Publish history</Link>
-                      </Button>
-                      <Button asChild variant="outline" size="sm" className="text-xs">
-                        <Link href={MANAGER_WORKFLOW_LINKS.lottery}>Open Lottery</Link>
-                      </Button>
-                    </>
-                  ) : (
-                    <>
+                    <Button asChild variant="outline" size="sm" className="h-12 rounded-[18px] px-5 text-sm">
+                      <Link href="/publish">Publish history</Link>
+                    </Button>
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="h-12 rounded-[18px] px-5 text-sm"
+                    >
+                      <Link href={MANAGER_WORKFLOW_LINKS.lottery}>Open Lottery</Link>
+                    </Button>
+                  </>
+                ) : (
+                  <>
                     <Button
                       type="button"
-                      variant={showEmptyDraftState ? 'default' : 'outline'}
                       size="sm"
-                      className="gap-1.5 text-xs"
+                      className="h-12 rounded-[18px] px-5 text-sm"
                       disabled={!canRunAutoDraft}
                       onClick={() => setPreFlightDialogOpen(true)}
                     >
-                      <Sparkles className="h-3.5 w-3.5" />
+                      <Sparkles className="h-4 w-4" />
                       Auto-draft
                     </Button>
                     {activeCyclePublished ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] px-3 py-1 text-xs font-medium text-[var(--success-text)]">
+                      <span className="inline-flex h-12 items-center gap-1.5 rounded-[18px] border border-[var(--success-border)] bg-[var(--success-subtle)] px-4 text-sm font-medium text-[var(--success-text)]">
                         <span className="h-1.5 w-1.5 rounded-full bg-[var(--success-text)]" />
                         Published
                       </span>
-                      ) : (
-                        <form action={toggleCyclePublishedAction}>
+                    ) : (
+                      <form action={toggleCyclePublishedAction}>
                         <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
                         <input type="hidden" name="view" value="week" />
                         <input type="hidden" name="show_unavailable" value="false" />
@@ -1157,20 +1164,20 @@ export function CoverageClientPage({
                         <input type="hidden" name="return_to" value="coverage" />
                         <Button
                           type="submit"
-                          variant={showEmptyDraftState ? 'outline' : 'default'}
+                          variant="outline"
                           size="sm"
-                          className="gap-1.5 text-xs"
+                          className="h-12 rounded-[18px] bg-background px-5 text-sm"
                           disabled={!canPublishCycle}
                         >
-                          <Send className="h-3.5 w-3.5" />
+                          <Send className="h-4 w-4" />
                           Publish
-                          </Button>
-                        </form>
-                      )}
-                      <Button asChild variant="outline" size="sm" className="text-xs">
-                        <Link href={MANAGER_WORKFLOW_LINKS.lottery}>Open Lottery</Link>
-                      </Button>
-                      <MoreActionsMenu triggerClassName="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs text-foreground transition-colors hover:bg-secondary">
+                        </Button>
+                      </form>
+                    )}
+                    <MoreActionsMenu
+                      label="More"
+                      triggerClassName="inline-flex h-12 cursor-pointer items-center gap-2 rounded-[18px] border border-border bg-card px-4 py-2 text-sm text-foreground transition-colors hover:bg-secondary"
+                    >
                       <form action={sendPreliminaryScheduleAction}>
                         <input type="hidden" name="cycle_id" value={activeCycleId ?? ''} />
                         <input type="hidden" name="view" value="week" />
@@ -1210,18 +1217,18 @@ export function CoverageClientPage({
                           Save as template
                         </button>
                       ) : null}
-                        <Link
-                          href={MANAGER_WORKFLOW_LINKS.lottery}
-                          className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
-                        >
-                          Open Lottery
-                        </Link>
-                        <Link
-                          href="/publish"
-                          className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
-                        >
-                          Publish history
-                        </Link>
+                      <Link
+                        href={MANAGER_WORKFLOW_LINKS.lottery}
+                        className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
+                      >
+                        Open Lottery
+                      </Link>
+                      <Link
+                        href="/publish"
+                        className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
+                      >
+                        Publish history
+                      </Link>
                       <button
                         type="button"
                         onClick={() => window.print()}
@@ -1238,7 +1245,7 @@ export function CoverageClientPage({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="gap-1.5 text-xs font-normal text-muted-foreground hover:text-foreground"
+                  className="h-12 rounded-[18px] px-5 text-sm font-normal text-muted-foreground hover:text-foreground"
                   onClick={() => window.print()}
                 >
                   <Printer className="h-3.5 w-3.5" />
@@ -1250,11 +1257,11 @@ export function CoverageClientPage({
         </header>
       </div>
 
-      <div className="no-print px-5 py-4">
-        <div className="space-y-4">
+      <div className="no-print px-5 py-5">
+        <div className="mx-auto w-full max-w-[1680px] space-y-4">
           {!noCycleSelected ? (
-            <section className="rounded-xl border border-border/70 bg-card/70 px-3 py-2.5">
-              <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:justify-between">
+            <section className="rounded-[24px] border border-border/70 bg-card px-4 py-3 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
+              <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
                 <div className="min-w-0">
                   <div className="mb-1 flex items-center gap-2">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
@@ -1273,9 +1280,9 @@ export function CoverageClientPage({
                           title={cycle.label}
                           aria-current={isActive ? 'page' : undefined}
                           className={cn(
-                            'shrink-0 rounded-full border px-2.5 py-1 text-[11px] transition-colors',
+                            'shrink-0 rounded-full border px-4 py-2 text-sm transition-colors',
                             isActive
-                              ? 'border-primary bg-primary/12 font-semibold text-foreground ring-1 ring-primary/20'
+                              ? 'border-sidebar bg-sidebar font-semibold text-white shadow-[0_1px_2px_rgba(15,23,42,0.16)]'
                               : 'border-border/70 bg-background font-medium text-muted-foreground hover:bg-muted/35 hover:text-foreground'
                           )}
                         >
@@ -1289,7 +1296,7 @@ export function CoverageClientPage({
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-3">
                   <CoverageSegmentedControl
                     label="Layout"
                     value={renderedViewMode}
@@ -1311,99 +1318,7 @@ export function CoverageClientPage({
             </section>
           ) : null}
 
-          {!noCycleSelected ? (
-            <section className="rounded-xl border border-border/70 bg-card/65 px-3 py-2.5 shadow-tw-2xs">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
-                <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
-                  <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                  {shiftTab} shift
-                </span>
-                <span className={cn('inline-flex items-center gap-1.5', workspaceStatusTone === 'success' && 'text-[var(--success-text)]')}>
-                  <span
-                    className={cn(
-                      'h-1.5 w-1.5 rounded-full bg-muted-foreground/45',
-                      workspaceStatusTone === 'success' && 'bg-[var(--success-text)]',
-                      workspaceStatusTone === 'warning' && 'bg-[var(--warning-text)]'
-                    )}
-                  />
-                  <span>{workspaceStatusLabel}</span>
-                </span>
-                <span className="text-foreground/80">{cycleRangeLabel}</span>
-                <CoverageSummaryItem
-                  value={coverageSummary.staffedDays}
-                  label="fully staffed"
-                  tone="success"
-                  emphasize={coverageSummary.staffedDays > 0}
-                />
-                <CoverageSummaryItem
-                  value={coverageSummary.priorityGapDays}
-                  label="priority gaps"
-                  tone="warning"
-                  emphasize={coverageSummary.priorityGapDays > 0}
-                />
-                <CoverageSummaryItem
-                  value={issueCount}
-                  label="missing leads"
-                  tone="critical"
-                  emphasize={issueCount > 0}
-                />
-                <CoverageSummaryItem
-                  value={coverageSummary.unassignedDays}
-                  label="unassigned days"
-                  tone="critical"
-                  emphasize={coverageSummary.unassignedDays > 0}
-                />
-                <span className="text-muted-foreground">
-                  <span className="tabular-nums font-semibold text-foreground">
-                    {rosterMembers.length}
-                  </span>{' '}
-                  therapists on this roster
-                </span>
-              </div>
-            </section>
-          ) : null}
-
           <div className="space-y-2">
-            {!noCycleSelected ? (
-              proactiveCoverageRisk && canManageCoverage && !activeCyclePublished ? (
-                <CoverageSurfaceBanner
-                  tone={proactiveCoverageRisk.tone}
-                  title={proactiveCoverageRisk.title}
-                  description={proactiveCoverageRisk.description}
-                  actions={
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setPreFlightDialogOpen(true)}
-                    >
-                      Review pre-flight
-                    </Button>
-                  }
-                />
-              ) : null
-            ) : null}
-            {!noCycleSelected ? (
-              <CoverageSurfaceBanner
-                tone={workspaceStatusTone}
-                title="Next step"
-                description={nextActionLabel}
-                actions={
-                  planningNotices.length > 0 ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      aria-expanded={showPlanningDetails}
-                      aria-controls={planningDetailsId}
-                      onClick={() => setShowPlanningDetails((current) => !current)}
-                    >
-                      {showPlanningDetails ? 'Hide details' : `Show details (${planningNotices.length})`}
-                    </Button>
-                  ) : undefined
-                }
-              />
-            ) : null}
             {activeCyclePublished ? (
               <CoverageSurfaceBanner
                 tone="success"
@@ -1431,20 +1346,12 @@ export function CoverageClientPage({
                 }
               />
             ) : null}
-
-            {showPlanningDetails && planningNotices.length > 0 ? (
-              <div
-                id={planningDetailsId}
-                className="rounded-md border border-border/70 bg-muted/20 px-3 py-2"
-              >
-                <ul className="space-y-1 text-xs text-foreground/85">
-                  {planningNotices.map((notice) => (
-                    <li key={notice} className="leading-5">
-                      {notice}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+            {planningNotices.length > 0 ? (
+              <CoverageSurfaceBanner
+                tone="neutral"
+                title="Planning note"
+                description={planningNotices[0] ?? ''}
+              />
             ) : null}
             {canManageCoverage && publishOverrideConfig && !activeCyclePublished ? (
               <CoverageSurfaceBanner
@@ -1575,7 +1482,7 @@ export function CoverageClientPage({
           ) : null}
 
           {!noCycleSelected ? (
-            <section className="rounded-2xl border border-border/70 bg-card/70 p-3 md:p-4">
+            <section className="rounded-[26px] border border-border/70 bg-card p-3 shadow-[0_16px_40px_rgba(15,23,42,0.06)] md:p-4">
               {renderedViewMode === 'roster' ? (
                 <RosterScheduleView
                   title={`Respiratory Therapy ${shiftTab} Shift`}

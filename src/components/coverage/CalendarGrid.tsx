@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const TARGET_HEADCOUNT = 4
 const STAFF_NAMES_PER_LINE = 2
-const MAX_STAFF_LINES = 3
+const MAX_STAFF_LINES = 1
 
 export function nextIndex(current: number, key: string, total: number): number {
   const cols = 7
@@ -73,7 +73,7 @@ function compactName(value: string): string {
 function formatDateHeader(isoDate: string): string {
   const parsed = new Date(`${isoDate}T00:00:00`)
   if (Number.isNaN(parsed.getTime())) return isoDate
-  return parsed.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' })
+  return parsed.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
 function chunkWeeks(days: DayItem[]): DayItem[][] {
@@ -103,7 +103,7 @@ export function resolveSwipeDirection(
 
 export function resolveDayBoardStatus(day: DayItem, activeCount: number): DayBoardStatus {
   if (day.constraintBlocked) {
-    return { tone: 'critical', label: 'No eligible therapists' }
+    return { tone: 'critical', label: 'Unassigned' }
   }
 
   if (!day.leadShift && activeCount === 0) {
@@ -111,14 +111,14 @@ export function resolveDayBoardStatus(day: DayItem, activeCount: number): DayBoa
   }
 
   if (!day.leadShift) {
-    return { tone: 'critical', label: 'Missing lead' }
+    return { tone: 'critical', label: 'Unassigned' }
   }
 
   const gapCount = Math.max(TARGET_HEADCOUNT - activeCount, 0)
   if (gapCount > 0) {
     return {
       tone: 'warning',
-      label: `${gapCount} ${gapCount === 1 ? 'gap' : 'gaps'}`,
+      label: 'Unassigned',
     }
   }
 
@@ -153,16 +153,16 @@ function toneClasses(tone: DayBoardTone): {
   switch (tone) {
     case 'critical':
       return {
-        card: 'border-[var(--error-border)]/60 bg-[var(--error-subtle)]/10',
+        card: 'border-border/70 bg-card',
         badge: 'border-[var(--error-border)]/45 text-[var(--error-text)]',
         label: 'text-[var(--error-text)]',
         dot: 'bg-[var(--error-text)]',
       }
     case 'warning':
       return {
-        card: 'border-[var(--warning-border)]/60 bg-[var(--warning-subtle)]/10',
+        card: 'border-border/70 bg-card',
         badge: 'border-[var(--warning-border)]/45 text-[var(--warning-text)]',
-        label: 'text-[var(--warning-text)]',
+        label: 'text-[var(--error-text)]',
         dot: 'bg-[var(--warning-text)]',
       }
     case 'healthy':
@@ -225,7 +225,7 @@ export function CalendarGrid({
         role="gridcell"
         data-testid={`coverage-day-panel-${day.id}`}
         className={cn(
-          'relative min-h-[116px] rounded-[14px] border px-2.5 py-2 shadow-tw-2xs transition-colors',
+          'relative min-h-[164px] rounded-[16px] border px-3.5 py-3.5 shadow-tw-2xs transition-colors',
           'hover:border-primary/40',
           dayTone.card,
           selectedId === day.id && 'border-primary/65 ring-2 ring-primary/15',
@@ -244,7 +244,7 @@ export function CalendarGrid({
           tabIndex={absoluteIndex === 0 ? 0 : -1}
           data-testid={`coverage-day-cell-button-${day.id}`}
           aria-label={`${schedulingViewOnly ? 'View' : 'Open'} ${day.label}`}
-          className="absolute inset-0 z-0 rounded-[14px]"
+          className="absolute inset-0 z-0 rounded-[16px]"
           onClick={() => onSelect(day.id)}
           onKeyDown={(event) => {
             if (!['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
@@ -256,9 +256,9 @@ export function CalendarGrid({
           }}
         />
 
-        <div className="pointer-events-none relative z-10 flex h-full flex-col gap-1.5">
+        <div className="pointer-events-none relative z-10 flex h-full flex-col gap-3">
           <div className="flex items-start justify-between gap-2">
-            <p className="text-[12px] font-semibold leading-none text-foreground">
+            <p className="text-[13px] font-semibold leading-none text-foreground">
               {formatDateHeader(day.isoDate)}
             </p>
             <span
@@ -272,18 +272,26 @@ export function CalendarGrid({
           </div>
 
           <p className="text-[11px] font-medium leading-4 text-foreground/82">
-            {day.leadShift ? `Lead: ${compactName(day.leadShift.name)}` : 'Lead: Unassigned'}
+            Lead:{' '}
+            <span className={day.leadShift ? 'text-foreground' : 'text-[var(--warning-text)]'}>
+              {day.leadShift ? compactName(day.leadShift.name) : 'Unassigned'}
+            </span>
           </p>
 
-          <div className="min-h-[3.4rem] space-y-0.5">
+          <div className="min-h-[3.8rem] space-y-1.5">
             {staffDisplay.lines.length > 0 ? (
               staffDisplay.lines.map((line) => (
-                <p key={`${day.id}-${line}`} className="text-[11px] leading-[1.15rem] text-foreground/78">
+                <p
+                  key={`${day.id}-${line}`}
+                  className="text-[11px] leading-[1.2rem] text-[var(--success-text)]"
+                >
                   {line}
                 </p>
               ))
             ) : (
-              <p className="text-[11px] leading-[1.15rem] text-muted-foreground">No staff assigned</p>
+              <p className="text-[11px] leading-[1.2rem] text-[var(--success-text)]">
+                No staff assigned
+              </p>
             )}
             {staffDisplay.remaining > 0 ? (
               <p className="text-[10px] font-medium text-muted-foreground">
