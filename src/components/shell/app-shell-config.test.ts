@@ -72,6 +72,7 @@ describe('app-shell-config', () => {
       'Roster',
       'Analytics',
       'Availability',
+      'Lottery',
       'Publish',
       'Approvals',
     ])
@@ -83,7 +84,7 @@ describe('app-shell-config', () => {
     )
   })
 
-  it('keeps /lottery in the Schedule shell context without adding duplicate local navigation', () => {
+  it('exposes /lottery as a first-class Schedule navigation item', () => {
     const context = getShellContext({
       pathname: '/lottery',
       canAccessManagerUi: true,
@@ -97,10 +98,13 @@ describe('app-shell-config', () => {
       'Roster',
       'Analytics',
       'Availability',
+      'Lottery',
       'Publish',
       'Approvals',
     ])
-    expect(context.localNav?.items.some((item) => item.href === '/lottery')).toBe(false)
+    const lotteryItem = context.localNav?.items.find((item) => item.label === 'Lottery')
+    expect(lotteryItem?.href).toBe('/lottery')
+    expect(lotteryItem?.active('/lottery')).toBe(true)
   })
 
   it('/shift-board is active under a direct manager Shift Board sub-nav item', () => {

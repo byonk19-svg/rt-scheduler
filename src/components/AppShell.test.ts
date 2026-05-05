@@ -146,10 +146,11 @@ describe('AppShell navigation structure', () => {
     expect(shellConfigSource).toContain("key: 'people'")
   })
 
-  it('puts Coverage, Roster, Availability, Publish, and Approvals under the Schedule section', () => {
+  it('puts Coverage, Roster, Availability, Lottery, Publish, and Approvals under the Schedule section', () => {
     expect(shellConfigSource).toContain("label: 'Coverage'")
     expect(shellConfigSource).toContain("label: 'Roster'")
     expect(shellConfigSource).toContain("label: 'Availability'")
+    expect(shellConfigSource).toContain("label: 'Lottery'")
     expect(shellConfigSource).toContain("label: 'Publish'")
     expect(shellConfigSource).toContain("label: 'Approvals'")
   })

@@ -106,6 +106,11 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
           active: (pathname) => pathname === '/availability',
         },
         {
+          href: MANAGER_WORKFLOW_LINKS.lottery,
+          label: 'Lottery',
+          active: (pathname) => pathname === MANAGER_WORKFLOW_LINKS.lottery,
+        },
+        {
           href: '/publish',
           label: 'Publish',
           active: (pathname) => pathname === '/publish' || pathname.startsWith('/publish/'),

@@ -64,6 +64,9 @@ test.describe.serial('lottery workflow surface', () => {
     await expect(scheduleMainNavLink).toHaveAttribute('aria-current', 'page')
 
     const scheduleNav = page.getByRole('navigation', { name: 'Schedule section navigation' })
-    await expect(scheduleNav.getByRole('link', { name: 'Lottery' })).toHaveCount(0)
+    const scheduleLotteryLink = scheduleNav.getByRole('link', { name: 'Lottery' })
+    await expect(scheduleLotteryLink).toBeVisible()
+    await expect(scheduleLotteryLink).toHaveAttribute('href', '/lottery')
+    await expect(scheduleLotteryLink).toHaveAttribute('aria-current', 'page')
   })
 })
