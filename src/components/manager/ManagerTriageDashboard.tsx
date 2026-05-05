@@ -95,8 +95,7 @@ export function ManagerTriageDashboard({
       ? '--'
       : Math.max(dayShiftsTotal - dayShiftsFilled, 0) +
         Math.max(nightShiftsTotal - nightShiftsFilled, 0)
-  const pendingRequestLabel =
-    pendingRequests === '--' ? LOADING_LABEL : 'Time off & swap requests'
+  const pendingRequestLabel = pendingRequests === '--' ? LOADING_LABEL : 'Time off & swap requests'
   const upcomingLabel = upcomingShiftCount === '--' ? LOADING_LABEL : 'Next 14 days'
   const needsReviewLabel =
     needsReviewCount === '--'
@@ -405,7 +404,9 @@ export function ManagerTriageDashboard({
 
         <Card className="rounded-lg border-border/70 bg-card shadow-tw-float-tight">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xl font-bold text-foreground">Open shifts snapshot</CardTitle>
+            <CardTitle className="text-xl font-bold text-foreground">
+              Open shifts snapshot
+            </CardTitle>
             <Button variant="ghost" size="sm" className="min-h-11 px-0 text-xs" asChild>
               <Link href={scheduleHref}>
                 View all
