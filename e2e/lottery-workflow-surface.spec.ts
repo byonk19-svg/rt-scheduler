@@ -41,14 +41,14 @@ test.describe.serial('lottery workflow surface', () => {
     await loginAs(page, manager!.email, manager!.password)
     await page.goto('/dashboard/manager')
 
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Manager Dashboard' })).toBeVisible()
     const openLotteryLink = page.getByRole('link', { name: 'Open Lottery' }).first()
     await expect(openLotteryLink).toBeVisible()
     await expect(openLotteryLink).toHaveAttribute('href', '/lottery')
 
     await openLotteryLink.click()
 
-    await expect(page).toHaveURL(/\/lottery(?:[/?].*)?$/)
+    await expect(page).toHaveURL(/\/lottery(?:[/?].*)?$/, { timeout: 30_000 })
     await expect(page.getByRole('heading', { name: 'Lottery' })).toBeVisible()
     await expect(
       page.getByText(

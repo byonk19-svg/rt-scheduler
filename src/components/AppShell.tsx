@@ -3,7 +3,18 @@
 import ThemeProvider from '@/components/ThemeProvider'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ArrowLeftRight, CalendarDays, ChevronDown, LogOut, Menu, Settings, X } from 'lucide-react'
+import {
+  ArrowLeftRight,
+  CalendarDays,
+  ChevronDown,
+  Home,
+  LogOut,
+  Menu,
+  Plus,
+  Settings,
+  Users,
+  X,
+} from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { DeferredNotificationBell } from '@/components/DeferredNotificationBell'
@@ -162,6 +173,41 @@ function UserDropdown({
   )
 }
 
+function MobileNavLink({
+  href,
+  label,
+  current,
+  icon,
+  badgeCount,
+}: {
+  href: string
+  label: string
+  current: boolean
+  icon: ReactNode
+  badgeCount?: number
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'relative flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-lg text-[10px] font-medium no-underline transition-colors hover:no-underline',
+        current
+          ? 'text-sidebar-primary'
+          : 'text-sidebar-foreground hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground'
+      )}
+      aria-current={current ? 'page' : undefined}
+    >
+      {icon}
+      <span>{label}</span>
+      {badgeCount ? (
+        <span className="absolute right-3 top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[color:var(--attention)] px-1 text-[9px] font-bold text-accent-foreground">
+          {badgeCount}
+        </span>
+      ) : null}
+    </Link>
+  )
+}
+
 export default function AppShell({ user, unreadNotificationCount = 0, children }: AppShellProps) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -199,6 +245,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
       })) ?? [],
     [pathname, shellContext.localNav]
   )
+  const mobileTitle = primaryItems.find((item) => item.current)?.label ?? 'Dashboard'
 
   useEffect(() => {
     function handleEsc(event: KeyboardEvent) {
@@ -259,28 +306,36 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
             </Link>
           }
           primaryNav={
-            <nav className="ml-2 hidden items-center gap-0.5 md:flex" aria-label="Main navigation">
-              {primaryItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    'relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors duration-150',
-                    item.current
-                      ? 'text-sidebar-primary after:absolute after:bottom-[-10px] after:left-3 after:right-3 after:h-0.5 after:rounded-full after:bg-[var(--attention)]'
-                      : 'text-sidebar-foreground hover:text-sidebar-accent-foreground'
-                  )}
-                  aria-current={item.current ? 'page' : undefined}
-                >
-                  {item.label}
-                  {item.badgeCount ? (
-                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--attention)] px-1.5 text-[10px] font-bold text-accent-foreground">
-                      {item.badgeCount}
-                    </span>
-                  ) : null}
-                </Link>
-              ))}
-            </nav>
+            <>
+              <p className="truncate text-center text-sm font-bold text-sidebar-primary md:hidden">
+                {mobileTitle}
+              </p>
+              <nav
+                className="ml-2 hidden items-center gap-0.5 md:flex"
+                aria-label="Main navigation"
+              >
+                {primaryItems.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      'relative flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors duration-150',
+                      item.current
+                        ? 'text-sidebar-primary after:absolute after:bottom-[-10px] after:left-3 after:right-3 after:h-0.5 after:rounded-full after:bg-[var(--attention)]'
+                        : 'text-sidebar-foreground hover:text-sidebar-accent-foreground'
+                    )}
+                    aria-current={item.current ? 'page' : undefined}
+                  >
+                    {item.label}
+                    {item.badgeCount ? (
+                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[color:var(--attention)] px-1.5 text-[10px] font-bold text-accent-foreground">
+                        {item.badgeCount}
+                      </span>
+                    ) : null}
+                  </Link>
+                ))}
+              </nav>
+            </>
           }
           utilityActions={
             <>
@@ -307,7 +362,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
           }
         />
 
-        <div className="min-h-screen pt-11">
+        <div className="min-h-screen pb-20 pt-11 md:pb-0">
           <main
             id="main-content"
             tabIndex={-1}
@@ -334,6 +389,50 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
             {children}
           </main>
         </div>
+
+        <nav
+          className="fixed inset-x-0 bottom-0 z-30 border-t border-sidebar-border/80 bg-sidebar/95 px-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 text-sidebar-foreground shadow-[0_-8px_24px_rgba(0,0,0,0.16)] backdrop-blur md:hidden"
+          aria-label="Mobile primary navigation"
+        >
+          <div className="mx-auto grid max-w-md grid-cols-5 items-center gap-1">
+            <MobileNavLink
+              href={primaryItems[0]?.href ?? dashboardHref}
+              label={primaryItems[0]?.label ?? 'Dashboard'}
+              current={Boolean(primaryItems[0]?.current)}
+              icon={<Home className="h-4 w-4" aria-hidden="true" />}
+            />
+            <MobileNavLink
+              href={primaryItems[1]?.href ?? '/coverage'}
+              label={primaryItems[1]?.label ?? 'Schedule'}
+              current={Boolean(primaryItems[1]?.current)}
+              icon={<CalendarDays className="h-4 w-4" aria-hidden="true" />}
+            />
+            <Link
+              href={canAccessManagerUi ? '/coverage' : '/therapist/availability'}
+              className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[color:var(--attention)] text-accent-foreground shadow-tw-md no-underline hover:no-underline"
+              aria-label={canAccessManagerUi ? 'Open schedule workspace' : 'Update availability'}
+            >
+              <Plus className="h-5 w-5" aria-hidden="true" />
+            </Link>
+            <MobileNavLink
+              href={primaryItems[2]?.href ?? '/team'}
+              label={primaryItems[2]?.label ?? 'People'}
+              current={Boolean(primaryItems[2]?.current)}
+              badgeCount={primaryItems[2]?.badgeCount}
+              icon={<Users className="h-4 w-4" aria-hidden="true" />}
+            />
+            <button
+              type="button"
+              className="relative flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-lg text-[10px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground"
+              onClick={() => setMobileMenuOpen(true)}
+              aria-expanded={mobileMenuOpen}
+              aria-label="Open more navigation"
+            >
+              <Menu className="h-4 w-4" aria-hidden="true" />
+              More
+            </button>
+          </div>
+        </nav>
 
         <Dialog open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
           <DialogContent

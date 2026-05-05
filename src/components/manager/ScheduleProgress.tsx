@@ -52,23 +52,23 @@ export function ScheduleProgress({
   ]
 
   return (
-    <div className="relative overflow-hidden rounded-[26px] border border-border/70 bg-card shadow-tw-panel">
+    <div className="relative overflow-hidden rounded-xl border border-border/70 bg-card shadow-tw-panel">
       <div className="teamwise-grid-bg-subtle teamwise-aurora-bg absolute inset-x-0 top-0 h-28 opacity-45" />
 
       <div className="relative flex items-start justify-between gap-3 border-b border-border/70 px-5 py-4">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             Coverage signal
           </p>
-          <h3 className="font-heading text-[1.05rem] font-semibold tracking-[-0.03em] text-foreground">
+          <h3 className="font-heading text-lg font-semibold text-foreground">
             Schedule Completion
           </h3>
         </div>
-        <div className="rounded-full border border-border/70 bg-card px-3 py-1 text-right shadow-tw-md">
+        <div className="rounded-lg border border-border/70 bg-card px-3 py-1 text-right shadow-tw-md">
           <p className="font-heading text-sm font-semibold leading-none text-foreground">
             {overall.pct}%
           </p>
-          <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+          <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
             Overall
           </p>
         </div>
@@ -78,11 +78,11 @@ export function ScheduleProgress({
         {rows.map((row) => (
           <div
             key={row.label}
-            className="rounded-[22px] border border-border/75 bg-card/95 px-4 py-3.5 shadow-tw-panel-inner"
+            className="rounded-lg border border-border/75 bg-card/95 px-4 py-3.5 shadow-tw-panel-inner"
           >
             <div className="mb-2 flex items-start justify-between gap-3">
               <div>
-                <span className="font-heading text-sm font-semibold tracking-[-0.02em] text-foreground">
+                <span className="font-heading text-sm font-semibold text-foreground">
                   {row.label}
                 </span>
                 <p className="mt-1 text-[11px] text-muted-foreground">{row.caption}</p>

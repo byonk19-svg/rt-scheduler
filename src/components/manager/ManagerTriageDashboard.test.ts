@@ -42,30 +42,37 @@ describe('ManagerTriageDashboard', () => {
       })
     )
 
-    expect(html).toContain('>Dashboard</h1>')
+    expect(html).toContain('>Manager Dashboard</h1>')
     expect(html).not.toContain('>Inbox</h1>')
-    expect(html).not.toContain('Manager Dashboard')
+    expect(html).toContain('Good morning')
+    expect(html).toContain('Riverside Medical Center')
+    expect(html).toContain('Scheduling workflow')
+    expect(html).toContain('Your next urgent action')
+    expect(html).toContain('Prepare availability')
+    expect(html).toContain('Build schedule')
+    expect(html).toContain('Review changes')
+    expect(html).toContain('Publish schedule')
     expect(html).toContain('Coverage Issues')
     expect(html).toContain('Pending Approvals')
     expect(html).toContain('Upcoming Shifts')
-    expect(html).toContain('Needs attention now')
-    expect(html).toContain('5 approvals waiting')
-    expect(html).toContain('Review approvals')
-    expect(html).toContain('Open schedule workspace')
+    expect(html).toContain('Open Assignments')
+    expect(html).toContain('2 updates need review')
+    expect(html).toContain('Review updates')
+    expect(html).toContain('Today / This week')
+    expect(html).toContain('Open shifts snapshot')
     expect(html).not.toContain('Publish flow')
     expect(html).toContain('Mar 26')
     expect(html).toContain('4 shifts')
     expect(html).toContain('Adrienne S.')
-    expect(html).toContain('Staffed Shifts')
+    expect(html).toContain('staffed shifts')
     expect(html).toContain('Staffed')
     expect(html).not.toContain('Coverage Risks')
-    expect(html).toContain('Cycle status')
-    expect(html).toContain('Recent Activity')
+    expect(html).toContain('Recent activity')
     expect(html).toContain('Brianna approved a shift swap')
     expect(html).toContain('href="/requests"')
     expect(html).toContain('Publish by Apr 27')
 
-    const nextActionIndex = html.indexOf('Needs attention now')
+    const nextActionIndex = html.indexOf('Your next urgent action')
     const metricCardIndex = html.indexOf('Coverage Issues')
 
     expect(nextActionIndex).toBeGreaterThan(-1)
@@ -104,11 +111,11 @@ describe('ManagerTriageDashboard', () => {
 
     expect(html).toContain('Loading...')
     expect(html).toContain('border-dashed')
-    expect(html).toContain('Review updates')
+    expect(html).toContain('Open schedule')
     expect(html).toContain('Coverage Issues')
     expect(html).toContain('href="/approvals"')
     expect(html).toContain('href="/coverage?view=week"')
-    expect(html).toContain('Lottery')
+    expect(html).toContain('Open Assignments')
     expect(html).toContain('Open Lottery')
     expect(html).toContain('href="/lottery"')
   })
@@ -143,11 +150,11 @@ describe('ManagerTriageDashboard', () => {
     )
 
     expect(html).not.toContain('Publish Readiness')
-    expect(html).toContain('No draft started yet')
-    expect(html).toContain('Open schedule to auto-draft')
+    expect(html).toContain('No urgent issues right now')
+    expect(html).toContain('Not started')
   })
 
-  it('renders Schedule Completion before Recent Activity', () => {
+  it('renders scheduling workflow before recent activity', () => {
     const html = renderToStaticMarkup(
       createElement(ManagerTriageDashboard, {
         todayCoverageCovered: 15,
@@ -176,15 +183,15 @@ describe('ManagerTriageDashboard', () => {
       })
     )
 
-    const scheduleProgressIndex = html.indexOf('Schedule Completion')
-    const recentActivityIndex = html.indexOf('Recent Activity')
+    const scheduleProgressIndex = html.indexOf('Scheduling workflow')
+    const recentActivityIndex = html.indexOf('Recent activity')
 
     expect(scheduleProgressIndex).toBeGreaterThan(-1)
     expect(recentActivityIndex).toBeGreaterThan(-1)
     expect(scheduleProgressIndex).toBeLessThan(recentActivityIndex)
   })
 
-  it('renders the canonical Lottery workflow card before recent activity', () => {
+  it('renders the canonical Lottery link in the open shifts snapshot', () => {
     const html = renderToStaticMarkup(
       createElement(ManagerTriageDashboard, {
         todayCoverageCovered: 15,
@@ -213,18 +220,15 @@ describe('ManagerTriageDashboard', () => {
       })
     )
 
-    const lotteryIndex = html.indexOf('Lottery')
-    const recentActivityIndex = html.indexOf('Recent Activity')
+    const openShiftsIndex = html.indexOf('Open shifts snapshot')
+    const lotteryIndex = html.indexOf('Open Lottery')
 
+    expect(openShiftsIndex).toBeGreaterThan(-1)
     expect(lotteryIndex).toBeGreaterThan(-1)
-    expect(html).toContain(
-      'Use Lottery to fairly select from eligible claimants on published shifts.'
-    )
     expect(html).toContain('Open Lottery')
     expect(html).toContain('href="/lottery"')
     expect(html.match(/href="\/lottery"/g)).toHaveLength(1)
-    expect(recentActivityIndex).toBeGreaterThan(-1)
-    expect(lotteryIndex).toBeLessThan(recentActivityIndex)
+    expect(openShiftsIndex).toBeLessThan(lotteryIndex)
   })
 
   it('renders recent activity items as navigable links using the provided href', () => {
@@ -296,7 +300,7 @@ describe('ManagerTriageDashboard', () => {
 
     expect(html).toContain('Mar 17 – Apr 13')
   })
-  it('renders an always-visible Lottery workflow card with the canonical workflow link', () => {
+  it('renders an always-visible Lottery link with the canonical workflow link', () => {
     const html = renderToStaticMarkup(
       createElement(ManagerTriageDashboard, {
         todayCoverageCovered: 15,
@@ -325,10 +329,7 @@ describe('ManagerTriageDashboard', () => {
       })
     )
 
-    expect(html).toContain('Lottery')
-    expect(html).toContain(
-      'Use Lottery to fairly select from eligible claimants on published shifts.'
-    )
+    expect(html).toContain('Open shifts snapshot')
     expect(html).toContain('Open Lottery')
     expect(html).toContain('href="/lottery"')
   })
