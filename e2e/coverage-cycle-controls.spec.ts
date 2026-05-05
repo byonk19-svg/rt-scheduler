@@ -100,7 +100,7 @@ test.describe.serial('coverage cycle controls', () => {
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto('/coverage?view=week')
-    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
 
     await openNewCycleDialog(page)
 
@@ -173,7 +173,7 @@ test.describe.serial('coverage cycle controls', () => {
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto('/coverage?view=week')
-    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
 
     await openNewCycleDialog(page)
 
@@ -266,9 +266,9 @@ test.describe.serial('coverage cycle controls', () => {
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${cycleInsert.data.id}&view=week`)
-    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
 
-    await page.getByRole('button', { name: 'Auto-draft' }).click()
+    await page.getByRole('button', { name: 'Auto-draft' }).first().click()
     const autoDialog = page.getByRole('dialog')
     await expect(autoDialog).toBeVisible()
     await autoDialog.getByRole('button', { name: 'Generate draft' }).click()

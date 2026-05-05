@@ -19,13 +19,14 @@ export function FormSubmitButton({
   children,
   pendingText,
   disabled,
+  type = 'submit',
   ...props
 }: FormSubmitButtonProps) {
   const { pending } = useFormStatus()
   const isDisabled = Boolean(disabled) || pending
 
   return (
-    <Button {...props} disabled={isDisabled}>
+    <Button {...props} type={type} disabled={isDisabled}>
       {pending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
       {pending ? (pendingText ?? children) : children}
     </Button>
@@ -37,6 +38,7 @@ export function FormMenuSubmitButton({
   pendingText,
   className,
   disabled,
+  type = 'submit',
   ...props
 }: FormMenuSubmitButtonProps) {
   const { pending } = useFormStatus()
@@ -45,6 +47,7 @@ export function FormMenuSubmitButton({
   return (
     <button
       {...props}
+      type={type}
       disabled={isDisabled}
       className={cn('inline-flex items-center gap-2', className)}
     >

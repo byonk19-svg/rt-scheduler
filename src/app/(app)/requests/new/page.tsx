@@ -47,6 +47,7 @@ function SwapRequestPageContent() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [myOpenRequests, setMyOpenRequests] = useState<OpenRequest[]>([])
   const showsTeammateStep = requestVisibility === 'direct'
+  const listPath = pathname === '/therapist/swaps' ? '/therapist/swaps' : '/requests/new'
 
   const selectedShiftData = useMemo(
     () => myShifts.find((shift) => shift.id === selectedShift) ?? null,
@@ -255,11 +256,12 @@ function SwapRequestPageContent() {
     }
 
     setSubmitting(false)
-    router.push('/requests/new')
+    resetComposerState()
+    setView('list')
+    router.replace(listPath)
   }
 
-  const handleNew = () => {
-    setView('form')
+  const resetComposerState = () => {
     setStep(1)
     setRequestType('swap')
     setRequestVisibility('direct')
@@ -271,10 +273,15 @@ function SwapRequestPageContent() {
     setError(null)
   }
 
+  const handleNew = () => {
+    setView('form')
+    resetComposerState()
+  }
+
   const handleBack = () => {
     setView('list')
-    setStep(1)
-    setError(null)
+    resetComposerState()
+    router.replace(listPath)
   }
 
   const handleNextStep = () => {

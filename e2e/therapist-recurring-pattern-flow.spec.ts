@@ -113,8 +113,11 @@ test.describe.serial('therapist recurring pattern flow', () => {
       .first()
     await expect(offDayButton).toBeVisible({ timeout: 30_000 })
     await offDayButton.click()
-    await expect(page.getByText('Off day in your normal schedule')).toBeVisible()
-    await page.getByRole('button', { name: /I can work this day/i }).click()
+    await expect(page.getByRole('heading', { name: 'Selected day' })).toBeVisible()
+    await page
+      .getByRole('button', { name: /^Can work$/ })
+      .last()
+      .click()
 
     const noteBox = page.locator(`textarea#therapist-day-note-${ctx!.offDate}`)
     await expect(noteBox).toBeVisible()
