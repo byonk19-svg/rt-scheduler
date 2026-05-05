@@ -176,7 +176,7 @@ describe('ManagerTriageDashboard', () => {
     expect(scheduleProgressIndex).toBeLessThan(recentActivityIndex)
   })
 
-  it('renders a dedicated lottery workflow card before recent activity', () => {
+  it('renders the canonical Lottery workflow card before recent activity', () => {
     const html = renderToStaticMarkup(
       createElement(ManagerTriageDashboard, {
         todayCoverageCovered: 15,
@@ -214,6 +214,7 @@ describe('ManagerTriageDashboard', () => {
     )
     expect(html).toContain('Open Lottery')
     expect(html).toContain('href="/lottery"')
+    expect(html.match(/href="\/lottery"/g)).toHaveLength(1)
     expect(recentActivityIndex).toBeGreaterThan(-1)
     expect(lotteryIndex).toBeLessThan(recentActivityIndex)
   })

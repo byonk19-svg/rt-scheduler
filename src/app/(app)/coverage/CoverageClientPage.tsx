@@ -68,7 +68,6 @@ import {
   parseCoverageShiftSearchParam,
   shiftTabToQueryValue,
 } from '@/lib/coverage/coverage-shift-tab'
-import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 
 type ClearDraftConfirmDialogComponent =
   typeof import('@/components/coverage/ClearDraftConfirmDialog').ClearDraftConfirmDialog
@@ -1127,14 +1126,6 @@ export function CoverageClientPage({
                     <Button asChild variant="outline" size="sm" className="h-12 rounded-[18px] px-5 text-sm">
                       <Link href="/publish">Publish history</Link>
                     </Button>
-                    <Button
-                      asChild
-                      variant="outline"
-                      size="sm"
-                      className="h-12 rounded-[18px] px-5 text-sm"
-                    >
-                      <Link href={MANAGER_WORKFLOW_LINKS.lottery}>Open Lottery</Link>
-                    </Button>
                   </>
                 ) : (
                   <>
@@ -1217,12 +1208,6 @@ export function CoverageClientPage({
                           Save as template
                         </button>
                       ) : null}
-                      <Link
-                        href={MANAGER_WORKFLOW_LINKS.lottery}
-                        className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"
-                      >
-                        Open Lottery
-                      </Link>
                       <Link
                         href="/publish"
                         className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-secondary"

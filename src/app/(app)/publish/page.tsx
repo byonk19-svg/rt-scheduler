@@ -26,7 +26,6 @@ import { fetchScheduleCyclesForCoverage } from '@/lib/coverage/fetch-schedule-cy
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { createClient } from '@/lib/supabase/server'
-import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 
 export const metadata: Metadata = {
   title: 'Publish History',
@@ -184,12 +183,6 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
               <Link href="/coverage">
                 <CalendarDays className="h-3.5 w-3.5" />
                 Back to schedule
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="text-xs">
-              <Link href={MANAGER_WORKFLOW_LINKS.lottery}>
-                Open Lottery
-                <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </Button>
           </div>

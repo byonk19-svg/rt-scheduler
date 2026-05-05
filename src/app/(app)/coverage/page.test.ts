@@ -128,11 +128,11 @@ describe('coverage publish override affordance', () => {
     expect(source).toContain('<StatusPill status="call_in" />')
   })
 
-  it('keeps a contextual Lottery handoff on the schedule workspace', () => {
+  it('does not duplicate the canonical dashboard Lottery entry point in the schedule workspace', () => {
     const source = readFileSync(coverageClientPath, 'utf8')
 
-    expect(source).toContain('MANAGER_WORKFLOW_LINKS.lottery')
-    expect(source).toContain('Open Lottery')
+    expect(source).not.toContain('MANAGER_WORKFLOW_LINKS.lottery')
+    expect(source).not.toContain('Open Lottery')
   })
 
   it('lazy-loads coverage dialogs instead of bundling closed overlays into first paint', () => {

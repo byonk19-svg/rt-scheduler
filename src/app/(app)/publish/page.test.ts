@@ -222,7 +222,7 @@ describe('PublishHistoryPage', () => {
     expect(html).toContain('will no longer appear in Coverage')
   })
 
-  it('includes a direct Lottery handoff from publish history', async () => {
+  it('does not duplicate the canonical dashboard Lottery entry point from publish history', async () => {
     createClientMock.mockResolvedValue(
       createSupabaseMock({
         userId: 'manager-1',
@@ -232,7 +232,7 @@ describe('PublishHistoryPage', () => {
 
     const html = renderToStaticMarkup(await PublishHistoryPage({}))
 
-    expect(html).toContain('Open Lottery')
-    expect(html).toContain('href="/lottery"')
+    expect(html).not.toContain('Open Lottery')
+    expect(html).not.toContain('href="/lottery"')
   })
 })

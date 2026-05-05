@@ -79,7 +79,7 @@ describe('app-shell-config', () => {
     )
   })
 
-  it('treats /lottery as a manager Schedule workflow without surfacing it in the local tab rail', () => {
+  it('keeps /lottery in the Schedule shell context without adding duplicate local navigation', () => {
     const context = getShellContext({
       pathname: '/lottery',
       canAccessManagerUi: true,
@@ -87,6 +87,7 @@ describe('app-shell-config', () => {
     })
 
     expect(context.primaryKey).toBe('schedule')
+    expect(usesAppShell('/lottery')).toBe(true)
     expect(context.localNav?.items.map((item) => item.label)).toEqual([
       'Schedule workspace',
       'Roster view',
@@ -95,10 +96,7 @@ describe('app-shell-config', () => {
       'Publish',
       'Approvals',
     ])
-  })
-
-  it('includes /lottery in the shared app shell allowlist', () => {
-    expect(usesAppShell('/lottery')).toBe(true)
+    expect(context.localNav?.items.some((item) => item.href === '/lottery')).toBe(false)
   })
 
   it('/shift-board is active under the manager Requests sub-nav item', () => {
@@ -110,18 +108,6 @@ describe('app-shell-config', () => {
     expect(context.primaryKey).toBe('people')
     const requestsItem = context.localNav?.items.find((item) => item.label === 'Requests')
     expect(requestsItem?.active('/shift-board')).toBe(true)
-  })
-
-  it('keeps /lottery under the schedule primary section without adding a local tab', () => {
-    const context = getShellContext({
-      pathname: '/lottery',
-      canAccessManagerUi: true,
-      pendingCount: 0,
-    })
-
-    expect(context.primaryKey).toBe('schedule')
-    expect(usesAppShell('/lottery')).toBe(true)
-    expect(context.localNav?.items.some((item) => item.label === 'Lottery')).toBe(false)
   })
 })
 
