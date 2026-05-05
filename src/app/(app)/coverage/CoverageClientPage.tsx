@@ -1590,6 +1590,9 @@ export function CoverageClientPage({
         <CycleManagementDialog
           key={`cycle-dialog-${cycleDialogOpen ? 'open' : 'closed'}-${availableCycles[0]?.end_date ?? 'none'}`}
           cycles={availableCycles}
+          currentCycleId={activeCycleId}
+          viewMode={viewMode}
+          shift={shiftTabToQueryValue(shiftTab)}
           open
           onOpenChange={setCycleDialogOpen}
           createCycleAction={createCycleAction}

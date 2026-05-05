@@ -13,7 +13,7 @@ type ControlsCtx = {
 async function getLatestCycleRange(supabase: SupabaseClient) {
   const result = await supabase
     .from('schedule_cycles')
-    .select('start_date, end_date')
+    .select('id, start_date, end_date')
     .order('end_date', { ascending: false })
     .order('start_date', { ascending: false })
     .limit(1)
@@ -172,7 +172,7 @@ test.describe.serial('coverage cycle controls', () => {
     const nextEndKey = formatDateKey(addDays(new Date(`${previousEndKey}T00:00:00`), 42))
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto('/coverage?view=week')
+    await page.goto(`/coverage?cycle=${latestCycle.id}&view=roster&shift=night`)
     await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
 
     await openNewCycleDialog(page)
@@ -187,7 +187,12 @@ test.describe.serial('coverage cycle controls', () => {
     await dialog.getByLabel('Label').fill(`Overlap Retry ${randomString('cycle')}`)
     await dialog.getByRole('button', { name: 'Create draft block' }).click()
 
-    await expect(page).toHaveURL(/\/coverage\?error=create_cycle_overlap/)
+    await expect(page).toHaveURL(
+      new RegExp(
+        `/coverage\\?cycle=${latestCycle.id}&view=roster&shift=night&error=create_cycle_overlap`
+      ),
+      { timeout: 20_000 }
+    )
 
     await openNewCycleDialog(page)
 
@@ -217,7 +222,10 @@ test.describe.serial('coverage cycle controls', () => {
       .toBe(true)
 
     createdCycleIds.push(nextCycleId!)
-    await expect(page).toHaveURL(/\/coverage\?cycle=.*success=cycle_created/)
+    await expect(page).toHaveURL(
+      /\/coverage\?cycle=.*&view=roster&shift=night&success=cycle_created/,
+      { timeout: 20_000 }
+    )
   })
 
   test('manager can auto-draft and then clear the draft from coverage', async ({ page }) => {

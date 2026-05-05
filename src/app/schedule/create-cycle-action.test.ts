@@ -1,18 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { redirectMock, createClientMock, getRoleForUserMock, getPanelParamMock } = vi.hoisted(
-  () => ({
-    redirectMock: vi.fn((url: string) => {
-      throw new Error(`REDIRECT:${url}`)
-    }),
-    createClientMock: vi.fn(),
-    getRoleForUserMock: vi.fn(async () => 'manager'),
-    getPanelParamMock: vi.fn(() => undefined),
-  })
-)
+const {
+  redirectMock,
+  revalidatePathMock,
+  createClientMock,
+  getRoleForUserMock,
+  getPanelParamMock,
+} = vi.hoisted(() => ({
+  redirectMock: vi.fn((url: string) => {
+    throw new Error(`REDIRECT:${url}`)
+  }),
+  revalidatePathMock: vi.fn(),
+  createClientMock: vi.fn(),
+  getRoleForUserMock: vi.fn(async () => 'manager'),
+  getPanelParamMock: vi.fn(() => undefined),
+}))
 
 vi.mock('next/navigation', () => ({ redirect: redirectMock }))
-vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+vi.mock('next/cache', () => ({ revalidatePath: revalidatePathMock }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: createClientMock }))
 vi.mock('@/app/(app)/schedule/actions/helpers', () => ({
   getRoleForUser: getRoleForUserMock,
@@ -37,13 +42,19 @@ type TestContext = {
   overlappingCycles?: Array<Record<string, unknown>>
 }
 
-function makeFormData(startDate: string, endDate: string, options?: { returnTo?: 'coverage' }) {
+function makeFormData(
+  startDate: string,
+  endDate: string,
+  options?: { returnTo?: 'coverage'; currentCycleId?: string; view?: string; shift?: string }
+) {
   const fd = new FormData()
   fd.set('label', 'Block 7')
   fd.set('start_date', startDate)
   fd.set('end_date', endDate)
-  fd.set('view', 'week')
+  fd.set('view', options?.view ?? 'week')
   if (options?.returnTo) fd.set('return_to', options.returnTo)
+  if (options?.currentCycleId) fd.set('current_cycle_id', options.currentCycleId)
+  if (options?.shift) fd.set('shift', options.shift)
   return fd
 }
 
@@ -139,7 +150,7 @@ describe('createCycleAction', () => {
 
     await expect(
       createCycleAction(makeFormData('2026-03-20', '2026-05-05', { returnTo: 'coverage' }))
-    ).rejects.toThrow('REDIRECT:/coverage?error=create_cycle_overlap')
+    ).rejects.toThrow('REDIRECT:/coverage?view=week&error=create_cycle_overlap')
 
     expect(supabase.state.insertedCycles).toHaveLength(0)
   })
@@ -150,8 +161,39 @@ describe('createCycleAction', () => {
 
     await expect(
       createCycleAction(makeFormData('2026-05-03', '2026-06-13', { returnTo: 'coverage' }))
-    ).rejects.toThrow('REDIRECT:/coverage?cycle=cycle-new&success=cycle_created')
+    ).rejects.toThrow('REDIRECT:/coverage?cycle=cycle-new&view=week&success=cycle_created')
 
+    expect(revalidatePathMock).toHaveBeenCalledWith('/coverage')
     expect(supabase.state.insertedCycles).toHaveLength(1)
+  })
+
+  it('keeps coverage-origin retry and success redirects in the current coverage context', async () => {
+    const overlapSupabase = createSupabaseMock({
+      userId: 'manager-1',
+      overlappingCycles: [{ id: 'cycle-existing' }],
+    })
+    createClientMock.mockResolvedValue(overlapSupabase)
+
+    const coverageContext = {
+      returnTo: 'coverage' as const,
+      currentCycleId: 'cycle-current',
+      view: 'roster',
+      shift: 'night',
+    }
+
+    await expect(
+      createCycleAction(makeFormData('2026-03-20', '2026-05-05', coverageContext))
+    ).rejects.toThrow(
+      'REDIRECT:/coverage?cycle=cycle-current&view=roster&shift=night&error=create_cycle_overlap'
+    )
+
+    const successSupabase = createSupabaseMock({ userId: 'manager-1', overlappingCycles: [] })
+    createClientMock.mockResolvedValue(successSupabase)
+
+    await expect(
+      createCycleAction(makeFormData('2026-05-03', '2026-06-13', coverageContext))
+    ).rejects.toThrow(
+      'REDIRECT:/coverage?cycle=cycle-new&view=roster&shift=night&success=cycle_created'
+    )
   })
 })
