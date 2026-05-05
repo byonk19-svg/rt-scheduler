@@ -46,9 +46,11 @@ test.describe.serial('lottery workflow surface', () => {
     await expect(openLotteryLink).toBeVisible()
     await expect(openLotteryLink).toHaveAttribute('href', '/lottery')
 
-    await openLotteryLink.click()
-
-    await expect(page).toHaveURL(/\/lottery(?:[/?].*)?$/, { timeout: 30_000 })
+    await openLotteryLink.scrollIntoViewIfNeeded()
+    await Promise.all([
+      page.waitForURL(/\/lottery(?:[/?].*)?$/, { timeout: 30_000 }),
+      openLotteryLink.click(),
+    ])
     await expect(page.getByRole('heading', { name: 'Lottery' })).toBeVisible()
     await expect(
       page.getByText(
