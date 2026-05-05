@@ -23,7 +23,12 @@ import {
   type TherapistWorkflowCycle,
   type TherapistWorkflowPreliminarySnapshot,
 } from '@/lib/therapist-workflow'
-import { countPendingRequestRows, type PersistedRequestStatus } from '@/lib/request-workflow'
+import {
+  countPendingRequestRows,
+  formatRequestShiftLabel,
+  type RequestShiftPostRow,
+} from '@/lib/request-workflow'
+import { deriveRequestStage } from '@/lib/request-page-data'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { fetchMyPublishedUpcomingShifts } from '@/lib/staff-my-schedule'
@@ -42,9 +47,96 @@ type SubmissionRow = {
   last_edited_at: string
 }
 
+type StaffSwapAttentionItem = {
+  href: string
+  title: string
+  detail: string
+}
+
+type DashboardSwapRequestRow = RequestShiftPostRow & {
+  shifts?:
+    | {
+        date: string
+        shift_type: 'day' | 'night'
+      }
+    | Array<{
+        date: string
+        shift_type: 'day' | 'night'
+      }>
+    | null
+}
+
 function getSearchParam(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0]
   return value
+}
+
+function buildSwapAttentionItems(params: {
+  currentUserId: string
+  requests: DashboardSwapRequestRow[]
+}): StaffSwapAttentionItem[] {
+  return params.requests
+    .map((request) => {
+      const involvement =
+        request.posted_by === params.currentUserId
+          ? 'posted'
+          : request.visibility === 'direct'
+            ? 'received_direct'
+            : 'claimed'
+      const stage = deriveRequestStage({
+        currentUserId: params.currentUserId,
+        request,
+        involvement,
+      })
+      const shiftRow = Array.isArray(request.shifts) ? request.shifts[0] : request.shifts
+      const shiftLabel = shiftRow
+        ? formatRequestShiftLabel(shiftRow.date, shiftRow.shift_type)
+        : 'this shift'
+
+      if (involvement === 'received_direct' && request.recipient_response === 'pending') {
+        return {
+          href: `/therapist/swaps?requestId=${request.id}`,
+          title: 'You have a swap request to review',
+          detail: `${shiftLabel}. Decide whether to accept and send it to the manager.`,
+        }
+      }
+
+      if (
+        request.posted_by === params.currentUserId &&
+        request.visibility === 'direct' &&
+        request.recipient_response === 'pending'
+      ) {
+        return {
+          href: `/therapist/swaps?requestId=${request.id}`,
+          title: 'Your swap is waiting for teammate response',
+          detail: `${shiftLabel}. The request stays private until your teammate responds.`,
+        }
+      }
+
+      if (
+        request.visibility === 'direct' &&
+        request.recipient_response === 'accepted' &&
+        request.status === 'pending'
+      ) {
+        return {
+          href: `/therapist/swaps?requestId=${request.id}`,
+          title: 'A swap is waiting for manager review',
+          detail: `${shiftLabel}. ${stage.detail ?? 'Manager approval is still required.'}`,
+        }
+      }
+
+      if (request.status === 'pending' && request.visibility === 'team') {
+        return {
+          href: `/therapist/swaps?requestId=${request.id}`,
+          title: 'A board request is waiting for manager review',
+          detail: `${shiftLabel}. ${stage.detail ?? 'Manager review is still required.'}`,
+        }
+      }
+
+      return null
+    })
+    .filter((item): item is StaffSwapAttentionItem => item !== null)
+    .slice(0, 2)
 }
 
 function toSearchSuffix(params?: StaffDashboardSearchParams): string {
@@ -163,7 +255,9 @@ export default async function StaffDashboardPage({
       : Promise.resolve({ data: [] }),
     supabase
       .from('shift_posts')
-      .select('id, status, created_at')
+      .select(
+        'id, type, status, visibility, recipient_response, request_kind, created_at, shift_id, posted_by, claimed_by, message, shifts!shift_posts_shift_id_fkey(date, shift_type)'
+      )
       .or(`posted_by.eq.${user.id},claimed_by.eq.${user.id}`),
   ])
 
@@ -183,10 +277,11 @@ export default async function StaffDashboardPage({
 
   const preliminarySnapshots =
     ((preliminarySnapshotsResult.data ?? []) as TherapistWorkflowPreliminarySnapshot[]) ?? []
-  const relevantShiftPosts = (relevantShiftPostsResult.data ?? []) as Array<{
-    status: PersistedRequestStatus
-    created_at: string
-  }>
+  const relevantShiftPosts = (relevantShiftPostsResult.data ?? []) as DashboardSwapRequestRow[]
+  const swapAttentionItems = buildSwapAttentionItems({
+    currentUserId: user.id,
+    requests: relevantShiftPosts,
+  })
 
   const workflow = resolveTherapistWorkflow({
     todayKey,
@@ -368,6 +463,23 @@ export default async function StaffDashboardPage({
                 <Link href="/therapist/swaps">Shift Swaps &amp; Pickups</Link>
               </Button>
             </div>
+            {swapAttentionItems.length > 0 ? (
+              <div className="mt-4 space-y-2 rounded-xl border border-border/70 bg-background/65 px-3 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  Needs attention
+                </p>
+                {swapAttentionItems.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="block rounded-lg border border-border/70 bg-card px-3 py-3 transition-colors hover:bg-secondary"
+                  >
+                    <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.detail}</p>
+                  </Link>
+                ))}
+              </div>
+            ) : null}
           </article>
 
           <article className="rounded-2xl border border-border bg-card px-5 py-5 shadow-tw-sm">

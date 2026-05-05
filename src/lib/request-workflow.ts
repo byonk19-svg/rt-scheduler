@@ -25,6 +25,7 @@ export type RequestShiftPostRow = {
   type: RequestType
   status: PersistedRequestStatus
   recipient_response: RecipientResponse | null
+  recipient_responded_at?: string | null
   request_kind: RequestKind | null
   created_at: string
   shift_id: string | null

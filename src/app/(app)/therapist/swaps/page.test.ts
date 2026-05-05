@@ -5,12 +5,11 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { redirectMock, createClientMock, loadShiftBoardSnapshotMock } = vi.hoisted(() => ({
+const { redirectMock, createClientMock } = vi.hoisted(() => ({
   redirectMock: vi.fn((url: string) => {
     throw new Error(`REDIRECT:${url}`)
   }),
   createClientMock: vi.fn(),
-  loadShiftBoardSnapshotMock: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -21,13 +20,8 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: createClientMock,
 }))
 
-vi.mock('@/lib/shift-board-snapshot', () => ({
-  loadShiftBoardSnapshot: loadShiftBoardSnapshotMock,
-}))
-
-vi.mock('@/components/shift-board/ShiftBoardClientPage', () => ({
-  default: ({ initialSnapshot }: { initialSnapshot: { currentUserId: string } }) =>
-    createElement('div', null, `Therapist swaps for ${initialSnapshot.currentUserId}`),
+vi.mock('@/app/(app)/requests/new/page', () => ({
+  default: () => createElement('div', null, 'Therapist swap workspace'),
 }))
 
 import TherapistSwapsPage from '@/app/(app)/therapist/swaps/page'
@@ -37,25 +31,18 @@ describe('therapist swaps route', () => {
     vi.clearAllMocks()
   })
 
-  it('uses the same open-board snapshot loader as the main shift-board route', async () => {
-    const supabase = { id: 'server-client' }
-    createClientMock.mockResolvedValue(supabase)
-    loadShiftBoardSnapshotMock.mockResolvedValue({
-      unauthorized: false,
-      role: 'therapist',
-      requests: [],
-      metrics: { unfilled: 0, missingLead: 0 },
-      pendingCount: 0,
-      currentUserId: 'therapist-2',
-      therapists: [],
-      employmentType: null,
-      scheduledByDateEntries: [],
+  it('renders the therapist swap workspace for authenticated users', async () => {
+    createClientMock.mockResolvedValue({
+      auth: {
+        getUser: async () => ({
+          data: { user: { id: 'therapist-2' } },
+        }),
+      },
     })
 
     const html = renderToStaticMarkup(await TherapistSwapsPage())
 
-    expect(loadShiftBoardSnapshotMock).toHaveBeenCalledWith({ supabase, tab: 'open' })
-    expect(html).toContain('Therapist swaps for therapist-2')
+    expect(html).toContain('Therapist swap workspace')
   })
 
   it('sets route-specific therapist swaps metadata', async () => {
@@ -65,12 +52,17 @@ describe('therapist swaps route', () => {
     )
 
     expect(source).toContain("title: 'Shift Swaps & Pickups'")
-    expect(source).toContain('shift swap and pickup requests')
+    expect(source).toContain('Create and track your shift swap and pickup requests.')
   })
 
-  it('redirects to login when the shared shift-board snapshot is unauthorized', async () => {
-    createClientMock.mockResolvedValue({ id: 'server-client' })
-    loadShiftBoardSnapshotMock.mockResolvedValue({ unauthorized: true })
+  it('redirects to login when there is no authenticated user', async () => {
+    createClientMock.mockResolvedValue({
+      auth: {
+        getUser: async () => ({
+          data: { user: null },
+        }),
+      },
+    })
 
     await expect(TherapistSwapsPage()).rejects.toThrow('REDIRECT:/login')
   })

@@ -24,15 +24,15 @@ describe('coverage client performance contract', () => {
     expect(coverageClientSource).not.toContain(
       "import { RosterScheduleView, type RosterMemberRow } from '@/components/coverage/RosterScheduleView'"
     )
-    expect(coverageClientSource).toContain('const CalendarGrid = dynamic(() =>')
-    expect(coverageClientSource).toContain('const RosterScheduleView = dynamic(() =>')
+    expect(coverageClientSource).toMatch(/const CalendarGrid = dynamic</)
+    expect(coverageClientSource).toMatch(/const RosterScheduleView = dynamic</)
   })
 
   it('lazy-loads the print surface instead of bundling it eagerly with the main coverage client chunk', () => {
     expect(coverageClientSource).not.toContain(
       "import { PrintSchedule } from '@/components/print-schedule'"
     )
-    expect(coverageClientSource).toContain('const PrintSchedule = dynamic(() =>')
+    expect(coverageClientSource).toMatch(/const PrintSchedule = dynamic</)
   })
 })
 

@@ -1,6 +1,7 @@
 /**
  * Full demo dataset for local/UAT: auth users, profiles, work patterns, two 6-week cycles,
  * and coverage shifts (1 lead + 4 staff per day/night slot where roster allows).
+ * Also seeds a few swap-request scenarios so the request workflow is immediately testable.
  *
  * Usage:
  *   node --env-file=.env.local scripts/seed-functional-demo.mjs
@@ -13,6 +14,7 @@
  *   SEED_PASSWORD=Teamwise123!
  *   SEED_THERAPIST_COUNT=12   (extra therapists beyond 2 fixed leads; default 12)
  */
+import { pathToFileURL } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 
 const DEMO_LABEL_PREFIX = 'Teamwise UAT'
@@ -287,6 +289,99 @@ async function seedShiftsForCycle(cycleId, cycleStartIso, cycleEndIso, rosterRow
   return rows.length
 }
 
+async function seedSwapRequestScenarios({ publishedCycleId }) {
+  const { data: shiftRows, error: shiftRowsError } = await supabase
+    .from('shifts')
+    .select('id, user_id, date')
+    .eq('cycle_id', publishedCycleId)
+    .eq('shift_type', 'day')
+    .eq('status', 'scheduled')
+    .eq('assignment_status', 'scheduled')
+    .order('date', { ascending: true })
+    .order('user_id', { ascending: true })
+
+  if (shiftRowsError) throw shiftRowsError
+
+  const dayShiftRows = (shiftRows ?? []).filter((row) => Boolean(row.user_id))
+  const shiftsByDate = new Map()
+  for (const row of dayShiftRows) {
+    const bucket = shiftsByDate.get(row.date) ?? []
+    bucket.push(row)
+    shiftsByDate.set(row.date, bucket)
+  }
+
+  const multiShiftDates = Array.from(shiftsByDate.entries())
+    .filter(([, rows]) => rows.length >= 2)
+    .map(([date, rows]) => ({ date, rows }))
+  const singleShiftDates = Array.from(shiftsByDate.entries())
+    .filter(([, rows]) => rows.length >= 1)
+    .map(([date, rows]) => ({ date, rows }))
+
+  if (multiShiftDates.length < 2 || singleShiftDates.length < 2) {
+    console.log('Skipped seeded swap requests: not enough generated day-shift coverage.')
+    return []
+  }
+
+  const teamSwapWithPartner = multiShiftDates[0]
+  const openSwap = singleShiftDates.find((entry) => entry.date !== teamSwapWithPartner.date)
+  const directSwap = multiShiftDates.find((entry) => entry.date !== teamSwapWithPartner.date)
+
+  if (!openSwap || !directSwap) {
+    console.log('Skipped seeded swap requests: could not find distinct dates for each scenario.')
+    return []
+  }
+
+  const scenarios = [
+    {
+      label: 'team swap with suggested partner',
+      message: 'Seeded team swap with suggested partner',
+      shiftId: teamSwapWithPartner.rows[0].id,
+      postedBy: teamSwapWithPartner.rows[0].user_id,
+      claimedBy: teamSwapWithPartner.rows[1].user_id,
+      visibility: 'team',
+      recipientResponse: null,
+    },
+    {
+      label: 'open team swap',
+      message: 'Seeded open team swap request',
+      shiftId: openSwap.rows[0].id,
+      postedBy: openSwap.rows[0].user_id,
+      claimedBy: null,
+      visibility: 'team',
+      recipientResponse: null,
+    },
+    {
+      label: 'direct swap awaiting teammate response',
+      message: 'Seeded direct swap awaiting response',
+      shiftId: directSwap.rows[0].id,
+      postedBy: directSwap.rows[0].user_id,
+      claimedBy: directSwap.rows[1].user_id,
+      visibility: 'direct',
+      recipientResponse: 'pending',
+    },
+  ]
+
+  for (const [index, scenario] of scenarios.entries()) {
+    const createdAt = new Date(Date.now() - (index + 1) * 60 * 60 * 1000).toISOString()
+    const { error } = await supabase.from('shift_posts').insert({
+      shift_id: scenario.shiftId,
+      posted_by: scenario.postedBy,
+      claimed_by: scenario.claimedBy,
+      type: 'swap',
+      status: 'pending',
+      visibility: scenario.visibility,
+      recipient_response: scenario.recipientResponse,
+      request_kind: 'standard',
+      message: scenario.message,
+      created_at: createdAt,
+    })
+
+    if (error) throw error
+  }
+
+  return scenarios
+}
+
 export async function seedFunctionalDemo(options = {}) {
   const domain = String(options.domain ?? defaultDomain)
     .trim()
@@ -445,12 +540,20 @@ export async function seedFunctionalDemo(options = {}) {
     draftEndIso,
     rosterForShifts
   )
+  const seededSwapScenarios = await seedSwapRequestScenarios({ publishedCycleId })
 
   console.log('')
   console.log('Functional demo seed complete.')
   console.log(`  Published cycle: ${publishedLabel} (${publishedCycleId}) — ${pubCount} shift rows`)
   console.log(`  Draft cycle:     ${draftLabel} (${draftCycleId}) — ${draftCount} shift rows`)
   console.log('')
+  if (seededSwapScenarios.length > 0) {
+    console.log('Seeded swap requests:')
+    for (const scenario of seededSwapScenarios) {
+      console.log(`  - ${scenario.label}: "${scenario.message}"`)
+    }
+    console.log('')
+  }
   console.log('Sign in (examples):')
   console.log(`  Manager:  ${managerEmail} / ${password}`)
   console.log(`  Lead:     ${leadSpecs[0].email} / ${password}`)
@@ -474,7 +577,7 @@ async function main() {
   await seedFunctionalDemo()
 }
 
-if (import.meta.url === new URL(process.argv[1], 'file:').href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => {
     console.error('seed-functional-demo failed:', error.message ?? error)
     process.exit(1)

@@ -917,11 +917,11 @@ test.describe.serial('role journeys', () => {
 
     await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
     await page.goto('/requests/new?new=1')
-    await expect(page.getByText('Step 1: Request details').first()).toBeVisible()
+    await expect(page.getByText('Which shift are you trying to change?').first()).toBeVisible()
     await page.getByRole('button', { name: 'pickup' }).click()
     await page.getByRole('combobox', { name: 'Select shift' }).selectOption({ index: 1 })
     await page.getByRole('button', { name: 'Continue' }).click()
-    await expect(page.getByText('Step 3: Final message').first()).toBeVisible()
+    await expect(page.getByText('Request summary').first()).toBeVisible()
     await page.getByLabel('Message').fill(requestMessage)
     await page.getByRole('button', { name: 'Submit request' }).click()
     await expect

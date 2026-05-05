@@ -7,8 +7,8 @@ import {
 
 describe('request composer steps', () => {
   it('shows a two-step team-board path without a hidden teammate step', () => {
-    const steps = getRequestComposerSteps('team')
-    const displayState = getRequestComposerDisplayState('team', 3)
+    const steps = getRequestComposerSteps('team', 'swap')
+    const displayState = getRequestComposerDisplayState('team', 'swap', 3)
 
     expect(steps.map((step) => step.id)).toEqual([1, 3])
     expect(steps.map((step) => step.displayStep)).toEqual([1, 2])
@@ -20,8 +20,8 @@ describe('request composer steps', () => {
   })
 
   it('keeps the choose-teammate step for direct requests', () => {
-    const steps = getRequestComposerSteps('direct')
-    const displayState = getRequestComposerDisplayState('direct', 2)
+    const steps = getRequestComposerSteps('direct', 'pickup')
+    const displayState = getRequestComposerDisplayState('direct', 'pickup', 2)
 
     expect(steps.map((step) => step.id)).toEqual([1, 2, 3])
     expect(steps.map((step) => step.displayStep)).toEqual([1, 2, 3])
@@ -36,8 +36,8 @@ describe('request composer steps', () => {
     expect(displayState.totalSteps).toBe(3)
   })
 
-  it('normalizes a hidden team-board teammate step to the review step', () => {
-    const displayState = getRequestComposerDisplayState('team', 2)
+  it('normalizes the hidden team teammate step to the review step', () => {
+    const displayState = getRequestComposerDisplayState('team', 'swap', 2)
 
     expect(displayState.currentStep.id).toBe(3)
     expect(displayState.currentStep.displayStep).toBe(2)

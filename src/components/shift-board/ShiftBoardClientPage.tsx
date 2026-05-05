@@ -54,6 +54,7 @@ type ShiftBoardRequest = {
   avatar: string
   shift: string
   shiftDate: string | null
+  shiftCycleId: string | null
   shiftId: string | null
   message: string
   status: RequestStatus
@@ -92,6 +93,7 @@ type ShiftBoardInitialSnapshot = {
   therapists: ProfileLookupRow[]
   employmentType: string | null
   scheduledByDateEntries: Array<[string, Array<[string, ShiftType]>]>
+  scheduledByCycleDateEntries: Array<[string, Array<[string, ShiftType]>]>
 }
 
 const STATUS_META: Record<
@@ -183,6 +185,7 @@ export default function ShiftBoardClientPage({
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const initialServerSnapshotConsumedRef = useRef(true)
+  const [isHydrated, setIsHydrated] = useState(false)
 
   const [role, setRole] = useState<Role>(initialSnapshot.role)
   const [loading, setLoading] = useState(false)
@@ -216,6 +219,14 @@ export default function ShiftBoardClientPage({
         initialSnapshot.scheduledByDateEntries.map(([date, entries]) => [date, new Map(entries)])
       )
   )
+  const [scheduledByCycleDate, setScheduledByCycleDate] = useState<
+    Map<string, Map<string, ShiftType>>
+  >(
+    () =>
+      new Map(
+        initialSnapshot.scheduledByCycleDateEntries.map(([key, entries]) => [key, new Map(entries)])
+      )
+  )
 
   const loadBoard = useCallback(
     async (tab: 'open' | 'history') => {
@@ -239,6 +250,11 @@ export default function ShiftBoardClientPage({
             snapshot.scheduledByDateEntries.map(([date, entries]) => [date, new Map(entries)])
           )
         )
+        setScheduledByCycleDate(
+          new Map(
+            snapshot.scheduledByCycleDateEntries.map(([key, entries]) => [key, new Map(entries)])
+          )
+        )
         setRequests(snapshot.requests as ShiftBoardRequest[])
         setMetrics(snapshot.metrics as MetricState)
       } catch (loadError) {
@@ -250,6 +266,10 @@ export default function ShiftBoardClientPage({
     },
     [router, supabase]
   )
+
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
 
   useEffect(() => {
     if (initialServerSnapshotConsumedRef.current && activeTab === 'open') {
@@ -362,11 +382,15 @@ export default function ShiftBoardClientPage({
         return next
       })
       const request = requests.find((row) => row.id === id)
+      const selectedSwapPartnerId =
+        action === 'approve' && request?.type === 'swap'
+          ? swapPartners[id] || request?.swapWithId || null
+          : null
       if (
         action === 'approve' &&
         request?.type === 'swap' &&
         request.visibility === 'team' &&
-        !swapPartners[id]
+        !selectedSwapPartnerId
       ) {
         setRequestErrors((prev) => ({
           ...prev,
@@ -384,7 +408,7 @@ export default function ShiftBoardClientPage({
           requestId: id,
           decision: action,
           selectedInterestId: selectedPickupInterestIds[id] ?? null,
-          swapPartnerId: swapPartners[id] ?? null,
+          swapPartnerId: selectedSwapPartnerId,
           override: opts?.override === true,
           overrideReason: overrideReasons[id] ?? null,
         })
@@ -825,11 +849,18 @@ export default function ShiftBoardClientPage({
               canReview={canReview}
               onPickupInterest={() => void handlePickupInterest(request)}
               saving={Boolean(savingState[request.id])}
+              interactiveEnabled={isHydrated}
               error={requestErrors[request.id]}
               therapists={therapists}
-              scheduledOnDate={scheduledByDate.get(request.shiftDate ?? '') ?? new Map()}
+              scheduledOnDate={
+                scheduledByCycleDate.get(
+                  `${request.shiftCycleId ?? ''}:${request.shiftDate ?? ''}`
+                ) ??
+                scheduledByDate.get(request.shiftDate ?? '') ??
+                new Map()
+              }
               shiftRole={request.shiftRole}
-              swapPartnerId={swapPartners[request.id] ?? ''}
+              swapPartnerId={swapPartners[request.id] ?? request.swapWithId ?? ''}
               onSwapPartnerChange={(partnerId) =>
                 setSwapPartners((prev) => ({ ...prev, [request.id]: partnerId }))
               }
@@ -927,6 +958,7 @@ function RequestCard({
   canReview,
   onPickupInterest,
   saving,
+  interactiveEnabled,
   error,
   therapists,
   scheduledOnDate,
@@ -944,6 +976,7 @@ function RequestCard({
   canReview: boolean
   onPickupInterest: () => void
   saving: boolean
+  interactiveEnabled: boolean
   error?: string
   therapists: ProfileLookupRow[]
   scheduledOnDate: Map<string, ShiftType>
@@ -964,7 +997,8 @@ function RequestCard({
     req.type === 'pickup' && req.visibility === 'team'
       ? partitionPickupInterestQueue(req.interestCandidates)
       : null
-  const needsPartner = req.type === 'swap' && !req.swapWithId && isPending && canReview
+  const showsPartnerPicker =
+    req.type === 'swap' && req.visibility === 'team' && isPending && canReview
   const needsLeadPartner = shiftRole === 'lead'
   const awaitingDirectAcceptance =
     req.visibility === 'direct' && req.recipientResponse !== 'accepted'
@@ -972,10 +1006,11 @@ function RequestCard({
   const eligibleTherapists =
     scheduledOnDate.size > 0
       ? therapists.filter((t) => {
+          if (t.id === req.postedById) return false
           if (!req.shiftType) return scheduledOnDate.has(t.id)
           return scheduledOnDate.get(t.id) === req.shiftType
         })
-      : therapists
+      : therapists.filter((t) => t.id !== req.postedById)
   const isOverrideableError = error?.startsWith('override:')
   const overrideMessage = isOverrideableError ? error!.slice('override:'.length).trim() : null
   const displayError = isOverrideableError ? null : error
@@ -1104,11 +1139,11 @@ function RequestCard({
       </div>
 
       {/* Swap partner picker - shown when no partner is assigned yet */}
-      {needsPartner && (
+      {showsPartnerPicker && (
         <div className="mt-3 rounded-lg border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-2.5">
           <div className="mb-1.5 flex items-center justify-between">
             <label className="text-xs font-semibold text-[var(--warning-text)]">
-              Select swap partner
+              {req.swapWithId ? 'Review or change swap partner' : 'Select swap partner'}
             </label>
             {needsLeadPartner && (
               <span className="rounded-full bg-[var(--warning)] px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
@@ -1116,6 +1151,12 @@ function RequestCard({
               </span>
             )}
           </div>
+          {req.swapWithName ? (
+            <p className="mb-2 text-xs text-muted-foreground">
+              Suggested partner:{' '}
+              <span className="font-medium text-foreground">{req.swapWithName}</span>
+            </p>
+          ) : null}
           {eligibleTherapists.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               No therapists with a shift on this date found.
@@ -1124,7 +1165,7 @@ function RequestCard({
             <select
               value={swapPartnerId}
               onChange={(e) => onSwapPartnerChange(e.target.value)}
-              disabled={saving}
+              disabled={saving || !interactiveEnabled}
               className="h-8 w-full rounded-md border border-border bg-card px-2 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 outline-none disabled:opacity-60"
             >
               <option value="">-- Choose a therapist --</option>
@@ -1156,7 +1197,12 @@ function RequestCard({
           <Button
             size="sm"
             className="min-h-9 flex-1"
-            disabled={saving || (needsPartner && !swapPartnerId) || awaitingDirectAcceptance}
+            disabled={
+              !interactiveEnabled ||
+              saving ||
+              (showsPartnerPicker && !swapPartnerId) ||
+              awaitingDirectAcceptance
+            }
             onClick={() => onAction('approve')}
           >
             {saving ? 'Saving...' : 'Approve'}
@@ -1165,12 +1211,12 @@ function RequestCard({
             size="sm"
             variant="outline"
             className="min-h-9 flex-1 border-[var(--error-border)] text-[var(--error-text)] hover:bg-[var(--error-subtle)]"
-            disabled={saving}
+            disabled={saving || !interactiveEnabled}
             onClick={() => onAction('deny')}
           >
             Deny
           </Button>
-          <Button size="sm" variant="outline" onClick={onViewShift}>
+          <Button size="sm" variant="outline" disabled={!interactiveEnabled} onClick={onViewShift}>
             View shift
           </Button>
         </div>
@@ -1178,7 +1224,12 @@ function RequestCard({
 
       {!canReview && req.type === 'pickup' && req.visibility === 'team' && (
         <div className="mt-3 flex justify-end border-t border-border pt-3">
-          <Button size="sm" variant="outline" onClick={onPickupInterest}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!interactiveEnabled}
+            onClick={onPickupInterest}
+          >
             {req.requestKind === 'call_in'
               ? req.hasMyInterest
                 ? 'Withdraw claim'

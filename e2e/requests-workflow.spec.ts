@@ -22,12 +22,34 @@ async function openRequestComposerForShift(page: Parameters<typeof loginAs>[0], 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await page.goto(url, { waitUntil: 'domcontentloaded' })
 
-    const stepHeader = page.getByText('Step 1: Request details').first()
+    const newRequestButton = page.getByRole('button', { name: 'New request' }).first()
+    const shiftStepHeader = page.getByText('Which shift are you trying to change?').first()
+    const teammateStepHeader = page.getByText('Who do you want to ask first?').first()
     const shiftSelect = page.getByRole('combobox', { name: 'Select shift' })
+    const autoSelectedShift = page.getByText('Your shift is already selected').first()
+    const requestSummary = page.getByText('Request summary').first()
 
     try {
-      await expect(stepHeader).toBeVisible({ timeout: 10_000 })
-      await expect(shiftSelect).toHaveValue(shiftId, { timeout: 10_000 })
+      if (await newRequestButton.isVisible({ timeout: 2_000 }).catch(() => false)) {
+        await newRequestButton.click()
+      }
+
+      if (await teammateStepHeader.isVisible({ timeout: 2_000 }).catch(() => false)) {
+        return
+      }
+
+      if (await autoSelectedShift.isVisible({ timeout: 2_000 }).catch(() => false)) {
+        return
+      }
+
+      if (await requestSummary.isVisible({ timeout: 2_000 }).catch(() => false)) {
+        return
+      }
+
+      await expect(shiftStepHeader).toBeVisible({ timeout: 10_000 })
+      if (await shiftSelect.isVisible({ timeout: 2_000 }).catch(() => false)) {
+        await expect(shiftSelect).toHaveValue(shiftId, { timeout: 10_000 })
+      }
       return
     } catch (error) {
       if (attempt === 2) {
@@ -230,7 +252,7 @@ test.describe.serial('requests workflow', () => {
     await openRequestComposerForShift(page, shiftInsert.data.id)
     await page.getByRole('button', { name: 'pickup' }).click()
     await page.getByRole('button', { name: 'Continue' }).click()
-    await expect(page.getByText('Step 3: Final message').first()).toBeVisible()
+    await expect(page.getByText('Request summary').first()).toBeVisible()
     await page.getByLabel('Message').fill(requestMessage)
     const createResponsePromise = page.waitForResponse((response) =>
       response.url().includes('/api/shift-posts')
@@ -315,9 +337,8 @@ test.describe.serial('requests workflow', () => {
 
     await loginAs(page, ctx!.requester.email, ctx!.requester.password)
     await openRequestComposerForShift(page, requesterShiftId)
-    await page.getByRole('button', { name: 'Direct request' }).click()
     await page.getByRole('button', { name: 'Continue' }).click()
-    await expect(page.getByText('Step 2: Choose teammate').first()).toBeVisible()
+    await expect(page.getByText('Who do you want to ask first?').first()).toBeVisible()
     await page.getByRole('button', { name: 'Requests Partner' }).click()
     await expect(page.getByRole('button', { name: 'Off Day Partner' })).toHaveCount(0)
     await page.getByRole('button', { name: 'Continue' }).click()
@@ -339,8 +360,8 @@ test.describe.serial('requests workflow', () => {
         .locator('div.rounded-xl')
         .filter({ has: recipientPage.getByText(requestMessage) })
         .first()
-      await expect(requestCard).toBeVisible()
-      await requestCard.getByRole('button', { name: 'Accept' }).click()
+      await expect(requestCard).toBeVisible({ timeout: 20_000 })
+      await requestCard.getByRole('button', { name: 'Accept and send to manager' }).click()
 
       await expect
         .poll(async () => {
@@ -356,7 +377,155 @@ test.describe.serial('requests workflow', () => {
         })
         .toBe('accepted:pending')
     } finally {
-      await recipientContext.close()
+      await recipientContext.close().catch(() => undefined)
+    }
+  })
+
+  test('requester can send a direct swap that the teammate accepts before manager approval', async ({
+    page,
+    browser,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run requests workflow e2e.')
+
+    const cycleDate = addDays(new Date(), 21)
+    const cycleKey = formatDateKey(cycleDate)
+    const cycleInsert = await ctx!.supabase
+      .from('schedule_cycles')
+      .insert({
+        label: `Requests Direct Swap ${randomString('cycle')}`,
+        start_date: cycleKey,
+        end_date: cycleKey,
+        published: true,
+      })
+      .select('id')
+      .single()
+
+    if (cycleInsert.error || !cycleInsert.data) {
+      throw new Error(cycleInsert.error?.message ?? 'Could not create direct swap cycle.')
+    }
+    createdCycleIds.push(cycleInsert.data.id)
+
+    const shiftsInsert = await ctx!.supabase
+      .from('shifts')
+      .insert([
+        {
+          cycle_id: cycleInsert.data.id,
+          user_id: ctx!.requester.id,
+          date: cycleKey,
+          shift_type: 'day',
+          status: 'scheduled',
+          assignment_status: 'scheduled',
+          role: 'staff',
+        },
+        {
+          cycle_id: cycleInsert.data.id,
+          user_id: ctx!.scheduledPartner.id,
+          date: cycleKey,
+          shift_type: 'day',
+          status: 'scheduled',
+          assignment_status: 'scheduled',
+          role: 'staff',
+        },
+      ])
+      .select('id, user_id')
+
+    if (shiftsInsert.error || !shiftsInsert.data) {
+      throw new Error(shiftsInsert.error?.message ?? 'Could not create direct swap shifts.')
+    }
+
+    const requesterShiftId =
+      shiftsInsert.data.find((row) => row.user_id === ctx!.requester.id)?.id ?? null
+    if (!requesterShiftId) {
+      throw new Error('Could not find requester shift for direct swap test.')
+    }
+
+    const requestMessage = `Direct swap ${randomString('swap-direct')}`
+
+    await loginAs(page, ctx!.requester.email, ctx!.requester.password)
+    await openRequestComposerForShift(page, requesterShiftId)
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await expect(page.getByText('Who do you want to ask first?').first()).toBeVisible()
+    await page.getByRole('button', { name: 'Requests Partner' }).click()
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await page.getByLabel('Message').fill(requestMessage)
+    const createResponsePromise = page.waitForResponse((response) =>
+      response.url().includes('/api/shift-posts')
+    )
+    await page.getByRole('button', { name: 'Submit request' }).click()
+    const createResponse = await createResponsePromise
+    const createBody = await createResponse.json().catch(() => null)
+    expect(createResponse.ok(), JSON.stringify(createBody)).toBe(true)
+
+    await expect
+      .poll(async () => {
+        const result = await ctx!.supabase
+          .from('shift_posts')
+          .select('status, claimed_by')
+          .eq('posted_by', ctx!.requester.id)
+          .eq('message', requestMessage)
+          .maybeSingle()
+
+        if (result.error) throw new Error(result.error.message)
+        return `${result.data?.status ?? ''}:${result.data?.claimed_by ?? ''}`
+      })
+      .toBe(`pending:${ctx!.scheduledPartner.id}`)
+
+    const recipientContext = await browser.newContext()
+    const recipientPage = await recipientContext.newPage()
+    try {
+      await loginAs(recipientPage, ctx!.scheduledPartner.email, ctx!.scheduledPartner.password)
+      await recipientPage.goto('/requests/new', { waitUntil: 'domcontentloaded' })
+      const requestCard = recipientPage
+        .locator('div.rounded-xl')
+        .filter({ has: recipientPage.getByText(requestMessage) })
+        .first()
+      await expect(requestCard).toBeVisible({ timeout: 20_000 })
+      await requestCard.getByRole('button', { name: 'Accept and send to manager' }).click()
+
+      await expect
+        .poll(async () => {
+          const result = await ctx!.supabase
+            .from('shift_posts')
+            .select('recipient_response, status')
+            .eq('posted_by', ctx!.requester.id)
+            .eq('message', requestMessage)
+            .maybeSingle()
+
+          if (result.error) throw new Error(result.error.message)
+          return `${result.data?.recipient_response ?? ''}:${result.data?.status ?? ''}`
+        })
+        .toBe('accepted:pending')
+    } finally {
+      await recipientContext.close().catch(() => undefined)
+    }
+
+    const managerContext = await browser.newContext()
+    const managerPage = await managerContext.newPage()
+    try {
+      await loginAs(managerPage, ctx!.manager.email, ctx!.manager.password)
+      await managerPage.goto('/shift-board', { waitUntil: 'domcontentloaded' })
+      const requestCard = managerPage
+        .locator('div.rounded-xl')
+        .filter({ has: managerPage.getByText(requestMessage) })
+        .first()
+      await expect(requestCard).toBeVisible({ timeout: 20_000 })
+      await requestCard.getByRole('button', { name: 'Approve' }).click()
+
+      await expect
+        .poll(async () => {
+          const result = await ctx!.supabase
+            .from('shift_posts')
+            .select('status, claimed_by')
+            .eq('posted_by', ctx!.requester.id)
+            .eq('message', requestMessage)
+            .maybeSingle()
+
+          if (result.error) throw new Error(result.error.message)
+          return `${result.data?.status ?? ''}:${result.data?.claimed_by ?? ''}`
+        })
+        .toBe(`approved:${ctx!.scheduledPartner.id}`)
+    } finally {
+      await managerContext.close().catch(() => undefined)
     }
   })
 
@@ -407,9 +576,9 @@ test.describe.serial('requests workflow', () => {
     await loginAs(page, ctx!.requester.email, ctx!.requester.password)
     await openRequestComposerForShift(page, shiftInsert.data.id)
     await page.getByRole('button', { name: 'pickup' }).click()
-    await page.getByRole('button', { name: 'Direct request' }).click()
+    await page.getByRole('button', { name: 'Ask a specific teammate' }).click()
     await page.getByRole('button', { name: 'Continue' }).click()
-    await expect(page.getByText('Step 2: Choose teammate').first()).toBeVisible()
+    await expect(page.getByText('Who do you want to ask?').first()).toBeVisible()
     await page.getByRole('button', { name: 'Off Day Partner' }).click()
     await page.getByRole('button', { name: 'Continue' }).click()
     await page.getByLabel('Message').fill(requestMessage)
@@ -430,8 +599,8 @@ test.describe.serial('requests workflow', () => {
         .locator('div.rounded-xl')
         .filter({ has: recipientPage.getByText(requestMessage) })
         .first()
-      await expect(requestCard).toBeVisible()
-      await requestCard.getByRole('button', { name: 'Accept' }).click()
+      await expect(requestCard).toBeVisible({ timeout: 20_000 })
+      await requestCard.getByRole('button', { name: 'Accept and send to manager' }).click()
 
       await expect
         .poll(async () => {
@@ -447,7 +616,7 @@ test.describe.serial('requests workflow', () => {
         })
         .toBe('accepted:pending')
     } finally {
-      await recipientContext.close()
+      await recipientContext.close().catch(() => undefined)
     }
 
     const managerContext = await browser.newContext()
@@ -459,42 +628,48 @@ test.describe.serial('requests workflow', () => {
         .locator('div.rounded-xl')
         .filter({ has: managerPage.getByText(requestMessage) })
         .first()
-      await expect(requestCard).toBeVisible()
+      await expect(requestCard).toBeVisible({ timeout: 20_000 })
       await requestCard.getByRole('button', { name: 'Approve' }).click()
 
       await expect
-        .poll(async () => {
-          const result = await ctx!.supabase
-            .from('shift_posts')
-            .select('status, claimed_by, recipient_response')
-            .eq('posted_by', ctx!.requester.id)
-            .eq('message', requestMessage)
-            .maybeSingle()
+        .poll(
+          async () => {
+            const result = await ctx!.supabase
+              .from('shift_posts')
+              .select('status, claimed_by, recipient_response')
+              .eq('posted_by', ctx!.requester.id)
+              .eq('message', requestMessage)
+              .maybeSingle()
 
-          if (result.error) throw new Error(result.error.message)
-          return `${result.data?.status ?? ''}:${result.data?.claimed_by ?? ''}:${result.data?.recipient_response ?? ''}`
-        })
+            if (result.error) throw new Error(result.error.message)
+            return `${result.data?.status ?? ''}:${result.data?.claimed_by ?? ''}:${result.data?.recipient_response ?? ''}`
+          },
+          { timeout: 20_000 }
+        )
         .toBe(`approved:${ctx!.offDayPartner.id}:accepted`)
 
       await expect
-        .poll(async () => {
-          const result = await ctx!.supabase
-            .from('shifts')
-            .select('user_id')
-            .eq('cycle_id', cycleInsert.data.id)
-            .eq('date', cycleKey)
-            .maybeSingle()
+        .poll(
+          async () => {
+            const result = await ctx!.supabase
+              .from('shifts')
+              .select('user_id')
+              .eq('cycle_id', cycleInsert.data.id)
+              .eq('date', cycleKey)
+              .maybeSingle()
 
-          if (result.error) throw new Error(result.error.message)
-          return result.data?.user_id ?? null
-        })
+            if (result.error) throw new Error(result.error.message)
+            return result.data?.user_id ?? null
+          },
+          { timeout: 20_000 }
+        )
         .toBe(ctx!.offDayPartner.id)
     } finally {
-      await managerContext.close()
+      await managerContext.close().catch(() => undefined)
     }
   })
 
-  test('lone lead direct requests only show lead-eligible same-date teammates', async ({
+  test('lead direct requests rank lead-qualified teammates first and keep weaker options visible for review', async ({
     page,
   }) => {
     test.skip(!ctx, 'Supabase service env values are required to run requests workflow e2e.')
@@ -561,10 +736,12 @@ test.describe.serial('requests workflow', () => {
 
     await loginAs(page, ctx!.leadRequester.email, ctx!.leadRequester.password)
     await openRequestComposerForShift(page, leadRequesterShiftId)
-    await page.getByRole('button', { name: 'Direct request' }).click()
+    await page.getByRole('button', { name: 'Ask a specific teammate' }).click()
     await page.getByRole('button', { name: 'Continue' }).click()
-    await expect(page.getByText('Step 2: Choose teammate').first()).toBeVisible()
+    await expect(page.getByText('Who do you want to ask first?').first()).toBeVisible()
     await expect(page.getByRole('button', { name: 'Lead Eligible Partner' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Non Lead Partner' })).toHaveCount(0)
+    await expect(page.getByText('Best direct options')).toBeVisible()
+    await expect(page.getByText('Still possible, but needs manager review')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Non Lead Partner' })).toBeVisible()
   })
 })

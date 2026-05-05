@@ -6,6 +6,7 @@ import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHea
 import { Button } from '@/components/ui/button'
 import { SkeletonListItem } from '@/components/ui/skeleton'
 import { getPickupInterestTherapistCopy } from '@/lib/pickup-interest-presentation'
+import { formatRequestRelativeTime } from '@/lib/request-workflow'
 import { cn } from '@/lib/utils'
 
 type RequestsHistoryViewProps = {
@@ -14,6 +15,7 @@ type RequestsHistoryViewProps = {
   loading: boolean
   pendingCount: number
   requests: OpenRequest[]
+  selectedRequestId?: string | null
   totalRequests: number
   onNewRequest: () => void
   onRespondDirectRequest: (requestId: string, decision: 'accepted' | 'declined') => Promise<void>
@@ -27,6 +29,7 @@ export function RequestsHistoryView({
   loading,
   pendingCount,
   requests,
+  selectedRequestId,
   totalRequests,
   onNewRequest,
   onRespondDirectRequest,
@@ -37,7 +40,7 @@ export function RequestsHistoryView({
     <div className="space-y-3">
       <ManagerWorkspaceHeader
         title="My Requests"
-        subtitle="Track posted, claimed, and direct requests."
+        subtitle="Track what is waiting on you, your teammate, or the manager."
         summary={
           <div className="flex flex-wrap items-center gap-2 text-foreground">
             <span className="inline-flex items-center rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold text-foreground">
@@ -69,8 +72,8 @@ export function RequestsHistoryView({
       <div className="rounded-xl border border-border bg-card px-4 py-3">
         <p className="text-xs font-semibold text-foreground">How requests work</p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Team board requests go to the shared board after review. Direct requests go to one
-          teammate first, then managers. Check this page for status updates.
+          Direct swaps move through teammate response first, then manager review. Board requests go
+          straight to manager review. This page shows which step is currently blocking the request.
         </p>
       </div>
 
@@ -97,6 +100,8 @@ export function RequestsHistoryView({
         requests.map((request) => {
           const meta = REQUEST_STATUS_META[request.status]
           const isPending = request.status === 'pending'
+          const isSelected =
+            request.id === selectedRequestId || request.sourcePostId === selectedRequestId
           const pickupInterestCopy =
             request.involvement === 'interest' &&
             (request.status === 'pending' || request.status === 'selected')
@@ -110,7 +115,11 @@ export function RequestsHistoryView({
               key={request.id}
               className={cn(
                 'rounded-xl border bg-card p-4',
-                isPending ? 'border-[var(--warning-border)] shadow-sm' : 'border-border'
+                isSelected
+                  ? 'border-primary shadow-md ring-2 ring-primary/20'
+                  : isPending
+                    ? 'border-[var(--warning-border)] shadow-sm'
+                    : 'border-border'
               )}
             >
               <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -153,6 +162,51 @@ export function RequestsHistoryView({
                 ) : null}
                 <span className="ml-auto text-xs text-muted-foreground">{request.posted}</span>
               </div>
+
+              <div className="mb-2 rounded-xl border border-border/70 bg-muted/20 px-3 py-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Current stage
+                </p>
+                <p className="mt-1 text-sm font-semibold text-foreground">{request.stageLabel}</p>
+                {request.stageDetail ? (
+                  <p className="mt-1 text-xs text-muted-foreground">{request.stageDetail}</p>
+                ) : null}
+              </div>
+
+              {isSelected ? (
+                <div className="mb-3 rounded-xl border border-border/70 bg-background/60 px-3 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Timeline
+                  </p>
+                  <div className="mt-3 space-y-3">
+                    <TimelineEntry
+                      title="Request created"
+                      timeLabel={formatRequestRelativeTime(request.createdAt)}
+                      detail="The swap request was created and entered the workflow."
+                    />
+                    {request.recipientRespondedAt && request.recipientResponse ? (
+                      <TimelineEntry
+                        title={
+                          request.recipientResponse === 'accepted'
+                            ? 'Teammate accepted'
+                            : 'Teammate declined'
+                        }
+                        timeLabel={formatRequestRelativeTime(request.recipientRespondedAt)}
+                        detail={
+                          request.recipientResponse === 'accepted'
+                            ? 'The request moved forward to manager review.'
+                            : 'The direct request stopped before manager approval.'
+                        }
+                      />
+                    ) : null}
+                    <TimelineEntry
+                      title={request.stageLabel}
+                      timeLabel={request.posted}
+                      detail={request.stageDetail ?? 'This is the current workflow state.'}
+                    />
+                  </div>
+                </div>
+              ) : null}
 
               <div className="mb-1.5 inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/60 px-2 py-1">
                 <CalendarDays className="h-3 w-3 text-muted-foreground" />
@@ -238,7 +292,7 @@ export function RequestsHistoryView({
                     size="sm"
                     onClick={() => void onRespondDirectRequest(request.id, 'accepted')}
                   >
-                    Accept
+                    Accept and send to manager
                   </Button>
                   <Button
                     size="sm"
@@ -276,6 +330,29 @@ export function RequestsHistoryView({
           )
         })
       )}
+    </div>
+  )
+}
+
+function TimelineEntry({
+  title,
+  timeLabel,
+  detail,
+}: {
+  title: string
+  timeLabel: string
+  detail: string
+}) {
+  return (
+    <div className="flex gap-3">
+      <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-primary" />
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-semibold text-foreground">{title}</p>
+          <span className="text-xs text-muted-foreground">{timeLabel}</span>
+        </div>
+        <p className="mt-0.5 text-xs text-muted-foreground">{detail}</p>
+      </div>
     </div>
   )
 }

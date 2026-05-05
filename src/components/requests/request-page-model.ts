@@ -23,11 +23,18 @@ export type TeamMember = {
   avatar: string
   shift: 'Day' | 'Night'
   isLead: boolean
+  verdict?: 'coverage_safe' | 'needs_manager_review' | 'not_allowed'
+  consequence?: string | null
+  nextMove?: string | null
+  availabilityReason?: string | null
+  currentShiftLabel?: string | null
+  isBestOption?: boolean
 }
 
 export type OpenRequest = {
   id: string
   createdAt: string
+  recipientRespondedAt: string | null
   type: RequestType
   visibility: RequestVisibility
   involvement: 'posted' | 'received_direct' | 'claimed' | 'interest'
@@ -36,6 +43,8 @@ export type OpenRequest = {
   requestKind: RequestKind
   shift: string
   status: RequestStatus
+  stageLabel: string
+  stageDetail: string | null
   swapWith: string | null
   posted: string
   message: string

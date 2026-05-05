@@ -208,6 +208,12 @@ describe('eligible request teammates API', () => {
         avatar: 'TT',
         shift: 'Day',
         isLead: true,
+        verdict: 'coverage_safe',
+        consequence: 'Both shifts stay covered after the exchange.',
+        nextMove: null,
+        availabilityReason: null,
+        currentShiftLabel: 'Currently on May 1 day shift',
+        isBestOption: true,
       },
     ])
   })
@@ -295,11 +301,17 @@ describe('eligible request teammates API', () => {
         avatar: 'SP',
         shift: 'Day',
         isLead: false,
+        verdict: 'coverage_safe',
+        consequence: 'Both shifts stay covered after the exchange.',
+        nextMove: null,
+        availabilityReason: null,
+        currentShiftLabel: 'Currently on May 1 day shift',
+        isBestOption: true,
       },
     ])
   })
 
-  it('keeps lone lead direct requests limited to lead-eligible teammates', async () => {
+  it('surfaces lead-safe teammates first and keeps weaker options visible for review', async () => {
     createAdminClientMock.mockReturnValue(
       createAdminClient({
         profiles: [
@@ -374,6 +386,25 @@ describe('eligible request teammates API', () => {
         avatar: 'LE',
         shift: 'Day',
         isLead: true,
+        verdict: 'coverage_safe',
+        consequence: 'Both shifts stay covered after the exchange.',
+        nextMove: null,
+        availabilityReason: null,
+        currentShiftLabel: 'Currently on May 2 day shift',
+        isBestOption: true,
+      },
+      {
+        id: 'therapist-3',
+        name: 'Non Lead Partner',
+        avatar: 'NL',
+        shift: 'Day',
+        isLead: false,
+        verdict: 'needs_manager_review',
+        consequence: 'Your May 2 day shift would lose its only lead.',
+        nextMove: 'Try another lead-qualified teammate if you want a safer swap.',
+        availabilityReason: null,
+        currentShiftLabel: 'Currently on May 2 day shift',
+        isBestOption: false,
       },
     ])
   })

@@ -36,6 +36,8 @@ export type RequestPageSnapshot = {
   myShifts: MyShift[]
 }
 
+export { deriveRequestStage }
+
 export async function loadRequestPageSnapshot(
   supabase: SupabaseLike,
   todayKey: string
@@ -60,7 +62,7 @@ export async function loadRequestPageSnapshot(
     supabase
       .from('shift_posts')
       .select(
-        'id, type, status, recipient_response, request_kind, created_at, shift_id, posted_by, claimed_by, visibility, message'
+        'id, type, status, recipient_response, recipient_responded_at, request_kind, created_at, shift_id, posted_by, claimed_by, visibility, message'
       )
       .or(`posted_by.eq.${user.id},claimed_by.eq.${user.id}`)
       .order('created_at', { ascending: false })
@@ -139,6 +141,89 @@ export async function loadEligibleRequestTeammates(
   return payload?.teammates ?? []
 }
 
+function deriveRequestStage(params: {
+  currentUserId: string
+  request: RequestShiftPostRow
+  involvement: OpenRequest['involvement']
+}): { label: string; detail: string | null } {
+  const { request, involvement } = params
+
+  if (request.status === 'approved') {
+    return {
+      label: 'Approved',
+      detail:
+        request.visibility === 'direct'
+          ? 'Teammate accepted and the manager approved the swap.'
+          : 'Manager approved this request.',
+    }
+  }
+
+  if (request.status === 'withdrawn') {
+    if (request.visibility === 'direct' && involvement === 'received_direct') {
+      return {
+        label:
+          request.recipient_response === 'accepted'
+            ? 'Withdrawn after your acceptance'
+            : 'Withdrawn by requester',
+        detail: 'The requester closed this request before final manager approval.',
+      }
+    }
+
+    return {
+      label: 'Withdrawn',
+      detail: 'The requester closed this request before final manager approval.',
+    }
+  }
+
+  if (request.status === 'denied') {
+    if (request.visibility === 'direct') {
+      if (request.recipient_response === 'declined') {
+        return {
+          label: involvement === 'received_direct' ? 'You declined' : 'Declined by teammate',
+          detail: 'The direct swap stopped before manager approval.',
+        }
+      }
+
+      return {
+        label: 'Denied by manager',
+        detail: 'Manager review did not approve this request.',
+      }
+    }
+
+    return {
+      label: 'Denied by manager',
+      detail: 'Manager review did not approve this request.',
+    }
+  }
+
+  if (request.visibility === 'direct') {
+    if (request.recipient_response === 'accepted') {
+      return {
+        label: 'Awaiting manager review',
+        detail:
+          involvement === 'received_direct'
+            ? 'You accepted. Manager approval is still required.'
+            : 'Teammate accepted. Manager approval is still required.',
+      }
+    }
+
+    if (request.recipient_response === 'pending') {
+      return {
+        label: involvement === 'received_direct' ? 'Needs your response' : 'Waiting for teammate',
+        detail:
+          involvement === 'received_direct'
+            ? 'Review the proposed swap and decide whether to send it to the manager.'
+            : 'This request stays private until your teammate responds.',
+      }
+    }
+  }
+
+  return {
+    label: 'Waiting for manager review',
+    detail: 'This request is on the board for manager review.',
+  }
+}
+
 async function loadLeadCountsBySlot(supabase: SupabaseLike, uniqueDates: string[]) {
   if (uniqueDates.length === 0) return {}
 
@@ -183,7 +268,7 @@ async function mapOpenRequests(params: {
     const { data: interestPostData } = await supabase
       .from('shift_posts')
       .select(
-        'id, type, status, recipient_response, request_kind, created_at, shift_id, posted_by, claimed_by, visibility, message'
+        'id, type, status, recipient_response, recipient_responded_at, request_kind, created_at, shift_id, posted_by, claimed_by, visibility, message'
       )
       .in('id', interestPostIds)
 
@@ -232,21 +317,31 @@ async function mapOpenRequests(params: {
 
   const mappedOpenRequests = requestRows.map((row) => {
     const shift = row.shift_id ? (shiftById.get(row.shift_id) ?? null) : null
+    const involvement =
+      row.posted_by === currentUserId
+        ? 'posted'
+        : row.visibility === 'direct'
+          ? 'received_direct'
+          : 'claimed'
+    const stage = deriveRequestStage({
+      currentUserId,
+      request: row,
+      involvement,
+    })
+
     return {
       id: row.id,
       type: row.type,
       visibility: row.visibility ?? 'team',
-      involvement:
-        row.posted_by === currentUserId
-          ? 'posted'
-          : row.visibility === 'direct'
-            ? 'received_direct'
-            : 'claimed',
+      involvement,
       sourcePostId: row.id,
       recipientResponse: row.recipient_response ?? null,
+      recipientRespondedAt: row.recipient_responded_at ?? null,
       requestKind: row.request_kind ?? 'standard',
       shift: shift ? formatRequestShiftLabel(shift.date, shift.shift_type) : 'Shift unavailable',
       status: toRequestUiStatus(row.status, row.created_at),
+      stageLabel: stage.label,
+      stageDetail: stage.detail,
       createdAt: row.created_at,
       swapWith: row.claimed_by ? (partnerById.get(row.claimed_by) ?? null) : null,
       posted: formatRequestRelativeTime(row.created_at),
@@ -260,6 +355,16 @@ async function mapOpenRequests(params: {
     .map((interest) => {
       const row = postById.get(interest.shift_post_id)
       const shift = row?.shift_id ? (shiftById.get(row.shift_id) ?? null) : null
+      const stage =
+        interest.status === 'selected'
+          ? {
+              label: 'Approved',
+              detail: 'Manager selected you as the claimant for this request.',
+            }
+          : {
+              label: 'Waiting for manager review',
+              detail: 'Your interest is still waiting on manager selection.',
+            }
 
       return {
         id: interest.id,
@@ -268,6 +373,7 @@ async function mapOpenRequests(params: {
         involvement: 'interest',
         sourcePostId: row?.id ?? null,
         recipientResponse: row?.recipient_response ?? null,
+        recipientRespondedAt: row?.recipient_responded_at ?? null,
         requestKind: row?.request_kind ?? 'standard',
         shift: shift ? formatRequestShiftLabel(shift.date, shift.shift_type) : 'Shift unavailable',
         status: toInterestRequestStatus(
@@ -279,6 +385,8 @@ async function mapOpenRequests(params: {
               }
             : null
         ),
+        stageLabel: stage.label,
+        stageDetail: stage.detail,
         createdAt: interest.created_at,
         swapWith: row?.posted_by ? (partnerById.get(row.posted_by) ?? null) : null,
         posted: formatRequestRelativeTime(interest.created_at),

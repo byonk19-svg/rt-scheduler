@@ -22,7 +22,7 @@ describe('requests composer route source contract', () => {
     expect(layoutSource).toContain('swap, pickup, and direct requests')
     expect(historySource).toContain('New request')
     expect(historySource).not.toContain('Start request')
-    expect(composerSource).toContain('Create request')
+    expect(composerSource).toContain('Find the best way to swap this shift')
     expect(composerSource).toContain('step === 1')
     expect(composerSource).toContain('selectedShift !== null')
     expect(composerSource).toContain("requestVisibility !== 'direct' || swapWith !== null")
@@ -31,15 +31,10 @@ describe('requests composer route source contract', () => {
     expect(composerSource).toContain(
       'Step {stepState.currentStep.displayStep} of {stepState.totalSteps}'
     )
-    expect(composerSource).toContain(
-      'Direct requests add a teammate step and stay private between you, the selected teammate, and managers.'
-    )
-    expect(composerSource).toContain(
-      'Team board requests skip teammate selection and post to the shared board after review.'
-    )
-    expect(composerSource).toContain(
-      'This shift does not have an eligible direct-swap teammate right now.'
-    )
-    expect(historySource).toContain('Team board requests go to the shared board after review.')
+    expect(composerSource).toContain('Find the best way to swap this shift')
+    expect(composerSource).toContain('Ask a specific teammate')
+    expect(composerSource).toContain('Post an open swap instead')
+    expect(composerSource).toContain('No strong direct swap options for this shift right now.')
+    expect(historySource).toContain('Direct swaps move through teammate response first')
   })
 })

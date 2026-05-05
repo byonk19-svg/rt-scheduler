@@ -134,9 +134,9 @@ test.describe.serial('manager specialized controls', () => {
     const requesterPage = page
     await loginAs(requesterPage, ctx!.requester.email, ctx!.requester.password)
     await requesterPage.goto('/requests/new?new=1')
-    await requesterPage.getByRole('button', { name: 'swap' }).click()
-    await requesterPage.getByRole('combobox', { name: 'Select shift' }).selectOption({ index: 1 })
-    await requesterPage.getByRole('button', { name: 'Continue' }).click()
+    await requesterPage.getByRole('button', { name: 'Swap this shift' }).click()
+    await expect(requesterPage.getByText('Your shift is already selected').first()).toBeVisible()
+    await requesterPage.getByRole('button', { name: 'Post an open swap instead' }).click()
     await requesterPage.getByRole('button', { name: 'Continue' }).click()
     const requestMessage = `Swap me ${randomString('swap')}`
     await requesterPage.getByLabel('Message').fill(requestMessage)
@@ -186,7 +186,7 @@ test.describe.serial('manager specialized controls', () => {
         )
         .toBe(`approved:${ctx!.partner.id}`)
     } finally {
-      await managerPage.close()
+      await managerPage.close().catch(() => undefined)
     }
 
     // The trigger swaps user assignments; both shifts should still be assigned, just exchanged.

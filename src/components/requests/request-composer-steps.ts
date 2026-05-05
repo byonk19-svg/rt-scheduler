@@ -1,4 +1,4 @@
-import type { RequestVisibility } from '@/lib/request-workflow'
+import type { RequestType, RequestVisibility } from '@/lib/request-workflow'
 
 export type RequestComposerStepId = 1 | 2 | 3
 
@@ -14,15 +14,23 @@ const STEP_LABELS: Record<RequestComposerStepId, RequestComposerStep['label']> =
   3: 'Final message / review',
 }
 
-const VISIBLE_STEP_IDS: Record<RequestVisibility, RequestComposerStepId[]> = {
-  direct: [1, 2, 3],
-  team: [1, 3],
+function getVisibleStepIds(
+  requestVisibility: RequestVisibility,
+  requestType: RequestType
+): RequestComposerStepId[] {
+  void requestType
+  if (requestVisibility === 'direct') {
+    return [1, 2, 3]
+  }
+
+  return [1, 3]
 }
 
 export function getRequestComposerSteps(
-  requestVisibility: RequestVisibility
+  requestVisibility: RequestVisibility,
+  requestType: RequestType
 ): RequestComposerStep[] {
-  return VISIBLE_STEP_IDS[requestVisibility].map((id, index) => ({
+  return getVisibleStepIds(requestVisibility, requestType).map((id, index) => ({
     id,
     displayStep: index + 1,
     label: STEP_LABELS[id],
@@ -31,9 +39,10 @@ export function getRequestComposerSteps(
 
 export function getRequestComposerDisplayState(
   requestVisibility: RequestVisibility,
+  requestType: RequestType,
   step: RequestComposerStepId
 ) {
-  const steps = getRequestComposerSteps(requestVisibility)
+  const steps = getRequestComposerSteps(requestVisibility, requestType)
   const fallbackStepId =
     requestVisibility === 'team' && step === 2
       ? 3

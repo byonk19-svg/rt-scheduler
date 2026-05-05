@@ -47,6 +47,15 @@ function toTeammate(profile: ProfileRow, shiftType: ShiftRow['shift_type']) {
   }
 }
 
+function formatTherapistShiftLabel(date: string, shiftType: ShiftRow['shift_type']): string {
+  const parsed = new Date(`${date}T00:00:00`)
+  const formattedDate = Number.isNaN(parsed.getTime())
+    ? date
+    : parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+  return `${formattedDate} ${shiftType === 'day' ? 'day' : 'night'} shift`
+}
+
 function isPublishedCycle(cycle: ShiftRow['schedule_cycles']): boolean {
   if (Array.isArray(cycle)) return cycle[0]?.published === true
   return cycle?.published === true
@@ -182,28 +191,76 @@ export async function GET(request: Request) {
     }
 
     const teammates = ((candidateProfiles ?? []) as ProfileRow[])
-      .filter((profile) => {
-        const candidateShift = candidateShiftByUserId.get(profile.id)
-        if (!candidateShift) return false
-
-        if (requestShift.role === 'lead' && profile.is_lead_eligible !== true) {
-          return hasOtherLeadEligibleShift(requestShift.id)
-        }
-
-        if (candidateShift.role === 'lead' && !actorIsLeadEligible) {
-          return hasOtherLeadEligibleShift(candidateShift.id)
-        }
-
-        return true
-      })
       .sort((left, right) =>
         (left.full_name ?? 'Unknown therapist').localeCompare(
           right.full_name ?? 'Unknown therapist'
         )
       )
-      .map((profile) => toTeammate(profile, requestShift.shift_type))
+      .map((profile) => {
+        const candidateShift = candidateShiftByUserId.get(profile.id)
+        const base = toTeammate(profile, requestShift.shift_type)
 
-    return NextResponse.json({ teammates })
+        if (!candidateShift) {
+          return {
+            ...base,
+            verdict: 'not_allowed' as const,
+            consequence: null,
+            nextMove: null,
+            availabilityReason: 'Not scheduled on this shift.',
+            currentShiftLabel: null,
+          }
+        }
+
+        const currentShiftLabel = `Currently on ${formatTherapistShiftLabel(
+          requestShift.date,
+          requestShift.shift_type
+        )}`
+
+        const requesterLeadRisk =
+          requestShift.role === 'lead' &&
+          profile.is_lead_eligible !== true &&
+          !hasOtherLeadEligibleShift(requestShift.id)
+        const partnerLeadRisk =
+          candidateShift.role === 'lead' &&
+          !actorIsLeadEligible &&
+          !hasOtherLeadEligibleShift(candidateShift.id)
+
+        if (requesterLeadRisk || partnerLeadRisk) {
+          const consequence = requesterLeadRisk
+            ? `Your ${formatTherapistShiftLabel(requestShift.date, requestShift.shift_type)} would lose its only lead.`
+            : `Their ${formatTherapistShiftLabel(requestShift.date, requestShift.shift_type)} would lose its only lead.`
+
+          return {
+            ...base,
+            verdict: 'needs_manager_review' as const,
+            consequence,
+            nextMove: 'Try another lead-qualified teammate if you want a safer swap.',
+            availabilityReason: null,
+            currentShiftLabel,
+          }
+        }
+
+        return {
+          ...base,
+          verdict: 'coverage_safe' as const,
+          consequence: 'Both shifts stay covered after the exchange.',
+          nextMove: null,
+          availabilityReason: null,
+          currentShiftLabel,
+        }
+      })
+
+    const bestOptionId =
+      teammates.find((teammate) => teammate.verdict === 'coverage_safe')?.id ??
+      teammates.find((teammate) => teammate.verdict === 'needs_manager_review')?.id ??
+      null
+
+    return NextResponse.json({
+      teammates: teammates.map((teammate) => ({
+        ...teammate,
+        isBestOption: teammate.id === bestOptionId,
+      })),
+    })
   }
 
   const { data: pickupProfiles, error: pickupProfilesError } = await admin

@@ -54,6 +54,7 @@ type PendingCountShiftPostRow = Pick<
 
 type ShiftLookupRow = {
   id: string
+  cycle_id: string
   date: string
   shift_type: ShiftBoardShiftType
   role: ShiftBoardShiftRole
@@ -94,6 +95,7 @@ export type ShiftBoardRequest = {
   avatar: string
   shift: string
   shiftDate: string | null
+  shiftCycleId: string | null
   shiftId: string | null
   message: string
   status: ShiftBoardRequestStatus
@@ -133,6 +135,7 @@ export type ShiftBoardAuthorizedSnapshot = {
   therapists: ShiftBoardProfileLookupRow[]
   employmentType: string | null
   scheduledByDateEntries: Array<[string, Array<[string, ShiftBoardShiftType]>]>
+  scheduledByCycleDateEntries: Array<[string, Array<[string, ShiftBoardShiftType]>]>
 }
 
 export type ShiftBoardSnapshot = { unauthorized: true } | ShiftBoardAuthorizedSnapshot
@@ -251,6 +254,7 @@ export async function loadShiftBoardSnapshot({
   let unfilled = 0
   let missingLead = 0
   const scheduledByDate = new Map<string, Map<string, ShiftBoardShiftType>>()
+  const scheduledByCycleDate = new Map<string, Map<string, ShiftBoardShiftType>>()
 
   if (activeCycle) {
     const { data: coverageData, error: coverageError } = await supabase
@@ -327,10 +331,50 @@ export async function loadShiftBoardSnapshot({
   if (shiftIds.length > 0) {
     const { data: shiftsData } = await supabase
       .from('shifts')
-      .select('id, date, shift_type, role')
+      .select('id, cycle_id, date, shift_type, role')
       .in('id', shiftIds)
 
     shiftsById = new Map(((shiftsData ?? []) as ShiftLookupRow[]).map((row) => [row.id, row]))
+  }
+
+  const requestShiftDatesByCycleId = new Map<string, Set<string>>()
+  for (const shift of shiftsById.values()) {
+    const bucket = requestShiftDatesByCycleId.get(shift.cycle_id) ?? new Set<string>()
+    bucket.add(shift.date)
+    requestShiftDatesByCycleId.set(shift.cycle_id, bucket)
+  }
+
+  for (const [cycleId, dates] of requestShiftDatesByCycleId.entries()) {
+    const sortedDates = Array.from(dates.values()).sort()
+    const { data: cycleShiftRows, error: cycleShiftRowsError } = await supabase
+      .from('shifts')
+      .select('id, cycle_id, date, shift_type, status, role, user_id')
+      .eq('cycle_id', cycleId)
+      .in('date', sortedDates)
+
+    if (cycleShiftRowsError) {
+      console.error('Failed to load swap partner schedule context:', cycleShiftRowsError)
+      continue
+    }
+
+    const rows = (cycleShiftRows ?? []) as Array<ShiftCoverageRow & { cycle_id: string }>
+    const activeOperationalCodes = await fetchActiveOperationalCodeMap(
+      supabase,
+      rows.map((row) => row.id)
+    )
+
+    for (const row of rows) {
+      if (!row.user_id || row.status !== 'scheduled' || activeOperationalCodes.has(row.id)) continue
+      const key = `${row.cycle_id}:${row.date}`
+      let userMap = scheduledByCycleDate.get(key)
+      if (!userMap) {
+        userMap = new Map()
+        scheduledByCycleDate.set(key, userMap)
+      }
+      if (!userMap.has(row.user_id)) {
+        userMap.set(row.user_id, row.shift_type)
+      }
+    }
   }
 
   const profileIds = Array.from(
@@ -418,6 +462,7 @@ export async function loadShiftBoardSnapshot({
       avatar: initials(posterName),
       shift: shiftLabel,
       shiftDate: shift?.date ?? null,
+      shiftCycleId: shift?.cycle_id ?? null,
       shiftId: row.shift_id ?? null,
       message: row.message,
       status: toRequestUiStatus(row.status, row.created_at) as ShiftBoardRequestStatus,
@@ -459,5 +504,8 @@ export async function loadShiftBoardSnapshot({
       date,
       Array.from(entries.entries()),
     ]),
+    scheduledByCycleDateEntries: Array.from(scheduledByCycleDate.entries()).map(
+      ([key, entries]) => [key, Array.from(entries.entries())]
+    ),
   }
 }

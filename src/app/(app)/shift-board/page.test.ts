@@ -47,6 +47,7 @@ describe('shift-board page', () => {
       therapists: [],
       employmentType: null,
       scheduledByDateEntries: [],
+      scheduledByCycleDateEntries: [],
     })
 
     const html = renderToStaticMarkup(await ShiftBoardPage())
