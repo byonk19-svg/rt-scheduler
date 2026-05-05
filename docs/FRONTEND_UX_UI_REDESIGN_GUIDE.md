@@ -158,12 +158,12 @@ Mobile (therapist):
 | Item | Label         | Route                     | Notes                                                       |
 | ---- | ------------- | ------------------------- | ----------------------------------------------------------- |
 | 1    | Dashboard     | `/dashboard/staff`        | Current                                                     |
-| 2    | My Shifts     | `/therapist/schedule`     | Not yet implemented; shows as dead link                     |
+| 2    | My Shifts     | `/therapist/schedule`     | Implemented (`src/app/(app)/therapist/schedule/page.tsx`)   |
 | 3    | Availability  | `/therapist/availability` | Rename from "Future Availability" — shorter, clearer        |
 | 4    | Team Schedule | `/coverage`               | Current                                                     |
 | 5    | Shift Swaps   | `/therapist/swaps`        | Rename from "Shift Swaps & Pickups" — too long for nav chip |
 
-**Remove:** History from nav (not implemented); expose it as a card on the dashboard until it has a real page.
+**History** (`/staff/history`) is implemented (`src/app/(app)/staff/history/page.tsx`) — keep it in the nav. The dashboard card linking to it is a useful shortcut but does not replace the nav item.
 
 ### Routes that feel redundant or confusing
 
@@ -1275,7 +1275,7 @@ Tasks:
 - Implement the state machine table from Section 4.6 — determine `primaryCta` and `secondaryCta` based on cycle state
 - Move Print, More actions, template management into a `...` overflow `MoreActionsMenu`
 - Test: cycle state transitions must show correct CTAs without regression in the existing dialog/mutation logic
-- Run targeted coverage lane: `npm run test:unit -- src/app/coverage/page.test.ts src/components/coverage/CalendarGrid.test.ts src/components/coverage/RosterScheduleView.test.ts`
+- Run targeted coverage lane: `npm run test:unit -- "src/app/(app)/coverage/page.test.ts" src/components/coverage/CalendarGrid.test.ts src/components/coverage/RosterScheduleView.test.ts`
 
 ---
 
@@ -1702,7 +1702,7 @@ Run the targeted lane for any component area before making changes:
 
 ```bash
 # Coverage
-npm run test:unit -- src/app/coverage/page.test.ts src/components/coverage/CalendarGrid.test.ts
+npm run test:unit -- "src/app/(app)/coverage/page.test.ts" src/components/coverage/CalendarGrid.test.ts
 
 # Shell/nav
 npx vitest run src/components/shell/app-shell-config.test.ts src/components/AppShell.test.ts
