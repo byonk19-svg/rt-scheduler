@@ -110,6 +110,14 @@ The demo seed script is idempotent and creates:
 - sample availability requests
 - one sample shift board post
 
+For a fuller UAT dataset, run:
+
+```bash
+npm run seed:functional
+```
+
+That seed creates Teamwise demo accounts, published/draft cycles, and seeded swap-request scenarios for `/requests/new` and `/shift-board`.
+
 Required env vars:
 
 - `NEXT_PUBLIC_SUPABASE_URL`

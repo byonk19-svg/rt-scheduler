@@ -152,6 +152,14 @@ npm run seed:demo
 
 This script is idempotent and creates demo cycles, shifts, availability requests, and one shift board post.
 
+For a richer browser/UAT dataset, run:
+
+```bash
+npm run seed:functional
+```
+
+`seed:functional` recreates the Teamwise UAT cycles plus demo accounts and seeded swap-request scenarios, so `/requests/new` and `/shift-board` have realistic swap states immediately after login.
+
 ## Seed Fake Employees
 
 Run:

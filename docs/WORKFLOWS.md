@@ -137,14 +137,15 @@ Current operational guidance:
 1. Staff create shift requests from `/requests/new`.
 2. Requests can be team-visible or direct:
    team requests are visible on `/shift-board`; direct requests stay between the requester, the selected teammate, and managers.
-3. Direct swap recipients must already be scheduled on the same date and shift type.
-4. Direct pickup recipients must match the shift type and must not already be scheduled on that date.
-5. Lead-slot requests stay constrained by lead-coverage rules:
+3. Team swap requests can optionally name a suggested swap partner up front; managers can keep or change that partner during review.
+4. Direct swap recipients must already be scheduled on the same date and shift type.
+5. Direct pickup recipients must match the shift type and must not already be scheduled on that date.
+6. Lead-slot requests stay constrained by lead-coverage rules:
    lone-lead requests only surface lead-safe recipient options, and manager approval still enforces the same server-side lead checks.
-6. Team pickup requests can collect interest from multiple therapists; manager review selects or denies the active claimant queue.
-7. Direct requests require the recipient to accept before a manager can approve them.
-8. Manager review happens in `/shift-board` and completes server-side assignment changes for approved swaps and pickups.
-9. Pending swap posts still auto-expire after the request window (`status = expired`).
+7. Team pickup requests can collect interest from multiple therapists; manager review selects or denies the active claimant queue.
+8. Direct requests require the recipient to accept before a manager can approve them.
+9. Manager review happens in `/shift-board` and completes server-side assignment changes for approved swaps and pickups.
+10. Pending swap posts still auto-expire after the request window (`status = expired`).
 
 ## 6) Notifications and Audit
 
