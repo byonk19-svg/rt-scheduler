@@ -1,8 +1,21 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
-import { ArrowRight, CalendarDays, FileCheck, Send, Shield, Sparkles, Users } from 'lucide-react'
+import {
+  AlertTriangle,
+  ArrowRight,
+  Building2,
+  CalendarDays,
+  CheckCircle2,
+  ChevronDown,
+  FileCheck,
+  Info,
+  ListChecks,
+  Rocket,
+  Send,
+  Shield,
+  Users,
+} from 'lucide-react'
 
-import { ScheduleProgress } from '@/components/manager/ScheduleProgress'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -74,23 +87,59 @@ export function ManagerTriageDashboard({
     todayCoverageCovered === '--' || todayCoverageTotal === '--'
       ? '--'
       : Math.max(todayCoverageTotal - todayCoverageCovered, 0)
-  const riskCountLabel =
-    riskCount === '--' ? LOADING_LABEL : `${riskCount} ${riskCount === 1 ? 'issue' : 'issues'}`
+  const openAssignments =
+    dayShiftsFilled === '--' ||
+    dayShiftsTotal === '--' ||
+    nightShiftsFilled === '--' ||
+    nightShiftsTotal === '--'
+      ? '--'
+      : Math.max(dayShiftsTotal - dayShiftsFilled, 0) +
+        Math.max(nightShiftsTotal - nightShiftsFilled, 0)
   const pendingRequestLabel =
-    pendingRequests === '--' ? LOADING_LABEL : `${pendingRequests} pending`
-  const teamLoadLabel =
-    upcomingShiftCount === '--' ? LOADING_LABEL : `${upcomingShiftCount} upcoming shifts`
+    pendingRequests === '--' ? LOADING_LABEL : 'Time off & swap requests'
+  const upcomingLabel = upcomingShiftCount === '--' ? LOADING_LABEL : 'Next 14 days'
   const needsReviewLabel =
     needsReviewCount === '--'
       ? LOADING_LABEL
       : `${needsReviewCount} update${needsReviewCount === 1 ? '' : 's'} need review`
+
+  const nextAction =
+    needsReviewCount !== '--' && needsReviewCount > 0
+      ? {
+          title: needsReviewLabel,
+          detail: needsReviewDetail,
+          href: reviewHref,
+          label: 'Review updates',
+        }
+      : riskCount !== '--' && riskCount > 0
+        ? {
+            title: `${riskCount} shift${riskCount === 1 ? '' : 's'} need coverage review`,
+            detail: 'Unstaffed or unstable coverage needs attention before handoff.',
+            href: scheduleHref,
+            label: 'Review shifts',
+          }
+        : pendingRequests !== '--' && pendingRequests > 0
+          ? {
+              title: `${pendingRequests} approval${pendingRequests === 1 ? '' : 's'} waiting`,
+              detail: 'Time off and swap requests need manager review.',
+              href: approvalsHref,
+              label: 'Review requests',
+            }
+          : {
+              title: 'No urgent issues right now',
+              detail: 'The current schedule is stable. Keep the next cycle moving.',
+              href: scheduleHref,
+              label: 'Open schedule',
+            }
+
   const metricCards = [
     {
       title: 'Coverage Issues',
       value: riskCount === '--' ? '--' : String(riskCount),
-      detail: riskCountLabel,
+      detail: riskCount === '--' ? LOADING_LABEL : 'Shifts need attention',
       href: scheduleHref,
-      icon: <Shield className="h-4 w-4 text-[var(--error-text)]" />,
+      action: 'View details',
+      icon: <Shield className="h-3.5 w-3.5" aria-hidden="true" />,
       tone: 'error' as const,
     },
     {
@@ -98,310 +147,345 @@ export function ManagerTriageDashboard({
       value: pendingRequests === '--' ? '--' : String(pendingRequests),
       detail: pendingRequestLabel,
       href: approvalsHref,
-      icon: <FileCheck className="h-4 w-4 text-[var(--warning-text)]" />,
+      action: 'Review requests',
+      icon: <FileCheck className="h-3.5 w-3.5" aria-hidden="true" />,
       tone: 'warning' as const,
     },
     {
       title: 'Upcoming Shifts',
       value: upcomingShiftCount === '--' ? '--' : String(upcomingShiftCount),
-      detail: teamLoadLabel,
+      detail: upcomingLabel,
       href: scheduleHref,
-      icon: <Users className="h-4 w-4 text-primary" />,
+      action: 'View schedule',
+      icon: <Users className="h-3.5 w-3.5" aria-hidden="true" />,
+      tone: 'info' as const,
+    },
+    {
+      title: 'Open Assignments',
+      value: openAssignments === '--' ? '--' : String(openAssignments),
+      detail: 'Unfilled shifts',
+      href: scheduleHref,
+      action: 'See open shifts',
+      icon: <Info className="h-3.5 w-3.5" aria-hidden="true" />,
       tone: 'info' as const,
     },
   ]
-  const nextAction =
-    pendingRequests !== '--' && pendingRequests > 0
-      ? {
-          eyebrow: 'Needs attention now',
-          title: `${pendingRequests} approval${pendingRequests === 1 ? '' : 's'} waiting`,
-          detail: 'Clear approvals first so access requests and workflow changes do not stall.',
-          primaryHref: approvalsHref,
-          primaryLabel: 'Review approvals',
-          secondaryHref: scheduleHref,
-          secondaryLabel: 'Open Coverage',
-        }
-      : riskCount !== '--' && riskCount > 0
-        ? {
-            eyebrow: 'Needs attention now',
-            title: `${riskCount} coverage issue${riskCount === 1 ? '' : 's'} to resolve`,
-            detail: 'Open Coverage and fix unstaffed or unstable days before the next handoff.',
-            primaryHref: scheduleHref,
-            primaryLabel: 'Open Coverage',
-            secondaryHref: reviewHref,
-            secondaryLabel: 'Review updates',
-          }
-        : needsReviewCount !== '--' && needsReviewCount > 0
-          ? {
-              eyebrow: 'Needs attention now',
-              title: needsReviewLabel,
-              detail: needsReviewDetail,
-              primaryHref: reviewHref,
-              primaryLabel: 'Review updates',
-              secondaryHref: scheduleHref,
-              secondaryLabel: 'Open Coverage',
-            }
-          : {
-              eyebrow: 'Good standing',
-              title: 'No urgent issues right now',
-              detail:
-                'The current schedule is stable. Use the workspace to keep the next cycle moving.',
-              primaryHref: scheduleHref,
-              primaryLabel: 'Open Coverage',
-              secondaryHref: approvalsHref,
-              secondaryLabel: 'Check approvals',
-            }
+
+  const workflowSteps = [
+    {
+      label: 'Prepare availability',
+      detail: 'Confirm time off, shift preferences, and availability.',
+      href: nextCycleCtaHref ?? '/availability',
+      icon: <Users className="h-5 w-5" aria-hidden="true" />,
+      state:
+        nextCycleLabel === 'No next cycle'
+          ? 'Not started'
+          : nextCycleLabel.startsWith('Collect availability')
+            ? 'In progress'
+            : 'Complete',
+    },
+    {
+      label: 'Build schedule',
+      detail:
+        currentCycleStatus === 'Draft not started'
+          ? currentCycleDetail
+          : 'Auto-assign shifts and resolve coverage gaps.',
+      href: currentCycleCtaHref ?? scheduleHref,
+      icon: <CalendarDays className="h-5 w-5" aria-hidden="true" />,
+      state:
+        currentCycleStatus === 'Draft not started'
+          ? 'Not started'
+          : currentCycleStatus === 'No active cycle'
+            ? 'Not started'
+            : 'Complete',
+    },
+    {
+      label: 'Review changes',
+      detail:
+        needsReviewCount === '--'
+          ? LOADING_LABEL
+          : needsReviewCount > 0
+            ? needsReviewDetail
+            : 'Check warnings, balance workloads, and adjust.',
+      href: reviewHref,
+      icon: <ListChecks className="h-5 w-5" aria-hidden="true" />,
+      state:
+        needsReviewCount === '--'
+          ? LOADING_LABEL
+          : needsReviewCount > 0
+            ? 'In progress'
+            : 'Complete',
+    },
+    {
+      label: 'Publish schedule',
+      detail:
+        currentCycleStatus === 'Published'
+          ? 'Share schedule with your team.'
+          : 'Publish only after coverage and requests are reviewed.',
+      href: scheduleHref,
+      icon: <Send className="h-5 w-5" aria-hidden="true" />,
+      state: currentCycleStatus === 'Published' ? 'Complete' : 'Not started',
+    },
+  ]
+
+  const todayThisWeekItems = [
+    {
+      label: 'Today',
+      detail:
+        approvalsWaiting === '--'
+          ? LOADING_LABEL
+          : `${approvalsWaiting} time off request${approvalsWaiting === 1 ? '' : 's'} need approval`,
+      href: approvalsHref,
+      icon: <CalendarDays className="h-5 w-5" aria-hidden="true" />,
+    },
+    {
+      label: 'Next 14 days',
+      detail:
+        upcomingShiftCount === '--'
+          ? LOADING_LABEL
+          : `${upcomingShiftCount} shift${upcomingShiftCount === 1 ? '' : 's'} scheduled`,
+      href: scheduleHref,
+      icon: <Users className="h-5 w-5" aria-hidden="true" />,
+    },
+    {
+      label: 'Coverage review',
+      detail:
+        riskCount === '--'
+          ? LOADING_LABEL
+          : `${riskCount} shift${riskCount === 1 ? '' : 's'} need coverage review`,
+      href: scheduleHref,
+      icon: <AlertTriangle className="h-5 w-5" aria-hidden="true" />,
+      tone: 'warning' as const,
+    },
+    {
+      label: 'Next schedule cycle',
+      detail:
+        nextCycleLabel === 'No next cycle'
+          ? nextCycleDetail
+          : `${nextCycleLabel} | ${nextCycleDetail}`,
+      href: nextCycleCtaHref ?? '/availability',
+      icon: <Rocket className="h-5 w-5" aria-hidden="true" />,
+    },
+  ]
 
   return (
-    <div className="max-w-[1120px] space-y-4 px-5 py-5 xl:px-7">
-      <div className="relative overflow-hidden rounded-[26px] border border-border/70 bg-card p-5 shadow-tw-inbox-hero">
-        <div className="relative flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <h1 className="font-heading text-5xl font-bold tracking-[-0.05em] text-foreground">
-                Dashboard
-              </h1>
-              {activeCycleDateRange && (
-                <span className="rounded-full border border-border/70 bg-muted/20 px-3 py-1 text-xs text-muted-foreground">
-                  {activeCycleDateRange}
-                </span>
-              )}
-            </div>
-            <div className="space-y-1">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                {nextAction.eyebrow}
-              </p>
-              <p className="text-lg font-semibold tracking-[-0.02em] text-foreground">
-                {nextAction.title}
-              </p>
-              <p className="max-w-[40rem] text-sm text-muted-foreground">{nextAction.detail}</p>
-            </div>
-          </div>
-          <div className="relative flex flex-wrap gap-2">
-            <Button size="sm" className="min-h-11 px-4" asChild>
-              <Link href={nextAction.primaryHref}>
-                <Send className="mr-1.5 h-3.5 w-3.5" />
-                {nextAction.primaryLabel}
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm" className="min-h-11 px-4" asChild>
-              <Link href={nextAction.secondaryHref}>
-                <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
-                {nextAction.secondaryLabel}
-              </Link>
-            </Button>
-          </div>
+    <div className="mx-auto max-w-7xl space-y-4 px-4 py-4 sm:px-5 md:py-6 xl:px-7">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h1 className="font-heading text-3xl font-bold text-foreground sm:text-4xl">
+            Manager Dashboard
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Good morning. Here&apos;s what needs your attention.
+          </p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 lg:min-w-[31rem]">
+          <SelectorPill icon={<Building2 className="h-4 w-4" aria-hidden="true" />}>
+            Riverside Medical Center
+          </SelectorPill>
+          <SelectorPill icon={<CalendarDays className="h-4 w-4" aria-hidden="true" />}>
+            {activeCycleDateRange ?? 'Current schedule cycle'}
+          </SelectorPill>
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
-        <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-3">
-            {metricCards.map((card) => (
-              <div key={card.title}>
-                <MetricCard {...card} />
-              </div>
-            ))}
+      <section
+        className={cn(
+          'rounded-lg border p-4 shadow-tw-ring-attention sm:flex sm:items-center sm:justify-between sm:gap-4',
+          nextAction.title === 'No urgent issues right now'
+            ? 'border-[var(--success-border)] bg-[var(--success-subtle)]/35'
+            : 'border-[var(--warning-border)] bg-[var(--warning-subtle)]'
+        )}
+        aria-label="Your next urgent action"
+      >
+        <div className="flex gap-3">
+          <AlertTriangle
+            className={cn(
+              'mt-1 h-8 w-8 shrink-0',
+              nextAction.title === 'No urgent issues right now'
+                ? 'text-[var(--success-text)]'
+                : 'text-[var(--warning-text)]'
+            )}
+            aria-hidden="true"
+          />
+          <div>
+            <p className="text-sm font-semibold text-foreground">Your next urgent action</p>
+            <p className="mt-0.5 text-xl font-bold text-foreground">{nextAction.title}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{nextAction.detail}</p>
           </div>
+        </div>
+        <Button
+          className="mt-4 min-h-11 w-full bg-[var(--warning)] text-accent-foreground hover:brightness-105 sm:mt-0 sm:w-auto"
+          asChild
+        >
+          <Link href={nextAction.href}>
+            {nextAction.label}
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        </Button>
+      </section>
 
-          {dayShiftsFilled !== '--' &&
-            dayShiftsTotal !== '--' &&
-            nightShiftsFilled !== '--' &&
-            nightShiftsTotal !== '--' &&
-            (dayShiftsTotal === 0 && nightShiftsTotal === 0 ? (
-              <div className="relative overflow-hidden rounded-[26px] border border-dashed border-border/70 bg-card/80 px-5 py-5 shadow-none">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
-                    <CalendarDays className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      Schedule Completion
-                    </p>
-                    <p className="mt-0.5 font-heading text-[1.05rem] font-semibold tracking-[-0.03em] text-foreground">
-                      No draft started yet
-                    </p>
-                    <p className="mt-1.5 text-sm text-muted-foreground">
-                      Auto-draft fills the day and night grids based on availability constraints.
-                      Takes about 30 seconds.
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-3 min-h-11 gap-1.5 px-3 text-xs"
-                      asChild
-                    >
-                      <Link href={scheduleHref}>
-                        <Sparkles className="h-3 w-3" />
-                        Open schedule to auto-draft
-                      </Link>
-                    </Button>
+      <section
+        className="grid grid-cols-2 gap-3 xl:grid-cols-4"
+        aria-label="Manager status summary"
+      >
+        {metricCards.map((card) => (
+          <MetricCard key={card.title} {...card} />
+        ))}
+      </section>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+        <Card className="rounded-lg border-border/70 bg-card shadow-tw-float-tight">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xl font-bold text-foreground">Scheduling workflow</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Follow these steps each cycle to build and publish with confidence.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-2 pb-4">
+            {workflowSteps.map((step, index) => (
+              <WorkflowRow key={step.label} stepNumber={index + 1} {...step} />
+            ))}
+            <Button variant="ghost" size="sm" className="mt-2 min-h-11 px-0 text-xs" asChild>
+              <Link href={scheduleHref}>
+                View scheduling guide
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg border-border/70 bg-card shadow-tw-float-tight">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xl font-bold text-foreground">Today / This week</CardTitle>
+          </CardHeader>
+          <CardContent className="divide-y divide-border/70 pb-4">
+            {todayThisWeekItems.map((item) => (
+              <ActionListItem key={item.label} {...item} />
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+        <Card className="rounded-lg border-border/70 bg-card shadow-tw-float-tight">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xl font-bold text-foreground">Recent activity</CardTitle>
+            <Button variant="ghost" size="sm" className="min-h-11 px-0 text-xs" asChild>
+              <Link href="/notifications">
+                View all
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="divide-y divide-border/70 pb-4">
+            {recentActivity.length > 0 ? (
+              recentActivity.slice(0, 5).map((item, index) => (
+                <Link
+                  key={`${item.title}-${index}`}
+                  href={item.href}
+                  className="flex min-h-14 items-center justify-between gap-3 py-2 text-foreground hover:no-underline"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium">{item.title}</span>
+                    <span className="text-xs text-muted-foreground">{item.timeLabel}</span>
+                  </span>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                </Link>
+              ))
+            ) : (
+              <p className="py-5 text-sm text-muted-foreground">
+                {isLoading
+                  ? LOADING_LABEL
+                  : 'Activity appears here as shifts are drafted, approved, and published.'}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg border-border/70 bg-card shadow-tw-float-tight">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xl font-bold text-foreground">Open shifts snapshot</CardTitle>
+            <Button variant="ghost" size="sm" className="min-h-11 px-0 text-xs" asChild>
+              <Link href={scheduleHref}>
+                View all
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-2 pb-4">
+            {upcomingShiftDays.length > 0 ? (
+              upcomingShiftDays.map((item) => (
+                <Link
+                  key={item.label}
+                  href={scheduleHref}
+                  className="flex min-h-11 items-center justify-between rounded-md border border-border/70 px-3 text-sm text-foreground hover:bg-muted/40 hover:no-underline"
+                >
+                  <span>{item.label}</span>
+                  <span className="text-[var(--error-text)]">
+                    {item.count} shift{item.count === 1 ? '' : 's'}
+                  </span>
+                </Link>
+              ))
+            ) : (
+              <p className="py-5 text-sm text-muted-foreground">
+                {isLoading ? LOADING_LABEL : 'No open shift clusters right now.'}
+              </p>
+            )}
+            <Button variant="ghost" size="sm" className="min-h-11 px-0 text-xs" asChild>
+              <Link href={lotteryHref}>
+                Open Lottery
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="rounded-lg border-border/70 bg-card shadow-tw-float-tight">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
+            Today&apos;s staffed shifts
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-2 pb-4 md:grid-cols-2">
+          {todayStaffedShifts.length > 0 ? (
+            todayStaffedShifts.map((shift, index) => (
+              <div
+                key={`${shift.label}-${shift.detail}-${index}`}
+                className="flex min-h-14 items-center justify-between gap-3 rounded-lg border border-border/70 bg-card px-3 py-2.5"
+              >
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <CalendarDays className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-foreground">{shift.label}</p>
+                    <p className="text-xs text-muted-foreground">{shift.detail}</p>
                   </div>
                 </div>
+                <span className="shrink-0 rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] px-2 py-0.5 text-[11px] font-semibold text-[var(--success-text)]">
+                  Staffed
+                </span>
               </div>
-            ) : (
-              <ScheduleProgress
-                dayFilled={dayShiftsFilled}
-                dayTotal={dayShiftsTotal}
-                nightFilled={nightShiftsFilled}
-                nightTotal={nightShiftsTotal}
-              />
-            ))}
+            ))
+          ) : (
+            <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground md:col-span-2">
+              {isLoading ? LOADING_LABEL : "No staffed shifts on today's schedule."}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
 
-          <Card className="rounded-2xl border-border/70 bg-card shadow-tw-float-tight">
-            <CardHeader className="pb-2 pt-4">
-              <CardTitle className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-                Today&apos;s Staffed Shifts
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 pb-4">
-              {todayStaffedShifts.length > 0 ? (
-                todayStaffedShifts.map((shift, index) => (
-                  <div
-                    key={`${shift.label}-${shift.detail}-${index}`}
-                    className="flex items-center justify-between rounded-lg border border-border/70 bg-card px-3 py-2.5"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <CalendarDays className="h-4 w-4 text-primary" />
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{shift.label}</p>
-                        <p className="text-xs text-muted-foreground">{shift.detail}</p>
-                      </div>
-                    </div>
-                    <span className="rounded-full border border-border/70 bg-muted/30 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                      Staffed
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
-                  {isLoading ? LOADING_LABEL : "No staffed shifts on today's schedule."}
-                </p>
-              )}
-              {todayStaffedShifts.length > 0 && (
-                <Button variant="ghost" size="sm" className="min-h-11 gap-1 px-0 text-xs" asChild>
-                  <Link href={scheduleHref}>
-                    Open Coverage
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </Link>
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-2xl border-border/70 bg-card shadow-tw-float-tight">
-            <CardHeader className="pb-2 pt-4">
-              <CardTitle className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-                Lottery
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 pb-4">
-              <p className="text-sm font-semibold text-foreground">
-                Run and review lottery decisions
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Use Lottery to fairly select from eligible claimants on published shifts.
-              </p>
-              <Button variant="ghost" size="sm" className="min-h-11 gap-1 px-0 text-xs" asChild>
-                <Link href={lotteryHref}>
-                  Open Lottery
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-2xl border-border/70 bg-card shadow-tw-float-tight">
-            <CardHeader className="pb-2 pt-4">
-              <CardTitle className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-                Recent Activity
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2.5 pb-4">
-              {recentActivity.length > 0 ? (
-                recentActivity.map((item, index) => (
-                  <Link
-                    key={`${item.title}-${index}`}
-                    href={item.href}
-                    className="-mx-2 flex items-center justify-between gap-3 rounded-md px-2 py-0.5 transition-colors hover:bg-muted/50"
-                  >
-                    <p className="text-sm text-foreground">{item.title}</p>
-                    <p className="text-xs text-muted-foreground">{item.timeLabel}</p>
-                  </Link>
-                ))
-              ) : (
-                <p className="rounded-lg border border-dashed border-border px-3 py-5 text-center text-xs text-muted-foreground">
-                  {isLoading
-                    ? LOADING_LABEL
-                    : 'Activity appears here as shifts are drafted, approved, and published.'}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-4 xl:sticky xl:top-4 xl:self-start">
-          <Card className="rounded-2xl border-border/70 bg-card shadow-tw-float-tight">
-            <CardHeader className="pb-2 pt-4">
-              <CardTitle className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-                Cycle status
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 pb-4">
-              <InboxRow
-                label="Current cycle"
-                value={currentCycleStatus}
-                detail={currentCycleDetail}
-                ctaHref={currentCycleCtaHref}
-                ctaLabel="New 6-week block"
-              />
-              <InboxRow
-                label="Next 6-week cycle"
-                value={nextCycleLabel}
-                detail={nextCycleDetail}
-                ctaHref={nextCycleCtaHref}
-                ctaLabel="Plan next cycle"
-              />
-              <InboxRow
-                label="Needs review"
-                value={needsReviewCount === '--' ? '--' : String(needsReviewCount)}
-                detail={needsReviewDetail}
-              />
-              <p className="text-[11px] text-muted-foreground">
-                {approvalsWaiting === '--' ? LOADING_LABEL : `${approvalsWaiting} waiting`}
-              </p>
-              <Button variant="ghost" size="sm" className="min-h-11 gap-1 px-0 text-xs" asChild>
-                <Link href={reviewHref}>
-                  Review updates
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-2xl border-border/70 bg-card shadow-tw-float-tight">
-            <CardHeader className="pb-2 pt-4">
-              <CardTitle className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-                Upcoming Days
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 pb-4">
-              {upcomingShiftDays.length > 0 ? (
-                upcomingShiftDays.map((item) => (
-                  <div key={item.label} className="flex items-center justify-between text-xs">
-                    <span className="text-foreground">{item.label}</span>
-                    <span className="text-muted-foreground">{item.count} shifts</span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  {isLoading ? LOADING_LABEL : 'No upcoming shift clusters right now.'}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+function SelectorPill({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 text-sm text-foreground shadow-tw-2xs">
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="text-primary">{icon}</span>
+        <span className="truncate">{children}</span>
+      </span>
+      <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
     </div>
   )
 }
@@ -411,6 +495,7 @@ function MetricCard({
   value,
   detail,
   href,
+  action,
   icon,
   tone,
 }: {
@@ -418,85 +503,156 @@ function MetricCard({
   value: string
   detail: string
   href: string
+  action: string
   icon: ReactNode
   tone: 'error' | 'warning' | 'info'
 }) {
-  const isEmpty = value === '0' || value === '0%' || value === '--'
   const toneClasses = {
     error: {
-      badge: 'bg-[var(--error-subtle)] text-[var(--error-text)]',
+      value: 'text-[var(--error-text)]',
+      icon: 'bg-[var(--error-subtle)] text-[var(--error-text)]',
     },
     warning: {
-      badge: 'bg-[var(--warning-subtle)] text-[var(--warning-text)]',
+      value: 'text-[var(--warning-text)]',
+      icon: 'bg-[var(--warning-subtle)] text-[var(--warning-text)]',
     },
     info: {
-      badge: 'bg-[var(--info-subtle)] text-[var(--info-text)]',
+      value: 'text-primary',
+      icon: 'bg-[var(--info-subtle)] text-[var(--info-text)]',
     },
   }[tone]
 
   return (
-    <Link href={href} className="block">
-      <Card
-        className={cn(
-          'relative overflow-hidden rounded-[24px] border-border/70 bg-card/95 shadow-tw-metric transition-transform duration-200 hover:-translate-y-0.5',
-          isEmpty && 'border-dashed bg-muted/20 shadow-none'
-        )}
-      >
-        <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4">
-          <CardTitle className="text-sm font-medium text-foreground">{title}</CardTitle>
-          <div className={cn('rounded-full p-2', toneClasses.badge)}>{icon}</div>
+    <Link
+      href={href}
+      className="block rounded-lg no-underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40 hover:no-underline"
+    >
+      <Card className="min-h-[7.6rem] gap-2 rounded-lg border-border/70 bg-card py-3 shadow-tw-metric transition-transform duration-200 hover:-translate-y-0.5 sm:min-h-[9.5rem] sm:gap-4 sm:py-4">
+        <CardHeader className="flex flex-row items-start justify-between px-3 pb-0 sm:px-4 sm:pb-1">
+          <CardTitle className="text-sm font-medium leading-tight text-foreground">
+            {title}
+          </CardTitle>
+          <span className={cn('rounded-full p-1.5', toneClasses.icon)}>{icon}</span>
         </CardHeader>
-        <CardContent className="space-y-1 pb-4">
+        <CardContent className="space-y-0.5 px-3 pb-3 sm:space-y-1 sm:px-4 sm:pb-4">
           <p
             className={cn(
-              'font-heading tabular-nums leading-none tracking-[-0.04em]',
-              isEmpty
-                ? 'text-xl font-semibold text-muted-foreground'
-                : 'text-4xl font-bold text-foreground'
+              'font-heading text-2xl font-bold leading-none tabular-nums sm:text-4xl',
+              toneClasses.value
             )}
           >
             {value}
           </p>
-          <p className="text-xs text-muted-foreground">{detail}</p>
+          <p className="text-xs leading-snug text-muted-foreground sm:text-sm">{detail}</p>
+          <span className="inline-flex min-h-7 items-center gap-1 pt-0.5 text-xs font-medium text-primary sm:min-h-9 sm:pt-1">
+            {action}
+            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </span>
         </CardContent>
       </Card>
     </Link>
   )
 }
 
-function InboxRow({
+function WorkflowRow({
+  stepNumber,
   label,
-  value,
   detail,
-  ctaHref,
-  ctaLabel,
+  href,
+  icon,
+  state,
+}: {
+  stepNumber: number
+  label: string
+  detail: string
+  href: string
+  icon: ReactNode
+  state: string
+}) {
+  const isComplete = state === 'Complete'
+  const isActive = state === 'In progress'
+
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'grid min-h-[4.25rem] grid-cols-[2.25rem_2.5rem_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border px-3 py-2 text-foreground hover:no-underline',
+        isActive
+          ? 'border-[var(--warning-border)] bg-[var(--warning-subtle)]/50'
+          : 'border-border/70 bg-card hover:bg-muted/30'
+      )}
+    >
+      <span
+        className={cn(
+          'flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold',
+          isComplete
+            ? 'bg-primary text-primary-foreground'
+            : isActive
+              ? 'bg-[var(--warning)] text-accent-foreground'
+              : 'bg-muted text-muted-foreground'
+        )}
+      >
+        {stepNumber}
+      </span>
+      <span className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-primary">
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-semibold">{label}</span>
+        <span className="block truncate text-xs text-muted-foreground">{detail}</span>
+      </span>
+      <span
+        className={cn(
+          'hidden items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium sm:inline-flex',
+          isComplete
+            ? 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
+            : isActive
+              ? 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+              : 'border-border bg-muted/50 text-muted-foreground'
+        )}
+      >
+        {isComplete ? <CheckCircle2 className="h-3 w-3" aria-hidden="true" /> : null}
+        {state}
+      </span>
+    </Link>
+  )
+}
+
+function ActionListItem({
+  label,
+  detail,
+  href,
+  icon,
+  tone,
 }: {
   label: string
-  value: string
   detail: string
-  ctaHref?: string
-  ctaLabel?: string
+  href: string
+  icon: ReactNode
+  tone?: 'warning'
 }) {
   return (
-    <div>
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-1 text-sm font-semibold text-foreground">{value}</p>
-      <p className="text-[11px] text-muted-foreground">{detail}</p>
-      {ctaHref && ctaLabel && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="mt-1 min-h-11 gap-1 px-0 text-xs text-primary"
-          asChild
+    <Link
+      href={href}
+      className="flex min-h-[4.5rem] items-center justify-between gap-3 py-2 text-foreground hover:no-underline"
+    >
+      <span className="flex min-w-0 items-center gap-3">
+        <span
+          className={cn(
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
+            tone === 'warning'
+              ? 'text-[var(--error-text)]'
+              : 'bg-[var(--info-subtle)] text-[var(--info-text)]'
+          )}
         >
-          <Link href={ctaHref}>
-            {ctaLabel}
-            <ArrowRight className="h-3 w-3" />
-          </Link>
-        </Button>
-      )}
-    </div>
+          {icon}
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-semibold">{label}</span>
+          <span className="block truncate text-xs text-muted-foreground">{detail}</span>
+        </span>
+      </span>
+      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+    </Link>
   )
 }
