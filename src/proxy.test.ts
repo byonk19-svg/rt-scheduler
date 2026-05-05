@@ -250,6 +250,20 @@ describe('proxy onboarding and pending gates', () => {
     expect(response.headers.get('location')).toBeNull()
   })
 
+  it('uses auth metadata role when the profile row has not been created yet', async () => {
+    createServerClientMock.mockReturnValue(
+      makeSupabaseMock({
+        user: { id: 'manager-1', user_metadata: { role: 'manager' } },
+        profile: null,
+      })
+    )
+
+    const response = await proxy(makeRequest('/dashboard'))
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('location')).toBeNull()
+  })
+
   it('redirects signed-in users without a role to pending setup', async () => {
     createServerClientMock.mockReturnValue(
       makeSupabaseMock({

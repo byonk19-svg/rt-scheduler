@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 import { can } from '@/lib/auth/can'
+import { resolveUserRole } from '@/lib/auth/role-source'
 import { parseRole } from '@/lib/auth/roles'
 import { isValidPublishWorkerRequest } from '@/lib/security/worker-auth'
 import { getStaffOnboardingStatus, type PreferredWorkDaysMode } from '@/lib/staff-onboarding'
@@ -15,6 +16,7 @@ const PUBLIC_ROUTES = [
   '/auth/signout',
   '/sitemap.xml',
   '/robots.txt',
+  '/sw.js',
 ] as const
 
 const PUBLIC_API_ROUTES = ['/api/inbound/availability-email'] as const
@@ -153,7 +155,6 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  const claimRole = user.app_metadata?.user_role ?? user.user_metadata?.user_role
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select(
@@ -174,7 +175,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  const role = normalizeRole(profileRow?.role ?? claimRole)
+  const role = normalizeRole(resolveUserRole(profileRow?.role, user))
   const onboardingStatus =
     role === 'staff' && profileRow
       ? getStaffOnboardingStatus({

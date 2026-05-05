@@ -42,7 +42,8 @@ describe('ManagerTriageDashboard', () => {
       })
     )
 
-    expect(html).toContain('>Inbox</h1>')
+    expect(html).toContain('>Dashboard</h1>')
+    expect(html).not.toContain('>Inbox</h1>')
     expect(html).not.toContain('Manager Dashboard')
     expect(html).toContain('Coverage Issues')
     expect(html).toContain('Pending Approvals')
@@ -63,6 +64,13 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('Brianna approved a shift swap')
     expect(html).toContain('href="/requests"')
     expect(html).toContain('Publish by Apr 27')
+
+    const nextActionIndex = html.indexOf('Needs attention now')
+    const metricCardIndex = html.indexOf('Coverage Issues')
+
+    expect(nextActionIndex).toBeGreaterThan(-1)
+    expect(metricCardIndex).toBeGreaterThan(-1)
+    expect(nextActionIndex).toBeLessThan(metricCardIndex)
   })
 
   it('renders loading state placeholders and action links', () => {

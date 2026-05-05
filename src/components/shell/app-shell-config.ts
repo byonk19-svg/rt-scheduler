@@ -74,7 +74,7 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
   return [
     {
       key: 'today',
-      label: 'Today',
+      label: 'Dashboard',
       href: MANAGER_WORKFLOW_LINKS.dashboard,
       isActive: (pathname) => pathname.startsWith('/dashboard/manager'),
       subItems: [],

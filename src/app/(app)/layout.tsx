@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import AppShell, { type AppShellUser } from '@/components/AppShell'
+import { resolveUserRole } from '@/lib/auth/role-source'
 import { toUiRole } from '@/lib/auth/roles'
 import { shouldIgnoreAuthenticatedLayoutError } from '@/lib/authenticated-layout-error'
 import { createClient } from '@/lib/supabase/server'
@@ -31,7 +32,7 @@ async function getAuthenticatedShellData(): Promise<{
 
     appShellUser = {
       fullName: profile?.full_name ?? user.user_metadata?.full_name ?? user.email ?? 'Team member',
-      role: toUiRole(profile?.role),
+      role: toUiRole(resolveUserRole(profile?.role, user)),
     }
   } catch (error) {
     if (shouldIgnoreAuthenticatedLayoutError(error)) {

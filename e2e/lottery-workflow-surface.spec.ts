@@ -33,7 +33,7 @@ test.describe.serial('lottery workflow surface', () => {
     await supabase.auth.admin.deleteUser(manager.id).catch(() => undefined)
   })
 
-  test('manager can open Lottery from the inbox and keep it in Schedule navigation', async ({
+  test('manager can open Lottery from the dashboard and keep Schedule navigation active', async ({
     page,
   }) => {
     test.skip(!supabase || !manager, 'Supabase service env values are required for lottery e2e.')
@@ -41,7 +41,7 @@ test.describe.serial('lottery workflow surface', () => {
     await loginAs(page, manager!.email, manager!.password)
     await page.goto('/dashboard/manager')
 
-    await expect(page.getByRole('heading', { name: 'Inbox' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
     const openLotteryLink = page.getByRole('link', { name: 'Open Lottery' }).first()
     await expect(openLotteryLink).toBeVisible()
     await expect(openLotteryLink).toHaveAttribute('href', '/lottery')
@@ -56,14 +56,12 @@ test.describe.serial('lottery workflow surface', () => {
       )
     ).toBeVisible()
 
-    const scheduleNav = page.getByRole('navigation', { name: 'Schedule section navigation' })
-    const lotteryNavLink = scheduleNav.getByRole('link', { name: 'Lottery' })
-    await expect(lotteryNavLink).toBeVisible()
-    await expect(lotteryNavLink).toHaveAttribute('href', '/lottery')
+    const scheduleMainNavLink = page
+      .getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('link', { name: 'Schedule' })
+    await expect(scheduleMainNavLink).toHaveAttribute('aria-current', 'page')
 
-    await page.goto('/coverage?view=week')
-    const scheduleLotteryLink = page.getByRole('link', { name: 'Open Lottery' }).first()
-    await expect(scheduleLotteryLink).toBeVisible()
-    await expect(scheduleLotteryLink).toHaveAttribute('href', '/lottery')
+    const scheduleNav = page.getByRole('navigation', { name: 'Schedule section navigation' })
+    await expect(scheduleNav.getByRole('link', { name: 'Lottery' })).toHaveCount(0)
   })
 })

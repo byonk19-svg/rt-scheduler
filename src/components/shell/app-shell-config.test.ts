@@ -40,9 +40,10 @@ describe('app-shell-config', () => {
     expect(context.localNav).toBeNull()
   })
 
-  it('keeps the manager sections grouped into Today, Schedule, and People', () => {
+  it('keeps the manager sections grouped into Dashboard, Schedule, and People', () => {
     const sections = buildManagerSections(0)
     expect(sections.map((section) => section.key)).toEqual(['today', 'schedule', 'people'])
+    expect(sections.map((section) => section.label)).toEqual(['Dashboard', 'Schedule', 'People'])
   })
 
   it('adds Analytics under Schedule and keeps /analytics schedule-active', () => {

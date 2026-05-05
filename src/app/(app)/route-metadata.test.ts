@@ -10,7 +10,7 @@ function read(filePath: string): string {
 const routes = [
   // Pre-existing
   ['src/app/(app)/dashboard/page.tsx', "title: 'Dashboard'"],
-  ['src/app/(app)/dashboard/manager/page.tsx', "title: 'Inbox'"],
+  ['src/app/(app)/dashboard/manager/page.tsx', "title: 'Dashboard'"],
   ['src/app/(app)/dashboard/staff/page.tsx', "title: 'Dashboard'"],
   ['src/app/(app)/availability/page.tsx', "title: 'Availability Manager'"],
   ['src/app/(app)/pending-setup/page.tsx', "title: 'Waiting for approval'"],

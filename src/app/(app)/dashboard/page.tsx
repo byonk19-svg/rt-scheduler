@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/can'
-import { parseRole } from '@/lib/auth/roles'
+import { resolveUserRole } from '@/lib/auth/role-source'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
@@ -55,7 +55,7 @@ export default async function DashboardPage({
     .eq('id', user.id)
     .maybeSingle()
 
-  const isManager = can(parseRole(profile?.role), 'access_manager_ui')
+  const isManager = can(resolveUserRole(profile?.role, user), 'access_manager_ui')
   const preferredLanding = profile?.default_landing_page === 'coverage' ? 'coverage' : 'dashboard'
   const suffix = toSearchSuffix(params)
 

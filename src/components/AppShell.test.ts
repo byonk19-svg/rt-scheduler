@@ -134,12 +134,12 @@ describe('AppShell navigation structure', () => {
     expect(shellConfigSource).toContain("label: 'Team Schedule'")
   })
 
-  it('routes manager Today section to the manager dashboard', () => {
-    expect(shellConfigSource).toContain("label: 'Today'")
+  it('routes manager Dashboard section to the manager dashboard', () => {
+    expect(shellConfigSource).toContain("label: 'Dashboard'")
     expect(shellConfigSource).toContain('MANAGER_WORKFLOW_LINKS.dashboard')
   })
 
-  it('groups manager workflow into Today, Schedule, and People sections', () => {
+  it('groups manager workflow into Dashboard, Schedule, and People sections', () => {
     expect(shellConfigSource).toContain("key: 'today'")
     expect(shellConfigSource).toContain("key: 'schedule'")
     expect(shellConfigSource).toContain("key: 'people'")

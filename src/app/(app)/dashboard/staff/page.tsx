@@ -12,7 +12,7 @@ import { FeedbackToast } from '@/components/feedback-toast'
 import { MyScheduleCard } from '@/components/schedule/MyScheduleCard'
 import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
-import { parseRole } from '@/lib/auth/roles'
+import { resolveUserRole } from '@/lib/auth/role-source'
 import {
   buildTherapistSubmissionUiState,
   resolveAvailabilityDueStatus,
@@ -199,7 +199,7 @@ export default async function StaffDashboardPage({
     .eq('id', user.id)
     .maybeSingle()
 
-  if (can(parseRole(profile?.role), 'access_manager_ui')) {
+  if (can(resolveUserRole(profile?.role, user), 'access_manager_ui')) {
     redirect('/dashboard/manager')
   }
 

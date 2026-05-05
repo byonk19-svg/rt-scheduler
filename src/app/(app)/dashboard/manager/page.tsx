@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import type { Cycle } from '@/app/schedule/types'
 import { ManagerTriageDashboard } from '@/components/manager/ManagerTriageDashboard'
 import { can } from '@/lib/auth/can'
-import { parseRole } from '@/lib/auth/roles'
+import { resolveUserRole } from '@/lib/auth/role-source'
 import { buildCycleRoute } from '@/lib/cycle-route'
 import { getNextCyclePlanningWindow } from '@/lib/manager-inbox'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
@@ -12,8 +12,8 @@ import { createClient } from '@/lib/supabase/server'
 import { MANAGER_WORKFLOW_LINKS } from '@/lib/workflow-links'
 
 export const metadata: Metadata = {
-  title: 'Inbox',
-  description: 'Manager workflow inbox for schedule, approval, and coverage follow-up.',
+  title: 'Dashboard',
+  description: 'Manager dashboard for schedule, approval, and coverage follow-up.',
 }
 
 type ManagerProfileRow = {
@@ -192,7 +192,7 @@ export default async function ManagerDashboardPage() {
   }
 
   const profile = (profileResult.data ?? null) as ManagerProfileRow | null
-  if (!can(parseRole(profile?.role), 'access_manager_ui')) {
+  if (!can(resolveUserRole(profile?.role, user), 'access_manager_ui')) {
     redirect('/dashboard/staff')
   }
 
