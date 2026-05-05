@@ -794,9 +794,14 @@ export function TherapistAvailabilityWorkspace({
             </div>
 
             <div className="flex flex-col gap-3 rounded-[1rem] border border-border/55 bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-muted-foreground">
-                Save progress now. Submit when this cycle is ready.
-              </p>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">
+                  Save progress keeps this as a draft.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Submit availability sends this cycle to managers.
+                </p>
+              </div>
               <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:justify-end">
                 {!submissionUi.isSubmitted ? (
                   <>
@@ -804,10 +809,10 @@ export function TherapistAvailabilityWorkspace({
                       type="submit"
                       name="workflow"
                       value="draft"
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
                       pendingText="Saving..."
-                      className="min-h-10 rounded-xl px-4 font-semibold sm:min-w-[9rem]"
+                      className="min-h-10 rounded-xl px-4 font-semibold text-muted-foreground hover:text-foreground sm:min-w-[9rem]"
                     >
                       Save progress
                     </FormSubmitButton>
@@ -816,8 +821,8 @@ export function TherapistAvailabilityWorkspace({
                       name="workflow"
                       value="submit"
                       size="sm"
-                      pendingText="Saving..."
-                      className="min-h-10 gap-2 rounded-xl px-4 font-semibold shadow-sm sm:min-w-[10.5rem]"
+                      pendingText="Submitting..."
+                      className="min-h-11 gap-2 rounded-xl px-5 font-semibold shadow-sm sm:min-w-[11.5rem]"
                     >
                       <Send className="h-3.5 w-3.5" aria-hidden />
                       Submit availability
@@ -829,8 +834,8 @@ export function TherapistAvailabilityWorkspace({
                     name="workflow"
                     value="submit"
                     size="sm"
-                    pendingText="Saving..."
-                    className="min-h-10 gap-2 rounded-xl px-4 font-semibold shadow-sm"
+                    pendingText="Saving changes..."
+                    className="min-h-11 gap-2 rounded-xl px-5 font-semibold shadow-sm"
                   >
                     <Send className="h-3.5 w-3.5" aria-hidden />
                     Save changes

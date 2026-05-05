@@ -98,7 +98,7 @@ export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
                 asChild
                 className="h-11 rounded-lg px-3.5 text-[14px] shadow-[0_1px_2px_rgba(15,23,42,0.16)]"
               >
-                <Link href={coverageHref}>Open schedule workspace</Link>
+                <Link href={coverageHref}>Open Coverage</Link>
               </Button>
             </div>
           </div>

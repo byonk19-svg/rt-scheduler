@@ -26,4 +26,19 @@ describe('shift-board route source contract', () => {
 
     expect(clientSource.match(/Published schedule changes only/g)?.length ?? 0).toBe(1)
   })
+
+  it('keeps request cards ahead of the metric-card summary', () => {
+    const clientSource = readFileSync(
+      resolve(process.cwd(), 'src/components/shift-board/ShiftBoardClientPage.tsx'),
+      'utf8'
+    )
+
+    const cardsIndex = clientSource.indexOf('{/* Cards */}')
+    const summaryIndex = clientSource.indexOf('Board summary')
+    const firstMetricIndex = clientSource.indexOf('label="Open posts"')
+
+    expect(cardsIndex).toBeGreaterThan(-1)
+    expect(summaryIndex).toBeGreaterThan(cardsIndex)
+    expect(firstMetricIndex).toBeGreaterThan(summaryIndex)
+  })
 })

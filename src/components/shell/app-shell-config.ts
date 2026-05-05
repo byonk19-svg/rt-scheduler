@@ -87,12 +87,12 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
       subItems: [
         {
           href: '/coverage',
-          label: 'Schedule workspace',
+          label: 'Coverage',
           active: (pathname) => pathname === '/coverage',
         },
         {
           href: '/schedule',
-          label: 'Roster view',
+          label: 'Roster',
           active: (pathname) => pathname === '/schedule',
         },
         {
@@ -135,7 +135,7 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
           active: (pathname) => pathname === '/team',
         },
         {
-          href: '/requests',
+          href: '/requests/user-access',
           label: 'Requests',
           active: (pathname) => pathname === '/requests' || pathname.startsWith('/requests/'),
           badgeCount: pendingCount > 0 ? pendingCount : undefined,
@@ -169,7 +169,7 @@ export function getStaffNavItems(): readonly ShellNavItem[] {
     },
     {
       href: '/therapist/availability',
-      label: 'Future Availability',
+      label: 'Availability',
       active: (pathname) => pathname === '/therapist/availability' || pathname === '/availability',
     },
     {
@@ -180,7 +180,7 @@ export function getStaffNavItems(): readonly ShellNavItem[] {
     },
     {
       href: '/therapist/swaps',
-      label: 'Shift Swaps & Pickups',
+      label: 'Shift Swaps',
       active: (pathname) => pathname === '/therapist/swaps' || pathname === '/shift-board',
     },
     {

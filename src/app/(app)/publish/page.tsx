@@ -300,7 +300,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                 : resolvedSearchParams.error === 'unpublish_not_live'
                   ? 'That block is already a draft.'
                   : resolvedSearchParams.error === 'delete_live_publish_event'
-                    ? 'Live publish entries must be restarted from the schedule workspace before they can be removed from history.'
+                    ? 'Live publish entries must be restarted from Coverage before they can be removed from history.'
                     : resolvedSearchParams.error === 'missing_publish_event'
                       ? 'Could not delete that history entry because no publish event was selected.'
                       : resolvedSearchParams.error === 'delete_publish_event_failed'

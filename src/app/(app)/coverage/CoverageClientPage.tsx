@@ -1065,12 +1065,12 @@ export function CoverageClientPage({
             <div className="min-w-0 space-y-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="font-heading text-[1.6rem] font-semibold tracking-[-0.04em] text-foreground">
-                  Team Schedule
+                  Coverage
                 </h1>
                 <Badge
                   variant="outline"
                   className={cn(
-                    'rounded-full px-3 py-1 text-[11px] font-semibold',
+                    'rounded-full px-3 py-1 text-xs font-semibold',
                     workspaceStatusTone === 'success' &&
                       'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]',
                     workspaceStatusTone === 'warning' &&
@@ -1079,7 +1079,7 @@ export function CoverageClientPage({
                       'border-border/70 bg-background text-muted-foreground'
                   )}
                 >
-                  {workspaceStatusLabel}
+                  Cycle status: {workspaceStatusLabel}
                 </Badge>
                 {preliminaryLive && !activeCyclePublished ? (
                   <Badge
@@ -1109,7 +1109,12 @@ export function CoverageClientPage({
 
             <div className="flex flex-wrap items-center gap-3 xl:justify-end">
               {!noCycleSelected ? (
-                <p className="text-sm font-medium text-foreground/72">{cycleRangeLabel}</p>
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="rounded-full border border-border/70 bg-background px-3 py-1 font-semibold text-foreground">
+                    {shiftTab} shift coverage
+                  </span>
+                  <span className="font-medium text-foreground/72">{cycleRangeLabel}</span>
+                </div>
               ) : null}
               {canManageCoverage ? (
                 noCycleSelected ? (
@@ -1245,14 +1250,37 @@ export function CoverageClientPage({
       <div className="no-print px-5 py-5">
         <div className="mx-auto w-full max-w-[1680px] space-y-4">
           {!noCycleSelected ? (
-            <section className="rounded-[24px] border border-border/70 bg-card px-4 py-3 shadow-[0_12px_32px_rgba(15,23,42,0.05)]">
+            <section
+              aria-labelledby="coverage-cycle-context-heading"
+              className="rounded-[24px] border border-border/70 bg-card px-4 py-3 shadow-[0_12px_32px_rgba(15,23,42,0.05)]"
+            >
               <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
                 <div className="min-w-0">
-                  <div className="mb-1 flex items-center gap-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      Cycle
-                    </p>
-                    <span className="text-[10px] text-muted-foreground">Switch block</span>
+                  <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <h2
+                      id="coverage-cycle-context-heading"
+                      className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+                    >
+                      Cycle context
+                    </h2>
+                    <span className="text-sm font-semibold text-foreground">
+                      Current block: {cycleRangeLabel}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        'rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
+                        workspaceStatusTone === 'success' &&
+                          'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]',
+                        workspaceStatusTone === 'warning' &&
+                          'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]',
+                        workspaceStatusTone === 'neutral' &&
+                          'border-border/70 bg-background text-muted-foreground'
+                      )}
+                    >
+                      Cycle status: {workspaceStatusLabel}
+                    </Badge>
+                    <span className="text-[10px] text-muted-foreground">Switch block below</span>
                   </div>
                   <div className="flex gap-1.5 overflow-x-auto pb-0.5">
                     {availableCycles.map((cycle) => {
@@ -1283,13 +1311,7 @@ export function CoverageClientPage({
 
                 <div className="flex flex-wrap items-center gap-3">
                   <CoverageSegmentedControl
-                    label="Layout"
-                    value={renderedViewMode}
-                    options={VIEW_OPTIONS}
-                    onChange={handleViewModeChange}
-                  />
-                  <CoverageSegmentedControl
-                    label="Shift"
+                    label="Day/Night"
                     value={shiftTab}
                     options={[
                       { value: 'Day', label: 'Day shift' },
@@ -1297,6 +1319,12 @@ export function CoverageClientPage({
                     ]}
                     onChange={handleTabSwitch}
                     testIdPrefix="coverage-shift-tab"
+                  />
+                  <CoverageSegmentedControl
+                    label="Layout"
+                    value={renderedViewMode}
+                    options={VIEW_OPTIONS}
+                    onChange={handleViewModeChange}
                   />
                 </div>
               </div>

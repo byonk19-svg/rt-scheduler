@@ -20,7 +20,7 @@ const routes = [
   ['src/app/(app)/team/page.tsx', "title: 'Team'"],
   ['src/app/(app)/lottery/page.tsx', "title: 'Lottery'"],
   // Manager schedule section
-  ['src/app/(app)/coverage/page.tsx', "title: 'Schedule Workspace'"],
+  ['src/app/(app)/coverage/page.tsx', "title: 'Coverage'"],
   ['src/app/(app)/schedule/page.tsx', "title: 'Schedule Roster'"],
   ['src/app/(app)/approvals/page.tsx', "title: 'Approvals'"],
   ['src/app/(app)/analytics/page.tsx', "title: 'Analytics'"],
@@ -75,10 +75,10 @@ describe('route title consistency', () => {
   it('/coverage (editable) and /schedule (read-only) have distinct metadata titles', () => {
     const coverage = read('src/app/(app)/coverage/page.tsx')
     const schedule = read('src/app/(app)/schedule/page.tsx')
-    expect(coverage).toContain("title: 'Schedule Workspace'")
+    expect(coverage).toContain("title: 'Coverage'")
     expect(schedule).toContain("title: 'Schedule Roster'")
     // They must not share the same title
     expect(coverage).not.toContain("title: 'Schedule Roster'")
-    expect(schedule).not.toContain("title: 'Schedule Workspace'")
+    expect(schedule).not.toContain("title: 'Coverage'")
   })
 })

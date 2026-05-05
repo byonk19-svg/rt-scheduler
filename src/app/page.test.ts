@@ -29,6 +29,12 @@ describe('public homepage redesign contract', () => {
     expect(pageSource).toContain('Coverage changes stay clear without the back-and-forth.')
   })
 
+  it('keeps feature cards free of decorative side-stripe borders', () => {
+    expect(pageSource).not.toContain('border-l')
+    expect(pageSource).not.toContain('border-left')
+    expect(pageSource).toContain('bg-[var(--attention)]')
+  })
+
   it('renders the hero on the deep --marketing-hero-bg teal, not the lighter --primary', () => {
     // The design handoff specifies #1b3836 (--marketing-hero-bg) for the hero —
     // bg-[var(--primary)] would produce the wrong (lighter) teal users complained about.
