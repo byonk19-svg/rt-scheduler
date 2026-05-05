@@ -24,6 +24,7 @@ Updated: 2026-05-05
 - **Theme support:** the root layout now reads the `tw-theme` cookie on the server, applies the initial `dark` class without any inline script, and renders a plain `<body>` without importing `ThemeProvider`. `ThemeProvider` now lives in `src/components/AppShell.tsx` so the theme boundary stays client-to-client and avoids the webpack HMR lazy-element crash path; `/profile` still includes an **Appearance** section with **Light / System / Dark** controls. Client-side theme changes keep `localStorage` and the `tw-theme` cookie in sync through `src/lib/theme.ts`, `.dark` token overrides live in `src/app/globals.css`, and print explicitly forces light token values.
 - **Hot-path performance trim:** `/coverage` now carries both day and night therapist/roster datasets in the initial server snapshot so shift-tab changes stop re-querying Supabase after hydration, `/availability` skips hidden-tab intake/planner reads, and `shift-board` approve/deny actions no longer rerun the full board bootstrap after a successful save.
 - **Auth entry (`/login`, `/signup`):** `src/lib/auth/login-utils.ts` parses auth errors from top-level query params **or nested inside `redirectTo`** (e.g. `/availability?error=...`), maps friendly copy, and `router.replace` cleans error keys while preserving a sanitized `redirectTo`. Approval/allowlist copy shows as a **warning** banner with optional **Request access** link and dismiss; credential failures stay **destructive**. Successful access **request** redirects to **`/login?status=requested`** with an **info** banner (dismiss + URL strip); signup no longer auto-signs-in before that redirect, and the public signup page now always uses that same generic redirect instead of exposing roster-match state. **Name roster auto-match:** managers maintain **`employee_roster`** on **`/team`** (single row, **bulk paste**, or ops script). On signup, **`handle_new_user`** still matches **normalized full name** to an active roster row on the server; matched users can receive roster **role/settings** immediately (non-pending), and the roster row records **`matched_profile_id`**, but the public UX no longer discloses whether that match happened. Unmatched signups stay **`profiles.role = null`** pending approval. **Migration:** `20260413123000_add_employee_roster_and_name_match_signup.sql`. **Ops:** `npm run sync:roster` bulk-creates **auth + profiles** from an email list file (separate from **`employee_roster`** name pre-match). **Public homepage (`/`):** deep teal hero (`bg-[var(--marketing-hero-bg)]` = `#1b3836`, hue 174°) with subtle grid texture and amber right stripe; headline "Scheduling that keeps care moving."; amber **Sign in** primary CTA + outline **Request access** secondary; warm `bg-background` feature strip below (3-up amber-line cards from the design handoff). `PublicHeader` also uses `bg-[var(--marketing-hero-bg)]` for the dark homepage variant — the header renders outside `<main>` in the public layout so transparent would land on the light wrapper background. **Do not** swap `--marketing-hero-bg` for `--primary` on the hero — that is the "wrong teal" regression users surfaced and `page.test.ts` now guards against. Vitest contracts in `src/app/page.test.ts` and `src/app/globals.test.ts`. Shared **Input** focus ring uses **`--ring`**; **`:autofill`** + **`-webkit-autofill`** theming lives in `globals.css`.
+- **Next 16 request guard:** authenticated route protection lives in `src/proxy.ts`, which is the active Next 16 file convention replacing `middleware.ts`. Do **not** add a duplicate `src/middleware.ts` shim unless the app is intentionally downgraded to a Next version that still requires the older convention. `e2e/proxy-routing.spec.ts` proves an unmatched protected route redirects through Proxy before rendering a 404.
 - **Layout split + authenticated shell performance pass:** the universal root layout is now lightweight (`src/app/layout.tsx`), public pages get the display font through `src/app/(public)/layout.tsx`, and authenticated shell work lives in `src/app/(app)/layout.tsx`. The authenticated layout is intentionally `force-dynamic` because it reads auth cookies and server-loads shell state. The shell no longer wraps the full authenticated tree in `MotionProvider`; `framer-motion` now stays local to the small surfaces that actually animate. The top-nav notification control now hydrates through `DeferredNotificationBell` so the unread badge can render immediately without loading the full dropdown/fetch logic on first paint. Prefer design tokens over raw **`text-white`** / **`bg-white`** / stray **`dark:`** on shared surfaces; destructive actions use **`text-destructive-foreground`**. **`globals.css`:** stronger **`--muted-foreground`**, **`--color-destructive-foreground`** in **`@theme`**, table row hover scoped to **`table:not(.no-row-hover)`**, marketing header + home preview shell reduce **`backdrop-filter`** under **`prefers-reduced-motion: reduce`**. **`/requests/new`** and **`/publish/[id]`** use **`ManagerWorkspaceHeader`**. **`LEAD_ELIGIBLE_BADGE_CLASS`** uses **`--info-*`** tokens (`src/lib/employee-tag-badges.ts`).
 - **Manager `/availability` planner shell:** URL tabs **`?tab=planner|intake`** under **`AvailabilityOverviewHeader`**. **Planner** = **`ManagerSchedulingInputs`** inside **`AvailabilityWorkspaceShell`**. **Saved planner dates** and primary planner actions belong in the shell **`controls`** slot (left column, muted background). Use **`lower={null}`** for that surface — **`lower`** renders **outside** the primary card. Calendar month UI: **`AvailabilityCalendarPanel`** (`src/components/availability/availability-calendar-panel.tsx`).
 - **Cycle templates:** managers can now save a published cycle as a reusable staffing template and apply a template into a draft cycle from Coverage. Templates serialize shifts as `day_of_cycle` rows only; they intentionally do **not** include availability overrides.
@@ -47,16 +48,14 @@ Key additions from PR `#43`: centralized therapist workflow state (`src/lib/ther
 2. **Production UAT for newer manager workflows** — verify `/availability`, `/coverage`, `/team`, `/approvals`, `/preliminary`, and `/publish` together against a real cycle before broader visual/branding work.
 3. Run a full browser QA pass on desktop, tablet, and mobile before shipping (shared headers, `/coverage`, `/schedule`, `/team/import`, `/settings/audit-log`).
 4. **Add "Send reminders" bulk action** to the response roster on `/availability` — bulk email nudge for non-respondents is still the top operational gap.
-5. **Swap history and My Schedule quick view** — `src/app/(app)/staff/history` and `src/app/(app)/staff/my-schedule` are still not implemented.
-6. **Schedule/roster CSV export** — `/api/schedule/export` and `/api/team/roster/export` not yet implemented; `csv-utils.ts` needs extraction from the availability export route.
-7. **Print confidentiality footer** — `print-schedule.tsx` still lacks the "Internal Use Only" footer.
-8. **Wire GitHub → Vercel auto-deploy** (optional) — connect `byonk19-svg/rt-scheduler` repo in Vercel dashboard under Git Integration so pushes trigger builds automatically.
-9. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
-10. Deploy production after significant public-surface changes (`vercel deploy --prod`) so `www.teamwise.work` matches `main`.
+5. **Print confidentiality footer** - `print-schedule.tsx` still lacks the "Internal Use Only" footer.
+6. **Wire GitHub -> Vercel auto-deploy** (optional) - connect `byonk19-svg/rt-scheduler` repo in Vercel dashboard under Git Integration so pushes trigger builds automatically.
+7. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
+8. Deploy production after significant public-surface changes (`vercel deploy --prod`) so `www.teamwise.work` matches `main`.
 
 ### Verification Baseline
 
-- As of 2026-04-25 on `main`, `npm run lint`, `npm run test:unit`, `npm run build`, and `npx tsc --noEmit` all pass (729+ unit tests).
+- As of 2026-05-05 on `main`, `npm run lint`, `npm run typecheck`, `npm run build`, and `npm run test:unit` are the baseline quality gates; the latest full unit lane covered 1027 tests across 189 files.
 - **Therapist browser validation path:** for `/therapist/settings`, `/therapist/recurring-pattern`, and `/therapist/availability`, prefer an automation-only auth setup over a human session. The validated local pattern is: read repo `.env.local`, create a temporary therapist user with the service-role client, authenticate Playwright/headless browser via Supabase SSR cookies on `127.0.0.1:3000`, capture the therapist routes, then delete the temporary user. Treat `SHOT_STAFF_EMAIL` / `SHOT_PASSWORD` as optional shortcuts only; if they fail, fall back to temp-user creation instead of giving up on the visual pass.
 - `npm run lint`
 - `npm run build`
@@ -174,26 +173,24 @@ Run these fresh at the start of each session:
 - `npx tsc --noEmit` pass
 - `npm run build` pass
 - `npm audit --omit=dev` pass
-- full `npx vitest run` pass (**729+ tests** as of 2026-04-25)
+- full `npm run test:unit` pass (**1027 tests across 189 files** as of 2026-05-05)
 - targeted `npx vitest run src/app/availability/actions.test.ts src/app/api/schedule/drag-drop/route.test.ts src/lib/coverage/mutations.test.ts` pass
 - targeted `npx eslint` on touched files pass
 - Playwright CLI smoke pass on `/` and `/coverage?shift=day` (redirect to login as expected, no console warnings)
 
 Broader historical baseline:
 
-- `npm run test:e2e` pass (**42 passed**) with default Playwright workers set to `2`
+- `npm run test:e2e` pass when Supabase service env is available; there are 26 Playwright spec files as of 2026-05-05 and default workers are set to `2`
 - Full `npx vitest run` is green without real Supabase admin env: **`assignment-status`** route tests mock **`@/lib/supabase/admin`** (`createAdminClient`).
-- Auth E2E happy path requires `.env.local` (or shell env) entries for `E2E_USER_EMAIL` and `E2E_USER_PASSWORD`
+- Local auth E2E defaults to the `reset:e2e` / `seed:functional` demo manager (`demo-manager@teamwise.test` / `Teamwise123!`) when `CI` is not set; CI should still provide explicit credentials.
 
 CI gates: format check → lint → tsc → build → Playwright E2E
 
-E2E specs:
+Representative E2E specs:
 
-- `e2e/coverage-overlay.spec.ts` (14 tests)
-- `e2e/directory-date-override.spec.ts` (12 tests)
-- `e2e/availability-override.spec.ts` (2 tests)
-- `e2e/publish-process-api.spec.ts` (2 tests)
-- `e2e/auth-redirect.spec.ts`, `e2e/authenticated-flow.spec.ts`, `e2e/public-pages.spec.ts`
+- `e2e/proxy-routing.spec.ts` guards the active Next 16 Proxy route protection.
+- `e2e/auth-redirect.spec.ts`, `e2e/authenticated-flow.spec.ts`, and `e2e/public-pages.spec.ts` cover auth and public entry surfaces.
+- Workflow specs cover coverage, availability, lottery, requests, role journeys, publish lifecycle, staff onboarding, team quick edit, and therapist schedule trust.
 
 ## Primary Routes
 
