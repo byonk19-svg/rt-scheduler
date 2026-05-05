@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import type { ConflictItem } from '@/lib/availability-scheduled-conflict'
 import type { GeneratedAvailabilityBaselineDay } from '@/lib/availability-pattern-generator'
 import { addDays, formatDateLabel, formatHumanCycleRange, toIsoDate } from '@/lib/calendar-utils'
+import { shiftOverridesToCycle } from '@/lib/copy-cycle-availability'
 import {
   buildTherapistSubmissionUiState,
   resolveTherapistDeadlinePresentation,
@@ -200,16 +201,6 @@ export function TherapistAvailabilityWorkspace({
   const [draftNotesByDate, setDraftNotesByDate] =
     useState<Record<string, string>>(initialNotesByDate)
 
-  function handleCycleChange(nextCycleId: string) {
-    setSelectedCycleId(nextCycleId)
-    setSelectedDate(null)
-    setRangeStart('')
-    setRangeEnd('')
-    const nextRows = availabilityRows.filter((row) => row.cycleId === nextCycleId)
-    setDraftStatusByDate(buildStatusMap(nextRows))
-    setDraftNotesByDate(buildNotesMap(nextRows))
-  }
-
   const baselineByDate = useMemo(
     () => generatedBaselineByCycleId[selectedCycleId] ?? {},
     [generatedBaselineByCycleId, selectedCycleId]
@@ -266,6 +257,24 @@ export function TherapistAvailabilityWorkspace({
     }
     return false
   }, [draftNotesByDate, draftStatusByDate, initialNotesByDate, initialStatusByDate])
+
+  function handleCycleChange(nextCycleId: string) {
+    if (nextCycleId === selectedCycleId) return
+    if (
+      hasUnsavedChanges &&
+      !window.confirm('You have unsaved changes. Switch cycles and lose them?')
+    ) {
+      return
+    }
+
+    setSelectedCycleId(nextCycleId)
+    setSelectedDate(null)
+    setRangeStart('')
+    setRangeEnd('')
+    const nextRows = availabilityRows.filter((row) => row.cycleId === nextCycleId)
+    setDraftStatusByDate(buildStatusMap(nextRows))
+    setDraftNotesByDate(buildNotesMap(nextRows))
+  }
 
   const serverSubmission = submissionsByCycleId[selectedCycleId]
   const submissionUi = useMemo(
@@ -380,21 +389,27 @@ export function TherapistAvailabilityWorkspace({
     const previousCycle = cycles[cycleIndex - 1]
     if (!previousCycle) return
 
-    const previousDays = buildCycleDays(previousCycle)
     const previousRows = availabilityRows.filter((row) => row.cycleId === previousCycle.id)
+    const copiedRows = shiftOverridesToCycle({
+      sourceOverrides: previousRows.map((row) => ({
+        date: row.date,
+        override_type: row.entryType === 'force_off' ? 'force_off' : 'force_on',
+        shift_type: row.shiftType,
+        note: row.reason ?? null,
+      })),
+      sourceCycleStart: previousCycle.start_date,
+      sourceCycleEnd: previousCycle.end_date,
+      targetCycleStart: selectedCycle.start_date,
+      targetCycleEnd: selectedCycle.end_date,
+      existingTargetDates: new Set(),
+    })
     const nextStatus: Record<string, DayStatus> = {}
     const nextNotes: Record<string, string> = {}
-    for (const row of previousRows) {
-      const previousIndex = previousDays.indexOf(row.date)
-      if (previousIndex < 0 || previousIndex >= cycleDays.length) continue
-      const nextDate = cycleDays[previousIndex]
-      const normalizedStatus = normalizeOverride(
-        nextDate,
-        row.entryType === 'force_off' ? 'force_off' : 'force_on'
-      )
+    for (const row of copiedRows) {
+      const normalizedStatus = normalizeOverride(row.date, row.override_type)
       if (normalizedStatus) {
-        nextStatus[nextDate] = normalizedStatus
-        if (row.reason?.trim()) nextNotes[nextDate] = row.reason.trim()
+        nextStatus[row.date] = normalizedStatus
+        if (row.note?.trim()) nextNotes[row.date] = row.note.trim()
       }
     }
     setDraftStatusByDate(nextStatus)

@@ -11,6 +11,7 @@ const BASE: SourceOverride = {
 
 const PARAMS = {
   sourceCycleStart: '2026-02-08',
+  sourceCycleEnd: '2026-03-14',
   targetCycleStart: '2026-03-22',
   targetCycleEnd: '2026-05-02',
   existingTargetDates: new Set<string>(),
@@ -51,6 +52,7 @@ describe('shiftOverridesToCycle', () => {
   it('excludes dates that fall outside the target cycle range', () => {
     const onEnd = shiftOverridesToCycle({
       ...PARAMS,
+      sourceCycleEnd: '2026-03-21',
       sourceOverrides: [{ ...BASE, date: '2026-03-21' }],
     })
 
@@ -58,6 +60,7 @@ describe('shiftOverridesToCycle', () => {
 
     const pastEnd = shiftOverridesToCycle({
       ...PARAMS,
+      sourceCycleEnd: '2026-03-21',
       sourceOverrides: [{ ...BASE, date: '2026-03-22' }],
     })
 
@@ -74,6 +77,40 @@ describe('shiftOverridesToCycle', () => {
     expect(result).toHaveLength(0)
   })
 
+  it('maps by weekday occurrence instead of absolute day index when cycle starts differ', () => {
+    const result = shiftOverridesToCycle({
+      ...PARAMS,
+      sourceCycleStart: '2026-02-09',
+      sourceCycleEnd: '2026-03-15',
+      targetCycleStart: '2026-03-22',
+      sourceOverrides: [{ ...BASE, date: '2026-02-10' }],
+    })
+
+    expect(result[0].date).toBe('2026-03-24')
+  })
+
+  it('expands full weekday patterns into extra weeks in a longer target cycle', () => {
+    const result = shiftOverridesToCycle({
+      ...PARAMS,
+      sourceOverrides: [
+        { ...BASE, date: '2026-02-09', override_type: 'force_off' },
+        { ...BASE, date: '2026-02-16', override_type: 'force_off' },
+        { ...BASE, date: '2026-02-23', override_type: 'force_off' },
+        { ...BASE, date: '2026-03-02', override_type: 'force_off' },
+        { ...BASE, date: '2026-03-09', override_type: 'force_off' },
+      ],
+    })
+
+    expect(result.map((row) => row.date)).toEqual([
+      '2026-03-23',
+      '2026-03-30',
+      '2026-04-06',
+      '2026-04-13',
+      '2026-04-20',
+      '2026-04-27',
+    ])
+  })
+
   it('returns empty when source list is empty', () => {
     expect(shiftOverridesToCycle({ ...PARAMS, sourceOverrides: [] })).toEqual([])
   })
@@ -82,6 +119,7 @@ describe('shiftOverridesToCycle', () => {
     const result = shiftOverridesToCycle({
       ...PARAMS,
       sourceCycleStart: '2026-03-22',
+      sourceCycleEnd: '2026-05-02',
       targetCycleStart: '2026-03-22',
       sourceOverrides: [{ ...BASE, date: '2026-03-25' }],
     })

@@ -255,8 +255,6 @@ export default async function TherapistAvailabilityPage({
     cycles[0] ??
     null
   const selectedCycleId = selectedCycle?.id ?? ''
-  const activeCycle =
-    cycles.find((cycle) => cycle.start_date <= todayKey && cycle.end_date >= todayKey) ?? null
 
   const { data: submissionRowsData } =
     cycles.length > 0
@@ -288,16 +286,16 @@ export default async function TherapistAvailabilityPage({
     .order('date', { ascending: true })
     .order('created_at', { ascending: false })
 
-  const scheduledShiftsPromise =
-    activeCycle && selectedCycleId === activeCycle.id
-      ? supabase
-          .from('shifts')
-          .select('date, shift_type')
-          .eq('user_id', user.id)
-          .eq('status', 'scheduled')
-          .gte('date', activeCycle.start_date)
-          .lte('date', activeCycle.end_date)
-      : Promise.resolve({ data: [] })
+  const scheduledShiftsPromise = selectedCycle
+    ? supabase
+        .from('shifts')
+        .select('date, shift_type')
+        .eq('user_id', user.id)
+        .eq('status', 'scheduled')
+        .eq('cycle_id', selectedCycleId)
+        .gte('date', selectedCycle.start_date)
+        .lte('date', selectedCycle.end_date)
+    : Promise.resolve({ data: [] })
 
   const [entriesResult, scheduledShiftsResult] = await Promise.all([
     entriesQuery,

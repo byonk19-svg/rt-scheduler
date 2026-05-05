@@ -16,6 +16,7 @@ import { PrintMenuItem } from '@/components/print-menu-item'
 import { can } from '@/lib/auth/can'
 import { buildMissingAvailabilityRows } from '@/lib/employee-directory'
 import { toUiRole } from '@/lib/auth/roles'
+import { formatHumanCycleRange } from '@/lib/calendar-utils'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
@@ -424,6 +425,7 @@ export default async function AvailabilityPage({
       override_type: entry.override_type,
       note: entry.note,
       created_at: entry.created_at,
+      updated_at: entry.updated_at ?? entry.created_at,
       source: entry.source === 'manager' ? 'manager' : 'therapist',
     })),
     selectedCycleId,
@@ -450,9 +452,7 @@ export default async function AvailabilityPage({
       createdAt: entry.created_at,
       updatedAt: entry.updated_at ?? undefined,
       requestedBy: requester?.full_name ?? 'Unknown user',
-      cycleLabel: cycle
-        ? `${cycle.label} (${cycle.start_date} to ${cycle.end_date})`
-        : 'Unknown cycle',
+      cycleLabel: cycle ? formatHumanCycleRange(cycle.start_date, cycle.end_date) : 'Unknown cycle',
       entryType: entry.override_type,
       shiftType: entry.shift_type,
       source: (entry.source === 'manager' ? 'manager' : 'therapist') as 'manager' | 'therapist',

@@ -1431,6 +1431,7 @@ export async function copyAvailabilityFromPreviousCycleAction(formData: FormData
       note: row.note ?? null,
     })),
     sourceCycleStart: sourceRow.schedule_cycles.start_date,
+    sourceCycleEnd: sourceRow.schedule_cycles.end_date,
     targetCycleStart: targetCycle.start_date,
     targetCycleEnd: targetCycle.end_date,
     existingTargetDates: new Set((existingRows ?? []).map((row) => String(row.date))),

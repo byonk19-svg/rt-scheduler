@@ -39,6 +39,7 @@ export type EmployeeAvailabilityOverride = {
   override_type: 'force_off' | 'force_on'
   note: string | null
   created_at: string
+  updated_at: string
   source: AvailabilityOverrideSource
 }
 
@@ -128,7 +129,9 @@ export function buildMissingAvailabilityRows(
       const lastUpdatedAt =
         metricsRows.length === 0
           ? null
-          : (metricsRows.map((row) => row.created_at).sort((a, b) => b.localeCompare(a))[0] ?? null)
+          : (metricsRows
+              .map((row) => row.updated_at || row.created_at)
+              .sort((a, b) => b.localeCompare(a))[0] ?? null)
       const submitted = officialIds !== undefined ? officialIds.has(therapist.id) : rows.length > 0
       return {
         therapistId: therapist.id,

@@ -168,6 +168,7 @@ describe('employee directory helpers', () => {
       override_type: 'force_off',
       note: null,
       created_at: '2026-02-27T12:00:00.000Z',
+      updated_at: '2026-02-27T12:00:00.000Z',
       source: 'manager',
     }
     const therapistOverride: EmployeeAvailabilityOverride = {
@@ -193,6 +194,7 @@ describe('employee directory helpers', () => {
           override_type: 'force_off',
           note: null,
           created_at: '2026-02-27T12:00:00.000Z',
+          updated_at: '2026-02-27T12:00:00.000Z',
           source: 'therapist',
         },
       ],
@@ -219,6 +221,7 @@ describe('employee directory helpers', () => {
           override_type: 'force_off',
           note: null,
           created_at: '2026-02-27T12:00:00.000Z',
+          updated_at: '2026-02-27T12:00:00.000Z',
           source: 'therapist',
         },
       ],
@@ -244,6 +247,7 @@ describe('employee directory helpers', () => {
           override_type: 'force_off',
           note: null,
           created_at: '2026-02-27T12:00:00.000Z',
+          updated_at: '2026-02-27T12:00:00.000Z',
           source: 'therapist',
         },
       ],
@@ -266,6 +270,7 @@ describe('employee directory helpers', () => {
           override_type: 'force_on',
           note: null,
           created_at: '2026-02-28T12:00:00.000Z',
+          updated_at: '2026-02-28T12:00:00.000Z',
           source: 'manager',
         },
         {
@@ -277,6 +282,7 @@ describe('employee directory helpers', () => {
           override_type: 'force_off',
           note: null,
           created_at: '2026-02-27T12:00:00.000Z',
+          updated_at: '2026-03-01T12:00:00.000Z',
           source: 'therapist',
         },
       ],
@@ -287,6 +293,7 @@ describe('employee directory helpers', () => {
     const row = new Map(rows.map((r) => [r.therapistId, r])).get('1')
     expect(row?.submitted).toBe(true)
     expect(row?.overridesCount).toBe(1)
+    expect(row?.lastUpdatedAt).toBe('2026-03-01T12:00:00.000Z')
   })
 
   it('shows zero therapist day entries when only manager overrides exist but official submission is present', () => {
@@ -302,6 +309,7 @@ describe('employee directory helpers', () => {
           override_type: 'force_on',
           note: null,
           created_at: '2026-02-28T12:00:00.000Z',
+          updated_at: '2026-02-28T12:00:00.000Z',
           source: 'manager',
         },
       ],

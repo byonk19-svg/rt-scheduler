@@ -60,11 +60,13 @@ type ShiftRow = {
     | {
         full_name: string
         role?: 'therapist' | 'lead' | null
+        shift_type?: 'day' | 'night' | null
         employment_type: 'full_time' | 'part_time' | 'prn' | null
       }
     | {
         full_name: string
         role?: 'therapist' | 'lead' | null
+        shift_type?: 'day' | 'night' | null
         employment_type: 'full_time' | 'part_time' | 'prn' | null
       }[]
     | null
@@ -386,7 +388,7 @@ export async function getCoveragePageServerData({
       supabase
         .from('shifts')
         .select(
-          'id,user_id,date,shift_type,status,assignment_status,unfilled_reason,role,profiles:profiles!shifts_user_id_fkey(full_name,role,employment_type)'
+          'id,user_id,date,shift_type,status,assignment_status,unfilled_reason,role,profiles:profiles!shifts_user_id_fkey(full_name,role,shift_type,employment_type)'
         )
         .gte('date', selectedCycle.start_date)
         .lte('date', selectedCycle.end_date)
@@ -589,6 +591,7 @@ export async function getCoveragePageServerData({
       full_name: string
       day: number
       night: number
+      profileShiftType: 'day' | 'night' | null
       role?: 'therapist' | 'lead'
       employment_type?: 'full_time' | 'part_time' | 'prn'
     }
@@ -603,6 +606,7 @@ export async function getCoveragePageServerData({
       full_name: fullName,
       day: 0,
       night: 0,
+      profileShiftType: normalizeActorShiftType(profileRow?.shift_type),
       role: profileRow?.role === 'lead' ? 'lead' : 'therapist',
       employment_type:
         profileRow?.employment_type === 'part_time' || profileRow?.employment_type === 'prn'
@@ -611,6 +615,7 @@ export async function getCoveragePageServerData({
     }
     if (row.shift_type === 'night') current.night += 1
     else current.day += 1
+    current.profileShiftType = current.profileShiftType ?? normalizeActorShiftType(profileRow?.shift_type)
     if (profileRow?.employment_type === 'part_time' || profileRow?.employment_type === 'prn') {
       current.employment_type = profileRow.employment_type
     }
@@ -629,7 +634,7 @@ export async function getCoveragePageServerData({
       id: row.id,
       full_name: row.full_name,
       role: row.role,
-      shift_type: row.night > row.day ? 'night' : 'day',
+      shift_type: row.profileShiftType ?? (row.night > row.day ? 'night' : 'day'),
       employment_type: row.employment_type ?? 'full_time',
     }))
     .sort((a, b) => {

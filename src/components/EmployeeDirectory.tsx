@@ -74,6 +74,7 @@ type EmployeeDirectoryProps = {
     override_type: 'force_off' | 'force_on'
     note: string | null
     created_at: string
+    updated_at: string
     source: 'therapist' | 'manager'
   }>
   initialEditEmployeeId?: string | null
