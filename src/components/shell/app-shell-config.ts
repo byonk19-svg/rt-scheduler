@@ -137,11 +137,13 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
         {
           href: '/requests',
           label: 'Requests',
-          active: (pathname) =>
-            pathname === '/requests' ||
-            pathname.startsWith('/requests/') ||
-            pathname === '/shift-board',
+          active: (pathname) => pathname === '/requests' || pathname.startsWith('/requests/'),
           badgeCount: pendingCount > 0 ? pendingCount : undefined,
+        },
+        {
+          href: '/shift-board',
+          label: 'Shift Board',
+          active: (pathname) => pathname === '/shift-board',
         },
         {
           href: '/settings/audit-log',

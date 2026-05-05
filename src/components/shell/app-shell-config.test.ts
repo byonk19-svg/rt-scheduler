@@ -13,7 +13,7 @@ describe('app-shell-config', () => {
     expect(APP_HEADER_HEIGHT).toBe(44)
   })
 
-  it('maps /team into the People section with Team, Requests, and Audit log local items', () => {
+  it('maps /team into the People section with Team, Requests, Shift Board, and Audit log local items', () => {
     const context = getShellContext({
       pathname: '/team',
       canAccessManagerUi: true,
@@ -24,9 +24,12 @@ describe('app-shell-config', () => {
     expect(context.localNav?.items.map((item) => item.label)).toEqual([
       'Team',
       'Requests',
+      'Shift Board',
       'Audit log',
     ])
-    expect(context.localNav?.items.find((item) => item.label === 'Requests')?.badgeCount).toBe(3)
+    const requestsItem = context.localNav?.items.find((item) => item.label === 'Requests')
+    expect(requestsItem?.href).toBe('/requests')
+    expect(requestsItem?.badgeCount).toBe(3)
   })
 
   it('does not return local nav for manager dashboard', () => {
@@ -100,7 +103,7 @@ describe('app-shell-config', () => {
     expect(context.localNav?.items.some((item) => item.href === '/lottery')).toBe(false)
   })
 
-  it('/shift-board is active under the manager Requests sub-nav item', () => {
+  it('/shift-board is active under a direct manager Shift Board sub-nav item', () => {
     const context = getShellContext({
       pathname: '/shift-board',
       canAccessManagerUi: true,
@@ -108,7 +111,26 @@ describe('app-shell-config', () => {
     })
     expect(context.primaryKey).toBe('people')
     const requestsItem = context.localNav?.items.find((item) => item.label === 'Requests')
-    expect(requestsItem?.active('/shift-board')).toBe(true)
+    expect(requestsItem?.active('/shift-board')).toBe(false)
+    expect(requestsItem?.href).toBe('/requests')
+    expect(requestsItem?.active('/requests')).toBe(true)
+
+    const shiftBoardItem = context.localNav?.items.find((item) => item.label === 'Shift Board')
+    expect(shiftBoardItem?.href).toBe('/shift-board')
+    expect(shiftBoardItem?.active('/shift-board')).toBe(true)
+  })
+
+  it('keeps existing manager Requests navigation intact', () => {
+    const context = getShellContext({
+      pathname: '/requests/user-access',
+      canAccessManagerUi: true,
+      pendingCount: 2,
+    })
+    expect(context.primaryKey).toBe('people')
+    const requestsItem = context.localNav?.items.find((item) => item.label === 'Requests')
+    expect(requestsItem?.href).toBe('/requests')
+    expect(requestsItem?.active('/requests/user-access')).toBe(true)
+    expect(requestsItem?.badgeCount).toBe(2)
   })
 })
 

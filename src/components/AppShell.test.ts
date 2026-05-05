@@ -157,9 +157,11 @@ describe('AppShell navigation structure', () => {
     expect(localSectionNavSource).toContain('overflow-x-auto')
   })
 
-  it('merges Team and Requests under the People section', () => {
+  it('puts Team, Requests, and Shift Board under the People section', () => {
     expect(shellConfigSource).toContain("label: 'Team'")
     expect(shellConfigSource).toContain("label: 'Requests'")
+    expect(shellConfigSource).toContain("label: 'Shift Board'")
+    expect(shellConfigSource).toContain("href: '/shift-board'")
     // User Access Requests is no longer a separate top-level nav item
     expect(shellConfigSource).not.toContain("label: 'User Access Requests'")
   })
