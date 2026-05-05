@@ -92,6 +92,16 @@ npm run dev
 
 4. Open `http://localhost:3000`.
 
+When using `next dev`, the first visit to each route can be slow because Next compiles that route on demand. To pay
+that cost up front before clicking through the app, run this in a second terminal after the dev server is ready:
+
+```bash
+npm run dev:warm
+```
+
+If you have saved browser auth with `npm run auth:save -- --start http://127.0.0.1:3000/login`, the warmup command
+will also reuse `.auth/storageState.json` so authenticated routes can be compiled before your manual pass.
+
 For final workflow/UAT validation, prefer the production build instead of `next dev`:
 
 ```bash
