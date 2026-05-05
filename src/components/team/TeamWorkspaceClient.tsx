@@ -91,7 +91,7 @@ function TeamWorkspaceClient({
           )}
           onClick={() => setTab('directory')}
         >
-          Team directory
+          Directory
         </button>
         <button
           type="button"
@@ -107,7 +107,7 @@ function TeamWorkspaceClient({
           )}
           onClick={() => setTab('roster')}
         >
-          Roster admin
+          Employee roster
         </button>
       </div>
 

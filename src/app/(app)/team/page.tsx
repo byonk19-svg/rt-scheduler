@@ -17,6 +17,7 @@ import type { WorkPatternRecord } from '@/components/team/team-directory-model'
 import { can } from '@/lib/auth/can'
 import { MANAGED_TEAM_ROLE_VALUES, parseRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
+import { getInitialTeamTab, getSearchParam } from './team-page-tabs'
 
 export const metadata: Metadata = {
   title: 'Team',
@@ -73,11 +74,6 @@ type EmployeeRosterRow = {
   matched_email: string | null
   matched_at: string | null
   phone_number: string | null
-}
-
-function getSearchParam(value: string | string[] | undefined): string | undefined {
-  if (Array.isArray(value)) return value[0]
-  return value
 }
 
 function getTeamFeedback(params?: TeamSearchParams): {
@@ -306,7 +302,7 @@ export default async function TeamPage({
 
   const feedback = getTeamFeedback(params)
   const initialEditProfileId = getSearchParam(params?.edit_profile) ?? null
-  const initialTab = getSearchParam(params?.tab) === 'directory' ? 'directory' : 'roster'
+  const initialTab = getInitialTeamTab(params)
 
   return (
     <div className="max-w-6xl space-y-4 py-5">

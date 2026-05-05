@@ -86,7 +86,7 @@ export default function TeamWorkspace({
           )}
           onClick={() => setTab('directory')}
         >
-          Team directory
+          Directory
         </button>
         <button
           type="button"
@@ -102,7 +102,7 @@ export default function TeamWorkspace({
           )}
           onClick={() => setTab('roster')}
         >
-          Roster admin
+          Employee roster
         </button>
       </div>
 
