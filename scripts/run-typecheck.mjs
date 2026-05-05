@@ -18,12 +18,16 @@ for (const artifactPath of resolveTypecheckArtifactTargets({
   }
 }
 
-const command = process.platform === 'win32' ? 'npx.cmd tsc --noEmit' : 'npx tsc --noEmit'
-const result = spawnSync(command, {
+const localTscPath = path.join(cwd, 'node_modules', 'typescript', 'bin', 'tsc')
+const hasLocalTsc = existsSync(localTscPath)
+const command = hasLocalTsc ? process.execPath : process.platform === 'win32' ? 'npx.cmd' : 'npx'
+const args = hasLocalTsc ? [localTscPath, '--noEmit'] : ['tsc', '--noEmit']
+
+const result = spawnSync(command, args, {
   stdio: 'inherit',
   cwd,
   env: process.env,
-  shell: true,
+  shell: !hasLocalTsc,
 })
 
 process.exit(result.status ?? 1)

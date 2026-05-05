@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
+    "dev:warm": "node scripts/warm-local-routes.mjs",
     "build": "next build --webpack",
     "start": "next start",
     "start:prod:local": "next start --port 3001",

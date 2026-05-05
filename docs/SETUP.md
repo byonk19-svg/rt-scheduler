@@ -31,6 +31,19 @@ npm run dev
 
 4. Open `http://localhost:3000`.
 
+### Warm Local Routes
+
+`next dev` compiles routes on first request, so the first click into a page can feel much slower than the app will be
+after compilation. After the dev server is ready, warm the common routes from a second terminal:
+
+```bash
+npm run dev:warm
+```
+
+The warmup uses `.auth/storageState.json` when present, which lets it prime authenticated routes after `npm run
+auth:save -- --start http://127.0.0.1:3000/login`. Without saved auth, it still warms the public pages and reports
+protected-route redirects.
+
 ### Clean Windows Restart
 
 If Chrome shows `ERR_FAILED`, `localhost:3000` stops responding, or `next dev` looks stuck on old runtime errors:
