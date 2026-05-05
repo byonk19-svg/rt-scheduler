@@ -16,10 +16,11 @@ const STEP_LABELS: Record<RequestComposerStepId, RequestComposerStep['label']> =
 
 function getVisibleStepIds(
   requestVisibility: RequestVisibility,
-  requestType: RequestType
+  requestType: RequestType,
+  showsTeammateStep = requestVisibility === 'direct'
 ): RequestComposerStepId[] {
   void requestType
-  if (requestVisibility === 'direct') {
+  if (showsTeammateStep) {
     return [1, 2, 3]
   }
 
@@ -28,9 +29,10 @@ function getVisibleStepIds(
 
 export function getRequestComposerSteps(
   requestVisibility: RequestVisibility,
-  requestType: RequestType
+  requestType: RequestType,
+  showsTeammateStep = requestVisibility === 'direct'
 ): RequestComposerStep[] {
-  return getVisibleStepIds(requestVisibility, requestType).map((id, index) => ({
+  return getVisibleStepIds(requestVisibility, requestType, showsTeammateStep).map((id, index) => ({
     id,
     displayStep: index + 1,
     label: STEP_LABELS[id],
@@ -40,11 +42,12 @@ export function getRequestComposerSteps(
 export function getRequestComposerDisplayState(
   requestVisibility: RequestVisibility,
   requestType: RequestType,
-  step: RequestComposerStepId
+  step: RequestComposerStepId,
+  showsTeammateStep = requestVisibility === 'direct'
 ) {
-  const steps = getRequestComposerSteps(requestVisibility, requestType)
+  const steps = getRequestComposerSteps(requestVisibility, requestType, showsTeammateStep)
   const fallbackStepId =
-    requestVisibility === 'team' && step === 2
+    !showsTeammateStep && step === 2
       ? 3
       : step < steps[0].id
         ? steps[0].id

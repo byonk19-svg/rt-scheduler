@@ -435,8 +435,13 @@ test.describe.serial('requests workflow', () => {
 
     const requesterShiftId =
       shiftsInsert.data.find((row) => row.user_id === ctx!.requester.id)?.id ?? null
+    const partnerShiftId =
+      shiftsInsert.data.find((row) => row.user_id === ctx!.scheduledPartner.id)?.id ?? null
     if (!requesterShiftId) {
       throw new Error('Could not find requester shift for direct swap test.')
+    }
+    if (!partnerShiftId) {
+      throw new Error('Could not find partner shift for direct swap test.')
     }
 
     const requestMessage = `Direct swap ${randomString('swap-direct')}`
@@ -524,6 +529,164 @@ test.describe.serial('requests workflow', () => {
           return `${result.data?.status ?? ''}:${result.data?.claimed_by ?? ''}`
         })
         .toBe(`approved:${ctx!.scheduledPartner.id}`)
+
+      await expect
+        .poll(
+          async () => {
+            const result = await ctx!.supabase
+              .from('shifts')
+              .select('id, user_id')
+              .in('id', [requesterShiftId, partnerShiftId])
+
+            if (result.error) throw new Error(result.error.message)
+            const owners = new Map((result.data ?? []).map((row) => [row.id, row.user_id]))
+            return `${owners.get(requesterShiftId) ?? ''}:${owners.get(partnerShiftId) ?? ''}`
+          },
+          { timeout: 20_000 }
+        )
+        .toBe(`${ctx!.scheduledPartner.id}:${ctx!.requester.id}`)
+    } finally {
+      await managerContext.close().catch(() => undefined)
+    }
+  })
+
+  test('requester can post a team swap with a suggested partner and manager can approve it', async ({
+    page,
+    browser,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run requests workflow e2e.')
+
+    const cycleDate = addDays(new Date(), 22)
+    const cycleKey = formatDateKey(cycleDate)
+    const cycleInsert = await ctx!.supabase
+      .from('schedule_cycles')
+      .insert({
+        label: `Requests Suggested Swap ${randomString('cycle')}`,
+        start_date: cycleKey,
+        end_date: cycleKey,
+        published: true,
+      })
+      .select('id')
+      .single()
+
+    if (cycleInsert.error || !cycleInsert.data) {
+      throw new Error(cycleInsert.error?.message ?? 'Could not create suggested swap cycle.')
+    }
+    createdCycleIds.push(cycleInsert.data.id)
+
+    const shiftsInsert = await ctx!.supabase
+      .from('shifts')
+      .insert([
+        {
+          cycle_id: cycleInsert.data.id,
+          user_id: ctx!.requester.id,
+          date: cycleKey,
+          shift_type: 'day',
+          status: 'scheduled',
+          assignment_status: 'scheduled',
+          role: 'staff',
+        },
+        {
+          cycle_id: cycleInsert.data.id,
+          user_id: ctx!.scheduledPartner.id,
+          date: cycleKey,
+          shift_type: 'day',
+          status: 'scheduled',
+          assignment_status: 'scheduled',
+          role: 'staff',
+        },
+      ])
+      .select('id, user_id')
+
+    if (shiftsInsert.error || !shiftsInsert.data) {
+      throw new Error(shiftsInsert.error?.message ?? 'Could not create suggested swap shifts.')
+    }
+    const requesterShiftId =
+      shiftsInsert.data.find((row) => row.user_id === ctx!.requester.id)?.id ?? null
+    const partnerShiftId =
+      shiftsInsert.data.find((row) => row.user_id === ctx!.scheduledPartner.id)?.id ?? null
+    if (!requesterShiftId || !partnerShiftId) {
+      throw new Error('Could not find both shifts for suggested swap test.')
+    }
+
+    const requestMessage = `Suggested team swap ${randomString('swap-suggested')}`
+
+    await loginAs(page, ctx!.requester.email, ctx!.requester.password)
+    await openRequestComposerForShift(page, requesterShiftId)
+    await page.getByRole('button', { name: 'Suggest a teammate on the board' }).click()
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await expect(page.getByText('Who should managers try first?').first()).toBeVisible()
+    await page.getByRole('button', { name: 'Requests Partner' }).click()
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await expect(page.getByText('Post to the team board with a suggested teammate')).toBeVisible()
+    await page.getByLabel('Message').fill(requestMessage)
+    const createResponsePromise = page.waitForResponse((response) =>
+      response.url().includes('/api/shift-posts')
+    )
+    await page.getByRole('button', { name: 'Submit request' }).click()
+    const createResponse = await createResponsePromise
+    const createBody = await createResponse.json().catch(() => null)
+    expect(createResponse.ok(), JSON.stringify(createBody)).toBe(true)
+
+    await expect
+      .poll(async () => {
+        const result = await ctx!.supabase
+          .from('shift_posts')
+          .select('status, visibility, claimed_by, recipient_response')
+          .eq('posted_by', ctx!.requester.id)
+          .eq('message', requestMessage)
+          .maybeSingle()
+
+        if (result.error) throw new Error(result.error.message)
+        return `${result.data?.status ?? ''}:${result.data?.visibility ?? ''}:${result.data?.claimed_by ?? ''}:${result.data?.recipient_response ?? 'null'}`
+      })
+      .toBe(`pending:team:${ctx!.scheduledPartner.id}:null`)
+
+    const managerContext = await browser.newContext()
+    const managerPage = await managerContext.newPage()
+    try {
+      await loginAs(managerPage, ctx!.manager.email, ctx!.manager.password)
+      await managerPage.goto('/shift-board', { waitUntil: 'domcontentloaded' })
+      const requestCard = managerPage
+        .locator('div.rounded-xl')
+        .filter({ has: managerPage.getByText(requestMessage) })
+        .first()
+      await expect(requestCard).toBeVisible({ timeout: 20_000 })
+      await expect(requestCard.getByText('Suggested partner:')).toBeVisible()
+      await requestCard.getByRole('button', { name: 'Approve' }).click()
+
+      await expect
+        .poll(
+          async () => {
+            const result = await ctx!.supabase
+              .from('shift_posts')
+              .select('status, claimed_by')
+              .eq('posted_by', ctx!.requester.id)
+              .eq('message', requestMessage)
+              .maybeSingle()
+
+            if (result.error) throw new Error(result.error.message)
+            return `${result.data?.status ?? ''}:${result.data?.claimed_by ?? ''}`
+          },
+          { timeout: 20_000 }
+        )
+        .toBe(`approved:${ctx!.scheduledPartner.id}`)
+
+      await expect
+        .poll(
+          async () => {
+            const result = await ctx!.supabase
+              .from('shifts')
+              .select('id, user_id')
+              .in('id', [requesterShiftId, partnerShiftId])
+
+            if (result.error) throw new Error(result.error.message)
+            const owners = new Map((result.data ?? []).map((row) => [row.id, row.user_id]))
+            return `${owners.get(requesterShiftId) ?? ''}:${owners.get(partnerShiftId) ?? ''}`
+          },
+          { timeout: 20_000 }
+        )
+        .toBe(`${ctx!.scheduledPartner.id}:${ctx!.requester.id}`)
     } finally {
       await managerContext.close().catch(() => undefined)
     }

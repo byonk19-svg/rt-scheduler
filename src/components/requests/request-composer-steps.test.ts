@@ -36,6 +36,16 @@ describe('request composer steps', () => {
     expect(displayState.totalSteps).toBe(3)
   })
 
+  it('keeps the choose-teammate step for team swaps with a suggested partner', () => {
+    const steps = getRequestComposerSteps('team', 'swap', true)
+    const displayState = getRequestComposerDisplayState('team', 'swap', 2, true)
+
+    expect(steps.map((step) => step.id)).toEqual([1, 2, 3])
+    expect(steps.map((step) => step.displayStep)).toEqual([1, 2, 3])
+    expect(displayState.currentStep.id).toBe(2)
+    expect(displayState.currentStepTitle).toBe('Step 2: Choose teammate')
+  })
+
   it('normalizes the hidden team teammate step to the review step', () => {
     const displayState = getRequestComposerDisplayState('team', 'swap', 2)
 

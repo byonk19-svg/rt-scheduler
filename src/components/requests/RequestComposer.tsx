@@ -14,6 +14,8 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { RequestType, RequestVisibility } from '@/lib/request-workflow'
 
+export type SwapRequestPath = 'direct' | 'team_suggested' | 'team_open'
+
 type RequestComposerProps = {
   eligibleMembers: TeamMember[]
   error: string | null
@@ -29,6 +31,7 @@ type RequestComposerProps = {
   selectedShiftRequiresLeadEligibleReplacement: boolean
   step: 1 | 2 | 3
   submitting: boolean
+  swapPath: SwapRequestPath
   swapWith: string | null
   onBack: () => void
   onMessageChange: (value: string) => void
@@ -39,6 +42,7 @@ type RequestComposerProps = {
   onSearchChange: (value: string) => void
   onSelectedShiftChange: (value: string | null) => void
   onSubmit: () => Promise<void>
+  onSwapPathChange: (value: SwapRequestPath) => void
   onSwapWithChange: (value: string | null) => void
 }
 
@@ -82,6 +86,7 @@ export function RequestComposer({
   selectedShiftRequiresLeadEligibleReplacement,
   step,
   submitting,
+  swapPath,
   swapWith,
   onBack,
   onMessageChange,
@@ -92,18 +97,27 @@ export function RequestComposer({
   onSearchChange,
   onSelectedShiftChange,
   onSubmit,
+  onSwapPathChange,
   onSwapWithChange,
 }: RequestComposerProps) {
-  const stepState = getRequestComposerDisplayState(requestVisibility, requestType, step)
-  const reviewStep = stepState.steps.find((item) => item.id === 3) ?? stepState.currentStep
   const isSwap = requestType === 'swap'
   const isDirectSwap = isSwap && requestVisibility === 'direct'
+  const isTeamSuggestedSwap = isSwap && swapPath === 'team_suggested'
+  const showsTeammateStep =
+    requestVisibility === 'direct' || (isSwap && swapPath === 'team_suggested')
+  const stepState = getRequestComposerDisplayState(
+    requestVisibility,
+    requestType,
+    step,
+    showsTeammateStep
+  )
+  const reviewStep = stepState.steps.find((item) => item.id === 3) ?? stepState.currentStep
   const autoSelectedShift = myShifts.length === 1 && selectedShiftData
   const canContinue =
     step === 1
       ? selectedShift !== null
       : step === 2
-        ? requestVisibility !== 'direct' || swapWith !== null
+        ? !showsTeammateStep || swapWith !== null
         : true
 
   const safeCandidates = eligibleMembers.filter((member) => member.verdict === 'coverage_safe')
@@ -159,16 +173,20 @@ export function RequestComposer({
         <div className="mt-4 max-w-3xl">
           <p className="font-heading text-2xl font-bold tracking-tight text-foreground">
             {isSwap
-              ? requestVisibility === 'direct'
+              ? isDirectSwap
                 ? 'Find the best way to swap this shift'
-                : 'Post an open swap request'
+                : isTeamSuggestedSwap
+                  ? 'Suggest a teammate for a team swap'
+                  : 'Post an open swap request'
               : 'Ask for pickup coverage'}
           </p>
           <p className="mt-1.5 text-sm text-muted-foreground">
             {isSwap
-              ? requestVisibility === 'direct'
+              ? isDirectSwap
                 ? 'Ask a teammate about a shift swap, see whether the exchange looks safe, then send it for review.'
-                : 'Post your shift for swap review when you do not have a teammate in mind yet.'
+                : isTeamSuggestedSwap
+                  ? 'Post the swap to the board with the teammate you think should trade with you.'
+                  : 'Post your shift for swap review when you do not have a teammate in mind yet.'
               : requestVisibility === 'direct'
                 ? 'Ask a specific teammate to cover this shift, then send it for manager review.'
                 : 'Post this shift to the board so interested teammates can respond.'}
@@ -219,10 +237,10 @@ export function RequestComposer({
                 <div className="mt-3 space-y-3">
                   <button
                     type="button"
-                    onClick={() => onRequestVisibilityChange('direct')}
+                    onClick={() => onSwapPathChange('direct')}
                     className={cn(
                       'w-full rounded-2xl border px-4 py-4 text-left transition-colors',
-                      requestVisibility === 'direct'
+                      swapPath === 'direct'
                         ? 'border-primary bg-primary/5'
                         : 'border-border bg-card hover:bg-secondary'
                     )}
@@ -235,10 +253,29 @@ export function RequestComposer({
 
                   <button
                     type="button"
-                    onClick={() => onRequestVisibilityChange('team')}
+                    onClick={() => onSwapPathChange('team_suggested')}
                     className={cn(
                       'w-full rounded-2xl border px-4 py-4 text-left transition-colors',
-                      requestVisibility === 'team'
+                      swapPath === 'team_suggested'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border bg-card hover:bg-secondary'
+                    )}
+                  >
+                    <p className="text-sm font-semibold text-foreground">
+                      Suggest a teammate on the board
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Managers can use your suggested swap partner, but the request is visible on
+                      the team board.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onSwapPathChange('team_open')}
+                    className={cn(
+                      'w-full rounded-2xl border px-4 py-4 text-left transition-colors',
+                      swapPath === 'team_open'
                         ? 'border-primary bg-primary/5'
                         : 'border-border bg-card hover:bg-secondary'
                     )}
@@ -338,11 +375,14 @@ export function RequestComposer({
               <>
                 <div className="max-w-3xl">
                   <p className="text-base font-semibold text-foreground">
-                    Who do you want to ask first?
+                    {isTeamSuggestedSwap
+                      ? 'Who should managers try first?'
+                      : 'Who do you want to ask first?'}
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    We sorted teammates by the clearest direct options first. Pick one to see what
-                    the swap would do.
+                    {isTeamSuggestedSwap
+                      ? 'Pick the teammate you already have in mind. The request still goes to the team board for manager review.'
+                      : 'We sorted teammates by the clearest direct options first. Pick one to see what the swap would do.'}
                   </p>
                 </div>
 
@@ -419,7 +459,7 @@ export function RequestComposer({
                       size="sm"
                       variant="outline"
                       className="mt-3"
-                      onClick={() => onRequestVisibilityChange('team')}
+                      onClick={() => onSwapPathChange('team_open')}
                     >
                       <ArrowRightLeft className="mr-1.5 h-3.5 w-3.5" />
                       Post an open swap instead
@@ -517,7 +557,7 @@ export function RequestComposer({
               </p>
             </div>
 
-            {isDirectSwap && selectedShiftData && selectedMember ? (
+            {(isDirectSwap || isTeamSuggestedSwap) && selectedShiftData && selectedMember ? (
               <div className="space-y-4">
                 <div className="grid gap-3 md:grid-cols-2">
                   <SwapDiagramCard
@@ -528,7 +568,11 @@ export function RequestComposer({
                   />
                   <SwapDiagramCard
                     title="After"
-                    name={selectedMember.name}
+                    name={
+                      isTeamSuggestedSwap
+                        ? `Suggested: ${selectedMember.name}`
+                        : selectedMember.name
+                    }
                     shiftLabel={`${selectedShiftData.date} · ${selectedShiftData.type}`}
                     detail={
                       selectedMember.verdict === 'coverage_safe'
@@ -551,7 +595,9 @@ export function RequestComposer({
                     <p className="mt-2 text-sm opacity-90">{selectedMember.nextMove}</p>
                   ) : null}
                   <p className="mt-3 text-xs opacity-80">
-                    Final approval still depends on manager review.
+                    {isTeamSuggestedSwap
+                      ? 'Managers can approve this suggested partner or choose a different safe partner.'
+                      : 'Final approval still depends on manager review.'}
                   </p>
                 </div>
               </div>
@@ -580,9 +626,11 @@ export function RequestComposer({
                 <p>
                   <span className="font-semibold text-foreground">Path:</span>{' '}
                   {isSwap
-                    ? requestVisibility === 'direct'
+                    ? isDirectSwap
                       ? 'Ask a specific teammate'
-                      : 'Post an open swap'
+                      : isTeamSuggestedSwap
+                        ? 'Post to the team board with a suggested teammate'
+                        : 'Post an open swap'
                     : requestVisibility === 'direct'
                       ? 'Ask a specific teammate'
                       : 'Post to the board'}

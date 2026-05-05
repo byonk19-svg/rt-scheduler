@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { loadEligibleRequestTeammates, loadRequestPageSnapshot } from '@/lib/request-page-data'
+import {
+  deriveRequestStage,
+  loadEligibleRequestTeammates,
+  loadRequestPageSnapshot,
+} from '@/lib/request-page-data'
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -265,5 +269,30 @@ describe('request page data', () => {
       '/api/shift-posts/eligible-teammates?shiftId=shift-1&requestType=swap',
       { cache: 'no-store' }
     )
+  })
+
+  it('labels team swaps with a suggested partner as manager-review work', () => {
+    const stage = deriveRequestStage({
+      currentUserId: 'therapist-1',
+      involvement: 'posted',
+      request: {
+        id: 'post-suggested',
+        type: 'swap',
+        status: 'pending',
+        recipient_response: null,
+        request_kind: 'standard',
+        created_at: '2026-04-28T12:00:00.000Z',
+        shift_id: 'shift-1',
+        posted_by: 'therapist-1',
+        claimed_by: 'therapist-2',
+        visibility: 'team',
+        message: 'Suggested team swap',
+      },
+    })
+
+    expect(stage).toEqual({
+      label: 'Suggested partner in manager review',
+      detail: 'Manager can approve your suggested teammate or choose another safe partner.',
+    })
   })
 })

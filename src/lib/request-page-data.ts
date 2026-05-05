@@ -218,6 +218,13 @@ function deriveRequestStage(params: {
     }
   }
 
+  if (request.visibility === 'team' && request.type === 'swap' && request.claimed_by) {
+    return {
+      label: 'Suggested partner in manager review',
+      detail: 'Manager can approve your suggested teammate or choose another safe partner.',
+    }
+  }
+
   return {
     label: 'Waiting for manager review',
     detail: 'This request is on the board for manager review.',

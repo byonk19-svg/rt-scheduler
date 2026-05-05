@@ -25,7 +25,7 @@ describe('requests composer route source contract', () => {
     expect(composerSource).toContain('Find the best way to swap this shift')
     expect(composerSource).toContain('step === 1')
     expect(composerSource).toContain('selectedShift !== null')
-    expect(composerSource).toContain("requestVisibility !== 'direct' || swapWith !== null")
+    expect(composerSource).toContain('!showsTeammateStep || swapWith !== null')
     expect(composerSource).toContain('disabled={!canContinue}')
     expect(composerSource).toContain('getRequestComposerDisplayState')
     expect(composerSource).toContain(
@@ -33,6 +33,8 @@ describe('requests composer route source contract', () => {
     )
     expect(composerSource).toContain('Find the best way to swap this shift')
     expect(composerSource).toContain('Ask a specific teammate')
+    expect(composerSource).toContain('Suggest a teammate on the board')
+    expect(composerSource).toContain('Post to the team board with a suggested teammate')
     expect(composerSource).toContain('Post an open swap instead')
     expect(composerSource).toContain('No strong direct swap options for this shift right now.')
     expect(historySource).toContain('Direct swaps move through teammate response first')

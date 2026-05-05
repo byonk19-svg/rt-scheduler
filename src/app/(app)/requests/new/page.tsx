@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
-import { RequestComposer } from '@/components/requests/RequestComposer'
+import { RequestComposer, type SwapRequestPath } from '@/components/requests/RequestComposer'
 import { RequestsHistoryView } from '@/components/requests/RequestsHistoryView'
 import type { MyShift, OpenRequest, TeamMember } from '@/components/requests/request-page-model'
 import { loadEligibleRequestTeammates, loadRequestPageSnapshot } from '@/lib/request-page-data'
@@ -36,6 +36,7 @@ function SwapRequestPageContent() {
   const [search, setSearch] = useState('')
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [requestVisibility, setRequestVisibility] = useState<RequestVisibility>('direct')
+  const [swapPath, setSwapPath] = useState<SwapRequestPath>('direct')
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -46,7 +47,8 @@ function SwapRequestPageContent() {
   const [leadCountsBySlot, setLeadCountsBySlot] = useState<Record<string, number>>({})
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [myOpenRequests, setMyOpenRequests] = useState<OpenRequest[]>([])
-  const showsTeammateStep = requestVisibility === 'direct'
+  const showsTeammateStep =
+    requestVisibility === 'direct' || (requestType === 'swap' && swapPath === 'team_suggested')
   const listPath = pathname === '/therapist/swaps' ? '/therapist/swaps' : '/requests/new'
 
   const selectedShiftData = useMemo(
@@ -141,17 +143,18 @@ function SwapRequestPageContent() {
     if (requestType === 'pickup') {
       setSwapWith(null)
       setMessageNeedsReview(false)
+      setSwapPath('direct')
     }
   }, [requestType])
 
   useEffect(() => {
-    if (requestVisibility === 'team') {
+    if (!showsTeammateStep) {
       setSwapWith(null)
       if (step === 2) {
         setStep(3)
       }
     }
-  }, [requestVisibility, step])
+  }, [showsTeammateStep, step])
 
   useEffect(() => {
     if (view !== 'form' || selectedShift || myShifts.length !== 1) return
@@ -230,8 +233,12 @@ function SwapRequestPageContent() {
       setError('Please select a shift first.')
       return
     }
-    if (requestVisibility === 'direct' && !swapWith) {
-      setError('Choose the teammate for this direct request.')
+    if (showsTeammateStep && !swapWith) {
+      setError(
+        requestVisibility === 'direct'
+          ? 'Choose the teammate for this direct request.'
+          : 'Choose the teammate you want to suggest for this team swap.'
+      )
       return
     }
 
@@ -265,6 +272,7 @@ function SwapRequestPageContent() {
     setStep(1)
     setRequestType('swap')
     setRequestVisibility('direct')
+    setSwapPath('direct')
     setSelectedShift(null)
     setSwapWith(null)
     setMessage('')
@@ -295,8 +303,12 @@ function SwapRequestPageContent() {
       return
     }
     if (step === 2) {
-      if (requestVisibility === 'direct' && !swapWith) {
-        setError('Choose the teammate for this direct request before continuing.')
+      if (showsTeammateStep && !swapWith) {
+        setError(
+          requestVisibility === 'direct'
+            ? 'Choose the teammate for this direct request before continuing.'
+            : 'Choose the teammate you want to suggest before continuing.'
+        )
         return
       }
       setStep(3)
@@ -402,6 +414,7 @@ function SwapRequestPageContent() {
       selectedShiftRequiresLeadEligibleReplacement={selectedShiftRequiresLeadEligibleReplacement}
       step={step}
       submitting={submitting}
+      swapPath={swapPath}
       swapWith={swapWith}
       onBack={handleBack}
       onMessageChange={(value) => {
@@ -413,6 +426,8 @@ function SwapRequestPageContent() {
       onRequestTypeChange={(value) => {
         setRequestType(value)
         setRequestVisibility(value === 'swap' ? 'direct' : 'team')
+        setSwapPath('direct')
+        setSwapWith(null)
       }}
       onRequestVisibilityChange={(value) => {
         setRequestVisibility(value)
@@ -423,6 +438,13 @@ function SwapRequestPageContent() {
       onSearchChange={setSearch}
       onSelectedShiftChange={setSelectedShift}
       onSubmit={handleSubmit}
+      onSwapPathChange={(value) => {
+        setSwapPath(value)
+        setRequestVisibility(value === 'direct' ? 'direct' : 'team')
+        if (value === 'team_open') {
+          setSwapWith(null)
+        }
+      }}
       onSwapWithChange={handleSwapWithChange}
     />
   )
