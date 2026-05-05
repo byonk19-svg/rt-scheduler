@@ -119,16 +119,15 @@ export function ManagerTriageDashboard({
           primaryHref: approvalsHref,
           primaryLabel: 'Review approvals',
           secondaryHref: scheduleHref,
-          secondaryLabel: 'Open schedule workspace',
+          secondaryLabel: 'Open Coverage',
         }
       : riskCount !== '--' && riskCount > 0
         ? {
             eyebrow: 'Needs attention now',
             title: `${riskCount} coverage issue${riskCount === 1 ? '' : 's'} to resolve`,
-            detail:
-              'Open the schedule workspace and fix unstaffed or unstable days before the next handoff.',
+            detail: 'Open Coverage and fix unstaffed or unstable days before the next handoff.',
             primaryHref: scheduleHref,
-            primaryLabel: 'Open schedule workspace',
+            primaryLabel: 'Open Coverage',
             secondaryHref: reviewHref,
             secondaryLabel: 'Review updates',
           }
@@ -140,7 +139,7 @@ export function ManagerTriageDashboard({
               primaryHref: reviewHref,
               primaryLabel: 'Review updates',
               secondaryHref: scheduleHref,
-              secondaryLabel: 'Open schedule workspace',
+              secondaryLabel: 'Open Coverage',
             }
           : {
               eyebrow: 'Good standing',
@@ -148,7 +147,7 @@ export function ManagerTriageDashboard({
               detail:
                 'The current schedule is stable. Use the workspace to keep the next cycle moving.',
               primaryHref: scheduleHref,
-              primaryLabel: 'Open schedule workspace',
+              primaryLabel: 'Open Coverage',
               secondaryHref: approvalsHref,
               secondaryLabel: 'Check approvals',
             }
@@ -282,7 +281,7 @@ export function ManagerTriageDashboard({
               {todayStaffedShifts.length > 0 && (
                 <Button variant="ghost" size="sm" className="min-h-11 gap-1 px-0 text-xs" asChild>
                   <Link href={scheduleHref}>
-                    Open schedule workspace
+                    Open Coverage
                     <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
                 </Button>

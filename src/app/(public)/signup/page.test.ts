@@ -25,4 +25,10 @@ describe('public signup shell', () => {
     expect(signupPageSource).toContain("router.push('/login?status=requested')")
     expect(signupPageSource).not.toContain("'/login?status=matched'")
   })
+
+  it('explains the approval queue before the user leaves signup', () => {
+    expect(signupPageSource).toContain('What happens next?')
+    expect(signupPageSource).toContain('Your account will be reviewed by a manager.')
+    expect(signupPageSource).toContain('receive access once')
+  })
 })

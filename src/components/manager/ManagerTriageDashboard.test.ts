@@ -51,7 +51,7 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('Needs attention now')
     expect(html).toContain('5 approvals waiting')
     expect(html).toContain('Review approvals')
-    expect(html).toContain('Open schedule workspace')
+    expect(html).toContain('Open Coverage')
     expect(html).not.toContain('Publish flow')
     expect(html).toContain('Mar 26')
     expect(html).toContain('4 shifts')

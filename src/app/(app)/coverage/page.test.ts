@@ -86,10 +86,35 @@ describe('coverage publish override affordance', () => {
     expect(source).toContain(
       'Read-only team staffing view. Use My Schedule for your own shifts and Future Availability for the next cycle.'
     )
-    expect(source).toContain('Team Schedule')
+    expect(source).toContain('Coverage')
     expect(source).toContain('Setup required')
     expect(source).toContain('Cycle board')
     expect(source).not.toContain('title="Next step"')
+  })
+
+  it('keeps coverage naming and context prominent in the route header', () => {
+    const source = readFileSync(coverageClientPath, 'utf8')
+
+    expect(source).toContain('Coverage')
+    expect(source).toContain('Cycle status: {workspaceStatusLabel}')
+    expect(source).toContain('{shiftTab} shift coverage')
+    expect(source).toContain('Cycle context')
+    expect(source).toContain('aria-labelledby="coverage-cycle-context-heading"')
+    expect(source).toContain('Current block: {cycleRangeLabel}')
+    expect(source).toContain('Day/Night')
+    expect(source).not.toContain('Team Schedule')
+  })
+
+  it('keeps Day/Night ahead of layout controls in the cycle context bar', () => {
+    const source = readFileSync(coverageClientPath, 'utf8')
+
+    const contextIndex = source.indexOf('coverage-cycle-context-heading')
+    const dayNightIndex = source.indexOf('label="Day/Night"', contextIndex)
+    const layoutIndex = source.indexOf('label="Layout"', contextIndex)
+
+    expect(contextIndex).toBeGreaterThan(-1)
+    expect(dayNightIndex).toBeGreaterThan(contextIndex)
+    expect(layoutIndex).toBeGreaterThan(dayNightIndex)
   })
 
   it('keeps proactive risk on the server while rendering a quieter planning surface', () => {

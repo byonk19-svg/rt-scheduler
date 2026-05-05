@@ -552,33 +552,6 @@ export default function ShiftBoardClientPage({
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-4 px-6 lg:grid-cols-4">
-        <KpiTile
-          label="Open posts"
-          value={loading ? '--' : openPostCount}
-          detail="Pending swap or pickup requests"
-          icon={<Clock3 className="h-3.5 w-3.5" />}
-        />
-        <KpiTile
-          label="Pending approvals"
-          value={loading ? '--' : pending}
-          detail="Requests awaiting manager decision"
-          icon={<CalendarDays className="h-3.5 w-3.5" />}
-        />
-        <KpiTile
-          label="Approved / denied"
-          value={loading ? '--' : `${approvedCount}/${deniedCount}`}
-          detail="Resolution history in this view"
-          icon={<CheckCircle2 className="h-3.5 w-3.5" />}
-        />
-        <KpiTile
-          label="Coverage risk"
-          value={loading ? '--' : `${metrics.unfilled + metrics.missingLead}`}
-          detail={needsCoverageAttention ? 'Coverage needs attention' : 'Coverage stable'}
-          icon={<ShieldAlert className="h-3.5 w-3.5" />}
-        />
-      </div>
-
       {error && (
         <div className="flex items-center gap-2 rounded-lg border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 py-3 text-sm font-medium text-[var(--error-text)]">
           <AlertCircle className="h-4 w-4 shrink-0" />
@@ -876,6 +849,47 @@ export default function ShiftBoardClientPage({
           ))
         )}
       </div>
+
+      <section
+        aria-labelledby="shift-board-summary-heading"
+        className="fade-up space-y-3"
+        style={{ animationDelay: '0.18s' }}
+      >
+        <div>
+          <h2 id="shift-board-summary-heading" className="text-sm font-semibold text-foreground">
+            Board summary
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            A quick readout of the current board state.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <KpiTile
+            label="Open posts"
+            value={loading ? '--' : openPostCount}
+            detail="Pending swap or pickup requests"
+            icon={<Clock3 className="h-3.5 w-3.5" />}
+          />
+          <KpiTile
+            label="Pending approvals"
+            value={loading ? '--' : pending}
+            detail="Requests awaiting manager decision"
+            icon={<CalendarDays className="h-3.5 w-3.5" />}
+          />
+          <KpiTile
+            label="Approved / denied"
+            value={loading ? '--' : `${approvedCount}/${deniedCount}`}
+            detail="Resolution history in this view"
+            icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+          />
+          <KpiTile
+            label="Coverage risk"
+            value={loading ? '--' : `${metrics.unfilled + metrics.missingLead}`}
+            detail={needsCoverageAttention ? 'Coverage needs attention' : 'Coverage stable'}
+            icon={<ShieldAlert className="h-3.5 w-3.5" />}
+          />
+        </div>
+      </section>
     </div>
   )
 }

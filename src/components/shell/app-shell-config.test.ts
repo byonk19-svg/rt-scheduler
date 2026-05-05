@@ -28,7 +28,7 @@ describe('app-shell-config', () => {
       'Audit log',
     ])
     const requestsItem = context.localNav?.items.find((item) => item.label === 'Requests')
-    expect(requestsItem?.href).toBe('/requests')
+    expect(requestsItem?.href).toBe('/requests/user-access')
     expect(requestsItem?.badgeCount).toBe(3)
   })
 
@@ -68,17 +68,17 @@ describe('app-shell-config', () => {
 
     expect(scheduleSection?.href).toBe('/coverage')
     expect(scheduleSection?.subItems.map((item) => item.label)).toEqual([
-      'Schedule workspace',
-      'Roster view',
+      'Coverage',
+      'Roster',
       'Analytics',
       'Availability',
       'Publish',
       'Approvals',
     ])
-    expect(
-      scheduleSection?.subItems.find((item) => item.label === 'Schedule workspace')?.href
-    ).toBe('/coverage')
-    expect(scheduleSection?.subItems.find((item) => item.label === 'Roster view')?.href).toBe(
+    expect(scheduleSection?.subItems.find((item) => item.label === 'Coverage')?.href).toBe(
+      '/coverage'
+    )
+    expect(scheduleSection?.subItems.find((item) => item.label === 'Roster')?.href).toBe(
       '/schedule'
     )
   })
@@ -93,8 +93,8 @@ describe('app-shell-config', () => {
     expect(context.primaryKey).toBe('schedule')
     expect(usesAppShell('/lottery')).toBe(true)
     expect(context.localNav?.items.map((item) => item.label)).toEqual([
-      'Schedule workspace',
-      'Roster view',
+      'Coverage',
+      'Roster',
       'Analytics',
       'Availability',
       'Publish',
@@ -112,7 +112,7 @@ describe('app-shell-config', () => {
     expect(context.primaryKey).toBe('people')
     const requestsItem = context.localNav?.items.find((item) => item.label === 'Requests')
     expect(requestsItem?.active('/shift-board')).toBe(false)
-    expect(requestsItem?.href).toBe('/requests')
+    expect(requestsItem?.href).toBe('/requests/user-access')
     expect(requestsItem?.active('/requests')).toBe(true)
 
     const shiftBoardItem = context.localNav?.items.find((item) => item.label === 'Shift Board')
@@ -120,7 +120,7 @@ describe('app-shell-config', () => {
     expect(shiftBoardItem?.active('/shift-board')).toBe(true)
   })
 
-  it('keeps existing manager Requests navigation intact', () => {
+  it('links manager Requests directly to user access while preserving active state and badge', () => {
     const context = getShellContext({
       pathname: '/requests/user-access',
       canAccessManagerUi: true,
@@ -128,8 +128,9 @@ describe('app-shell-config', () => {
     })
     expect(context.primaryKey).toBe('people')
     const requestsItem = context.localNav?.items.find((item) => item.label === 'Requests')
-    expect(requestsItem?.href).toBe('/requests')
+    expect(requestsItem?.href).toBe('/requests/user-access')
     expect(requestsItem?.active('/requests/user-access')).toBe(true)
+    expect(requestsItem?.active('/requests')).toBe(true)
     expect(requestsItem?.badgeCount).toBe(2)
   })
 })
@@ -140,9 +141,9 @@ describe('staff nav items', () => {
     expect(items.map((item) => item.label)).toEqual([
       'Dashboard',
       'My Shifts',
-      'Future Availability',
+      'Availability',
       'Team Schedule',
-      'Shift Swaps & Pickups',
+      'Shift Swaps',
       'History',
     ])
   })
@@ -159,9 +160,9 @@ describe('staff nav items', () => {
     expect(myShifts?.active('/staff/my-schedule')).toBe(true)
   })
 
-  it('"Shift Swaps & Pickups" routes to /therapist/swaps and is also active for /shift-board', () => {
+  it('"Shift Swaps" routes to /therapist/swaps and is also active for /shift-board', () => {
     const items = getStaffNavItems()
-    const swaps = items.find((item) => item.label === 'Shift Swaps & Pickups')
+    const swaps = items.find((item) => item.label === 'Shift Swaps')
     expect(swaps?.href).toBe('/therapist/swaps')
     expect(swaps?.active('/shift-board')).toBe(true)
   })

@@ -305,6 +305,13 @@ export default function SignUpPage() {
                 'Submit request'
               )}
             </Button>
+            <div className="rounded-lg border border-border/70 bg-muted/25 px-3 py-2.5">
+              <p className="text-sm font-semibold text-foreground">What happens next?</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                Your account will be reviewed by a manager. You&apos;ll receive access once
+                approved.
+              </p>
+            </div>
           </form>
 
           <p className="mt-3.5 text-center text-sm text-muted-foreground">

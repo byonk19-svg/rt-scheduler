@@ -42,7 +42,7 @@ describe('ScheduleRosterScreen', () => {
     expect(html).not.toContain('March 22, 2026')
     expect(html).toContain('DRAFT')
     expect(html).toContain('Print')
-    expect(html).toContain('Open schedule workspace')
+    expect(html).toContain('Open Coverage')
     expect(html).not.toContain('Export')
     expect(html).not.toContain('Publish')
     expect(html).toContain('PRN / Extra staff')

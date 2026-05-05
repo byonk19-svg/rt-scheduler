@@ -40,7 +40,7 @@ export default async function SchedulePage(props: SchedulePageProps) {
           </p>
           <div className="mt-5">
             <Button asChild>
-              <Link href="/coverage">Open schedule workspace</Link>
+              <Link href="/coverage">Open Coverage</Link>
             </Button>
           </div>
         </section>

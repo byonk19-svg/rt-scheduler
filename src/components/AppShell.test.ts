@@ -96,7 +96,7 @@ describe('AppShell mobile menu', () => {
 describe('AppShell navigation structure', () => {
   it('routes staff availability navigation to the therapist availability page', () => {
     expect(shellConfigSource).toContain("'/therapist/availability'")
-    expect(shellConfigSource).toContain("label: 'Future Availability'")
+    expect(shellConfigSource).toContain("label: 'Availability'")
   })
 
   it('keeps the manager Schedule section active on the legacy /schedule route', () => {
@@ -110,16 +110,17 @@ describe('AppShell navigation structure', () => {
     const scheduleSection = buildManagerSections(0).find((section) => section.key === 'schedule')
 
     expect(scheduleSection?.href).toBe('/coverage')
-    expect(
-      scheduleSection?.subItems.find((item) => item.label === 'Schedule workspace')?.href
-    ).toBe('/coverage')
-    expect(scheduleSection?.subItems.find((item) => item.label === 'Roster view')?.href).toBe(
+    expect(scheduleSection?.subItems.find((item) => item.label === 'Coverage')?.href).toBe(
+      '/coverage'
+    )
+    expect(scheduleSection?.subItems.find((item) => item.label === 'Roster')?.href).toBe(
       '/schedule'
     )
   })
 
-  it('uses Shift Swaps & Pickups wording in staff shell navigation', () => {
-    expect(shellConfigSource).toContain("label: 'Shift Swaps & Pickups'")
+  it('uses compact Shift Swaps wording in staff shell navigation', () => {
+    expect(shellConfigSource).toContain("label: 'Shift Swaps'")
+    expect(shellConfigSource).not.toContain("label: 'Shift Swaps & Pickups'")
     expect(shellConfigSource).not.toContain("label: 'Open shifts'")
   })
 
@@ -145,9 +146,9 @@ describe('AppShell navigation structure', () => {
     expect(shellConfigSource).toContain("key: 'people'")
   })
 
-  it('puts Schedule workspace, Roster view, Availability, Publish, and Approvals under the Schedule section', () => {
-    expect(shellConfigSource).toContain("label: 'Schedule workspace'")
-    expect(shellConfigSource).toContain("label: 'Roster view'")
+  it('puts Coverage, Roster, Availability, Publish, and Approvals under the Schedule section', () => {
+    expect(shellConfigSource).toContain("label: 'Coverage'")
+    expect(shellConfigSource).toContain("label: 'Roster'")
     expect(shellConfigSource).toContain("label: 'Availability'")
     expect(shellConfigSource).toContain("label: 'Publish'")
     expect(shellConfigSource).toContain("label: 'Approvals'")
@@ -162,6 +163,10 @@ describe('AppShell navigation structure', () => {
     expect(shellConfigSource).toContain("label: 'Requests'")
     expect(shellConfigSource).toContain("label: 'Shift Board'")
     expect(shellConfigSource).toContain("href: '/shift-board'")
+    const peopleSection = buildManagerSections(0).find((section) => section.key === 'people')
+    expect(peopleSection?.subItems.find((item) => item.label === 'Requests')?.href).toBe(
+      '/requests/user-access'
+    )
     // User Access Requests is no longer a separate top-level nav item
     expect(shellConfigSource).not.toContain("label: 'User Access Requests'")
   })

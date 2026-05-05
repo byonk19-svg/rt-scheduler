@@ -133,7 +133,7 @@ describe('schedule route', () => {
 
     expect(html).toContain('No active schedule block yet')
     expect(html).toContain('Create or reopen a cycle in Coverage')
-    expect(html).toContain('Open schedule workspace')
+    expect(html).toContain('Open Coverage')
   })
 
   it('sets route-specific schedule-roster metadata', async () => {
