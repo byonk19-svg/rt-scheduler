@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/can'
-import { buildDateRange, buildScheduleUrl } from '@/lib/schedule-helpers'
+import { buildDateRange, buildScheduleUrl, normalizeViewMode } from '@/lib/schedule-helpers'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import type { ShiftRole, ShiftStatus } from '@/app/schedule/types'
@@ -142,6 +142,15 @@ export async function createCycleAction(formData: FormData) {
   const published = copyFromLastCycle ? false : publishedRequested
   const view = String(formData.get('view') ?? '').trim()
   const returnTo = String(formData.get('return_to') ?? '').trim()
+  const coverageCurrentCycleId = String(formData.get('current_cycle_id') ?? '').trim()
+  const coverageShift = String(formData.get('shift') ?? '').trim()
+  const coverageContextParams =
+    returnTo === 'coverage'
+      ? {
+          view: normalizeViewMode(view),
+          shift: coverageShift === 'day' || coverageShift === 'night' ? coverageShift : undefined,
+        }
+      : undefined
   const panel = getPanelParam(formData)
   const errorViewParams = panel ? { panel } : undefined
   const buildReturnUrl = (
@@ -149,8 +158,15 @@ export async function createCycleAction(formData: FormData) {
     params?: Record<string, string | undefined>
   ) =>
     returnTo === 'coverage'
-      ? buildCoverageUrl(cycleIdOverride, params)
+      ? buildCoverageUrl((cycleIdOverride ?? coverageCurrentCycleId) || undefined, {
+          ...coverageContextParams,
+          ...params,
+        })
       : buildScheduleUrl(cycleIdOverride, view, params)
+  const revalidateCreatedCycleSurfaces = () => {
+    revalidatePath('/schedule')
+    revalidatePath('/coverage')
+  }
 
   if (!label || !startDate || !endDate) {
     redirect(buildReturnUrl(undefined, { ...errorViewParams, error: 'create_cycle_failed' }))
@@ -211,7 +227,7 @@ export async function createCycleAction(formData: FormData) {
         sourceCycleError: sourceCycleResult.error,
         importedCycleError: importedShiftsResult.error,
       })
-      revalidatePath('/schedule')
+      revalidateCreatedCycleSurfaces()
       redirect(
         buildReturnUrl(data.id, { ...errorViewParams, error: 'copy_from_last_cycle_failed' })
       )
@@ -228,7 +244,7 @@ export async function createCycleAction(formData: FormData) {
 
       if (sourceShiftsError) {
         console.error('Failed to load source shifts for cycle import:', sourceShiftsError)
-        revalidatePath('/schedule')
+        revalidateCreatedCycleSurfaces()
         redirect(
           buildReturnUrl(data.id, { ...errorViewParams, error: 'copy_from_last_cycle_failed' })
         )
@@ -254,7 +270,7 @@ export async function createCycleAction(formData: FormData) {
             'Failed to load eligible therapists for cycle import:',
             eligibleProfilesError
           )
-          revalidatePath('/schedule')
+          revalidateCreatedCycleSurfaces()
           redirect(
             buildReturnUrl(data.id, { ...errorViewParams, error: 'copy_from_last_cycle_failed' })
           )
@@ -303,7 +319,7 @@ export async function createCycleAction(formData: FormData) {
 
           if (insertedShiftsError) {
             console.error('Failed to insert imported shifts:', insertedShiftsError)
-            revalidatePath('/schedule')
+            revalidateCreatedCycleSurfaces()
             redirect(
               buildReturnUrl(data.id, { ...errorViewParams, error: 'copy_from_last_cycle_failed' })
             )
@@ -312,7 +328,7 @@ export async function createCycleAction(formData: FormData) {
           copiedAssignments = insertedShifts?.length ?? 0
         }
 
-        revalidatePath('/schedule')
+        revalidateCreatedCycleSurfaces()
         redirect(
           buildReturnUrl(data.id, {
             success: 'cycle_created',
@@ -323,10 +339,10 @@ export async function createCycleAction(formData: FormData) {
       }
     }
 
-    revalidatePath('/schedule')
+    revalidateCreatedCycleSurfaces()
     redirect(buildReturnUrl(data.id, { success: 'cycle_created', copied: '0' }))
   }
 
-  revalidatePath('/schedule')
+  revalidateCreatedCycleSurfaces()
   redirect(buildReturnUrl(data.id, { success: 'cycle_created' }))
 }

@@ -46,6 +46,9 @@ export function buildCycleDraft(latestCycleEndDate: string | null, fallbackStart
 
 type CycleManagementDialogProps = {
   cycles: Cycle[]
+  currentCycleId: string | null
+  viewMode: 'week' | 'calendar' | 'roster'
+  shift: 'day' | 'night'
   open: boolean
   onOpenChange: (open: boolean) => void
   createCycleAction: (formData: FormData) => void | Promise<void>
@@ -55,6 +58,9 @@ type CycleManagementDialogProps = {
 
 export function CycleManagementDialog({
   cycles,
+  currentCycleId,
+  viewMode,
+  shift,
   open,
   onOpenChange,
   createCycleAction,
@@ -93,7 +99,11 @@ export function CycleManagementDialog({
         </DialogHeader>
 
         <form action={createCycleAction} className="space-y-4" autoComplete="off">
-          <input type="hidden" name="view" value="week" />
+          <input type="hidden" name="view" value={viewMode} />
+          <input type="hidden" name="shift" value={shift} />
+          {currentCycleId ? (
+            <input type="hidden" name="current_cycle_id" value={currentCycleId} />
+          ) : null}
           <input type="hidden" name="return_to" value="coverage" />
 
           <div className="rounded-[20px] border border-border/80 bg-muted/15 p-4">
