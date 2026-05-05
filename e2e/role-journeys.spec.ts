@@ -31,6 +31,14 @@ function formatPreliminaryShiftLabel(isoDate: string): string {
   })
 }
 
+function formatAvailabilityDayLabel(isoDate: string): string {
+  return new Date(`${isoDate}T00:00:00`).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
 async function createPublishReadyCycle(params: {
   supabase: SupabaseClient
   createdUserIds: string[]
@@ -197,8 +205,7 @@ async function createSimpleDraftCycle(params: {
 async function expectShiftTabActive(page: Page, tab: 'day' | 'night') {
   const button = page.getByTestId(`coverage-shift-tab-${tab}`).first()
   await expect(button).toBeVisible()
-  const className = await button.evaluate((element) => element.className)
-  expect(className).toMatch(/bg-primary/)
+  await expect(button).toHaveAttribute('aria-pressed', 'true')
 }
 
 async function expectStaffRedirect(page: Page, path: string) {
@@ -694,11 +701,15 @@ test.describe.serial('role journeys', () => {
 
     const dayButton = page
       .getByRole('button', {
-        name: /: Available$/,
+        name: new RegExp(`^${formatAvailabilityDayLabel(ctx!.draftCycle.availabilityDate)}$`),
       })
       .first()
     await expect(dayButton).toBeVisible()
     await dayButton.click()
+    await page
+      .getByRole('button', { name: /^Can't work$/ })
+      .last()
+      .click()
 
     const noteBox = page.locator('textarea[id^="therapist-day-note-"]').first()
     await expect(noteBox).toBeVisible()
@@ -734,12 +745,10 @@ test.describe.serial('role journeys', () => {
   }) => {
     test.skip(!ctx, 'Supabase service env values are required to run role journeys.')
 
-    const claimNote = `I can cover this shift ${randomString('claim')}`
-
     await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
     await page.goto('/preliminary')
     await expect(page.getByRole('heading', { name: 'Preliminary Schedule' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Request change' })).toBeVisible()
+    await expect(page.getByText('Team schedule overview')).toBeVisible()
 
     const openShiftCard = page
       .locator('article')
@@ -750,14 +759,23 @@ test.describe.serial('role journeys', () => {
       .first()
 
     await expect(openShiftCard).toBeVisible()
-    await openShiftCard.getByRole('textbox').fill(claimNote)
-    await openShiftCard.getByRole('button', { name: 'Claim shift' }).click()
+    await openShiftCard.getByRole('button', { name: "I'll take this" }).click()
 
-    await expect(page.getByText('Your shift claim is pending manager approval.')).toBeVisible({
+    await expect(page.getByText('Your change request is pending manager approval.')).toBeVisible({
       timeout: 30_000,
     })
     await expect(page.getByRole('heading', { name: 'Request history' })).toBeVisible()
-    await expect(page.getByText('Claimed open shift').first()).toBeVisible()
+    await expect(
+      page
+        .locator('article')
+        .filter({
+          has: page.getByText(
+            new RegExp(formatPreliminaryShiftLabel(ctx!.draftCycle.openShiftDate))
+          ),
+        })
+        .filter({ has: page.getByText('Claimed') })
+        .first()
+    ).toBeVisible()
   })
 
   test('lead can update assignment status but remains blocked from manager-only pages', async ({
@@ -774,10 +792,11 @@ test.describe.serial('role journeys', () => {
 
     await page.goto(`/coverage?cycle=${ctx!.publishedCycle.id}&view=week`)
     await expectShiftTabActive(page, 'day')
+    await page.getByRole('button', { name: 'Roster' }).click()
 
     const assignmentTrigger = page
       .locator(
-        `[data-testid="coverage-assignment-trigger-${ctx!.publishedCycle.shiftDate}-${ctx!.therapist.id}"]:visible`
+        `[data-testid="roster-status-${ctx!.therapist.id}-${ctx!.publishedCycle.shiftDate}"]:visible`
       )
       .first()
 
@@ -827,7 +846,7 @@ test.describe.serial('role journeys', () => {
     await expect(assignmentTrigger).toContainText(/call in/i)
 
     await page.goto(`/coverage?cycle=${ctx!.draftCycle.id}&view=week`)
-    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
     await expectShiftTabActive(page, 'day')
 
     await expectStaffRedirect(page, '/team')
@@ -1293,7 +1312,7 @@ test.describe.serial('role journeys', () => {
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto('/coverage?view=week')
-    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
     const directCreateButton = page.getByRole('button', { name: 'New 6-week block' })
     if ((await directCreateButton.count()) > 0) {
       await directCreateButton.first().click()
@@ -1365,7 +1384,7 @@ test.describe.serial('role journeys', () => {
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${draftCycle.cycleId}&view=week`)
-    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
     await page.getByRole('button', { name: 'Send preliminary' }).click()
     await expect(
       page.getByText('Preliminary schedule sent. Therapists can now review it in the app.')

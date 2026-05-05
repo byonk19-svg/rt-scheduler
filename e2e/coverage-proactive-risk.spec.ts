@@ -112,7 +112,7 @@ test.describe.serial('coverage proactive risk warning', () => {
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycleId}&view=week`)
-    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
 
     await expect(page.getByText('Coverage risk before Auto-draft').first()).toBeVisible()
     await expect(page.getByText(/projected to miss/i).first()).toBeVisible()
