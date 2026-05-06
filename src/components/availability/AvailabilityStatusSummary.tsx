@@ -262,8 +262,8 @@ export function AvailabilityStatusSummary({
                 <AlertDialogTitle>Send availability reminders?</AlertDialogTitle>
                 <AlertDialogDescription>
                   {missingRows.length} therapist{missingRows.length === 1 ? '' : 's'}{' '}
-                  {missingRows.length === 1 ? "hasn't" : "haven't"} submitted yet. They'll receive
-                  an email with a link to submit their availability.
+                  {missingRows.length === 1 ? "hasn't" : "haven't"} submitted yet. They&apos;ll
+                  receive an email with a link to submit their availability.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
