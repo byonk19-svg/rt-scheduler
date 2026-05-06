@@ -1,7 +1,25 @@
-import { defineConfig, devices } from '@playwright/test'
+import fs from 'node:fs'
+import path from 'node:path'
+
 import { loadEnvConfig } from '@next/env'
+import { defineConfig, devices } from '@playwright/test'
 
 loadEnvConfig(process.cwd())
+
+function loadPlaywrightEnvFile(fileName: string) {
+  const envPath = path.resolve(process.cwd(), fileName)
+  if (!fs.existsSync(envPath)) return
+
+  for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+    const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
+    if (!match) continue
+
+    const [, key, rawValue] = match
+    process.env[key] = rawValue.replace(/^(['"])(.*)\1$/, '$2')
+  }
+}
+
+loadPlaywrightEnvFile(process.env.PLAYWRIGHT_ENV_FILE ?? '.env.test')
 
 if (!process.env.CI) {
   process.env.E2E_USER_EMAIL ??= 'demo-manager@teamwise.test'
