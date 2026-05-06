@@ -570,6 +570,7 @@ export type Database = {
           description: string | null
           created_by: string | null
           created_at: string
+          site_id: string
           shift_data: Json
         }
         Insert: {
@@ -578,6 +579,7 @@ export type Database = {
           description?: string | null
           created_by?: string | null
           created_at?: string
+          site_id?: string
           shift_data: Json
         }
         Update: {
@@ -586,6 +588,7 @@ export type Database = {
           description?: string | null
           created_by?: string | null
           created_at?: string
+          site_id?: string
           shift_data?: Json
         }
         Relationships: [
@@ -1412,6 +1415,30 @@ export type Database = {
           },
         ]
       }
+      resend_webhook_receipts: {
+        Row: {
+          svix_id: string
+          event_type: string
+          email_id: string | null
+          received_at: string
+          processed_at: string | null
+        }
+        Insert: {
+          svix_id: string
+          event_type: string
+          email_id?: string | null
+          received_at?: string
+          processed_at?: string | null
+        }
+        Update: {
+          svix_id?: string
+          event_type?: string
+          email_id?: string | null
+          received_at?: string
+          processed_at?: string | null
+        }
+        Relationships: []
+      }
       schedule_cycles: {
         Row: {
           id: string
@@ -1422,6 +1449,7 @@ export type Database = {
           created_at: string | null
           archived_at: string | null
           availability_due_at: string | null
+          site_id: string
         }
         Insert: {
           id?: string
@@ -1432,6 +1460,7 @@ export type Database = {
           created_at?: string | null
           archived_at?: string | null
           availability_due_at?: string | null
+          site_id?: string
         }
         Update: {
           id?: string
@@ -1442,6 +1471,7 @@ export type Database = {
           created_at?: string | null
           archived_at?: string | null
           availability_due_at?: string | null
+          site_id?: string
         }
         Relationships: []
       }
@@ -2019,6 +2049,34 @@ export type Database = {
           p_interest_id: string
         }
         Returns: any
+      }
+      app_express_shift_post_interest: {
+        Args: {
+          p_actor_id: string
+          p_post_id: string
+        }
+        Returns: Array<{
+          id: string
+          status: string
+        }>
+      }
+      app_delete_unpublished_cycle_shifts: {
+        Args: {
+          p_actor_id: string
+          p_cycle_id: string
+          p_unfilled_only?: boolean
+        }
+        Returns: number
+      }
+      app_insert_unpublished_cycle_shifts: {
+        Args: {
+          p_actor_id: string
+          p_cycle_id: string
+          p_shifts: Json
+        }
+        Returns: Array<{
+          id: string
+        }>
       }
       app_respond_direct_shift_post: {
         Args: {

@@ -32,7 +32,7 @@ async function getAuthenticatedShellData(): Promise<{
 
     appShellUser = {
       fullName: profile?.full_name ?? user.user_metadata?.full_name ?? user.email ?? 'Team member',
-      role: toUiRole(resolveUserRole(profile?.role, user)),
+      role: toUiRole(resolveUserRole(profile?.role)),
     }
   } catch (error) {
     if (shouldIgnoreAuthenticatedLayoutError(error)) {

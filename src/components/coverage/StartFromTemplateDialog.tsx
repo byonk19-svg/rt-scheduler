@@ -25,7 +25,6 @@ type Props = {
   open: boolean
   onClose: () => void
   newCycleId: string
-  newCycleStartDate: string
   applyTemplateAction: (formData: FormData) => void | Promise<void>
 }
 
@@ -33,7 +32,6 @@ export function StartFromTemplateDialog({
   open,
   onClose,
   newCycleId,
-  newCycleStartDate,
   applyTemplateAction,
 }: Props) {
   const [templates, setTemplates] = useState<TemplateListRow[]>([])
@@ -102,7 +100,6 @@ export function StartFromTemplateDialog({
           </div>
 
           <input type="hidden" name="new_cycle_id" value={newCycleId} />
-          <input type="hidden" name="new_cycle_start_date" value={newCycleStartDate} />
           <input type="hidden" name="template_id" value={selectedTemplateId ?? ''} />
 
           {loading ? <p className="text-sm text-muted-foreground">Loading templates...</p> : null}

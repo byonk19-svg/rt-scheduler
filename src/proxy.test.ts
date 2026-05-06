@@ -250,7 +250,7 @@ describe('proxy onboarding and pending gates', () => {
     expect(response.headers.get('location')).toBeNull()
   })
 
-  it('uses auth metadata role when the profile row has not been created yet', async () => {
+  it('does not use auth metadata role when the profile row has not been created yet', async () => {
     createServerClientMock.mockReturnValue(
       makeSupabaseMock({
         user: { id: 'manager-1', user_metadata: { role: 'manager' } },
@@ -260,8 +260,8 @@ describe('proxy onboarding and pending gates', () => {
 
     const response = await proxy(makeRequest('/dashboard'))
 
-    expect(response.status).toBe(200)
-    expect(response.headers.get('location')).toBeNull()
+    expect(response.status).toBe(307)
+    expect(response.headers.get('location')).toBe('https://teamwise.test/pending-setup')
   })
 
   it('redirects signed-in users without a role to pending setup', async () => {

@@ -55,7 +55,7 @@ export default async function DashboardPage({
     .eq('id', user.id)
     .maybeSingle()
 
-  const isManager = can(resolveUserRole(profile?.role, user), 'access_manager_ui')
+  const isManager = can(resolveUserRole(profile?.role), 'access_manager_ui')
   const preferredLanding = profile?.default_landing_page === 'coverage' ? 'coverage' : 'dashboard'
   const suffix = toSearchSuffix(params)
 

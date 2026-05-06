@@ -275,7 +275,7 @@ describe('lottery workflow routes', () => {
     expect(loadLotteryHistoryMock).not.toHaveBeenCalled()
   })
 
-  it('rejects lottery history reads for another therapist when the actor is not a manager or lead', async () => {
+  it('rejects lottery history reads for another therapist when the actor is not a manager', async () => {
     createClientMock.mockResolvedValue(createSupabaseMock('staff-1'))
     loadLotteryActorMock.mockResolvedValue({
       userId: 'staff-1',
@@ -293,6 +293,24 @@ describe('lottery workflow routes', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: 'You can only view your own Lottery history.',
     })
+    expect(loadLotteryHistoryMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects lottery history reads for another therapist when the actor is a lead', async () => {
+    createClientMock.mockResolvedValue(createSupabaseMock('lead-1'))
+    loadLotteryActorMock.mockResolvedValue({
+      userId: 'lead-1',
+      fullName: 'Lead User',
+      role: 'lead',
+      siteId: 'default',
+      shiftType: 'day',
+    })
+
+    const response = await lotteryHistoryGet(
+      new Request('http://localhost/api/lottery/history?therapistId=therapist-2&shift=night')
+    )
+
+    expect(response.status).toBe(403)
     expect(loadLotteryHistoryMock).not.toHaveBeenCalled()
   })
 

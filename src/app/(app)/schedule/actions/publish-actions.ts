@@ -254,16 +254,34 @@ export async function toggleCyclePublishedAction(formData: FormData) {
     }
   }
 
-  const { error } = await supabase
+  const { data: updatedCycle, error } = await supabase
     .from('schedule_cycles')
     .update({ published: !currentlyPublished })
     .eq('id', cycleId)
+    .eq('published', currentlyPublished)
+    .select('id')
+    .maybeSingle()
 
   if (error) {
     console.error('Failed to toggle schedule publication state:', error)
+    redirect(
+      buildReturnUrl(cycleId, {
+        ...viewParams,
+        error: currentlyPublished ? 'unpublish_failed' : 'publish_failed',
+      })
+    )
   }
 
-  if (!currentlyPublished && !error) {
+  if (!updatedCycle && !error) {
+    redirect(
+      buildReturnUrl(cycleId, {
+        ...viewParams,
+        error: currentlyPublished ? 'unpublish_state_changed' : 'publish_state_changed',
+      })
+    )
+  }
+
+  if (!currentlyPublished && !error && updatedCycle) {
     const emailConfig = getPublishEmailConfig()
     let publishEventId: string | null = null
     let publishedAt: string | null = null
@@ -346,7 +364,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
       if (dedupedRecipients.length > 0) {
         const { data: outboxRows, error: outboxError } = await supabase
           .from('notification_outbox')
-          .insert(
+          .upsert(
             dedupedRecipients.map((recipient) => ({
               publish_event_id: currentPublishEventId,
               user_id: recipient.id,
@@ -354,7 +372,8 @@ export async function toggleCyclePublishedAction(formData: FormData) {
               name: recipient.fullName,
               channel: 'email',
               status: 'queued',
-            }))
+            })),
+            { onConflict: 'publish_event_id,email,channel', ignoreDuplicates: true }
           )
           .select('id')
 

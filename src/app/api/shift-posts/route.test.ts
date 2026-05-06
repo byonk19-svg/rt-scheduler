@@ -117,33 +117,9 @@ describe('shift-post mutation API', () => {
     })
   })
 
-  it('creates pickup interests through the trusted route instead of direct client writes', async () => {
-    const shiftPostsSelect = {
-      eq: vi.fn(() => ({
-        maybeSingle: async () => ({
-          data: {
-            id: 'post-1',
-            posted_by: 'other-user',
-            status: 'pending',
-            type: 'pickup',
-            visibility: 'team',
-          },
-          error: null,
-        }),
-      })),
-    }
-    const selectedInterestLookup = {
-      eq: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          maybeSingle: async () => ({
-            data: { id: 'selected-interest' },
-            error: null,
-          }),
-        })),
-      })),
-    }
-    const insertSingle = vi.fn(async () => ({
-      data: { id: 'interest-1' },
+  it('creates pickup interests through the hardened database function', async () => {
+    const rpcMock = vi.fn(async () => ({
+      data: [{ id: 'interest-1', status: 'selected' }],
       error: null,
     }))
 
@@ -151,27 +127,7 @@ describe('shift-post mutation API', () => {
       makeServerClient({ userId: 'therapist-1', role: 'therapist' })
     )
     createAdminClientMock.mockReturnValue({
-      rpc: vi.fn(),
-      from: vi.fn((table: string) => {
-        if (table === 'shift_posts') {
-          return {
-            select: vi.fn(() => shiftPostsSelect),
-          }
-        }
-
-        if (table === 'shift_post_interests') {
-          return {
-            select: vi.fn(() => selectedInterestLookup),
-            insert: vi.fn(() => ({
-              select: vi.fn(() => ({
-                maybeSingle: insertSingle,
-              })),
-            })),
-          }
-        }
-
-        throw new Error(`Unexpected admin table ${table}`)
-      }),
+      rpc: rpcMock,
     })
 
     const response = await POST(
@@ -182,18 +138,23 @@ describe('shift-post mutation API', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(insertSingle).toHaveBeenCalled()
+    expect(rpcMock).toHaveBeenCalledWith('app_express_shift_post_interest', {
+      p_actor_id: 'therapist-1',
+      p_post_id: 'post-1',
+    })
   })
 
-  it('blocks inactive staff from expressing pickup interest before admin writes', async () => {
-    const fromMock = vi.fn()
+  it('returns pickup-interest eligibility failures as client-visible validation errors', async () => {
+    const rpcMock = vi.fn(async () => ({
+      data: null,
+      error: { message: 'Pickup claimant is not eligible for this request.' },
+    }))
 
     createClientMock.mockResolvedValue(
       makeServerClient({ userId: 'therapist-1', role: 'therapist', isActive: false })
     )
     createAdminClientMock.mockReturnValue({
-      rpc: vi.fn(),
-      from: fromMock,
+      rpc: rpcMock,
     })
 
     const response = await POST(
@@ -203,8 +164,11 @@ describe('shift-post mutation API', () => {
       })
     )
 
-    expect(response.status).toBe(403)
-    expect(fromMock).not.toHaveBeenCalled()
+    expect(response.status).toBe(400)
+    expect(rpcMock).toHaveBeenCalledWith('app_express_shift_post_interest', {
+      p_actor_id: 'therapist-1',
+      p_post_id: 'post-1',
+    })
   })
 
   it('blocks review actions for non-managers before calling the review function', async () => {

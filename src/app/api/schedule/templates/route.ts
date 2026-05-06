@@ -30,7 +30,7 @@ async function requireManager() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, is_active, archived_at')
+    .select('role, is_active, archived_at, site_id')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -47,16 +47,17 @@ async function requireManager() {
     }
   }
 
-  return { error: null, supabase, user }
+  return { error: null, supabase, user, siteId: String(profile?.site_id ?? '') }
 }
 
 export async function GET() {
-  const { error, supabase } = await requireManager()
+  const { error, supabase, siteId } = await requireManager()
   if (error) return error
 
   const { data, error: templatesError } = await supabase
     .from('cycle_templates')
     .select('id, name, description, created_at, shift_data')
+    .eq('site_id', siteId)
     .order('created_at', { ascending: false })
 
   if (templatesError) {
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 })
   }
 
-  const { error, supabase, user } = await requireManager()
+  const { error, supabase, user, siteId } = await requireManager()
   if (error || !user) return error
 
   const body = (await request.json()) as {
@@ -107,6 +108,7 @@ export async function POST(request: Request) {
         .from('shifts')
         .select('user_id, date, shift_type, role')
         .eq('cycle_id', cycleId)
+        .eq('site_id', siteId)
         .not('user_id', 'is', null),
     ])
 
@@ -130,6 +132,7 @@ export async function POST(request: Request) {
       name,
       description,
       created_by: user.id,
+      site_id: siteId,
       shift_data: shiftData,
     })
     .select('id')

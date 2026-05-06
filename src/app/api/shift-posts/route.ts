@@ -98,6 +98,8 @@ function toErrorResponse(message: string): NextResponse {
     lowered.includes('lead coverage gap') ||
     lowered.includes('double booking') ||
     lowered.includes('no pickup interest') ||
+    lowered.includes('pickup claimant') ||
+    lowered.includes('already has a scheduled shift') ||
     lowered.includes('requests can only') ||
     lowered.includes('recipient is not available') ||
     lowered.includes('same shift type') ||
@@ -108,15 +110,6 @@ function toErrorResponse(message: string): NextResponse {
   }
 
   return NextResponse.json({ error: 'request_mutation_failed' }, { status: 500 })
-}
-
-function canExpressPickupInterest(profile: ProfileRow | null): boolean {
-  const role = parseRole(profile?.role)
-  return (
-    (role === 'therapist' || role === 'lead') &&
-    profile?.is_active !== false &&
-    !profile?.archived_at
-  )
 }
 
 async function getActorProfile(userId: string): Promise<ProfileRow | null> {
@@ -242,87 +235,10 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
       }
 
-      const actorProfile = await getActorProfile(user.id)
-      if (!canExpressPickupInterest(actorProfile)) {
-        return NextResponse.json({ error: 'forbidden' }, { status: 403 })
-      }
-
-      const { data: post, error: postError } = await admin
-        .from('shift_posts')
-        .select('id, posted_by, status, type, visibility')
-        .eq('id', requestId)
-        .maybeSingle()
-
-      const requestPost = (post ?? null) as {
-        id: string
-        posted_by: string | null
-        status: string | null
-        type: string | null
-        visibility: 'team' | 'direct' | null
-      } | null
-
-      if (postError || !requestPost) {
-        return NextResponse.json({ error: 'Shift post was not found.' }, { status: 404 })
-      }
-
-      if (
-        requestPost.type !== 'pickup' ||
-        requestPost.status !== 'pending' ||
-        (requestPost.visibility ?? 'team') !== 'team'
-      ) {
-        return NextResponse.json(
-          { error: 'This pickup request is no longer accepting interests.' },
-          { status: 400 }
-        )
-      }
-
-      if (requestPost.posted_by === user.id) {
-        return NextResponse.json(
-          { error: 'You cannot express interest in your own pickup request.' },
-          { status: 400 }
-        )
-      }
-
-      const insertedAt = new Date().toISOString()
-      let nextStatus: 'pending' | 'selected' = 'selected'
-      const { data: selectedInterest } = await admin
-        .from('shift_post_interests')
-        .select('id')
-        .eq('shift_post_id', requestId)
-        .eq('status', 'selected')
-        .maybeSingle()
-
-      if (selectedInterest?.id) {
-        nextStatus = 'pending'
-      }
-
-      let { data, error } = await admin
-        .from('shift_post_interests')
-        .insert({
-          shift_post_id: requestId,
-          therapist_id: user.id,
-          status: nextStatus,
-          created_at: insertedAt,
-        })
-        .select('id')
-        .maybeSingle()
-
-      if (error && nextStatus === 'selected' && error.code === '23505') {
-        const retryResult = await admin
-          .from('shift_post_interests')
-          .insert({
-            shift_post_id: requestId,
-            therapist_id: user.id,
-            status: 'pending',
-            created_at: insertedAt,
-          })
-          .select('id')
-          .maybeSingle()
-
-        data = retryResult.data
-        error = retryResult.error
-        nextStatus = 'pending'
-      }
+      const { data, error } = await admin.rpc('app_express_shift_post_interest', {
+        p_actor_id: user.id,
+        p_post_id: requestId,
+      })
 
       if (error || !data) {
         return toErrorResponse(error?.message ?? 'Could not save interest.')
@@ -330,10 +246,7 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         success: true,
-        result: {
-          id: data.id,
-          status: nextStatus,
-        },
+        result: data,
       })
     }
 

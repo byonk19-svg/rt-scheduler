@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-export type PublishDeliveryStatus = 'queued' | 'sent' | 'failed'
+export type PublishDeliveryStatus = 'queued' | 'processing' | 'sent' | 'failed'
 
 export type PublishDeliveryCount = {
   queuedCount: number
@@ -87,7 +87,7 @@ export function aggregatePublishDeliveryCounts(
       failedCount: 0,
     }
 
-    if (row.status === 'queued') bucket.queuedCount += 1
+    if (row.status === 'queued' || row.status === 'processing') bucket.queuedCount += 1
     if (row.status === 'sent') bucket.sentCount += 1
     if (row.status === 'failed') bucket.failedCount += 1
 
@@ -309,6 +309,22 @@ export async function processQueuedPublishEmails(
   let nextSendNotBefore = 0
 
   for (const row of rows) {
+    const { data: claimedRow, error: claimError } = await admin
+      .from('notification_outbox')
+      .update({ status: 'processing' })
+      .eq('id', row.id)
+      .eq('status', 'queued')
+      .select('id')
+      .maybeSingle()
+
+    if (claimError) {
+      throw new Error(claimError.message)
+    }
+
+    if (!claimedRow) {
+      continue
+    }
+
     if (row.user_id && emailPreferenceByUserId.get(row.user_id) === false) {
       const { error: skipUpdateError } = await admin
         .from('notification_outbox')

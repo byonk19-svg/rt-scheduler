@@ -11,6 +11,7 @@ vi.mock('@/lib/supabase/server', () => ({
 type Scenario = {
   userId?: string | null
   role?: string
+  siteId?: string
   isActive?: boolean | null
   archivedAt?: string | null
 }
@@ -19,6 +20,7 @@ function makeSupabaseMock(scenario: Scenario = {}) {
   const state = {
     insertedTemplates: [] as Array<Record<string, unknown>>,
     deletedTemplateIds: [] as string[],
+    filters: [] as Array<{ table: string; column: string; value: unknown }>,
   }
 
   const auth = {
@@ -50,6 +52,7 @@ function makeSupabaseMock(scenario: Scenario = {}) {
                   role: scenario.role ?? 'manager',
                   is_active: scenario.isActive ?? true,
                   archived_at: scenario.archivedAt ?? null,
+                  site_id: scenario.siteId ?? 'site-a',
                 },
           error: null,
         }
@@ -104,6 +107,7 @@ function makeSupabaseMock(scenario: Scenario = {}) {
       select: () => builder,
       eq: (column: string, value: unknown) => {
         queryState.filters[column] = value
+        state.filters.push({ table, column, value })
         return builder
       },
       not: (column: string, operator: string, value: unknown) => {
@@ -234,5 +238,36 @@ describe('schedule template mutation security', () => {
 
     expect(response.status).toBe(403)
     expect(supabase.state.deletedTemplateIds).toHaveLength(0)
+  })
+
+  it('stores templates with the manager site id and reads shifts from that site only', async () => {
+    const supabase = makeSupabaseMock({ siteId: 'site-b' })
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/templates', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          origin: 'http://localhost',
+        },
+        body: JSON.stringify({
+          cycleId: 'cycle-1',
+          name: 'March template',
+        }),
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(supabase.state.insertedTemplates[0]).toMatchObject({
+      site_id: 'site-b',
+    })
+    expect(supabase.state.filters).toContainEqual({
+      table: 'shifts',
+      column: 'site_id',
+      value: 'site-b',
+    })
   })
 })

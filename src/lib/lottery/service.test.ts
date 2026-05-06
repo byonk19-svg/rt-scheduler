@@ -15,6 +15,25 @@ const actor: LotteryActor = {
 }
 
 describe('applyLotteryDecision', () => {
+  it('does not allow leads to apply lottery decisions', async () => {
+    const result = await applyLotteryDecision({
+      actor: { ...actor, userId: 'lead-1', role: 'lead' },
+      authClient: {
+        rpc: vi.fn(),
+      },
+      shiftDate: '2026-04-23',
+      shiftType: 'day',
+      keepToWork: 0,
+      contextSignature: 'ctx-1',
+      actions: [],
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Only managers can apply Lottery results.',
+    })
+  })
+
   it('rolls back the current assignment when reconciliation fails after the status mutation', async () => {
     const updateAssignmentStatusWithLotteryMock = vi
       .fn()
@@ -113,6 +132,20 @@ describe('moveLotteryListEntry', () => {
       },
     ])
   }
+
+  it('does not allow leads to edit the lottery list', async () => {
+    const result = await moveLotteryListEntry({
+      actor: { ...actor, userId: 'lead-1', role: 'lead' },
+      entryId: 'entry-1',
+      shiftType: 'day',
+      direction: 'down',
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Only managers can edit the Lottery list.',
+    })
+  })
 
   it('restores the original order when step 2 fails', async () => {
     const orderState: Record<string, number> = {

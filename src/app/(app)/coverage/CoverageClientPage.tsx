@@ -1582,7 +1582,6 @@ export function CoverageClientPage({
           open
           onClose={() => setTemplateTarget(null)}
           newCycleId={templateTarget.cycleId}
-          newCycleStartDate={templateTarget.startDate}
           applyTemplateAction={applyTemplateAction}
         />
       ) : null}

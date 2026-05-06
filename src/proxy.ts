@@ -175,7 +175,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  const role = normalizeRole(resolveUserRole(profileRow?.role, user))
+  const role = normalizeRole(resolveUserRole(profileRow?.role))
   const onboardingStatus =
     role === 'staff' && profileRow
       ? getStaffOnboardingStatus({

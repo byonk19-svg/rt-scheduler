@@ -520,9 +520,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing email id.' }, { status: 400 })
   }
 
+  const webhookId = request.headers.get('svix-id')?.trim()
+  if (!webhookId) {
+    return NextResponse.json({ error: 'Missing webhook id.' }, { status: 400 })
+  }
+
+  const receiptAdmin = createAdminClient()
+  const { error: receiptError } = await receiptAdmin.from('resend_webhook_receipts').insert({
+    svix_id: webhookId,
+    event_type: payload.type,
+    email_id: emailId,
+  })
+
+  if (receiptError) {
+    if (receiptError.code === '23505') {
+      return NextResponse.json({ ok: true, duplicate: true, email_id: emailId })
+    }
+
+    console.error('Failed to record inbound Resend webhook receipt:', receiptError)
+    return NextResponse.json({ error: 'Could not queue webhook.' }, { status: 500 })
+  }
+
   after(async () => {
     try {
       await processInboundAvailabilityEmail(emailId)
+      await receiptAdmin
+        .from('resend_webhook_receipts')
+        .update({ processed_at: new Date().toISOString() })
+        .eq('svix_id', webhookId)
     } catch (error) {
       console.error('Failed to process inbound availability email:', error)
     }

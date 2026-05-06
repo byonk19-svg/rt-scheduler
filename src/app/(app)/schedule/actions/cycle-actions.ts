@@ -87,6 +87,7 @@ export async function deleteCycleAction(formData: FormData) {
     .from('schedule_cycles')
     .delete()
     .eq('id', cycleId)
+    .eq('published', false)
     .select('id')
 
   if (error) {
@@ -132,6 +133,17 @@ export async function createCycleAction(formData: FormData) {
   const role = await getRoleForUser(user.id)
   if (!can(role, 'manage_schedule')) {
     redirect('/schedule')
+  }
+
+  const { data: actorProfile, error: actorProfileError } = await supabase
+    .from('profiles')
+    .select('site_id')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (actorProfileError || !actorProfile?.site_id) {
+    console.error('Failed to load manager site for cycle creation:', actorProfileError)
+    redirect('/schedule?error=create_cycle_failed')
   }
 
   const label = String(formData.get('label') ?? '').trim()
@@ -199,6 +211,7 @@ export async function createCycleAction(formData: FormData) {
       start_date: startDate,
       end_date: endDate,
       published,
+      site_id: actorProfile.site_id,
     })
     .select('id')
     .maybeSingle()

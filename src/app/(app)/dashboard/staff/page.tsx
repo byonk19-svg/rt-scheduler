@@ -199,7 +199,7 @@ export default async function StaffDashboardPage({
     .eq('id', user.id)
     .maybeSingle()
 
-  if (can(resolveUserRole(profile?.role, user), 'access_manager_ui')) {
+  if (can(resolveUserRole(profile?.role), 'access_manager_ui')) {
     redirect('/dashboard/manager')
   }
 

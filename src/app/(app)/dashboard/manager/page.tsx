@@ -192,7 +192,7 @@ export default async function ManagerDashboardPage() {
   }
 
   const profile = (profileResult.data ?? null) as ManagerProfileRow | null
-  if (!can(resolveUserRole(profile?.role, user), 'access_manager_ui')) {
+  if (!can(resolveUserRole(profile?.role), 'access_manager_ui')) {
     redirect('/dashboard/staff')
   }
 

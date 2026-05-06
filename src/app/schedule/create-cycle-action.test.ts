@@ -75,6 +75,9 @@ function createSupabaseMock(context: TestContext) {
         select() {
           return builder
         },
+        eq() {
+          return builder
+        },
         is() {
           return builder
         },
@@ -93,6 +96,12 @@ function createSupabaseMock(context: TestContext) {
               }
             },
           }
+        },
+        maybeSingle: async () => {
+          if (table === 'profiles') {
+            return { data: { site_id: 'default' }, error: null }
+          }
+          return { data: null, error: null }
         },
         then(resolve: (value: unknown) => unknown) {
           if (table === 'schedule_cycles') {

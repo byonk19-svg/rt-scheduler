@@ -158,6 +158,22 @@ export async function queueAndSendShiftReminders(
   let failed = 0
 
   for (const row of rows) {
+    const { data: claimedRow, error: claimError } = await adminClient
+      .from('shift_reminder_outbox')
+      .update({ status: 'processing' })
+      .eq('id', row.id)
+      .eq('status', 'queued')
+      .select('id')
+      .maybeSingle()
+
+    if (claimError) {
+      throw new Error(claimError.message)
+    }
+
+    if (!claimedRow) {
+      continue
+    }
+
     const shift = getOne(row.shifts)
     const shiftType = shift?.shift_type ?? 'day'
     const shiftDate = shift?.date ?? tomorrow

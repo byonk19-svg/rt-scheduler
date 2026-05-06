@@ -249,15 +249,15 @@ function getOne<T>(value: T | T[] | null | undefined): T | null {
 }
 
 function canManageList(role: UiRole): boolean {
-  return role === 'manager' || role === 'lead'
+  return role === 'manager'
 }
 
 function canApplyLottery(role: UiRole): boolean {
-  return role === 'manager' || role === 'lead'
+  return role === 'manager'
 }
 
 function canReadLotteryHistory(actor: LotteryActor, therapistId: string): boolean {
-  return actor.userId === therapistId || actor.role === 'manager' || actor.role === 'lead'
+  return actor.userId === therapistId || actor.role === 'manager'
 }
 
 function lotteryServiceError(
@@ -1246,7 +1246,7 @@ export async function addLotteryListEntry(args: {
   shiftType: LotteryShiftType
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!canManageList(args.actor.role)) {
-    return { ok: false, error: 'Only leads or managers can edit the Lottery list.' }
+    return { ok: false, error: 'Only managers can edit the Lottery list.' }
   }
 
   const [profileResult, currentList] = await Promise.all([
@@ -1315,7 +1315,7 @@ export async function moveLotteryListEntry(
   }
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!canManageList(args.actor.role)) {
-    return { ok: false, error: 'Only leads or managers can edit the Lottery list.' }
+    return { ok: false, error: 'Only managers can edit the Lottery list.' }
   }
 
   const loadList = deps?.loadLotteryList ?? loadLotteryList
@@ -1905,7 +1905,7 @@ export async function applyLotteryDecision(
   const deleteDecision = deps?.deleteLotteryDecision ?? deleteLotteryDecision
 
   if (!canApplyLottery(args.actor.role)) {
-    return { ok: false, error: 'Only leads or managers can apply Lottery results.' }
+    return { ok: false, error: 'Only managers can apply Lottery results.' }
   }
 
   const snapshot = await loadSnapshot({

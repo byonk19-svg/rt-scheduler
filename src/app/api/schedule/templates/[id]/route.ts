@@ -17,7 +17,7 @@ async function requireManager() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, is_active, archived_at')
+    .select('role, is_active, archived_at, site_id')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -30,7 +30,7 @@ async function requireManager() {
     return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }), supabase }
   }
 
-  return { error: null, supabase }
+  return { error: null, supabase, siteId: String(profile?.site_id ?? '') }
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -38,11 +38,15 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 })
   }
 
-  const { error, supabase } = await requireManager()
+  const { error, supabase, siteId } = await requireManager()
   if (error) return error
 
   const { id } = await params
-  const { error: deleteError } = await supabase.from('cycle_templates').delete().eq('id', id)
+  const { error: deleteError } = await supabase
+    .from('cycle_templates')
+    .delete()
+    .eq('id', id)
+    .eq('site_id', siteId)
 
   if (deleteError) {
     return NextResponse.json({ error: deleteError.message }, { status: 500 })

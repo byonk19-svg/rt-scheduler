@@ -41,6 +41,7 @@ import type { ShiftStatus, ShiftRole, EmploymentType } from '@/app/schedule/type
 type RemovableShift = {
   id: string
   cycle_id: string
+  site_id: string
   user_id: string
   date: string
   shift_type: 'day' | 'night'
@@ -445,7 +446,7 @@ export async function POST(request: Request) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, is_active, archived_at')
+    .select('role, is_active, archived_at, site_id')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -456,6 +457,10 @@ export async function POST(request: Request) {
     })
   ) {
     return NextResponse.json({ error: 'Manager access required' }, { status: 403 })
+  }
+  const managerSiteId = typeof profile?.site_id === 'string' ? profile.site_id : ''
+  if (!managerSiteId) {
+    return NextResponse.json({ error: 'Manager site scope required' }, { status: 403 })
   }
 
   const payload = parseActionBody(await request.json().catch(() => null))
@@ -491,6 +496,16 @@ export async function POST(request: Request) {
     }
     if (!isDateWithinRange(payload.date, cycle.start_date, cycle.end_date)) {
       return NextResponse.json({ error: 'Date is outside this cycle' }, { status: 400 })
+    }
+
+    const { data: targetProfile, error: targetProfileError } = await supabase
+      .from('profiles')
+      .select('site_id')
+      .eq('id', payload.userId)
+      .maybeSingle()
+
+    if (targetProfileError || targetProfile?.site_id !== managerSiteId) {
+      return NextResponse.json({ error: 'Therapist is outside your site scope.' }, { status: 403 })
     }
 
     const availabilityState = await getTherapistAvailabilityState(
@@ -678,12 +693,15 @@ export async function POST(request: Request) {
 
     const { data: shift, error: shiftError } = await supabase
       .from('shifts')
-      .select('id, cycle_id, user_id, date, shift_type, status, role')
+      .select('id, cycle_id, site_id, user_id, date, shift_type, status, role')
       .eq('id', payload.shiftId)
       .maybeSingle()
 
     if (shiftError || !shift || shift.cycle_id !== payload.cycleId) {
       return NextResponse.json({ error: 'Shift not found in this cycle' }, { status: 404 })
+    }
+    if (shift.site_id !== managerSiteId) {
+      return NextResponse.json({ error: 'Shift is outside your site scope.' }, { status: 403 })
     }
 
     if (shift.date === payload.targetDate && shift.shift_type === payload.targetShiftType) {
@@ -881,7 +899,7 @@ export async function POST(request: Request) {
     if ('shiftId' in payload) {
       const result = await supabase
         .from('shifts')
-        .select('id, cycle_id, user_id, date, shift_type, role')
+        .select('id, cycle_id, site_id, user_id, date, shift_type, role')
         .eq('id', payload.shiftId)
         .maybeSingle()
       shift = (result.data as RemovableShift | null) ?? null
@@ -889,7 +907,7 @@ export async function POST(request: Request) {
     } else {
       const result = await supabase
         .from('shifts')
-        .select('id, cycle_id, user_id, date, shift_type, role')
+        .select('id, cycle_id, site_id, user_id, date, shift_type, role')
         .eq('cycle_id', payload.cycleId)
         .eq('user_id', payload.userId)
         .eq('date', payload.date)
@@ -901,6 +919,9 @@ export async function POST(request: Request) {
 
     if (shiftError || !shift || shift.cycle_id !== payload.cycleId) {
       return NextResponse.json({ error: 'Shift not found in this cycle' }, { status: 404 })
+    }
+    if (shift.site_id !== managerSiteId) {
+      return NextResponse.json({ error: 'Shift is outside your site scope.' }, { status: 403 })
     }
 
     await preserveShiftPostHistoryBeforeShiftDeletion(
@@ -975,7 +996,7 @@ export async function POST(request: Request) {
 
     const { data: therapist, error: therapistError } = await supabase
       .from('profiles')
-      .select('id, role, is_lead_eligible')
+      .select('id, role, is_lead_eligible, site_id')
       .eq('id', payload.therapistId)
       .maybeSingle()
 
@@ -989,6 +1010,9 @@ export async function POST(request: Request) {
         { error: 'Only lead-eligible therapists can be designated as lead.' },
         { status: 409 }
       )
+    }
+    if (therapist.site_id !== managerSiteId) {
+      return NextResponse.json({ error: 'Therapist is outside your site scope.' }, { status: 403 })
     }
 
     const availabilityState = await getTherapistAvailabilityState(

@@ -39,6 +39,8 @@ function createAdminMock() {
     attachmentUpserts: [] as Array<Record<string, unknown>>,
     itemInserts: [] as Array<Array<Record<string, unknown>>>,
     overrideUpserts: [] as Array<Array<Record<string, unknown>>>,
+    receiptInserts: [] as Array<Record<string, unknown>>,
+    receiptUpdates: [] as Array<Record<string, unknown>>,
   }
 
   return {
@@ -92,11 +94,24 @@ function createAdminMock() {
 
           return Promise.resolve({ error: null })
         },
-        insert(payload: Array<Record<string, unknown>>) {
+        insert(payload: Record<string, unknown> | Array<Record<string, unknown>>) {
+          if (table === 'resend_webhook_receipts') {
+            state.receiptInserts.push(payload as Record<string, unknown>)
+            return Promise.resolve({ error: null })
+          }
+
           if (table === 'availability_email_intake_items') {
-            state.itemInserts.push(payload)
+            state.itemInserts.push(payload as Array<Record<string, unknown>>)
           }
           return Promise.resolve({ error: null })
+        },
+        update(payload: Record<string, unknown>) {
+          if (table === 'resend_webhook_receipts') {
+            state.receiptUpdates.push(payload)
+          }
+          return {
+            eq: async () => ({ error: null }),
+          }
         },
         maybeSingle: async () => {
           if (table === 'profiles') {
@@ -161,6 +176,7 @@ function createWebhookRequest(emailId = 'email-1') {
     }),
     headers: {
       'content-type': 'application/json',
+      'svix-id': `svix-${emailId}`,
     },
   })
 }

@@ -131,12 +131,25 @@ describe('processQueuedPublishEmails', () => {
               return Promise.resolve({ data: null, error: null })
             },
             update(payload: Record<string, unknown>) {
-              return {
-                eq(_column: string, id: string) {
+              let id = ''
+              const updateBuilder = {
+                eq(column: string, value: string) {
+                  if (column === 'id') id = value
+                  return updateBuilder
+                },
+                select() {
+                  return updateBuilder
+                },
+                maybeSingle() {
                   outboxUpdates.push({ id, payload })
-                  return Promise.resolve({ error: null })
+                  return Promise.resolve({ data: { id }, error: null })
+                },
+                then(resolve: (value: { error: null }) => unknown) {
+                  outboxUpdates.push({ id, payload })
+                  return Promise.resolve(resolve({ error: null }))
                 },
               }
+              return updateBuilder
             },
             then(resolve: (value: unknown) => unknown) {
               return Promise.resolve(
@@ -220,6 +233,10 @@ describe('processQueuedPublishEmails', () => {
     const fetchPayload = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string)
     expect(fetchPayload.html).toContain('https://www.teamwise.work/therapist/schedule')
     expect(outboxUpdates[0]).toMatchObject({
+      id: 'outbox-1',
+      payload: expect.objectContaining({ status: 'processing' }),
+    })
+    expect(outboxUpdates[1]).toMatchObject({
       id: 'outbox-1',
       payload: expect.objectContaining({ status: 'sent', attempt_count: 1 }),
     })

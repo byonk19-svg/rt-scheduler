@@ -26,8 +26,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Therapist is required.' }, { status: 400 })
   }
 
-  const canReadHistory =
-    actor.userId === therapistId || actor.role === 'manager' || actor.role === 'lead'
+  const canReadHistory = actor.userId === therapistId || actor.role === 'manager'
 
   if (!canReadHistory) {
     return NextResponse.json(

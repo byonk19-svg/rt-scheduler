@@ -30,6 +30,7 @@ type Scenario = {
   removableShift?: {
     id: string
     cycle_id: string
+    site_id?: string
     user_id: string
     date: string
     shift_type: 'day' | 'night'
@@ -51,6 +52,7 @@ type Scenario = {
       full_name?: string
       employment_type?: 'full_time' | 'part_time' | 'prn'
       max_work_days_per_week?: number
+      site_id?: string
     }
   >
   insertError?: { code?: string; message?: string } | null
@@ -90,6 +92,7 @@ function makeSupabaseMock(scenario: Scenario) {
         full_name: 'Manager',
         employment_type: 'full_time',
         max_work_days_per_week: 3,
+        site_id: 'site-a',
       }
     }
     if (id === 'therapist-lead') {
@@ -99,6 +102,7 @@ function makeSupabaseMock(scenario: Scenario) {
         full_name: 'Lead Therapist',
         employment_type: 'full_time',
         max_work_days_per_week: 3,
+        site_id: 'site-a',
       }
     }
     const custom = scenario.therapistProfiles?.[id]
@@ -109,6 +113,7 @@ function makeSupabaseMock(scenario: Scenario) {
         full_name: custom.full_name ?? id,
         employment_type: custom.employment_type ?? 'full_time',
         max_work_days_per_week: custom.max_work_days_per_week ?? 3,
+        site_id: custom.site_id ?? 'site-a',
       }
     }
     return {
@@ -117,6 +122,7 @@ function makeSupabaseMock(scenario: Scenario) {
       full_name: id,
       employment_type: 'full_time',
       max_work_days_per_week: 3,
+      site_id: 'site-a',
     }
   }
 
@@ -165,14 +171,17 @@ function makeSupabaseMock(scenario: Scenario) {
 
         if (single && state.filters.id === 'shift-1') {
           return {
-            data: scenario.removableShift ?? {
-              id: 'shift-1',
-              cycle_id: 'cycle-1',
-              user_id: 'therapist-1',
-              date: '2026-03-10',
-              shift_type: 'day',
-              role: 'staff',
-            },
+            data: scenario.removableShift
+              ? { ...scenario.removableShift, site_id: scenario.removableShift.site_id ?? 'site-a' }
+              : {
+                  id: 'shift-1',
+                  cycle_id: 'cycle-1',
+                  site_id: 'site-a',
+                  user_id: 'therapist-1',
+                  date: '2026-03-10',
+                  shift_type: 'day',
+                  role: 'staff',
+                },
             error: null,
           }
         }
@@ -423,6 +432,40 @@ describe('drag-drop API behavior', () => {
     expect(response.status).toBe(409)
     await expect(response.json()).resolves.toMatchObject({
       error: 'Each shift can have at most 5 scheduled team members.',
+    })
+  })
+
+  it('blocks assignment to therapists outside the manager site', async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      makeSupabaseMock({
+        coverageStatuses: [],
+        weeklyShifts: [],
+        therapistProfiles: {
+          'therapist-1': {
+            site_id: 'site-b',
+          },
+        },
+      }) as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          action: 'assign',
+          cycleId: 'cycle-1',
+          userId: 'therapist-1',
+          shiftType: 'day',
+          date: '2026-03-10',
+          overrideWeeklyRules: false,
+        }),
+      })
+    )
+
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Therapist is outside your site scope.',
     })
   })
 
