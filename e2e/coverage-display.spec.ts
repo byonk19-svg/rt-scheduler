@@ -2,16 +2,26 @@ import { expect, test } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
-import { formatDateKey, randomString } from './helpers/env'
+import { addDays, formatDateKey, randomString } from './helpers/env'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type TestContext = {
   supabase: SupabaseClient
   manager: { id: string; email: string; password: string }
   staffViewer: { id: string; email: string; password: string }
-  publishedCycle: { id: string; targetDate: string }
+  publishedCycle: {
+    id: string
+    startDate: string
+    endDate: string
+    targetDate: string
+    underDate: string
+    healthyDate: string
+    overDate: string
+    nightDate: string
+  }
   emptyDraftCycle: { id: string; startDate: string }
   expectedNames: string[]
+  nightLeadName: string
 }
 
 test.describe.serial('coverage display regressions', () => {
@@ -51,6 +61,7 @@ test.describe.serial('coverage display regressions', () => {
     const leadName = `LeadDisplay ${randomString('lead')}`
     const therapistName = `StaffDisplay ${randomString('staff')}`
     const secondTherapistName = `FloatDisplay ${randomString('float')}`
+    const nightLeadName = `NightDisplay ${randomString('lead')}`
 
     const lead = await createE2EUser(supabase, {
       email: `${randomString('coverage-lead')}@example.com`,
@@ -82,13 +93,47 @@ test.describe.serial('coverage display regressions', () => {
       isLeadEligible: false,
     })
 
-    createdUserIds.push(manager.id, staffViewer.id, lead.id, therapist.id, secondTherapist.id)
+    const extraTherapists: Array<{ id: string; fullName: string }> = []
+    for (let index = 0; index < 3; index += 1) {
+      const extraName = `ExtraDisplay${index + 1} ${randomString('extra')}`
+      const extraTherapist = await createE2EUser(supabase, {
+        email: `${randomString(`coverage-extra-${index}`)}@example.com`,
+        password: `Ther!${Math.random().toString(16).slice(2, 8)}`,
+        fullName: extraName,
+        role: 'therapist',
+        employmentType: 'full_time',
+        shiftType: 'day',
+        isLeadEligible: false,
+      })
+      extraTherapists.push({ id: extraTherapist.id, fullName: extraName })
+    }
 
-    const cycleStart = new Date()
-    cycleStart.setDate(cycleStart.getDate() - 1)
-    const cycleEnd = new Date(cycleStart)
-    cycleEnd.setDate(cycleEnd.getDate() + 41)
-    const targetDate = formatDateKey(new Date(cycleStart))
+    const nightLead = await createE2EUser(supabase, {
+      email: `${randomString('coverage-night-lead')}@example.com`,
+      password: `Lead!${Math.random().toString(16).slice(2, 8)}`,
+      fullName: nightLeadName,
+      role: 'lead',
+      employmentType: 'full_time',
+      shiftType: 'night',
+      isLeadEligible: true,
+    })
+
+    createdUserIds.push(
+      manager.id,
+      staffViewer.id,
+      lead.id,
+      therapist.id,
+      secondTherapist.id,
+      nightLead.id,
+      ...extraTherapists.map((row) => row.id)
+    )
+
+    const cycleStart = addDays(new Date(), -1)
+    const cycleEnd = addDays(cycleStart, 41)
+    const underDate = formatDateKey(cycleStart)
+    const healthyDate = formatDateKey(addDays(cycleStart, 1))
+    const overDate = formatDateKey(addDays(cycleStart, 2))
+    const nightDate = healthyDate
 
     const publishedCycleInsert = await supabase
       .from('schedule_cycles')
@@ -130,7 +175,7 @@ test.describe.serial('coverage display regressions', () => {
       {
         cycle_id: publishedCycleInsert.data.id,
         user_id: lead.id,
-        date: targetDate,
+        date: underDate,
         shift_type: 'day',
         role: 'lead',
         status: 'scheduled',
@@ -139,7 +184,25 @@ test.describe.serial('coverage display regressions', () => {
       {
         cycle_id: publishedCycleInsert.data.id,
         user_id: therapist.id,
-        date: targetDate,
+        date: underDate,
+        shift_type: 'day',
+        role: 'staff',
+        status: 'scheduled',
+        assignment_status: 'scheduled',
+      },
+      {
+        cycle_id: publishedCycleInsert.data.id,
+        user_id: lead.id,
+        date: healthyDate,
+        shift_type: 'day',
+        role: 'lead',
+        status: 'scheduled',
+        assignment_status: 'scheduled',
+      },
+      {
+        cycle_id: publishedCycleInsert.data.id,
+        user_id: therapist.id,
+        date: healthyDate,
         shift_type: 'day',
         role: 'staff',
         status: 'scheduled',
@@ -148,12 +211,30 @@ test.describe.serial('coverage display regressions', () => {
       {
         cycle_id: publishedCycleInsert.data.id,
         user_id: secondTherapist.id,
-        date: targetDate,
+        date: healthyDate,
         shift_type: 'day',
         role: 'staff',
         status: 'scheduled',
         assignment_status: 'scheduled',
       },
+      {
+        cycle_id: publishedCycleInsert.data.id,
+        user_id: nightLead.id,
+        date: nightDate,
+        shift_type: 'night',
+        role: 'lead',
+        status: 'scheduled',
+        assignment_status: 'scheduled',
+      },
+      ...[lead, therapist, secondTherapist, ...extraTherapists].map((row, index) => ({
+        cycle_id: publishedCycleInsert.data.id,
+        user_id: row.id,
+        date: overDate,
+        shift_type: 'day' as const,
+        role: index === 0 ? ('lead' as const) : ('staff' as const),
+        status: 'scheduled' as const,
+        assignment_status: 'scheduled' as const,
+      })),
     ])
 
     if (shiftsInsert.error) {
@@ -168,7 +249,16 @@ test.describe.serial('coverage display regressions', () => {
         email: staffViewerEmail,
         password: staffViewerPassword,
       },
-      publishedCycle: { id: publishedCycleInsert.data.id, targetDate },
+      publishedCycle: {
+        id: publishedCycleInsert.data.id,
+        startDate: formatDateKey(cycleStart),
+        endDate: formatDateKey(cycleEnd),
+        targetDate: healthyDate,
+        underDate,
+        healthyDate,
+        overDate,
+        nightDate,
+      },
       emptyDraftCycle: {
         id: emptyDraftCycleInsert.data.id,
         startDate: emptyDraftCycleInsert.data.start_date,
@@ -178,6 +268,7 @@ test.describe.serial('coverage display regressions', () => {
         therapistName.split(' ')[0]!,
         secondTherapistName.split(' ')[0]!,
       ],
+      nightLeadName: nightLeadName.split(' ')[0]!,
     }
   })
 
@@ -198,7 +289,12 @@ test.describe.serial('coverage display regressions', () => {
     await loginAs(page, ctx!.staffViewer.email, ctx!.staffViewer.password)
     await page.goto(`/coverage?cycle=${ctx!.publishedCycle.id}`)
 
-    await expect(page.getByRole('heading', { name: 'Team Schedule' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
+    await expect(
+      page.getByText(
+        'Read-only team staffing view. Use My Schedule for your own shifts and Future Availability for the next cycle.'
+      )
+    ).toBeVisible()
     await expect(page.getByRole('button', { name: 'Cycle board' })).toHaveAttribute(
       'aria-pressed',
       'true'
@@ -213,6 +309,66 @@ test.describe.serial('coverage display regressions', () => {
       await expect(dayPanel.getByText(name, { exact: false })).toBeVisible()
     }
     await expect(dayPanel.getByText('Unknown')).toHaveCount(0)
+  })
+
+  test('manager calendar renders the full cycle and keeps day/night cells independent', async ({
+    page,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    await loginAs(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto(`/coverage?cycle=${ctx!.publishedCycle.id}&view=week&shift=day`)
+    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
+
+    const visibleDayPanels = page.locator('[data-testid^="coverage-day-panel-"]:visible')
+    await expect(visibleDayPanels).toHaveCount(42, { timeout: 15_000 })
+    await expect(
+      page.locator(`[data-testid="coverage-day-panel-${ctx!.publishedCycle.startDate}"]:visible`)
+    ).toBeVisible()
+    await expect(
+      page.locator(`[data-testid="coverage-day-panel-${ctx!.publishedCycle.endDate}"]:visible`)
+    ).toBeVisible()
+
+    const dayPanel = page.locator(
+      `[data-testid="coverage-day-panel-${ctx!.publishedCycle.targetDate}"]:visible`
+    )
+    await expect(dayPanel.getByText(ctx!.expectedNames[0], { exact: false })).toBeVisible()
+
+    await page.getByTestId('coverage-shift-tab-night').click()
+    await expect(visibleDayPanels).toHaveCount(42, { timeout: 15_000 })
+
+    const nightPanel = page.locator(
+      `[data-testid="coverage-day-panel-${ctx!.publishedCycle.nightDate}"]:visible`
+    )
+    await expect(nightPanel.getByText(ctx!.nightLeadName, { exact: false })).toBeVisible()
+    await expect(nightPanel.getByText(ctx!.expectedNames[0], { exact: false })).toHaveCount(0)
+  })
+
+  test('manager calendar headcount badge uses coverage min/max thresholds', async ({ page }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    await loginAs(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto(`/coverage?cycle=${ctx!.publishedCycle.id}&view=week&shift=day`)
+    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
+
+    const underBadge = page
+      .locator(`[data-testid="coverage-headcount-badge-${ctx!.publishedCycle.underDate}"]:visible`)
+      .first()
+    const healthyBadge = page
+      .locator(
+        `[data-testid="coverage-headcount-badge-${ctx!.publishedCycle.healthyDate}"]:visible`
+      )
+      .first()
+    const overBadge = page
+      .locator(`[data-testid="coverage-headcount-badge-${ctx!.publishedCycle.overDate}"]:visible`)
+      .first()
+
+    await expect(underBadge).toContainText('2/3-5')
+    await expect(underBadge).toHaveClass(/error-text/)
+    await expect(healthyBadge).toContainText('3/3-5')
+    await expect(healthyBadge).toHaveClass(/success-text/)
+    await expect(overBadge).toContainText('6/3-5')
+    await expect(overBadge).toHaveClass(/warning-text/)
   })
 
   test('manager coverage keeps the draft grid interactive while showing the empty-draft prompt', async ({

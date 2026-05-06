@@ -4,10 +4,13 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 
 import type { DayItem } from '@/lib/coverage/selectors'
 import { countActive } from '@/lib/coverage/selectors'
+import {
+  MAX_SHIFT_COVERAGE_PER_DAY,
+  MIN_SHIFT_COVERAGE_PER_DAY,
+} from '@/lib/scheduling-constants'
 import { cn } from '@/lib/utils'
 
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const TARGET_HEADCOUNT = 4
 const STAFF_NAMES_PER_LINE = 2
 const MAX_STAFF_LINES = 1
 
@@ -114,12 +117,15 @@ export function resolveDayBoardStatus(day: DayItem, activeCount: number): DayBoa
     return { tone: 'critical', label: 'Unassigned' }
   }
 
-  const gapCount = Math.max(TARGET_HEADCOUNT - activeCount, 0)
-  if (gapCount > 0) {
+  if (activeCount < MIN_SHIFT_COVERAGE_PER_DAY) {
     return {
-      tone: 'warning',
-      label: 'Unassigned',
+      tone: 'critical',
+      label: 'Understaffed',
     }
+  }
+
+  if (activeCount > MAX_SHIFT_COVERAGE_PER_DAY) {
+    return { tone: 'warning', label: 'Overstaffed' }
   }
 
   return { tone: 'healthy', label: 'Fully staffed' }
@@ -168,7 +174,7 @@ function toneClasses(tone: DayBoardTone): {
     case 'healthy':
       return {
         card: 'border-border/70 bg-card',
-        badge: 'border-border/70 text-muted-foreground',
+        badge: 'border-[var(--success-border)]/55 text-[var(--success-text)]',
         label: 'text-[var(--success-text)]',
         dot: 'bg-[var(--success-text)]',
       }
@@ -262,12 +268,13 @@ export function CalendarGrid({
               {formatDateHeader(day.isoDate)}
             </p>
             <span
+              data-testid={`coverage-headcount-badge-${day.id}`}
               className={cn(
                 'inline-flex items-center gap-1 rounded-full border bg-background/90 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
                 dayTone.badge
               )}
             >
-              {activeCount}/{TARGET_HEADCOUNT}
+              {activeCount}/{MIN_SHIFT_COVERAGE_PER_DAY}-{MAX_SHIFT_COVERAGE_PER_DAY}
             </span>
           </div>
 

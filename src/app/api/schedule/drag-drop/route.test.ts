@@ -567,6 +567,45 @@ describe('drag-drop API behavior', () => {
     )
   })
 
+  it('preserves the requested lead role when assigning a lead-eligible therapist', async () => {
+    const supabase = makeSupabaseMock({
+      coverageStatuses: ['scheduled', 'scheduled'],
+      weeklyShifts: [],
+      therapistProfiles: {
+        'therapist-1': {
+          full_name: 'Alex Jones',
+          is_lead_eligible: true,
+          employment_type: 'full_time',
+        },
+      },
+    })
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          action: 'assign',
+          cycleId: 'cycle-1',
+          userId: 'therapist-1',
+          shiftType: 'day',
+          date: '2026-03-10',
+          role: 'lead',
+          overrideWeeklyRules: false,
+        }),
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(supabase.insertedShiftPayloads[0]).toMatchObject({
+      user_id: 'therapist-1',
+      role: 'lead',
+    })
+  })
+
   it('ignores client-supplied post-publish audit flags for future slots without operational entries', async () => {
     const supabase = makeSupabaseMock({
       coverageStatuses: ['scheduled', 'scheduled'],

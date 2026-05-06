@@ -357,6 +357,7 @@ function parseActionBody(raw: unknown): DragAction | null {
         userId: r.userId,
         shiftType: r.shiftType,
         date: r.date,
+        role: r.role === 'lead' || r.role === 'staff' ? r.role : undefined,
         overrideWeeklyRules: r.overrideWeeklyRules === true,
         availabilityOverride:
           typeof r.availabilityOverride === 'boolean' ? r.availabilityOverride : undefined,
