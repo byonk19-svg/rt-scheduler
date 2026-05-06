@@ -333,21 +333,22 @@ export async function toggleCyclePublishedAction(formData: FormData) {
           : null,
       })
       .select('id, published_at')
-      .single()
+      .maybeSingle()
 
-    if (publishEventError) {
+    if (publishEventError || !publishEventRow) {
       console.error('Failed to create publish event:', publishEventError)
       emailQueueError = 'publish_event_insert_failed'
     } else {
       publishEventId = publishEventRow.id
       publishedAt = publishEventRow.published_at
+      const currentPublishEventId = publishEventRow.id
 
       if (dedupedRecipients.length > 0) {
         const { data: outboxRows, error: outboxError } = await supabase
           .from('notification_outbox')
           .insert(
             dedupedRecipients.map((recipient) => ({
-              publish_event_id: publishEventId,
+              publish_event_id: currentPublishEventId,
               user_id: recipient.id,
               email: recipient.email,
               name: recipient.fullName,

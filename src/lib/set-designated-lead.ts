@@ -4,7 +4,15 @@ type RpcError = {
 }
 
 type RpcClient = {
-  rpc: (fn: string, params: Record<string, string>) => unknown
+  rpc: (
+    fn: 'set_designated_shift_lead',
+    params: {
+      p_cycle_id: string
+      p_shift_date: string
+      p_shift_type: string
+      p_therapist_id: string
+    }
+  ) => unknown
 }
 
 export type SetDesignatedLeadInput = {

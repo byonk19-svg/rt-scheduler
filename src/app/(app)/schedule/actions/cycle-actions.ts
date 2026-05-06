@@ -201,9 +201,9 @@ export async function createCycleAction(formData: FormData) {
       published,
     })
     .select('id')
-    .single()
+    .maybeSingle()
 
-  if (error) {
+  if (error || !data) {
     console.error('Failed to create schedule cycle:', error)
     redirect(buildReturnUrl(undefined, { ...errorViewParams, error: 'create_cycle_failed' }))
   }
@@ -219,10 +219,10 @@ export async function createCycleAction(formData: FormData) {
         .order('start_date', { ascending: false })
         .limit(1)
         .maybeSingle(),
-      supabase.from('schedule_cycles').select('id').eq('id', data.id).single(),
+      supabase.from('schedule_cycles').select('id').eq('id', data.id).maybeSingle(),
     ])
 
-    if (sourceCycleResult.error || importedShiftsResult.error) {
+    if (sourceCycleResult.error || importedShiftsResult.error || !importedShiftsResult.data) {
       console.error('Failed to prepare import from previous cycle:', {
         sourceCycleError: sourceCycleResult.error,
         importedCycleError: importedShiftsResult.error,

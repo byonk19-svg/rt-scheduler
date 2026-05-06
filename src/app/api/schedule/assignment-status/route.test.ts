@@ -245,7 +245,7 @@ function makeAdminClientMock(scenario: Scenario) {
         insertCalls.push(payload)
         return {
           select: () => ({
-            single: async () => ({
+            maybeSingle: async () => ({
               data: { id: 'call-in-post-1' },
               error: null,
             }),

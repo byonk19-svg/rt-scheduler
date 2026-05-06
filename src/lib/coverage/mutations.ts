@@ -7,7 +7,7 @@ type SupabaseLike = {
   from: (table: string) => {
     insert: (value: Record<string, unknown>) => {
       select: (columns: string) => {
-        single: () => PromiseLike<{ data: unknown; error: CoverageMutationError }>
+        maybeSingle: () => PromiseLike<{ data: unknown; error: CoverageMutationError }>
       }
     }
     delete: () => {
@@ -57,11 +57,11 @@ export async function assignCoverageShift(
       status: 'scheduled',
     })
     .select('id, user_id, date, shift_type, status, assignment_status')
-    .single()
+    .maybeSingle()
 
   return {
     data: (data ?? null) as AssignedCoverageShiftRow | null,
-    error,
+    error: error ?? (!data ? { message: 'Could not create coverage shift.' } : null),
   }
 }
 

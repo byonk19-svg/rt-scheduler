@@ -173,8 +173,8 @@ export async function POST(request: Request) {
         p_message: message,
       })
 
-      if (error) {
-        return toErrorResponse(error.message)
+      if (error || !data) {
+        return toErrorResponse(error?.message ?? 'Could not save interest.')
       }
 
       return NextResponse.json({ success: true, post: data })
@@ -193,8 +193,8 @@ export async function POST(request: Request) {
         p_response: decision,
       })
 
-      if (error) {
-        return toErrorResponse(error.message)
+      if (error || !data) {
+        return toErrorResponse(error?.message ?? 'Could not save interest.')
       }
 
       return NextResponse.json({ success: true, post: data })
@@ -305,7 +305,7 @@ export async function POST(request: Request) {
           created_at: insertedAt,
         })
         .select('id')
-        .single()
+        .maybeSingle()
 
       if (error && nextStatus === 'selected' && error.code === '23505') {
         const retryResult = await admin
@@ -317,21 +317,21 @@ export async function POST(request: Request) {
             created_at: insertedAt,
           })
           .select('id')
-          .single()
+          .maybeSingle()
 
         data = retryResult.data
         error = retryResult.error
         nextStatus = 'pending'
       }
 
-      if (error) {
-        return toErrorResponse(error.message)
+      if (error || !data) {
+        return toErrorResponse(error?.message ?? 'Could not save interest.')
       }
 
       return NextResponse.json({
         success: true,
         result: {
-          id: (data as { id: string }).id,
+          id: data.id,
           status: nextStatus,
         },
       })

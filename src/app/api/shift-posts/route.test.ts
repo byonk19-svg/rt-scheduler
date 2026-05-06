@@ -164,7 +164,7 @@ describe('shift-post mutation API', () => {
             select: vi.fn(() => selectedInterestLookup),
             insert: vi.fn(() => ({
               select: vi.fn(() => ({
-                single: insertSingle,
+                maybeSingle: insertSingle,
               })),
             })),
           }

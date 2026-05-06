@@ -309,7 +309,10 @@ export default async function TherapistSettingsPage({
     profile.default_schedule_view ?? undefined
   )
   const defaultLandingPage = profile.default_landing_page === 'coverage' ? 'coverage' : 'dashboard'
-  const pattern = toPatternRecord(profile.id, profile.work_patterns)
+  const pattern = toPatternRecord(
+    profile.id,
+    profile.work_patterns as WorkPatternRow | WorkPatternRow[] | null
+  )
   const patternSummary = describeWorkPatternSummary(pattern)
   const hasRecurringPattern = Boolean(pattern && pattern.pattern_type !== 'none')
   const recurringPatternHref = returnTo

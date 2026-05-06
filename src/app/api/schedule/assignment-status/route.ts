@@ -221,11 +221,17 @@ export async function POST(request: Request) {
       if (existingCallInPost?.id) {
         await admin.from('shift_posts').update(callInPayload).eq('id', existingCallInPost.id)
       } else {
-        const { data: insertedCallInPost } = await admin
+        const { data: insertedCallInPost, error: callInPostError } = await admin
           .from('shift_posts')
           .insert(callInPayload)
           .select('id')
-          .single()
+          .maybeSingle()
+        if (callInPostError || !insertedCallInPost) {
+          console.warn(
+            'Failed to create call-in shift post:',
+            callInPostError?.message ?? 'no row returned'
+          )
+        }
         callInPostId = insertedCallInPost?.id ?? null
       }
 
