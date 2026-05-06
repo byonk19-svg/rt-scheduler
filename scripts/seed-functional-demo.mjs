@@ -127,6 +127,13 @@ function* eachDateInclusive(isoStart, isoEnd) {
   }
 }
 
+function normalizeRosterName(name) {
+  return String(name ?? '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+}
+
 async function listAllAuthUsers() {
   const users = []
   let page = 1
@@ -382,6 +389,202 @@ async function seedSwapRequestScenarios({ publishedCycleId }) {
   return scenarios
 }
 
+async function seedEmployeeRoster(managerId, rosterRows) {
+  const rows = rosterRows
+    .filter((row) => row.role === 'therapist' || row.role === 'lead')
+    .map((row) => ({
+      full_name: row.full_name,
+      normalized_full_name: normalizeRosterName(row.full_name),
+      role: row.role,
+      shift_type: row.shift_type,
+      employment_type: 'full_time',
+      max_work_days_per_week: 5,
+      is_lead_eligible: row.is_lead_eligible,
+      is_active: true,
+      matched_profile_id: row.id,
+      matched_email: row.email,
+      matched_at: new Date().toISOString(),
+      created_by: managerId,
+      updated_by: managerId,
+    }))
+
+  if (rows.length === 0) return 0
+
+  const { error } = await supabase
+    .from('employee_roster')
+    .upsert(rows, { onConflict: 'normalized_full_name' })
+  if (error) throw error
+  return rows.length
+}
+
+async function seedCycleTemplates(managerId) {
+  const templateName = `${DEMO_LABEL_PREFIX} Baseline 6-week template`
+  const shiftData = {
+    version: 1,
+    cycleLengthDays: 42,
+    slots: Array.from({ length: 42 }, (_, dayOffset) => [
+      { dayOffset, shiftType: 'day', role: 'lead', count: 1 },
+      { dayOffset, shiftType: 'day', role: 'staff', count: 4 },
+      { dayOffset, shiftType: 'night', role: 'lead', count: 1 },
+      { dayOffset, shiftType: 'night', role: 'staff', count: 4 },
+    ]).flat(),
+  }
+
+  const { error: deleteError } = await supabase
+    .from('cycle_templates')
+    .delete()
+    .eq('name', templateName)
+  if (deleteError) throw deleteError
+
+  const { error: insertError } = await supabase.from('cycle_templates').insert({
+    name: templateName,
+    description: 'Seeded baseline coverage template for local UAT and branch E2E data.',
+    created_by: managerId,
+    shift_data: shiftData,
+  })
+  if (insertError) throw insertError
+  return templateName
+}
+
+async function seedPickupInterestScenarios({ publishedCycleId }) {
+  const { data: shifts, error: shiftsError } = await supabase
+    .from('shifts')
+    .select('id, user_id, date, shift_type')
+    .eq('cycle_id', publishedCycleId)
+    .eq('shift_type', 'night')
+    .eq('status', 'scheduled')
+    .eq('assignment_status', 'scheduled')
+    .not('user_id', 'is', null)
+    .order('date', { ascending: true })
+    .order('user_id', { ascending: true })
+    .limit(8)
+  if (shiftsError) throw shiftsError
+
+  const sourceShift = (shifts ?? [])[0]
+  const claimantRows = (shifts ?? [])
+    .map((shift) => shift.user_id)
+    .filter((id) => id && id !== sourceShift?.user_id)
+    .slice(0, 3)
+
+  if (!sourceShift?.id || !sourceShift.user_id || claimantRows.length < 2) {
+    console.log('Skipped seeded pickup interests: not enough night-shift rows.')
+    return null
+  }
+
+  const { data: post, error: postError } = await supabase
+    .from('shift_posts')
+    .insert({
+      shift_id: sourceShift.id,
+      posted_by: sourceShift.user_id,
+      claimed_by: null,
+      type: 'pickup',
+      status: 'pending',
+      visibility: 'team',
+      recipient_response: null,
+      request_kind: 'standard',
+      message: 'Seeded pickup queue with primary and backup claimants',
+      created_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+    })
+    .select('id')
+    .single()
+  if (postError) throw postError
+
+  const { error: interestError } = await supabase.from('shift_post_interests').insert(
+    claimantRows.map((therapistId, index) => ({
+      shift_post_id: post.id,
+      therapist_id: therapistId,
+      status: index === 0 ? 'selected' : 'pending',
+      created_at: new Date(Date.now() - (20 - index) * 60 * 1000).toISOString(),
+      responded_at: index === 0 ? new Date(Date.now() - 19 * 60 * 1000).toISOString() : null,
+    }))
+  )
+  if (interestError) throw interestError
+
+  return { postId: post.id, interestCount: claimantRows.length }
+}
+
+async function seedPreliminarySnapshot({ draftCycleId, managerId }) {
+  const { data: existingSnapshots, error: existingError } = await supabase
+    .from('preliminary_snapshots')
+    .select('id')
+    .eq('cycle_id', draftCycleId)
+  if (existingError) throw existingError
+
+  if ((existingSnapshots ?? []).length > 0) {
+    const { error: deleteError } = await supabase
+      .from('preliminary_snapshots')
+      .delete()
+      .eq('cycle_id', draftCycleId)
+    if (deleteError) throw deleteError
+  }
+
+  const { data: snapshot, error: snapshotError } = await supabase
+    .from('preliminary_snapshots')
+    .insert({
+      cycle_id: draftCycleId,
+      created_by: managerId,
+      status: 'active',
+    })
+    .select('id')
+    .single()
+  if (snapshotError) throw snapshotError
+
+  const { data: shifts, error: shiftsError } = await supabase
+    .from('shifts')
+    .select('id, user_id')
+    .eq('cycle_id', draftCycleId)
+    .order('date', { ascending: true })
+    .order('shift_type', { ascending: true })
+    .limit(6)
+  if (shiftsError) throw shiftsError
+
+  const rows = (shifts ?? []).map((shift, index) => ({
+    snapshot_id: snapshot.id,
+    shift_id: shift.id,
+    state: index === 0 ? 'open' : 'tentative_assignment',
+    reserved_by: null,
+    active_request_id: null,
+  }))
+
+  if (rows.length > 0) {
+    const { error: stateError } = await supabase.from('preliminary_shift_states').insert(rows)
+    if (stateError) throw stateError
+  }
+
+  const openShift = (shifts ?? [])[0]
+  const requester = (shifts ?? []).find(
+    (shift) => shift.user_id && shift.user_id !== openShift?.user_id
+  )
+  if (openShift?.id && requester?.user_id) {
+    const { data: request, error: requestError } = await supabase
+      .from('preliminary_requests')
+      .insert({
+        snapshot_id: snapshot.id,
+        shift_id: openShift.id,
+        requester_id: requester.user_id,
+        type: 'claim_open_shift',
+        status: 'pending',
+        note: 'Seeded preliminary open-slot claim',
+      })
+      .select('id')
+      .single()
+    if (requestError) throw requestError
+
+    const { error: updateError } = await supabase
+      .from('preliminary_shift_states')
+      .update({
+        state: 'pending_claim',
+        reserved_by: requester.user_id,
+        active_request_id: request.id,
+      })
+      .eq('snapshot_id', snapshot.id)
+      .eq('shift_id', openShift.id)
+    if (updateError) throw updateError
+  }
+
+  return { snapshotId: snapshot.id, stateCount: rows.length }
+}
+
 export async function seedFunctionalDemo(options = {}) {
   const domain = String(options.domain ?? defaultDomain)
     .trim()
@@ -441,6 +644,7 @@ export async function seedFunctionalDemo(options = {}) {
       on_fmla: false,
     })
     await ensureWorkPattern(id, [1, 2, 3, 4, 5])
+    spec.id = id
   }
 
   const therapistRows = []
@@ -472,6 +676,7 @@ export async function seedFunctionalDemo(options = {}) {
     therapistRows.push({
       id,
       full_name: fullName,
+      email,
       role: 'therapist',
       shift_type: shiftType,
       is_lead_eligible: alsoLeadEligible,
@@ -479,8 +684,10 @@ export async function seedFunctionalDemo(options = {}) {
   }
 
   const rosterForShifts = [
-    ...leadSpecs.map((s, idx) => ({
-      id: leadIds[idx],
+    ...leadSpecs.map((s) => ({
+      id: s.id,
+      full_name: s.name,
+      email: s.email,
       role: 'lead',
       shift_type: s.shift,
       is_lead_eligible: true,
@@ -541,6 +748,10 @@ export async function seedFunctionalDemo(options = {}) {
     rosterForShifts
   )
   const seededSwapScenarios = await seedSwapRequestScenarios({ publishedCycleId })
+  const rosterCount = await seedEmployeeRoster(managerId, rosterForShifts)
+  const templateName = await seedCycleTemplates(managerId)
+  const seededPickupScenario = await seedPickupInterestScenarios({ publishedCycleId })
+  const seededPreliminarySnapshot = await seedPreliminarySnapshot({ draftCycleId, managerId })
 
   console.log('')
   console.log('Functional demo seed complete.')
@@ -554,6 +765,17 @@ export async function seedFunctionalDemo(options = {}) {
     }
     console.log('')
   }
+  console.log(`Seeded employee roster rows: ${rosterCount}`)
+  console.log(`Seeded cycle template: ${templateName}`)
+  if (seededPickupScenario) {
+    console.log(
+      `Seeded pickup interest queue: ${seededPickupScenario.postId} (${seededPickupScenario.interestCount} claimant rows)`
+    )
+  }
+  console.log(
+    `Seeded preliminary snapshot: ${seededPreliminarySnapshot.snapshotId} (${seededPreliminarySnapshot.stateCount} shift states)`
+  )
+  console.log('')
   console.log('Sign in (examples):')
   console.log(`  Manager:  ${managerEmail} / ${password}`)
   console.log(`  Lead:     ${leadSpecs[0].email} / ${password}`)
