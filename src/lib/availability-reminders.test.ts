@@ -21,7 +21,7 @@ function makeRecipient(overrides?: Partial<{ id: string; email: string; name: st
   return {
     therapistId: overrides?.id ?? 'therapist-1',
     email: overrides?.email ?? 'therapist@test.com',
-    name: overrides && 'name' in overrides ? overrides.name : 'Jane Doe',
+    name: overrides && 'name' in overrides ? (overrides.name ?? null) : 'Jane Doe',
   }
 }
 
