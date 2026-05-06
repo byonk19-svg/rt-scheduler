@@ -7,6 +7,32 @@ import {
   resolveDayBoardStatus,
   resolveSwipeDirection,
 } from './CalendarGrid'
+import type { DayItem, ShiftItem } from '@/lib/coverage/selectors'
+
+function makeShift(overrides: Partial<ShiftItem> = {}): ShiftItem {
+  return {
+    id: 'lead-shift',
+    userId: 'lead-1',
+    name: 'Lead One',
+    status: 'active',
+    log: [],
+    ...overrides,
+  }
+}
+
+function makeDay(overrides: Partial<DayItem> = {}): DayItem {
+  return {
+    id: '2026-05-01',
+    isoDate: '2026-05-01',
+    date: 1,
+    label: 'Fri, May 1',
+    dayStatus: 'published',
+    constraintBlocked: false,
+    leadShift: makeShift(),
+    staffShifts: [],
+    ...overrides,
+  }
+}
 
 describe('CalendarGrid keyboard navigation index', () => {
   it('moves right by 1', () => {
@@ -73,36 +99,39 @@ describe('CalendarGrid roster helpers', () => {
   })
 
   it('uses quiet healthy copy and explicit gap copy for board tiles', () => {
-    expect(
-      resolveDayBoardStatus(
-        {
-          id: '2026-04-20',
-          isoDate: '2026-04-20',
-          date: 20,
-          label: 'Sun Apr 20',
-          dayStatus: 'published',
-          constraintBlocked: false,
-          leadShift: { id: 'lead', userId: 'lead-1', name: 'Demo', status: 'active', log: [] },
-          staffShifts: [],
-        },
-        4
-      )
-    ).toEqual({ tone: 'healthy', label: 'Fully staffed' })
+    expect(resolveDayBoardStatus(makeDay(), 4)).toEqual({
+      tone: 'healthy',
+      label: 'Fully staffed',
+    })
 
-    expect(
-      resolveDayBoardStatus(
-        {
-          id: '2026-04-21',
-          isoDate: '2026-04-21',
-          date: 21,
-          label: 'Mon Apr 21',
-          dayStatus: 'published',
-          constraintBlocked: false,
-          leadShift: { id: 'lead', userId: 'lead-1', name: 'Demo', status: 'active', log: [] },
-          staffShifts: [],
-        },
-        2
-      )
-    ).toEqual({ tone: 'warning', label: 'Unassigned' })
+    expect(resolveDayBoardStatus(makeDay(), 2)).toEqual({
+      tone: 'critical',
+      label: 'Understaffed',
+    })
+  })
+
+  it('marks minimum-to-maximum staffing as healthy', () => {
+    expect(resolveDayBoardStatus(makeDay(), 3)).toEqual({
+      tone: 'healthy',
+      label: 'Fully staffed',
+    })
+    expect(resolveDayBoardStatus(makeDay(), 5)).toEqual({
+      tone: 'healthy',
+      label: 'Fully staffed',
+    })
+  })
+
+  it('marks over-capacity staffing as warning', () => {
+    expect(resolveDayBoardStatus(makeDay(), 6)).toEqual({
+      tone: 'warning',
+      label: 'Overstaffed',
+    })
+  })
+
+  it('keeps missing lead as critical even when staff count is otherwise acceptable', () => {
+    expect(resolveDayBoardStatus(makeDay({ leadShift: null }), 3)).toEqual({
+      tone: 'critical',
+      label: 'Unassigned',
+    })
   })
 })

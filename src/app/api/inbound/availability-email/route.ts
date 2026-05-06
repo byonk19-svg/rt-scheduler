@@ -13,6 +13,7 @@ import {
 import { extractTextFromAttachment } from '@/lib/openai-ocr'
 import { isValidResendWebhookRequest } from '@/lib/security/resend-webhook'
 import { createAdminClient } from '@/lib/supabase/admin'
+import type { Json } from '@/lib/supabase/database.types'
 
 export const maxDuration = 60
 
@@ -386,7 +387,7 @@ async function processInboundAvailabilityEmail(emailId: string) {
     parse_status: batchStatus,
     batch_status: batchStatus,
     parse_summary: batchSummary.summary,
-    parsed_requests: flattenBatchRequests(parsedItems),
+    parsed_requests: flattenBatchRequests(parsedItems) as Json,
     item_count: batchSummary.itemCount,
     auto_applied_count: batchSummary.autoAppliedCount,
     needs_review_count: batchSummary.needsReviewCount,
@@ -401,7 +402,7 @@ async function processInboundAvailabilityEmail(emailId: string) {
     .from('availability_email_intakes')
     .upsert(intakeInsert, { onConflict: 'provider_email_id' })
     .select('id')
-    .single()
+    .maybeSingle()
 
   if (intakeError || !savedIntake) {
     throw new Error(`Could not store intake: ${intakeError?.message ?? 'unknown error'}`)
@@ -446,9 +447,9 @@ async function processInboundAvailabilityEmail(emailId: string) {
         employee_match_candidates: item.employeeMatchCandidates,
         matched_therapist_id: item.matchedTherapistId,
         matched_cycle_id: item.matchedCycleId,
-        original_parsed_requests: item.requests,
-        parsed_requests: item.requests,
-        unresolved_lines: item.unresolvedLines,
+        original_parsed_requests: item.requests as Json,
+        parsed_requests: item.requests as Json,
+        unresolved_lines: item.unresolvedLines as Json,
         manually_edited_at: null,
         auto_applied_at: item.parseStatus === 'auto_applied' ? new Date().toISOString() : null,
         auto_applied_by: null,
@@ -473,8 +474,8 @@ async function processInboundAvailabilityEmail(emailId: string) {
         shift_type: request.shift_type,
         override_type: request.override_type,
         note: request.note ?? `Imported from ${item.sourceLabel}: ${request.source_line}`,
-        created_by: null,
-        source: 'manager' as const,
+        created_by: item.matchedTherapistId!,
+        source: 'therapist' as const,
       }))
     )
 

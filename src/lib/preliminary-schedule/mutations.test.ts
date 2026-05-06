@@ -149,7 +149,7 @@ function createSupabaseMock(initialState: Partial<DbState> = {}) {
         return {
           select() {
             return {
-              async single() {
+              async maybeSingle() {
                 const inserted = rows[0] as Record<string, unknown>
                 if (table === 'preliminary_snapshots') {
                   state.preliminarySnapshots.push(inserted as PreliminarySnapshotRow)

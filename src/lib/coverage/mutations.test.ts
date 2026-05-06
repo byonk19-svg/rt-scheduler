@@ -19,7 +19,7 @@ function makeSupabase({
     from: vi.fn().mockReturnValue({
       insert: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue(insertResult),
+          maybeSingle: vi.fn().mockResolvedValue(insertResult),
         }),
       }),
       delete: vi.fn().mockReturnValue({

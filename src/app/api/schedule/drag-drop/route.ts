@@ -259,7 +259,7 @@ async function getTherapistAvailabilityState(
         cycle_segments:
           (patternResult.data as { cycle_segments?: WorkPattern['cycle_segments'] | null } | null)
             ?.cycle_segments ?? [],
-        shift_preference: patternResult.data.shift_preference,
+        shift_preference: patternResult.data.shift_preference as WorkPattern['shift_preference'],
       })
     : normalizeWorkPattern({
         therapist_id: therapistId,
@@ -357,6 +357,7 @@ function parseActionBody(raw: unknown): DragAction | null {
         userId: r.userId,
         shiftType: r.shiftType,
         date: r.date,
+        role: r.role === 'lead' || r.role === 'staff' ? r.role : undefined,
         overrideWeeklyRules: r.overrideWeeklyRules === true,
         availabilityOverride:
           typeof r.availabilityOverride === 'boolean' ? r.availabilityOverride : undefined,
@@ -593,9 +594,9 @@ export async function POST(request: Request) {
         availability_override_at: shouldSetAvailabilityOverride ? new Date().toISOString() : null,
       })
       .select('id')
-      .single()
+      .maybeSingle()
 
-    if (error) {
+    if (error || !insertedShift) {
       if (error?.code === '23505') {
         return NextResponse.json(
           { error: 'That therapist already has a shift on this date.' },
@@ -689,9 +690,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Shift already on that date.' })
     }
 
+    const assignedUserId = shift.user_id
+    if (!assignedUserId) {
+      return NextResponse.json({ error: 'Only assigned shifts can be moved.' }, { status: 400 })
+    }
+
     const availabilityState = await getTherapistAvailabilityState(
       supabase,
-      shift.user_id,
+      assignedUserId,
       payload.cycleId,
       payload.targetDate,
       payload.targetShiftType
@@ -716,7 +722,7 @@ export async function POST(request: Request) {
           error: 'Conflicts with scheduling constraints.',
           code: 'availability_conflict',
           availability: {
-            therapistId: shift.user_id,
+            therapistId: assignedUserId,
             therapistName: availabilityState.therapistName,
             date: payload.targetDate,
             shiftType: payload.targetShiftType,
@@ -752,14 +758,14 @@ export async function POST(request: Request) {
 
       const weekly = await getWorkedDatesInWeek(
         supabase,
-        shift.user_id,
+        assignedUserId,
         payload.targetDate,
         shift.id
       )
       if (weekly.error) {
         return NextResponse.json({ error: 'Failed to validate weekly rule' }, { status: 500 })
       }
-      const weeklyLimit = await getTherapistWeeklyLimit(supabase, shift.user_id)
+      const weeklyLimit = await getTherapistWeeklyLimit(supabase, assignedUserId)
       if (exceedsWeeklyLimit(weekly.dates, payload.targetDate, weeklyLimit)) {
         return NextResponse.json(
           {

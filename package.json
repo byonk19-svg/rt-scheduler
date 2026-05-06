@@ -13,6 +13,7 @@
     "format:check": "prettier --check .",
     "prepare": "husky",
     "seed:demo": "node --env-file=.env.local scripts/seed-demo.mjs",
+    "seed:dev": "node --env-file=.env.local scripts/seed-dev.mjs",
     "seed:functional": "node --env-file=.env.local scripts/seed-functional-demo.mjs",
     "reset:e2e": "node --env-file=.env.local scripts/reset-e2e-data.mjs",
     "reset:e2e:fresh-auth": "node --env-file=.env.local scripts/reset-e2e-data.mjs --delete-auth-users",

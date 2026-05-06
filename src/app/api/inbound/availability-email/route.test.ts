@@ -74,7 +74,7 @@ function createAdminMock() {
             return {
               select() {
                 return {
-                  single: async () => ({ data: { id: 'intake-1' }, error: null }),
+                  maybeSingle: async () => ({ data: { id: 'intake-1' }, error: null }),
                 }
               },
             }

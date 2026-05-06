@@ -11,6 +11,7 @@ type TestContext = {
   therapist1: { id: string; fullName: string }
   therapist2: { id: string; fullName: string }
   therapist3: { id: string; fullName: string }
+  therapist4: { id: string; fullName: string }
   cycle: { id: string }
   targetDate: string
   assignDate: string
@@ -70,7 +71,18 @@ test.describe.serial('coverage manager dialog interactions', () => {
       isLeadEligible: false,
     })
 
-    createdUserIds.push(manager.id, therapist1.id, therapist2.id, therapist3.id)
+    const therapist4FullName = `E2E Cov Backup Lead ${randomString('t4')}`
+    const therapist4 = await createE2EUser(supabase, {
+      email: `${randomString('cov-t4')}@example.com`,
+      password: `Ther!${Math.random().toString(16).slice(2, 8)}`,
+      fullName: therapist4FullName,
+      role: 'therapist',
+      employmentType: 'full_time',
+      shiftType: 'day',
+      isLeadEligible: true,
+    })
+
+    createdUserIds.push(manager.id, therapist1.id, therapist2.id, therapist3.id, therapist4.id)
 
     const start = new Date()
     start.setDate(start.getDate() - 1)
@@ -144,6 +156,7 @@ test.describe.serial('coverage manager dialog interactions', () => {
       therapist1: { id: therapist1.id, fullName: therapist1FullName },
       therapist2: { id: therapist2.id, fullName: therapist2FullName },
       therapist3: { id: therapist3.id, fullName: therapist3FullName },
+      therapist4: { id: therapist4.id, fullName: therapist4FullName },
       cycle: { id: cycleInsert.data.id },
       targetDate,
       assignDate,
@@ -211,7 +224,9 @@ test.describe.serial('coverage manager dialog interactions', () => {
     await expect(page.getByTestId('coverage-drawer-close')).toHaveCount(0)
   })
 
-  test('clicking an assigned therapist opens the status popover only', async ({ page }) => {
+  test('opening an assigned day shows assigned lead and staff in the shift editor', async ({
+    page,
+  }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
@@ -219,43 +234,12 @@ test.describe.serial('coverage manager dialog interactions', () => {
     await page.waitForTimeout(3000)
 
     await waitForCalendar(page, ctx!.targetDate)
-    const triggerClicked = await page.evaluate(
-      ({ date, therapistId }) => {
-        const candidates = Array.from(
-          document.querySelectorAll<HTMLButtonElement>(
-            `[data-testid="coverage-assignment-trigger-${date}-${therapistId}"]`
-          )
-        )
-        const visible = candidates.find((element) => {
-          const rect = element.getBoundingClientRect()
-          const style = window.getComputedStyle(element)
-          return (
-            rect.width > 0 &&
-            rect.height > 0 &&
-            style.display !== 'none' &&
-            style.visibility !== 'hidden'
-          )
-        })
-        if (!visible) return false
-        visible.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-        return true
-      },
-      { date: ctx!.targetDate, therapistId: ctx!.therapist1.id }
-    )
-    expect(triggerClicked).toBe(true)
+    await openShiftEditor(page, ctx!.targetDate)
 
-    await expect
-      .poll(
-        async () =>
-          page.evaluate(
-            () => document.querySelectorAll('[data-testid=\"coverage-status-popover\"]').length
-          ),
-        { timeout: 10_000 }
-      )
-      .toBeGreaterThan(0)
-    await page.waitForTimeout(1000)
-    await expect(page.getByRole('button', { name: 'Call In' })).toBeVisible({ timeout: 5_000 })
-    await expect(shiftEditorDialog(page)).toHaveCount(0)
+    const dialog = shiftEditorDialog(page)
+    await expect(dialog.getByText(ctx!.therapist1.fullName, { exact: false }).first()).toBeVisible()
+    await expect(dialog.getByText(ctx!.therapist2.fullName, { exact: false }).first()).toBeVisible()
+    await expect(page.getByTestId('coverage-status-popover')).toHaveCount(0)
   })
 
   test('clicking the Close button dismisses the shift editor dialog', async ({ page }) => {
@@ -277,6 +261,70 @@ test.describe.serial('coverage manager dialog interactions', () => {
     })
     expect(closed).toBe(true)
     await expect(shiftEditorDialog(page)).toHaveCount(0)
+  })
+
+  test('lead designation clears the missing-lead banner and preserves a single lead', async ({
+    page,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+    test.setTimeout(60_000)
+
+    await loginAs(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto(`/coverage?cycle=${ctx!.cycle.id}`, { waitUntil: 'domcontentloaded' })
+    await page.waitForTimeout(3000)
+
+    await waitForCalendar(page, ctx!.assignDate)
+    await openShiftEditor(page, ctx!.assignDate)
+
+    const dialog = shiftEditorDialog(page)
+    await expect(
+      dialog.getByText('No lead assigned. A lead therapist is required for this shift.')
+    ).toBeVisible()
+
+    await page.getByTestId(`coverage-assign-toggle-${ctx!.therapist1.id}-lead`).click()
+
+    await expect
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('shifts')
+            .select('role')
+            .eq('cycle_id', ctx!.cycle.id)
+            .eq('user_id', ctx!.therapist1.id)
+            .eq('date', ctx!.assignDate)
+            .eq('shift_type', 'day')
+            .maybeSingle()
+          if (result.error) throw new Error(result.error.message)
+          return result.data?.role ?? null
+        },
+        { timeout: 20_000 }
+      )
+      .toBe('lead')
+
+    await expect(
+      dialog.getByText('No lead assigned. A lead therapist is required for this shift.')
+    ).toHaveCount(0)
+
+    await page.getByTestId(`coverage-assign-toggle-${ctx!.therapist4.id}-lead`).click()
+
+    await expect
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('shifts')
+            .select('user_id, role')
+            .eq('cycle_id', ctx!.cycle.id)
+            .eq('date', ctx!.assignDate)
+            .eq('shift_type', 'day')
+          if (result.error) throw new Error(result.error.message)
+          const rows = result.data ?? []
+          const leadCount = rows.filter((row) => row.role === 'lead').length
+          const backupRole = rows.find((row) => row.user_id === ctx!.therapist4.id)?.role ?? null
+          return `${leadCount}:${backupRole ?? ''}`
+        },
+        { timeout: 20_000 }
+      )
+      .toBe('1:staff')
   })
 
   test('assigning and unassigning a therapist works through the shift editor dialog', async ({

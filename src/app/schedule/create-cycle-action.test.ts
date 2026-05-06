@@ -89,7 +89,7 @@ function createSupabaseMock(context: TestContext) {
           return {
             select() {
               return {
-                single: async () => ({ data: { id: 'cycle-new' }, error: null }),
+                maybeSingle: async () => ({ data: { id: 'cycle-new' }, error: null }),
               }
             },
           }

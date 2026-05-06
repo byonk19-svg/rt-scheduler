@@ -972,7 +972,7 @@ export function CoverageClientPage({
         applyOptimisticUpdate: buildStatusUpdater('optimistic'),
         rollbackOptimisticUpdate: buildStatusUpdater('rollback'),
         persistAssignmentStatus: async (id, payload) =>
-          await persistCoverageShiftStatus(supabase, id, payload),
+          await persistCoverageShiftStatus(supabase as never, id, payload),
         logError: (message, error) => {
           console.error(message, error)
         },

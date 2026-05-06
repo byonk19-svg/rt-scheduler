@@ -1455,7 +1455,7 @@ async function loadShiftStatusMutationContext(args: { shiftId: string }): Promis
 
 type SupabaseRpcClient = {
   rpc: (
-    fn: string,
+    fn: 'update_assignment_status',
     args: {
       p_assignment_id: string
       p_status: AssignmentStatus

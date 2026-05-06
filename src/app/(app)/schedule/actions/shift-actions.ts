@@ -164,11 +164,11 @@ export async function addShiftAction(formData: FormData) {
       role: 'staff',
     })
     .select('id')
-    .single()
+    .maybeSingle()
 
-  if (error) {
+  if (error || !insertedShift) {
     console.error('Failed to insert shift:', error)
-    if (error.code === '23505') {
+    if (error?.code === '23505') {
       redirect(buildReturnUrl(cycleId, { ...errorViewParams, error: 'duplicate_shift' }))
     }
     redirect(buildReturnUrl(cycleId, { ...errorViewParams, error: 'add_shift_failed' }))

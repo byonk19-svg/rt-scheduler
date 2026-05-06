@@ -46,7 +46,7 @@ type SupabaseLike = {
     select: (...args: unknown[]) => QueryBuilder<unknown>
     insert: (payload: Record<string, unknown> | Array<Record<string, unknown>>) => {
       select: () => {
-        single: () => Promise<{ data: unknown; error: QueryError }>
+        maybeSingle: () => Promise<{ data: unknown; error: QueryError }>
       }
     }
     upsert: (
@@ -214,14 +214,14 @@ export async function sendPreliminarySnapshot(
     .from('preliminary_snapshots')
     .insert(snapshot as unknown as Record<string, unknown>)
     .select()
-    .single()
+    .maybeSingle()
 
-  if (inserted.error) {
+  if (inserted.error || !inserted.data) {
     return {
       data: null,
       error: mutationError(
         'database_error',
-        inserted.error.message ?? 'Could not create preliminary snapshot.'
+        inserted.error?.message ?? 'Could not create preliminary snapshot.'
       ),
     }
   }
@@ -577,7 +577,7 @@ export async function applyDirectPreliminaryEdit(
       role: currentShift.role,
     })
     .select()
-    .single()
+    .maybeSingle()
 
   if (insertedShift.error || !insertedShift.data) {
     return {
@@ -647,14 +647,14 @@ export async function submitPreliminaryClaimRequest(
     .from('preliminary_requests')
     .insert(request as unknown as Record<string, unknown>)
     .select()
-    .single()
+    .maybeSingle()
 
-  if (inserted.error) {
+  if (inserted.error || !inserted.data) {
     return {
       data: null,
       error: mutationError(
         'database_error',
-        inserted.error.message ?? 'Could not create preliminary claim request.'
+        inserted.error?.message ?? 'Could not create preliminary claim request.'
       ),
     }
   }
@@ -715,14 +715,14 @@ export async function submitPreliminaryChangeRequest(
     .from('preliminary_requests')
     .insert(request as unknown as Record<string, unknown>)
     .select()
-    .single()
+    .maybeSingle()
 
-  if (inserted.error) {
+  if (inserted.error || !inserted.data) {
     return {
       data: null,
       error: mutationError(
         'database_error',
-        inserted.error.message ?? 'Could not create preliminary change request.'
+        inserted.error?.message ?? 'Could not create preliminary change request.'
       ),
     }
   }
