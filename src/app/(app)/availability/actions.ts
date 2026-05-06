@@ -1528,10 +1528,15 @@ export async function sendAvailabilityRemindersAction(
     return { sent: 0, skipped: 0, failed: 0, error: 'db_error' }
   }
 
-  const { data: submissionRows } = await supabase
+  const { data: submissionRows, error: submissionError } = await supabase
     .from('therapist_availability_submissions')
     .select('therapist_id')
     .eq('schedule_cycle_id', cycleId)
+
+  if (submissionError) {
+    console.error('[sendAvailabilityRemindersAction] submission fetch failed:', submissionError)
+    return { sent: 0, skipped: 0, failed: 0, error: 'db_error' }
+  }
 
   const submittedIds = new Set((submissionRows ?? []).map((row) => row.therapist_id))
 
