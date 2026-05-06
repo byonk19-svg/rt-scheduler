@@ -50,6 +50,7 @@ function SwapRequestPageContent() {
   const showsTeammateStep =
     requestVisibility === 'direct' || (requestType === 'swap' && swapPath === 'team_suggested')
   const listPath = pathname === '/therapist/swaps' ? '/therapist/swaps' : '/requests/new'
+  const historySurface = pathname === '/therapist/swaps' ? 'therapist-swaps' : 'requests'
 
   const selectedShiftData = useMemo(
     () => myShifts.find((shift) => shift.id === selectedShift) ?? null,
@@ -392,6 +393,7 @@ function SwapRequestPageContent() {
       pendingCount={pendingCount}
       requests={myOpenRequests}
       selectedRequestId={requestIdFromQuery}
+      surface={historySurface}
       totalRequests={totalRequests}
       onNewRequest={handleNew}
       onRespondDirectRequest={handleRecipientDecision}

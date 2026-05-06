@@ -219,6 +219,14 @@ function deriveRequestStage(params: {
   }
 
   if (request.visibility === 'team' && request.type === 'swap' && request.claimed_by) {
+    if (involvement === 'claimed') {
+      return {
+        label: 'You are suggested for manager review',
+        detail:
+          'The requester suggested you as the swap partner. A manager still approves the swap.',
+      }
+    }
+
     return {
       label: 'Suggested partner in manager review',
       detail: 'Manager can approve your suggested teammate or choose another safe partner.',
@@ -320,6 +328,12 @@ async function mapOpenRequests(params: {
         row.full_name ?? 'Unknown therapist',
       ])
     )
+
+    const missingPartnerIds = requestedPartnerIds.filter((id) => !partnerById.has(id))
+    const visibleCounterpartyNames = await loadVisibleRequestCounterpartyNames(missingPartnerIds)
+    for (const [id, fullName] of visibleCounterpartyNames) {
+      partnerById.set(id, fullName)
+    }
   }
 
   const mappedOpenRequests = requestRows.map((row) => {
@@ -330,6 +344,7 @@ async function mapOpenRequests(params: {
         : row.visibility === 'direct'
           ? 'received_direct'
           : 'claimed'
+    const counterpartyId = involvement === 'posted' ? row.claimed_by : row.posted_by
     const stage = deriveRequestStage({
       currentUserId,
       request: row,
@@ -350,7 +365,7 @@ async function mapOpenRequests(params: {
       stageLabel: stage.label,
       stageDetail: stage.detail,
       createdAt: row.created_at,
-      swapWith: row.claimed_by ? (partnerById.get(row.claimed_by) ?? null) : null,
+      swapWith: counterpartyId ? (partnerById.get(counterpartyId) ?? null) : null,
       posted: formatRequestRelativeTime(row.created_at),
       message: row.message,
     } satisfies OpenRequest
@@ -419,6 +434,33 @@ async function mapOpenRequests(params: {
 
       return right.id.localeCompare(left.id)
     })
+}
+
+async function loadVisibleRequestCounterpartyNames(ids: string[]) {
+  if (ids.length === 0 || typeof window === 'undefined') {
+    return new Map<string, string>()
+  }
+
+  const params = new URLSearchParams({ ids: ids.join(',') })
+  const response = await fetch(`/api/shift-posts/request-counterparties?${params.toString()}`, {
+    cache: 'no-store',
+  }).catch(() => null)
+
+  if (!response?.ok) {
+    return new Map<string, string>()
+  }
+
+  const payload = (await response.json().catch(() => null)) as {
+    profiles?: Array<{ id?: string; fullName?: string | null }>
+  } | null
+
+  return new Map(
+    (payload?.profiles ?? [])
+      .filter((profile): profile is { id: string; fullName: string } =>
+        Boolean(profile.id && profile.fullName)
+      )
+      .map((profile) => [profile.id, profile.fullName])
+  )
 }
 
 function formatRequestDate(isoDate: string) {

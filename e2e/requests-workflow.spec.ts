@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process'
+
 import { expect, test } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -14,6 +16,90 @@ type RequestsCtx = {
   leadRequester: { id: string; email: string; password: string }
   leadEligiblePartner: { id: string; email: string; password: string }
   leadIneligiblePartner: { id: string; email: string; password: string }
+}
+
+type SeededTeamwiseDirectSwap = {
+  message: string
+  partnerShiftId: string
+  requesterId: string
+  requesterName: string
+  requesterShiftId: string
+  recipientId: string
+  recipientName: string
+}
+
+function reseedFunctionalDemo() {
+  execFileSync(process.execPath, ['--env-file=.env.local', 'scripts/seed-functional-demo.mjs'], {
+    cwd: process.cwd(),
+    stdio: 'pipe',
+  })
+}
+
+async function loadSeededTeamwiseDirectSwap(
+  supabase: SupabaseClient
+): Promise<SeededTeamwiseDirectSwap> {
+  const { data: recipient, error: recipientError } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+    .eq('email', 'demo-therapist01@teamwise.test')
+    .maybeSingle()
+
+  if (recipientError || !recipient) {
+    throw new Error(recipientError?.message ?? 'Seeded Teamwise therapist was not found.')
+  }
+
+  const { data: post, error: postError } = await supabase
+    .from('shift_posts')
+    .select(
+      'id, message, shift_id, posted_by, claimed_by, shift:shifts!shift_posts_shift_id_fkey(cycle_id, date, shift_type)'
+    )
+    .eq('message', 'Seeded direct swap awaiting response')
+    .eq('visibility', 'direct')
+    .eq('recipient_response', 'pending')
+    .eq('claimed_by', recipient.id)
+    .maybeSingle()
+
+  if (postError || !post) {
+    throw new Error(postError?.message ?? 'Seeded Teamwise direct swap was not found.')
+  }
+
+  const shift = Array.isArray(post.shift) ? post.shift[0] : post.shift
+  if (!shift?.cycle_id || !shift.date || !shift.shift_type || !post.shift_id || !post.posted_by) {
+    throw new Error('Seeded Teamwise direct swap is missing shift context.')
+  }
+
+  const { data: requester, error: requesterError } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+    .eq('id', post.posted_by)
+    .maybeSingle()
+
+  if (requesterError || !requester) {
+    throw new Error(requesterError?.message ?? 'Seeded Teamwise requester was not found.')
+  }
+
+  const { data: partnerShift, error: partnerShiftError } = await supabase
+    .from('shifts')
+    .select('id')
+    .eq('cycle_id', shift.cycle_id)
+    .eq('date', shift.date)
+    .eq('shift_type', shift.shift_type)
+    .eq('user_id', recipient.id)
+    .maybeSingle()
+
+  if (partnerShiftError || !partnerShift) {
+    throw new Error(partnerShiftError?.message ?? 'Seeded Teamwise partner shift was not found.')
+  }
+
+  return {
+    message: post.message,
+    partnerShiftId: partnerShift.id,
+    requesterId: requester.id,
+    requesterName: requester.full_name ?? 'Requester',
+    requesterShiftId: post.shift_id,
+    recipientId: recipient.id,
+    recipientName: recipient.full_name ?? 'Recipient',
+  }
 }
 
 async function openRequestComposerForShift(page: Parameters<typeof loginAs>[0], shiftId: string) {
@@ -204,6 +290,91 @@ test.describe.serial('requests workflow', () => {
 
     for (const userId of createdUserIds) {
       await ctx.supabase.auth.admin.deleteUser(userId).catch(() => undefined)
+    }
+  })
+
+  test('seeded Teamwise therapist can accept a direct swap and manager can approve it', async ({
+    page,
+    browser,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded Teamwise swap e2e.')
+
+    reseedFunctionalDemo()
+    const seededSwap = await loadSeededTeamwiseDirectSwap(ctx!.supabase)
+
+    await loginAs(page, 'demo-therapist01@teamwise.test', 'Teamwise123!')
+    await page.goto('/therapist/swaps', { waitUntil: 'domcontentloaded' })
+    await expect(page.getByRole('heading', { name: 'Shift Swaps & Pickups' })).toBeVisible()
+
+    const directSwapCard = page
+      .locator('div.rounded-xl')
+      .filter({ has: page.getByText(seededSwap.message) })
+      .first()
+    await expect(directSwapCard).toBeVisible({ timeout: 20_000 })
+    await expect(
+      directSwapCard.getByText(`Swap requested by: ${seededSwap.requesterName}`)
+    ).toBeVisible()
+    await expect(directSwapCard.getByText(`Swap with: ${seededSwap.recipientName}`)).toHaveCount(0)
+    await directSwapCard.getByRole('button', { name: 'Accept and send to manager' }).click()
+
+    await expect
+      .poll(async () => {
+        const result = await ctx!.supabase
+          .from('shift_posts')
+          .select('recipient_response, status')
+          .eq('message', seededSwap.message)
+          .maybeSingle()
+
+        if (result.error) throw new Error(result.error.message)
+        return `${result.data?.recipient_response ?? ''}:${result.data?.status ?? ''}`
+      })
+      .toBe('accepted:pending')
+
+    const managerContext = await browser.newContext()
+    const managerPage = await managerContext.newPage()
+    try {
+      await loginAs(managerPage, 'demo-manager@teamwise.test', 'Teamwise123!')
+      await managerPage.goto('/shift-board', { waitUntil: 'domcontentloaded' })
+      const managerCard = managerPage
+        .locator('div.rounded-xl')
+        .filter({ has: managerPage.getByText(seededSwap.message) })
+        .first()
+      await expect(managerCard).toBeVisible({ timeout: 20_000 })
+      await managerCard.getByRole('button', { name: 'Approve' }).click()
+
+      await expect
+        .poll(
+          async () => {
+            const result = await ctx!.supabase
+              .from('shift_posts')
+              .select('status, claimed_by, recipient_response')
+              .eq('message', seededSwap.message)
+              .maybeSingle()
+
+            if (result.error) throw new Error(result.error.message)
+            return `${result.data?.status ?? ''}:${result.data?.claimed_by ?? ''}:${result.data?.recipient_response ?? ''}`
+          },
+          { timeout: 20_000 }
+        )
+        .toBe(`approved:${seededSwap.recipientId}:accepted`)
+
+      await expect
+        .poll(
+          async () => {
+            const result = await ctx!.supabase
+              .from('shifts')
+              .select('id, user_id')
+              .in('id', [seededSwap.requesterShiftId, seededSwap.partnerShiftId])
+
+            if (result.error) throw new Error(result.error.message)
+            const owners = new Map((result.data ?? []).map((row) => [row.id, row.user_id]))
+            return `${owners.get(seededSwap.requesterShiftId) ?? ''}:${owners.get(seededSwap.partnerShiftId) ?? ''}`
+          },
+          { timeout: 20_000 }
+        )
+        .toBe(`${seededSwap.recipientId}:${seededSwap.requesterId}`)
+    } finally {
+      await managerContext.close().catch(() => undefined)
     }
   })
 

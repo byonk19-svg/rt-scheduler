@@ -16,6 +16,7 @@ type RequestsHistoryViewProps = {
   pendingCount: number
   requests: OpenRequest[]
   selectedRequestId?: string | null
+  surface?: 'requests' | 'therapist-swaps'
   totalRequests: number
   onNewRequest: () => void
   onRespondDirectRequest: (requestId: string, decision: 'accepted' | 'declined') => Promise<void>
@@ -30,17 +31,24 @@ export function RequestsHistoryView({
   pendingCount,
   requests,
   selectedRequestId,
+  surface = 'requests',
   totalRequests,
   onNewRequest,
   onRespondDirectRequest,
   onWithdrawInterest,
   onWithdrawRequest,
 }: RequestsHistoryViewProps) {
+  const isTherapistSwapsSurface = surface === 'therapist-swaps'
+
   return (
     <div className="space-y-3">
       <ManagerWorkspaceHeader
-        title="My Requests"
-        subtitle="Track what is waiting on you, your teammate, or the manager."
+        title={isTherapistSwapsSurface ? 'Shift Swaps & Pickups' : 'My Requests'}
+        subtitle={
+          isTherapistSwapsSurface
+            ? 'Track swap requests, teammate responses, and manager review for your published shifts.'
+            : 'Track what is waiting on you, your teammate, or the manager.'
+        }
         summary={
           <div className="flex flex-wrap items-center gap-2 text-foreground">
             <span className="inline-flex items-center rounded-full border border-border bg-card/90 px-2.5 py-1 text-[11px] font-semibold text-foreground">
@@ -72,8 +80,9 @@ export function RequestsHistoryView({
       <div className="rounded-xl border border-border bg-card px-4 py-3">
         <p className="text-xs font-semibold text-foreground">How requests work</p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Direct swaps move through teammate response first, then manager review. Board requests go
-          straight to manager review. This page shows which step is currently blocking the request.
+          {isTherapistSwapsSurface
+            ? 'Direct swaps wait for the teammate first, then manager review. Team-board swaps go straight to manager review. Each card names who the request is waiting on.'
+            : 'Direct swaps move through teammate response first, then manager review. Board requests go straight to manager review. This page shows which step is currently blocking the request.'}
         </p>
       </div>
 
@@ -90,7 +99,9 @@ export function RequestsHistoryView({
           </div>
           <p className="mb-1 text-sm font-bold text-foreground">No requests yet</p>
           <p className="mb-4 text-xs text-muted-foreground">
-            Create a swap, pickup, or direct request to track it here.
+            {isTherapistSwapsSurface
+              ? 'Create a shift swap or pickup request to track it here.'
+              : 'Create a swap, pickup, or direct request to track it here.'}
           </p>
           <Button size="sm" onClick={onNewRequest}>
             New request
@@ -217,7 +228,7 @@ export function RequestsHistoryView({
 
               {request.swapWith ? (
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {request.involvement === 'interest' ? 'Posted by: ' : 'Swap with: '}
+                  {getRequestPartnerLabel(request)}:{' '}
                   <span className="font-medium text-foreground">{request.swapWith}</span>
                 </p>
               ) : null}
@@ -332,6 +343,26 @@ export function RequestsHistoryView({
       )}
     </div>
   )
+}
+
+function getRequestPartnerLabel(request: OpenRequest) {
+  if (request.involvement === 'interest') {
+    return 'Posted by'
+  }
+
+  if (request.involvement === 'received_direct') {
+    return request.type === 'swap' ? 'Swap requested by' : 'Pickup requested by'
+  }
+
+  if (request.involvement === 'claimed') {
+    return request.type === 'swap' ? 'Suggested by' : 'Requested by'
+  }
+
+  if (request.type === 'pickup') {
+    return request.visibility === 'direct' ? 'Asked teammate' : 'Claimed by'
+  }
+
+  return 'Swap with'
 }
 
 function TimelineEntry({

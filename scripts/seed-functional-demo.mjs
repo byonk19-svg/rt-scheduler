@@ -296,7 +296,21 @@ async function seedShiftsForCycle(cycleId, cycleStartIso, cycleEndIso, rosterRow
   return rows.length
 }
 
-async function seedSwapRequestScenarios({ publishedCycleId }) {
+async function seedSwapRequestScenarios({ publishedCycleId, domain }) {
+  const demoStaffEmail = `demo-therapist01@${domain}`
+  const { data: demoStaff, error: demoStaffError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('email', demoStaffEmail)
+    .maybeSingle()
+
+  if (demoStaffError) throw demoStaffError
+  if (!demoStaff?.id) {
+    console.log(`Skipped seeded swap requests: could not find ${demoStaffEmail}.`)
+    return []
+  }
+
+  const todayIso = formatDate(new Date())
   const { data: shiftRows, error: shiftRowsError } = await supabase
     .from('shifts')
     .select('id, user_id, date')
@@ -304,6 +318,7 @@ async function seedSwapRequestScenarios({ publishedCycleId }) {
     .eq('shift_type', 'day')
     .eq('status', 'scheduled')
     .eq('assignment_status', 'scheduled')
+    .gte('date', todayIso)
     .order('date', { ascending: true })
     .order('user_id', { ascending: true })
 
@@ -317,20 +332,30 @@ async function seedSwapRequestScenarios({ publishedCycleId }) {
     shiftsByDate.set(row.date, bucket)
   }
 
+  const demoStaffId = demoStaff.id
   const multiShiftDates = Array.from(shiftsByDate.entries())
-    .filter(([, rows]) => rows.length >= 2)
-    .map(([date, rows]) => ({ date, rows }))
-  const singleShiftDates = Array.from(shiftsByDate.entries())
-    .filter(([, rows]) => rows.length >= 1)
-    .map(([date, rows]) => ({ date, rows }))
+    .map(([date, rows]) => ({
+      date,
+      demoRow: rows.find((row) => row.user_id === demoStaffId) ?? null,
+      partnerRow: rows.find((row) => row.user_id && row.user_id !== demoStaffId) ?? null,
+      rows,
+    }))
+    .filter((entry) => entry.demoRow && entry.partnerRow && entry.rows.length >= 2)
+  const demoShiftDates = Array.from(shiftsByDate.entries())
+    .map(([date, rows]) => ({
+      date,
+      demoRow: rows.find((row) => row.user_id === demoStaffId) ?? null,
+      rows,
+    }))
+    .filter((entry) => entry.demoRow)
 
-  if (multiShiftDates.length < 2 || singleShiftDates.length < 2) {
+  if (multiShiftDates.length < 2 || demoShiftDates.length < 2) {
     console.log('Skipped seeded swap requests: not enough generated day-shift coverage.')
     return []
   }
 
   const teamSwapWithPartner = multiShiftDates[0]
-  const openSwap = singleShiftDates.find((entry) => entry.date !== teamSwapWithPartner.date)
+  const openSwap = demoShiftDates.find((entry) => entry.date !== teamSwapWithPartner.date)
   const directSwap = multiShiftDates.find((entry) => entry.date !== teamSwapWithPartner.date)
 
   if (!openSwap || !directSwap) {
@@ -342,17 +367,17 @@ async function seedSwapRequestScenarios({ publishedCycleId }) {
     {
       label: 'team swap with suggested partner',
       message: 'Seeded team swap with suggested partner',
-      shiftId: teamSwapWithPartner.rows[0].id,
-      postedBy: teamSwapWithPartner.rows[0].user_id,
-      claimedBy: teamSwapWithPartner.rows[1].user_id,
+      shiftId: teamSwapWithPartner.partnerRow.id,
+      postedBy: teamSwapWithPartner.partnerRow.user_id,
+      claimedBy: demoStaffId,
       visibility: 'team',
       recipientResponse: null,
     },
     {
       label: 'open team swap',
       message: 'Seeded open team swap request',
-      shiftId: openSwap.rows[0].id,
-      postedBy: openSwap.rows[0].user_id,
+      shiftId: openSwap.demoRow.id,
+      postedBy: demoStaffId,
       claimedBy: null,
       visibility: 'team',
       recipientResponse: null,
@@ -360,9 +385,9 @@ async function seedSwapRequestScenarios({ publishedCycleId }) {
     {
       label: 'direct swap awaiting teammate response',
       message: 'Seeded direct swap awaiting response',
-      shiftId: directSwap.rows[0].id,
-      postedBy: directSwap.rows[0].user_id,
-      claimedBy: directSwap.rows[1].user_id,
+      shiftId: directSwap.partnerRow.id,
+      postedBy: directSwap.partnerRow.user_id,
+      claimedBy: demoStaffId,
       visibility: 'direct',
       recipientResponse: 'pending',
     },
@@ -747,7 +772,7 @@ export async function seedFunctionalDemo(options = {}) {
     draftEndIso,
     rosterForShifts
   )
-  const seededSwapScenarios = await seedSwapRequestScenarios({ publishedCycleId })
+  const seededSwapScenarios = await seedSwapRequestScenarios({ publishedCycleId, domain })
   const rosterCount = await seedEmployeeRoster(managerId, rosterForShifts)
   const templateName = await seedCycleTemplates(managerId)
   const seededPickupScenario = await seedPickupInterestScenarios({ publishedCycleId })

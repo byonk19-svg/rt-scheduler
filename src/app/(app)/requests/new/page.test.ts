@@ -38,5 +38,8 @@ describe('requests composer route source contract', () => {
     expect(composerSource).toContain('Post an open swap instead')
     expect(composerSource).toContain('No strong direct swap options for this shift right now.')
     expect(historySource).toContain('Direct swaps move through teammate response first')
+    expect(historySource).toContain('Shift Swaps & Pickups')
+    expect(historySource).toContain('Swap requested by')
+    expect(historySource).toContain('Suggested by')
   })
 })

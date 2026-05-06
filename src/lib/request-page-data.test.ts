@@ -16,8 +16,12 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-function createSupabaseMock() {
-  const requestRows = [
+function createSupabaseMock(overrides?: {
+  requestRows?: Array<Record<string, unknown>>
+  interestRows?: Array<Record<string, unknown>>
+  profiles?: Array<{ id: string; full_name: string }>
+}) {
+  const requestRows = overrides?.requestRows ?? [
     {
       id: 'post-1',
       type: 'pickup',
@@ -45,7 +49,7 @@ function createSupabaseMock() {
       message: 'Old coverage request',
     },
   ]
-  const interestRows = [
+  const interestRows = overrides?.interestRows ?? [
     {
       id: 'interest-expired',
       shift_post_id: 'interest-post-expired',
@@ -192,7 +196,7 @@ function createSupabaseMock() {
           select() {
             return {
               in: async () => ({
-                data: [{ id: 'therapist-2', full_name: 'Therapist Two' }],
+                data: overrides?.profiles ?? [{ id: 'therapist-2', full_name: 'Therapist Two' }],
                 error: null,
               }),
             }
@@ -294,5 +298,61 @@ describe('request page data', () => {
       label: 'Suggested partner in manager review',
       detail: 'Manager can approve your suggested teammate or choose another safe partner.',
     })
+  })
+
+  it('maps seeded received and suggested swap cards to the requester instead of the current therapist', async () => {
+    const snapshot = await loadRequestPageSnapshot(
+      createSupabaseMock({
+        interestRows: [],
+        profiles: [
+          { id: 'therapist-1', full_name: 'Aleyce L.' },
+          { id: 'therapist-2', full_name: 'Ruth G.' },
+        ],
+        requestRows: [
+          {
+            id: 'post-direct',
+            type: 'swap',
+            status: 'pending',
+            recipient_response: 'pending',
+            request_kind: 'standard',
+            created_at: '2026-04-28T12:00:00.000Z',
+            shift_id: 'shift-1',
+            posted_by: 'therapist-2',
+            claimed_by: 'therapist-1',
+            visibility: 'direct',
+            message: 'Seeded direct swap awaiting response',
+          },
+          {
+            id: 'post-suggested',
+            type: 'swap',
+            status: 'pending',
+            recipient_response: null,
+            request_kind: 'standard',
+            created_at: '2026-04-28T11:00:00.000Z',
+            shift_id: 'shift-1',
+            posted_by: 'therapist-2',
+            claimed_by: 'therapist-1',
+            visibility: 'team',
+            message: 'Seeded team swap with suggested partner',
+          },
+        ],
+      }),
+      '2026-04-28'
+    )
+
+    expect(snapshot?.myOpenRequests).toEqual([
+      expect.objectContaining({
+        id: 'post-direct',
+        involvement: 'received_direct',
+        stageLabel: 'Needs your response',
+        swapWith: 'Ruth G.',
+      }),
+      expect.objectContaining({
+        id: 'post-suggested',
+        involvement: 'claimed',
+        stageLabel: 'You are suggested for manager review',
+        swapWith: 'Ruth G.',
+      }),
+    ])
   })
 })
