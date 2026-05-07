@@ -101,8 +101,11 @@ export type ManagerPreliminaryQueueItem = {
   shiftId: string
   shiftDate: string
   shiftType: 'day' | 'night'
+  shiftRole: ShiftRole
+  assignedName: string | null
   requesterId: string
   requesterName: string
+  requesterShiftType: 'day' | 'night' | null
   requestType: PreliminaryRequestType
   isOppositeShiftRequest: boolean
   status: PreliminaryRequestStatus

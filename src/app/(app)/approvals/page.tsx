@@ -18,7 +18,11 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { toManagerPreliminaryQueue } from '@/lib/preliminary-schedule/selectors'
-import type { PreliminaryRequestRow, PreliminaryShiftRow } from '@/lib/preliminary-schedule/types'
+import type {
+  ManagerPreliminaryQueueItem,
+  PreliminaryRequestRow,
+  PreliminaryShiftRow,
+} from '@/lib/preliminary-schedule/types'
 import { createClient } from '@/lib/supabase/server'
 
 type ApprovalsSearchParams = Record<string, string | string[] | undefined>
@@ -56,6 +60,55 @@ function formatShiftLabel(date: string, shiftType: 'day' | 'night') {
       day: 'numeric',
     }) + ` - ${shiftType === 'day' ? 'Day' : 'Night'}`
   )
+}
+
+function formatShiftType(shiftType: 'day' | 'night') {
+  return shiftType === 'day' ? 'Day' : 'Night'
+}
+
+function formatShiftRole(role: string) {
+  if (role === 'lead') return 'Lead'
+  if (role === 'staff') return 'Staff'
+  return role
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function getRequestTitle(request: ManagerPreliminaryQueueItem) {
+  if (request.requestType === 'claim_open_shift') {
+    return request.isOppositeShiftRequest
+      ? 'Open-slot claim outside usual shift'
+      : 'Open-slot claim'
+  }
+
+  return 'Schedule change request'
+}
+
+function getRequestSummary(request: ManagerPreliminaryQueueItem) {
+  const slot = `${formatShiftType(request.shiftType)} ${formatShiftRole(request.shiftRole)} slot`
+
+  if (request.requestType === 'claim_open_shift') {
+    return `${request.requesterName} wants to fill this ${request.assignedName ? 'assigned' : 'open'} ${slot}.`
+  }
+
+  return `${request.requesterName} is asking to change this preliminary ${slot}.`
+}
+
+function getDecisionHelp(request: ManagerPreliminaryQueueItem) {
+  if (request.requestType === 'claim_open_shift') {
+    return {
+      approve: `Approve assigns ${request.requesterName} to this preliminary slot.`,
+      deny: request.assignedName
+        ? `Deny leaves ${request.assignedName} on the preliminary schedule.`
+        : 'Deny keeps this preliminary slot open.',
+    }
+  }
+
+  return {
+    approve: 'Approve applies the requested preliminary schedule change.',
+    deny: 'Deny leaves the preliminary schedule unchanged.',
+  }
 }
 
 export default async function ApprovalsPage({
@@ -242,55 +295,80 @@ export default async function ApprovalsPage({
         </div>
       ) : (
         <div className="grid gap-3 px-6 pb-6">
-          {queue.map((request) => (
-            <div
-              key={request.id}
-              className="rounded-xl border border-border/70 bg-card/85 px-4 py-4 shadow-none"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-foreground">{request.requesterName}</p>
-                    <StatusBadge variant="warning" dot={false} className="text-[10px]">
-                      {request.requestType === 'claim_open_shift'
-                        ? request.isOppositeShiftRequest
-                          ? 'Opposite-shift interest'
-                          : 'Claim open shift'
-                        : 'Request change'}
-                    </StatusBadge>
+          {queue.map((request) => {
+            const decisionHelp = getDecisionHelp(request)
+
+            return (
+              <div
+                key={request.id}
+                className="rounded-xl border border-border/70 bg-card/85 px-4 py-4 shadow-none"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-foreground">
+                        {request.requesterName}
+                      </p>
+                      <StatusBadge variant="warning" dot={false} className="text-[10px]">
+                        {getRequestTitle(request)}
+                      </StatusBadge>
+                    </div>
+                    <p className="mt-1 text-sm font-medium text-foreground">
+                      {getRequestSummary(request)}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                      <span className="rounded-md bg-muted/60 px-2 py-1">
+                        Slot: {formatShiftLabel(request.shiftDate, request.shiftType)}
+                      </span>
+                      <span className="rounded-md bg-muted/60 px-2 py-1">
+                        Role: {formatShiftRole(request.shiftRole)}
+                      </span>
+                      <span className="rounded-md bg-muted/60 px-2 py-1">
+                        Current: {request.assignedName ?? 'Open'}
+                      </span>
+                      {request.requesterShiftType ? (
+                        <span className="rounded-md bg-muted/60 px-2 py-1">
+                          Usual shift: {formatShiftType(request.requesterShiftType)}
+                        </span>
+                      ) : null}
+                    </div>
+                    {request.isOppositeShiftRequest ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        This is outside the therapist&apos;s usual shift. Approve only if that
+                        exception is intentional for this date.
+                      </p>
+                    ) : null}
+                    {request.note && (
+                      <p className="mt-3 rounded-lg bg-muted/70 px-3 py-2 text-sm text-foreground">
+                        <span className="block text-xs font-semibold uppercase text-muted-foreground">
+                          Request note
+                        </span>
+                        {request.note}
+                      </p>
+                    )}
+                    <div className="mt-3 grid gap-1 text-xs text-muted-foreground">
+                      <p>{decisionHelp.approve}</p>
+                      <p>{decisionHelp.deny}</p>
+                    </div>
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {formatShiftLabel(request.shiftDate, request.shiftType)}
-                  </p>
-                  {request.isOppositeShiftRequest ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      This therapist is on the opposite shift and needs manager approval before the
-                      preliminary assignment becomes active.
-                    </p>
-                  ) : null}
-                  {request.note && (
-                    <p className="mt-2 rounded-lg bg-muted/70 px-3 py-2 text-sm text-foreground">
-                      {request.note}
-                    </p>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <form action={approvePreliminaryRequestAction}>
-                    <input type="hidden" name="request_id" value={request.id} />
-                    <Button type="submit" size="sm" className="text-xs">
-                      Approve
-                    </Button>
-                  </form>
-                  <form action={denyPreliminaryRequestAction}>
-                    <input type="hidden" name="request_id" value={request.id} />
-                    <Button type="submit" size="sm" variant="outline" className="text-xs">
-                      Deny
-                    </Button>
-                  </form>
+                  <div className="flex gap-2">
+                    <form action={approvePreliminaryRequestAction}>
+                      <input type="hidden" name="request_id" value={request.id} />
+                      <Button type="submit" size="sm" className="text-xs">
+                        Approve
+                      </Button>
+                    </form>
+                    <form action={denyPreliminaryRequestAction}>
+                      <input type="hidden" name="request_id" value={request.id} />
+                      <Button type="submit" size="sm" variant="outline" className="text-xs">
+                        Deny
+                      </Button>
+                    </form>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

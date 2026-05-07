@@ -236,6 +236,10 @@ describe('approvals preliminary queue', () => {
 
     expect(html).toContain('Preliminary approvals')
     expect(html).toContain('Barbara C.')
+    expect(html).toContain('Barbara C. wants to fill this open Day Staff slot.')
+    expect(html).toContain('Slot: Sun, Mar 22 - Day')
+    expect(html).toContain('Current: Open')
+    expect(html).toContain('Approve assigns Barbara C. to this preliminary slot.')
     expect(html).toContain('Approve')
     expect(html).toContain('I can fill this shift.')
   })
@@ -266,10 +270,9 @@ describe('approvals preliminary queue', () => {
 
     const html = renderToStaticMarkup(await ApprovalsPage({ searchParams: Promise.resolve({}) }))
 
-    expect(html).toContain('Opposite-shift interest')
-    expect(html).toContain(
-      'needs manager approval before the preliminary assignment becomes active'
-    )
+    expect(html).toContain('Open-slot claim outside usual shift')
+    expect(html).toContain('Usual shift: Night')
+    expect(html).toContain('Approve only if that exception is intentional for this date.')
   })
 
   it('redirects non-managers away from approvals', async () => {

@@ -125,19 +125,23 @@ export function toManagerPreliminaryQueue(
     )
     .map((request) => {
       const shift = shiftsById.get(request.shift_id)
+      const requesterShiftType = requesterShiftTypesById.get(request.requester_id) ?? null
 
       return {
         id: request.id,
         shiftId: request.shift_id,
         shiftDate: shift?.date ?? '',
         shiftType: shift?.shift_type ?? 'day',
+        shiftRole: shift?.role ?? 'staff',
+        assignedName: shift?.full_name ?? null,
         requesterId: request.requester_id,
         requesterName: request.requester_name ?? 'Unknown',
+        requesterShiftType,
         requestType: request.type,
         isOppositeShiftRequest:
           request.type === 'claim_open_shift' &&
-          Boolean(requesterShiftTypesById.get(request.requester_id)) &&
-          requesterShiftTypesById.get(request.requester_id) !== (shift?.shift_type ?? null),
+          requesterShiftType != null &&
+          requesterShiftType !== (shift?.shift_type ?? null),
         status: request.status,
         note: request.note,
         createdAt: request.created_at,
