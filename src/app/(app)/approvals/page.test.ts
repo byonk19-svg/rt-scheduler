@@ -50,6 +50,17 @@ type TestContext = {
   userId?: string | null
   role?: string | null
   requesterShiftType?: 'day' | 'night' | null
+  affectedShiftUserId?: string | null
+  affectedShiftProfileName?: string | null
+  impactShifts?: Array<{
+    id: string
+    cycle_id: string | null
+    user_id: string | null
+    date: string
+    shift_type: 'day' | 'night'
+    status: string
+    role: string
+  }>
   pendingRequests?: Array<{
     id: string
     snapshot_id: string
@@ -129,10 +140,32 @@ function createSupabaseMock(context: TestContext) {
             )
           }
 
-          if (table === 'shifts') {
+          if (table === 'shifts' && selected.includes('profiles:')) {
             return Promise.resolve(
               resolve({
                 data: [
+                  {
+                    id: 'shift-1',
+                    cycle_id: 'cycle-1',
+                    user_id: context.affectedShiftUserId ?? null,
+                    date: '2026-03-22',
+                    shift_type: 'day',
+                    status: 'scheduled',
+                    role: 'staff',
+                    profiles: context.affectedShiftProfileName
+                      ? { full_name: context.affectedShiftProfileName }
+                      : null,
+                  },
+                ],
+                error: null,
+              })
+            )
+          }
+
+          if (table === 'shifts') {
+            return Promise.resolve(
+              resolve({
+                data: context.impactShifts ?? [
                   {
                     id: 'shift-1',
                     cycle_id: 'cycle-1',
@@ -141,7 +174,24 @@ function createSupabaseMock(context: TestContext) {
                     shift_type: 'day',
                     status: 'scheduled',
                     role: 'staff',
-                    profiles: null,
+                  },
+                  {
+                    id: 'shift-2',
+                    cycle_id: 'cycle-1',
+                    user_id: 'lead-1',
+                    date: '2026-03-22',
+                    shift_type: 'day',
+                    status: 'scheduled',
+                    role: 'lead',
+                  },
+                  {
+                    id: 'shift-3',
+                    cycle_id: 'cycle-1',
+                    user_id: 'staff-2',
+                    date: '2026-03-22',
+                    shift_type: 'day',
+                    status: 'scheduled',
+                    role: 'staff',
                   },
                 ],
                 error: null,
@@ -157,6 +207,22 @@ function createSupabaseMock(context: TestContext) {
                     id: 'therapist-1',
                     full_name: 'Barbara C.',
                     shift_type: context.requesterShiftType ?? 'day',
+                  },
+                ],
+                error: null,
+              })
+            )
+          }
+
+          if (table === 'schedule_cycles') {
+            return Promise.resolve(
+              resolve({
+                data: [
+                  {
+                    id: 'cycle-1',
+                    label: 'Demo Cycle',
+                    start_date: '2026-03-08',
+                    end_date: '2026-04-18',
                   },
                 ],
                 error: null,
@@ -237,11 +303,73 @@ describe('approvals preliminary queue', () => {
     expect(html).toContain('Preliminary approvals')
     expect(html).toContain('Barbara C.')
     expect(html).toContain('Barbara C. wants to fill this open Day Staff slot.')
-    expect(html).toContain('Slot: Sun, Mar 22 - Day')
+    expect(html).toContain('Affected shift')
+    expect(html).toContain('Sun, Mar 22')
+    expect(html).toContain('Day shift')
     expect(html).toContain('Current: Open')
+    expect(html).toContain('Coverage impact')
+    expect(html).toContain('2 / 5 staffed')
+    expect(html).toContain('After approval')
+    expect(html).toContain('3 / 5 staffed')
+    expect(html).toContain('Schedule preview')
+    expect(html).toContain('Request would fill')
     expect(html).toContain('Approve assigns Barbara C. to this preliminary slot.')
     expect(html).toContain('Approve')
     expect(html).toContain('I can fill this shift.')
+  })
+
+  it('shows approval impact when a change request would reopen a filled slot', async () => {
+    createClientMock.mockResolvedValue(
+      createSupabaseMock({
+        userId: 'manager-1',
+        role: 'manager',
+        affectedShiftUserId: 'therapist-1',
+        affectedShiftProfileName: 'Barbara C.',
+        pendingRequests: [
+          {
+            id: 'request-1',
+            snapshot_id: 'snapshot-1',
+            shift_id: 'shift-1',
+            requester_id: 'therapist-1',
+            type: 'request_change',
+            status: 'pending',
+            note: 'Need this day back.',
+            decision_note: null,
+            approved_by: null,
+            approved_at: null,
+            created_at: '2026-03-19T10:00:00.000Z',
+          },
+        ],
+        impactShifts: [
+          {
+            id: 'shift-1',
+            cycle_id: 'cycle-1',
+            user_id: 'therapist-1',
+            date: '2026-03-22',
+            shift_type: 'day',
+            status: 'scheduled',
+            role: 'staff',
+          },
+          {
+            id: 'shift-2',
+            cycle_id: 'cycle-1',
+            user_id: 'staff-2',
+            date: '2026-03-22',
+            shift_type: 'day',
+            status: 'scheduled',
+            role: 'staff',
+          },
+        ],
+      })
+    )
+
+    const html = renderToStaticMarkup(await ApprovalsPage({ searchParams: Promise.resolve({}) }))
+
+    expect(html).toContain('Schedule change request')
+    expect(html).toContain('2 / 5 staffed')
+    expect(html).toContain('1 / 5 staffed')
+    expect(html).toContain('Approval would open')
+    expect(html).toContain('Approve applies the requested preliminary schedule change.')
   })
 
   it('labels opposite-shift preliminary interest explicitly in the queue', async () => {
