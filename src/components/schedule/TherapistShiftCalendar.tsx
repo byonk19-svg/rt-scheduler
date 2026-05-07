@@ -7,7 +7,9 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Clock,
   Download,
+  Moon,
   Search,
   Settings,
   Star,
@@ -107,22 +109,21 @@ function matchesFilter(day: TherapistShiftDay, filter: FilterKey) {
   return !day.userShift
 }
 
-function Chip({
+function ShiftBadge({
   children,
-  tone = 'muted',
+  variant = 'muted',
 }: {
   children: ReactNode
-  tone?: 'day' | 'lead' | 'muted'
+  variant?: 'day' | 'night' | 'lead' | 'muted'
 }) {
   return (
     <span
       className={cn(
-        'inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold uppercase leading-none tracking-[0.04em]',
-        tone === 'day' &&
-          'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)]',
-        tone === 'lead' &&
-          'border-[color:color-mix(in_srgb,var(--attention)_65%,white)] bg-[var(--warning-subtle)] text-[var(--warning-text)]',
-        tone === 'muted' && 'border-border bg-muted text-muted-foreground'
+        'inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-wide',
+        variant === 'day' && 'bg-[var(--info-subtle)] text-[var(--info-text)]',
+        variant === 'night' && 'bg-[var(--night-subtle)] text-[var(--night-text)]',
+        variant === 'lead' && 'bg-[var(--warning-subtle)] text-[var(--warning-text)]',
+        variant === 'muted' && 'bg-muted text-muted-foreground'
       )}
     >
       {children}
@@ -130,17 +131,55 @@ function Chip({
   )
 }
 
-function MemberAvatar({ member }: { member: TherapistShiftMember }) {
+function MemberAvatar({ member, size = 'sm' }: { member: TherapistShiftMember; size?: 'sm' | 'md' }) {
   return (
     <span
       className={cn(
-        'inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white ring-1 ring-white/80',
+        'inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white ring-2 ring-card',
+        size === 'sm' && 'h-6 w-6 text-[10px]',
+        size === 'md' && 'h-8 w-8 text-xs',
         member.colorClass
       )}
       aria-hidden="true"
     >
       {member.initials}
     </span>
+  )
+}
+
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  accent = false,
+}: {
+  label: string
+  value: string | number
+  icon: LucideIcon
+  accent?: boolean
+}) {
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-3 rounded-xl border px-4 py-3',
+        accent
+          ? 'border-primary/20 bg-primary/5'
+          : 'border-border bg-card'
+      )}
+    >
+      <div
+        className={cn(
+          'flex h-10 w-10 items-center justify-center rounded-lg',
+          accent ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+        )}
+      >
+        <Icon className="h-5 w-5" />
+      </div>
+      <div>
+        <p className="text-2xl font-bold tracking-tight text-foreground">{value}</p>
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      </div>
+    </div>
   )
 }
 
@@ -153,64 +192,111 @@ function DayCard({
 }) {
   const visibleTeam = day.team.filter((member) => visibleMemberIds.has(member.id))
   const assignment = assignmentLabel(day.userShift?.assignmentStatus ?? null)
+  const isNightShift = day.userShift?.shiftType === 'night'
 
   return (
     <article
       className={cn(
-        'flex min-h-[13rem] flex-col rounded-md border border-border/80 bg-card p-3 shadow-tw-2xs',
-        day.isWeekend && !day.userShift && 'bg-muted/20'
+        'group relative flex flex-col rounded-xl border bg-card transition-all duration-200',
+        day.userShift
+          ? isNightShift
+            ? 'border-[var(--night-border)]/50 hover:border-[var(--night-border)] hover:shadow-tw-md'
+            : 'border-[var(--info-border)]/50 hover:border-[var(--info-border)] hover:shadow-tw-md'
+          : 'border-border/60 bg-muted/30 hover:bg-muted/50'
       )}
       aria-label={`${day.weekdayLabel} ${day.dayLabel}`}
     >
-      <div className="mb-2 flex min-h-5 flex-wrap items-center gap-1.5">
+      {/* Shift type indicator bar */}
+      {day.userShift && (
+        <div
+          className={cn(
+            'h-1 w-full rounded-t-xl',
+            isNightShift ? 'bg-[var(--night)]' : 'bg-[var(--info)]'
+          )}
+        />
+      )}
+
+      <div className="flex flex-1 flex-col p-4">
+        {/* Header with badges */}
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          {day.userShift ? (
+            <>
+              <ShiftBadge variant={isNightShift ? 'night' : 'day'}>
+                {isNightShift ? <Moon className="h-3 w-3" /> : <Sun className="h-3 w-3" />}
+                {day.userShift.shiftType}
+              </ShiftBadge>
+              {day.userShift.role === 'lead' && (
+                <ShiftBadge variant="lead">
+                  <Star className="h-3 w-3" />
+                  Lead
+                </ShiftBadge>
+              )}
+              {assignment && <ShiftBadge>{assignment}</ShiftBadge>}
+            </>
+          ) : (
+            <ShiftBadge>Off</ShiftBadge>
+          )}
+        </div>
+
         {day.userShift ? (
           <>
-            <Chip tone="day">{day.userShift.shiftType}</Chip>
-            {day.userShift.role === 'lead' ? <Chip tone="lead">Lead</Chip> : null}
-            {assignment ? <Chip>{assignment}</Chip> : null}
+            {/* Time info */}
+            <div className="mb-4 flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <p className="text-sm font-semibold text-foreground">
+                {shiftTimeLabel(day.userShift.shiftType)}
+              </p>
+              <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                12h
+              </span>
+            </div>
+
+            {/* Team section */}
+            <div className="mt-auto">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Users className="h-3 w-3" />
+                Team
+              </p>
+              <div className="space-y-2">
+                {visibleTeam.length > 0 ? (
+                  visibleTeam.slice(0, 4).map((member) => (
+                    <div key={member.id} className="flex min-w-0 items-center gap-2">
+                      <MemberAvatar member={member} />
+                      <span
+                        className={cn(
+                          'min-w-0 flex-1 truncate text-sm font-medium',
+                          member.isYou ? 'text-primary' : 'text-foreground'
+                        )}
+                      >
+                        {member.shortName}
+                        {member.isYou && ' (You)'}
+                      </span>
+                      {member.isLead && (
+                        <Star className="h-3.5 w-3.5 fill-[var(--attention)] text-[var(--attention)]" />
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-muted-foreground">No teammates selected</p>
+                )}
+                {visibleTeam.length > 4 && (
+                  <p className="text-xs font-medium text-muted-foreground">
+                    +{visibleTeam.length - 4} more
+                  </p>
+                )}
+              </div>
+            </div>
           </>
         ) : (
-          <Chip>Day off</Chip>
+          <div className="flex flex-1 flex-col items-center justify-center py-6 text-center">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+              <CalendarDays className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+            </div>
+            <p className="text-sm font-medium text-muted-foreground">Day off</p>
+            <p className="mt-1 text-xs text-muted-foreground/70">Enjoy your rest!</p>
+          </div>
         )}
       </div>
-
-      {day.userShift ? (
-        <>
-          <div className="mb-4 flex items-baseline justify-between gap-2">
-            <p className="text-sm font-bold text-foreground">
-              {shiftTimeLabel(day.userShift.shiftType)}
-            </p>
-            <p className="text-xs font-medium text-muted-foreground">12h</p>
-          </div>
-          <p className="mb-2 text-xs font-medium text-muted-foreground">Team</p>
-          <div className="space-y-2">
-            {visibleTeam.length > 0 ? (
-              visibleTeam.map((member) => (
-                <div key={member.id} className="flex min-w-0 items-center gap-2">
-                  <MemberAvatar member={member} />
-                  <span
-                    className={cn(
-                      'min-w-0 truncate text-xs font-semibold text-foreground',
-                      member.isYou && 'text-primary'
-                    )}
-                  >
-                    {member.shortName}
-                    {member.isYou ? ' (You)' : ''}
-                  </span>
-                  {member.isLead ? <Chip tone="lead">Lead</Chip> : null}
-                </div>
-              ))
-            ) : (
-              <p className="text-xs text-muted-foreground">No selected teammates</p>
-            )}
-          </div>
-        </>
-      ) : (
-        <div className="flex flex-1 flex-col items-center justify-center text-center">
-          <CalendarDays className="h-8 w-8 text-muted-foreground/70" aria-hidden="true" />
-          <p className="mt-3 text-xs font-medium text-muted-foreground">Enjoy your day!</p>
-        </div>
-      )}
     </article>
   )
 }
@@ -266,219 +352,276 @@ export function TherapistShiftCalendar({
   }
 
   return (
-    <div className="space-y-5 px-4 py-5 md:px-8 md:py-7">
-      <header className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <h1 className="font-heading text-3xl font-bold tracking-tight text-foreground">
-            {title}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex overflow-hidden rounded-lg border border-border bg-card shadow-tw-2xs">
-            <Button
-              asChild
-              variant="ghost"
-              size="icon-sm"
-              className="rounded-none border-r border-border"
-            >
-              <Link href={previousHref} aria-label="Previous schedule window">
-                <ChevronLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <div className="inline-flex min-h-11 items-center gap-2 px-4 text-sm font-bold text-foreground">
-              <CalendarDays className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              {periodLabel}
+    <div className="min-h-screen bg-background">
+      {/* Header Section */}
+      <header className="border-b border-border bg-card">
+        <div className="mx-auto max-w-[1600px] px-4 py-6 md:px-8">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-3xl">
+                {title}
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
             </div>
-            <Button
-              asChild
-              variant="ghost"
-              size="icon-sm"
-              className="rounded-none border-l border-border"
-            >
-              <Link href={nextHref} aria-label="Next schedule window">
-                <ChevronRight className="h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
 
-          <div className="inline-flex overflow-hidden rounded-lg border border-border bg-card shadow-tw-2xs">
-            {[
-              ['week', 'Week'],
-              ['two', '2 Weeks'],
-              ['month', 'Month'],
-            ].map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setViewMode(key as 'week' | 'two' | 'month')}
-                className={cn(
-                  'min-h-11 border-r border-border px-5 text-sm font-semibold last:border-r-0',
-                  viewMode === key
-                    ? 'bg-[var(--info-subtle)] text-primary ring-1 ring-inset ring-primary/70'
-                    : 'text-foreground hover:bg-muted'
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Period Navigator */}
+              <div className="inline-flex items-center overflow-hidden rounded-xl border border-border bg-background shadow-tw-sm">
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="icon"
+                  className="h-11 w-11 rounded-none border-r border-border hover:bg-muted"
+                >
+                  <Link href={previousHref} aria-label="Previous schedule window">
+                    <ChevronLeft className="h-5 w-5" />
+                  </Link>
+                </Button>
+                <div className="flex min-h-11 items-center gap-2 px-5 text-sm font-semibold text-foreground">
+                  <CalendarDays className="h-4 w-4 text-primary" aria-hidden="true" />
+                  {periodLabel}
+                </div>
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="icon"
+                  className="h-11 w-11 rounded-none border-l border-border hover:bg-muted"
+                >
+                  <Link href={nextHref} aria-label="Next schedule window">
+                    <ChevronRight className="h-5 w-5" />
+                  </Link>
+                </Button>
+              </div>
 
-          <Button asChild variant="outline" size="icon" aria-label="Schedule settings">
-            <Link href="/therapist/settings">
-              <Settings className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
-      </header>
-
-      <section className="rounded-lg border border-border bg-card px-4 py-3 shadow-tw-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[var(--info-subtle)] text-primary">
-              <Users className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <p className="text-sm font-bold text-foreground">
-              {summary.shiftCount} shift{summary.shiftCount === 1 ? '' : 's'}{' '}
-              <span className="text-muted-foreground">-</span> {summary.totalHours}h total
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-5 text-sm">
-            <span className="inline-flex items-center gap-2">
-              <Chip tone="day">{primaryShiftLabel.split(' ')[0]}</Chip>
-              <span>{primaryShiftLabel}</span>
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <Chip tone="lead">Lead</Chip>
-              <span>Lead</span>
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <Chip>Off</Chip>
-              <span>Day off</span>
-            </span>
-          </div>
-
-          <Button variant="outline" onClick={() => window.print()}>
-            <Download className="h-4 w-4" />
-            Export schedule
-          </Button>
-        </div>
-      </section>
-
-      <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
-        <aside className="space-y-4">
-          <section className="rounded-lg border border-border bg-card p-3 shadow-tw-sm">
-            <p className="px-1 pb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-              Filters
-            </p>
-            <div className="space-y-1">
-              {FILTERS.map((item) => {
-                const Icon = item.icon
-                const label =
-                  item.key === 'working' ? `${primaryShiftLabel.split(' ')[0]} shifts` : item.label
-                const count = item.key === 'working' ? primaryShiftCount : summary[item.countKey]
-                return (
+              {/* View Mode Toggle */}
+              <div className="inline-flex overflow-hidden rounded-xl border border-border bg-background shadow-tw-sm">
+                {[
+                  ['week', 'Week'],
+                  ['two', '2 Weeks'],
+                  ['month', 'Month'],
+                ].map(([key, label]) => (
                   <button
-                    key={item.key}
+                    key={key}
                     type="button"
-                    onClick={() => setFilter(item.key)}
+                    onClick={() => setViewMode(key as 'week' | 'two' | 'month')}
                     className={cn(
-                      'flex min-h-10 w-full items-center gap-2 rounded-md px-2 text-left text-sm font-semibold',
-                      filter === item.key
-                        ? 'bg-[var(--info-subtle)] text-primary'
+                      'min-h-11 border-r border-border px-5 text-sm font-medium transition-colors last:border-r-0',
+                      viewMode === key
+                        ? 'bg-primary text-primary-foreground'
                         : 'text-foreground hover:bg-muted'
                     )}
                   >
-                    <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    <span className="min-w-0 flex-1 truncate">{label}</span>
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-foreground">
-                      {count}
-                    </span>
+                    {label}
                   </button>
-                )
-              })}
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={() => window.print()} className="gap-2">
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline">Export</span>
+                </Button>
+                <Button asChild variant="outline" size="icon" aria-label="Schedule settings">
+                  <Link href="/therapist/settings">
+                    <Settings className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
             </div>
-          </section>
+          </div>
+        </div>
+      </header>
 
-          <section className="rounded-lg border border-border bg-card p-3 shadow-tw-sm">
-            <p className="px-1 pb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-              Teammates
-            </p>
-            <label className="mb-3 flex min-h-10 items-center gap-2 rounded-md border border-border bg-background px-3">
-              <Search className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              <span className="sr-only">Search teammates</span>
-              <input
-                value={teammateQuery}
-                onChange={(event) => setTeammateQuery(event.target.value)}
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                placeholder="Search teammates..."
-              />
-            </label>
+      {/* Stats Summary */}
+      <section className="border-b border-border bg-muted/30">
+        <div className="mx-auto max-w-[1600px] px-4 py-5 md:px-8">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
+            <StatCard
+              label="Total Shifts"
+              value={summary.shiftCount}
+              icon={CalendarDays}
+              accent
+            />
+            <StatCard label="Day Shifts" value={summary.dayShiftCount} icon={Sun} />
+            <StatCard label="Night Shifts" value={summary.nightShiftCount} icon={Moon} />
+            <StatCard label="Lead Shifts" value={summary.leadCount} icon={Star} />
+            <div className="col-span-2 flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 sm:col-span-4 lg:col-span-1">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <Clock className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold tracking-tight text-foreground">
+                  {summary.totalHours}h
+                </p>
+                <p className="text-xs font-medium text-muted-foreground">Total Hours</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-            <div className="max-h-[22rem] space-y-1 overflow-y-auto pr-1">
-              {filteredTeammates.map((member) => {
-                const selected = visibleMemberIds.has(member.id)
-                return (
-                  <button
-                    key={member.id}
-                    type="button"
-                    onClick={() => toggleMember(member.id)}
-                    className="flex min-h-9 w-full items-center gap-2 rounded-md px-1.5 text-left hover:bg-muted"
-                  >
-                    <MemberAvatar member={member} />
-                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
-                      {member.shortName}
-                      {member.isYou ? ' (You)' : ''}
-                    </span>
-                    <span
+      {/* Main Content */}
+      <div className="mx-auto max-w-[1600px] px-4 py-6 md:px-8">
+        <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+          {/* Sidebar */}
+          <aside className="space-y-4">
+            {/* Filters */}
+            <section className="rounded-xl border border-border bg-card p-4 shadow-tw-sm">
+              <h3 className="mb-3 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                Filter Shifts
+              </h3>
+              <div className="space-y-1">
+                {FILTERS.map((item) => {
+                  const Icon = item.icon
+                  const label =
+                    item.key === 'working'
+                      ? `${primaryShiftLabel.split(' ')[0]} shifts`
+                      : item.label
+                  const count = item.key === 'working' ? primaryShiftCount : summary[item.countKey]
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setFilter(item.key)}
                       className={cn(
-                        'inline-flex h-5 w-5 items-center justify-center rounded text-white',
-                        selected ? 'bg-primary' : 'bg-muted text-transparent'
+                        'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors',
+                        filter === item.key
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-foreground hover:bg-muted'
                       )}
                     >
-                      <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-
-            <Button asChild variant="ghost" size="sm" className="mt-3 w-full justify-start">
-              <Link href={backHref}>Back to dashboard</Link>
-            </Button>
-          </section>
-        </aside>
-
-        <section className="overflow-hidden rounded-lg border border-border bg-card shadow-tw-sm">
-          {visibleWeeks.map((week, index) => (
-            <div key={week.id} className={cn(index > 0 && 'border-t border-border')}>
-              <div className="flex min-h-11 items-center justify-between border-b border-border bg-muted/30 px-4">
-                <h2 className="text-sm font-bold uppercase tracking-[0.08em] text-muted-foreground">
-                  {week.label} <span className="text-foreground">{week.rangeLabel}</span>
-                </h2>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium">{label}</span>
+                      <span
+                        className={cn(
+                          'rounded-full px-2 py-0.5 text-xs font-semibold',
+                          filter === item.key
+                            ? 'bg-primary-foreground/20 text-primary-foreground'
+                            : 'bg-muted text-muted-foreground'
+                        )}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
-              {week.days.length > 0 ? (
-                <div className="grid min-w-[58rem] grid-cols-7 gap-2 overflow-x-auto p-2">
-                  {week.days.map((day) => (
-                    <div key={day.isoDate} className="min-w-0">
-                      <p className="mb-2 text-center text-xs font-bold text-foreground">
-                        {day.weekdayLabel} {day.dayLabel}
-                      </p>
-                      <DayCard day={day} visibleMemberIds={visibleMemberIds} />
-                    </div>
-                  ))}
+            </section>
+
+            {/* Teammates */}
+            <section className="rounded-xl border border-border bg-card p-4 shadow-tw-sm">
+              <h3 className="mb-3 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                Teammates
+              </h3>
+              <label className="mb-3 flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2.5 focus-within:ring-2 focus-within:ring-primary/30">
+                <Search className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <span className="sr-only">Search teammates</span>
+                <input
+                  value={teammateQuery}
+                  onChange={(event) => setTeammateQuery(event.target.value)}
+                  className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                  placeholder="Search..."
+                />
+              </label>
+
+              <div className="max-h-[320px] space-y-1 overflow-y-auto">
+                {filteredTeammates.map((member) => {
+                  const selected = visibleMemberIds.has(member.id)
+                  return (
+                    <button
+                      key={member.id}
+                      type="button"
+                      onClick={() => toggleMember(member.id)}
+                      className={cn(
+                        'flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors',
+                        selected ? 'bg-muted/50' : 'hover:bg-muted/30'
+                      )}
+                    >
+                      <MemberAvatar member={member} />
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                        {member.shortName}
+                        {member.isYou && (
+                          <span className="ml-1 text-primary">(You)</span>
+                        )}
+                      </span>
+                      <span
+                        className={cn(
+                          'flex h-5 w-5 items-center justify-center rounded-md border transition-colors',
+                          selected
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border bg-background'
+                        )}
+                      >
+                        {selected && <Check className="h-3 w-3" aria-hidden="true" />}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="mt-4 border-t border-border pt-4">
+                <Button asChild variant="ghost" size="sm" className="w-full justify-start gap-2">
+                  <Link href={backHref}>
+                    <ChevronLeft className="h-4 w-4" />
+                    Back to dashboard
+                  </Link>
+                </Button>
+              </div>
+            </section>
+          </aside>
+
+          {/* Calendar Grid */}
+          <section className="space-y-6">
+            {visibleWeeks.map((week) => (
+              <div
+                key={week.id}
+                className="overflow-hidden rounded-xl border border-border bg-card shadow-tw-sm"
+              >
+                {/* Week Header */}
+                <div className="flex items-center justify-between border-b border-border bg-muted/40 px-5 py-3">
+                  <h2 className="text-sm font-semibold text-foreground">
+                    <span className="text-muted-foreground">{week.label}</span>{' '}
+                    {week.rangeLabel}
+                  </h2>
+                  <span className="text-xs text-muted-foreground">
+                    {week.days.length} day{week.days.length !== 1 && 's'}
+                  </span>
                 </div>
-              ) : (
-                <p className="px-4 py-8 text-sm text-muted-foreground">
-                  No days match this filter in this week.
-                </p>
-              )}
-            </div>
-          ))}
-        </section>
+
+                {/* Days Grid */}
+                {week.days.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <div className="grid min-w-[900px] grid-cols-7 gap-3 p-4">
+                      {week.days.map((day) => (
+                        <div key={day.isoDate} className="min-w-0">
+                          <p
+                            className={cn(
+                              'mb-2 text-center text-xs font-semibold',
+                              day.isWeekend ? 'text-muted-foreground' : 'text-foreground'
+                            )}
+                          >
+                            {day.weekdayLabel}{' '}
+                            <span className="font-bold">{day.dayLabel}</span>
+                          </p>
+                          <DayCard day={day} visibleMemberIds={visibleMemberIds} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                      <CalendarDays className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      No days match this filter
+                    </p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </section>
+        </div>
       </div>
     </div>
   )
