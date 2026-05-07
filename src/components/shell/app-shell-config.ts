@@ -38,6 +38,7 @@ const SHELL_ROUTES = [
   '/requests',
   '/notifications',
   '/swaps',
+  '/staff',
   '/team',
   '/settings',
   '/therapist',

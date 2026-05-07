@@ -128,9 +128,11 @@ test.describe.serial('staff personal schedule pages', () => {
 
     await page.goto('/staff/my-schedule')
     await expect(page.getByRole('heading', { name: 'My Shifts' })).toBeVisible()
-    await expect(page.getByText('Upcoming shifts from published schedules only.')).toBeVisible()
+    await expect(
+      page.getByText("Your published schedule and who you're working with.")
+    ).toBeVisible()
     await expect(page.getByText('day', { exact: true }).first()).toBeVisible()
-    await expect(page.getByText(/1 shift this week/i)).toBeVisible()
+    await expect(page.getByText(/1 shift - 12h total/i)).toBeVisible()
 
     await page.goto('/staff/history')
     await expect(page.getByRole('heading', { name: 'Shift Swaps & Pickups History' })).toBeVisible()

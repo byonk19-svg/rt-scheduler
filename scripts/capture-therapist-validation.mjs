@@ -27,6 +27,7 @@ const therapistEmail = process.env.SHOT_STAFF_EMAIL ?? 'demo-therapist01@teamwis
 const therapistPassword = process.env.SHOT_PASSWORD ?? 'Teamwise123!'
 
 const ROUTES = [
+  { name: 'therapist-my-shifts', path: '/therapist/schedule' },
   { name: 'therapist-settings', path: '/therapist/settings' },
   { name: 'therapist-recurring-pattern', path: '/therapist/recurring-pattern' },
   { name: 'therapist-future-availability', path: '/therapist/availability' },
