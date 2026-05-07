@@ -158,9 +158,9 @@ function SwapRequestPageContent() {
   }, [showsTeammateStep, step])
 
   useEffect(() => {
-    if (view !== 'form' || selectedShift || myShifts.length !== 1) return
+    if (view !== 'form' || shiftIdFromQuery || selectedShift || myShifts.length === 0) return
     setSelectedShift(myShifts[0]?.id ?? null)
-  }, [myShifts, selectedShift, view])
+  }, [myShifts, selectedShift, shiftIdFromQuery, view])
 
   useEffect(() => {
     if (

@@ -51,7 +51,7 @@ async function loadSeededTeamwiseDirectSwap(
   const { data: post, error: postError } = await supabase
     .from('shift_posts')
     .select(
-      'id, message, shift_id, posted_by, claimed_by, shift:shifts!shift_posts_shift_id_fkey(cycle_id, date, shift_type)'
+      'id, message, shift_id, posted_by, claimed_by, swap_shift_id, shift:shifts!shift_posts_shift_id_fkey(cycle_id, date, shift_type)'
     )
     .eq('message', 'Seeded direct swap awaiting response')
     .eq('visibility', 'direct')
@@ -78,14 +78,18 @@ async function loadSeededTeamwiseDirectSwap(
     throw new Error(requesterError?.message ?? 'Seeded Teamwise requester was not found.')
   }
 
-  const { data: partnerShift, error: partnerShiftError } = await supabase
-    .from('shifts')
-    .select('id')
-    .eq('cycle_id', shift.cycle_id)
-    .eq('date', shift.date)
-    .eq('shift_type', shift.shift_type)
-    .eq('user_id', recipient.id)
-    .maybeSingle()
+  const partnerShiftQuery = supabase.from('shifts').select('id')
+  const partnerShiftPromise = post.swap_shift_id
+    ? partnerShiftQuery.eq('id', post.swap_shift_id).maybeSingle()
+    : partnerShiftQuery
+        .eq('cycle_id', shift.cycle_id)
+        .neq('date', shift.date)
+        .eq('shift_type', shift.shift_type)
+        .eq('user_id', recipient.id)
+        .order('date', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+  const { data: partnerShift, error: partnerShiftError } = await partnerShiftPromise
 
   if (partnerShiftError || !partnerShift) {
     throw new Error(partnerShiftError?.message ?? 'Seeded Teamwise partner shift was not found.')
@@ -318,16 +322,19 @@ test.describe.serial('requests workflow', () => {
     await directSwapCard.getByRole('button', { name: 'Accept and send to manager' }).click()
 
     await expect
-      .poll(async () => {
-        const result = await ctx!.supabase
-          .from('shift_posts')
-          .select('recipient_response, status')
-          .eq('message', seededSwap.message)
-          .maybeSingle()
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('shift_posts')
+            .select('recipient_response, status')
+            .eq('message', seededSwap.message)
+            .maybeSingle()
 
-        if (result.error) throw new Error(result.error.message)
-        return `${result.data?.recipient_response ?? ''}:${result.data?.status ?? ''}`
-      })
+          if (result.error) throw new Error(result.error.message)
+          return `${result.data?.recipient_response ?? ''}:${result.data?.status ?? ''}`
+        },
+        { timeout: 20_000 }
+      )
       .toBe('accepted:pending')
 
     const managerContext = await browser.newContext()
@@ -455,12 +462,13 @@ test.describe.serial('requests workflow', () => {
 
     const cycleDate = addDays(new Date(), 19)
     const cycleKey = formatDateKey(cycleDate)
+    const partnerKey = formatDateKey(addDays(cycleDate, 1))
     const cycleInsert = await ctx!.supabase
       .from('schedule_cycles')
       .insert({
         label: `Requests Direct ${randomString('cycle')}`,
         start_date: cycleKey,
-        end_date: cycleKey,
+        end_date: partnerKey,
         published: true,
       })
       .select('id')
@@ -486,7 +494,7 @@ test.describe.serial('requests workflow', () => {
         {
           cycle_id: cycleInsert.data.id,
           user_id: ctx!.scheduledPartner.id,
-          date: cycleKey,
+          date: partnerKey,
           shift_type: 'day',
           status: 'scheduled',
           assignment_status: 'scheduled',
@@ -560,12 +568,13 @@ test.describe.serial('requests workflow', () => {
 
     const cycleDate = addDays(new Date(), 21)
     const cycleKey = formatDateKey(cycleDate)
+    const partnerKey = formatDateKey(addDays(cycleDate, 1))
     const cycleInsert = await ctx!.supabase
       .from('schedule_cycles')
       .insert({
         label: `Requests Direct Swap ${randomString('cycle')}`,
         start_date: cycleKey,
-        end_date: cycleKey,
+        end_date: partnerKey,
         published: true,
       })
       .select('id')
@@ -591,7 +600,7 @@ test.describe.serial('requests workflow', () => {
         {
           cycle_id: cycleInsert.data.id,
           user_id: ctx!.scheduledPartner.id,
-          date: cycleKey,
+          date: partnerKey,
           shift_type: 'day',
           status: 'scheduled',
           assignment_status: 'scheduled',
@@ -701,17 +710,30 @@ test.describe.serial('requests workflow', () => {
         })
         .toBe(`approved:${ctx!.scheduledPartner.id}`)
 
+      const { data: approvedPost, error: approvedPostError } = await ctx!.supabase
+        .from('shift_posts')
+        .select('swap_shift_id')
+        .eq('posted_by', ctx!.requester.id)
+        .eq('message', requestMessage)
+        .maybeSingle()
+
+      if (approvedPostError || !approvedPost?.swap_shift_id) {
+        throw new Error(
+          approvedPostError?.message ?? 'Approved direct swap is missing swap_shift_id.'
+        )
+      }
+
       await expect
         .poll(
           async () => {
             const result = await ctx!.supabase
               .from('shifts')
               .select('id, user_id')
-              .in('id', [requesterShiftId, partnerShiftId])
+              .in('id', [requesterShiftId, approvedPost.swap_shift_id])
 
             if (result.error) throw new Error(result.error.message)
             const owners = new Map((result.data ?? []).map((row) => [row.id, row.user_id]))
-            return `${owners.get(requesterShiftId) ?? ''}:${owners.get(partnerShiftId) ?? ''}`
+            return `${owners.get(requesterShiftId) ?? ''}:${owners.get(approvedPost.swap_shift_id) ?? ''}`
           },
           { timeout: 20_000 }
         )
@@ -729,12 +751,13 @@ test.describe.serial('requests workflow', () => {
 
     const cycleDate = addDays(new Date(), 22)
     const cycleKey = formatDateKey(cycleDate)
+    const partnerKey = formatDateKey(addDays(cycleDate, 1))
     const cycleInsert = await ctx!.supabase
       .from('schedule_cycles')
       .insert({
         label: `Requests Suggested Swap ${randomString('cycle')}`,
         start_date: cycleKey,
-        end_date: cycleKey,
+        end_date: partnerKey,
         published: true,
       })
       .select('id')
@@ -760,7 +783,7 @@ test.describe.serial('requests workflow', () => {
         {
           cycle_id: cycleInsert.data.id,
           user_id: ctx!.scheduledPartner.id,
-          date: cycleKey,
+          date: partnerKey,
           shift_type: 'day',
           status: 'scheduled',
           assignment_status: 'scheduled',
@@ -843,17 +866,30 @@ test.describe.serial('requests workflow', () => {
         )
         .toBe(`approved:${ctx!.scheduledPartner.id}`)
 
+      const { data: approvedPost, error: approvedPostError } = await ctx!.supabase
+        .from('shift_posts')
+        .select('swap_shift_id')
+        .eq('posted_by', ctx!.requester.id)
+        .eq('message', requestMessage)
+        .maybeSingle()
+
+      if (approvedPostError || !approvedPost?.swap_shift_id) {
+        throw new Error(
+          approvedPostError?.message ?? 'Approved team swap is missing swap_shift_id.'
+        )
+      }
+
       await expect
         .poll(
           async () => {
             const result = await ctx!.supabase
               .from('shifts')
               .select('id, user_id')
-              .in('id', [requesterShiftId, partnerShiftId])
+              .in('id', [requesterShiftId, approvedPost.swap_shift_id])
 
             if (result.error) throw new Error(result.error.message)
             const owners = new Map((result.data ?? []).map((row) => [row.id, row.user_id]))
-            return `${owners.get(requesterShiftId) ?? ''}:${owners.get(partnerShiftId) ?? ''}`
+            return `${owners.get(requesterShiftId) ?? ''}:${owners.get(approvedPost.swap_shift_id) ?? ''}`
           },
           { timeout: 20_000 }
         )
@@ -913,7 +949,7 @@ test.describe.serial('requests workflow', () => {
     await page.getByRole('button', { name: 'Ask a specific teammate' }).click()
     await page.getByRole('button', { name: 'Continue' }).click()
     await expect(page.getByText('Who do you want to ask?').first()).toBeVisible()
-    await page.getByRole('button', { name: 'Off Day Partner' }).click()
+    await page.getByTestId(`teammate-option-${ctx!.offDayPartner.id}`).click()
     await page.getByRole('button', { name: 'Continue' }).click()
     await page.getByLabel('Message').fill(requestMessage)
     const createResponsePromise = page.waitForResponse((response) =>
@@ -1010,12 +1046,14 @@ test.describe.serial('requests workflow', () => {
 
     const cycleDate = addDays(new Date(), 210)
     const cycleKey = formatDateKey(cycleDate)
+    const leadEligiblePartnerKey = formatDateKey(addDays(cycleDate, 1))
+    const leadIneligiblePartnerKey = formatDateKey(addDays(cycleDate, 2))
     const cycleInsert = await ctx!.supabase
       .from('schedule_cycles')
       .insert({
         label: `Requests Lead Filter ${randomString('cycle')}`,
         start_date: cycleKey,
-        end_date: cycleKey,
+        end_date: leadIneligiblePartnerKey,
         published: true,
       })
       .select('id')
@@ -1041,7 +1079,7 @@ test.describe.serial('requests workflow', () => {
         {
           cycle_id: cycleInsert.data.id,
           user_id: ctx!.leadEligiblePartner.id,
-          date: cycleKey,
+          date: leadEligiblePartnerKey,
           shift_type: 'day',
           status: 'scheduled',
           assignment_status: 'scheduled',
@@ -1050,7 +1088,7 @@ test.describe.serial('requests workflow', () => {
         {
           cycle_id: cycleInsert.data.id,
           user_id: ctx!.leadIneligiblePartner.id,
-          date: cycleKey,
+          date: leadIneligiblePartnerKey,
           shift_type: 'day',
           status: 'scheduled',
           assignment_status: 'scheduled',
@@ -1075,7 +1113,7 @@ test.describe.serial('requests workflow', () => {
     await expect(page.getByText('Who do you want to ask first?').first()).toBeVisible()
     await expect(page.getByRole('button', { name: 'Lead Eligible Partner' })).toBeVisible()
     await expect(page.getByText('Best direct options')).toBeVisible()
-    await expect(page.getByText('Still possible, but needs manager review')).toBeVisible()
+    await expect(page.getByText('Worth checking')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Non Lead Partner' })).toBeVisible()
   })
 })

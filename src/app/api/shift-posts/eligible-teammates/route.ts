@@ -7,6 +7,7 @@ type RequestType = 'swap' | 'pickup'
 
 type ShiftRow = {
   id: string
+  cycle_id: string
   user_id: string | null
   date: string
   shift_type: 'day' | 'night'
@@ -61,6 +62,10 @@ function isPublishedCycle(cycle: ShiftRow['schedule_cycles']): boolean {
   return cycle?.published === true
 }
 
+function getShiftSlotKey(date: string, shiftType: ShiftRow['shift_type']): string {
+  return `${date}:${shiftType}`
+}
+
 export async function GET(request: Request) {
   const supabase = await createClient()
   const {
@@ -80,12 +85,13 @@ export async function GET(request: Request) {
   }
 
   const admin = createAdminClient()
+  const todayKey = new Date().toISOString().slice(0, 10)
 
   const [{ data: shift, error: shiftError }, { data: requesterProfile }] = await Promise.all([
     admin
       .from('shifts')
       .select(
-        'id, user_id, date, shift_type, role, status, assignment_status, schedule_cycles!inner(published)'
+        'id, cycle_id, user_id, date, shift_type, role, status, assignment_status, schedule_cycles!inner(published)'
       )
       .eq('id', shiftId)
       .maybeSingle(),
@@ -153,25 +159,30 @@ export async function GET(request: Request) {
   if (requestTypeValue === 'swap') {
     const { data: candidateShiftRows, error: candidateShiftRowsError } = await admin
       .from('shifts')
-      .select('id, user_id, role, schedule_cycles!inner(published)')
-      .eq('date', requestShift.date)
+      .select('id, user_id, date, shift_type, role, schedule_cycles!inner(published)')
+      .eq('cycle_id', requestShift.cycle_id)
       .eq('shift_type', requestShift.shift_type)
+      .gte('date', todayKey)
       .eq('status', 'scheduled')
       .eq('assignment_status', 'scheduled')
       .eq('schedule_cycles.published', true)
+      .neq('date', requestShift.date)
       .neq('user_id', user.id)
 
     if (candidateShiftRowsError) {
       return NextResponse.json({ error: 'Could not load eligible teammates.' }, { status: 500 })
     }
 
-    const candidateShiftByUserId = new Map(
-      ((candidateShiftRows ?? []) as Array<Pick<ShiftRow, 'id' | 'user_id' | 'role'>>)
-        .filter((row): row is Pick<ShiftRow, 'id' | 'user_id' | 'role'> & { user_id: string } =>
-          Boolean(row.user_id)
-        )
-        .map((row) => [row.user_id, row])
-    )
+    const sortedCandidateShiftRows = ((candidateShiftRows ?? []) as ShiftRow[])
+      .filter((row): row is ShiftRow & { user_id: string } => Boolean(row.user_id))
+      .sort((left, right) => left.date.localeCompare(right.date))
+    const candidateShiftByUserId = new Map<string, ShiftRow & { user_id: string }>()
+
+    sortedCandidateShiftRows.forEach((row) => {
+      if (!candidateShiftByUserId.has(row.user_id)) {
+        candidateShiftByUserId.set(row.user_id, row)
+      }
+    })
     const candidateUserIds = Array.from(candidateShiftByUserId.keys())
 
     if (candidateUserIds.length === 0) {
@@ -189,6 +200,65 @@ export async function GET(request: Request) {
     if (candidateProfilesError) {
       return NextResponse.json({ error: 'Could not load eligible teammates.' }, { status: 500 })
     }
+
+    const leadCoverageDates = Array.from(
+      new Set([
+        requestShift.date,
+        ...Array.from(candidateShiftByUserId.values()).map((row) => row.date),
+      ])
+    )
+    const { data: swapLeadRows, error: swapLeadRowsError } = await admin
+      .from('shifts')
+      .select('id, user_id, date, shift_type, schedule_cycles!inner(published)')
+      .eq('cycle_id', requestShift.cycle_id)
+      .in('date', leadCoverageDates)
+      .eq('shift_type', requestShift.shift_type)
+      .eq('role', 'lead')
+      .eq('status', 'scheduled')
+      .eq('assignment_status', 'scheduled')
+      .eq('schedule_cycles.published', true)
+
+    if (swapLeadRowsError) {
+      return NextResponse.json({ error: 'Could not load eligible teammates.' }, { status: 500 })
+    }
+
+    const swapLeadShiftRows = ((swapLeadRows ?? []) as ShiftRow[]).filter(
+      (row): row is ShiftRow & { user_id: string } => Boolean(row.user_id)
+    )
+    const swapLeadUserIds = Array.from(new Set(swapLeadShiftRows.map((row) => row.user_id)))
+    let swapLeadEligibilityByUserId = new Map<string, boolean>()
+
+    if (swapLeadUserIds.length > 0) {
+      const { data: swapLeadProfiles, error: swapLeadProfilesError } = await admin
+        .from('profiles')
+        .select('id, is_lead_eligible')
+        .in('id', swapLeadUserIds)
+
+      if (swapLeadProfilesError) {
+        return NextResponse.json({ error: 'Could not load eligible teammates.' }, { status: 500 })
+      }
+
+      swapLeadEligibilityByUserId = new Map(
+        ((swapLeadProfiles ?? []) as Array<Pick<ProfileRow, 'id' | 'is_lead_eligible'>>).map(
+          (profile) => [profile.id, profile.is_lead_eligible === true]
+        )
+      )
+    }
+
+    const leadShiftRowsBySlot = new Map<string, Array<ShiftRow & { user_id: string }>>()
+    swapLeadShiftRows.forEach((row) => {
+      const key = getShiftSlotKey(row.date, row.shift_type)
+      leadShiftRowsBySlot.set(key, [...(leadShiftRowsBySlot.get(key) ?? []), row])
+    })
+
+    const hasOtherLeadEligibleShiftForSlot = (
+      date: string,
+      shiftType: ShiftRow['shift_type'],
+      excludedShiftId: string
+    ) =>
+      (leadShiftRowsBySlot.get(getShiftSlotKey(date, shiftType)) ?? []).some(
+        (row) => row.id !== excludedShiftId && swapLeadEligibilityByUserId.get(row.user_id) === true
+      )
 
     const teammates = ((candidateProfiles ?? []) as ProfileRow[])
       .sort((left, right) =>
@@ -212,23 +282,31 @@ export async function GET(request: Request) {
         }
 
         const currentShiftLabel = `Currently on ${formatTherapistShiftLabel(
-          requestShift.date,
-          requestShift.shift_type
+          candidateShift.date,
+          candidateShift.shift_type
         )}`
 
         const requesterLeadRisk =
           requestShift.role === 'lead' &&
           profile.is_lead_eligible !== true &&
-          !hasOtherLeadEligibleShift(requestShift.id)
+          !hasOtherLeadEligibleShiftForSlot(
+            requestShift.date,
+            requestShift.shift_type,
+            requestShift.id
+          )
         const partnerLeadRisk =
           candidateShift.role === 'lead' &&
           !actorIsLeadEligible &&
-          !hasOtherLeadEligibleShift(candidateShift.id)
+          !hasOtherLeadEligibleShiftForSlot(
+            candidateShift.date,
+            candidateShift.shift_type,
+            candidateShift.id
+          )
 
         if (requesterLeadRisk || partnerLeadRisk) {
           const consequence = requesterLeadRisk
             ? `Your ${formatTherapistShiftLabel(requestShift.date, requestShift.shift_type)} would lose its only lead.`
-            : `Their ${formatTherapistShiftLabel(requestShift.date, requestShift.shift_type)} would lose its only lead.`
+            : `Their ${formatTherapistShiftLabel(candidateShift.date, candidateShift.shift_type)} would lose its only lead.`
 
           return {
             ...base,

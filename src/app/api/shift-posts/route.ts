@@ -67,6 +67,12 @@ type ProfileRow = {
   archived_at: string | null
 }
 
+type ShiftSelectionRow = {
+  cycle_id: string | null
+  date: string | null
+  shift_type: 'day' | 'night' | null
+}
+
 function asTrimmedString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
@@ -123,6 +129,54 @@ async function getActorProfile(userId: string): Promise<ProfileRow | null> {
   return (data ?? null) as ProfileRow | null
 }
 
+async function resolveSameCycleSwapShiftId(params: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: any
+  actorId: string
+  partnerId: string
+  shiftId: string
+}): Promise<string | null> {
+  const { admin, actorId, partnerId, shiftId } = params
+  const todayKey = new Date().toISOString().slice(0, 10)
+  const { data: requesterShift, error: requesterShiftError } = await admin
+    .from('shifts')
+    .select('cycle_id, date, shift_type')
+    .eq('id', shiftId)
+    .eq('user_id', actorId)
+    .maybeSingle()
+
+  if (requesterShiftError || !requesterShift) {
+    return null
+  }
+
+  const shift = requesterShift as ShiftSelectionRow
+  if (!shift.cycle_id || !shift.date || !shift.shift_type) {
+    return null
+  }
+
+  const { data: partnerShift, error: partnerShiftError } = await admin
+    .from('shifts')
+    .select('id, schedule_cycles!inner(published)')
+    .eq('cycle_id', shift.cycle_id)
+    .eq('user_id', partnerId)
+    .gte('date', todayKey)
+    .neq('date', shift.date)
+    .eq('shift_type', shift.shift_type)
+    .eq('status', 'scheduled')
+    .eq('assignment_status', 'scheduled')
+    .eq('schedule_cycles.published', true)
+    .order('date', { ascending: true })
+    .order('id', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  if (partnerShiftError || !partnerShift) {
+    return null
+  }
+
+  return (partnerShift as { id: string }).id
+}
+
 export async function POST(request: Request) {
   if (!isTrustedMutationRequest(request)) {
     return NextResponse.json({ error: 'invalid_origin' }, { status: 403 })
@@ -157,6 +211,26 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
       }
 
+      const swapShiftId =
+        requestType === 'swap' && teammateId
+          ? await resolveSameCycleSwapShiftId({
+              admin,
+              actorId: user.id,
+              partnerId: teammateId,
+              shiftId,
+            })
+          : null
+
+      if (requestType === 'swap' && teammateId && !swapShiftId) {
+        return NextResponse.json(
+          {
+            error:
+              'Swap partner must already have a different scheduled shift in this schedule cycle.',
+          },
+          { status: 400 }
+        )
+      }
+
       const { data, error } = await admin.rpc('app_create_shift_post_request', {
         p_actor_id: user.id,
         p_shift_id: shiftId,
@@ -170,7 +244,35 @@ export async function POST(request: Request) {
         return toErrorResponse(error?.message ?? 'Could not save interest.')
       }
 
-      return NextResponse.json({ success: true, post: data })
+      let post = data
+      if (
+        requestType === 'swap' &&
+        swapShiftId &&
+        (data as { swap_shift_id?: string }).swap_shift_id !== swapShiftId
+      ) {
+        const { data: updatedPost, error: swapShiftUpdateError } = await admin
+          .from('shift_posts')
+          .update({ swap_shift_id: swapShiftId })
+          .eq('id', (data as { id: string }).id)
+          .eq('posted_by', user.id)
+          .eq('status', 'pending')
+          .select()
+          .maybeSingle()
+
+        if (swapShiftUpdateError || !updatedPost) {
+          await admin
+            .from('shift_posts')
+            .delete()
+            .eq('id', (data as { id: string }).id)
+          return toErrorResponse(
+            swapShiftUpdateError?.message ?? 'Could not save selected swap shift.'
+          )
+        }
+
+        post = updatedPost
+      }
+
+      return NextResponse.json({ success: true, post })
     }
 
     if (action === 'respond_direct_request') {

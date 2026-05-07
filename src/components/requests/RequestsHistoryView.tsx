@@ -1,7 +1,6 @@
 import { AlertCircle, CalendarDays, CheckCircle2, Plus } from 'lucide-react'
 
 import type { OpenRequest } from '@/components/requests/request-page-model'
-import { REQUEST_STATUS_META } from '@/components/requests/request-page-model'
 import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
 import { Button } from '@/components/ui/button'
 import { SkeletonListItem } from '@/components/ui/skeleton'
@@ -81,8 +80,8 @@ export function RequestsHistoryView({
         <p className="text-xs font-semibold text-foreground">How requests work</p>
         <p className="mt-0.5 text-xs text-muted-foreground">
           {isTherapistSwapsSurface
-            ? 'Direct swaps wait for the teammate first, then manager review. Team-board swaps go straight to manager review. Each card names who the request is waiting on.'
-            : 'Direct swaps move through teammate response first, then manager review. Board requests go straight to manager review. This page shows which step is currently blocking the request.'}
+            ? 'Direct swaps wait for your teammate first. Team-board swaps wait for manager review. Each card shows the next step first.'
+            : 'Direct requests wait for teammate response first. Board requests wait for manager review. Each card shows the next step first.'}
         </p>
       </div>
 
@@ -109,7 +108,6 @@ export function RequestsHistoryView({
         </div>
       ) : (
         requests.map((request) => {
-          const meta = REQUEST_STATUS_META[request.status]
           const isPending = request.status === 'pending'
           const isSelected =
             request.id === selectedRequestId || request.sourcePostId === selectedRequestId
@@ -133,61 +131,51 @@ export function RequestsHistoryView({
                     : 'border-border'
               )}
             >
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span
-                  className={cn(
-                    'rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
-                    request.type === 'swap'
-                      ? 'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)]'
-                      : 'border-border bg-secondary text-foreground'
-                  )}
-                >
-                  {request.type}
-                </span>
-                <span
-                  className={cn(
-                    'rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
-                    meta.borderClass,
-                    meta.bgClass,
-                    meta.colorClass
-                  )}
-                >
-                  {meta.label}
-                </span>
-                <span className="rounded-full border border-border/70 bg-muted/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                  {request.visibility === 'direct' ? 'Direct' : 'Team'}
-                </span>
-                <span className="rounded-full border border-border/70 bg-muted/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                  {request.involvement === 'posted'
-                    ? 'Posted'
-                    : request.involvement === 'received_direct'
-                      ? 'Received'
-                      : request.involvement === 'interest'
-                        ? (pickupInterestCopy?.roleLabel ?? 'Interested')
-                        : 'Claimed'}
-                </span>
-                {request.requestKind === 'call_in' ? (
-                  <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--warning-text)]">
-                    Call-in help
-                  </span>
-                ) : null}
-                <span className="ml-auto text-xs text-muted-foreground">{request.posted}</span>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={cn(
+                        'rounded-full border px-2.5 py-1 text-[11px] font-semibold',
+                        request.type === 'swap'
+                          ? 'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)]'
+                          : 'border-border bg-secondary text-foreground'
+                      )}
+                    >
+                      {getRequestTypeLabel(request)}
+                    </span>
+                    <span className="rounded-full border border-border/70 bg-muted/15 px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
+                      {getRequestPathLabel(request)}
+                    </span>
+                    <span className="rounded-full border border-border/70 bg-muted/15 px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
+                      {getRequestRoleLabel(request, pickupInterestCopy?.roleLabel)}
+                    </span>
+                    {request.requestKind === 'call_in' ? (
+                      <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2.5 py-1 text-[11px] font-semibold text-[var(--warning-text)]">
+                        Call-in help
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <p className="mt-3 text-base font-semibold text-foreground">{request.message}</p>
+                </div>
+                <span className="text-xs text-muted-foreground">{request.posted}</span>
               </div>
 
-              <div className="mb-2 rounded-xl border border-border/70 bg-muted/20 px-3 py-2">
+              <div className="mt-3 rounded-xl border border-border/70 bg-muted/20 px-3 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Current stage
+                  Next step
                 </p>
-                <p className="mt-1 text-sm font-semibold text-foreground">{request.stageLabel}</p>
+                <p className="mt-1 text-base font-semibold text-foreground">{request.stageLabel}</p>
                 {request.stageDetail ? (
-                  <p className="mt-1 text-xs text-muted-foreground">{request.stageDetail}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{request.stageDetail}</p>
                 ) : null}
               </div>
 
               {isSelected ? (
-                <div className="mb-3 rounded-xl border border-border/70 bg-background/60 px-3 py-3">
+                <div className="mt-3 rounded-xl border border-border/70 bg-background/60 px-3 py-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Timeline
+                    Request timeline
                   </p>
                   <div className="mt-3 space-y-3">
                     <TimelineEntry
@@ -219,12 +207,10 @@ export function RequestsHistoryView({
                 </div>
               ) : null}
 
-              <div className="mb-1.5 inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/60 px-2 py-1">
+              <div className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/60 px-2 py-1">
                 <CalendarDays className="h-3 w-3 text-muted-foreground" />
                 <span className="text-xs font-medium text-foreground">{request.shift}</span>
               </div>
-
-              <p className="text-sm text-muted-foreground">{request.message}</p>
 
               {request.swapWith ? (
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -252,42 +238,12 @@ export function RequestsHistoryView({
                   {pickupInterestCopy.helperText}
                 </div>
               ) : null}
-              {request.visibility === 'direct' &&
-              request.involvement === 'posted' &&
-              request.recipientResponse === 'pending' ? (
-                <p className="mt-2 text-xs text-[var(--warning-text)]">
-                  Waiting for the recipient to respond before manager approval.
-                </p>
-              ) : null}
-              {request.visibility === 'direct' &&
-              request.involvement === 'posted' &&
-              request.recipientResponse === 'accepted' &&
-              request.status === 'pending' ? (
-                <p className="mt-2 text-xs text-[var(--warning-text)]">
-                  Recipient accepted. Waiting for manager approval.
-                </p>
-              ) : null}
-              {request.visibility === 'direct' &&
-              request.involvement === 'posted' &&
-              request.recipientResponse === 'declined' ? (
-                <p className="mt-2 text-xs text-[var(--error-text)]">
-                  Recipient declined this direct request.
-                </p>
-              ) : null}
               {request.visibility === 'direct' && request.recipientResponse ? (
                 <p className="mt-2 text-xs text-muted-foreground">
                   Recipient response:{' '}
                   <span className="font-medium text-foreground capitalize">
                     {request.recipientResponse}
                   </span>
-                </p>
-              ) : null}
-              {request.visibility === 'direct' &&
-              request.involvement === 'received_direct' &&
-              request.recipientResponse === 'accepted' &&
-              request.status === 'pending' ? (
-                <p className="mt-2 text-xs text-[var(--warning-text)]">
-                  You accepted. Waiting for manager approval.
                 </p>
               ) : null}
               {request.visibility === 'direct' && request.status === 'withdrawn' ? (
@@ -363,6 +319,38 @@ function getRequestPartnerLabel(request: OpenRequest) {
   }
 
   return 'Swap with'
+}
+
+function getRequestTypeLabel(request: OpenRequest) {
+  if (request.requestKind === 'call_in') {
+    return 'Call-in request'
+  }
+
+  return request.type === 'swap' ? 'Swap request' : 'Pickup request'
+}
+
+function getRequestPathLabel(request: OpenRequest) {
+  if (request.visibility === 'direct') {
+    return request.involvement === 'received_direct' ? 'Direct to you' : 'Direct teammate request'
+  }
+
+  return 'Team board'
+}
+
+function getRequestRoleLabel(request: OpenRequest, interestRoleLabel?: string) {
+  if (request.involvement === 'posted') {
+    return 'You posted this'
+  }
+
+  if (request.involvement === 'received_direct') {
+    return 'Needs your decision'
+  }
+
+  if (request.involvement === 'interest') {
+    return interestRoleLabel ?? 'You offered to help'
+  }
+
+  return 'You are the suggested partner'
 }
 
 function TimelineEntry({

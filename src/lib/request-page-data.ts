@@ -199,11 +199,11 @@ function deriveRequestStage(params: {
   if (request.visibility === 'direct') {
     if (request.recipient_response === 'accepted') {
       return {
-        label: 'Awaiting manager review',
+        label: 'Waiting on manager approval',
         detail:
           involvement === 'received_direct'
-            ? 'You accepted. Manager approval is still required.'
-            : 'Teammate accepted. Manager approval is still required.',
+            ? 'You accepted this swap. Nothing changes unless a manager approves it.'
+            : 'Your teammate accepted. Nothing changes unless a manager approves it.',
       }
     }
 
@@ -212,8 +212,8 @@ function deriveRequestStage(params: {
         label: involvement === 'received_direct' ? 'Needs your response' : 'Waiting for teammate',
         detail:
           involvement === 'received_direct'
-            ? 'Review the proposed swap and decide whether to send it to the manager.'
-            : 'This request stays private until your teammate responds.',
+            ? 'Accept sends it to manager review. Decline stops the request.'
+            : 'Your teammate must accept before this goes to manager review.',
       }
     }
   }
@@ -221,21 +221,20 @@ function deriveRequestStage(params: {
   if (request.visibility === 'team' && request.type === 'swap' && request.claimed_by) {
     if (involvement === 'claimed') {
       return {
-        label: 'You are suggested for manager review',
-        detail:
-          'The requester suggested you as the swap partner. A manager still approves the swap.',
+        label: 'Waiting on manager approval',
+        detail: 'You are the suggested swap partner. Nothing changes unless a manager approves it.',
       }
     }
 
     return {
-      label: 'Suggested partner in manager review',
-      detail: 'Manager can approve your suggested teammate or choose another safe partner.',
+      label: 'Waiting on manager approval',
+      detail: 'You suggested a swap partner. A manager still has to approve the swap.',
     }
   }
 
   return {
-    label: 'Waiting for manager review',
-    detail: 'This request is on the board for manager review.',
+    label: 'Waiting on manager approval',
+    detail: 'This request is on the team board for manager review.',
   }
 }
 

@@ -17,6 +17,7 @@ import { GET } from '@/app/api/shift-posts/eligible-teammates/route'
 
 type TestShiftRow = {
   id: string
+  cycle_id: string
   user_id: string | null
   date: string
   shift_type: 'day' | 'night'
@@ -85,6 +86,11 @@ function createAdminClient(state: TestState) {
         if (filter.op === 'neq') {
           return cell !== filter.value
         }
+        if (filter.op === 'gte') {
+          return typeof cell === 'string' && typeof filter.value === 'string'
+            ? cell >= filter.value
+            : false
+        }
         if (filter.op === 'is') {
           return (cell ?? null) === filter.value
         }
@@ -111,6 +117,10 @@ function createAdminClient(state: TestState) {
       },
       neq(key: string, value: unknown) {
         filters.push({ op: 'neq', key, value })
+        return builder
+      },
+      gte(key: string, value: unknown) {
+        filters.push({ op: 'gte', key, value })
         return builder
       },
       is(key: string, value: unknown) {
@@ -175,6 +185,7 @@ describe('eligible request teammates API', () => {
         shifts: [
           {
             id: 'shift-1',
+            cycle_id: 'cycle-1',
             user_id: 'therapist-1',
             date: '2026-05-01',
             shift_type: 'day',
@@ -185,8 +196,9 @@ describe('eligible request teammates API', () => {
           },
           {
             id: 'shift-2',
+            cycle_id: 'cycle-1',
             user_id: 'therapist-2',
-            date: '2026-05-01',
+            date: '2026-05-08',
             shift_type: 'day',
             role: 'staff',
             status: 'scheduled',
@@ -212,13 +224,13 @@ describe('eligible request teammates API', () => {
         consequence: 'Both shifts stay covered after the exchange.',
         nextMove: null,
         availabilityReason: null,
-        currentShiftLabel: 'Currently on May 1 day shift',
+        currentShiftLabel: 'Currently on May 8 day shift',
         isBestOption: true,
       },
     ])
   })
 
-  it('returns only same-date same-shift teammates for direct swaps', async () => {
+  it('returns only teammates with a different same-shift-type assignment for direct swaps', async () => {
     createAdminClientMock.mockReturnValue(
       createAdminClient({
         profiles: [
@@ -240,7 +252,7 @@ describe('eligible request teammates API', () => {
           },
           {
             id: 'therapist-3',
-            full_name: 'Off Day Therapist',
+            full_name: 'Same Slot Therapist',
             is_lead_eligible: false,
             is_active: true,
             role: 'therapist',
@@ -254,10 +266,19 @@ describe('eligible request teammates API', () => {
             role: 'therapist',
             shift_type: 'night',
           },
+          {
+            id: 'therapist-5',
+            full_name: 'Other Cycle Therapist',
+            is_lead_eligible: false,
+            is_active: true,
+            role: 'therapist',
+            shift_type: 'day',
+          },
         ],
         shifts: [
           {
             id: 'shift-1',
+            cycle_id: 'cycle-1',
             user_id: 'therapist-1',
             date: '2026-05-01',
             shift_type: 'day',
@@ -268,7 +289,19 @@ describe('eligible request teammates API', () => {
           },
           {
             id: 'shift-2',
+            cycle_id: 'cycle-1',
             user_id: 'therapist-2',
+            date: '2026-05-08',
+            shift_type: 'day',
+            role: 'staff',
+            status: 'scheduled',
+            assignment_status: 'scheduled',
+            schedule_cycles: [{ published: true }],
+          },
+          {
+            id: 'shift-3',
+            cycle_id: 'cycle-1',
+            user_id: 'therapist-3',
             date: '2026-05-01',
             shift_type: 'day',
             role: 'staff',
@@ -278,9 +311,21 @@ describe('eligible request teammates API', () => {
           },
           {
             id: 'shift-4',
+            cycle_id: 'cycle-1',
             user_id: 'therapist-4',
             date: '2026-05-01',
             shift_type: 'night',
+            role: 'staff',
+            status: 'scheduled',
+            assignment_status: 'scheduled',
+            schedule_cycles: [{ published: true }],
+          },
+          {
+            id: 'shift-5',
+            cycle_id: 'cycle-2',
+            user_id: 'therapist-5',
+            date: '2026-05-08',
+            shift_type: 'day',
             role: 'staff',
             status: 'scheduled',
             assignment_status: 'scheduled',
@@ -305,7 +350,7 @@ describe('eligible request teammates API', () => {
         consequence: 'Both shifts stay covered after the exchange.',
         nextMove: null,
         availabilityReason: null,
-        currentShiftLabel: 'Currently on May 1 day shift',
+        currentShiftLabel: 'Currently on May 8 day shift',
         isBestOption: true,
       },
     ])
@@ -343,6 +388,7 @@ describe('eligible request teammates API', () => {
         shifts: [
           {
             id: 'shift-1',
+            cycle_id: 'cycle-1',
             user_id: 'therapist-1',
             date: '2026-05-02',
             shift_type: 'day',
@@ -353,8 +399,9 @@ describe('eligible request teammates API', () => {
           },
           {
             id: 'shift-2',
+            cycle_id: 'cycle-1',
             user_id: 'therapist-2',
-            date: '2026-05-02',
+            date: '2026-05-09',
             shift_type: 'day',
             role: 'staff',
             status: 'scheduled',
@@ -363,8 +410,9 @@ describe('eligible request teammates API', () => {
           },
           {
             id: 'shift-3',
+            cycle_id: 'cycle-1',
             user_id: 'therapist-3',
-            date: '2026-05-02',
+            date: '2026-05-10',
             shift_type: 'day',
             role: 'staff',
             status: 'scheduled',
@@ -390,7 +438,7 @@ describe('eligible request teammates API', () => {
         consequence: 'Both shifts stay covered after the exchange.',
         nextMove: null,
         availabilityReason: null,
-        currentShiftLabel: 'Currently on May 2 day shift',
+        currentShiftLabel: 'Currently on May 9 day shift',
         isBestOption: true,
       },
       {
@@ -403,7 +451,7 @@ describe('eligible request teammates API', () => {
         consequence: 'Your May 2 day shift would lose its only lead.',
         nextMove: 'Try another lead-qualified teammate if you want a safer swap.',
         availabilityReason: null,
-        currentShiftLabel: 'Currently on May 2 day shift',
+        currentShiftLabel: 'Currently on May 10 day shift',
         isBestOption: false,
       },
     ])
@@ -441,6 +489,7 @@ describe('eligible request teammates API', () => {
         shifts: [
           {
             id: 'shift-1',
+            cycle_id: 'cycle-1',
             user_id: 'therapist-1',
             date: '2026-05-03',
             shift_type: 'day',
@@ -451,6 +500,7 @@ describe('eligible request teammates API', () => {
           },
           {
             id: 'shift-3',
+            cycle_id: 'cycle-1',
             user_id: 'therapist-3',
             date: '2026-05-03',
             shift_type: 'day',

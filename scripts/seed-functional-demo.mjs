@@ -313,7 +313,7 @@ async function seedSwapRequestScenarios({ publishedCycleId, domain }) {
   const todayIso = formatDate(new Date())
   const { data: shiftRows, error: shiftRowsError } = await supabase
     .from('shifts')
-    .select('id, user_id, date')
+    .select('id, user_id, date, role')
     .eq('cycle_id', publishedCycleId)
     .eq('shift_type', 'day')
     .eq('status', 'scheduled')
@@ -333,14 +333,14 @@ async function seedSwapRequestScenarios({ publishedCycleId, domain }) {
   }
 
   const demoStaffId = demoStaff.id
-  const multiShiftDates = Array.from(shiftsByDate.entries())
+  const partnerOnlyDates = Array.from(shiftsByDate.entries())
     .map(([date, rows]) => ({
       date,
       demoRow: rows.find((row) => row.user_id === demoStaffId) ?? null,
       partnerRow: rows.find((row) => row.user_id && row.user_id !== demoStaffId) ?? null,
       rows,
     }))
-    .filter((entry) => entry.demoRow && entry.partnerRow && entry.rows.length >= 2)
+    .filter((entry) => !entry.demoRow && entry.partnerRow)
   const demoShiftDates = Array.from(shiftsByDate.entries())
     .map(([date, rows]) => ({
       date,
@@ -349,16 +349,71 @@ async function seedSwapRequestScenarios({ publishedCycleId, domain }) {
     }))
     .filter((entry) => entry.demoRow)
 
-  if (multiShiftDates.length < 2 || demoShiftDates.length < 2) {
+  if (partnerOnlyDates.length < 2 || demoShiftDates.length < 3) {
     console.log('Skipped seeded swap requests: not enough generated day-shift coverage.')
     return []
   }
 
-  const teamSwapWithPartner = multiShiftDates[0]
-  const openSwap = demoShiftDates.find((entry) => entry.date !== teamSwapWithPartner.date)
-  const directSwap = multiShiftDates.find((entry) => entry.date !== teamSwapWithPartner.date)
+  const hasUserOnDate = (userId, date) =>
+    (shiftsByDate.get(date) ?? []).some((row) => row.user_id === userId)
+  const findDemoTradeShift = (requestEntry, excludedDates) =>
+    demoShiftDates.find(
+      (entry) =>
+        !excludedDates.has(entry.date) &&
+        entry.demoRow.role !== 'lead' &&
+        !hasUserOnDate(requestEntry.partnerRow.user_id, entry.date)
+    )
 
-  if (!openSwap || !directSwap) {
+  const teamSwapWithPartner =
+    partnerOnlyDates.find((entry) => findDemoTradeShift(entry, new Set([entry.date]))) ?? null
+  const openSwap = teamSwapWithPartner
+    ? demoShiftDates.find((entry) => entry.date !== teamSwapWithPartner.date)
+    : null
+  const teamSwapRecipientShift = teamSwapWithPartner
+    ? findDemoTradeShift(
+        teamSwapWithPartner,
+        new Set([teamSwapWithPartner.date, openSwap?.date].filter(Boolean))
+      )
+    : null
+  const directSwap =
+    partnerOnlyDates.find(
+      (entry) =>
+        entry.date !== teamSwapWithPartner?.date &&
+        entry.date !== openSwap?.date &&
+        entry.date !== teamSwapRecipientShift?.date &&
+        findDemoTradeShift(
+          entry,
+          new Set(
+            [
+              teamSwapWithPartner?.date,
+              openSwap?.date,
+              teamSwapRecipientShift?.date,
+              entry.date,
+            ].filter(Boolean)
+          )
+        )
+    ) ?? null
+  const directSwapRecipientShift = directSwap
+    ? findDemoTradeShift(
+        directSwap,
+        new Set(
+          [
+            teamSwapWithPartner?.date,
+            openSwap?.date,
+            teamSwapRecipientShift?.date,
+            directSwap.date,
+          ].filter(Boolean)
+        )
+      )
+    : null
+
+  if (
+    !teamSwapWithPartner ||
+    !openSwap ||
+    !teamSwapRecipientShift ||
+    !directSwap ||
+    !directSwapRecipientShift
+  ) {
     console.log('Skipped seeded swap requests: could not find distinct dates for each scenario.')
     return []
   }
@@ -370,6 +425,7 @@ async function seedSwapRequestScenarios({ publishedCycleId, domain }) {
       shiftId: teamSwapWithPartner.partnerRow.id,
       postedBy: teamSwapWithPartner.partnerRow.user_id,
       claimedBy: demoStaffId,
+      swapShiftId: teamSwapRecipientShift.demoRow.id,
       visibility: 'team',
       recipientResponse: null,
     },
@@ -379,6 +435,7 @@ async function seedSwapRequestScenarios({ publishedCycleId, domain }) {
       shiftId: openSwap.demoRow.id,
       postedBy: demoStaffId,
       claimedBy: null,
+      swapShiftId: null,
       visibility: 'team',
       recipientResponse: null,
     },
@@ -388,6 +445,7 @@ async function seedSwapRequestScenarios({ publishedCycleId, domain }) {
       shiftId: directSwap.partnerRow.id,
       postedBy: directSwap.partnerRow.user_id,
       claimedBy: demoStaffId,
+      swapShiftId: directSwapRecipientShift.demoRow.id,
       visibility: 'direct',
       recipientResponse: 'pending',
     },
@@ -399,6 +457,7 @@ async function seedSwapRequestScenarios({ publishedCycleId, domain }) {
       shift_id: scenario.shiftId,
       posted_by: scenario.postedBy,
       claimed_by: scenario.claimedBy,
+      swap_shift_id: scenario.swapShiftId,
       type: 'swap',
       status: 'pending',
       visibility: scenario.visibility,

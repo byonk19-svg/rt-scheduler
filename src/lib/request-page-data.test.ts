@@ -295,8 +295,8 @@ describe('request page data', () => {
     })
 
     expect(stage).toEqual({
-      label: 'Suggested partner in manager review',
-      detail: 'Manager can approve your suggested teammate or choose another safe partner.',
+      label: 'Waiting on manager approval',
+      detail: 'You suggested a swap partner. A manager still has to approve the swap.',
     })
   })
 
@@ -350,7 +350,7 @@ describe('request page data', () => {
       expect.objectContaining({
         id: 'post-suggested',
         involvement: 'claimed',
-        stageLabel: 'You are suggested for manager review',
+        stageLabel: 'Waiting on manager approval',
         swapWith: 'Ruth G.',
       }),
     ])
