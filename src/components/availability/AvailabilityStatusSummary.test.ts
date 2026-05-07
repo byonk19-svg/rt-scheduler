@@ -98,6 +98,49 @@ describe('AvailabilityStatusSummary', () => {
     expect(html).not.toContain('overflow-y-auto')
   })
 
+  it('renders the send-reminders button when onSendReminders prop is provided and there are missing rows', () => {
+    const html = renderToStaticMarkup(
+      createElement(AvailabilityStatusSummary, {
+        submittedRows: [],
+        missingRows: [
+          {
+            therapistId: 'missing-1',
+            therapistName: 'Layne P.',
+            overridesCount: 0,
+            lastUpdatedAt: null,
+            shiftType: 'day',
+            employmentType: 'full_time',
+          },
+        ],
+        cycleId: 'cycle-abc',
+        onSendReminders: async () => ({ sent: 1, skipped: 0, failed: 0 }),
+      })
+    )
+
+    expect(html).toContain('data-testid="send-reminders-trigger"')
+    expect(html).toContain('Send reminders')
+  })
+
+  it('does not render the send-reminders button when missingRows is empty', () => {
+    const html = renderToStaticMarkup(
+      createElement(AvailabilityStatusSummary, {
+        submittedRows: [
+          {
+            therapistId: 'submitted-1',
+            therapistName: 'Adrienne S.',
+            overridesCount: 1,
+            lastUpdatedAt: '2026-03-15T12:00:00.000Z',
+          },
+        ],
+        missingRows: [],
+        cycleId: 'cycle-abc',
+        onSendReminders: async () => ({ sent: 0, skipped: 0, failed: 0 }),
+      })
+    )
+
+    expect(html).not.toContain('Send reminders')
+  })
+
   it('highlights the selected planner therapist row', () => {
     const html = renderToStaticMarkup(
       createElement(AvailabilityStatusSummary, {

@@ -2,6 +2,18 @@
 
 import { useMemo, useState } from 'react'
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import { FeedbackToast } from '@/components/feedback-toast'
 import { cn } from '@/lib/utils'
 
 export type AvailabilityStatusSummaryRow = {
@@ -27,6 +39,8 @@ type AvailabilityStatusSummaryProps = {
   embedded?: boolean
   searchTerm?: string
   activeShift?: 'day' | 'night'
+  cycleId?: string
+  onSendReminders?: () => Promise<{ sent: number; skipped: number; failed: number; error?: string }>
 }
 
 type CombinedRosterRow = AvailabilityStatusSummaryRow & {
@@ -84,12 +98,48 @@ export function AvailabilityStatusSummary({
   embedded = false,
   searchTerm = '',
   activeShift,
+  onSendReminders,
 }: AvailabilityStatusSummaryProps) {
   const [uncontrolledActiveFilter, setUncontrolledActiveFilter] =
     useState<AvailabilityRosterFilter>(initialFilter)
   const [visibleCount, setVisibleCount] = useState(5)
+  const [isSending, setIsSending] = useState(false)
+  const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' } | null>(null)
 
   const resolvedActiveFilter = activeFilter ?? uncontrolledActiveFilter
+
+  async function handleSendReminders() {
+    if (!onSendReminders) return
+    setIsSending(true)
+    setToast(null)
+    try {
+      const result = await onSendReminders()
+      if (result.error === 'email_not_configured') {
+        setToast({
+          message: 'Failed to send reminders — check email configuration',
+          variant: 'error',
+        })
+      } else if (result.error) {
+        setToast({ message: 'Failed to send reminders', variant: 'error' })
+      } else if (result.sent === 0 && result.skipped === 0 && result.failed === 0) {
+        setToast({ message: 'Everyone has already submitted', variant: 'success' })
+      } else if (result.sent === 0 && result.skipped > 0) {
+        setToast({
+          message: 'No reminders sent — all missing therapists have email notifications disabled',
+          variant: 'error',
+        })
+      } else {
+        const parts: string[] = [
+          `Reminders sent to ${result.sent} therapist${result.sent === 1 ? '' : 's'}`,
+        ]
+        if (result.skipped > 0) parts.push(`${result.skipped} skipped — email disabled`)
+        if (result.failed > 0) parts.push(`${result.failed} failed`)
+        setToast({ message: parts.join(' · '), variant: result.failed > 0 ? 'error' : 'success' })
+      }
+    } finally {
+      setIsSending(false)
+    }
+  }
 
   function handleFilterChange(nextFilter: AvailabilityRosterFilter) {
     if (!activeFilter) {
@@ -190,6 +240,39 @@ export function AvailabilityStatusSummary({
             </span>
           </button>
         ))}
+
+        {onSendReminders && missingRows.length > 0 ? (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button
+                type="button"
+                disabled={isSending}
+                className="ml-auto inline-flex min-h-9 items-center gap-2 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+                data-testid="send-reminders-trigger"
+              >
+                {isSending ? (
+                  <span aria-live="polite">Sending…</span>
+                ) : (
+                  <>Send reminders ({missingRows.length})</>
+                )}
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Send availability reminders?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {missingRows.length} therapist{missingRows.length === 1 ? '' : 's'}{' '}
+                  {missingRows.length === 1 ? "hasn't" : "haven't"} submitted yet. They&apos;ll
+                  receive an email with a link to submit their availability.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleSendReminders}>Send reminders</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        ) : null}
       </div>
 
       <div className="px-3 py-3">
@@ -297,6 +380,8 @@ export function AvailabilityStatusSummary({
           </div>
         ) : null}
       </div>
+
+      {toast ? <FeedbackToast message={toast.message} variant={toast.variant} /> : null}
     </section>
   )
 }

@@ -12,6 +12,7 @@ import type {
 } from '@/components/availability/AvailabilityStatusSummary'
 import type { PlannerMode, PlannerOverrideRow } from '@/lib/availability-planner'
 import { splitPlannerDatesByMode } from '@/lib/availability-planner'
+import { sendAvailabilityRemindersAction } from '@/app/(app)/availability/actions'
 import { formatHumanCycleRange } from '@/lib/calendar-utils'
 import { isDateWithinCycle } from '@/lib/employee-directory'
 import { cn } from '@/lib/utils'
@@ -473,6 +474,10 @@ export function ManagerSchedulingInputs({
             embedded
             activeShift={activeShift}
             searchTerm={therapistSearch}
+            cycleId={selectedCycleId}
+            onSendReminders={
+              selectedCycleId ? () => sendAvailabilityRemindersAction(selectedCycleId) : undefined
+            }
           />
         </div>
         <div className="min-h-0 rounded-[1.5rem] border border-border/70 bg-card px-5 py-5 shadow-tw-sm">
