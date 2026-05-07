@@ -217,10 +217,10 @@ async function ensureWorkPattern(therapistId, shiftPreference) {
       weekend_anchor_date: null,
       works_dow_mode: 'soft',
       shift_preference: shiftPreference,
-      pattern_type: 'weekly',
+      pattern_type: 'weekly_fixed',
       weekly_weekdays: [1, 2, 3, 4, 5],
-      weekend_rule: 'as_needed',
-      cycle_anchor_date: DEMO_PAPER_SCHEDULE.startDate,
+      weekend_rule: 'none',
+      cycle_anchor_date: null,
       cycle_segments: [],
     },
     { onConflict: 'therapist_id' }
