@@ -76,6 +76,19 @@ function makeRequest(body: Record<string, unknown>) {
   })
 }
 
+function makeAdminQuery(result: { data: unknown; error: unknown }) {
+  const query = {
+    select: vi.fn(() => query),
+    eq: vi.fn(() => query),
+    gte: vi.fn(() => query),
+    neq: vi.fn(() => query),
+    order: vi.fn(() => query),
+    limit: vi.fn(() => query),
+    maybeSingle: vi.fn(async () => result),
+  }
+  return query
+}
+
 describe('shift-post mutation API', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -84,14 +97,35 @@ describe('shift-post mutation API', () => {
 
   it('creates requests through the hardened database function', async () => {
     const rpcMock = vi.fn(async () => ({
-      data: { id: 'post-1' },
+      data: { id: 'post-1', swap_shift_id: 'partner-shift-1' },
       error: null,
     }))
+    const shiftQueries = [
+      makeAdminQuery({
+        data: { cycle_id: 'cycle-1', date: '2026-05-04', shift_type: 'day' },
+        error: null,
+      }),
+      makeAdminQuery({
+        data: { id: 'partner-shift-1' },
+        error: null,
+      }),
+    ]
+    const fromMock = vi.fn((table: string) => {
+      if (table !== 'shifts') {
+        throw new Error(`Unexpected admin table ${table}`)
+      }
+      const query = shiftQueries.shift()
+      if (!query) {
+        throw new Error('Unexpected extra admin shifts query')
+      }
+      return query
+    })
 
     createClientMock.mockResolvedValue(
       makeServerClient({ userId: 'therapist-1', role: 'therapist' })
     )
     createAdminClientMock.mockReturnValue({
+      from: fromMock,
       rpc: rpcMock,
     })
 
