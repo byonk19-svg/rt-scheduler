@@ -1,3 +1,5 @@
+import { cn } from '@/lib/utils'
+
 import {
   Table,
   TableBody,
@@ -26,37 +28,69 @@ export function SubmissionComplianceTable({ rows }: Props) {
         <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
           Submission compliance
         </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Therapist availability submissions per cycle.
+        </p>
       </div>
       <Table>
         <TableHeader>
           <TableRow className="bg-muted text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
             <TableHead>Cycle</TableHead>
             <TableHead className="text-right">Submitted</TableHead>
-            <TableHead className="text-right">Total</TableHead>
-            <TableHead className="text-right">Compliance %</TableHead>
+            <TableHead>Rate</TableHead>
             <TableHead>Status</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.cycleId}>
-              <TableCell className="font-medium text-foreground">{row.label}</TableCell>
-              <TableCell className="text-right tabular-nums">{row.submittedCount}</TableCell>
-              <TableCell className="text-right tabular-nums">{row.totalActive}</TableCell>
-              <TableCell className="text-right tabular-nums">{row.compliancePercent}%</TableCell>
-              <TableCell>
-                <span
-                  className={
-                    row.submittedCount >= row.totalActive
-                      ? 'inline-flex rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] px-2 py-0.5 text-[11px] font-semibold text-[var(--success-text)]'
-                      : 'inline-flex rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[11px] font-semibold text-[var(--warning-text)]'
-                  }
-                >
-                  {row.submittedCount >= row.totalActive ? 'Complete' : 'Pending'}
-                </span>
+          {rows.map((row) => {
+            const pct = row.compliancePercent
+            const barClass =
+              pct >= 100
+                ? 'bg-[var(--success)]'
+                : pct >= 60
+                  ? 'bg-[var(--warning)]'
+                  : 'bg-[var(--error)]'
+
+            return (
+              <TableRow key={row.cycleId}>
+                <TableCell className="font-medium text-foreground">{row.label}</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {row.submittedCount} / {row.totalActive}
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-border">
+                      <div
+                        className={cn('h-full rounded-full transition-[width]', barClass)}
+                        style={{ width: `${Math.min(pct, 100)}%` }}
+                      />
+                    </div>
+                    <span className="tabular-nums text-sm text-muted-foreground">{pct}%</span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <span
+                    className={
+                      row.submittedCount >= row.totalActive && row.totalActive > 0
+                        ? 'inline-flex rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] px-2 py-0.5 text-[11px] font-semibold text-[var(--success-text)]'
+                        : 'inline-flex rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[11px] font-semibold text-[var(--warning-text)]'
+                    }
+                  >
+                    {row.submittedCount >= row.totalActive && row.totalActive > 0
+                      ? 'Complete'
+                      : 'Pending'}
+                  </span>
+                </TableCell>
+              </TableRow>
+            )
+          })}
+          {rows.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">
+                No submission data yet.
               </TableCell>
             </TableRow>
-          ))}
+          ) : null}
         </TableBody>
       </Table>
     </section>
