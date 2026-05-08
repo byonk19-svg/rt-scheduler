@@ -8,10 +8,18 @@ import {
 } from '@/components/schedule/TherapistShiftCalendar'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
+import {
+  addDays,
+  formatScheduleBlockRange,
+  formatShortDate,
+  fromIsoDate,
+  parseScheduleBlockStart,
+  SCHEDULE_BLOCK_DAYS,
+  SCHEDULE_BLOCK_WEEKS,
+} from '@/lib/my-shifts-schedule-block'
 import { fetchPublishedScheduleWindow, type MyScheduleTeamShiftRow } from '@/lib/staff-my-schedule'
 import { createClient } from '@/lib/supabase/server'
 
-const PERIOD_DAYS = 35
 const HOURS_PER_SHIFT = 12
 const MEMBER_COLORS = [
   'bg-primary',
@@ -21,59 +29,6 @@ const MEMBER_COLORS = [
   'bg-[color:var(--warning-text)]',
   'bg-[color:var(--muted-foreground)]',
 ] as const
-
-function formatShortDate(isoDate: string): string {
-  const parsed = new Date(`${isoDate}T12:00:00`)
-  if (Number.isNaN(parsed.getTime())) return isoDate
-  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-function formatPeriodLabel(startIso: string, endIso: string): string {
-  const start = new Date(`${startIso}T12:00:00`)
-  const end = new Date(`${endIso}T12:00:00`)
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return `${startIso} - ${endIso}`
-  }
-  const startLabel = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  const endLabel = end.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-  return `${startLabel} - ${endLabel}`
-}
-
-function toIsoDate(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function fromIsoDate(isoDate: string): Date {
-  return new Date(`${isoDate}T12:00:00`)
-}
-
-function addDays(isoDate: string, days: number): string {
-  const date = fromIsoDate(isoDate)
-  date.setDate(date.getDate() + days)
-  return toIsoDate(date)
-}
-
-function startOfWeekIso(date: Date): string {
-  const local = new Date(date)
-  local.setHours(12, 0, 0, 0)
-  local.setDate(local.getDate() - local.getDay())
-  return toIsoDate(local)
-}
-
-function parseStartParam(value: string | string[] | undefined): string {
-  const raw = Array.isArray(value) ? value[0] : value
-  if (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    return startOfWeekIso(fromIsoDate(raw))
-  }
-  return startOfWeekIso(new Date())
-}
 
 function getOne<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null
@@ -143,7 +98,7 @@ function buildWeeks(args: {
   members: Map<string, TherapistShiftMember>
 }): TherapistShiftWeek[] {
   const weeks: TherapistShiftWeek[] = []
-  for (let weekIndex = 0; weekIndex < 5; weekIndex += 1) {
+  for (let weekIndex = 0; weekIndex < SCHEDULE_BLOCK_WEEKS; weekIndex += 1) {
     const weekStart = addDays(args.startIso, weekIndex * 7)
     const days: TherapistShiftDay[] = []
 
@@ -219,8 +174,8 @@ export async function PublishedSchedulePage({
     redirect('/dashboard/manager')
   }
 
-  const startIso = parseStartParam(searchParams?.start)
-  const endIso = addDays(startIso, PERIOD_DAYS - 1)
+  const startIso = parseScheduleBlockStart(searchParams?.start)
+  const endIso = addDays(startIso, SCHEDULE_BLOCK_DAYS - 1)
   const rows = await fetchPublishedScheduleWindow(supabase, startIso, endIso)
   const currentUserRows = rows.filter((row) => row.user_id === user.id)
   const userShiftType =
@@ -242,6 +197,7 @@ export async function PublishedSchedulePage({
   const members = buildMemberMap(rows, currentMember)
   const weeks = buildWeeks({ startIso, rows, userId: user.id, userShiftType, members })
   const days = weeks.flatMap((week) => week.days)
+  const defaultShiftLabel = userShiftType === 'night' ? 'Night shift' : 'Day shift'
   const shiftCount = days.filter((day) => Boolean(day.userShift)).length
   const leadCount = days.filter((day) => day.userShift?.role === 'lead').length
   const dayShiftCount = days.filter((day) => day.userShift?.shiftType === 'day').length
@@ -251,12 +207,20 @@ export async function PublishedSchedulePage({
     <TherapistShiftCalendar
       key={startIso}
       title={title}
-      subtitle="Your published schedule and who you're working with."
-      periodLabel={formatPeriodLabel(startIso, endIso)}
-      previousHref={`${scheduleHref}?start=${addDays(startIso, -PERIOD_DAYS)}`}
-      nextHref={`${scheduleHref}?start=${addDays(startIso, PERIOD_DAYS)}`}
+      subtitle="Your personal view of the published Schedule Block."
+      periodLabel={formatScheduleBlockRange(startIso, endIso)}
+      previousHref={`${scheduleHref}?start=${addDays(startIso, -SCHEDULE_BLOCK_DAYS)}`}
+      nextHref={`${scheduleHref}?start=${addDays(startIso, SCHEDULE_BLOCK_DAYS)}`}
       weeks={weeks}
       teammates={Array.from(members.values()).sort(sortMembers)}
+      defaultShiftLabel={defaultShiftLabel}
+      scheduleContext={{
+        rangeLabel: formatScheduleBlockRange(startIso, endIso),
+        cadenceLabel: 'Sunday-start, 6 weeks',
+        shiftLabel: defaultShiftLabel,
+        stateLabel: 'Published schedule',
+        permissionLabel: 'Read-only personal schedule',
+      }}
       summary={{
         shiftCount,
         leadCount,

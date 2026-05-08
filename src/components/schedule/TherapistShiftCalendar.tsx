@@ -8,14 +8,17 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  Moon,
   Search,
   Settings,
   Star,
   Sun,
+  UserCheck,
   Users,
   type LucideIcon,
 } from 'lucide-react'
 
+import { ScheduleContextBar } from '@/components/schedule/ScheduleContextBar'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -58,6 +61,14 @@ export type TherapistShiftCalendarProps = {
   nextHref: string
   weeks: TherapistShiftWeek[]
   teammates: TherapistShiftMember[]
+  defaultShiftLabel: 'Day shift' | 'Night shift'
+  scheduleContext: {
+    rangeLabel: string
+    cadenceLabel: string
+    shiftLabel: string
+    stateLabel: string
+    permissionLabel: string
+  }
   summary: {
     shiftCount: number
     leadCount: number
@@ -77,27 +88,63 @@ const FILTERS: Array<{
   icon: LucideIcon
   countKey: keyof TherapistShiftCalendarProps['summary']
 }> = [
-  { key: 'all', label: 'All shifts', icon: CalendarDays, countKey: 'shiftCount' },
-  { key: 'lead', label: 'Lead shifts', icon: Star, countKey: 'leadCount' },
-  { key: 'working', label: 'Day shifts', icon: Sun, countKey: 'dayShiftCount' },
+  { key: 'all', label: 'Full block', icon: CalendarDays, countKey: 'shiftCount' },
+  { key: 'lead', label: 'Lead days', icon: Star, countKey: 'leadCount' },
+  { key: 'working', label: 'Working days', icon: UserCheck, countKey: 'shiftCount' },
   { key: 'off', label: 'Days off', icon: CalendarDays, countKey: 'dayOffCount' },
 ]
+
+function labelFromValue(value: string) {
+  return value
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
 
 function assignmentLabel(value: string | null) {
   switch (value) {
     case 'call_in':
-      return 'Call in'
+      return 'Call In'
     case 'on_call':
-      return 'On call'
+      return 'On Call'
     case 'left_early':
-      return 'Left early'
+      return 'Left Early'
+    case 'cancelled':
+      return 'Cancelled'
+    case 'scheduled':
+      return 'Scheduled'
     default:
-      return null
+      return value ? labelFromValue(value) : null
   }
+}
+
+function scheduleStatusLabel(day: TherapistShiftDay) {
+  if (!day.userShift) return 'Not scheduled'
+  const preferredStatus =
+    day.userShift.assignmentStatus && day.userShift.assignmentStatus !== 'scheduled'
+      ? day.userShift.assignmentStatus
+      : day.userShift.status
+  return assignmentLabel(preferredStatus) ?? 'Scheduled'
+}
+
+function shiftName(shiftType: 'day' | 'night') {
+  return shiftType === 'night' ? 'Night shift' : 'Day shift'
 }
 
 function shiftTimeLabel(shiftType: 'day' | 'night') {
   return shiftType === 'night' ? '7:00 PM - 7:00 AM' : '7:00 AM - 7:00 PM'
+}
+
+function formatSelectedDate(isoDate: string) {
+  const parsed = new Date(`${isoDate}T12:00:00`)
+  if (Number.isNaN(parsed.getTime())) return isoDate
+  return parsed.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })
 }
 
 function matchesFilter(day: TherapistShiftDay, filter: FilterKey) {
@@ -147,27 +194,41 @@ function MemberAvatar({ member }: { member: TherapistShiftMember }) {
 function DayCard({
   day,
   visibleMemberIds,
+  isSelected,
+  isHighlighted,
+  onSelect,
 }: {
   day: TherapistShiftDay
   visibleMemberIds: Set<string>
+  isSelected: boolean
+  isHighlighted: boolean
+  onSelect: () => void
 }) {
   const visibleTeam = day.team.filter((member) => visibleMemberIds.has(member.id))
-  const assignment = assignmentLabel(day.userShift?.assignmentStatus ?? null)
+  const status = scheduleStatusLabel(day)
 
   return (
-    <article
+    <button
+      type="button"
+      onClick={onSelect}
       className={cn(
-        'flex min-h-[13rem] flex-col rounded-md border border-border/80 bg-card p-3 shadow-tw-2xs',
-        day.isWeekend && !day.userShift && 'bg-muted/20'
+        'flex min-h-[13rem] w-full flex-col rounded-md border border-border/80 bg-card p-3 text-left shadow-tw-2xs transition',
+        day.isWeekend && !day.userShift && 'bg-muted/20',
+        day.userShift && 'border-primary/60 bg-[var(--info-subtle)]/45 ring-1 ring-primary/20',
+        isSelected && 'border-primary bg-[var(--info-subtle)] ring-2 ring-primary/70',
+        !isHighlighted && 'opacity-55 hover:opacity-90',
+        isHighlighted && 'hover:border-primary/80 hover:ring-1 hover:ring-primary/50'
       )}
       aria-label={`${day.weekdayLabel} ${day.dayLabel}`}
+      aria-pressed={isSelected}
     >
       <div className="mb-2 flex min-h-5 flex-wrap items-center gap-1.5">
         {day.userShift ? (
           <>
-            <Chip tone="day">{day.userShift.shiftType}</Chip>
+            <Chip tone="day">{shiftName(day.userShift.shiftType)}</Chip>
+            <Chip>You work</Chip>
             {day.userShift.role === 'lead' ? <Chip tone="lead">Lead</Chip> : null}
-            {assignment ? <Chip>{assignment}</Chip> : null}
+            <Chip>{status}</Chip>
           </>
         ) : (
           <Chip>Day off</Chip>
@@ -208,10 +269,10 @@ function DayCard({
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center text-center">
           <CalendarDays className="h-8 w-8 text-muted-foreground/70" aria-hidden="true" />
-          <p className="mt-3 text-xs font-medium text-muted-foreground">Enjoy your day!</p>
+          <p className="mt-3 text-xs font-medium text-muted-foreground">Not scheduled</p>
         </div>
       )}
-    </article>
+    </button>
   )
 }
 
@@ -223,29 +284,31 @@ export function TherapistShiftCalendar({
   nextHref,
   weeks,
   teammates,
+  defaultShiftLabel,
+  scheduleContext,
   summary,
   backHref,
 }: TherapistShiftCalendarProps) {
+  const allDays = useMemo(() => weeks.flatMap((week) => week.days), [weeks])
   const [filter, setFilter] = useState<FilterKey>('all')
   const [visibleMemberIds, setVisibleMemberIds] = useState<Set<string>>(
     () => new Set(teammates.map((member) => member.id))
   )
   const [teammateQuery, setTeammateQuery] = useState('')
-  const [viewMode, setViewMode] = useState<'week' | 'two' | 'month'>('week')
-  const primaryShiftLabel =
-    summary.nightShiftCount > summary.dayShiftCount ? 'Night shift' : 'Day shift'
-  const primaryShiftCount =
-    summary.nightShiftCount > summary.dayShiftCount
-      ? summary.nightShiftCount
-      : summary.dayShiftCount
+  const [viewMode, setViewMode] = useState<'block' | 'two' | 'month'>('block')
+  const [selectedDayIso, setSelectedDayIso] = useState(
+    () => allDays.find((day) => day.userShift)?.isoDate ?? allDays[0]?.isoDate ?? ''
+  )
+  const selectedDay = allDays.find((day) => day.isoDate === selectedDayIso) ?? allDays[0] ?? null
+  const selectedCoworkers = selectedDay?.team.filter((member) => !member.isYou) ?? []
+  const selectedLead = selectedDay?.team.find((member) => member.isLead) ?? null
 
   const visibleWeeks = useMemo(() => {
     const maxWeeks = viewMode === 'two' ? 2 : viewMode === 'month' ? 4 : weeks.length
     return weeks.slice(0, maxWeeks).map((week) => ({
       ...week,
-      days: week.days.filter((day) => matchesFilter(day, filter)),
     }))
-  }, [filter, viewMode, weeks])
+  }, [viewMode, weeks])
 
   const filteredTeammates = useMemo(() => {
     const query = teammateQuery.trim().toLowerCase()
@@ -305,14 +368,14 @@ export function TherapistShiftCalendar({
 
           <div className="inline-flex overflow-hidden rounded-lg border border-border bg-card shadow-tw-2xs">
             {[
-              ['week', 'Week'],
+              ['block', '6 Weeks'],
               ['two', '2 Weeks'],
-              ['month', 'Month'],
+              ['month', '4 Weeks'],
             ].map(([key, label]) => (
               <button
                 key={key}
                 type="button"
-                onClick={() => setViewMode(key as 'week' | 'two' | 'month')}
+                onClick={() => setViewMode(key as 'block' | 'two' | 'month')}
                 className={cn(
                   'min-h-11 border-r border-border px-5 text-sm font-semibold last:border-r-0',
                   viewMode === key
@@ -333,6 +396,8 @@ export function TherapistShiftCalendar({
         </div>
       </header>
 
+      <ScheduleContextBar {...scheduleContext} />
+
       <section className="rounded-lg border border-border bg-card px-4 py-3 shadow-tw-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
@@ -347,8 +412,12 @@ export function TherapistShiftCalendar({
 
           <div className="flex flex-wrap items-center gap-5 text-sm">
             <span className="inline-flex items-center gap-2">
-              <Chip tone="day">{primaryShiftLabel.split(' ')[0]}</Chip>
-              <span>{primaryShiftLabel}</span>
+              {defaultShiftLabel === 'Night shift' ? (
+                <Moon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              ) : (
+                <Sun className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              )}
+              <span>{defaultShiftLabel}</span>
             </span>
             <span className="inline-flex items-center gap-2">
               <Chip tone="lead">Lead</Chip>
@@ -371,14 +440,13 @@ export function TherapistShiftCalendar({
         <aside className="space-y-4">
           <section className="rounded-lg border border-border bg-card p-3 shadow-tw-sm">
             <p className="px-1 pb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-              Filters
+              Highlights
             </p>
             <div className="space-y-1">
               {FILTERS.map((item) => {
                 const Icon = item.icon
-                const label =
-                  item.key === 'working' ? `${primaryShiftLabel.split(' ')[0]} shifts` : item.label
-                const count = item.key === 'working' ? primaryShiftCount : summary[item.countKey]
+                const label = item.key === 'working' ? `${defaultShiftLabel} days` : item.label
+                const count = item.key === 'all' ? allDays.length : summary[item.countKey]
                 return (
                   <button
                     key={item.key}
@@ -401,6 +469,65 @@ export function TherapistShiftCalendar({
               })}
             </div>
           </section>
+
+          {selectedDay ? (
+            <section className="rounded-lg border border-border bg-card p-4 shadow-tw-sm">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                Selected day
+              </p>
+              <h2 className="mt-1 text-base font-bold text-foreground">
+                {formatSelectedDate(selectedDay.isoDate)}
+              </h2>
+
+              <div className="mt-3 space-y-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Shift</span>
+                  <span className="font-semibold text-foreground">
+                    {selectedDay.userShift
+                      ? shiftName(selectedDay.userShift.shiftType)
+                      : defaultShiftLabel}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Your status</span>
+                  <span className="font-semibold text-foreground">
+                    {selectedDay.userShift ? 'You work this day' : 'You are not scheduled'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Schedule status</span>
+                  <Chip>{scheduleStatusLabel(selectedDay)}</Chip>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Lead</span>
+                  <span className="font-semibold text-foreground">
+                    {selectedLead ? selectedLead.shortName : 'No lead listed'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-4 border-t border-border pt-3">
+                <p className="mb-2 text-xs font-bold text-muted-foreground">Coworkers</p>
+                {selectedCoworkers.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedCoworkers.map((member) => (
+                      <div key={member.id} className="flex min-w-0 items-center gap-2">
+                        <MemberAvatar member={member} />
+                        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
+                          {member.shortName}
+                        </span>
+                        {member.isLead ? <Chip tone="lead">Lead</Chip> : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No coworkers are listed for this shift.
+                  </p>
+                )}
+              </div>
+            </section>
+          ) : null}
 
           <section className="rounded-lg border border-border bg-card p-3 shadow-tw-sm">
             <p className="px-1 pb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
@@ -467,7 +594,13 @@ export function TherapistShiftCalendar({
                       <p className="mb-2 text-center text-xs font-bold text-foreground">
                         {day.weekdayLabel} {day.dayLabel}
                       </p>
-                      <DayCard day={day} visibleMemberIds={visibleMemberIds} />
+                      <DayCard
+                        day={day}
+                        visibleMemberIds={visibleMemberIds}
+                        isSelected={day.isoDate === selectedDay?.isoDate}
+                        isHighlighted={matchesFilter(day, filter)}
+                        onSelect={() => setSelectedDayIso(day.isoDate)}
+                      />
                     </div>
                   ))}
                 </div>

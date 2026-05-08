@@ -1,5 +1,7 @@
 # RT Scheduler UI/UX Redesign Audit
 
+Implementation tracker: `docs/UI_UX_REDESIGN_IMPLEMENTATION_PLAN.md`.
+
 ## Executive summary
 
 The app already contains most of the workflows respiratory therapy scheduling needs: manager coverage editing, a read-only roster view, therapist availability, manager availability review, shift swaps and pickups, and a lottery workflow. The core UX problem is not missing capability. The problem is that schedule context, shift context, action ownership, and edit permissions are fragmented across pages.
@@ -81,7 +83,7 @@ The redesign should make the app feel like one coherent scheduling system, not a
 
 High-impact findings:
 
-- My Shifts currently uses a 35-day period, not the full 6-week block required by the product model.
+- My Shifts first slice is now implemented: it uses a 42-day Sunday-start Schedule Block, shows shared schedule context, keeps non-working days visible, highlights the therapist's scheduled days, and includes selected-day details with coworkers.
 - The Coverage page has strong 6-week manager tooling, but its schedule context is local to that page instead of a shared pattern.
 - The read-only roster view defaults to day shift instead of the actor's own shift, and should be reframed as a Roster View of Team Schedule rather than a separate primary workflow.
 - Therapist availability is functionally strong, but labels such as "Future Availability", "Can work", and "Can't work" do not match the exception-based therapist vocabulary: Need Off and Need to Work.
@@ -262,7 +264,17 @@ Current implementation evidence:
 - Route: `src/app/(app)/therapist/schedule/page.tsx`.
 - Main component: `src/components/schedule/PublishedSchedulePage.tsx`.
 - Calendar UI: `src/components/schedule/TherapistShiftCalendar.tsx`.
-- Current published schedule window uses `PERIOD_DAYS = 35`, which is 5 weeks.
+- Shared context component: `src/components/schedule/ScheduleContextBar.tsx`.
+- Schedule Block helpers and tests: `src/lib/my-shifts-schedule-block.ts` and `src/lib/my-shifts-schedule-block.test.ts`.
+- Current published schedule window uses `SCHEDULE_BLOCK_DAYS = 42`, which is 6 weeks.
+- Focused component coverage: `src/components/schedule/TherapistShiftCalendar.test.ts`.
+
+Implementation status:
+
+- Done in first slice: My Shifts page title remains "My Shifts"; the page shows the Schedule Block date range, Sunday-start 6-week context, therapist default shift, Published schedule state, and Read-only personal schedule state.
+- Done in first slice: My Shifts now loads and displays a full 42-day Schedule Block from existing published schedule rows, with no backend, schema, RLS, server action, route, manager Coverage, publish/preflight, Shift Board, or Lottery changes.
+- Done in first slice: non-working days remain visible for orientation, therapist working days are clearly highlighted, and selected-day detail shows date, shift, whether the therapist works, coworkers on that shift, lead when listed, and schedule status labels.
+- Still remaining: next shift card, upcoming personal shifts list, historical block selector, mobile-specific week strip polish, and calendar-started Give up this shift / Trade this shift entry points.
 
 What the page is trying to help the user do:
 
@@ -271,23 +283,23 @@ What the page is trying to help the user do:
 
 Why the current UX may be confusing:
 
-- The product model is a 6-week block, but this page shows a 35-day period.
-- View labels are misleading: "Week" can still show all loaded weeks, while "2 Weeks" and "Month" constrain the list.
+- The first slice fixed the 35-day period; the page now shows the full 6-week block.
+- View labels are clearer after the first slice: "6 Weeks", "2 Weeks", and "4 Weeks" now describe the visible block window.
 - Day/Night mode is inferred from the therapist profile and current rows, but the UI should be clearer about "your shift" and when another shift can be viewed.
 - Team-wide shift visibility must not imply edit permission; therapists can view both shifts on Team Schedule but should not see manager controls.
-- Teammate filters and status filters are useful, but they can appear before the user understands the basic schedule block.
+- Teammate filters and highlight controls remain useful, but can still be made more compact once the shared selected-day pattern is reused elsewhere.
 
 What should be visible immediately:
 
-- "My Shifts" title with the Schedule Block Sunday-start range.
-- The user's default shift mode: Day or Night.
-- A clear "Your shift" marker when showing the therapist's own assigned shift.
+- Implemented: "My Shifts" title with the Schedule Block Sunday-start range.
+- Implemented: the user's default shift mode: Day shift or Night shift.
+- Implemented: a clear working-day marker when showing the therapist's own assigned shift.
 - Next shift card with date, time, lead, and coworkers.
-- 6-week overview with the user's working days clearly marked.
-- Selected day detail showing whether the current user works that day and who else is scheduled.
-- Non-working days visible for orientation, not hidden from the Schedule Block calendar.
+- Implemented: 6-week overview with the user's working days clearly marked.
+- Implemented: selected day detail showing whether the current user works that day and who else is scheduled.
+- Implemented: non-working days visible for orientation, not hidden from the Schedule Block calendar.
 - For non-working selected days, show coworkers on the therapist's own shift by default and route both-shift exploration to Team Schedule.
-- Scheduled, On Call, Cancelled, Call In, and Left Early should remain visible in My Shifts rather than disappearing from the block.
+- Implemented: Scheduled, On Call, Cancelled, Call In, and Left Early labels remain available in My Shifts rather than disappearing from the block.
 - Scheduled selected days should offer contextual actions such as Give up this shift and Trade this shift.
 
 What should move into a detail panel, drawer, or modal:
@@ -309,11 +321,11 @@ Recommended layout:
 
 Reusable components needed:
 
-- `ScheduleContextBar`
+- `ScheduleContextBar` - implemented and applied to My Shifts first.
 - `SixWeekBlockGrid`
-- `SelectedDayPanel`
-- `CoworkerList`
-- `MyShiftHighlight`
+- `SelectedDayPanel` - first My Shifts version implemented inline in `TherapistShiftCalendar`; extract when a second page needs it.
+- `CoworkerList` - first My Shifts version implemented inline in `TherapistShiftCalendar`; extract when reused.
+- `MyShiftHighlight` - first My Shifts version implemented through calendar day styling; extract only if reuse becomes real.
 - `BlockSelector`
 
 Risks or behavior that must not be broken:
@@ -329,7 +341,7 @@ Risks or behavior that must not be broken:
 
 Suggested implementation phase:
 
-- Phase 2: Therapist schedule clarity.
+- Phase 2: Therapist schedule clarity. First slice complete; remaining work should stay scoped to next shift/upcoming list, mobile polish, and safe Shift Board entry points.
 
 ### 4. Team Schedule
 
@@ -1072,6 +1084,7 @@ Verification:
 
 Scope:
 
+- Status: partially complete. My Shifts now has the first shared schedule context implementation; broader reuse across Team Schedule, Coverage, Availability, Shift Board, and Lottery remains future work.
 - Add shared schedule terminology and low-risk reusable components.
 - Establish the canonical navigation model: My Shifts, Team Schedule, Coverage, Availability, Shift Board, Lottery.
 - Fold Publish into Coverage and add a Schedule Blocks manager utility for published block history and lifecycle actions.
@@ -1091,18 +1104,22 @@ Do not change:
 
 Suggested first surfaces:
 
-- My Shifts.
+- My Shifts - complete for the first slice.
 - Team Schedule read-only frame.
 
 ### Phase 2: Therapist schedule clarity
 
 Scope:
 
-- Make My Shifts show the full 6-week block.
-- Keep non-working days visible while highlighting the therapist's scheduled days.
-- Clarify own shift default.
-- Add selected-day detail for coworkers.
-- Simplify filters and view labels.
+- Status: partially complete. My Shifts now covers the full Schedule Block and selected-day clarity without backend changes.
+- Complete: make My Shifts show the full 6-week block.
+- Complete: keep non-working days visible while highlighting the therapist's scheduled days.
+- Complete: clarify own shift default.
+- Complete: add selected-day detail for coworkers.
+- Complete for first slice: simplify filters into highlights and clarify view labels.
+- Remaining: add next shift/upcoming personal shifts below the block if still useful after selected-day detail.
+- Remaining: add mobile-specific week strip polish.
+- Remaining: add calendar-started Shift Board entry points only after request lifecycle wiring is scoped and tested separately.
 
 Critical behavior to preserve:
 
@@ -1356,12 +1373,33 @@ Note:
 
 ## Recommended first implementation slice
 
-The safest first code slice is Phase 1 plus a small part of Phase 2:
+Status: complete as of the My Shifts clarity slice.
 
-1. Introduce shared display vocabulary for "Schedule Block", "Day shift", "Night shift", "Read-only", and "Editable".
-2. Add a `ScheduleContextBar` to My Shifts using existing data.
-3. Expand My Shifts from 35 days to the full 42-day block if the published schedule data supports it without changing backend behavior.
-4. Add or adapt a selected-day panel for My Shifts so therapists can immediately see coworkers.
-5. Add focused tests for 42-day display and own-shift default behavior.
+The safest first code slice was Phase 1 plus a small part of Phase 2:
+
+1. Complete: Introduce shared display vocabulary for "Schedule Block", "Day shift", "Night shift", and "Read-only" on My Shifts. "Editable" remains future work for manager-owned surfaces.
+2. Complete: Add a `ScheduleContextBar` to My Shifts using existing data.
+3. Complete: Expand My Shifts from 35 days to the full 42-day block using existing published schedule data without changing backend behavior.
+4. Complete: Add selected-day detail for My Shifts so therapists can immediately see coworkers.
+5. Complete: Add focused tests for 42-day display, Sunday-start behavior, own-shift default behavior, selected-day coworkers, and non-working day visibility.
 
 This slice improves therapist comprehension without touching manager editing, Supabase schema, RLS, publishing, request lifecycle, or lottery decisions.
+
+Verification from the completed slice:
+
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+- `npm run test:unit -- src/lib/my-shifts-schedule-block.test.ts src/components/schedule/TherapistShiftCalendar.test.ts`
+- `git diff --check`
+
+Browser note: unauthenticated `/therapist/schedule` redirects to login locally, so authenticated browser verification remains a follow-up when a seeded therapist session is available.
+
+## Recommended next implementation slice
+
+Keep the next slice narrow and still therapist-safe:
+
+1. Extract the selected-day detail and coworker list only if Team Schedule or another page is ready to reuse it.
+2. Add the My Shifts next-shift or upcoming-shifts summary using the existing published schedule data already available to the page.
+3. Do mobile-only polish for the My Shifts 6-week block and selected-day detail.
+4. Do not add calendar-started Give up this shift or Trade this shift actions until Shift Board request lifecycle wiring is scoped as its own tested slice.
