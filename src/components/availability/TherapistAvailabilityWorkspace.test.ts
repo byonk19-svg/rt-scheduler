@@ -66,6 +66,7 @@ describe('TherapistAvailabilityWorkspace', () => {
           },
         },
         submissionsByCycleId: {},
+        regularShiftType: 'night',
         submitTherapistAvailabilityGridAction: async () => {},
       })
     )
@@ -85,12 +86,21 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('Select one day or several days, then choose a state.')
     expect(html).toContain('Select a day to make a change.')
     expect(html).toContain('Current starting point')
+    expect(html).toContain('Review before submitting')
+    expect(html).toContain('Schedule Block')
+    expect(html).toContain('Regular shift')
+    expect(html).toContain('Night shift')
+    expect(html).toContain('Need Off')
+    expect(html).toContain('Mar 24 (Vacation)')
+    expect(html).toContain('Need to Work')
     expect(html).toContain('Legend')
     expect(html).toContain('Selected day')
     expect(html).toContain('Starting point')
     expect(html).toContain('This cycle changes')
-    expect(html).toContain('Can work')
-    expect(html).toContain('Can&#x27;t work')
+    expect(html).toContain('Need to Work')
+    expect(html).toContain('Need Off')
+    expect(html).toContain('Normally working')
+    expect(html).toContain('Normally off')
     expect(html).toContain('Clear')
     expect(html).toContain('Unmarked')
     expect(html).not.toContain('Normal work')
@@ -102,7 +112,8 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(html).toContain('Mar')
     expect(html).toContain('Apr')
     expect(html).not.toContain('Request to Work')
-    expect(html).not.toContain('Need Off')
+    expect(html).not.toContain('Can work')
+    expect(html).not.toContain('Can&#x27;t work')
     expect(html).toContain('Clear cycle changes')
     expect(html).toContain('Edit several days')
     expect(html).toContain('Week 1')
@@ -162,7 +173,7 @@ describe('TherapistAvailabilityWorkspace', () => {
     )
 
     expect(html).toContain('This cycle starts blank.')
-    expect(html).toContain('Add the days you can or can&#x27;t work.')
+    expect(html).toContain('Add days you need to work or need off.')
     expect(html).toContain('Unmarked')
     expect(html).not.toContain('Not set')
     expect(html).not.toContain('Normal off day')
@@ -202,6 +213,8 @@ describe('TherapistAvailabilityWorkspace', () => {
       'Submitted with no day-level changes. This cycle is currently blank unless you add dates.'
     )
     expect(html).toContain('You already submitted this cycle with a blank response.')
+    expect(html).toContain('No exceptions selected for this Schedule Block.')
+    expect(html).toContain('Submitted availability')
   })
 
   it('keeps blank-start copy when onboarding only saved never-work blocks', () => {
@@ -237,7 +250,7 @@ describe('TherapistAvailabilityWorkspace', () => {
 
     expect(html).toContain('No normal schedule saved yet.')
     expect(html).toContain('This cycle starts blank.')
-    expect(html).toContain('Add the days you can or can&#x27;t work.')
+    expect(html).toContain('Add days you need to work or need off.')
     expect(html).toContain('Set recurring pattern')
     expect(html).not.toContain('Edit recurring pattern')
     expect(html).not.toContain('We used your normal schedule to fill this cycle.')
@@ -253,6 +266,11 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(src).not.toContain('Normal off')
     expect(src).not.toContain('Use normal schedule')
     expect(src).not.toContain('This cycle:')
+    expect(src).not.toContain('Can work')
+    expect(src).not.toContain("can't work")
+    expect(src).not.toContain("can or can't work")
+    expect(src).toContain('Need to Work')
+    expect(src).toContain('Need Off')
     expect(src).toContain(
       'Submitted with no cycle-only changes. Your normal schedule is your current response.'
     )
@@ -262,10 +280,16 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(src).toContain("displayState === 'can_work' || displayState === 'cannot_work'")
     expect(src).toContain('{showStatusLabel ? (')
     expect(src).toContain('Notes are only saved for days you change for this cycle.')
+    expect(src).toContain('Review before submitting')
+    expect(src).toContain('formatReviewDateWithNote')
+    expect(src).toContain('No exceptions selected for this Schedule Block.')
     expect(src).toContain('Edit several days')
     expect(src).toContain('rounded-[0.95rem] border border-border/60 bg-background px-3.5 py-2.5')
     expect(src).toContain('xl:border-l xl:border-t-0')
     expect(src).toContain('xl:grid-cols-[minmax(0,1fr)_19rem]')
+    expect(src).toContain('flex flex-col gap-3 xl:self-start')
+    expect(src).toContain('order-1 rounded-[1.1rem]')
+    expect(src).toContain('xl:order-3')
     expect(src).toContain('ring-primary/35')
     expect(src).toContain('value="draft"')
     expect(src).toContain('variant="ghost"')

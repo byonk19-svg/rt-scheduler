@@ -35,6 +35,9 @@ describe('therapist availability route', () => {
     expect(pageSource).toContain('Once you submit, your availability will appear here.')
     expect(pageSource).not.toContain('days selected')
     expect(pageSource).toContain('therapist_availability_submissions')
+    expect(pageSource).toContain('role, shift_type, work_patterns')
+    expect(pageSource).toContain('regularShiftType={regularShiftType}')
+    expect(workspaceSource).toContain('Review before submitting')
   })
 
   it('sets route-specific metadata and recurring-pattern wording', () => {

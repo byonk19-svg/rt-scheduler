@@ -37,11 +37,11 @@ export function AvailabilityOverviewHeader({
             <span className="text-border/90" aria-hidden="true">
               ·
             </span>
-            <span className="text-muted-foreground">{needOffRequests} need off</span>
+            <span className="text-muted-foreground">{needOffRequests} Need Off</span>
             <span className="text-border/90" aria-hidden="true">
               /
             </span>
-            <span className="text-muted-foreground">{availableToWorkRequests} request to work</span>
+            <span className="text-muted-foreground">{availableToWorkRequests} Need to Work</span>
             {responseRatio ? (
               <>
                 <span className="text-border/90" aria-hidden="true">

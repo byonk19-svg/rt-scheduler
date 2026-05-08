@@ -289,13 +289,13 @@ test.describe.serial('coverage display regressions', () => {
     await loginAs(page, ctx!.staffViewer.email, ctx!.staffViewer.password)
     await page.goto(`/coverage?cycle=${ctx!.publishedCycle.id}`)
 
-    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Team Schedule' })).toBeVisible()
     await expect(
       page.getByText(
-        'Read-only team staffing view. Use My Schedule for your own shifts and Future Availability for the next cycle.'
+        'Read-only Team Schedule. Use My Shifts for your own shifts and Future Availability for the next Schedule Block.'
       )
     ).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Cycle board' })).toHaveAttribute(
+    await expect(page.getByRole('button', { name: 'Block board' })).toHaveAttribute(
       'aria-pressed',
       'true'
     )
@@ -309,6 +309,14 @@ test.describe.serial('coverage display regressions', () => {
       await expect(dayPanel.getByText(name, { exact: false })).toBeVisible()
     }
     await expect(dayPanel.getByText('Unknown')).toHaveCount(0)
+
+    await dayPanel.click()
+    const drawer = page.getByTestId('coverage-shift-editor-dialog')
+    await expect(drawer).toBeVisible()
+    await expect(drawer.getByText('Your status')).toBeVisible()
+    await expect(drawer.getByText('You are not scheduled')).toBeVisible()
+    await expect(drawer.getByText('No assignment for you on this Day shift.')).toBeVisible()
+    await expect(drawer.getByText('Manager-only actions')).toHaveCount(0)
   })
 
   test('manager calendar renders the full cycle and keeps day/night cells independent', async ({

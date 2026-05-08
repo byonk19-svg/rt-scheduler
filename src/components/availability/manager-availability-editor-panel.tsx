@@ -58,12 +58,12 @@ const MODE_OPTIONS: Array<{
   },
   {
     value: 'need_off',
-    label: 'Need off',
+    label: 'Need Off',
     tone: 'data-[active=true]:bg-[var(--warning-subtle)] data-[active=true]:text-[var(--warning-text)]',
   },
   {
     value: 'request_to_work',
-    label: 'Request to work',
+    label: 'Need to Work',
     tone: 'data-[active=true]:bg-[var(--info-subtle)] data-[active=true]:text-[var(--info-text)]',
   },
 ]

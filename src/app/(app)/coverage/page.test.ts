@@ -69,7 +69,7 @@ describe('coverage publish override affordance', () => {
     const source = readFileSync(coverageClientPath, 'utf8')
 
     expect(source).toContain('No open 6-week block')
-    expect(source).toContain('No open 6-week block — create a new draft block to start staffing.')
+    expect(source).toContain('No open 6-week block - create a new draft block to start staffing.')
     expect(source).not.toContain('Current 6-week window')
   })
 
@@ -84,25 +84,26 @@ describe('coverage publish override affordance', () => {
     const source = readFileSync(coverageClientPath, 'utf8')
 
     expect(source).toContain(
-      'Read-only team staffing view. Use My Schedule for your own shifts and Future Availability for the next cycle.'
+      'Read-only Team Schedule. Use My Shifts for your own shifts and Future Availability for the next Schedule Block.'
     )
-    expect(source).toContain('Coverage')
+    expect(source).toContain('Team Schedule')
     expect(source).toContain('Setup required')
-    expect(source).toContain('Cycle board')
+    expect(source).toContain('Block board')
     expect(source).not.toContain('title="Next step"')
   })
 
   it('keeps coverage naming and context prominent in the route header', () => {
     const source = readFileSync(coverageClientPath, 'utf8')
 
-    expect(source).toContain('Coverage')
-    expect(source).toContain('Cycle status: {workspaceStatusLabel}')
+    expect(source).toContain("const workspaceTitle = canManageCoverage ? 'Coverage' : 'Team Schedule'")
+    expect(source).toContain('Schedule status: {workspaceStatusLabel}')
     expect(source).toContain('{shiftTab} shift coverage')
-    expect(source).toContain('Cycle context')
+    expect(source).toContain('Schedule Block context')
     expect(source).toContain('aria-labelledby="coverage-cycle-context-heading"')
+    expect(source).toContain('sticky top-2 z-20')
+    expect(source).toContain('lg:static')
     expect(source).toContain('Current block: {cycleRangeLabel}')
     expect(source).toContain('Day/Night')
-    expect(source).not.toContain('Team Schedule')
   })
 
   it('keeps Day/Night ahead of layout controls in the cycle context bar', () => {
@@ -186,6 +187,15 @@ describe('coverage publish override affordance', () => {
     expect(client).toContain('const [activeOperationalDetails, setActiveOperationalDetails]')
     expect(client).toContain('activeOperationalDetails={activeOperationalDetails}')
     expect(client).toContain('selectedDayNotes={selectedDayNotes}')
+  })
+
+  it('passes actor identity into the selected-day drawer for staff context', () => {
+    const client = readFileSync(coverageClientPath, 'utf8')
+    const server = readFileSync(coverageServerDataPath, 'utf8')
+
+    expect(server).toContain('snapshot.actorUserId = user.id')
+    expect(client).toContain('const actorUserId = initialSnapshot.actorUserId')
+    expect(client).toContain('actorUserId={actorUserId}')
   })
 
   it('declares each lazy-loaded dialog exactly once', () => {

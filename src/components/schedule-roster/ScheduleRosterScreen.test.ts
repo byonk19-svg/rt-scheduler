@@ -25,6 +25,7 @@ describe('ScheduleRosterScreen', () => {
           endDate: '2026-05-09',
           shortLabel: 'May 3 - May 9, 2026',
           isPublished: false,
+          defaultShiftType: 'day',
           availableCycles: [
             { id: 'cycle-1', label: 'Cycle Alpha' },
             { id: 'cycle-2', label: 'Cycle Beta' },
@@ -36,7 +37,7 @@ describe('ScheduleRosterScreen', () => {
       })
     )
 
-    expect(html).toContain('Respiratory Therapy - Day Shift')
+    expect(html).toContain('Roster View - Day Shift')
     expect(html).toContain('Cycle Alpha')
     expect(html).toContain('May 3 - May 9, 2026')
     expect(html).not.toContain('March 22, 2026')
@@ -50,7 +51,9 @@ describe('ScheduleRosterScreen', () => {
     expect(html).toContain('On Call')
     expect(html).toContain('Call In')
     expect(html).toContain('Roster view only')
-    expect(html).toContain('Use Coverage to edit staffing, auto-draft, or publish this cycle.')
+    expect(html).toContain(
+      'Use Coverage to edit staffing, auto-draft, or publish this Schedule Block.'
+    )
     expect(html).toContain('Bold vertical lines separate weeks')
     expect(html).toContain('Weekends shaded')
     expect(html).toContain('<colgroup>')

@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import Link from 'next/link'
 import { AlertCircle, AlertTriangle, Check, Clock, MinusCircle } from 'lucide-react'
 
 import {
@@ -31,6 +32,7 @@ type SelectedDay = DayItem & { shiftType: ShiftTab }
 type ShiftEditorDialogProps = {
   open: boolean
   selectedDay: SelectedDay | null
+  actorUserId: string | null
   therapists: TherapistOption[]
   canEdit: boolean
   canUpdateAssignmentStatus: boolean
@@ -451,9 +453,52 @@ function DrawerPersonRow({
   )
 }
 
+function resolveActorPresence(selectedDay: SelectedDay, actorUserId: string | null): {
+  label: string
+  detail: string
+  shift: ShiftItem | null
+  isLead: boolean
+} {
+  if (!actorUserId) {
+    return {
+      label: 'Read-only',
+      detail: 'Signed-in schedule context is unavailable.',
+      shift: null,
+      isLead: false,
+    }
+  }
+
+  if (selectedDay.leadShift?.userId === actorUserId) {
+    return {
+      label: 'You are assigned as lead',
+      detail: `${selectedDay.shiftType} shift on this selected day.`,
+      shift: selectedDay.leadShift,
+      isLead: true,
+    }
+  }
+
+  const staffShift = selectedDay.staffShifts.find((shift) => shift.userId === actorUserId) ?? null
+  if (staffShift) {
+    return {
+      label: 'You work this day',
+      detail: `${selectedDay.shiftType} shift on this selected day.`,
+      shift: staffShift,
+      isLead: false,
+    }
+  }
+
+  return {
+    label: 'You are not scheduled',
+    detail: `No assignment for you on this ${selectedDay.shiftType} shift.`,
+    shift: null,
+    isLead: false,
+  }
+}
+
 export function ShiftEditorDialog({
   open,
   selectedDay,
+  actorUserId,
   therapists,
   canEdit,
   canUpdateAssignmentStatus,
@@ -515,6 +560,18 @@ export function ShiftEditorDialog({
   const assignedCount = dayAssignments.length
   const activeCount = selectedDay ? countActive(selectedDay) : 0
   const coverageBadge = coverageState(selectedDay, activeCount)
+  const actorPresence = selectedDay ? resolveActorPresence(selectedDay, actorUserId) : null
+  const hasLotteryStatus = operationalEntries.some(
+    ({ shift }) => shift.status === 'cancelled' || shift.status === 'oncall'
+  )
+  const showLotteryLink = assignedCount > 4 || hasLotteryStatus
+  const lotteryHref = selectedDay
+    ? `/lottery?date=${selectedDay.isoDate}&shift=${selectedDay.shiftType.toLowerCase()}`
+    : '/lottery'
+  const lotteryLinkReason =
+    assignedCount > 4
+      ? 'This shift has more scheduled staff than the normal active target.'
+      : 'This shift has Cancelled or On Call status in Team Schedule.'
 
   const leadTherapists = useMemo(
     () =>
@@ -641,6 +698,49 @@ export function ShiftEditorDialog({
                   <span>No lead assigned. A lead therapist is required for this shift.</span>
                 </div>
               ) : null}
+
+              {showLotteryLink ? (
+                <div className="rounded-xl border border-border/70 bg-muted/15 px-3 py-3 text-sm">
+                  <p className="font-semibold text-foreground">Lottery decision available</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{lotteryLinkReason}</p>
+                  <Link
+                    href={lotteryHref}
+                    className="mt-3 inline-flex min-h-9 items-center rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground hover:bg-muted"
+                  >
+                    Open Lottery for this shift
+                  </Link>
+                </div>
+              ) : null}
+
+              <section className="space-y-2">
+                <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  Your status
+                </h2>
+                {actorPresence ? (
+                  <div className="rounded-xl border border-border/70 bg-card px-3 py-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground">
+                          {actorPresence.label}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {actorPresence.detail}
+                        </p>
+                      </div>
+                      {actorPresence.shift ? (
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          {actorPresence.isLead ? (
+                            <span className="rounded-full border border-[var(--info-border)] bg-[var(--info-subtle)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--info-text)]">
+                              Lead
+                            </span>
+                          ) : null}
+                          <InlineStatusChip status={actorPresence.shift.status} />
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+              </section>
 
               <section className="space-y-2">
                 <div className="flex items-center justify-between gap-2">

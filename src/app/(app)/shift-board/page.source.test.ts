@@ -14,7 +14,12 @@ describe('shift-board route source contract', () => {
       'utf8'
     )
 
-    expect(routeSource).toContain("title: 'Shift Swaps & Pickups'")
+    expect(routeSource).toContain("title: 'Shift Board'")
+    expect(clientSource).toContain('Shift Board')
+    expect(clientSource).toContain('Open Shifts')
+    expect(clientSource).toContain('Needs Action')
+    expect(clientSource).toContain('Next: {actionOwnerLabel}')
+    expect(clientSource).toContain('getActionOwnerLabel')
     expect(clientSource).toContain('>Open schedule<')
   })
 

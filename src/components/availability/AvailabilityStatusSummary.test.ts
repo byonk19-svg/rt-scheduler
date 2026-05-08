@@ -36,7 +36,7 @@ describe('AvailabilityStatusSummary', () => {
           {
             therapistId: 'submitted-4',
             therapistName: 'Rosa V.',
-            overridesCount: 1,
+            overridesCount: 0,
             lastUpdatedAt: '2026-03-12T12:00:00.000Z',
             shiftType: 'day',
             employmentType: 'prn',
@@ -60,21 +60,22 @@ describe('AvailabilityStatusSummary', () => {
             employmentType: 'prn',
           },
         ],
-        initialFilter: 'submitted',
+        initialFilter: 'submitted_with_exceptions',
       })
     )
 
-    expect(html).toContain('Needs attention')
-    expect(html).toContain('Has requests')
+    expect(html).toContain('Missing submissions')
+    expect(html).toContain('Submitted with exceptions')
+    expect(html).toContain('Submitted no exceptions')
     expect(html).toContain('All')
     expect(html).toContain('Therapist')
     expect(html).toContain('Status')
-    expect(html).toContain('Requests')
+    expect(html).toContain('Exceptions')
     expect(html).toContain('Actions')
     expect(html).toContain('Adrienne S.')
     expect(html).toContain('Barbara C.')
     expect(html).toContain('Part-time')
-    expect(html).toContain('PRN')
+    expect(html).not.toContain('Rosa V.')
     expect(html).toContain('Review')
     expect(html).not.toContain('Enter manually')
   })

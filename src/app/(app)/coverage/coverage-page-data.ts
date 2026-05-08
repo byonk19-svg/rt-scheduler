@@ -245,6 +245,7 @@ async function getCoverageNamesByUserId(cycleId: string): Promise<Record<string,
 
 function createEmptySnapshot(): CoveragePageSnapshot {
   return {
+    actorUserId: null,
     actorScheduleShift: { resolved: true, type: null },
     activeCycleId: null,
     activeCyclePublished: false,
@@ -310,6 +311,7 @@ export async function getCoveragePageServerData({
   const initialShiftType = initialShiftTab === 'Night' ? 'night' : 'day'
 
   const snapshot = createEmptySnapshot()
+  snapshot.actorUserId = user.id
   snapshot.actorScheduleShift = { resolved: true, type: actorScheduleShift }
   snapshot.actorRole = actorRole
   snapshot.canManageCoverage = can(actorRole, 'manage_coverage', permContext)

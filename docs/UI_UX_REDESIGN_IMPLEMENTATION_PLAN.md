@@ -73,7 +73,7 @@ Verification:
 
 ### Phase 2 - My Shifts Completion
 
-Status: partially complete. First slice complete.
+Status: partially complete. My Shifts next-shift/mobile slice complete.
 
 Completed:
 
@@ -84,13 +84,15 @@ Completed:
 - Non-working days visible.
 - Current therapist's scheduled days highlighted.
 - Selected-day detail with date, shift, work status, coworkers, lead, and schedule status.
+- Compact next-shift card and upcoming personal shifts list using the already-loaded published Schedule Block data.
+- Mobile stacking now keeps Schedule Block context and selected-day detail visible before secondary filters.
+- Published post-status rows such as Cancelled and Call In remain visible in My Shifts instead of being filtered out before rendering.
 - Focused tests in `src/lib/my-shifts-schedule-block.test.ts` and `src/components/schedule/TherapistShiftCalendar.test.ts`.
 
-Next safe slice:
+Remaining safe slice:
 
-1. Add a compact next-shift or upcoming-personal-shifts summary using the already-loaded published schedule data.
-2. Tighten My Shifts mobile behavior: week strip or stacked selected-day card, without changing desktop workflow.
-3. Extract selected-day detail and coworker list only if Team Schedule work starts and needs the same shape.
+1. Extract selected-day detail and coworker list only if Team Schedule work starts and needs the same shape.
+2. Add historical block selection only after published-block lifecycle visibility is scoped.
 
 Explicitly defer:
 
@@ -117,9 +119,12 @@ Verification:
 - `npm run test:unit -- src/lib/my-shifts-schedule-block.test.ts src/components/schedule/TherapistShiftCalendar.test.ts`
 - `npm run lint`
 - `npm run typecheck`
-- Browser smoke with a seeded therapist session when available
+- `npm run build`
+- Browser smoke with a seeded therapist session when available: `PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001 node --env-file=.env.local scripts/capture-therapist-validation.mjs`
 
 ### Phase 3 - Team Schedule and Coverage Frame
+
+Status: partially complete. Read-only framing, selected-day presence, and Roster default-shift slices complete.
 
 Goal:
 
@@ -139,15 +144,18 @@ Implementation slices:
    - Add shared Schedule Block context to the staff Team Schedule surface.
    - Clarify read-only state and Day/Night mode.
    - Keep staff controls non-mutating.
+   - Status: complete for the route-framing slice. Non-manager `/coverage` now presents as Team Schedule with Schedule Block context and read-only copy while preserving manager Coverage controls.
 
 2. Shared selected-day pattern:
    - Reuse or extract the My Shifts selected-day panel shape.
    - Show date, shift, lead, scheduled staff, current user's presence, and operational statuses.
    - Keep manager edit controls out of the staff panel.
+   - Status: complete for the read-only presence slice. Team Schedule selected-day detail now shows the signed-in user's status for that selected day without exposing manager edit controls to staff.
 
 3. Roster framing:
    - Reframe `/schedule` as Roster View of Team Schedule in labels and empty states.
    - Default shift behavior should match actor context where safe.
+   - Status: complete for route framing and actor default shift. `/schedule` now opens Day or Night from the manager/lead profile shift when available, with Day as the safe fallback.
 
 4. Manager/lead operational controls:
    - Only after read-only framing is stable.
@@ -182,6 +190,8 @@ Verification:
 
 ### Phase 4 - Availability Vocabulary and Queue Clarity
 
+Status: complete for scoped Phase 4 slices.
+
 Goal:
 
 - Make therapist availability exception-based: Need Off and Need to Work, with unmarked days treated as no therapist-entered exception.
@@ -200,14 +210,17 @@ Implementation slices:
    - Replace safe user-facing "Can work" / "Can't work" labels with Need to Work / Need Off.
    - Keep no-exception submissions valid and clear.
    - Keep recurring pattern as baseline context.
+   - Status: complete for therapist and manager-visible exception labels. UI now uses Need Off / Need to Work while preserving existing internal form names and stored values.
 
 2. Therapist review-before-submit:
    - Summarize Schedule Block, regular shift, Need Off dates, Need to Work dates, PTO reasons when present, and edit-window state.
+   - Status: complete for inline review summary. The therapist availability workspace now shows Schedule Block, regular shift, Need Off dates, Need to Work dates, notes, edit-window/submitted state, and no-exception copy before submit.
 
 3. Manager queue clarity:
    - Group Missing submissions, Submitted with exceptions, Submitted with no exceptions.
    - Separate therapist exception layer from manager planning layer.
    - Keep manager editing in the selected therapist detail panel.
+   - Status: complete for queue grouping. The manager work queue now separates Missing submissions, Submitted with exceptions, and Submitted no exceptions while leaving the selected-therapist manager editor in the detail panel.
 
 Likely files:
 
@@ -239,6 +252,8 @@ Verification:
 
 ### Phase 5 - Shift Board Action Ownership
 
+Status: complete for scoped Phase 5 slices.
+
 Goal:
 
 - Make request lifecycle states readable without changing lifecycle behavior.
@@ -255,17 +270,21 @@ Implementation slices:
 1. Board section architecture:
    - Needs Action, Open Shifts, My Requests, History.
    - Keep sections role-aware but consistently named.
+   - Status: complete for the first naming slice. The route is now Shift Board, the open tab is Open Shifts, manager review CTA says Needs Action, and staff history/action labels are simplified.
 
 2. Request card language:
    - Add action owner labels: Needs your action, Waiting on manager, Waiting on teammate, Open to team, Already handled.
    - Move long timelines and claimant details into drawers.
+   - Status: complete for action-owner labels. Request cards now show a `Next:` chip derived from status, direct-recipient state, pickup interest, and reviewer role.
 
 3. Composer language:
    - Trade shift, Give up shift, Ask a specific teammate.
    - Pickup starts from Open Shifts, not New Request.
+   - Status: complete for labels. The composer now uses Trade shift, Give up shift, Ask a specific teammate, and Open Shifts language without changing request creation behavior.
 
 4. My Shifts entry points:
    - Add Give up this shift / Trade this shift from selected-day detail only after the board path and tests are stable.
+   - Status: complete. My Shifts selected-day detail now links scheduled shifts into the existing request composer for Give up shift or Trade shift, passing the selected shift and request type without creating requests directly from the calendar.
 
 Likely files:
 
@@ -296,6 +315,8 @@ Verification:
 
 ### Phase 6 - Lottery Decision Center
 
+Status: complete.
+
 Goal:
 
 - Reframe Lottery as a decision center driven by live Team Schedule while preserving recommendation and apply logic.
@@ -310,18 +331,17 @@ Cut lines:
 Implementation slices:
 
 1. Decision context:
-   - Show selected date, Day/Night shift, scheduled staff, PRN/core grouping, volunteers, and latest applied decision.
+   - Complete. Lottery snapshot now includes selected-shift scheduled staff from the live published schedule, with lead/core/PRN grouping, volunteer flags, decision-pool/protected labels, and latest applied decision context.
+   - Overlapping published cycle dates are de-duplicated before rendering the Lottery date selector.
 
 2. Recommendation clarity:
-   - Show recommendation and reason in plain language.
-   - Show stale/applied state.
+   - Complete for current recommendation output. The panel now names preview/applied/outdated state in plain language, separates the recommended result from the reason, and keeps latest applied decision context visible before a recommendation is generated.
 
 3. Therapist transparency:
-   - Therapists see their shift order and own position with neutral wording.
-   - No manager-only rationale or actions.
+   - Complete for the Lottery page. Therapist views keep full order visibility, identify the therapist's own fixed-order position, and avoid apply/override/add-on-behalf controls.
 
 4. Team Schedule link-in:
-   - Add contextual links from Team Schedule selected-day detail when extra staff or active lottery decisions exist.
+   - Complete. Team Schedule selected-day detail links to Lottery for the same date and Day/Night shift when the shift has extra scheduled staff or Cancelled/On Call operational status.
 
 Likely files:
 
@@ -340,13 +360,15 @@ Acceptance criteria:
 Verification:
 
 - Existing Lottery unit tests.
-- Add label/state tests for stale/applied recommendation display.
+- Added `src/components/lottery/LotteryClientPage.test.ts` for decision context ordering, staff grouping, latest applied decision context, stale state, and therapist no-action visibility.
 - Browser checks for manager/lead and therapist visibility.
 - `npm run lint`
 - `npm run typecheck`
 - `npm run build`
 
 ### Phase 7 - Mobile Schedule Pass
+
+Status: complete for the scoped mobile pass.
 
 Goal:
 
@@ -362,14 +384,14 @@ Entry criteria:
 Implementation slices:
 
 1. Mobile context:
-   - Sticky Schedule Block and shift context.
+   - Complete. My Shifts keeps Schedule Block context sticky on mobile, and Team Schedule/Coverage now keeps Schedule Block, status, Day/Night, and layout context sticky on mobile without changing desktop layout.
 
 2. Mobile schedule navigation:
-   - Week selector or day strip.
-   - Selected-day card or bottom sheet.
+   - Complete. Therapist Availability now places the Selected day controls before review/summary cards on mobile while preserving the desktop review-first order.
 
 3. Mobile action queues:
-   - Therapist Dashboard, My Shifts, Availability, Team Schedule, Shift Board.
+   - Complete. Staff shell navigation now uses Shift Board and links to the canonical `/shift-board` route while preserving the legacy therapist swaps URL as active.
+   - Browser checks covered staff My Shifts, staff Shift Board, staff Availability, manager Team Schedule/Coverage, and manager Lottery at mobile width.
    - Lead day-of Team Schedule and Lottery.
    - Manager triage only; dense schedule building stays desktop-first.
 
@@ -423,8 +445,7 @@ Run before merging a phase:
 
 ## Current next action
 
-The next safest implementation task is Phase 2, My Shifts completion:
+No planned implementation slice remains in this document.
 
-1. Add a compact next-shift or upcoming-shifts summary from existing published schedule data.
-2. Improve My Shifts mobile layout around the 6-week block and selected-day detail.
-3. Keep Shift Board actions out of scope until the request lifecycle slice begins.
+1. Keep future work scoped to new audit findings or explicit product requests.
+2. Do not start schema, RLS, scheduling algorithm, or lifecycle changes without a specific scoped slice.

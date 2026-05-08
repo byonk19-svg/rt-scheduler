@@ -25,7 +25,13 @@ export type AvailabilityStatusSummaryRow = {
   employmentType?: 'full_time' | 'part_time' | 'prn'
 }
 
-export type AvailabilityRosterFilter = 'all' | 'missing' | 'submitted' | 'has_requests'
+export type AvailabilityRosterFilter =
+  | 'all'
+  | 'missing'
+  | 'submitted_with_exceptions'
+  | 'submitted_no_exceptions'
+  | 'submitted'
+  | 'has_requests'
 
 type AvailabilityStatusSummaryProps = {
   submittedRows: AvailabilityStatusSummaryRow[]
@@ -185,14 +191,24 @@ export function AvailabilityStatusSummary({
     if (resolvedActiveFilter === 'missing') return visibleRows.filter((row) => !row.submitted)
     if (resolvedActiveFilter === 'submitted') return visibleRows.filter((row) => row.submitted)
     if (resolvedActiveFilter === 'has_requests') {
-      return visibleRows.filter((row) => row.overridesCount > 0)
+      return visibleRows.filter((row) => row.submitted && row.overridesCount > 0)
+    }
+    if (resolvedActiveFilter === 'submitted_with_exceptions') {
+      return visibleRows.filter((row) => row.submitted && row.overridesCount > 0)
+    }
+    if (resolvedActiveFilter === 'submitted_no_exceptions') {
+      return visibleRows.filter((row) => row.submitted && row.overridesCount === 0)
     }
     return visibleRows
   }, [resolvedActiveFilter, visibleRows])
 
-  const requestCount = visibleRows.filter((row) => row.overridesCount > 0).length
   const missingCount = visibleRows.filter((row) => !row.submitted).length
-  const submittedCount = visibleRows.filter((row) => row.submitted).length
+  const submittedWithExceptionsCount = visibleRows.filter(
+    (row) => row.submitted && row.overridesCount > 0
+  ).length
+  const submittedNoExceptionsCount = visibleRows.filter(
+    (row) => row.submitted && row.overridesCount === 0
+  ).length
   const displayedRows = filteredRows.slice(0, visibleCount)
   const canLoadMore = filteredRows.length > visibleCount
 
@@ -209,9 +225,13 @@ export function AvailabilityStatusSummary({
       >
         {(
           [
-            ['missing', 'Needs attention', missingCount],
-            ['has_requests', 'Has requests', requestCount],
-            ['submitted', 'Submitted', submittedCount],
+            ['missing', 'Missing submissions', missingCount],
+            [
+              'submitted_with_exceptions',
+              'Submitted with exceptions',
+              submittedWithExceptionsCount,
+            ],
+            ['submitted_no_exceptions', 'Submitted no exceptions', submittedNoExceptionsCount],
             ['all', 'All', visibleRows.length],
           ] as const
         ).map(([value, label, count]) => (
@@ -281,7 +301,7 @@ export function AvailabilityStatusSummary({
             <div className="hidden grid-cols-[minmax(0,2.9fr)_6rem_3.25rem_5.75rem_5.75rem] gap-4 px-2 pb-2 text-[13px] font-medium text-muted-foreground md:grid">
               <span>Therapist</span>
               <span>Status</span>
-              <span>Requests</span>
+              <span>Exceptions</span>
               <span>Last activity</span>
               <span>Actions</span>
             </div>

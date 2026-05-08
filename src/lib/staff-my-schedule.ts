@@ -81,7 +81,6 @@ export async function fetchPublishedScheduleWindow(
     .lte('date', endDate)
     .eq('schedule_cycles.published', true)
     .not('user_id', 'is', null)
-    .not('status', 'eq', 'called_off')
     .order('date', { ascending: true })
 
   if (error) {
@@ -89,7 +88,5 @@ export async function fetchPublishedScheduleWindow(
     return []
   }
 
-  return ((data ?? []) as MyScheduleTeamShiftRow[]).filter(
-    (row) => row.assignment_status !== 'cancelled'
-  )
+  return (data ?? []) as MyScheduleTeamShiftRow[]
 }

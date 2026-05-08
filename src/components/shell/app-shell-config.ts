@@ -185,8 +185,8 @@ export function getStaffNavItems(): readonly ShellNavItem[] {
         pathname === '/coverage' || pathname === '/schedule' || pathname === '/preliminary',
     },
     {
-      href: '/therapist/swaps',
-      label: 'Shift Swaps',
+      href: '/shift-board',
+      label: 'Shift Board',
       active: (pathname) => pathname === '/therapist/swaps' || pathname === '/shift-board',
     },
     {

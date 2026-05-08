@@ -32,6 +32,7 @@ export type PreliminarySnapshotRow = {
 }
 
 export type CoveragePageSnapshot = {
+  actorUserId: string | null
   actorScheduleShift: {
     resolved: boolean
     type: 'day' | 'night' | null

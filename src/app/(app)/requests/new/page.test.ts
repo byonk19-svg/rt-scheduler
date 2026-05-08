@@ -17,12 +17,17 @@ describe('requests composer route source contract', () => {
       resolve(process.cwd(), 'src/components/requests/RequestComposer.tsx'),
       'utf8'
     )
+    const pageSource = readFileSync(
+      resolve(process.cwd(), 'src/app/(app)/requests/new/page.tsx'),
+      'utf8'
+    )
 
     expect(layoutSource).toContain("title: 'My Requests'")
     expect(layoutSource).toContain('swap, pickup, and direct requests')
     expect(historySource).toContain('New request')
     expect(historySource).not.toContain('Start request')
-    expect(composerSource).toContain('Trade a shift')
+    expect(composerSource).toContain('Trade shift')
+    expect(composerSource).toContain('Give up shift')
     expect(composerSource).toContain('step === 1')
     expect(composerSource).toContain('selectedShift !== null')
     expect(composerSource).toContain('!showsTeammateStep || swapWith !== null')
@@ -32,9 +37,15 @@ describe('requests composer route source contract', () => {
     expect(composerSource).toContain('Request preview')
     expect(composerSource).toContain('Choose your shift')
     expect(composerSource).toContain('Ask a specific teammate')
-    expect(composerSource).toContain('Suggest a teammate on the board')
-    expect(composerSource).toContain('Post to the team board with a suggested teammate')
+    expect(composerSource).toContain('Suggest teammate')
+    expect(composerSource).toContain('Post to Open Shifts with a suggested teammate')
     expect(composerSource).toContain('Post an open swap instead')
+    expect(composerSource).toContain('Open Shifts')
+    expect(pageSource).toContain("searchParams.get('type') === 'pickup' ? 'pickup' : 'swap'")
+    expect(pageSource).toContain('setRequestType(requestTypeFromQuery)')
+    expect(pageSource).toContain(
+      "setRequestVisibility(requestTypeFromQuery === 'pickup' ? 'team' : 'direct')"
+    )
     expect(composerSource).toContain('No strong direct swap options for this shift right now.')
     expect(historySource).toContain('Direct requests wait for teammate response first')
     expect(historySource).toContain('Shift Swaps & Pickups')

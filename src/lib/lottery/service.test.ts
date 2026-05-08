@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   applyLotteryDecision,
+  buildAvailableDates,
   moveLotteryListEntry,
   type LotteryActor,
 } from '@/lib/lottery/service'
@@ -13,6 +14,17 @@ const actor: LotteryActor = {
   siteId: 'default',
   shiftType: 'day',
 }
+
+describe('buildAvailableDates', () => {
+  it('deduplicates overlapping published cycle dates before rendering selectors', () => {
+    expect(
+      buildAvailableDates([
+        { start_date: '2026-05-01', end_date: '2026-05-03' },
+        { start_date: '2026-05-03', end_date: '2026-05-05' },
+      ])
+    ).toEqual(['2026-05-01', '2026-05-02', '2026-05-03', '2026-05-04', '2026-05-05'])
+  })
+})
 
 describe('applyLotteryDecision', () => {
   it('does not allow leads to apply lottery decisions', async () => {

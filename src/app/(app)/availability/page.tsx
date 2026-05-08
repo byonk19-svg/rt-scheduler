@@ -479,6 +479,8 @@ export default async function AvailabilityPage({
           submittedRows={submittedAvailabilityRows}
           missingRows={missingAvailabilityRows}
           initialRosterFilter={
+            initialRoster === 'submitted_with_exceptions' ||
+            initialRoster === 'submitted_no_exceptions' ||
             initialRoster === 'submitted' ||
             initialRoster === 'has_requests' ||
             initialRoster === 'all'

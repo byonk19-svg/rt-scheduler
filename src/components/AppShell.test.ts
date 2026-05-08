@@ -118,8 +118,8 @@ describe('AppShell navigation structure', () => {
     )
   })
 
-  it('uses compact Shift Swaps wording in staff shell navigation', () => {
-    expect(shellConfigSource).toContain("label: 'Shift Swaps'")
+  it('uses Shift Board wording in staff shell navigation', () => {
+    expect(shellConfigSource).toContain("label: 'Shift Board'")
     expect(shellConfigSource).not.toContain("label: 'Shift Swaps & Pickups'")
     expect(shellConfigSource).not.toContain("label: 'Open shifts'")
   })

@@ -139,10 +139,10 @@ export function RequestComposer({
   const messageCount = message.length
   const visibleShiftChoices = myShifts.slice(0, 10)
 
-  const title = isSwap ? 'Trade a shift' : 'Give away a shift'
+  const title = isSwap ? 'Trade shift' : 'Give up shift'
   const subtitle = isSwap
-    ? 'Pick the shift you want to move and find a teammate to take it. Coverage-safe swaps help keep the schedule balanced.'
-    : 'Pick the shift you need covered, choose how to ask for help, and send it for review.'
+    ? 'Pick the shift you want to trade and choose whether to ask a specific teammate or post to Open Shifts.'
+    : 'Pick the shift you need covered, ask a specific teammate or post to Open Shifts, and send it for review.'
 
   return (
     <div className="relative left-1/2 w-[min(calc(100vw-5rem),1760px)] -translate-x-1/2 space-y-6 max-lg:left-auto max-lg:w-full max-lg:translate-x-0">
@@ -184,13 +184,13 @@ export function RequestComposer({
                   selected={requestType === 'swap'}
                   onClick={() => onRequestTypeChange('swap')}
                 >
-                  Swap with someone
+                  Trade shift
                 </SegmentButton>
                 <SegmentButton
                   selected={requestType === 'pickup'}
                   onClick={() => onRequestTypeChange('pickup')}
                 >
-                  Give it away (pickup)
+                  Give up shift
                 </SegmentButton>
               </div>
             </div>
@@ -202,21 +202,21 @@ export function RequestComposer({
                   selected={swapPath === 'direct'}
                   onClick={() => onSwapPathChange('direct')}
                 >
-                  Specific teammate
+                  Ask a specific teammate
                 </PathButton>
                 <PathButton
                   ariaLabel="Suggest a teammate on the board"
                   selected={swapPath === 'team_suggested'}
                   onClick={() => onSwapPathChange('team_suggested')}
                 >
-                  Suggested on board
+                  Suggest teammate
                 </PathButton>
                 <PathButton
                   ariaLabel="Post an open swap instead"
                   selected={swapPath === 'team_open'}
                   onClick={() => onSwapPathChange('team_open')}
                 >
-                  Open swap
+                  Open Shifts
                 </PathButton>
               </div>
             ) : (
@@ -226,14 +226,14 @@ export function RequestComposer({
                   selected={requestVisibility === 'direct'}
                   onClick={() => onRequestVisibilityChange('direct')}
                 >
-                  Specific teammate
+                  Ask a specific teammate
                 </PathButton>
                 <PathButton
                   ariaLabel="Post to the board"
                   selected={requestVisibility === 'team'}
                   onClick={() => onRequestVisibilityChange('team')}
                 >
-                  Team board
+                  Open Shifts
                 </PathButton>
               </div>
             )}
@@ -765,7 +765,7 @@ function RequestPreview({
         ) : (
           <div className="mt-5">
             <PreviewShiftCard
-              eyebrow="You give away"
+              eyebrow="You give up"
               name="Pickup coverage"
               shiftLabel={
                 selectedShiftData
@@ -955,7 +955,7 @@ function getPreviewPathLabel({
   requestType: RequestType
 }) {
   if (requestType === 'pickup') {
-    return 'Ask a teammate or post to the board for pickup coverage.'
+    return 'Ask a specific teammate or post to Open Shifts for pickup coverage.'
   }
 
   if (isDirectSwap) {
@@ -963,11 +963,11 @@ function getPreviewPathLabel({
   }
 
   if (isTeamSuggestedSwap) {
-    return 'Post to the team board with a suggested teammate.'
+    return 'Post to Open Shifts with a suggested teammate.'
   }
 
   if (isOpenTeamSwap) {
-    return 'Post an open swap for manager review.'
+    return 'Post an open trade to Open Shifts for manager review.'
   }
 
   return 'Review and send this request.'

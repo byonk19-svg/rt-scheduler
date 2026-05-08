@@ -10,6 +10,7 @@ const live = {
   endDate: '2026-05-04',
   shortLabel: 'May 3 - May 4, 2026',
   isPublished: false,
+  defaultShiftType: 'day' as const,
   availableCycles: [{ id: 'cycle-1', label: 'Cycle Alpha' }],
   staff: [
     {

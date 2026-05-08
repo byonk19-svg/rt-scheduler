@@ -61,7 +61,7 @@ type AvailabilityEntriesTableProps = {
 const STATUS_OPTIONS: TableStatusOption[] = [
   { value: 'all', label: 'All' },
   { value: 'force_off', label: 'Need Off' },
-  { value: 'force_on', label: 'Request to Work' },
+  { value: 'force_on', label: 'Need to Work' },
 ]
 
 function formatDateTime(value: string): string {
@@ -71,7 +71,7 @@ function formatDateTime(value: string): string {
 }
 
 function formatEntryLabel(entryType: AvailabilityEntryTableRow['entryType']): string {
-  return entryType === 'force_on' ? 'Request to Work' : 'Need Off'
+  return entryType === 'force_on' ? 'Need to Work' : 'Need Off'
 }
 
 function formatShiftTypeLabel(shiftType: AvailabilityEntryTableRow['shiftType']): string {
@@ -297,7 +297,7 @@ export function AvailabilityEntriesTable({
           <span>
             {entrySummary.needOff} Need Off
             <span className="px-1 text-muted-foreground/40">|</span>
-            {entrySummary.requestToWork} Request to Work
+            {entrySummary.requestToWork} Need to Work
           </span>
         </p>
       ) : null}

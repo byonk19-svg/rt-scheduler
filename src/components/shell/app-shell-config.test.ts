@@ -147,7 +147,7 @@ describe('staff nav items', () => {
       'My Shifts',
       'Availability',
       'Team Schedule',
-      'Shift Swaps',
+      'Shift Board',
       'History',
     ])
   })
@@ -164,11 +164,12 @@ describe('staff nav items', () => {
     expect(myShifts?.active('/staff/my-schedule')).toBe(true)
   })
 
-  it('"Shift Swaps" routes to /therapist/swaps and is also active for /shift-board', () => {
+  it('"Shift Board" routes to /shift-board and remains active for the legacy therapist swaps URL', () => {
     const items = getStaffNavItems()
-    const swaps = items.find((item) => item.label === 'Shift Swaps')
-    expect(swaps?.href).toBe('/therapist/swaps')
-    expect(swaps?.active('/shift-board')).toBe(true)
+    const shiftBoard = items.find((item) => item.label === 'Shift Board')
+    expect(shiftBoard?.href).toBe('/shift-board')
+    expect(shiftBoard?.active('/shift-board')).toBe(true)
+    expect(shiftBoard?.active('/therapist/swaps')).toBe(true)
   })
 
   it('"Team Schedule" links to /coverage (the shared schedule workspace)', () => {

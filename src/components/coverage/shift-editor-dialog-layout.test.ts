@@ -23,8 +23,20 @@ describe('ShiftEditorDialog layout', () => {
     expect(shiftEditorSource).toContain(
       'Review daily staffing details, operational statuses, notes, and edit actions for this shift.'
     )
+    expect(shiftEditorSource).toContain('Your status')
+    expect(shiftEditorSource).toContain('You are assigned as lead')
+    expect(shiftEditorSource).toContain('You work this day')
+    expect(shiftEditorSource).toContain('You are not scheduled')
     expect(shiftEditorSource).toContain('Operational statuses')
     expect(shiftEditorSource).toContain('Managers edit staffing assignments.')
+    expect(shiftEditorSource).toContain('Lottery decision available')
+    expect(shiftEditorSource).toContain('Open Lottery for this shift')
+    expect(shiftEditorSource).toContain('/lottery?date=${selectedDay.isoDate}&shift=${selectedDay.shiftType.toLowerCase()}')
+  })
+
+  it('receives actor identity for read-only selected-day context', () => {
+    expect(shiftEditorSource).toContain('actorUserId: string | null')
+    expect(shiftEditorSource).toContain('function resolveActorPresence')
   })
 })
 

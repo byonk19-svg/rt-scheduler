@@ -1,4 +1,4 @@
-import { createElement } from 'react'
+import { createElement, type ComponentProps } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
@@ -45,6 +45,7 @@ function buildWeeks(startIso: string): TherapistShiftWeek[] {
         isWeekend: date.getDay() === 0 || date.getDay() === 6,
         userShift: isSelectedShift
           ? {
+              id: 'shift-1',
               shiftType: 'day',
               role: 'staff',
               assignmentStatus: 'scheduled',
@@ -66,9 +67,22 @@ function buildWeeks(startIso: string): TherapistShiftWeek[] {
   })
 }
 
-function renderCalendar() {
-  const weeks = buildWeeks('2026-03-22')
-
+function renderCalendar({
+  weeks = buildWeeks('2026-03-22'),
+  summary = {
+    shiftCount: 1,
+    leadCount: 0,
+    dayShiftCount: 1,
+    nightShiftCount: 0,
+    dayOffCount: 41,
+    totalHours: 12,
+  },
+  todayIso = '2026-03-22',
+}: {
+  weeks?: TherapistShiftWeek[]
+  summary?: ComponentProps<typeof TherapistShiftCalendar>['summary']
+  todayIso?: string
+} = {}) {
   return renderToStaticMarkup(
     createElement(TherapistShiftCalendar, {
       title: 'My Shifts',
@@ -86,14 +100,8 @@ function renderCalendar() {
         stateLabel: 'Published schedule',
         permissionLabel: 'Read-only personal schedule',
       },
-      summary: {
-        shiftCount: 1,
-        leadCount: 0,
-        dayShiftCount: 1,
-        nightShiftCount: 0,
-        dayOffCount: 41,
-        totalHours: 12,
-      },
+      summary,
+      todayIso,
       backHref: '/dashboard/staff',
     })
   )
@@ -133,5 +141,55 @@ describe('TherapistShiftCalendar', () => {
     expect(html).toContain('Coworkers')
     expect(html).toContain('Morgan L.')
     expect(html).toContain('Lead')
+    expect(html).toContain('Give up shift')
+    expect(html).toContain('Trade shift')
+    expect(html).toContain('/requests/new?new=1&amp;shiftId=shift-1&amp;type=pickup')
+    expect(html).toContain('/requests/new?new=1&amp;shiftId=shift-1&amp;type=swap')
+  })
+
+  it('summarizes the next and upcoming personal shifts from the visible block', () => {
+    const html = renderCalendar()
+
+    expect(html).toContain('Next shift')
+    expect(html).toContain('Upcoming personal shifts')
+    expect(html).toContain('1 in this Schedule Block')
+    expect(html).toContain('Working shift')
+    expect(html).toContain('Sun, Mar 22')
+  })
+
+  it('keeps post-publish status changes visible in My Shifts', () => {
+    const weeks = buildWeeks('2026-03-22')
+    weeks[0].days[1].userShift = {
+      id: 'shift-cancelled',
+      shiftType: 'day',
+      role: 'staff',
+      assignmentStatus: null,
+      status: 'called_off',
+    }
+    weeks[0].days[1].team = [you]
+    weeks[0].days[2].userShift = {
+      id: 'shift-call-in',
+      shiftType: 'day',
+      role: 'staff',
+      assignmentStatus: 'call_in',
+      status: 'called_off',
+    }
+    weeks[0].days[2].team = [you]
+
+    const html = renderCalendar({
+      weeks,
+      summary: {
+        shiftCount: 3,
+        leadCount: 0,
+        dayShiftCount: 3,
+        nightShiftCount: 0,
+        dayOffCount: 39,
+        totalHours: 36,
+      },
+    })
+
+    expect(html).toContain('Cancelled')
+    expect(html).toContain('Call In')
+    expect(html).not.toContain('Called Off')
   })
 })

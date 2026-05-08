@@ -37,7 +37,15 @@ const SHIFT_OPTIONS: Array<{ value: ShiftType; label: string }> = [
 ]
 
 export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
-  const [selectedShift, setSelectedShift] = useState<ShiftType>('day')
+  const defaultShiftType = live?.defaultShiftType ?? 'day'
+  const liveShiftKey = `${live?.cycleId ?? 'none'}:${defaultShiftType}`
+  const [shiftState, setShiftState] = useState<{ key: string; selectedShift: ShiftType }>(() => ({
+    key: liveShiftKey,
+    selectedShift: defaultShiftType,
+  }))
+  const selectedShift =
+    shiftState.key === liveShiftKey ? shiftState.selectedShift : defaultShiftType
+
   const dataset = useMemo(
     () => (live ? buildLiveScheduleDataset(live, selectedShift) : null),
     [live, selectedShift]
@@ -49,10 +57,11 @@ export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
       <div className="mx-auto flex w-full max-w-[960px] flex-col px-2 py-2 sm:px-3 lg:px-5">
         <section className="rounded-[26px] border border-border/70 bg-card px-6 py-8 shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
           <h1 className="font-heading text-[1.75rem] font-semibold tracking-[-0.04em] text-foreground sm:text-[1.9rem]">
-            Schedule roster
+            Roster View
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Schedule data is unavailable right now. Refresh after a cycle is selected.
+            Team Schedule roster data is unavailable right now. Refresh after a Schedule Block is
+            selected.
           </p>
         </section>
       </div>
@@ -71,7 +80,7 @@ export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="space-y-1.5">
               <h1 className="font-heading text-[1.75rem] font-semibold tracking-[-0.04em] text-foreground sm:text-[1.9rem]">
-                Respiratory Therapy - {selectedShift === 'day' ? 'Day' : 'Night'} Shift
+                Roster View - {selectedShift === 'day' ? 'Day' : 'Night'} Shift
               </h1>
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
                 <p className="text-[13px] text-muted-foreground">{dataset.cycleLabel}</p>
@@ -106,7 +115,7 @@ export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
           <div className="flex flex-col gap-3 border-t border-border/70 pt-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/20 px-3.5 py-3 text-sm text-muted-foreground">
               <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-foreground/75" />
-              <p>Use Coverage to edit staffing, auto-draft, or publish this cycle.</p>
+              <p>Use Coverage to edit staffing, auto-draft, or publish this Schedule Block.</p>
             </div>
 
             <div className="inline-flex h-[52px] items-center rounded-lg border border-border/70 bg-muted/35 p-1 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
@@ -116,7 +125,9 @@ export function ScheduleRosterScreen({ live }: ScheduleRosterScreenProps) {
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => setSelectedShift(option.value)}
+                    onClick={() =>
+                      setShiftState({ key: liveShiftKey, selectedShift: option.value })
+                    }
                     className={cn(
                       'h-11 rounded-md px-3 text-[14px] font-medium transition-colors',
                       isActive

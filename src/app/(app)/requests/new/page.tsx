@@ -25,6 +25,8 @@ function SwapRequestPageContent() {
   const supabase = useMemo(() => createClient(), [])
   const shiftIdFromQuery = searchParams.get('shiftId')
   const composeMode = searchParams.get('new') === '1'
+  const requestTypeFromQuery: RequestType =
+    searchParams.get('type') === 'pickup' ? 'pickup' : 'swap'
   const requestIdFromQuery = searchParams.get('requestId')
 
   const [view, setView] = useState<'list' | 'form'>('list')
@@ -70,8 +72,11 @@ function SwapRequestPageContent() {
     }
     if (composeMode) {
       setView('form')
+      setRequestType(requestTypeFromQuery)
+      setRequestVisibility(requestTypeFromQuery === 'pickup' ? 'team' : 'direct')
+      setSwapPath('direct')
     }
-  }, [composeMode, requestIdFromQuery])
+  }, [composeMode, requestIdFromQuery, requestTypeFromQuery])
 
   const loadData = useCallback(async () => {
     let active = true
@@ -237,7 +242,7 @@ function SwapRequestPageContent() {
     if (showsTeammateStep && !swapWith) {
       setError(
         requestVisibility === 'direct'
-          ? 'Choose the teammate for this direct request.'
+          ? 'Choose the teammate you want to ask.'
           : 'Choose the teammate you want to suggest for this team swap.'
       )
       return
@@ -307,7 +312,7 @@ function SwapRequestPageContent() {
       if (showsTeammateStep && !swapWith) {
         setError(
           requestVisibility === 'direct'
-            ? 'Choose the teammate for this direct request before continuing.'
+            ? 'Choose the teammate you want to ask before continuing.'
             : 'Choose the teammate you want to suggest before continuing.'
         )
         return
