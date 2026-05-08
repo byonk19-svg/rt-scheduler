@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/table'
 
 type ForcedDateMissRow = {
+  therapistId: string
   therapistName: string
   date: string
   cycleLabel: string
@@ -21,6 +22,7 @@ type Props = {
 }
 
 type TherapistSummary = {
+  id: string
   name: string
   misses: number
   met: number
@@ -29,18 +31,19 @@ type TherapistSummary = {
 }
 
 function groupByTherapist(rows: ForcedDateMissRow[]): TherapistSummary[] {
-  const map = new Map<string, { misses: number; met: number }>()
+  const map = new Map<string, { name: string; misses: number; met: number }>()
   for (const row of rows) {
-    const entry = map.get(row.therapistName) ?? { misses: 0, met: 0 }
+    const entry = map.get(row.therapistId) ?? { name: row.therapistName, misses: 0, met: 0 }
     if (row.missed) {
       entry.misses++
     } else {
       entry.met++
     }
-    map.set(row.therapistName, entry)
+    map.set(row.therapistId, entry)
   }
   return [...map.entries()]
-    .map(([name, { misses, met }]) => ({
+    .map(([id, { name, misses, met }]) => ({
+      id,
       name,
       misses,
       met,
@@ -103,7 +106,7 @@ export function ForcedDateMissTable({ rows }: Props) {
                   : 'text-[var(--warning-text)]'
 
             return (
-              <TableRow key={t.name}>
+              <TableRow key={t.id}>
                 <TableCell className="font-medium text-foreground">{t.name}</TableCell>
                 <TableCell className="text-right tabular-nums">{t.total}</TableCell>
                 <TableCell className="text-right tabular-nums">

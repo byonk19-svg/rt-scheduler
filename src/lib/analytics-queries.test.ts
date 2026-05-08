@@ -135,12 +135,14 @@ describe('analytics queries', () => {
 
     await expect(getForcedDateMisses(supabase as never)).resolves.toEqual([
       {
+        therapistId: 'ther-1',
         therapistName: 'Barbara C.',
         date: '2026-04-03',
         cycleLabel: 'Apr 2026',
         missed: true,
       },
       {
+        therapistId: 'ther-2',
         therapistName: 'Tannie B.',
         date: '2026-04-04',
         cycleLabel: 'Apr 2026',
