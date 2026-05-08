@@ -9,7 +9,7 @@
 **Organization:** Respiratory Therapy department at HCA Tomball (Houston, TX).
 **Team size:** ~22 therapists.
 **Built by:** The department manager, for internal use only. There is no plan to sell this to other hospitals.
-**`site_id` in the schema** is an unused placeholder — it refers to HCA Tomball and has no multi-tenant significance.
+**`site_id` in the schema** is a single-value constant — every row in production carries the same value (`'default'`), because there is only one organization. However, it is **not inert**: RPC functions (`update_assignment_status`, lottery RPCs) and RLS policies compare actor vs. row `site_id` as an authorization scope check. New migrations that add tables or RPCs touching shifts, cycles, or lottery data **must include and propagate `site_id`** or those authorization checks will break.
 
 ---
 
@@ -89,7 +89,7 @@ This cycle is the main organizing principle of the codebase. Most features exist
 - **Not a general-purpose scheduler.** Every design decision is scoped to respiratory therapy shift scheduling in a hospital department. The 6-week cycle length, day/night split, coverage targets (3–5), PRN rules, and lead-eligibility model are domain-specific and hardcoded to that context.
 - **Not a time-tracking or payroll tool.** Assignment status is informational for operational awareness, not a time record.
 - **Not real-time.** The schedule is built in advance. Live swap activity is the only near-real-time workflow, and it's async (post → claim → approve).
-- **Not multi-department.** `profiles.site_id` is an unused schema placeholder referring to HCA Tomball. The app is single-organization. Do not build multi-tenant features around it.
+- **Not multi-department.** The app is single-organization (HCA Tomball). `site_id` exists on several tables and is enforced by RPC/RLS authorization logic, but all rows share the same constant value. Do not build multi-tenant features around it — but do not omit it from new migrations either, because the authorization layer depends on it being present and consistent.
 
 ---
 
