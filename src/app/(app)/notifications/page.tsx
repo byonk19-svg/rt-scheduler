@@ -6,7 +6,7 @@ import type { ComponentType } from 'react'
 import { Bell, CheckCheck, CheckCircle2, Filter, Inbox } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/server'
 
@@ -263,37 +263,37 @@ export default async function NotificationsPage({
               <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {group.label}
               </p>
-              <div className="space-y-2">
+              <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-tw-sm">
                 {group.items.map((item) => (
-                  <Card
+                  <article
                     key={item.id}
                     className={cn(
-                      'border transition-colors',
-                      item.read_at
-                        ? 'border-border bg-card'
-                        : 'border-[var(--info-border)] bg-[var(--info-subtle)]/30'
+                      'grid gap-2 px-4 py-3 transition-colors sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start',
+                      item.read_at ? 'bg-card' : 'bg-[var(--info-subtle)]/35'
                     )}
                   >
-                    <CardHeader className="gap-2 pb-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <CardTitle className="text-base">{item.title}</CardTitle>
-                          {item.read_at === null ? (
-                            <span className="h-2 w-2 rounded-full bg-primary" />
-                          ) : null}
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          {formatTime(item.created_at)}
-                        </span>
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 items-center gap-2">
+                        {item.read_at === null ? (
+                          <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />
+                        ) : null}
+                        <h2 className="truncate text-sm font-semibold text-foreground">
+                          {item.title}
+                        </h2>
                       </div>
-                      <CardDescription className="uppercase tracking-wide">
+                      <p className="mt-1 line-clamp-2 text-sm leading-5 text-foreground/80">
+                        {item.message}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                      <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                         {getEventTypeLabel(item.event_type)}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-foreground/85">{item.message}</p>
-                    </CardContent>
-                  </Card>
+                      </span>
+                      <time className="text-xs text-muted-foreground" dateTime={item.created_at}>
+                        {formatTime(item.created_at)}
+                      </time>
+                    </div>
+                  </article>
                 ))}
               </div>
             </div>

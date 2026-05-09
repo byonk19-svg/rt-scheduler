@@ -24,6 +24,13 @@ export type ShellContext = {
   localNav: { ariaLabel: string; items: ShellNavItem[] } | null
 }
 
+export type WorkflowContext = {
+  workflow: string
+  context: string
+  state: string
+  permission: string
+}
+
 const SHELL_ROUTES = [
   '/dashboard',
   '/coverage',
@@ -67,6 +74,24 @@ function isManagerScheduleRoute(pathname: string): boolean {
   )
 }
 
+function isStaffScheduleRoute(pathname: string): boolean {
+  return (
+    pathname === '/therapist/schedule' ||
+    pathname === '/staff/my-schedule' ||
+    pathname === '/staff/schedule' ||
+    pathname === '/coverage' ||
+    pathname === '/schedule' ||
+    pathname === '/preliminary' ||
+    pathname === '/therapist/availability' ||
+    pathname === '/availability' ||
+    pathname === '/shift-board' ||
+    pathname === '/therapist/swaps' ||
+    pathname === '/requests/new' ||
+    pathname === '/staff/requests' ||
+    pathname === '/staff/history'
+  )
+}
+
 export function usesAppShell(pathname: string): boolean {
   return SHELL_ROUTES.some((route) => isRouteActive(pathname, route))
 }
@@ -93,7 +118,7 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
         },
         {
           href: '/schedule',
-          label: 'Roster',
+          label: 'Roster View',
           active: (pathname) => pathname === '/schedule',
         },
         {
@@ -232,4 +257,197 @@ export function getShellContext(args: {
     primaryItems: [...staffItems],
     localNav: null,
   }
+}
+
+export function getMobilePrimaryItems(args: {
+  canAccessManagerUi: boolean
+  pendingCount: number
+}): readonly ShellNavItem[] {
+  if (args.canAccessManagerUi) {
+    return [
+      {
+        href: MANAGER_WORKFLOW_LINKS.dashboard,
+        label: 'Dashboard',
+        active: (pathname) => pathname.startsWith('/dashboard/manager'),
+      },
+      {
+        href: '/coverage',
+        label: 'Coverage',
+        active: (pathname) => pathname === '/coverage',
+      },
+      {
+        href: '/availability',
+        label: 'Availability',
+        active: (pathname) => pathname === '/availability',
+      },
+      {
+        href: '/shift-board',
+        label: 'Shift Board',
+        active: (pathname) => pathname === '/shift-board' || pathname === '/swaps',
+      },
+    ]
+  }
+
+  return [
+    {
+      href: '/dashboard/staff',
+      label: 'Dashboard',
+      active: (pathname) => pathname.startsWith('/dashboard/staff'),
+    },
+    {
+      href: '/therapist/schedule',
+      label: 'My Shifts',
+      active: (pathname) =>
+        pathname === '/therapist/schedule' ||
+        pathname === '/staff/my-schedule' ||
+        pathname === '/staff/schedule',
+    },
+    {
+      href: '/therapist/availability',
+      label: 'Availability',
+      active: (pathname) => pathname === '/therapist/availability' || pathname === '/availability',
+    },
+    {
+      href: '/shift-board',
+      label: 'Shift Board',
+      active: (pathname) =>
+        pathname === '/shift-board' ||
+        pathname === '/therapist/swaps' ||
+        pathname === '/staff/requests' ||
+        pathname === '/requests/new',
+    },
+  ]
+}
+
+export function getWorkflowContext(args: {
+  pathname: string
+  canAccessManagerUi: boolean
+}): WorkflowContext | null {
+  const { pathname, canAccessManagerUi } = args
+
+  if (canAccessManagerUi) {
+    if (!isManagerScheduleRoute(pathname) && pathname !== '/shift-board' && pathname !== '/swaps') {
+      return null
+    }
+
+    if (pathname === '/coverage') {
+      return {
+        workflow: 'Coverage',
+        context: 'Schedule Block workbench',
+        state: 'Draft, review, publish',
+        permission: 'Manager editable',
+      }
+    }
+
+    if (pathname === '/schedule') {
+      return {
+        workflow: 'Team Schedule',
+        context: 'Published roster view',
+        state: 'Live schedule truth',
+        permission: 'Review, print, export',
+      }
+    }
+
+    if (pathname === '/availability') {
+      return {
+        workflow: 'Availability',
+        context: 'Team exceptions for the block',
+        state: 'Missing, submitted, manager edited',
+        permission: 'Manager managed after lock',
+      }
+    }
+
+    if (pathname === '/lottery') {
+      return {
+        workflow: 'Lottery',
+        context: 'Live schedule reduction decisions',
+        state: 'Recommend, apply, record',
+        permission: 'Manager decision center',
+      }
+    }
+
+    if (pathname === '/shift-board' || pathname === '/swaps') {
+      return {
+        workflow: 'Shift Board',
+        context: 'Swaps, pickups, and direct requests',
+        state: 'Open, waiting, approved',
+        permission: 'Manager final approval',
+      }
+    }
+
+    if (pathname === '/preliminary' || pathname === '/approvals') {
+      return {
+        workflow: 'Schedule approval',
+        context: 'Preliminary schedule handoff',
+        state: 'Review before publish',
+        permission: 'Manager approval required',
+      }
+    }
+
+    if (pathname === '/publish' || pathname.startsWith('/publish/')) {
+      return {
+        workflow: 'Publish',
+        context: 'Schedule Block history',
+        state: 'Queued, published, offline',
+        permission: 'Manager controlled',
+      }
+    }
+
+    return {
+      workflow: 'Schedule',
+      context: 'Manager scheduling workspace',
+      state: 'Block-based workflow',
+      permission: 'Manager access',
+    }
+  }
+
+  if (!isStaffScheduleRoute(pathname)) return null
+
+  if (
+    pathname === '/therapist/schedule' ||
+    pathname === '/staff/my-schedule' ||
+    pathname === '/staff/schedule'
+  ) {
+    return {
+      workflow: 'My Shifts',
+      context: 'Your Schedule Block',
+      state: 'Scheduled days and coworkers',
+      permission: 'Personal view',
+    }
+  }
+
+  if (pathname === '/therapist/availability' || pathname === '/availability') {
+    return {
+      workflow: 'Availability',
+      context: 'Need Off and Need to Work',
+      state: 'Editable while the window is open',
+      permission: 'Your exceptions',
+    }
+  }
+
+  if (pathname === '/coverage' || pathname === '/schedule' || pathname === '/preliminary') {
+    return {
+      workflow: 'Team Schedule',
+      context: 'Published schedule visibility',
+      state: 'Day, night, or both shifts',
+      permission: 'Read-only for staff',
+    }
+  }
+
+  if (
+    pathname === '/shift-board' ||
+    pathname === '/therapist/swaps' ||
+    pathname === '/staff/requests' ||
+    pathname === '/requests/new' ||
+    pathname === '/staff/history'
+  ) {
+    return {
+      workflow: 'Shift Board',
+      context: 'Swaps, pickups, and direct requests',
+      state: 'Needs your action or waiting',
+      permission: 'Manager approves final changes',
+    }
+  }
+
+  return null
 }

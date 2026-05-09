@@ -106,14 +106,14 @@ describe('AppShell navigation structure', () => {
     expect(scheduleSection?.isActive('/schedule')).toBe(true)
   })
 
-  it('sends the manager Schedule entry to the editable coverage workspace and keeps roster as a separate local item', () => {
+  it('sends the manager Schedule entry to the editable coverage workspace and keeps roster view as a separate local item', () => {
     const scheduleSection = buildManagerSections(0).find((section) => section.key === 'schedule')
 
     expect(scheduleSection?.href).toBe('/coverage')
     expect(scheduleSection?.subItems.find((item) => item.label === 'Coverage')?.href).toBe(
       '/coverage'
     )
-    expect(scheduleSection?.subItems.find((item) => item.label === 'Roster')?.href).toBe(
+    expect(scheduleSection?.subItems.find((item) => item.label === 'Roster View')?.href).toBe(
       '/schedule'
     )
   })
@@ -146,9 +146,9 @@ describe('AppShell navigation structure', () => {
     expect(shellConfigSource).toContain("key: 'people'")
   })
 
-  it('puts Coverage, Roster, Availability, Lottery, Publish, and Approvals under the Schedule section', () => {
+  it('puts Coverage, Roster View, Availability, Lottery, Publish, and Approvals under the Schedule section', () => {
     expect(shellConfigSource).toContain("label: 'Coverage'")
-    expect(shellConfigSource).toContain("label: 'Roster'")
+    expect(shellConfigSource).toContain("label: 'Roster View'")
     expect(shellConfigSource).toContain("label: 'Availability'")
     expect(shellConfigSource).toContain("label: 'Lottery'")
     expect(shellConfigSource).toContain("label: 'Publish'")

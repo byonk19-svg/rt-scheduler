@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest'
 import {
   APP_HEADER_HEIGHT,
   buildManagerSections,
+  getMobilePrimaryItems,
   getShellContext,
   getStaffNavItems,
+  getWorkflowContext,
   usesAppShell,
 } from '@/components/shell/app-shell-config'
 
@@ -69,7 +71,7 @@ describe('app-shell-config', () => {
     expect(scheduleSection?.href).toBe('/coverage')
     expect(scheduleSection?.subItems.map((item) => item.label)).toEqual([
       'Coverage',
-      'Roster',
+      'Roster View',
       'Analytics',
       'Availability',
       'Lottery',
@@ -79,7 +81,7 @@ describe('app-shell-config', () => {
     expect(scheduleSection?.subItems.find((item) => item.label === 'Coverage')?.href).toBe(
       '/coverage'
     )
-    expect(scheduleSection?.subItems.find((item) => item.label === 'Roster')?.href).toBe(
+    expect(scheduleSection?.subItems.find((item) => item.label === 'Roster View')?.href).toBe(
       '/schedule'
     )
   })
@@ -95,7 +97,7 @@ describe('app-shell-config', () => {
     expect(usesAppShell('/lottery')).toBe(true)
     expect(context.localNav?.items.map((item) => item.label)).toEqual([
       'Coverage',
-      'Roster',
+      'Roster View',
       'Analytics',
       'Availability',
       'Lottery',
@@ -136,6 +138,33 @@ describe('app-shell-config', () => {
     expect(requestsItem?.active('/requests/user-access')).toBe(true)
     expect(requestsItem?.active('/requests')).toBe(true)
     expect(requestsItem?.badgeCount).toBe(2)
+  })
+
+  it('uses explicit manager mobile workflow destinations instead of a generic action slot', () => {
+    const items = getMobilePrimaryItems({ canAccessManagerUi: true, pendingCount: 0 })
+
+    expect(items.map((item) => item.label)).toEqual([
+      'Dashboard',
+      'Coverage',
+      'Availability',
+      'Shift Board',
+    ])
+    expect(items.map((item) => item.href)).toEqual([
+      '/dashboard/manager',
+      '/coverage',
+      '/availability',
+      '/shift-board',
+    ])
+  })
+
+  it('returns manager workflow context for schedule routes', () => {
+    expect(getWorkflowContext({ pathname: '/coverage', canAccessManagerUi: true })).toEqual({
+      workflow: 'Coverage',
+      context: 'Schedule Block workbench',
+      state: 'Draft, review, publish',
+      permission: 'Manager editable',
+    })
+    expect(getWorkflowContext({ pathname: '/settings', canAccessManagerUi: true })).toBeNull()
   })
 })
 
@@ -195,5 +224,28 @@ describe('staff nav items', () => {
     })
     const myShifts = context.primaryItems.find((item) => item.label === 'My Shifts')
     expect(myShifts?.active('/therapist/schedule')).toBe(true)
+  })
+
+  it('uses explicit staff mobile workflow destinations', () => {
+    const items = getMobilePrimaryItems({ canAccessManagerUi: false, pendingCount: 0 })
+
+    expect(items.map((item) => item.label)).toEqual([
+      'Dashboard',
+      'My Shifts',
+      'Availability',
+      'Shift Board',
+    ])
+  })
+
+  it('returns staff workflow context for personal schedule routes', () => {
+    expect(
+      getWorkflowContext({ pathname: '/therapist/schedule', canAccessManagerUi: false })
+    ).toEqual({
+      workflow: 'My Shifts',
+      context: 'Your Schedule Block',
+      state: 'Scheduled days and coworkers',
+      permission: 'Personal view',
+    })
+    expect(getWorkflowContext({ pathname: '/profile', canAccessManagerUi: false })).toBeNull()
   })
 })
