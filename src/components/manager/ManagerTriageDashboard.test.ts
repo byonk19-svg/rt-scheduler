@@ -4,125 +4,121 @@ import { describe, expect, it } from 'vitest'
 
 import { ManagerTriageDashboard } from '@/components/manager/ManagerTriageDashboard'
 
+const baseProps = {
+  todayCoverageCovered: 15,
+  todayCoverageTotal: 17,
+  upcomingShiftCount: 6,
+  upcomingShiftDays: [
+    { label: 'Mar 26', count: 4 },
+    { label: 'Mar 27', count: 2 },
+  ],
+  todayStaffedShifts: [
+    { label: 'Adrienne S.', detail: 'Day shift | Lead' },
+    { label: 'Alyce L.', detail: 'Day shift | Staff' },
+    { label: 'Brianna K.', detail: 'Day shift | Staff' },
+    { label: 'Barbara J.', detail: 'Night shift | Lead' },
+    { label: 'Unassigned therapist', detail: 'Night shift | Staff' },
+  ],
+  recentActivity: [
+    { title: 'Brianna approved a shift swap', timeLabel: '2 hours ago', href: '/requests' },
+  ],
+  pendingRequests: 5,
+  approvalsWaiting: 5,
+  currentCycleStatus: 'Draft cycle',
+  currentCycleDetail: 'Publish by Apr 27',
+  nextCycleLabel: 'Collect availability Mar 17',
+  nextCycleDetail: 'Publish by Apr 27',
+  needsReviewCount: 2,
+  needsReviewDetail: 'Preliminary request waiting',
+  dayShiftsFilled: 18,
+  dayShiftsTotal: 21,
+  nightShiftsFilled: 15,
+  nightShiftsTotal: 21,
+  approvalsHref: '/approvals',
+  lotteryHref: '/lottery',
+  scheduleHref: '/coverage?view=week',
+  reviewHref: '/approvals',
+  activeCycleDateRange: 'Mar 17 - Apr 13',
+}
+
 describe('ManagerTriageDashboard', () => {
-  it('renders feature cards, schedule overview, and a clear next-action hierarchy', () => {
-    const html = renderToStaticMarkup(
-      createElement(ManagerTriageDashboard, {
-        todayCoverageCovered: 15,
-        todayCoverageTotal: 17,
-        upcomingShiftCount: 12,
-        upcomingShiftDays: [
-          { label: 'Mar 26', count: 4 },
-          { label: 'Mar 27', count: 5 },
-        ],
-        todayStaffedShifts: [
-          { label: 'Adrienne S.', detail: 'Day shift | Lead' },
-          { label: 'Alyce L.', detail: 'Day shift | Staff' },
-        ],
-        recentActivity: [
-          { title: 'Brianna approved a shift swap', timeLabel: '2 hours ago', href: '/requests' },
-        ],
-        pendingRequests: 5,
-        approvalsWaiting: 3,
-        currentCycleStatus: 'Draft cycle',
-        currentCycleDetail: 'Publish by Apr 27',
-        nextCycleLabel: 'Collect availability Mar 17',
-        nextCycleDetail: 'Publish by Apr 27',
-        needsReviewCount: 2,
-        needsReviewDetail: 'Preliminary request waiting',
-        dayShiftsFilled: 18,
-        dayShiftsTotal: 21,
-        nightShiftsFilled: 15,
-        nightShiftsTotal: 21,
-        approvalsHref: '/approvals',
-        lotteryHref: '/lottery',
-        scheduleHref: '/coverage?view=week',
-        reviewHref: '/approvals',
-        activeCycleDateRange: 'Mar 17 – Apr 13',
-      })
-    )
+  it('renders a focused triage hierarchy with schedule context first', () => {
+    const html = renderToStaticMarkup(createElement(ManagerTriageDashboard, baseProps))
 
     expect(html).toContain('>Manager Dashboard</h1>')
-    expect(html).not.toContain('>Inbox</h1>')
-    expect(html).toContain('Good morning')
+    expect(html).toContain('What needs to be fixed or approved right now.')
+    expect(html).toContain('Facility')
     expect(html).toContain('Riverside Medical Center')
-    expect(html).toContain('Scheduling workflow')
-    expect(html).toContain('Your next urgent action')
-    expect(html).toContain('Prepare availability')
-    expect(html).toContain('Build schedule')
-    expect(html).toContain('Review changes')
-    expect(html).toContain('Publish schedule')
-    expect(html).toContain('Coverage Issues')
-    expect(html).toContain('Pending Approvals')
-    expect(html).toContain('Upcoming Shifts')
-    expect(html).toContain('Open Assignments')
-    expect(html).toContain('2 updates need review')
-    expect(html).toContain('Review updates')
-    expect(html).toContain('Today / This week')
-    expect(html).toContain('Open shifts snapshot')
-    expect(html).not.toContain('Publish flow')
-    expect(html).toContain('Mar 26')
-    expect(html).toContain('4 shifts')
-    expect(html).toContain('Adrienne S.')
-    expect(html).toContain('staffed shifts')
-    expect(html).toContain('Staffed')
-    expect(html).not.toContain('Coverage Risks')
-    expect(html).toContain('Recent activity')
-    expect(html).toContain('Brianna approved a shift swap')
-    expect(html).toContain('href="/requests"')
-    expect(html).toContain('Publish by Apr 27')
+    expect(html).toContain('Current cycle')
+    expect(html).toContain('Mar 17 - Apr 13')
+    expect(html).toContain('Shift context')
+    expect(html).toContain('Day / Night / Both')
+    expect(html).toContain('Schedule status')
+    expect(html).toContain('Draft cycle')
 
-    const nextActionIndex = html.indexOf('Your next urgent action')
-    const metricCardIndex = html.indexOf('Coverage Issues')
+    const attentionIndex = html.indexOf('Needs your attention')
+    const staffingIndex = html.indexOf('Today&#x27;s staffing')
+    const nextDeadlineIndex = html.indexOf('Next deadline')
 
-    expect(nextActionIndex).toBeGreaterThan(-1)
-    expect(metricCardIndex).toBeGreaterThan(-1)
-    expect(nextActionIndex).toBeLessThan(metricCardIndex)
+    expect(attentionIndex).toBeGreaterThan(-1)
+    expect(staffingIndex).toBeGreaterThan(-1)
+    expect(nextDeadlineIndex).toBeGreaterThan(-1)
+    expect(attentionIndex).toBeLessThan(staffingIndex)
+    expect(staffingIndex).toBeLessThan(nextDeadlineIndex)
   })
 
-  it('renders loading state placeholders and action links', () => {
-    const html = renderToStaticMarkup(
-      createElement(ManagerTriageDashboard, {
-        todayCoverageCovered: '--',
-        todayCoverageTotal: '--',
-        upcomingShiftCount: '--',
-        upcomingShiftDays: [],
-        todayStaffedShifts: [],
-        recentActivity: [],
-        pendingRequests: '--',
-        approvalsWaiting: '--',
-        currentCycleStatus: 'Loading',
-        currentCycleDetail: 'Loading',
-        nextCycleLabel: 'Loading',
-        nextCycleDetail: 'Loading',
-        needsReviewCount: '--',
-        needsReviewDetail: 'Loading',
-        dayShiftsFilled: '--',
-        dayShiftsTotal: '--',
-        nightShiftsFilled: '--',
-        nightShiftsTotal: '--',
-        approvalsHref: '/approvals',
-        lotteryHref: '/lottery',
-        scheduleHref: '/coverage?view=week',
-        reviewHref: '/approvals',
-        activeCycleDateRange: undefined,
-      })
-    )
+  it('replaces separate KPI cards with attention rows and primary actions', () => {
+    const html = renderToStaticMarkup(createElement(ManagerTriageDashboard, baseProps))
 
-    expect(html).toContain('Loading...')
-    expect(html).toContain('border-dashed')
-    expect(html).toContain('Open schedule')
-    expect(html).toContain('Coverage Issues')
+    expect(html).toContain('5 approvals waiting')
+    expect(html).toContain('Review requests')
+    expect(html).toContain('9 open shifts in this cycle')
+    expect(html).toContain('Fill open shifts')
+    expect(html).toContain('2 coverage safety issues')
+    expect(html).toContain('View schedule')
+    expect(html).toContain('2 review items waiting')
+    expect(html).toContain('Review updates')
     expect(html).toContain('href="/approvals"')
     expect(html).toContain('href="/coverage?view=week"')
-    expect(html).toContain('Open Assignments')
-    expect(html).toContain('Open Lottery')
-    expect(html).toContain('href="/lottery"')
+    expect(html).not.toContain('Coverage Issues')
+    expect(html).not.toContain('Pending Approvals')
+    expect(html).not.toContain('Upcoming Shifts')
+    expect(html).not.toContain('Open Assignments')
   })
 
-  it('shows actionable prompts when loaded metrics are empty', () => {
+  it('shows day and night staffing with lead, workers, open count, and status', () => {
+    const html = renderToStaticMarkup(createElement(ManagerTriageDashboard, baseProps))
+
+    expect(html).toContain('Day Shift')
+    expect(html).toContain('Lead: ')
+    expect(html).toContain('Adrienne S.')
+    expect(html).toContain('Alyce L., Brianna K.')
+    expect(html).toContain('Night Shift')
+    expect(html).toContain('Barbara J.')
+    expect(html).toContain('Open: ')
+    expect(html).toContain('Needs attention')
+    expect(html).toContain('Good')
+    expect(html).not.toContain('Today / This week')
+  })
+
+  it('renders the compact current cycle card instead of the old workflow card', () => {
+    const html = renderToStaticMarkup(createElement(ManagerTriageDashboard, baseProps))
+
+    expect(html).toContain('Next deadline')
+    expect(html).toContain('Availability')
+    expect(html).toContain('Build')
+    expect(html).toContain('Review')
+    expect(html).toContain('Publish')
+    expect(html).toContain('Continue cycle')
+    expect(html).not.toContain('Scheduling workflow')
+    expect(html).not.toContain('Follow these steps each cycle')
+    expect(html).not.toContain('Prepare availability')
+  })
+
+  it('hides low-value empty sections and avoids duplicated metrics', () => {
     const html = renderToStaticMarkup(
       createElement(ManagerTriageDashboard, {
+        ...baseProps,
         todayCoverageCovered: 0,
         todayCoverageTotal: 0,
         upcomingShiftCount: 0,
@@ -131,206 +127,73 @@ describe('ManagerTriageDashboard', () => {
         recentActivity: [],
         pendingRequests: 0,
         approvalsWaiting: 0,
-        currentCycleStatus: 'Draft cycle',
-        currentCycleDetail: 'Publish by Apr 27',
-        nextCycleLabel: 'Collect availability Mar 17',
-        nextCycleDetail: 'Publish by Apr 27',
         needsReviewCount: 0,
         needsReviewDetail: 'You are caught up.',
         dayShiftsFilled: 0,
         dayShiftsTotal: 0,
         nightShiftsFilled: 0,
         nightShiftsTotal: 0,
-        approvalsHref: '/approvals',
-        lotteryHref: '/lottery',
-        scheduleHref: '/coverage?view=week',
-        reviewHref: '/approvals',
-        activeCycleDateRange: 'Mar 17 – Apr 13',
+        currentCycleStatus: 'Published',
       })
     )
 
-    expect(html).not.toContain('Publish Readiness')
-    expect(html).toContain('No urgent issues right now')
-    expect(html).toContain('Not started')
+    expect(html).toContain('0 coverage safety issues')
+    expect(html).not.toContain('Recent activity')
+    expect(html).not.toContain('Upcoming exceptions')
+    expect(html).not.toContain('Open shifts snapshot')
+    expect(html).not.toContain('Open Lottery')
+    expect(html).not.toContain('Upcoming Shifts')
   })
 
-  it('renders scheduling workflow before recent activity', () => {
-    const html = renderToStaticMarkup(
-      createElement(ManagerTriageDashboard, {
-        todayCoverageCovered: 15,
-        todayCoverageTotal: 17,
-        upcomingShiftCount: 12,
-        upcomingShiftDays: [],
-        todayStaffedShifts: [],
-        recentActivity: [{ title: 'Some activity', timeLabel: '1 hour ago', href: '/coverage' }],
-        pendingRequests: 0,
-        approvalsWaiting: 0,
-        currentCycleStatus: 'Draft cycle',
-        currentCycleDetail: 'Publish by Apr 27',
-        nextCycleLabel: 'Collect availability Apr 1',
-        nextCycleDetail: 'Publish by Apr 27',
-        needsReviewCount: 0,
-        needsReviewDetail: 'You are caught up.',
-        dayShiftsFilled: 18,
-        dayShiftsTotal: 21,
-        nightShiftsFilled: 15,
-        nightShiftsTotal: 21,
-        approvalsHref: '/approvals',
-        lotteryHref: '/lottery',
-        scheduleHref: '/coverage?view=week',
-        reviewHref: '/approvals',
-        activeCycleDateRange: 'Mar 17 – Apr 13',
-      })
-    )
+  it('lists only actionable upcoming exceptions and preserves workflow links', () => {
+    const html = renderToStaticMarkup(createElement(ManagerTriageDashboard, baseProps))
 
-    const scheduleProgressIndex = html.indexOf('Scheduling workflow')
-    const recentActivityIndex = html.indexOf('Recent activity')
-
-    expect(scheduleProgressIndex).toBeGreaterThan(-1)
-    expect(recentActivityIndex).toBeGreaterThan(-1)
-    expect(scheduleProgressIndex).toBeLessThan(recentActivityIndex)
-  })
-
-  it('renders the canonical Lottery link in the open shifts snapshot', () => {
-    const html = renderToStaticMarkup(
-      createElement(ManagerTriageDashboard, {
-        todayCoverageCovered: 15,
-        todayCoverageTotal: 17,
-        upcomingShiftCount: 12,
-        upcomingShiftDays: [],
-        todayStaffedShifts: [],
-        recentActivity: [{ title: 'Some activity', timeLabel: '1 hour ago', href: '/coverage' }],
-        pendingRequests: 0,
-        approvalsWaiting: 0,
-        currentCycleStatus: 'Draft cycle',
-        currentCycleDetail: 'Publish by Apr 27',
-        nextCycleLabel: 'Collect availability Apr 1',
-        nextCycleDetail: 'Publish by Apr 27',
-        needsReviewCount: 0,
-        needsReviewDetail: 'You are caught up.',
-        dayShiftsFilled: 18,
-        dayShiftsTotal: 21,
-        nightShiftsFilled: 15,
-        nightShiftsTotal: 21,
-        approvalsHref: '/approvals',
-        lotteryHref: '/lottery',
-        scheduleHref: '/coverage?view=week',
-        reviewHref: '/approvals',
-        activeCycleDateRange: 'Mar 17 â€“ Apr 13',
-      })
-    )
-
-    const openShiftsIndex = html.indexOf('Open shifts snapshot')
-    const lotteryIndex = html.indexOf('Open Lottery')
-
-    expect(openShiftsIndex).toBeGreaterThan(-1)
-    expect(lotteryIndex).toBeGreaterThan(-1)
+    expect(html).toContain('Upcoming exceptions')
+    expect(html).toContain('Mar 26')
+    expect(html).toContain('4 open shifts')
+    expect(html).toContain('Requests queue')
+    expect(html).toContain('5 approvals affecting schedule changes')
     expect(html).toContain('Open Lottery')
     expect(html).toContain('href="/lottery"')
     expect(html.match(/href="\/lottery"/g)).toHaveLength(1)
-    expect(openShiftsIndex).toBeLessThan(lotteryIndex)
   })
 
-  it('renders recent activity items as navigable links using the provided href', () => {
+  it('keeps recent activity conditional and navigable when activity exists', () => {
+    const html = renderToStaticMarkup(createElement(ManagerTriageDashboard, baseProps))
+
+    expect(html).toContain('Recent activity')
+    expect(html).toContain('Brianna approved a shift swap')
+    expect(html).toContain('href="/requests"')
+    expect(html).toContain('href="/notifications"')
+  })
+
+  it('renders loading state placeholders and safe action links', () => {
     const html = renderToStaticMarkup(
       createElement(ManagerTriageDashboard, {
-        todayCoverageCovered: 15,
-        todayCoverageTotal: 17,
-        upcomingShiftCount: 12,
+        ...baseProps,
+        todayCoverageCovered: '--',
+        todayCoverageTotal: '--',
+        upcomingShiftCount: '--',
         upcomingShiftDays: [],
         todayStaffedShifts: [],
-        recentActivity: [
-          { title: 'Schedule published', timeLabel: '5 minutes ago', href: '/coverage?view=week' },
-          { title: 'New preliminary request', timeLabel: '1 hour ago', href: '/approvals' },
-        ],
-        pendingRequests: 0,
-        approvalsWaiting: 0,
-        currentCycleStatus: 'Published',
-        currentCycleDetail: 'Live',
-        nextCycleLabel: 'Collect availability Apr 1',
-        nextCycleDetail: 'Publish by May 11',
-        needsReviewCount: 0,
-        needsReviewDetail: 'You are caught up.',
-        dayShiftsFilled: 18,
-        dayShiftsTotal: 21,
-        nightShiftsFilled: 15,
-        nightShiftsTotal: 21,
-        approvalsHref: '/approvals',
-        lotteryHref: '/lottery',
-        scheduleHref: '/coverage',
-        reviewHref: '/approvals',
-        activeCycleDateRange: 'Mar 17 – Apr 13',
+        recentActivity: [],
+        pendingRequests: '--',
+        approvalsWaiting: '--',
+        needsReviewCount: '--',
+        dayShiftsFilled: '--',
+        dayShiftsTotal: '--',
+        nightShiftsFilled: '--',
+        nightShiftsTotal: '--',
+        currentCycleStatus: 'Loading',
+        currentCycleDetail: 'Loading',
+        nextCycleLabel: 'Loading',
+        nextCycleDetail: 'Loading',
       })
     )
 
-    expect(html).toContain('Schedule published')
-    expect(html).toContain('href="/coverage?view=week"')
-    expect(html).toContain('New preliminary request')
+    expect(html).toContain('Loading...')
+    expect(html).toContain('Review requests')
     expect(html).toContain('href="/approvals"')
-  })
-
-  it('renders cycle date range pill when provided', () => {
-    const html = renderToStaticMarkup(
-      createElement(ManagerTriageDashboard, {
-        todayCoverageCovered: 15,
-        todayCoverageTotal: 17,
-        upcomingShiftCount: 12,
-        upcomingShiftDays: [],
-        todayStaffedShifts: [],
-        recentActivity: [],
-        pendingRequests: 0,
-        approvalsWaiting: 0,
-        currentCycleStatus: 'Published',
-        currentCycleDetail: 'Live',
-        nextCycleLabel: 'Collect availability Apr 1',
-        nextCycleDetail: 'Publish by May 11',
-        needsReviewCount: 0,
-        needsReviewDetail: 'You are caught up.',
-        dayShiftsFilled: 18,
-        dayShiftsTotal: 21,
-        nightShiftsFilled: 15,
-        nightShiftsTotal: 21,
-        approvalsHref: '/approvals',
-        lotteryHref: '/lottery',
-        scheduleHref: '/coverage',
-        reviewHref: '/approvals',
-        activeCycleDateRange: 'Mar 17 – Apr 13',
-      })
-    )
-
-    expect(html).toContain('Mar 17 – Apr 13')
-  })
-  it('renders an always-visible Lottery link with the canonical workflow link', () => {
-    const html = renderToStaticMarkup(
-      createElement(ManagerTriageDashboard, {
-        todayCoverageCovered: 15,
-        todayCoverageTotal: 17,
-        upcomingShiftCount: 12,
-        upcomingShiftDays: [],
-        todayStaffedShifts: [],
-        recentActivity: [],
-        pendingRequests: 0,
-        approvalsWaiting: 0,
-        currentCycleStatus: 'Published',
-        currentCycleDetail: 'Live',
-        nextCycleLabel: 'Collect availability Apr 1',
-        nextCycleDetail: 'Publish by May 11',
-        needsReviewCount: 0,
-        needsReviewDetail: 'You are caught up.',
-        dayShiftsFilled: 18,
-        dayShiftsTotal: 21,
-        nightShiftsFilled: 15,
-        nightShiftsTotal: 21,
-        approvalsHref: '/approvals',
-        lotteryHref: '/lottery',
-        scheduleHref: '/coverage',
-        reviewHref: '/approvals',
-        activeCycleDateRange: 'Mar 17 â€“ Apr 13',
-      })
-    )
-
-    expect(html).toContain('Open shifts snapshot')
-    expect(html).toContain('Open Lottery')
-    expect(html).toContain('href="/lottery"')
+    expect(html).toContain('href="/coverage?view=week"')
   })
 })

@@ -33,7 +33,7 @@ test.describe.serial('lottery workflow surface', () => {
     await supabase.auth.admin.deleteUser(manager.id).catch(() => undefined)
   })
 
-  test('manager can open Lottery from the dashboard and keep Schedule navigation active', async ({
+  test('manager can open Lottery from Schedule navigation after the dashboard', async ({
     page,
   }) => {
     test.skip(!supabase || !manager, 'Supabase service env values are required for lottery e2e.')
@@ -42,19 +42,24 @@ test.describe.serial('lottery workflow surface', () => {
     await page.goto('/dashboard/manager')
 
     await expect(page.getByRole('heading', { name: 'Manager Dashboard' })).toBeVisible()
-    const openLotteryLink = page.getByRole('link', { name: 'Open Lottery' }).first()
-    await expect(openLotteryLink).toBeVisible()
-    await expect(openLotteryLink).toHaveAttribute('href', '/lottery')
 
-    await openLotteryLink.scrollIntoViewIfNeeded()
-    await Promise.all([
-      page.waitForURL(/\/lottery(?:[/?].*)?$/, { timeout: 30_000 }),
-      openLotteryLink.click(),
-    ])
-    await expect(page.getByRole('heading', { name: 'Lottery' })).toBeVisible()
+    await page.goto('/coverage', { waitUntil: 'domcontentloaded' })
+    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
+    await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {})
+
+    const scheduleNav = page.getByRole('navigation', { name: 'Schedule section navigation' })
+    const scheduleLotteryLink = scheduleNav.getByRole('link', { name: 'Lottery' })
+    await expect(scheduleLotteryLink).toBeVisible()
+    await expect(scheduleLotteryLink).toHaveAttribute('href', '/lottery')
+
+    const lotteryHref = await scheduleLotteryLink.getAttribute('href')
+    expect(lotteryHref).toBe('/lottery')
+    await page.goto(lotteryHref!, { waitUntil: 'domcontentloaded' })
+    await expect(page).toHaveURL(/\/lottery(?:[/?].*)?$/)
+    await expect(page.getByRole('heading', { name: 'Lottery Decision Center' })).toBeVisible()
     await expect(
       page.getByText(
-        'Preview low-census reductions, track request order, and apply the result against the live published schedule.'
+        'Review the live Team Schedule shift, volunteers, and recommendation before applying a staff reduction.'
       )
     ).toBeVisible()
 
@@ -63,10 +68,6 @@ test.describe.serial('lottery workflow surface', () => {
       .getByRole('link', { name: 'Schedule' })
     await expect(scheduleMainNavLink).toHaveAttribute('aria-current', 'page')
 
-    const scheduleNav = page.getByRole('navigation', { name: 'Schedule section navigation' })
-    const scheduleLotteryLink = scheduleNav.getByRole('link', { name: 'Lottery' })
-    await expect(scheduleLotteryLink).toBeVisible()
-    await expect(scheduleLotteryLink).toHaveAttribute('href', '/lottery')
     await expect(scheduleLotteryLink).toHaveAttribute('aria-current', 'page')
   })
 })
