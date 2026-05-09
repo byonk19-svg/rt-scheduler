@@ -6,7 +6,7 @@ import {
 } from '@/lib/coverage/status-ui'
 
 export type UiStatus = CoverageUiStatus
-export type DayStatus = 'published' | 'draft' | 'override' | 'missing_lead'
+export type DayStatus = 'ok' | 'override' | 'missing_lead'
 export type ShiftTab = 'Day' | 'Night'
 
 export type ShiftLog = { from: string; to: UiStatus; toLabel: string; time: string }
@@ -90,14 +90,11 @@ export function buildDayItems(
         row.assignment_status === 'call_in' ||
         row.status === 'called_off'
     )
-    const hasDraft = slot.some((row) => row.status === 'sick')
     const dayStatus: DayStatus = !leadShift
       ? 'missing_lead'
       : hasOverride
         ? 'override'
-        : hasDraft
-          ? 'draft'
-          : 'published'
+        : 'ok'
 
     const date = new Date(`${isoDate}T00:00:00`)
     return {
