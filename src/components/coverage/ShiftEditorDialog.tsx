@@ -564,7 +564,7 @@ export function ShiftEditorDialog({
   const hasLotteryStatus = operationalEntries.some(
     ({ shift }) => shift.status === 'cancelled' || shift.status === 'oncall'
   )
-  const showLotteryLink = assignedCount > 4 || hasLotteryStatus
+  const showLotteryLink = canEdit && (assignedCount > 4 || hasLotteryStatus)
   const lotteryHref = selectedDay
     ? `/lottery?date=${selectedDay.isoDate}&shift=${selectedDay.shiftType.toLowerCase()}`
     : '/lottery'
@@ -635,7 +635,11 @@ export function ShiftEditorDialog({
                     {formatDrawerDate(selectedDay.isoDate)}
                   </DialogTitle>
                   <DialogDescription className="sr-only">
-                    Review daily staffing details, operational statuses, notes, and edit actions for this shift.
+                    {canEdit
+                      ? 'Review daily staffing details, operational statuses, notes, and edit actions for this shift.'
+                      : canUpdateAssignmentStatus
+                        ? 'Review Team Schedule details and operational statuses for this shift.'
+                        : 'Review read-only Team Schedule details for this selected day.'}
                   </DialogDescription>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <span>{selectedDay.shiftType} shift</span>
@@ -673,10 +677,10 @@ export function ShiftEditorDialog({
               {!canEdit ? (
                 <div className="rounded-xl border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-2 text-[12px] font-medium text-[var(--warning-text)]">
                   {!coverageCycleId
-                    ? 'This view has no active schedule cycle, so assignments are read-only.'
+                    ? 'This view has no active Schedule Block, so assignments are read-only.'
                     : canUpdateAssignmentStatus
-                      ? 'Managers edit staffing assignments. Leads can still update on-call, call-in, cancelled, and leave-early statuses from this drawer.'
-                      : 'This schedule is read-only. Managers or leads handle staffing and operational updates.'}
+                      ? 'Staffing edits stay in Coverage for managers. Leads can still update on-call, call-in, cancelled, and leave-early statuses from this drawer.'
+                      : 'This Team Schedule is read-only. Managers use Coverage for staffing changes; leads handle operational status updates.'}
                 </div>
               ) : null}
 
@@ -745,7 +749,7 @@ export function ShiftEditorDialog({
               <section className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    Coverage details
+                    {canEdit ? 'Coverage details' : 'Team Schedule details'}
                   </h2>
                 </div>
                 <div className="grid grid-cols-3 gap-2">

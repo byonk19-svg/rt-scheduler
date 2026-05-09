@@ -28,7 +28,7 @@ describe('ShiftEditorDialog layout', () => {
     expect(shiftEditorSource).toContain('You work this day')
     expect(shiftEditorSource).toContain('You are not scheduled')
     expect(shiftEditorSource).toContain('Operational statuses')
-    expect(shiftEditorSource).toContain('Managers edit staffing assignments.')
+    expect(shiftEditorSource).toContain('Staffing edits stay in Coverage for managers.')
     expect(shiftEditorSource).toContain('Lottery decision available')
     expect(shiftEditorSource).toContain('Open Lottery for this shift')
     expect(shiftEditorSource).toContain('/lottery?date=${selectedDay.isoDate}&shift=${selectedDay.shiftType.toLowerCase()}')
@@ -37,6 +37,15 @@ describe('ShiftEditorDialog layout', () => {
   it('receives actor identity for read-only selected-day context', () => {
     expect(shiftEditorSource).toContain('actorUserId: string | null')
     expect(shiftEditorSource).toContain('function resolveActorPresence')
+  })
+
+  it('keeps staff and lead selected-day context framed as Team Schedule instead of Coverage editing', () => {
+    expect(shiftEditorSource).toContain(
+      "canEdit ? 'Coverage details' : 'Team Schedule details'"
+    )
+    expect(shiftEditorSource).toContain('This Team Schedule is read-only.')
+    expect(shiftEditorSource).toContain('Staffing edits stay in Coverage for managers.')
+    expect(shiftEditorSource).toContain("const showLotteryLink = canEdit &&")
   })
 })
 

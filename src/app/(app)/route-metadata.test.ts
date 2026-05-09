@@ -82,4 +82,13 @@ describe('route title consistency', () => {
     expect(coverage).not.toContain("title: 'Roster View'")
     expect(schedule).not.toContain("title: 'Coverage'")
   })
+
+  it('/coverage metadata description uses Team Schedule and Schedule Block language', () => {
+    const coverageLayout = read('src/app/(app)/coverage/layout.tsx')
+
+    expect(coverageLayout).toContain(
+      'View the Team Schedule or manage Coverage for the active Schedule Block.'
+    )
+    expect(coverageLayout).not.toContain('schedule cycle')
+  })
 })

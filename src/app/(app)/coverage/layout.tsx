@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 
 export const metadata: Metadata = {
   title: 'Coverage',
-  description: 'Plan shift coverage, assign leads, and manage the active schedule cycle.',
+  description: 'View the Team Schedule or manage Coverage for the active Schedule Block.',
 }
 
 export default function CoverageSegmentLayout({ children }: { children: ReactNode }) {
