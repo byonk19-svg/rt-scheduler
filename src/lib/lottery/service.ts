@@ -54,6 +54,16 @@ export type LotteryEligiblePerson = {
   employmentType: EmploymentType | null
 }
 
+export type LotteryScheduledStaffItem = {
+  shiftId: string
+  therapistId: string
+  therapistName: string
+  employmentType: EmploymentType | null
+  role: 'lead' | 'staff'
+  isReductionCandidate: boolean
+  hasRequest: boolean
+}
+
 export type LotteryRecommendationActionView = {
   therapistId: string
   therapistName: string
@@ -88,6 +98,7 @@ export type LotteryPageSnapshot = {
   workingScheduledCount: number
   eligibleReductionCount: number
   protectedScheduledCount: number
+  scheduledStaff: LotteryScheduledStaffItem[]
   requestList: LotteryRequestListItem[]
   myRequests: LotteryMyRequestItem[]
   lotteryList: LotteryListItem[]
@@ -231,6 +242,7 @@ type SlotAssignment = {
   therapistId: string
   therapistName: string
   employmentType: EmploymentType | null
+  role: 'lead' | 'staff'
   liveStatus: AssignmentStatus
 }
 
@@ -502,8 +514,12 @@ async function loadPublishedCycles(): Promise<PublishedCycleRow[]> {
   return (data ?? []) as PublishedCycleRow[]
 }
 
-function buildAvailableDates(cycles: PublishedCycleRow[]): string[] {
-  return cycles.flatMap((cycle) => dateRange(cycle.start_date, cycle.end_date))
+export function buildAvailableDates(
+  cycles: Array<{ start_date: string; end_date: string }>
+): string[] {
+  return Array.from(
+    new Set(cycles.flatMap((cycle) => dateRange(cycle.start_date, cycle.end_date)))
+  ).sort()
 }
 
 async function loadSlotAssignments(args: {
@@ -542,6 +558,7 @@ async function loadSlotAssignments(args: {
         therapistId: row.user_id as string,
         therapistName: profile?.full_name?.trim() || 'Unknown therapist',
         employmentType: profile?.employment_type ?? null,
+        role: row.role,
         liveStatus: resolveLiveAssignmentStatus(row.status, activeCodes.get(row.id)),
       }
     })
@@ -865,6 +882,32 @@ function buildEligibleCandidates(args: {
   return { candidates, protectedScheduledCount, missingListEntries }
 }
 
+function buildScheduledStaffSummary(args: {
+  workingAssignments: SlotAssignment[]
+  requestList: LotteryRequestListItem[]
+  candidates: LotteryCandidate[]
+}): LotteryScheduledStaffItem[] {
+  const requestedTherapistIds = new Set(args.requestList.map((request) => request.therapistId))
+  const candidateTherapistIds = new Set(args.candidates.map((candidate) => candidate.id))
+
+  return args.workingAssignments
+    .map<LotteryScheduledStaffItem>((assignment) => ({
+      shiftId: assignment.shiftId,
+      therapistId: assignment.therapistId,
+      therapistName: assignment.therapistName,
+      employmentType: assignment.employmentType,
+      role: assignment.role,
+      isReductionCandidate: candidateTherapistIds.has(assignment.therapistId),
+      hasRequest: requestedTherapistIds.has(assignment.therapistId),
+    }))
+    .sort(
+      (a, b) =>
+        Number(b.role === 'lead') - Number(a.role === 'lead') ||
+        Number(b.hasRequest) - Number(a.hasRequest) ||
+        a.therapistName.localeCompare(b.therapistName)
+    )
+}
+
 export async function loadLotterySnapshot(args: {
   actor: LotteryActor
   shiftDate?: string | null
@@ -895,6 +938,7 @@ export async function loadLotterySnapshot(args: {
       workingScheduledCount: 0,
       eligibleReductionCount: 0,
       protectedScheduledCount: 0,
+      scheduledStaff: [],
       requestList: [],
       myRequests: [],
       lotteryList: [],
@@ -953,6 +997,11 @@ export async function loadLotterySnapshot(args: {
   const { candidates, protectedScheduledCount, missingListEntries } = buildEligibleCandidates({
     workingAssignments,
     lotteryList,
+  })
+  const scheduledStaff = buildScheduledStaffSummary({
+    workingAssignments,
+    requestList,
+    candidates,
   })
 
   const currentUserHasRequest = requestList.some(
@@ -1069,6 +1118,7 @@ export async function loadLotterySnapshot(args: {
     workingScheduledCount: workingAssignments.length,
     eligibleReductionCount: candidates.length,
     protectedScheduledCount,
+    scheduledStaff,
     requestList,
     myRequests,
     lotteryList,

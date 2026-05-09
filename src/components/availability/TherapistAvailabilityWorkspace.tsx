@@ -41,6 +41,7 @@ type Props = {
   generatedBaselineByCycleId: Record<string, Record<string, GeneratedAvailabilityBaselineDay>>
   /** Official submission timestamps from therapist_availability_submissions (not inferred from overrides). */
   submissionsByCycleId: Record<string, { submittedAt: string; lastEditedAt: string }>
+  regularShiftType?: 'day' | 'night'
   submitTherapistAvailabilityGridAction: (formData: FormData) => void | Promise<void>
   returnToPath?: '/availability' | '/therapist/availability'
 }
@@ -98,10 +99,10 @@ function getDisplayStateLabel(state: DayDisplayState): string {
   switch (state) {
     case 'normal_work':
     case 'can_work':
-      return 'Can work'
+      return 'Need to Work'
     case 'normal_off':
     case 'cannot_work':
-      return "Can't work"
+      return 'Need Off'
     default:
       return 'Unmarked'
   }
@@ -157,6 +158,17 @@ function formatSelectedDayLabel(isoDate: string): string {
   })
 }
 
+function formatReviewDateWithNote(isoDate: string, note: string | undefined): string {
+  const label = formatMonthDay(isoDate)
+  const trimmedNote = note?.trim()
+  return trimmedNote ? `${label} (${trimmedNote})` : label
+}
+
+function formatReviewDateList(dates: string[], notesByDate: Record<string, string>): string {
+  if (dates.length === 0) return 'None'
+  return dates.map((date) => formatReviewDateWithNote(date, notesByDate[date])).join(', ')
+}
+
 export function TherapistAvailabilityWorkspace({
   cycles,
   availabilityRows,
@@ -166,6 +178,7 @@ export function TherapistAvailabilityWorkspace({
   recurringPatternSummary,
   generatedBaselineByCycleId,
   submissionsByCycleId,
+  regularShiftType = 'day',
   submitTherapistAvailabilityGridAction,
   returnToPath = '/availability',
 }: Props) {
@@ -437,6 +450,15 @@ export function TherapistAvailabilityWorkspace({
   const dueDateLabel = selectedCycle?.availability_due_at
     ? formatDateLabel(selectedCycle.availability_due_at.slice(0, 10))
     : null
+  const regularShiftLabel = regularShiftType === 'night' ? 'Night shift' : 'Day shift'
+  const reviewNeedOffSummary = formatReviewDateList(cannotWorkDates, draftNotesByDate)
+  const reviewNeedToWorkSummary = formatReviewDateList(canWorkDates, draftNotesByDate)
+  const reviewBlockLabel = selectedCycle
+    ? formatHumanCycleRange(selectedCycle.start_date, selectedCycle.end_date)
+    : 'No Schedule Block selected'
+  const reviewWindowLabel = submissionUi.isSubmitted
+    ? 'Submitted availability'
+    : (deadlinePresentation?.deadlineHeadline ?? 'Availability open')
   const submissionStatusDetail = submissionUi.isSubmitted
     ? hasCycleSpecificChanges
       ? 'Submitted with cycle-specific changes.'
@@ -530,7 +552,7 @@ export function TherapistAvailabilityWorkspace({
                 <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
                   {hasSavedRecurringPattern
                     ? 'We used your normal schedule to fill this cycle. Changes here stay in this cycle only.'
-                    : "This cycle starts blank. Add the days you can or can't work. Changes here stay in this cycle only."}
+                    : 'This cycle starts blank. Add days you need to work or need off. Changes here stay in this cycle only.'}
                 </p>
                 {submissionUi.isSubmitted && !hasCycleSpecificChanges ? (
                   <p className="text-sm font-medium text-foreground">
@@ -615,7 +637,7 @@ export function TherapistAvailabilityWorkspace({
                     className="min-h-9 rounded-xl border-[var(--success-border)] bg-[var(--success-subtle)]/35 px-3 text-[var(--success-text)] hover:bg-[var(--success-subtle)]"
                   >
                     <CalendarCheck className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-                    Can work
+                    Need to Work
                   </Button>
                   <Button
                     type="button"
@@ -626,7 +648,7 @@ export function TherapistAvailabilityWorkspace({
                     className="min-h-9 rounded-xl border-[var(--error-border)] bg-[var(--error-subtle)]/35 px-3 text-[var(--error-text)] hover:bg-[var(--error-subtle)]"
                   >
                     <CalendarX2 className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-                    Can&apos;t work
+                    Need Off
                   </Button>
                   <Button
                     type="button"
@@ -860,8 +882,51 @@ export function TherapistAvailabilityWorkspace({
             </div>
           </div>
 
-          <aside className="space-y-3 xl:self-start">
-            <section className="rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,white)] px-4 py-4 shadow-tw-sm">
+          <aside className="flex flex-col gap-3 xl:self-start">
+            <section className="order-2 rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,white)] px-4 py-4 shadow-tw-sm xl:order-1">
+              <h3 className="text-[0.95rem] font-semibold text-foreground">
+                Review before submitting
+              </h3>
+              <dl className="mt-3 space-y-3 text-sm">
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Schedule Block
+                  </dt>
+                  <dd className="mt-1 text-foreground">{reviewBlockLabel}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Regular shift
+                  </dt>
+                  <dd className="mt-1 text-foreground">{regularShiftLabel}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Need Off
+                  </dt>
+                  <dd className="mt-1 text-foreground">{reviewNeedOffSummary}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Need to Work
+                  </dt>
+                  <dd className="mt-1 text-foreground">{reviewNeedToWorkSummary}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Edit window
+                  </dt>
+                  <dd className="mt-1 text-foreground">{reviewWindowLabel}</dd>
+                </div>
+              </dl>
+              {!hasCycleSpecificChanges ? (
+                <p className="mt-3 rounded-xl border border-border/60 bg-background px-3 py-2 text-xs text-muted-foreground">
+                  No exceptions selected for this Schedule Block.
+                </p>
+              ) : null}
+            </section>
+
+            <section className="order-3 rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,white)] px-4 py-4 shadow-tw-sm xl:order-2">
               <h3 className="text-[0.95rem] font-semibold text-foreground">
                 Current starting point
               </h3>
@@ -874,7 +939,7 @@ export function TherapistAvailabilityWorkspace({
                 <div className="flex items-center justify-between text-sm">
                   <span className="inline-flex items-center gap-3 text-muted-foreground">
                     <span className="h-6 w-0.5 rounded-full bg-[var(--success-text)]" />
-                    Can work
+                    Normally working
                   </span>
                   <span className="font-semibold tabular-nums text-foreground">
                     {baselineSummary.normalWork}
@@ -883,7 +948,7 @@ export function TherapistAvailabilityWorkspace({
                 <div className="flex items-center justify-between text-sm">
                   <span className="inline-flex items-center gap-3 text-muted-foreground">
                     <span className="h-6 w-0.5 rounded-full bg-[var(--error-text)]" />
-                    Can&apos;t work
+                    Normally off
                   </span>
                   <span className="font-semibold tabular-nums text-foreground">
                     {baselineSummary.normalOff}
@@ -907,7 +972,7 @@ export function TherapistAvailabilityWorkspace({
                 <div className="flex items-center justify-between text-sm">
                   <span className="inline-flex items-center gap-3 text-muted-foreground">
                     <span className="h-6 w-0.5 rounded-full bg-[var(--success-text)]" />
-                    Can work
+                    Need to Work
                   </span>
                   <span className="font-semibold tabular-nums text-foreground">
                     {canWorkDates.length}
@@ -916,7 +981,7 @@ export function TherapistAvailabilityWorkspace({
                 <div className="flex items-center justify-between text-sm">
                   <span className="inline-flex items-center gap-3 text-muted-foreground">
                     <span className="h-6 w-0.5 rounded-full bg-[var(--error-text)]" />
-                    Can&apos;t work
+                    Need Off
                   </span>
                   <span className="font-semibold tabular-nums text-foreground">
                     {cannotWorkDates.length}
@@ -933,11 +998,11 @@ export function TherapistAvailabilityWorkspace({
               <div className="mt-3 space-y-2 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-[var(--success-text)]" />
-                  <span>Can work</span>
+                  <span>Need to Work</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-[var(--error-text)]" />
-                  <span>Can&apos;t work</span>
+                  <span>Need Off</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-border" />
@@ -946,7 +1011,7 @@ export function TherapistAvailabilityWorkspace({
               </div>
             </section>
 
-            <section className="rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,white)] px-4 py-4 shadow-tw-sm">
+            <section className="order-1 rounded-[1.1rem] border border-border/70 bg-[color:color-mix(in_srgb,var(--background)_45%,white)] px-4 py-4 shadow-tw-sm xl:order-3">
               <h3 className="text-[0.95rem] font-semibold text-foreground">Selected day</h3>
               {!selectedDate ? (
                 <p className="mt-2 text-sm text-muted-foreground">
@@ -971,7 +1036,7 @@ export function TherapistAvailabilityWorkspace({
                           <Check className="h-3 w-3" aria-hidden />
                         ) : null}
                       </span>
-                      <span className="text-sm font-medium text-foreground">Can work</span>
+                      <span className="text-sm font-medium text-foreground">Need to Work</span>
                     </button>
 
                     <button
@@ -987,7 +1052,7 @@ export function TherapistAvailabilityWorkspace({
                           <X className="h-3 w-3" aria-hidden />
                         ) : null}
                       </span>
-                      <span className="text-sm font-medium text-foreground">Can&apos;t work</span>
+                      <span className="text-sm font-medium text-foreground">Need Off</span>
                     </button>
 
                     <button

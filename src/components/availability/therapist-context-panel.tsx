@@ -204,14 +204,14 @@ export function TherapistContextPanel({
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-[1rem] border border-border/60 bg-background/80 px-4 py-4">
-          <p className="text-[13px] font-medium text-muted-foreground">Need off</p>
+          <p className="text-[13px] font-medium text-muted-foreground">Need Off</p>
           <p className="mt-3 text-[1.35rem] font-semibold tracking-[-0.02em] text-[var(--warning-text)]">
             {needOffCount}
           </p>
         </div>
 
         <div className="rounded-[1rem] border border-border/60 bg-background/80 px-4 py-4">
-          <p className="text-[13px] font-medium text-muted-foreground">Request to work</p>
+          <p className="text-[13px] font-medium text-muted-foreground">Need to Work</p>
           <p className="mt-3 text-[1.35rem] font-semibold tracking-[-0.02em] text-[color:#7c3aed]">
             {requestToWorkCount}
           </p>
@@ -266,7 +266,7 @@ export function TherapistContextPanel({
                             : 'border-[var(--info-border)] text-[var(--info-text)]'
                         )}
                       >
-                        {row.entryType === 'force_off' ? 'Need off' : 'Request to work'}
+                        {row.entryType === 'force_off' ? 'Need Off' : 'Need to Work'}
                       </Badge>
                       {isManagerEdited ? (
                         <Badge variant="outline" className="text-muted-foreground">

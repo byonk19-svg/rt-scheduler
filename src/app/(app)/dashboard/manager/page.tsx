@@ -34,10 +34,12 @@ type ShiftStatusRow = {
 type ShiftDateRow = {
   id: string
   date: string
+  user_id: string | null
 }
 
 type ShiftAssignmentRow = {
   id: string
+  user_id: string | null
   shift_type: 'day' | 'night' | null
   role: 'lead' | 'staff' | null
   profiles: { full_name: string } | { full_name: string }[] | null
@@ -210,12 +212,12 @@ export default async function ManagerDashboardPage() {
   let todayCoverageQuery = supabase.from('shifts').select('id').eq('date', todayKey)
   let upcomingShiftsQuery = supabase
     .from('shifts')
-    .select('id, date')
+    .select('id, date, user_id')
     .gte('date', todayKey)
     .lte('date', toIsoDate(addDays(today, 14)))
   let todayStaffedShiftsQuery = supabase
     .from('shifts')
-    .select('id, shift_type, role, profiles:profiles!shifts_user_id_fkey(full_name)')
+    .select('id, user_id, shift_type, role, profiles:profiles!shifts_user_id_fkey(full_name)')
     .eq('date', todayKey)
     .order('shift_type', { ascending: true })
     .order('role', { ascending: true })
@@ -275,6 +277,7 @@ export default async function ManagerDashboardPage() {
   const upcomingByDayMap = new Map<string, number>()
   for (const row of upcomingRows) {
     if (!isWorkingScheduled(row.id)) continue
+    if (row.user_id !== null) continue
     upcomingByDayMap.set(row.date, (upcomingByDayMap.get(row.date) ?? 0) + 1)
   }
   const upcomingShiftDays = Array.from(upcomingByDayMap.entries())
@@ -287,7 +290,6 @@ export default async function ManagerDashboardPage() {
 
   const todayStaffedShifts = todayShiftRows
     .filter((row) => isWorkingScheduled(row.id))
-    .slice(0, 6)
     .map(formatShiftLine)
   const dayRows = shiftCountRows.filter((row) => row.shift_type === 'day')
   const nightRows = shiftCountRows.filter((row) => row.shift_type === 'night')

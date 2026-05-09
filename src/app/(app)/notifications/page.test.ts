@@ -42,4 +42,10 @@ describe('notifications page copy guardrails', () => {
     expect(notificationsPageSource).toContain("eventType === 'call_in_help_available'")
     expect(notificationsPageSource).toContain("item.event_type === 'call_in_help_available'")
   })
+
+  it('renders notification groups as compact rows instead of a card per message', () => {
+    expect(notificationsPageSource).toContain('divide-y divide-border')
+    expect(notificationsPageSource).toContain('<article')
+    expect(notificationsPageSource).toContain('line-clamp-2')
+  })
 })

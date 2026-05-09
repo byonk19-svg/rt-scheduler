@@ -21,6 +21,7 @@ import type {
   LotteryHistoryItem,
   LotteryPageSnapshot,
   LotteryRecommendationActionView,
+  LotteryScheduledStaffItem,
   LotteryShiftType,
 } from '@/lib/lottery/service'
 
@@ -53,6 +54,28 @@ function recommendationStateVariant(
 
 function actionStatusVariant(status: LotteryRecommendationActionView['status']) {
   return status === 'cancelled' ? 'error' : 'info'
+}
+
+function formatEmploymentLabel(value: LotteryScheduledStaffItem['employmentType']): string {
+  if (value === 'prn') return 'PRN'
+  if (value === 'part_time') return 'Part-time'
+  return 'Full-time'
+}
+
+function formatShiftLabel(value: LotteryShiftType): string {
+  return value === 'night' ? 'Night shift' : 'Day shift'
+}
+
+function getRecommendationStateCopy(
+  state: NonNullable<LotteryPageSnapshot['recommendation']>['state']
+) {
+  if (state === 'applied') {
+    return 'This exact recommendation is already applied to the live Team Schedule.'
+  }
+  if (state === 'stale') {
+    return 'The live schedule, requests, or keep-working count no longer matches the latest applied decision. Review before applying again.'
+  }
+  return 'This is a preview. Nothing changes in the live Team Schedule until the result is applied.'
 }
 
 function sameActions(
@@ -319,6 +342,57 @@ export default function LotteryClientPage({
   const isRecommendedOverride = recommendation
     ? sameActions(recommendation.actions, overrideActionSummary)
     : false
+  const leadStaff = snapshot.scheduledStaff.filter((staff) => staff.role === 'lead')
+  const coreStaff = snapshot.scheduledStaff.filter(
+    (staff) => staff.role !== 'lead' && staff.employmentType !== 'prn'
+  )
+  const prnStaff = snapshot.scheduledStaff.filter(
+    (staff) => staff.role !== 'lead' && staff.employmentType === 'prn'
+  )
+  const currentUserLotteryIndex = snapshot.lotteryList.findIndex(
+    (entry) => entry.therapistId === snapshot.actor.userId
+  )
+  const currentUserLotteryPosition =
+    currentUserLotteryIndex >= 0 ? currentUserLotteryIndex + 1 : null
+
+  function renderStaffGroup(title: string, staff: LotteryScheduledStaffItem[]) {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-medium text-foreground">{title}</p>
+          <Badge variant="outline">{staff.length}</Badge>
+        </div>
+        {staff.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border/80 px-3 py-4 text-sm text-muted-foreground">
+            None scheduled.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {staff.map((person) => (
+              <div
+                key={person.shiftId}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-card px-3 py-3"
+              >
+                <div>
+                  <p className="font-medium text-foreground">{person.therapistName}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {person.role === 'lead' ? 'Lead' : 'Staff'} -{' '}
+                    {formatEmploymentLabel(person.employmentType)}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {person.hasRequest ? <Badge variant="outline">Volunteer</Badge> : null}
+                  <Badge variant="outline">
+                    {person.isReductionCandidate ? 'In decision pool' : 'Protected'}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   function renderRequestList() {
     return (
@@ -478,6 +552,17 @@ export default function LotteryClientPage({
   function renderLotteryList() {
     return (
       <div className="space-y-4">
+        {snapshot.actor.role === 'therapist' ? (
+          <div className="rounded-lg border border-border/70 bg-muted/15 px-3 py-3 text-sm">
+            <p className="font-medium text-foreground">Your Lottery order</p>
+            <p className="mt-1 text-muted-foreground">
+              {currentUserLotteryPosition
+                ? `You are position ${currentUserLotteryPosition} of ${snapshot.lotteryList.length} for ${formatShiftLabel(selectedShift).toLowerCase()}.`
+                : `You are not currently in the fixed Lottery order for ${formatShiftLabel(selectedShift).toLowerCase()}.`}
+            </p>
+          </div>
+        ) : null}
+
         {snapshot.missingListEntries.length > 0 ? (
           <div className="rounded-lg border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-3">
             <p className="text-sm font-medium text-[var(--warning-text)]">
@@ -522,6 +607,9 @@ export default function LotteryClientPage({
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  {entry.therapistId === snapshot.actor.userId ? (
+                    <Badge variant="outline">You</Badge>
+                  ) : null}
                   <Button
                     type="button"
                     size="sm"
@@ -564,8 +652,8 @@ export default function LotteryClientPage({
   return (
     <div className="max-w-6xl space-y-5">
       <PageIntro
-        title="Lottery"
-        subtitle="Preview low-census reductions, track request order, and apply the result against the live published schedule."
+        title="Lottery Decision Center"
+        subtitle="Review the live Team Schedule shift, volunteers, and recommendation before applying a staff reduction."
         summary={
           <>
             <Badge variant="outline">
@@ -574,7 +662,7 @@ export default function LotteryClientPage({
             </Badge>
             <Badge variant="outline">
               <Users className="h-3 w-3" />
-              {selectedShift === 'night' ? 'Night shift' : 'Day shift'}
+              {formatShiftLabel(selectedShift)}
             </Badge>
             <Badge variant="outline">
               <ClipboardList className="h-3 w-3" />
@@ -638,6 +726,96 @@ export default function LotteryClientPage({
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Decision context</CardTitle>
+          <CardDescription>
+            Live Team Schedule staff for the selected date and shift before any recommendation is
+            applied.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="grid gap-3 md:grid-cols-4">
+            <div className="rounded-lg border border-border/70 px-3 py-3">
+              <p className="text-xs font-medium uppercase text-muted-foreground">Scheduled</p>
+              <p className="mt-1 text-2xl font-semibold text-foreground">
+                {snapshot.workingScheduledCount}
+              </p>
+              <p className="text-xs text-muted-foreground">{formatShiftLabel(selectedShift)}</p>
+            </div>
+            <div className="rounded-lg border border-border/70 px-3 py-3">
+              <p className="text-xs font-medium uppercase text-muted-foreground">Decision pool</p>
+              <p className="mt-1 text-2xl font-semibold text-foreground">
+                {snapshot.eligibleReductionCount}
+              </p>
+              <p className="text-xs text-muted-foreground">Eligible scheduled staff</p>
+            </div>
+            <div className="rounded-lg border border-border/70 px-3 py-3">
+              <p className="text-xs font-medium uppercase text-muted-foreground">Protected</p>
+              <p className="mt-1 text-2xl font-semibold text-foreground">
+                {snapshot.protectedScheduledCount}
+              </p>
+              <p className="text-xs text-muted-foreground">Excluded by current rules</p>
+            </div>
+            <div className="rounded-lg border border-border/70 px-3 py-3">
+              <p className="text-xs font-medium uppercase text-muted-foreground">Volunteers</p>
+              <p className="mt-1 text-2xl font-semibold text-foreground">
+                {snapshot.requestList.length}
+              </p>
+              <p className="text-xs text-muted-foreground">Requested this shift</p>
+            </div>
+          </div>
+
+          {snapshot.latestAppliedDecision ? (
+            <div className="rounded-lg border border-border/70 bg-muted/15 px-3 py-3 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusBadge variant="info">Latest applied decision</StatusBadge>
+                <Badge variant="outline">
+                  Keep working: {snapshot.latestAppliedDecision.keepToWork}
+                </Badge>
+                {snapshot.latestAppliedDecision.overrideApplied ? (
+                  <Badge variant="outline">Override</Badge>
+                ) : null}
+              </div>
+              <p className="mt-2 text-muted-foreground">
+                Applied {formatDateTime(snapshot.latestAppliedDecision.appliedAt)}
+                {snapshot.latestAppliedDecision.appliedBy
+                  ? ` by ${snapshot.latestAppliedDecision.appliedBy}`
+                  : ''}
+                .
+              </p>
+              {snapshot.latestAppliedDecision.actions.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {snapshot.latestAppliedDecision.actions.map((action) => (
+                    <StatusBadge
+                      key={`${action.therapistId}-${action.status}`}
+                      variant={actionStatusVariant(action.status)}
+                    >
+                      {action.therapistName}:{' '}
+                      {action.status === 'cancelled' ? 'Cancelled' : 'On Call'}
+                    </StatusBadge>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  No staff were reduced in the latest applied decision.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border/80 px-3 py-3 text-sm text-muted-foreground">
+              No Lottery decision has been applied for this date and shift yet.
+            </div>
+          )}
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            {renderStaffGroup('Lead', leadStaff)}
+            {renderStaffGroup('Core staff', coreStaff)}
+            {renderStaffGroup('PRN staff', prnStaff)}
+          </div>
+        </CardContent>
+      </Card>
+
       {error ? (
         <div className="flex items-start gap-2 rounded-lg border border-[var(--error-border)] bg-[var(--error-subtle)] px-4 py-3 text-sm text-[var(--error-text)]">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -683,7 +861,12 @@ export default function LotteryClientPage({
                   ) : null}
                 </div>
 
+                <div className="rounded-lg border border-border/70 bg-muted/15 px-3 py-3 text-sm text-muted-foreground">
+                  {getRecommendationStateCopy(recommendation.state)}
+                </div>
+
                 <div className="space-y-2">
+                  <p className="text-sm font-medium text-foreground">Recommended result</p>
                   {recommendation.actions.length === 0 ? (
                     <div className="rounded-lg border border-border/70 px-3 py-3 text-sm text-muted-foreground">
                       Everyone stays working on this shift.
@@ -709,6 +892,7 @@ export default function LotteryClientPage({
                 </div>
 
                 <div className="space-y-2 rounded-lg border border-border/70 bg-muted/15 px-3 py-3 text-sm">
+                  <p className="font-medium text-foreground">Why this result</p>
                   {recommendation.explanation.map((line) => (
                     <p key={line} className="text-muted-foreground">
                       {line}

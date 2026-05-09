@@ -10,7 +10,9 @@ import {
   type LiveRosterOverrideRow,
   type LiveRosterShiftRow,
 } from '@/lib/schedule-roster-data'
+import { normalizeActorShiftType } from '@/lib/coverage/coverage-shift-tab'
 import type { AssignmentStore, AvailabilityApprovalStore } from '@/lib/mock-coverage-roster'
+import type { ShiftType } from '@/lib/mock-coverage-roster'
 
 export type ScheduleRosterLivePayload = {
   cycleId: string
@@ -19,6 +21,7 @@ export type ScheduleRosterLivePayload = {
   endDate: string
   shortLabel: string
   isPublished: boolean
+  defaultShiftType: ShiftType
   availableCycles: Array<{ id: string; label: string }>
   staff: ScheduleRosterStaff[]
   assignments: AssignmentStore
@@ -83,7 +86,7 @@ export async function loadScheduleRosterPageData(
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, shift_type')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -91,6 +94,7 @@ export async function loadScheduleRosterPageData(
   if (role !== 'manager' && role !== 'lead') {
     return { status: 'forbidden' }
   }
+  const defaultShiftType = normalizeActorShiftType(profile?.shift_type) ?? 'day'
 
   const today = new Date()
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -169,6 +173,7 @@ export async function loadScheduleRosterPageData(
       endDate: selectedCycle.end_date,
       shortLabel,
       isPublished: selectedCycle.published,
+      defaultShiftType,
       availableCycles: cycles.map((c) => ({ id: c.id, label: c.label })),
       staff,
       assignments,

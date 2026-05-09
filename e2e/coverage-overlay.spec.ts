@@ -188,27 +188,11 @@ test.describe.serial('coverage manager dialog interactions', () => {
 
   async function openShiftEditor(page: Page, isoDate: string) {
     await page.waitForTimeout(1000)
-    const clicked = await page.evaluate((targetDate) => {
-      const candidates = Array.from(
-        document.querySelectorAll<HTMLButtonElement>(
-          `[data-testid="coverage-day-cell-button-${targetDate}"]`
-        )
-      )
-      const visible = candidates.find((element) => {
-        const rect = element.getBoundingClientRect()
-        const style = window.getComputedStyle(element)
-        return (
-          rect.width > 0 &&
-          rect.height > 0 &&
-          style.display !== 'none' &&
-          style.visibility !== 'hidden'
-        )
-      })
-      if (!visible) return false
-      visible.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
-      return true
-    }, isoDate)
-    expect(clicked).toBe(true)
+    const dayButton = page
+      .locator(`[data-testid="coverage-day-cell-button-${isoDate}"]:visible`)
+      .first()
+    await expect(dayButton).toBeVisible()
+    await dayButton.click({ position: { x: 18, y: 18 } })
     await expect(shiftEditorDialog(page)).toBeVisible({ timeout: 5_000 })
   }
 

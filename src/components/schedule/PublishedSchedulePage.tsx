@@ -16,6 +16,7 @@ import {
   parseScheduleBlockStart,
   SCHEDULE_BLOCK_DAYS,
   SCHEDULE_BLOCK_WEEKS,
+  toIsoDate,
 } from '@/lib/my-shifts-schedule-block'
 import { fetchPublishedScheduleWindow, type MyScheduleTeamShiftRow } from '@/lib/staff-my-schedule'
 import { createClient } from '@/lib/supabase/server'
@@ -121,6 +122,7 @@ function buildWeeks(args: {
         isWeekend: date.getDay() === 0 || date.getDay() === 6,
         userShift: userShift
           ? {
+              id: userShift.id,
               shiftType: userShift.shift_type === 'night' ? 'night' : 'day',
               role: userShift.role,
               assignmentStatus: userShift.assignment_status,
@@ -229,6 +231,7 @@ export async function PublishedSchedulePage({
         dayOffCount: days.length - shiftCount,
         totalHours: shiftCount * HOURS_PER_SHIFT,
       }}
+      todayIso={toIsoDate(new Date())}
       backHref={backHref}
     />
   )

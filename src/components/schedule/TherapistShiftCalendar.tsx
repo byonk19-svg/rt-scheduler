@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useMemo, useState, type ReactNode } from 'react'
 import {
   CalendarDays,
+  Clock3,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -38,6 +39,7 @@ export type TherapistShiftDay = {
   dayLabel: string
   isWeekend: boolean
   userShift: {
+    id: string
     shiftType: 'day' | 'night'
     role: string | null
     assignmentStatus: string | null
@@ -77,6 +79,7 @@ export type TherapistShiftCalendarProps = {
     dayOffCount: number
     totalHours: number
   }
+  todayIso: string
   backHref: string
 }
 
@@ -112,6 +115,9 @@ function assignmentLabel(value: string | null) {
       return 'Left Early'
     case 'cancelled':
       return 'Cancelled'
+    case 'called_off':
+    case 'sick':
+      return 'Cancelled'
     case 'scheduled':
       return 'Scheduled'
     default:
@@ -128,12 +134,26 @@ function scheduleStatusLabel(day: TherapistShiftDay) {
   return assignmentLabel(preferredStatus) ?? 'Scheduled'
 }
 
+function activeWorkStatusLabel(day: TherapistShiftDay) {
+  const status = scheduleStatusLabel(day)
+  if (status === 'Cancelled') return 'Cancelled'
+  if (status === 'Call In') return 'Call In'
+  if (status === 'On Call') return 'On Call'
+  if (status === 'Left Early') return 'Left Early'
+  return 'Working shift'
+}
+
 function shiftName(shiftType: 'day' | 'night') {
   return shiftType === 'night' ? 'Night shift' : 'Day shift'
 }
 
 function shiftTimeLabel(shiftType: 'day' | 'night') {
   return shiftType === 'night' ? '7:00 PM - 7:00 AM' : '7:00 AM - 7:00 PM'
+}
+
+function buildShiftRequestHref(shiftId: string, requestType: 'swap' | 'pickup') {
+  const params = new URLSearchParams({ new: '1', shiftId, type: requestType })
+  return `/requests/new?${params.toString()}`
 }
 
 function formatSelectedDate(isoDate: string) {
@@ -144,6 +164,16 @@ function formatSelectedDate(isoDate: string) {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
+  })
+}
+
+function formatCompactDate(isoDate: string) {
+  const parsed = new Date(`${isoDate}T12:00:00`)
+  if (Number.isNaN(parsed.getTime())) return isoDate
+  return parsed.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
   })
 }
 
@@ -287,6 +317,7 @@ export function TherapistShiftCalendar({
   defaultShiftLabel,
   scheduleContext,
   summary,
+  todayIso,
   backHref,
 }: TherapistShiftCalendarProps) {
   const allDays = useMemo(() => weeks.flatMap((week) => week.days), [weeks])
@@ -302,6 +333,17 @@ export function TherapistShiftCalendar({
   const selectedDay = allDays.find((day) => day.isoDate === selectedDayIso) ?? allDays[0] ?? null
   const selectedCoworkers = selectedDay?.team.filter((member) => !member.isYou) ?? []
   const selectedLead = selectedDay?.team.find((member) => member.isLead) ?? null
+  const canRequestSelectedShift =
+    selectedDay?.userShift && scheduleStatusLabel(selectedDay) === 'Scheduled'
+  const upcomingShiftDays = useMemo(
+    () =>
+      allDays
+        .filter((day) => day.userShift && day.isoDate >= todayIso)
+        .sort((left, right) => left.isoDate.localeCompare(right.isoDate))
+        .slice(0, 4),
+    [allDays, todayIso]
+  )
+  const nextShift = upcomingShiftDays[0] ?? null
 
   const visibleWeeks = useMemo(() => {
     const maxWeeks = viewMode === 'two' ? 2 : viewMode === 'month' ? 4 : weeks.length
@@ -396,7 +438,10 @@ export function TherapistShiftCalendar({
         </div>
       </header>
 
-      <ScheduleContextBar {...scheduleContext} />
+      <ScheduleContextBar
+        {...scheduleContext}
+        className="sticky top-2 z-20 bg-card/95 backdrop-blur md:static md:bg-card md:backdrop-blur-none"
+      />
 
       <section className="rounded-lg border border-border bg-card px-4 py-3 shadow-tw-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -436,9 +481,108 @@ export function TherapistShiftCalendar({
         </div>
       </section>
 
+      <section className="grid gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <article className="rounded-lg border border-border bg-card p-4 shadow-tw-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                Next shift
+              </p>
+              {nextShift ? (
+                <h2 className="mt-1 text-lg font-bold text-foreground">
+                  {formatSelectedDate(nextShift.isoDate)}
+                </h2>
+              ) : (
+                <h2 className="mt-1 text-lg font-bold text-foreground">
+                  No remaining shifts in this Schedule Block
+                </h2>
+              )}
+            </div>
+            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--info-subtle)] text-primary">
+              <Clock3 className="h-5 w-5" aria-hidden="true" />
+            </span>
+          </div>
+
+          {nextShift?.userShift ? (
+            <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground">Shift</p>
+                <p className="font-semibold text-foreground">
+                  {shiftName(nextShift.userShift.shiftType)} ·{' '}
+                  {shiftTimeLabel(nextShift.userShift.shiftType)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground">Status</p>
+                <p className="font-semibold text-foreground">{activeWorkStatusLabel(nextShift)}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground">Lead</p>
+                <p className="font-semibold text-foreground">
+                  {nextShift.team.find((member) => member.isLead)?.shortName ?? 'No lead listed'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground">Coworkers</p>
+                <p className="font-semibold text-foreground">
+                  {Math.max(nextShift.team.filter((member) => !member.isYou).length, 0)} listed
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-muted-foreground">
+              Use the full block below to review past shifts and team context.
+            </p>
+          )}
+        </article>
+
+        <article className="rounded-lg border border-border bg-card p-4 shadow-tw-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                Upcoming personal shifts
+              </p>
+              <h2 className="mt-1 text-lg font-bold text-foreground">
+                {upcomingShiftDays.length} in this Schedule Block
+              </h2>
+            </div>
+            <CalendarDays className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+          </div>
+
+          {upcomingShiftDays.length > 0 ? (
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              {upcomingShiftDays.map((day) => (
+                <button
+                  key={day.isoDate}
+                  type="button"
+                  onClick={() => setSelectedDayIso(day.isoDate)}
+                  className={cn(
+                    'min-h-16 rounded-md border border-border bg-background px-3 py-2 text-left transition hover:border-primary/70 hover:bg-[var(--info-subtle)]',
+                    selectedDay?.isoDate === day.isoDate &&
+                      'border-primary bg-[var(--info-subtle)] ring-1 ring-primary/60'
+                  )}
+                >
+                  <p className="text-sm font-bold text-foreground">
+                    {formatCompactDate(day.isoDate)}
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-muted-foreground">
+                    {day.userShift ? shiftName(day.userShift.shiftType) : defaultShiftLabel} ·{' '}
+                    {scheduleStatusLabel(day)}
+                  </p>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-muted-foreground">
+              No future assigned shifts are listed in this block.
+            </p>
+          )}
+        </article>
+      </section>
+
       <div className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
-        <aside className="space-y-4">
-          <section className="rounded-lg border border-border bg-card p-3 shadow-tw-sm">
+        <aside className="flex flex-col gap-4">
+          <section className="order-2 rounded-lg border border-border bg-card p-3 shadow-tw-sm lg:order-1">
             <p className="px-1 pb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
               Highlights
             </p>
@@ -471,7 +615,7 @@ export function TherapistShiftCalendar({
           </section>
 
           {selectedDay ? (
-            <section className="rounded-lg border border-border bg-card p-4 shadow-tw-sm">
+            <section className="order-1 rounded-lg border border-border bg-card p-4 shadow-tw-sm lg:order-2">
               <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
                 Selected day
               </p>
@@ -526,10 +670,25 @@ export function TherapistShiftCalendar({
                   </p>
                 )}
               </div>
+
+              {canRequestSelectedShift ? (
+                <div className="mt-4 grid gap-2 border-t border-border pt-3 sm:grid-cols-2">
+                  <Button asChild variant="outline" size="sm" className="min-h-10">
+                    <Link href={buildShiftRequestHref(selectedDay.userShift!.id, 'pickup')}>
+                      Give up shift
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm" className="min-h-10">
+                    <Link href={buildShiftRequestHref(selectedDay.userShift!.id, 'swap')}>
+                      Trade shift
+                    </Link>
+                  </Button>
+                </div>
+              ) : null}
             </section>
           ) : null}
 
-          <section className="rounded-lg border border-border bg-card p-3 shadow-tw-sm">
+          <section className="order-3 rounded-lg border border-border bg-card p-3 shadow-tw-sm">
             <p className="px-1 pb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
               Teammates
             </p>
@@ -588,21 +747,23 @@ export function TherapistShiftCalendar({
                 <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               </div>
               {week.days.length > 0 ? (
-                <div className="grid min-w-[58rem] grid-cols-7 gap-2 overflow-x-auto p-2">
-                  {week.days.map((day) => (
-                    <div key={day.isoDate} className="min-w-0">
-                      <p className="mb-2 text-center text-xs font-bold text-foreground">
-                        {day.weekdayLabel} {day.dayLabel}
-                      </p>
-                      <DayCard
-                        day={day}
-                        visibleMemberIds={visibleMemberIds}
-                        isSelected={day.isoDate === selectedDay?.isoDate}
-                        isHighlighted={matchesFilter(day, filter)}
-                        onSelect={() => setSelectedDayIso(day.isoDate)}
-                      />
-                    </div>
-                  ))}
+                <div className="overflow-x-auto p-2">
+                  <div className="grid min-w-[58rem] grid-cols-7 gap-2">
+                    {week.days.map((day) => (
+                      <div key={day.isoDate} className="min-w-0">
+                        <p className="mb-2 text-center text-xs font-bold text-foreground">
+                          {day.weekdayLabel} {day.dayLabel}
+                        </p>
+                        <DayCard
+                          day={day}
+                          visibleMemberIds={visibleMemberIds}
+                          isSelected={day.isoDate === selectedDay?.isoDate}
+                          isHighlighted={matchesFilter(day, filter)}
+                          onSelect={() => setSelectedDayIso(day.isoDate)}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <p className="px-4 py-8 text-sm text-muted-foreground">

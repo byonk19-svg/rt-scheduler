@@ -181,7 +181,7 @@ export default async function TherapistAvailabilityPage({
   const { data: profile } = await supabase
     .from('profiles')
     .select(
-      'role, work_patterns(pattern_type, works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode, weekly_weekdays, weekend_rule, cycle_anchor_date, cycle_segments, shift_preference)'
+      'role, shift_type, work_patterns(pattern_type, works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode, weekly_weekdays, weekend_rule, cycle_anchor_date, cycle_segments, shift_preference)'
     )
     .eq('id', user.id)
     .maybeSingle()
@@ -215,6 +215,10 @@ export default async function TherapistAvailabilityPage({
     recurringPattern && recurringPattern.pattern_type !== 'none'
   )
   const recurringPatternSummary = describeWorkPatternSummary(recurringPattern)
+  const regularShiftType =
+    (profile as { shift_type?: 'day' | 'night' | null } | null)?.shift_type === 'night'
+      ? 'night'
+      : 'day'
 
   const today = new Date()
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -357,6 +361,7 @@ export default async function TherapistAvailabilityPage({
         recurringPatternSummary={recurringPatternSummary}
         generatedBaselineByCycleId={generatedBaselineByCycleId}
         submissionsByCycleId={submissionsByCycleId}
+        regularShiftType={regularShiftType}
         submitTherapistAvailabilityGridAction={submitTherapistAvailabilityGridAction}
         returnToPath="/therapist/availability"
       />

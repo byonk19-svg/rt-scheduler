@@ -109,7 +109,8 @@ describe('AvailabilityEntriesTable', () => {
     expect(html).toMatch(/>2<\/span>\s*entries/)
     expect(html).toContain('>Action</th>')
     expect(html).toContain('1 Need Off')
-    expect(html).toContain('1 Request to Work')
+    expect(html).toContain('1 Need to Work')
+    expect(html).not.toContain('Request to Work')
     expect(html).not.toContain('>Shift</th>')
   })
 

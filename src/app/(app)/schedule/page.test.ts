@@ -42,6 +42,7 @@ describe('schedule route', () => {
         endDate: '2026-05-09',
         shortLabel: 'May 3 - May 9, 2026',
         isPublished: false,
+        defaultShiftType: 'day',
         availableCycles: [
           { id: 'cycle-1', label: 'Cycle Alpha' },
           { id: 'cycle-2', label: 'Cycle Beta' },
@@ -99,7 +100,7 @@ describe('schedule route', () => {
     )
 
     expect(loadScheduleRosterPageDataMock).toHaveBeenCalledWith({ cycle: 'cycle-2' })
-    expect(html).toContain('Respiratory Therapy - Day Shift')
+    expect(html).toContain('Roster View - Day Shift')
     expect(html).toContain('Cycle Beta')
     expect(html).toContain('May 3 - May 9, 2026')
     expect(html).toContain('Day Core')
@@ -108,6 +109,57 @@ describe('schedule route', () => {
     expect(html).toContain('OFF')
     expect(html).toContain('OC')
     expect(html).toContain('Cycle Alpha')
+  })
+
+  it('opens the roster on the actor default shift when supplied by the live payload', async () => {
+    loadScheduleRosterPageDataMock.mockResolvedValue({
+      status: 'ok',
+      data: {
+        cycleId: 'cycle-2',
+        label: 'Cycle Beta',
+        startDate: '2026-05-03',
+        endDate: '2026-05-09',
+        shortLabel: 'May 3 - May 9, 2026',
+        isPublished: true,
+        defaultShiftType: 'night',
+        availableCycles: [{ id: 'cycle-2', label: 'Cycle Beta' }],
+        staff: [
+          {
+            id: 'day-core',
+            name: 'Day Core',
+            roleLabel: 'Therapist',
+            rosterKind: 'core',
+            shiftType: 'day',
+          },
+          {
+            id: 'night-core',
+            name: 'Night Core',
+            roleLabel: 'Therapist',
+            rosterKind: 'core',
+            shiftType: 'night',
+          },
+        ],
+        assignments: {
+          [createAssignmentKey('night-core', '2026-05-03', 'night')]: {
+            id: 'shift-3',
+            staffId: 'night-core',
+            isoDate: '2026-05-03',
+            shiftType: 'night',
+            status: 'assigned',
+            assignmentStatus: null,
+          },
+        },
+        availabilityApprovals: {},
+      },
+    })
+
+    const html = renderToStaticMarkup(
+      await SchedulePage({ searchParams: Promise.resolve({ cycle: 'cycle-2' }) })
+    )
+
+    expect(html).toContain('Roster View - Night Shift')
+    expect(html).toContain('Night Core')
+    expect(html).not.toContain('Day Core')
   })
 
   it('redirects unauthenticated users to login', async () => {
@@ -131,15 +183,15 @@ describe('schedule route', () => {
 
     const html = renderToStaticMarkup(await SchedulePage({ searchParams: Promise.resolve({}) }))
 
-    expect(html).toContain('No active schedule block yet')
-    expect(html).toContain('Create or reopen a cycle in Coverage')
+    expect(html).toContain('No active Schedule Block yet')
+    expect(html).toContain('Create or reopen a Schedule Block in Coverage')
     expect(html).toContain('Open Coverage')
   })
 
-  it('sets route-specific schedule-roster metadata', async () => {
+  it('sets route-specific roster-view metadata', async () => {
     const source = readFileSync(resolve(process.cwd(), 'src/app/(app)/schedule/page.tsx'), 'utf8')
 
-    expect(source).toContain("title: 'Schedule Roster'")
-    expect(source).toContain('live staffing roster for the active schedule block')
+    expect(source).toContain("title: 'Roster View'")
+    expect(source).toContain('Team Schedule for the active Schedule Block')
   })
 })

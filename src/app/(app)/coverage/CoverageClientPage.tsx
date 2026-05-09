@@ -169,7 +169,7 @@ type DayStatus = DayItem['dayStatus']
 type CoverageViewMode = 'week' | 'calendar' | 'roster'
 type RenderedCoverageViewMode = 'week' | 'roster'
 const VIEW_OPTIONS = [
-  { value: 'week', label: 'Cycle board' },
+  { value: 'week', label: 'Block board' },
   { value: 'roster', label: 'Roster' },
 ] as const
 
@@ -364,9 +364,11 @@ export function CoverageClientPage({
     () => initialSnapshot.canUpdateAssignmentStatus
   )
   const [actorRole, setActorRole] = useState<Role | null>(() => initialSnapshot.actorRole)
+  const actorUserId = initialSnapshot.actorUserId
   const autoDraftFormRef = useRef<HTMLFormElement>(null)
   const clearDraftFormRef = useRef<HTMLFormElement>(null)
   const deferredSelectedId = useDeferredValue(selectedId)
+  const lastSnapshotCycleIdRef = useRef<string | null>(initialSnapshot.activeCycleId)
   const days = shiftTab === 'Day' ? dayDays : nightDays
   const setDays = shiftTab === 'Day' ? setDayDays : setNightDays
   const totalWeeks = Math.max(Math.ceil(days.length / 7), 1)
@@ -471,6 +473,8 @@ export function CoverageClientPage({
   }, [initialViewMode])
 
   useEffect(() => {
+    const snapshotCycleChanged = lastSnapshotCycleIdRef.current !== initialSnapshot.activeCycleId
+    lastSnapshotCycleIdRef.current = initialSnapshot.activeCycleId
     profileDefaultAppliedRef.current = shiftTabLockedFromUrl
     setShiftTab(initialShiftTab)
     setDayDays(initialSnapshot.dayDays)
@@ -490,7 +494,13 @@ export function CoverageClientPage({
     setActiveOpCodes(new Map(Object.entries(initialSnapshot.activeOpCodes)))
     setActiveOperationalDetails(new Map(Object.entries(initialSnapshot.activeOperationalDetails)))
     setLoading(false)
-    setSelectedId(null)
+    setSelectedId((current) => {
+      if (!current || snapshotCycleChanged) return null
+      const selectedDateStillExists =
+        initialSnapshot.dayDays.some((day) => day.id === current) ||
+        initialSnapshot.nightDays.some((day) => day.id === current)
+      return selectedDateStillExists ? current : null
+    })
     setWeekOffset(0)
     setSelectedCycleHasShiftRows(initialSnapshot.selectedCycleHasShiftRows)
     setError(initialSnapshot.error)
@@ -602,12 +612,26 @@ export function CoverageClientPage({
         ? 'warning'
         : 'neutral'
   const workspaceStatusLabel = noCycleSelected
-    ? 'No active cycle'
+    ? 'No active block'
     : activeCyclePublished
       ? 'Published'
       : scheduleNeedsSetup
         ? 'Setup required'
         : 'Draft'
+  const workspaceTitle = canManageCoverage ? 'Coverage' : 'Team Schedule'
+  const workspaceSubtitle = noCycleSelected
+    ? canManageCoverage
+      ? 'No open 6-week block - create a new draft block to start staffing.'
+      : 'No published schedule is available right now.'
+    : showEmptyDraftState
+      ? canManageCoverage
+        ? 'No staffing drafted yet. Auto-draft or open a day to assign the first shifts.'
+        : 'No staffing published yet.'
+      : canManageCoverage
+        ? null
+        : canUpdateAssignmentStatus
+          ? 'View the live team schedule and operational status. Open a day to review details and update statuses.'
+          : 'Read-only Team Schedule. Use My Shifts for your own shifts and Future Availability for the next Schedule Block.'
   const hasSchedulingContent = selectedCycleHasShiftRows && days.length > 0
   const canRunAutoDraft = Boolean(activeCycleId) && !activeCyclePublished
   const canSendPreliminary = Boolean(activeCycleId) && !activeCyclePublished && selectedCycleHasShiftRows
@@ -676,9 +700,7 @@ export function CoverageClientPage({
   }
 
   const handleSelect = useCallback((id: string) => {
-    window.requestAnimationFrame(() => {
-      setSelectedId((prev) => (prev === id ? null : id))
-    })
+    setSelectedId((prev) => (prev === id ? null : id))
     setAssignError('')
     setRosterCellError(null)
   }, [])
@@ -1065,7 +1087,7 @@ export function CoverageClientPage({
             <div className="min-w-0 space-y-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="font-heading text-[1.6rem] font-semibold tracking-[-0.04em] text-foreground">
-                  Coverage
+                  {workspaceTitle}
                 </h1>
                 <Badge
                   variant="outline"
@@ -1079,7 +1101,7 @@ export function CoverageClientPage({
                       'border-border/70 bg-background text-muted-foreground'
                   )}
                 >
-                  Cycle status: {workspaceStatusLabel}
+                  Schedule status: {workspaceStatusLabel}
                 </Badge>
                 {preliminaryLive && !activeCyclePublished ? (
                   <Badge
@@ -1090,21 +1112,9 @@ export function CoverageClientPage({
                   </Badge>
                 ) : null}
               </div>
-              <div className="text-[12px] text-muted-foreground">
-                {noCycleSelected ? (
-                  canManageCoverage
-                    ? 'No open 6-week block — create a new draft block to start staffing.'
-                    : 'No published schedule is available right now.'
-                ) : showEmptyDraftState ? (
-                  canManageCoverage
-                    ? 'No staffing drafted yet. Auto-draft or open a day to assign the first shifts.'
-                    : 'No staffing published yet.'
-                ) : canManageCoverage ? null : canUpdateAssignmentStatus ? (
-                  'View staffing and operational status. Open a day to review details and update statuses.'
-                ) : (
-                  'Read-only team staffing view. Use My Schedule for your own shifts and Future Availability for the next cycle.'
-                )}
-              </div>
+              {workspaceSubtitle ? (
+                <div className="text-[12px] text-muted-foreground">{workspaceSubtitle}</div>
+              ) : null}
             </div>
 
             <div className="flex flex-wrap items-center gap-3 xl:justify-end">
@@ -1252,7 +1262,7 @@ export function CoverageClientPage({
           {!noCycleSelected ? (
             <section
               aria-labelledby="coverage-cycle-context-heading"
-              className="rounded-[24px] border border-border/70 bg-card px-4 py-3 shadow-[0_12px_32px_rgba(15,23,42,0.05)]"
+              className="sticky top-2 z-20 rounded-[24px] border border-border/70 bg-card/95 px-4 py-3 shadow-[0_12px_32px_rgba(15,23,42,0.05)] backdrop-blur lg:static lg:bg-card lg:backdrop-blur-none"
             >
               <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
                 <div className="min-w-0">
@@ -1261,7 +1271,7 @@ export function CoverageClientPage({
                       id="coverage-cycle-context-heading"
                       className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
                     >
-                      Cycle context
+                      Schedule Block context
                     </h2>
                     <span className="text-sm font-semibold text-foreground">
                       Current block: {cycleRangeLabel}
@@ -1278,7 +1288,7 @@ export function CoverageClientPage({
                           'border-border/70 bg-background text-muted-foreground'
                       )}
                     >
-                      Cycle status: {workspaceStatusLabel}
+                      Schedule status: {workspaceStatusLabel}
                     </Badge>
                     <span className="text-[10px] text-muted-foreground">Switch block below</span>
                   </div>
@@ -1532,6 +1542,7 @@ export function CoverageClientPage({
         <ShiftEditorDialog
           open
           selectedDay={selectedDay}
+          actorUserId={actorUserId}
           therapists={allTherapists}
           canEdit={Boolean(canManageCoverage && activeCycleId)}
           canUpdateAssignmentStatus={canUpdateAssignmentStatus}

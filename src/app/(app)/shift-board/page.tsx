@@ -6,7 +6,7 @@ import { loadShiftBoardSnapshot } from '@/lib/shift-board-snapshot'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
-  title: 'Shift Swaps & Pickups',
+  title: 'Shift Board',
   description: 'Review and manage shift swap and pickup requests.',
 }
 

@@ -21,7 +21,7 @@ const routes = [
   ['src/app/(app)/lottery/page.tsx', "title: 'Lottery'"],
   // Manager schedule section
   ['src/app/(app)/coverage/page.tsx', "title: 'Coverage'"],
-  ['src/app/(app)/schedule/page.tsx', "title: 'Schedule Roster'"],
+  ['src/app/(app)/schedule/page.tsx', "title: 'Roster View'"],
   ['src/app/(app)/approvals/page.tsx', "title: 'Approvals'"],
   ['src/app/(app)/analytics/page.tsx', "title: 'Analytics'"],
   // Profile / settings
@@ -35,7 +35,7 @@ const routes = [
   ['src/app/(app)/staff/my-schedule/page.tsx', "title: 'My Shifts'"],
   ['src/app/(app)/staff/history/page.tsx', "title: 'Shift Swaps & Pickups History'"],
   // Manager shift board
-  ['src/app/(app)/shift-board/page.tsx', "title: 'Shift Swaps & Pickups'"],
+  ['src/app/(app)/shift-board/page.tsx', "title: 'Shift Board'"],
 ] as const
 
 describe('app route metadata sweep', () => {
@@ -48,12 +48,13 @@ describe('app route metadata sweep', () => {
 })
 
 describe('route title consistency', () => {
-  it('/schedule empty-state h1 matches its metadata title casing (Schedule Roster)', () => {
+  it('/schedule empty-state h1 matches its metadata title casing (Roster View)', () => {
     const source = read('src/app/(app)/schedule/page.tsx')
     // Metadata title uses title case
-    expect(source).toContain("title: 'Schedule Roster'")
-    // h1 in the no-cycle empty state must match — not lowercase "roster"
+    expect(source).toContain("title: 'Roster View'")
+    // h1 in the no-cycle empty state must match — not lowercase "roster view"
     expect(source).not.toContain('>Schedule roster<')
+    expect(source).not.toContain('>Roster view<')
   })
 
   it('/staff/my-schedule and /therapist/schedule both render "My Shifts" as their page title', () => {
@@ -65,10 +66,10 @@ describe('route title consistency', () => {
     expect(mySchedule).not.toContain('"My Schedule"')
   })
 
-  it('/shift-board and /therapist/swaps share the same "Shift Swaps & Pickups" title', () => {
+  it('/shift-board is the canonical board while /therapist/swaps keeps legacy therapist wording', () => {
     const shiftBoard = read('src/app/(app)/shift-board/page.tsx')
     const therapistSwaps = read('src/app/(app)/therapist/swaps/page.tsx')
-    expect(shiftBoard).toContain("title: 'Shift Swaps & Pickups'")
+    expect(shiftBoard).toContain("title: 'Shift Board'")
     expect(therapistSwaps).toContain("title: 'Shift Swaps & Pickups'")
   })
 
@@ -76,9 +77,9 @@ describe('route title consistency', () => {
     const coverage = read('src/app/(app)/coverage/page.tsx')
     const schedule = read('src/app/(app)/schedule/page.tsx')
     expect(coverage).toContain("title: 'Coverage'")
-    expect(schedule).toContain("title: 'Schedule Roster'")
+    expect(schedule).toContain("title: 'Roster View'")
     // They must not share the same title
-    expect(coverage).not.toContain("title: 'Schedule Roster'")
+    expect(coverage).not.toContain("title: 'Roster View'")
     expect(schedule).not.toContain("title: 'Coverage'")
   })
 })

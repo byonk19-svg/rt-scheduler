@@ -334,7 +334,7 @@ function getRequestPathLabel(request: OpenRequest) {
     return request.involvement === 'received_direct' ? 'Direct to you' : 'Direct teammate request'
   }
 
-  return 'Team board'
+  return 'Open Shifts'
 }
 
 function getRequestRoleLabel(request: OpenRequest, interestRoleLabel?: string) {

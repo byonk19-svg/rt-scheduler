@@ -10,7 +10,6 @@ import {
   Home,
   LogOut,
   Menu,
-  Plus,
   Settings,
   Users,
   X,
@@ -30,8 +29,11 @@ import {
 import {
   APP_PAGE_MAX_WIDTH_CLASS,
   buildManagerSections,
+  getMobilePrimaryItems,
   getShellContext,
+  getWorkflowContext,
   usesAppShell,
+  type WorkflowContext,
 } from '@/components/shell/app-shell-config'
 import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
@@ -208,6 +210,58 @@ function MobileNavLink({
   )
 }
 
+function WorkflowContextStrip({ context }: { context: WorkflowContext }) {
+  return (
+    <section
+      aria-label="Current workflow context"
+      className="border-b border-border/70 bg-[color-mix(in_srgb,var(--muted)_72%,var(--background))]"
+    >
+      <div className={cn(APP_PAGE_MAX_WIDTH_CLASS, 'flex items-center gap-2 py-2 sm:hidden')}>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-bold text-foreground">{context.workflow}</p>
+          <p className="text-[11px] font-medium leading-tight text-muted-foreground">
+            {context.context} / {context.state}
+          </p>
+        </div>
+        <span className="max-w-[9.5rem] shrink-0 truncate rounded-md border border-[var(--info-border)] bg-[var(--info-subtle)] px-2 py-1 text-[10px] font-bold text-[var(--info-text)]">
+          {context.permission}
+        </span>
+      </div>
+      <div
+        className={cn(
+          APP_PAGE_MAX_WIDTH_CLASS,
+          'hidden gap-2 py-2 text-xs text-muted-foreground sm:grid sm:grid-cols-2 lg:grid-cols-[1.1fr_1fr_1fr_1fr]'
+        )}
+      >
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+            Workflow
+          </p>
+          <p className="truncate text-sm font-bold text-foreground">{context.workflow}</p>
+        </div>
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+            Context
+          </p>
+          <p className="truncate font-semibold text-foreground">{context.context}</p>
+        </div>
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+            State
+          </p>
+          <p className="truncate font-medium text-muted-foreground">{context.state}</p>
+        </div>
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+            Access
+          </p>
+          <p className="truncate font-medium text-muted-foreground">{context.permission}</p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export default function AppShell({ user, unreadNotificationCount = 0, children }: AppShellProps) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -222,6 +276,10 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
   const shellContext = useMemo(
     () => getShellContext({ pathname, canAccessManagerUi, pendingCount }),
     [pathname, canAccessManagerUi, pendingCount]
+  )
+  const workflowContext = useMemo(
+    () => getWorkflowContext({ pathname, canAccessManagerUi }),
+    [pathname, canAccessManagerUi]
   )
 
   const primaryItems = useMemo(
@@ -246,6 +304,17 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
     [pathname, shellContext.localNav]
   )
   const mobileTitle = primaryItems.find((item) => item.current)?.label ?? 'Dashboard'
+  const mobileQuickItems = useMemo(
+    () =>
+      getMobilePrimaryItems({ canAccessManagerUi, pendingCount }).map((item) => ({
+        href: item.href,
+        label: item.label,
+        current: item.active(pathname),
+        badgeCount: item.badgeCount,
+      })),
+    [canAccessManagerUi, pathname, pendingCount]
+  )
+  const moreNavCurrent = !mobileQuickItems.some((item) => item.current)
 
   useEffect(() => {
     function handleEsc(event: KeyboardEvent) {
@@ -365,6 +434,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
         />
 
         <div className="min-h-screen pb-20 pt-11 md:pb-0">
+          {workflowContext ? <WorkflowContextStrip context={workflowContext} /> : null}
           <main
             id="main-content"
             tabIndex={-1}
@@ -398,34 +468,36 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
         >
           <div className="mx-auto grid max-w-md grid-cols-5 items-center gap-1">
             <MobileNavLink
-              href={primaryItems[0]?.href ?? dashboardHref}
-              label={primaryItems[0]?.label ?? 'Dashboard'}
-              current={Boolean(primaryItems[0]?.current)}
+              href={mobileQuickItems[0]?.href ?? dashboardHref}
+              label={mobileQuickItems[0]?.label ?? 'Dashboard'}
+              current={Boolean(mobileQuickItems[0]?.current)}
               icon={<Home className="h-4 w-4" aria-hidden="true" />}
             />
             <MobileNavLink
-              href={primaryItems[1]?.href ?? '/coverage'}
-              label={primaryItems[1]?.label ?? 'Schedule'}
-              current={Boolean(primaryItems[1]?.current)}
+              href={mobileQuickItems[1]?.href ?? '/coverage'}
+              label={mobileQuickItems[1]?.label ?? 'Schedule'}
+              current={Boolean(mobileQuickItems[1]?.current)}
               icon={<CalendarDays className="h-4 w-4" aria-hidden="true" />}
             />
-            <Link
-              href={canAccessManagerUi ? '/coverage' : '/therapist/availability'}
-              className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[color:var(--attention)] text-accent-foreground shadow-tw-md no-underline hover:no-underline"
-              aria-label={canAccessManagerUi ? 'Open schedule workspace' : 'Update availability'}
-            >
-              <Plus className="h-5 w-5" aria-hidden="true" />
-            </Link>
             <MobileNavLink
-              href={primaryItems[2]?.href ?? '/team'}
-              label={primaryItems[2]?.label ?? 'People'}
-              current={Boolean(primaryItems[2]?.current)}
-              badgeCount={primaryItems[2]?.badgeCount}
+              href={mobileQuickItems[2]?.href ?? '/therapist/availability'}
+              label={mobileQuickItems[2]?.label ?? 'Availability'}
+              current={Boolean(mobileQuickItems[2]?.current)}
+              icon={<CalendarDays className="h-4 w-4" aria-hidden="true" />}
+            />
+            <MobileNavLink
+              href={mobileQuickItems[3]?.href ?? '/shift-board'}
+              label={mobileQuickItems[3]?.label ?? 'Shift Board'}
+              current={Boolean(mobileQuickItems[3]?.current)}
+              badgeCount={mobileQuickItems[3]?.badgeCount}
               icon={<Users className="h-4 w-4" aria-hidden="true" />}
             />
             <button
               type="button"
-              className="relative flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-lg text-[10px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground"
+              className={cn(
+                'relative flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-lg text-[10px] font-medium transition-colors hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground',
+                moreNavCurrent ? 'text-sidebar-primary' : 'text-sidebar-foreground'
+              )}
               onClick={() => setMobileMenuOpen(true)}
               aria-expanded={mobileMenuOpen}
               aria-label="Open more navigation"

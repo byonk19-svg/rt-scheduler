@@ -150,6 +150,18 @@ const TYPE_META: Record<RequestType, { label: string; color: string; bg: string;
 
 const HISTORY_STATUSES: RequestStatus[] = ['approved', 'denied', 'expired', 'withdrawn']
 
+function getActionOwnerLabel(req: ShiftBoardRequest, canReview: boolean): string {
+  if (req.status !== 'pending') return 'Already handled'
+  if (req.visibility === 'direct' && req.recipientResponse !== 'accepted') {
+    return 'Waiting on teammate'
+  }
+  if (canReview) return 'Needs your action'
+  if (req.type === 'pickup' && req.visibility === 'team' && !req.hasMyInterest) {
+    return 'Open to team'
+  }
+  return 'Waiting on manager'
+}
+
 function formatPickupQueueTimestamp(value: string): string {
   return new Date(value).toLocaleString('en-US', {
     month: 'short',
@@ -497,7 +509,7 @@ export default function ShiftBoardClientPage({
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
-              Shift Swaps &amp; Pickups
+              Shift Board
             </h1>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {canReview
@@ -525,7 +537,7 @@ export default function ShiftBoardClientPage({
               onClick={() => router.push('/requests/new?new=1')}
             >
               <ArrowRightLeft className="h-3.5 w-3.5" />
-              {!canReview && employmentType === 'prn' ? 'Express interest' : 'Post request'}
+              {!canReview && employmentType === 'prn' ? 'Open Shifts' : 'New request'}
             </Button>
             <Button asChild size="sm" variant="outline" className="text-xs">
               <Link href={canReview ? '/availability' : '/therapist/availability'}>
@@ -534,7 +546,7 @@ export default function ShiftBoardClientPage({
             </Button>
             {!canReview && (
               <Button asChild size="sm" variant="ghost" className="text-xs">
-                <Link href="/staff/history">View history</Link>
+                <Link href="/staff/history">History</Link>
               </Button>
             )}
             {canReview && (
@@ -586,7 +598,7 @@ export default function ShiftBoardClientPage({
             </div>
             <div className="flex gap-2">
               <Button size="sm" onClick={() => setStatusFilter('pending')}>
-                Review approvals
+                Needs Action
               </Button>
               <Button size="sm" variant="outline" onClick={() => router.push('/requests/new')}>
                 New request
@@ -599,7 +611,7 @@ export default function ShiftBoardClientPage({
       <div className="fade-up flex gap-1" style={{ animationDelay: '0.08s' }}>
         {(
           [
-            { id: 'open' as const, label: 'Open Posts' },
+            { id: 'open' as const, label: 'Open Shifts' },
             { id: 'history' as const, label: 'History' },
           ] as const
         ).map((tab) => (
@@ -1006,6 +1018,7 @@ function RequestCard({
 }) {
   const statusMeta = STATUS_META[req.status]
   const typeMeta = TYPE_META[req.type]
+  const actionOwnerLabel = getActionOwnerLabel(req, canReview)
   const isPending = req.status === 'pending'
   const pickupQueue =
     req.type === 'pickup' && req.visibility === 'team'
@@ -1059,6 +1072,9 @@ function RequestCard({
             </span>
             <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
               {req.visibility === 'direct' ? 'Direct' : 'Team'}
+            </span>
+            <span className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-foreground">
+              Next: {actionOwnerLabel}
             </span>
             {req.requestKind === 'call_in' ? (
               <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--warning-text)]">
