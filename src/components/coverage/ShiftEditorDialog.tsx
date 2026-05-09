@@ -173,6 +173,111 @@ export function getCandidatePriority({
   }
 }
 
+type CandidatePriority = ReturnType<typeof getCandidatePriority>
+
+type CandidateRowGuidance = {
+  label: string
+  detail: string
+  tone: 'success' | 'warning' | 'muted' | 'selected'
+  disabledReason: string | null
+}
+
+export function getCandidateRowGuidance({
+  role,
+  priority,
+  canEdit,
+  processing,
+}: {
+  role: 'lead' | 'staff'
+  priority: CandidatePriority
+  canEdit: boolean
+  processing: boolean
+}): CandidateRowGuidance {
+  if (!canEdit) {
+    return {
+      label: 'Read-only',
+      detail: 'Managers edit staffing assignments for this shift.',
+      tone: 'muted',
+      disabledReason: 'Read-only',
+    }
+  }
+
+  if (processing) {
+    return {
+      label: 'Saving',
+      detail: 'This assignment is being updated.',
+      tone: 'muted',
+      disabledReason: 'Saving',
+    }
+  }
+
+  if (priority.assignedInRole) {
+    return {
+      label: 'Selected',
+      detail: `Already assigned to this ${role} slot.`,
+      tone: 'selected',
+      disabledReason: null,
+    }
+  }
+
+  if (priority.assignedElsewhere) {
+    return {
+      label: 'Unavailable',
+      detail: `Already assigned as ${role === 'lead' ? 'staff' : 'lead'} on this shift.`,
+      tone: 'warning',
+      disabledReason: 'Already on shift',
+    }
+  }
+
+  if (role === 'lead' && priority.leadSlotTaken) {
+    return {
+      label: 'Lead filled',
+      detail: 'A lead is already assigned. Use only when changing the lead.',
+      tone: 'muted',
+      disabledReason: null,
+    }
+  }
+
+  if (priority.atLimit) {
+    return {
+      label: 'At weekly limit',
+      detail: `Already at ${priority.weeklyLimit} scheduled days this week.`,
+      tone: 'warning',
+      disabledReason: null,
+    }
+  }
+
+  if (priority.recommended) {
+    return {
+      label: 'Best fit',
+      detail: 'Available for this role with room in the weekly workload.',
+      tone: 'success',
+      disabledReason: null,
+    }
+  }
+
+  return {
+    label: 'Available',
+    detail: `Eligible for this ${role} slot. Week ${priority.weekCount}/${priority.weeklyLimit}.`,
+    tone: 'muted',
+    disabledReason: null,
+  }
+}
+
+function guidanceToneClasses(tone: CandidateRowGuidance['tone']): string {
+  switch (tone) {
+    case 'success':
+      return 'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
+    case 'warning':
+      return 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+    case 'selected':
+      return 'border-primary bg-primary/10 text-primary'
+    case 'muted':
+    default:
+      return 'border-border/70 bg-background text-muted-foreground'
+  }
+}
+
 type TherapistRowProps = {
   therapist: TherapistOption
   role: 'lead' | 'staff'
@@ -214,6 +319,8 @@ function TherapistRow({
   const processing =
     (assigning && !assignedInThisRole) || (shiftId !== null && unassigningShiftId === shiftId)
   const disabled = !canEdit || assignedElsewhere || processing
+  const guidance = getCandidateRowGuidance({ role, priority, canEdit, processing })
+  const guidanceId = `coverage-candidate-guidance-${therapist.id}-${role}`
   const employmentTypeLabel =
     therapist.employment_type?.toLowerCase() === 'prn'
       ? '[PRN]'
@@ -237,7 +344,7 @@ function TherapistRow({
         disabled && !assignedInThisRole && 'opacity-60'
       )}
     >
-      <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-extrabold text-muted-foreground">
+      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-extrabold text-muted-foreground">
         {initials(therapist.full_name)}
       </span>
 
@@ -251,18 +358,29 @@ function TherapistRow({
               </span>
             ) : null}
           </p>
-          {priority.recommended ? (
+          <span
+            className={cn(
+              badgeClassName,
+              guidanceToneClasses(guidance.tone)
+            )}
+          >
+            {guidance.label}
+          </span>
+          {guidance.disabledReason ? (
             <span
               className={cn(
                 badgeClassName,
-                'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
+                'border-border/70 bg-muted text-muted-foreground'
               )}
             >
-              Best fit
+              {guidance.disabledReason}
             </span>
           ) : null}
         </div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+        <p id={guidanceId} className="mt-1 text-[11px] leading-snug text-muted-foreground">
+          {guidance.detail}
+        </p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
           <span
             className={cn(
               badgeClassName,
@@ -290,7 +408,7 @@ function TherapistRow({
                 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
               )}
             >
-              Already on day
+              Already on shift
             </span>
           ) : null}
           {priority.atLimit ? (
@@ -328,6 +446,7 @@ function TherapistRow({
             : 'border-border bg-background text-foreground hover:border-primary/50 hover:bg-primary/5',
           disabled && 'cursor-not-allowed opacity-50'
         )}
+        aria-describedby={guidanceId}
         onClick={() => {
           if (disabled) return
           if (assignedInThisRole && shiftId) {
@@ -411,17 +530,30 @@ function DrawerPersonRow({
   dayId,
   shift,
   isLead,
+  canEdit,
+  hasLead,
+  leadEligible,
+  assigning,
   canUpdateAssignmentStatus,
   operationalDetail,
   onChangeStatus,
+  onAssignTherapist,
 }: {
   dayId: string
   shift: ShiftItem
   isLead: boolean
+  canEdit: boolean
+  hasLead: boolean
+  leadEligible: boolean
+  assigning: boolean
   canUpdateAssignmentStatus: boolean
   operationalDetail: ActiveOperationalDetail | null
   onChangeStatus: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => Promise<void> | void
+  onAssignTherapist: (userId: string, role: 'lead' | 'staff') => Promise<void> | void
 }) {
+  const canPromoteToLead = canEdit && !hasLead && !isLead && leadEligible
+  const showLeadEligibilityHint = canEdit && !hasLead && !isLead && !leadEligible
+
   return (
     <div className="flex items-start justify-between gap-3 rounded-xl border border-border/70 bg-card px-3 py-2.5">
       <div className="min-w-0">
@@ -440,7 +572,25 @@ function DrawerPersonRow({
           ) : null}
         </div>
       </div>
-      <div className="shrink-0">
+      <div className="flex shrink-0 flex-col items-end gap-1.5">
+        {canPromoteToLead ? (
+          <button
+            type="button"
+            data-testid={`coverage-make-lead-${shift.id}`}
+            disabled={assigning}
+            className="inline-flex min-h-8 items-center rounded-full border border-primary/50 bg-primary/10 px-3 text-[11px] font-semibold text-primary hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => {
+              void onAssignTherapist(shift.userId, 'lead')
+            }}
+          >
+            {assigning ? 'Saving...' : 'Make lead'}
+          </button>
+        ) : null}
+        {showLeadEligibilityHint ? (
+          <span className="rounded-full border border-border/70 bg-muted px-2 py-1 text-[10px] font-semibold text-muted-foreground">
+            Not lead eligible
+          </span>
+        ) : null}
         <StatusAction
           dayId={dayId}
           shift={shift}
@@ -450,6 +600,66 @@ function DrawerPersonRow({
         />
       </div>
     </div>
+  )
+}
+
+function ResolveMissingLeadPanel({
+  assignedLeadCandidates,
+  assigning,
+  onAssignTherapist,
+}: {
+  assignedLeadCandidates: ShiftItem[]
+  assigning: boolean
+  onAssignTherapist: (userId: string, role: 'lead' | 'staff') => Promise<void> | void
+}) {
+  return (
+    <section
+      data-testid="coverage-resolve-lead-panel"
+      className="space-y-3 rounded-xl border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-3 text-[var(--warning-text)]"
+    >
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-foreground">Resolve missing lead</h2>
+          <p className="mt-0.5 text-xs leading-snug">
+            Pick one lead-eligible therapist already scheduled on this shift, or open add/change
+            staffing for the full lead list.
+          </p>
+        </div>
+      </div>
+
+      {assignedLeadCandidates.length > 0 ? (
+        <div className="space-y-2">
+          {assignedLeadCandidates.map((shift) => (
+            <div
+              key={`lead-candidate-${shift.id}`}
+              className="flex items-center justify-between gap-3 rounded-xl border border-[var(--warning-border)]/65 bg-background px-3 py-2"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-foreground">{shift.name}</p>
+                <p className="text-[11px] text-muted-foreground">Already scheduled staff</p>
+              </div>
+              <button
+                type="button"
+                data-testid={`coverage-resolve-make-lead-${shift.id}`}
+                disabled={assigning}
+                className="inline-flex min-h-9 shrink-0 items-center rounded-full border border-primary/50 bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => {
+                  void onAssignTherapist(shift.userId, 'lead')
+                }}
+              >
+                {assigning ? 'Saving...' : 'Make lead'}
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-[var(--warning-border)]/65 bg-background px-3 py-2 text-sm text-muted-foreground">
+          No assigned staff are lead-eligible. Open add/change staffing and choose a lead
+          therapist.
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -561,10 +771,23 @@ export function ShiftEditorDialog({
   const activeCount = selectedDay ? countActive(selectedDay) : 0
   const coverageBadge = coverageState(selectedDay, activeCount)
   const actorPresence = selectedDay ? resolveActorPresence(selectedDay, actorUserId) : null
+  const leadEligibleTherapistIds = useMemo(
+    () =>
+      new Set(
+        therapists.filter((therapist) => therapist.isLeadEligible).map((therapist) => therapist.id)
+      ),
+    [therapists]
+  )
+  const assignedLeadCandidates = useMemo(
+    () =>
+      selectedDay?.staffShifts.filter((shift) => leadEligibleTherapistIds.has(shift.userId)) ?? [],
+    [leadEligibleTherapistIds, selectedDay]
+  )
   const hasLotteryStatus = operationalEntries.some(
     ({ shift }) => shift.status === 'cancelled' || shift.status === 'oncall'
   )
   const showLotteryLink = assignedCount > 4 || hasLotteryStatus
+  const openEditStaffingByDefault = canEdit && !hasLead && assignedLeadCandidates.length === 0
   const lotteryHref = selectedDay
     ? `/lottery?date=${selectedDay.isoDate}&shift=${selectedDay.shiftType.toLowerCase()}`
     : '/lottery'
@@ -693,10 +916,11 @@ export function ShiftEditorDialog({
               ) : null}
 
               {!hasLead && canEdit ? (
-                <div className="flex items-start gap-2 rounded-xl border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-2 text-[12px] text-[var(--warning-text)]">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>No lead assigned. A lead therapist is required for this shift.</span>
-                </div>
+                <ResolveMissingLeadPanel
+                  assignedLeadCandidates={assignedLeadCandidates}
+                  assigning={assigning}
+                  onAssignTherapist={onAssignTherapist}
+                />
               ) : null}
 
               {showLotteryLink ? (
@@ -712,123 +936,145 @@ export function ShiftEditorDialog({
                 </div>
               ) : null}
 
-              <section className="space-y-2">
-                <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Your status
-                </h2>
-                {actorPresence ? (
-                  <div className="rounded-xl border border-border/70 bg-card px-3 py-2.5">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground">
-                          {actorPresence.label}
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {actorPresence.detail}
-                        </p>
-                      </div>
-                      {actorPresence.shift ? (
-                        <div className="flex shrink-0 items-center gap-1.5">
-                          {actorPresence.isLead ? (
-                            <span className="rounded-full border border-[var(--info-border)] bg-[var(--info-subtle)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--info-text)]">
-                              Lead
-                            </span>
-                          ) : null}
-                          <InlineStatusChip status={actorPresence.shift.status} />
+              {!canEdit ? (
+                <section className="space-y-2">
+                  <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    Your status
+                  </h2>
+                  {actorPresence ? (
+                    <div className="rounded-xl border border-border/70 bg-card px-3 py-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground">
+                            {actorPresence.label}
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {actorPresence.detail}
+                          </p>
                         </div>
-                      ) : null}
+                        {actorPresence.shift ? (
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            {actorPresence.isLead ? (
+                              <span className="rounded-full border border-[var(--info-border)] bg-[var(--info-subtle)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--info-text)]">
+                                Lead
+                              </span>
+                            ) : null}
+                            <InlineStatusChip status={actorPresence.shift.status} />
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
+
+              {!canEdit ? (
+                <section className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      Coverage details
+                    </h2>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-xl border border-border/70 bg-card px-3 py-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                        Target
+                      </p>
+                      <p className="mt-1 tabular-nums text-sm font-semibold text-foreground">4</p>
+                    </div>
+                    <div className="rounded-xl border border-border/70 bg-card px-3 py-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                        Scheduled
+                      </p>
+                      <p className="mt-1 tabular-nums text-sm font-semibold text-foreground">
+                        {assignedCount}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-border/70 bg-card px-3 py-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                        Active
+                      </p>
+                      <p className="mt-1 tabular-nums text-sm font-semibold text-foreground">
+                        {activeCount}
+                      </p>
                     </div>
                   </div>
-                ) : null}
-              </section>
+                </section>
+              ) : null}
 
-              <section className="space-y-2">
+              <section className="space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    Coverage details
-                  </h2>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="rounded-xl border border-border/70 bg-card px-3 py-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                      Target
-                    </p>
-                    <p className="mt-1 tabular-nums text-sm font-semibold text-foreground">4</p>
-                  </div>
-                  <div className="rounded-xl border border-border/70 bg-card px-3 py-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                      Scheduled
-                    </p>
-                    <p className="mt-1 tabular-nums text-sm font-semibold text-foreground">
-                      {assignedCount}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-border/70 bg-card px-3 py-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                      Active
-                    </p>
-                    <p className="mt-1 tabular-nums text-sm font-semibold text-foreground">
-                      {activeCount}
-                    </p>
-                  </div>
-                </div>
-              </section>
-
-              <section className="space-y-2">
-                <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Lead
-                </h2>
-                {selectedDay.leadShift ? (
-                  <DrawerPersonRow
-                    dayId={selectedDay.id}
-                    shift={selectedDay.leadShift}
-                    isLead
-                    canUpdateAssignmentStatus={canUpdateAssignmentStatus}
-                    operationalDetail={activeOperationalDetails.get(selectedDay.leadShift.id) ?? null}
-                    onChangeStatus={onChangeStatus}
-                  />
-                ) : (
-                  <div className="rounded-xl border border-dashed border-[var(--warning-border)] bg-[var(--warning-subtle)]/35 px-3 py-2 text-sm text-[var(--warning-text)]">
-                    No lead assigned.
-                  </div>
-                )}
-              </section>
-
-              <section className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    Staff
+                    Current staffing
                   </h2>
                   <span className="text-xs text-muted-foreground">
-                    {selectedDay.staffShifts.length} assigned
+                    {assignedCount}/4 scheduled
                   </span>
                 </div>
-                {selectedDay.staffShifts.length > 0 ? (
-                  <div className="space-y-2">
-                    {selectedDay.staffShifts.map((shift) => (
-                      <DrawerPersonRow
-                        key={shift.id}
-                        dayId={selectedDay.id}
-                        shift={shift}
-                        isLead={false}
-                        canUpdateAssignmentStatus={canUpdateAssignmentStatus}
-                        operationalDetail={activeOperationalDetails.get(shift.id) ?? null}
-                        onChangeStatus={onChangeStatus}
-                      />
-                    ))}
+
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-foreground">Lead</h3>
+                  {selectedDay.leadShift ? (
+                    <DrawerPersonRow
+                      dayId={selectedDay.id}
+                      shift={selectedDay.leadShift}
+                      isLead
+                      canEdit={canEdit}
+                      hasLead={hasLead}
+                      leadEligible
+                      assigning={assigning}
+                      canUpdateAssignmentStatus={canUpdateAssignmentStatus}
+                      operationalDetail={activeOperationalDetails.get(selectedDay.leadShift.id) ?? null}
+                      onChangeStatus={onChangeStatus}
+                      onAssignTherapist={onAssignTherapist}
+                    />
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-[var(--warning-border)] bg-[var(--warning-subtle)]/35 px-3 py-2 text-sm text-[var(--warning-text)]">
+                      No lead assigned. Use Make lead on an assigned staff row below, or choose a
+                      lead from add/change staffing.
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-foreground">Staff</h3>
+                    <span className="text-xs text-muted-foreground">
+                      {selectedDay.staffShifts.length} assigned
+                    </span>
                   </div>
-                ) : (
-                  <div className="rounded-xl border border-border/70 bg-card px-3 py-2 text-sm text-muted-foreground">
-                    No staff assigned.
-                  </div>
-                )}
+                  {selectedDay.staffShifts.length > 0 ? (
+                    <div className="space-y-2">
+                      {selectedDay.staffShifts.map((shift) => (
+                        <DrawerPersonRow
+                          key={shift.id}
+                          dayId={selectedDay.id}
+                          shift={shift}
+                          isLead={false}
+                          canEdit={canEdit}
+                          hasLead={hasLead}
+                          leadEligible={leadEligibleTherapistIds.has(shift.userId)}
+                          assigning={assigning}
+                          canUpdateAssignmentStatus={canUpdateAssignmentStatus}
+                          operationalDetail={activeOperationalDetails.get(shift.id) ?? null}
+                          onChangeStatus={onChangeStatus}
+                          onAssignTherapist={onAssignTherapist}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-border/70 bg-card px-3 py-2 text-sm text-muted-foreground">
+                      No staff assigned.
+                    </div>
+                  )}
+                </div>
               </section>
 
-              <section className="space-y-2">
+              {operationalEntries.length > 0 ? (
+                <section className="space-y-2">
                 <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                   Operational statuses
                 </h2>
-                {operationalEntries.length > 0 ? (
                   <div className="space-y-2">
                     {operationalEntries.map(({ shift, isLead, detail }) => (
                       <div
@@ -855,18 +1101,14 @@ export function ShiftEditorDialog({
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <div className="rounded-xl border border-border/70 bg-card px-3 py-2 text-sm text-muted-foreground">
-                    None
-                  </div>
-                )}
               </section>
+              ) : null}
 
-              <section className="space-y-2">
+              {selectedDayNotes.length > 0 ? (
+                <section className="space-y-2">
                 <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                   Notes
                 </h2>
-                {selectedDayNotes.length > 0 ? (
                   <div className="space-y-2">
                     {selectedDayNotes.map((note) => (
                       <div key={note} className="rounded-xl border border-border/70 bg-card px-3 py-2 text-sm text-foreground/80">
@@ -874,27 +1116,32 @@ export function ShiftEditorDialog({
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <div className="rounded-xl border border-border/70 bg-card px-3 py-2 text-sm text-muted-foreground">
-                    —
-                  </div>
-                )}
-              </section>
+                </section>
+              ) : null}
 
               {canEdit ? (
-                <section className="space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      Edit staffing
-                    </h2>
-                    <span className="text-xs text-muted-foreground">
-                      Manager-only actions
-                    </span>
-                  </div>
+                <details
+                  className="group space-y-3 rounded-xl border border-border/80 bg-card px-3 py-3"
+                  open={openEditStaffingByDefault}
+                >
+                  <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-sm font-semibold text-foreground">Add or change staffing</h2>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Use this when the current team is not the right fit.
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-xs text-muted-foreground">Manager-only</span>
+                  </summary>
 
-                  <section className="space-y-2">
+                  <section className="mt-3 space-y-2">
                     <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-sm font-semibold text-foreground">Lead therapists</h3>
+                      <div>
+                        <h3 className="text-sm font-semibold text-foreground">Lead therapists</h3>
+                        <p className="text-[11px] text-muted-foreground">
+                          Lead-eligible therapists are sorted by assignment fit and weekly load.
+                        </p>
+                      </div>
                       <span className="text-[11px] text-muted-foreground">
                         {leadTherapists.length} options
                       </span>
@@ -921,7 +1168,12 @@ export function ShiftEditorDialog({
 
                   <section className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-sm font-semibold text-foreground">Staff therapists</h3>
+                      <div>
+                        <h3 className="text-sm font-semibold text-foreground">Staff therapists</h3>
+                        <p className="text-[11px] text-muted-foreground">
+                          Available staff appear first; unavailable rows explain the blocker.
+                        </p>
+                      </div>
                       <span className="text-[11px] text-muted-foreground">
                         {staffTherapists.length} options
                       </span>
@@ -952,7 +1204,7 @@ export function ShiftEditorDialog({
                       <span>No eligible therapists for this shift because of current constraints.</span>
                     </div>
                   ) : null}
-                </section>
+                </details>
               ) : null}
             </div>
           </>

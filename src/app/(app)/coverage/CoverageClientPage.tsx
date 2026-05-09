@@ -766,6 +766,28 @@ export function CoverageClientPage({
           }
           setAssignError('')
           setRosterCellError(null)
+          setDays((current) =>
+            current.map((day) => {
+              if (day.id !== targetDay.id) return day
+
+              const promotedLead =
+                day.staffShifts.find((shift) => shift.userId === userId) ?? staffShift
+              const demotedLead =
+                day.leadShift && day.leadShift.userId !== userId ? day.leadShift : null
+
+              if (!promotedLead) return day
+
+              return {
+                ...day,
+                leadShift: promotedLead,
+                staffShifts: [
+                  ...(demotedLead ? [demotedLead] : []),
+                  ...day.staffShifts.filter((shift) => shift.userId !== userId),
+                ].sort((a, b) => a.name.localeCompare(b.name)),
+                dayStatus: 'published' as DayStatus,
+              }
+            })
+          )
           router.refresh()
           setAssigning(false)
           return
