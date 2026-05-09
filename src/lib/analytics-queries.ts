@@ -212,6 +212,7 @@ export async function getForcedDateMisses(supabase: SupabaseClientLike) {
   )
 
   return overrides.map((override) => ({
+    therapistId: override.therapist_id,
     therapistName: getOne(override.profiles)?.full_name ?? 'Unknown therapist',
     date: override.date,
     cycleLabel: getOne(override.schedule_cycles)?.label ?? override.cycle_id,

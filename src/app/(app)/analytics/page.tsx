@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
+import { AnalyticsSummaryStrip } from '@/components/analytics/AnalyticsSummaryStrip'
 import { CycleFillRateChart } from '@/components/analytics/CycleFillRateChart'
 
 export const metadata: Metadata = {
@@ -59,7 +60,22 @@ export default async function AnalyticsPage() {
         subtitle="Cycle fill rates, submission compliance, and forced-date miss patterns."
       />
 
+      <AnalyticsSummaryStrip
+        fillRates={fillRates}
+        submissionCompliance={submissionCompliance}
+        forcedDateMisses={forcedDateMisses}
+      />
+
       <CycleFillRateChart rows={fillRates} idealCoveragePerShift={idealCoveragePerShift} />
+
+      <div className="flex items-center gap-3 px-1">
+        <div className="h-px flex-1 bg-border" />
+        <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+          Compliance tracking
+        </p>
+        <div className="h-px flex-1 bg-border" />
+      </div>
+
       <SubmissionComplianceTable rows={submissionCompliance} />
       <ForcedDateMissTable rows={forcedDateMisses} />
     </div>

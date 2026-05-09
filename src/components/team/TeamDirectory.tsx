@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ChevronDown, ChevronsDownUp, ChevronsUpDown, RotateCcw } from 'lucide-react'
 
 import { FormSubmitButton } from '@/components/form-submit-button'
@@ -32,7 +32,6 @@ import {
   TeamDirectorySummaryChips,
   type DirectoryChipFilter,
 } from '@/components/team/team-directory-summary-chips'
-import { BulkActionBar } from '@/components/team/BulkActionBar'
 import { TeamPersonRow } from '@/components/team/team-person-row'
 import { getTeamRolePermissions } from '@/lib/team-role-permissions'
 import { cn } from '@/lib/utils'
@@ -52,7 +51,6 @@ type TeamDirectoryProps = {
   initialEditProfileId?: string | null
   archiveTeamMemberAction: (formData: FormData) => void | Promise<void>
   saveTeamQuickEditAction: (formData: FormData) => void | Promise<void>
-  bulkUpdateTeamMembersAction: (formData: FormData) => void | Promise<void>
 }
 
 type EditableRole = 'manager' | 'lead' | 'therapist'
@@ -173,8 +171,6 @@ function CollapsibleTeamGroup({
   count,
   isOpen,
   onToggle,
-  allSelected,
-  onToggleSelectAll,
   children,
 }: {
   sectionKey: TeamDirectorySectionKey
@@ -182,8 +178,6 @@ function CollapsibleTeamGroup({
   count: number
   isOpen: boolean
   onToggle: (sectionKey: TeamDirectorySectionKey, nextOpen: boolean) => void
-  allSelected: boolean
-  onToggleSelectAll: (checked: boolean) => void
   children: ReactNode
 }) {
   if (count === 0) return null
@@ -193,13 +187,6 @@ function CollapsibleTeamGroup({
   return (
     <section className="border-b border-border/70 pb-1 last:border-b-0">
       <div className="flex items-center gap-2 px-2 py-1.5">
-        <input
-          type="checkbox"
-          className="h-11 w-11 rounded border-border text-primary focus-visible:ring-2 focus-visible:ring-ring sm:h-6 sm:w-6"
-          checked={allSelected}
-          onChange={(event) => onToggleSelectAll(event.target.checked)}
-          aria-label={`Select all in ${title}`}
-        />
         <button
           type="button"
           id={summaryId}
@@ -234,21 +221,10 @@ function CollapsibleTeamGroup({
   )
 }
 
-function renderGroupRows(
-  profiles: TeamProfileRecord[],
-  onOpen: (id: string) => void,
-  selectedIds: Set<string>,
-  onToggleSelected: (id: string) => void
-): ReactNode {
+function renderGroupRows(profiles: TeamProfileRecord[], onOpen: (id: string) => void): ReactNode {
   if (profiles.length === 0) return null
   return profiles.map((profile) => (
-    <TeamPersonRow
-      key={profile.id}
-      profile={profile}
-      onOpen={onOpen}
-      isSelected={selectedIds.has(profile.id)}
-      onToggle={() => onToggleSelected(profile.id)}
-    />
+    <TeamPersonRow key={profile.id} profile={profile} onOpen={onOpen} />
   ))
 }
 
@@ -305,9 +281,7 @@ export function TeamDirectory({
   initialEditProfileId = null,
   archiveTeamMemberAction,
   saveTeamQuickEditAction,
-  bulkUpdateTeamMembersAction,
 }: TeamDirectoryProps) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [chipFilter, setChipFilter] = useState<DirectoryChipFilter>('all')
   const [formFilters, setFormFilters] = useState<TeamDirectoryFilterState>({
@@ -466,41 +440,6 @@ export function TeamDirectory({
     })
   }
 
-  const onToggleSelected = useCallback((id: string) => {
-    setSelectedIds((current) => {
-      const next = new Set(current)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }, [])
-
-  const onToggleGroupSelected = useCallback((ids: string[], checked: boolean) => {
-    setSelectedIds((current) => {
-      const next = new Set(current)
-      for (const id of ids) {
-        if (checked) next.add(id)
-        else next.delete(id)
-      }
-      return next
-    })
-  }, [])
-
-  const onApplyBulk = useCallback(
-    (action: string, value?: string) => {
-      if (selectedIds.size === 0) return
-      const formData = new FormData()
-      for (const id of selectedIds) {
-        formData.append('profile_ids', id)
-      }
-      formData.set('bulk_action', action)
-      if (value) formData.set('bulk_value', value)
-      setSelectedIds(new Set())
-      void bulkUpdateTeamMembersAction(formData)
-    },
-    [bulkUpdateTeamMembersAction, selectedIds]
-  )
-
   return (
     <>
       <div className="space-y-2 rounded-lg border border-border/60 bg-background p-2">
@@ -563,12 +502,7 @@ export function TeamDirectory({
         />
       </div>
 
-      <div
-        className={cn(
-          'space-y-1.5 rounded-lg border border-border/60 bg-card/30 p-2',
-          selectedIds.size > 0 && 'pb-24'
-        )}
-      >
+      <div className="space-y-1.5 rounded-lg border border-border/60 bg-card/30 p-2">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-sm font-semibold text-foreground">Grouped staff directory</h2>
           {hasActiveFilters ? (
@@ -582,18 +516,8 @@ export function TeamDirectory({
           count={sections.managers.length}
           isOpen={effectiveSectionOpenState.managers}
           onToggle={handleSectionToggle}
-          allSelected={
-            sections.managers.length > 0 &&
-            sections.managers.every((profile) => selectedIds.has(profile.id))
-          }
-          onToggleSelectAll={(checked) =>
-            onToggleGroupSelected(
-              sections.managers.map((profile) => profile.id),
-              checked
-            )
-          }
         >
-          {renderGroupRows(sections.managers, openEditor, selectedIds, onToggleSelected)}
+          {renderGroupRows(sections.managers, openEditor)}
         </CollapsibleTeamGroup>
 
         <CollapsibleTeamGroup
@@ -602,18 +526,8 @@ export function TeamDirectory({
           count={sections.dayLeads.length}
           isOpen={effectiveSectionOpenState.dayLeads}
           onToggle={handleSectionToggle}
-          allSelected={
-            sections.dayLeads.length > 0 &&
-            sections.dayLeads.every((profile) => selectedIds.has(profile.id))
-          }
-          onToggleSelectAll={(checked) =>
-            onToggleGroupSelected(
-              sections.dayLeads.map((profile) => profile.id),
-              checked
-            )
-          }
         >
-          {renderGroupRows(sections.dayLeads, openEditor, selectedIds, onToggleSelected)}
+          {renderGroupRows(sections.dayLeads, openEditor)}
         </CollapsibleTeamGroup>
 
         <CollapsibleTeamGroup
@@ -622,18 +536,8 @@ export function TeamDirectory({
           count={sections.dayTherapists.length}
           isOpen={effectiveSectionOpenState.dayTherapists}
           onToggle={handleSectionToggle}
-          allSelected={
-            sections.dayTherapists.length > 0 &&
-            sections.dayTherapists.every((profile) => selectedIds.has(profile.id))
-          }
-          onToggleSelectAll={(checked) =>
-            onToggleGroupSelected(
-              sections.dayTherapists.map((profile) => profile.id),
-              checked
-            )
-          }
         >
-          {renderGroupRows(sections.dayTherapists, openEditor, selectedIds, onToggleSelected)}
+          {renderGroupRows(sections.dayTherapists, openEditor)}
         </CollapsibleTeamGroup>
 
         <CollapsibleTeamGroup
@@ -642,18 +546,8 @@ export function TeamDirectory({
           count={sections.nightLeads.length}
           isOpen={effectiveSectionOpenState.nightLeads}
           onToggle={handleSectionToggle}
-          allSelected={
-            sections.nightLeads.length > 0 &&
-            sections.nightLeads.every((profile) => selectedIds.has(profile.id))
-          }
-          onToggleSelectAll={(checked) =>
-            onToggleGroupSelected(
-              sections.nightLeads.map((profile) => profile.id),
-              checked
-            )
-          }
         >
-          {renderGroupRows(sections.nightLeads, openEditor, selectedIds, onToggleSelected)}
+          {renderGroupRows(sections.nightLeads, openEditor)}
         </CollapsibleTeamGroup>
 
         <CollapsibleTeamGroup
@@ -662,18 +556,8 @@ export function TeamDirectory({
           count={sections.nightTherapists.length}
           isOpen={effectiveSectionOpenState.nightTherapists}
           onToggle={handleSectionToggle}
-          allSelected={
-            sections.nightTherapists.length > 0 &&
-            sections.nightTherapists.every((profile) => selectedIds.has(profile.id))
-          }
-          onToggleSelectAll={(checked) =>
-            onToggleGroupSelected(
-              sections.nightTherapists.map((profile) => profile.id),
-              checked
-            )
-          }
         >
-          {renderGroupRows(sections.nightTherapists, openEditor, selectedIds, onToggleSelected)}
+          {renderGroupRows(sections.nightTherapists, openEditor)}
         </CollapsibleTeamGroup>
 
         <CollapsibleTeamGroup
@@ -682,18 +566,8 @@ export function TeamDirectory({
           count={sections.inactive.length}
           isOpen={effectiveSectionOpenState.inactive}
           onToggle={handleSectionToggle}
-          allSelected={
-            sections.inactive.length > 0 &&
-            sections.inactive.every((profile) => selectedIds.has(profile.id))
-          }
-          onToggleSelectAll={(checked) =>
-            onToggleGroupSelected(
-              sections.inactive.map((profile) => profile.id),
-              checked
-            )
-          }
         >
-          {renderGroupRows(sections.inactive, openEditor, selectedIds, onToggleSelected)}
+          {renderGroupRows(sections.inactive, openEditor)}
         </CollapsibleTeamGroup>
       </div>
 
@@ -702,12 +576,6 @@ export function TeamDirectory({
           <p className="text-sm text-muted-foreground">No people match these filters.</p>
         </div>
       )}
-
-      <BulkActionBar
-        selectedCount={selectedIds.size}
-        onClear={() => setSelectedIds(new Set())}
-        onApply={onApplyBulk}
-      />
 
       <Dialog open={Boolean(editProfile)} onOpenChange={(open) => !open && setEditProfileId(null)}>
         {editProfile && (

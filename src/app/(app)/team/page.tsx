@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation'
 
 import {
   archiveTeamMemberAction,
-  bulkUpdateTeamMembersAction,
   bulkUpsertEmployeeRosterAction,
   deleteEmployeeRosterEntryAction,
   replaceTherapistRosterAction,
@@ -335,7 +334,6 @@ export default async function TeamPage({
         bulkUpsertEmployeeRosterAction={bulkUpsertEmployeeRosterAction}
         replaceTherapistRosterAction={replaceTherapistRosterAction}
         deleteEmployeeRosterEntryAction={deleteEmployeeRosterEntryAction}
-        bulkUpdateTeamMembersAction={bulkUpdateTeamMembersAction}
       />
     </div>
   )
