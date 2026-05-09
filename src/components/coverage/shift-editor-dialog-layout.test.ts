@@ -19,8 +19,12 @@ describe('ShiftEditorDialog layout', () => {
   })
 
   it('uses explicit staffing-edit wording and a detail-drawer description', () => {
+    expect(shiftEditorSource).toContain('Coverage shift editor')
     expect(shiftEditorSource).toContain(
-      'Review daily staffing, operational notes, and edit actions for this shift.'
+      'Manager staffing changes and post-publish guardrails for this selected shift.'
+    )
+    expect(shiftEditorSource).toContain(
+      'Read-only shared schedule context for this selected shift.'
     )
     expect(shiftEditorSource).toContain('Operational notes')
     expect(shiftEditorSource).toContain('Past date')
@@ -45,6 +49,7 @@ describe('ShiftEditorDialog layout', () => {
   it('does not contain YOUR STATUS section', () => {
     expect(shiftEditorSource).not.toContain('YOUR STATUS')
     expect(shiftEditorSource).not.toContain('resolveActorPresence')
+    expect(shiftEditorSource).not.toContain('You are not scheduled')
   })
 })
 

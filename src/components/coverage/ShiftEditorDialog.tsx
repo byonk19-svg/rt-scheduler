@@ -185,23 +185,38 @@ function PanelHeader({
   activeCount,
   assignedCount,
   coverageBadge,
+  canEdit,
+  canUpdateAssignmentStatus,
 }: {
   selectedDay: SelectedDay
   activeCount: number
   assignedCount: number
   coverageBadge: ReturnType<typeof coverageState>
+  canEdit: boolean
+  canUpdateAssignmentStatus: boolean
 }) {
   const progress = Math.min((activeCount / 4) * 100, 100)
+  const drawerModeLabel = canEdit ? 'Coverage shift editor' : 'Team Schedule details'
+  const drawerModeDescription = canEdit
+    ? 'Manager staffing changes and post-publish guardrails for this selected shift.'
+    : canUpdateAssignmentStatus
+      ? 'Shared schedule context with lead-only operational status updates.'
+      : 'Read-only shared schedule context for this selected shift.'
 
   return (
     <DialogHeader className="sticky top-0 z-10 gap-2 border-b border-border bg-background px-5 pb-3 pt-4 text-left">
       <div className="flex flex-wrap items-start justify-between gap-3 pr-10">
         <div className="min-w-0">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            {drawerModeLabel}
+          </p>
           <DialogTitle className="font-heading text-[1.25rem] font-semibold tracking-tight text-foreground">
             {formatDrawerDate(selectedDay.isoDate)} - {selectedDay.shiftType} shift
           </DialogTitle>
           <DialogDescription className="sr-only">
-            Review daily staffing, operational notes, and edit actions for this shift.
+            {canEdit
+              ? 'Review manager staffing actions and guardrails for this selected shift.'
+              : 'Review shared schedule details for this selected shift.'}
           </DialogDescription>
           <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
             <div
@@ -215,6 +230,9 @@ function PanelHeader({
             </span>
             <span className="text-muted-foreground/70">({assignedCount} assigned)</span>
           </div>
+          <p className="mt-1 max-w-[34rem] text-xs text-muted-foreground">
+            {drawerModeDescription}
+          </p>
         </div>
         <span
           className={cn(
@@ -926,6 +944,8 @@ export function ShiftEditorDialog({
               activeCount={activeCount}
               assignedCount={assignedCount}
               coverageBadge={coverageBadge}
+              canEdit={canEdit}
+              canUpdateAssignmentStatus={canUpdateAssignmentStatus}
             />
             <PastDateBar
               canEdit={canEdit}

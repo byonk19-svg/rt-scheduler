@@ -433,6 +433,14 @@ test.describe.serial('coverage display regressions', () => {
     )
     await expect(dayCellButton).toBeVisible()
     await dayCellButton.click({ position: { x: 18, y: 18 } })
-    await expect(page.getByTestId('coverage-shift-editor-dialog')).toBeVisible()
+    const drawer = page.getByTestId('coverage-shift-editor-dialog')
+    await expect(drawer).toBeVisible()
+    await expect(drawer.getByText('Coverage shift editor')).toBeVisible()
+    await expect(
+      drawer.getByText(
+        'Manager staffing changes and post-publish guardrails for this selected shift.'
+      )
+    ).toBeVisible()
+    await expect(drawer.getByText('Your status')).toHaveCount(0)
   })
 })
