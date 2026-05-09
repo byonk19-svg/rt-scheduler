@@ -368,6 +368,7 @@ export function CoverageClientPage({
   const autoDraftFormRef = useRef<HTMLFormElement>(null)
   const clearDraftFormRef = useRef<HTMLFormElement>(null)
   const deferredSelectedId = useDeferredValue(selectedId)
+  const lastSnapshotCycleIdRef = useRef<string | null>(initialSnapshot.activeCycleId)
   const days = shiftTab === 'Day' ? dayDays : nightDays
   const setDays = shiftTab === 'Day' ? setDayDays : setNightDays
   const totalWeeks = Math.max(Math.ceil(days.length / 7), 1)
@@ -472,6 +473,8 @@ export function CoverageClientPage({
   }, [initialViewMode])
 
   useEffect(() => {
+    const snapshotCycleChanged = lastSnapshotCycleIdRef.current !== initialSnapshot.activeCycleId
+    lastSnapshotCycleIdRef.current = initialSnapshot.activeCycleId
     profileDefaultAppliedRef.current = shiftTabLockedFromUrl
     setShiftTab(initialShiftTab)
     setDayDays(initialSnapshot.dayDays)
@@ -491,7 +494,13 @@ export function CoverageClientPage({
     setActiveOpCodes(new Map(Object.entries(initialSnapshot.activeOpCodes)))
     setActiveOperationalDetails(new Map(Object.entries(initialSnapshot.activeOperationalDetails)))
     setLoading(false)
-    setSelectedId(null)
+    setSelectedId((current) => {
+      if (!current || snapshotCycleChanged) return null
+      const selectedDateStillExists =
+        initialSnapshot.dayDays.some((day) => day.id === current) ||
+        initialSnapshot.nightDays.some((day) => day.id === current)
+      return selectedDateStillExists ? current : null
+    })
     setWeekOffset(0)
     setSelectedCycleHasShiftRows(initialSnapshot.selectedCycleHasShiftRows)
     setError(initialSnapshot.error)
@@ -691,9 +700,7 @@ export function CoverageClientPage({
   }
 
   const handleSelect = useCallback((id: string) => {
-    window.requestAnimationFrame(() => {
-      setSelectedId((prev) => (prev === id ? null : id))
-    })
+    setSelectedId((prev) => (prev === id ? null : id))
     setAssignError('')
     setRosterCellError(null)
   }, [])
