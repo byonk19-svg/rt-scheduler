@@ -861,7 +861,7 @@ export function CoverageClientPage({
         setDays((current) =>
           current.map((day) => {
             if (day.id !== targetDay.id) return day
-            return { ...day, leadShift: nextShift, dayStatus: 'published' as DayStatus }
+            return { ...day, leadShift: nextShift, dayStatus: 'ok' as DayStatus }
           })
         )
       } else {

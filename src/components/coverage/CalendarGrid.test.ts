@@ -26,7 +26,7 @@ function makeDay(overrides: Partial<DayItem> = {}): DayItem {
     isoDate: '2026-05-01',
     date: 1,
     label: 'Fri, May 1',
-    dayStatus: 'published',
+    dayStatus: 'ok',
     constraintBlocked: false,
     leadShift: makeShift(),
     staffShifts: [],
