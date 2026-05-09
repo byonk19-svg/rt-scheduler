@@ -14,29 +14,37 @@ describe('ShiftEditorDialog layout', () => {
     expect(shiftEditorSource).toContain('right-0 top-0 flex h-dvh')
     expect(shiftEditorSource).toContain("w-[min(460px,100vw)]")
     expect(shiftEditorSource).toContain('rounded-none')
-    expect(shiftEditorSource).toContain('rounded-[16px]')
-    expect(shiftEditorSource).toContain('min-w-[82px]')
+    expect(shiftEditorSource).toContain('rounded-xl')
+    expect(shiftEditorSource).toContain('min-w-[96px]')
   })
 
   it('uses explicit staffing-edit wording and a detail-drawer description', () => {
-    expect(shiftEditorSource).toContain('Edit staffing')
     expect(shiftEditorSource).toContain(
-      'Review daily staffing details, operational statuses, notes, and edit actions for this shift.'
+      'Review daily staffing, operational notes, and edit actions for this shift.'
     )
-    expect(shiftEditorSource).toContain('Your status')
-    expect(shiftEditorSource).toContain('You are assigned as lead')
-    expect(shiftEditorSource).toContain('You work this day')
-    expect(shiftEditorSource).toContain('You are not scheduled')
-    expect(shiftEditorSource).toContain('Operational statuses')
-    expect(shiftEditorSource).toContain('Managers edit staffing assignments.')
+    expect(shiftEditorSource).toContain('Operational notes')
+    expect(shiftEditorSource).toContain('Past date')
     expect(shiftEditorSource).toContain('Lottery decision available')
     expect(shiftEditorSource).toContain('Open Lottery for this shift')
     expect(shiftEditorSource).toContain('/lottery?date=${selectedDay.isoDate}&shift=${selectedDay.shiftType.toLowerCase()}')
   })
 
-  it('receives actor identity for read-only selected-day context', () => {
+  it('keeps actor identity in the prop contract without manager status UI', () => {
     expect(shiftEditorSource).toContain('actorUserId: string | null')
-    expect(shiftEditorSource).toContain('function resolveActorPresence')
+    expect(shiftEditorSource).not.toContain('function resolveActorPresence')
+  })
+
+  it('uses an inline picker with search, not a static scrollable list', () => {
+    expect(shiftEditorSource).toContain('pickerMode')
+    expect(shiftEditorSource).toContain('pickerQuery')
+    expect(shiftEditorSource).toContain('Search therapists')
+    expect(shiftEditorSource).toContain('Add to shift')
+    expect(shiftEditorSource).toContain('Assign lead')
+  })
+
+  it('does not contain YOUR STATUS section', () => {
+    expect(shiftEditorSource).not.toContain('YOUR STATUS')
+    expect(shiftEditorSource).not.toContain('resolveActorPresence')
   })
 })
 
