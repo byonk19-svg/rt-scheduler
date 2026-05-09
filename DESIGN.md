@@ -187,25 +187,19 @@ Three visual states for `RosterMatrixTable` and the six-week compact board:
 
 ### Shipped wiring (2026-04-11)
 
-- **`src/app/layout.tsx`:** `DM_Sans` with CSS variable `--font-dm-sans` (body + UI); `Fraunces` with `--font-display` (loaded on `<html>`). Plus Jakarta removed per typography spec.
-- **`src/app/globals.css`:** `--font-sans` resolves to DM Sans; `.font-heading` / `.app-page-title` use sans only; `.font-display` uses `var(--font-display)` for serif display.
-- **Marketing / auth:** Homepage hero (`src/app/page.tsx`) and login/signup brand column use `.font-display` for the large line only; forms and page titles stay sans.
 - **Data density:** Inbox metric card values use `tabular-nums` (`ManagerTriageDashboard`); extend the same class anywhere counts and dates should align in columns.
-- **2026-04-11 (pass 2):** `tabular-nums` on `StatsCard` and shift-board `KpiTile` values; `Geist_Mono` loaded in `layout.tsx` with `--font-geist-mono` (see `@theme` `--font-mono`); decorative backgrounds in `globals.css` (`.teamwise-grid-bg*`, `.teamwise-aurora-bg`, table row hover, new `.teamwise-hero-grid-bg`) use `color-mix` with `var(--primary)` / `var(--muted)` instead of hardcoded RGB; homepage hero grid uses `.teamwise-hero-grid-bg`; `StatsCard` shadow uses `color-mix` with `var(--foreground)`.
-- **2026-04-11 (pass 3 — elevation):** Legacy arbitrary slate shadows removed; canonical list and usage guidance is **Shadow map** above (source: `globals.css` → `Elevation shadows`).
+- **Pass 2:** `tabular-nums` on `StatsCard` and shift-board `KpiTile` values; `Geist_Mono` loaded in `layout.tsx` with `--font-geist-mono` (see `@theme` `--font-mono`); decorative backgrounds in `globals.css` (`.teamwise-grid-bg*`, `.teamwise-aurora-bg`, table row hover, new `.teamwise-hero-grid-bg`) use `color-mix` with `var(--primary)` / `var(--muted)` instead of hardcoded RGB; homepage hero grid uses `.teamwise-hero-grid-bg`; `StatsCard` shadow uses `color-mix` with `var(--foreground)`.
+- **Pass 3 — elevation:** Legacy arbitrary slate shadows removed; canonical list and usage guidance is **Shadow map** above (source: `globals.css` → `Elevation shadows`).
 - **2026-04-12 (homepage — luminous shell):** Public `/` originally added `--home-glow-warm`, `--home-glow-cool`, `--home-panel`, `--home-panel-border`, `--home-shadow` plus `.teamwise-home-luminous`, `.teamwise-home-grid`, `.teamwise-home-preview-shell`, `.teamwise-home-preview-sheen` utilities. **Removed 2026-04-27** when the homepage was redesigned to the dark-teal hero — these utilities are no longer present in `globals.css`.
 
 ### Shipped wiring (2026-04-25)
 
-- **Typography reversal:** `DM_Sans` + `Fraunces` swapped back to **Plus Jakarta Sans** (body/UI, `--font-plus-jakarta-sans`) + **Instrument Serif** (display, `--font-display`). Reflects the updated typography section above; replaces the 2026-04-11 wiring entry.
+- **Typography (current):** **Plus Jakarta Sans** (`--font-plus-jakarta-sans`) for body/UI — loaded in `src/app/layout.tsx`; **Instrument Serif** (`--font-display`) for display/hero — loaded in `src/app/(public)/layout.tsx`. This matches the Typography section above.
 
 ### Shipped wiring (2026-04-27)
 
-- **Public surface trim:** Homepage feature strip removed (no longer markets to a public audience — this is an internal RT-dept tool); auth-page brand panels stop duplicating the homepage hero copy. `/login` left panel says "Welcome back."; `/signup` left panel says "New here?" + the manager-approval explanation.
-- **New tokens in `:root`:** `--marketing-hero-bg: var(--primary)` (single alias used by `/`, `/login`, `/signup` brand panels) and `--scrim: color-mix(in srgb, var(--foreground) 50%, transparent)` (used by `<DialogOverlay>` instead of `bg-black/50`).
-- **Dark-mode brand color fix:** `--primary` (and `--ring`, `--highlight`, `--chart-1`) in `.dark` moved from `hsl(203 93% 35%)` (blue) → `hsl(187 60% 50%)` (lifted teal). Brand identity now stays in the 187° hue family across light/dark; `--primary-foreground` flipped to dark text in dark mode for AA contrast on the lighter teal.
-- **Dead CSS removed:** `--home-glow-warm`, `--home-glow-cool`, `--home-panel`, `--home-panel-border`, `--home-shadow` tokens and `.teamwise-home-luminous`, `.teamwise-home-grid`, `.teamwise-home-preview-shell`, `.teamwise-home-preview-sheen` utilities deleted from `globals.css` (unused outside tests).
-- **On-dark contrast pass:** All ad-hoc `text-white/22..50` opacity values on the dark teal hero/auth panels raised to `/70` (eyebrow / large-tracked) or `/85` (body) so on-dark text passes WCAG AA on `--primary`. Outline-button border bumped from `/22` to `/40`.
+- **New token `--scrim`:** `color-mix(in srgb, var(--foreground) 50%, transparent)` — used by `<DialogOverlay>` instead of `bg-black/50`.
+- **Dead CSS removed:** `--home-glow-warm`, `--home-glow-cool`, `--home-panel`, `--home-panel-border`, `--home-shadow` tokens and `.teamwise-home-luminous`, `.teamwise-home-grid`, `.teamwise-home-preview-shell`, `.teamwise-home-preview-sheen` utilities deleted from `globals.css`.
 
 ### Refined design handoff (2026-04-27)
 
