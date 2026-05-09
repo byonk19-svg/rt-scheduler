@@ -135,7 +135,7 @@ function buildEmptyCoverageDays(cycleStartDate: string, cycleEndDate: string): D
         month: 'short',
         day: 'numeric',
       }),
-      dayStatus: 'draft',
+      dayStatus: 'missing_lead',
       constraintBlocked: false,
       leadShift: null,
       staffShifts: [],

@@ -1,8 +1,8 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertCircle, AlertTriangle, Check, Clock, MinusCircle } from 'lucide-react'
+import { AlertCircle, Search, X } from 'lucide-react'
 
 import {
   AssignmentStatusPopover,
@@ -50,6 +50,8 @@ type ShiftEditorDialogProps = {
   onChangeStatus: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => Promise<void> | void
   onUnassign: (dayId: string, shiftId: string, isLead: boolean) => Promise<void> | void
 }
+
+type PickerMode = 'lead' | 'staff'
 
 function initials(name: string): string {
   return name
@@ -173,193 +175,97 @@ export function getCandidatePriority({
   }
 }
 
-type TherapistRowProps = {
+type PickerCandidate = {
   therapist: TherapistOption
-  role: 'lead' | 'staff'
-  selectedDay: SelectedDay
-  canEdit: boolean
-  assigning: boolean
-  unassigningShiftId: string | null
-  weeklyTherapistCounts: Map<string, number>
-  assignedShiftMap: Map<string, { shiftId: string; isLead: boolean }>
-  hasLead: boolean
-  onAssignTherapist: (userId: string, role: 'lead' | 'staff') => Promise<void> | void
-  onUnassign: (dayId: string, shiftId: string, isLead: boolean) => Promise<void> | void
+  priority: ReturnType<typeof getCandidatePriority>
 }
 
-function TherapistRow({
-  therapist,
-  role,
+function PanelHeader({
   selectedDay,
-  canEdit,
-  assigning,
-  unassigningShiftId,
-  weeklyTherapistCounts,
-  assignedShiftMap,
-  hasLead,
-  onAssignTherapist,
-  onUnassign,
-}: TherapistRowProps) {
-  const assignment = assignedShiftMap.get(therapist.id)
-  const priority = getCandidatePriority({
-    role,
-    therapist,
-    assignment,
-    weeklyTherapistCounts,
-    hasLead,
-  })
-  const assignedInThisRole = priority.assignedInRole
-  const assignedElsewhere = priority.assignedElsewhere
-  const shiftId = assignment?.shiftId ?? null
-  const processing =
-    (assigning && !assignedInThisRole) || (shiftId !== null && unassigningShiftId === shiftId)
-  const disabled = !canEdit || assignedElsewhere || processing
-  const employmentTypeLabel =
-    therapist.employment_type?.toLowerCase() === 'prn'
-      ? '[PRN]'
-      : therapist.employment_type?.toLowerCase() === 'part_time' ||
-          therapist.employment_type?.toLowerCase() === 'pt'
-        ? '[PT]'
-        : null
-  const badgeClassName =
-    'inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em]'
+  activeCount,
+  assignedCount,
+  coverageBadge,
+}: {
+  selectedDay: SelectedDay
+  activeCount: number
+  assignedCount: number
+  coverageBadge: ReturnType<typeof coverageState>
+}) {
+  const progress = Math.min((activeCount / 4) * 100, 100)
 
   return (
-    <div
-      data-testid={`coverage-therapist-row-${therapist.id}-${role}`}
-      className={cn(
-        'flex items-center gap-2 rounded-[16px] border px-3 py-2 transition-colors',
-        assignedInThisRole
-          ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary/20'
-          : priority.recommended
-            ? 'border-[var(--success-border)]/65 bg-[var(--success-subtle)]/18'
-            : 'border-border/90 bg-card',
-        disabled && !assignedInThisRole && 'opacity-60'
-      )}
-    >
-      <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-extrabold text-muted-foreground">
-        {initials(therapist.full_name)}
-      </span>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <p className="truncate text-[14px] font-semibold text-foreground">
-            {therapist.full_name}
-            {employmentTypeLabel ? (
-              <span className="ml-1 text-xs font-medium text-muted-foreground">
-                {employmentTypeLabel}
-              </span>
-            ) : null}
-          </p>
-          {priority.recommended ? (
-            <span
-              className={cn(
-                badgeClassName,
-                'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]'
-              )}
+    <DialogHeader className="sticky top-0 z-10 gap-2 border-b border-border bg-background px-5 pb-3 pt-4 text-left">
+      <div className="flex flex-wrap items-start justify-between gap-3 pr-10">
+        <div className="min-w-0">
+          <DialogTitle className="font-heading text-[1.25rem] font-semibold tracking-tight text-foreground">
+            {formatDrawerDate(selectedDay.isoDate)} - {selectedDay.shiftType} shift
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            Review daily staffing, operational notes, and edit actions for this shift.
+          </DialogDescription>
+          <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+            <div
+              className="h-1.5 w-28 overflow-hidden rounded-full bg-muted"
+              aria-label={`${activeCount} of 4 active`}
             >
-              Best fit
+              <div className="h-full rounded-full bg-primary" style={{ width: `${progress}%` }} />
+            </div>
+            <span className="tabular-nums">
+              {activeCount} / 4 active
             </span>
-          ) : null}
+            <span className="text-muted-foreground/70">({assignedCount} assigned)</span>
+          </div>
         </div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
-          <span
-            className={cn(
-              badgeClassName,
-              priority.atLimit
-                ? 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
-                : 'border-border/70 bg-background text-muted-foreground'
-            )}
-          >
-            Week {priority.weekCount}/{priority.weeklyLimit}
-          </span>
-          {role === 'lead' && therapist.isLeadEligible ? (
-            <span
-              className={cn(
-                badgeClassName,
-                'border-[var(--info-border)] bg-[var(--info-subtle)] text-[var(--info-text)]'
-              )}
-            >
-              Lead eligible
-            </span>
-          ) : null}
-          {assignedElsewhere ? (
-            <span
-              className={cn(
-                badgeClassName,
-                'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
-              )}
-            >
-              Already on day
-            </span>
-          ) : null}
-          {priority.atLimit ? (
-            <span className="inline-flex items-center gap-1 text-[var(--warning-text)]">
-              <Clock className="h-3 w-3" />
-              At limit
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      {role === 'lead' ? (
-        <span className="rounded-full border border-[var(--info-border)] bg-[var(--info-subtle)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--info-text)]">
-          Lead
+        <span
+          className={cn(
+            'rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]',
+            coverageBadge.tone === 'success' &&
+              'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]',
+            coverageBadge.tone === 'warning' &&
+              'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]',
+            coverageBadge.tone === 'critical' &&
+              'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]'
+          )}
+        >
+          {coverageBadge.label}
         </span>
-      ) : null}
+      </div>
+    </DialogHeader>
+  )
+}
 
-      <button
-        type="button"
-        disabled={disabled}
-        data-testid={
-          assignedInThisRole && shiftId
-            ? `coverage-unassign-${shiftId}`
-            : `coverage-assign-toggle-${therapist.id}-${role}`
-        }
-        aria-label={
-          assignedInThisRole
-            ? `Unassign ${therapist.full_name}`
-            : `Assign ${therapist.full_name} as ${role}`
-        }
-        className={cn(
-          'inline-flex h-9 min-w-[82px] shrink-0 items-center justify-center rounded-full border px-3 text-[11px] font-semibold transition-colors',
-          assignedInThisRole
-            ? 'border-primary bg-primary text-primary-foreground'
-            : 'border-border bg-background text-foreground hover:border-primary/50 hover:bg-primary/5',
-          disabled && 'cursor-not-allowed opacity-50'
-        )}
-        onClick={() => {
-          if (disabled) return
-          if (assignedInThisRole && shiftId) {
-            void onUnassign(selectedDay.id, shiftId, role === 'lead')
-            return
-          }
-          void onAssignTherapist(therapist.id, role)
-        }}
-      >
-        {assignedInThisRole ? (
-          <>
-            <Check className="h-4 w-4" />
-            Selected
-          </>
-        ) : assignedElsewhere ? (
-          <>
-            <MinusCircle className="h-4 w-4" />
-            Unavailable
-          </>
-        ) : (
-          <>
-            <span className="inline-block h-2.5 w-2.5 rounded-full border border-current" />
-            {role === 'lead'
-              ? assignment && !assignment.isLead
-                ? 'Make lead'
-                : hasLead
-                  ? 'Add to day'
-                  : 'Assign lead'
-              : 'Select'}
-          </>
-        )}
-      </button>
+function PastDateBar({
+  canEdit,
+  canUpdateAssignmentStatus,
+  coverageCycleId,
+  isPastDate,
+  hasOperationalEntries,
+}: {
+  canEdit: boolean
+  canUpdateAssignmentStatus: boolean
+  coverageCycleId: string | null
+  isPastDate: boolean
+  hasOperationalEntries: boolean
+}) {
+  let message: string | null = null
+
+  if (!coverageCycleId) {
+    message = 'Read-only: no active schedule cycle is available for this shift.'
+  } else if (!canEdit) {
+    message = canUpdateAssignmentStatus
+      ? 'Read-only staffing: operational status updates are still available.'
+      : 'Read-only schedule: staffing and operational updates are unavailable.'
+  } else if (isPastDate) {
+    message = 'Past date: staffing edits will be logged as post-publish changes.'
+  } else if (hasOperationalEntries) {
+    message = 'Operational activity exists: staffing edits will be logged as post-publish changes.'
+  }
+
+  if (!message) return null
+
+  return (
+    <div className="border-b border-[var(--warning-border)] bg-[var(--warning-subtle)] px-5 py-1.5 text-[11px] font-medium text-[var(--warning-text)]">
+      {message}
     </div>
   )
 }
@@ -412,15 +318,21 @@ function DrawerPersonRow({
   shift,
   isLead,
   canUpdateAssignmentStatus,
+  canUnassign = false,
+  unassigning = false,
   operationalDetail,
   onChangeStatus,
+  onUnassign,
 }: {
   dayId: string
   shift: ShiftItem
   isLead: boolean
   canUpdateAssignmentStatus: boolean
+  canUnassign?: boolean
+  unassigning?: boolean
   operationalDetail: ActiveOperationalDetail | null
   onChangeStatus: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => Promise<void> | void
+  onUnassign?: (dayId: string, shiftId: string, isLead: boolean) => Promise<void> | void
 }) {
   return (
     <div className="flex items-start justify-between gap-3 rounded-xl border border-border/70 bg-card px-3 py-2.5">
@@ -440,7 +352,7 @@ function DrawerPersonRow({
           ) : null}
         </div>
       </div>
-      <div className="shrink-0">
+      <div className="flex shrink-0 items-center gap-1.5">
         <StatusAction
           dayId={dayId}
           shift={shift}
@@ -448,57 +360,424 @@ function DrawerPersonRow({
           canUpdateAssignmentStatus={canUpdateAssignmentStatus}
           onChangeStatus={onChangeStatus}
         />
+        {canUnassign ? (
+          <button
+            type="button"
+            disabled={unassigning}
+            data-testid={`coverage-unassign-${shift.id}`}
+            aria-label={`Remove ${shift.name} from this shift`}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:border-[var(--error-border)] hover:text-[var(--error-text)] disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => onUnassign?.(dayId, shift.id, isLead)}
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
       </div>
     </div>
   )
 }
 
-function resolveActorPresence(selectedDay: SelectedDay, actorUserId: string | null): {
-  label: string
-  detail: string
-  shift: ShiftItem | null
-  isLead: boolean
-} {
-  if (!actorUserId) {
-    return {
-      label: 'Read-only',
-      detail: 'Signed-in schedule context is unavailable.',
-      shift: null,
-      isLead: false,
-    }
-  }
+function SectionHeading({
+  title,
+  trailing,
+}: {
+  title: string
+  trailing?: React.ReactNode
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        {title}
+      </h2>
+      {trailing}
+    </div>
+  )
+}
 
-  if (selectedDay.leadShift?.userId === actorUserId) {
-    return {
-      label: 'You are assigned as lead',
-      detail: `${selectedDay.shiftType} shift on this selected day.`,
-      shift: selectedDay.leadShift,
-      isLead: true,
-    }
-  }
+function LeadSection({
+  selectedDay,
+  canEdit,
+  canUpdateAssignmentStatus,
+  unassigningShiftId,
+  operationalDetail,
+  onOpenPicker,
+  onChangeStatus,
+  onUnassign,
+}: {
+  selectedDay: SelectedDay
+  canEdit: boolean
+  canUpdateAssignmentStatus: boolean
+  unassigningShiftId: string | null
+  operationalDetail: ActiveOperationalDetail | null
+  onOpenPicker: () => void
+  onChangeStatus: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => Promise<void> | void
+  onUnassign: (dayId: string, shiftId: string, isLead: boolean) => Promise<void> | void
+}) {
+  return (
+    <section className="space-y-2">
+      <SectionHeading title="Lead" />
+      {selectedDay.leadShift ? (
+        <div className="space-y-2">
+          <DrawerPersonRow
+            dayId={selectedDay.id}
+            shift={selectedDay.leadShift}
+            isLead
+            canUpdateAssignmentStatus={canUpdateAssignmentStatus}
+            canUnassign={canEdit}
+            unassigning={unassigningShiftId === selectedDay.leadShift.id}
+            operationalDetail={operationalDetail}
+            onChangeStatus={onChangeStatus}
+            onUnassign={onUnassign}
+          />
+          {canEdit ? (
+            <button
+              type="button"
+              className="inline-flex min-h-9 items-center rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+              onClick={onOpenPicker}
+            >
+              Change
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-[var(--warning-border)] bg-[var(--warning-subtle)]/35 px-3 py-3">
+          <span className="text-sm font-medium text-[var(--warning-text)]">No lead assigned</span>
+          {canEdit ? (
+            <button
+              type="button"
+              className="inline-flex min-h-9 shrink-0 items-center rounded-lg border border-[var(--warning-border)] bg-background px-3 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+              onClick={onOpenPicker}
+            >
+              Assign lead
+            </button>
+          ) : null}
+        </div>
+      )}
+    </section>
+  )
+}
 
-  const staffShift = selectedDay.staffShifts.find((shift) => shift.userId === actorUserId) ?? null
-  if (staffShift) {
-    return {
-      label: 'You work this day',
-      detail: `${selectedDay.shiftType} shift on this selected day.`,
-      shift: staffShift,
-      isLead: false,
-    }
-  }
+function StaffSection({
+  selectedDay,
+  canEdit,
+  canUpdateAssignmentStatus,
+  unassigningShiftId,
+  activeOperationalDetails,
+  onOpenPicker,
+  onChangeStatus,
+  onUnassign,
+}: {
+  selectedDay: SelectedDay
+  canEdit: boolean
+  canUpdateAssignmentStatus: boolean
+  unassigningShiftId: string | null
+  activeOperationalDetails: Map<string, ActiveOperationalDetail>
+  onOpenPicker: () => void
+  onChangeStatus: (dayId: string, shiftId: string, isLead: boolean, nextStatus: UiStatus) => Promise<void> | void
+  onUnassign: (dayId: string, shiftId: string, isLead: boolean) => Promise<void> | void
+}) {
+  return (
+    <section className="space-y-2">
+      <SectionHeading
+        title="Staff"
+        trailing={
+          <span className="text-xs text-muted-foreground">
+            {selectedDay.staffShifts.length} assigned
+          </span>
+        }
+      />
+      {selectedDay.staffShifts.length > 0 ? (
+        <div className="space-y-2">
+          {selectedDay.staffShifts.map((shift) => (
+            <DrawerPersonRow
+              key={shift.id}
+              dayId={selectedDay.id}
+              shift={shift}
+              isLead={false}
+              canUpdateAssignmentStatus={canUpdateAssignmentStatus}
+              canUnassign={canEdit}
+              unassigning={unassigningShiftId === shift.id}
+              operationalDetail={activeOperationalDetails.get(shift.id) ?? null}
+              onChangeStatus={onChangeStatus}
+              onUnassign={onUnassign}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-border/70 bg-card px-3 py-2 text-sm text-muted-foreground">
+          No staff assigned.
+        </div>
+      )}
+      {canEdit ? (
+        <button
+          type="button"
+          className="inline-flex min-h-9 items-center rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+          onClick={onOpenPicker}
+        >
+          + Add therapist
+        </button>
+      ) : null}
+    </section>
+  )
+}
 
-  return {
-    label: 'You are not scheduled',
-    detail: `No assignment for you on this ${selectedDay.shiftType} shift.`,
-    shift: null,
-    isLead: false,
-  }
+function PickerRow({
+  mode,
+  candidate,
+  assigning,
+  onAssign,
+}: {
+  mode: PickerMode
+  candidate: PickerCandidate
+  assigning: boolean
+  onAssign: (userId: string, role: 'lead' | 'staff') => void
+}) {
+  const { therapist, priority } = candidate
+  const actionLabel = mode === 'lead' ? 'Assign lead' : 'Add to shift'
+  const employmentTypeLabel =
+    therapist.employment_type?.toLowerCase() === 'prn'
+      ? 'PRN'
+      : therapist.employment_type?.toLowerCase() === 'part_time' ||
+          therapist.employment_type?.toLowerCase() === 'pt'
+        ? 'PT'
+        : null
+
+  return (
+    <div
+      data-testid={`coverage-picker-row-${therapist.id}-${mode}`}
+      className={cn(
+        'flex items-center gap-2 rounded-xl border px-3 py-2 transition-colors',
+        priority.recommended
+          ? 'border-[var(--success-border)]/65 bg-[var(--success-subtle)]/18'
+          : 'border-border/90 bg-card'
+      )}
+    >
+      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-extrabold text-muted-foreground">
+        {initials(therapist.full_name)}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <p className="truncate text-sm font-semibold text-foreground">{therapist.full_name}</p>
+          {employmentTypeLabel ? (
+            <span className="rounded-full border border-border/70 bg-background px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              {employmentTypeLabel}
+            </span>
+          ) : null}
+          {priority.recommended ? (
+            <span className="rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--success-text)]">
+              Recommended
+            </span>
+          ) : null}
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+          <span
+            className={cn(
+              'rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em]',
+              priority.atLimit
+                ? 'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+                : 'border-border/70 bg-background text-muted-foreground'
+            )}
+          >
+            Week {priority.weekCount}/{priority.weeklyLimit}
+          </span>
+          {mode === 'lead' && therapist.isLeadEligible ? <span>Lead eligible</span> : null}
+        </div>
+      </div>
+      <button
+        type="button"
+        disabled={assigning}
+        className="inline-flex h-9 min-w-[96px] shrink-0 items-center justify-center rounded-lg border border-input bg-background px-3 text-[11px] font-semibold text-foreground transition-colors hover:border-primary/50 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
+        onClick={() => onAssign(therapist.id, mode)}
+      >
+        {actionLabel}
+      </button>
+    </div>
+  )
+}
+
+function TherapistPicker({
+  mode,
+  candidates,
+  query,
+  assigning,
+  onQueryChange,
+  onAssign,
+  onClose,
+}: {
+  mode: PickerMode
+  candidates: PickerCandidate[]
+  query: string
+  assigning: boolean
+  onQueryChange: (query: string) => void
+  onAssign: (userId: string, role: 'lead' | 'staff') => void
+  onClose: () => void
+}) {
+  const normalizedQuery = query.trim().toLowerCase()
+  const filteredCandidates = candidates.filter(({ therapist }) => {
+    if (!normalizedQuery) return true
+    return [therapist.full_name, therapist.employment_type ?? '', therapist.shift_type]
+      .join(' ')
+      .toLowerCase()
+      .includes(normalizedQuery)
+  })
+  const recommended = filteredCandidates.filter(({ priority }) => priority.recommended)
+  const all = filteredCandidates.filter(({ priority }) => !priority.recommended)
+  const title = mode === 'lead' ? 'Choose lead' : 'Add therapist'
+  const placeholder = mode === 'lead' ? 'Search lead-eligible therapists...' : 'Search therapists...'
+
+  return (
+    <section className="space-y-3 rounded-xl border border-border/80 bg-muted/15 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+        <button
+          type="button"
+          aria-label="Close therapist picker"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background text-muted-foreground hover:bg-muted"
+          onClick={onClose}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <label className="flex min-h-10 items-center gap-2 rounded-lg border border-input bg-background px-3 text-sm text-muted-foreground focus-within:border-primary/60">
+        <Search className="h-4 w-4" />
+        <input
+          autoFocus
+          value={query}
+          placeholder={placeholder}
+          className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          onChange={(event) => onQueryChange(event.target.value)}
+        />
+      </label>
+      {recommended.length > 0 ? (
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Recommended
+          </p>
+          {recommended.map((candidate) => (
+            <PickerRow
+              key={`recommended-${mode}-${candidate.therapist.id}`}
+              mode={mode}
+              candidate={candidate}
+              assigning={assigning}
+              onAssign={onAssign}
+            />
+          ))}
+        </div>
+      ) : null}
+      <div className="space-y-1.5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          All
+        </p>
+        {all.length > 0 ? (
+          all.map((candidate) => (
+            <PickerRow
+              key={`all-${mode}-${candidate.therapist.id}`}
+              mode={mode}
+              candidate={candidate}
+              assigning={assigning}
+              onAssign={onAssign}
+            />
+          ))
+        ) : (
+          <div className="rounded-xl border border-border/70 bg-card px-3 py-2 text-sm text-muted-foreground">
+            {filteredCandidates.length === 0
+              ? 'No therapists match this search.'
+              : 'No additional therapists in this group.'}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function OperationalNotesSection({
+  operationalEntries,
+  selectedDayNotes,
+  showLotteryLink,
+  lotteryHref,
+  lotteryLinkReason,
+}: {
+  operationalEntries: Array<{
+    shift: ShiftItem
+    isLead: boolean
+    detail: ActiveOperationalDetail | null
+  }>
+  selectedDayNotes: string[]
+  showLotteryLink: boolean
+  lotteryHref: string
+  lotteryLinkReason: string
+}) {
+  const operationalNotes = operationalEntries.flatMap(({ detail }) => (detail?.note ? [detail.note] : []))
+  const notes = Array.from(new Set([...operationalNotes, ...selectedDayNotes].filter(Boolean)))
+  const hasContent = operationalEntries.length > 0 || notes.length > 0 || showLotteryLink
+
+  return (
+    <details className="group rounded-xl border border-border/70 bg-card" open={hasContent}>
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          Operational notes
+        </span>
+        <span className="text-xs text-muted-foreground">
+          {hasContent ? 'Review' : 'None'}
+        </span>
+      </summary>
+      <div className="space-y-3 border-t border-border/70 px-3 py-3">
+        {operationalEntries.length > 0 ? (
+          <div className="space-y-2">
+            {operationalEntries.map(({ shift, isLead, detail }) => (
+              <div key={`operational-${shift.id}`} className="rounded-xl border border-border/70 bg-background px-3 py-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-semibold text-foreground">{shift.name}</p>
+                  {isLead ? (
+                    <span className="rounded-full border border-[var(--info-border)] bg-[var(--info-subtle)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--info-text)]">
+                      Lead
+                    </span>
+                  ) : null}
+                  <InlineStatusChip status={shift.status} />
+                </div>
+                {detail?.leftEarlyTime ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Left at {formatLeftEarlyTime(detail.leftEarlyTime)}
+                  </p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {notes.length > 0 ? (
+          <div className="space-y-2">
+            {notes.map((note) => (
+              <div key={note} className="rounded-xl border border-border/70 bg-background px-3 py-2 text-sm text-foreground/80">
+                {note}
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {showLotteryLink ? (
+          <div className="rounded-xl border border-border/70 bg-muted/15 px-3 py-3 text-sm">
+            <p className="font-semibold text-foreground">Lottery decision available</p>
+            <p className="mt-1 text-xs text-muted-foreground">{lotteryLinkReason}</p>
+            <Link
+              href={lotteryHref}
+              className="mt-3 inline-flex min-h-9 items-center rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground hover:bg-muted"
+            >
+              Open Lottery for this shift
+            </Link>
+          </div>
+        ) : null}
+        {!hasContent ? (
+          <div className="rounded-xl border border-border/70 bg-background px-3 py-2 text-sm text-muted-foreground">
+            No operational notes.
+          </div>
+        ) : null}
+      </div>
+    </details>
+  )
 }
 
 export function ShiftEditorDialog({
   open,
   selectedDay,
-  actorUserId,
   therapists,
   canEdit,
   canUpdateAssignmentStatus,
@@ -516,6 +795,19 @@ export function ShiftEditorDialog({
   onChangeStatus,
   onUnassign,
 }: ShiftEditorDialogProps) {
+  const selectedDayId = selectedDay?.id ?? null
+  const [pickerState, setPickerState] = useState<{
+    mode: PickerMode | null
+    query: string
+    dayId: string | null
+  }>({
+    mode: null,
+    query: '',
+    dayId: null,
+  })
+  const pickerMode = pickerState.dayId === selectedDayId ? pickerState.mode : null
+  const pickerQuery = pickerState.dayId === selectedDayId ? pickerState.query : ''
+
   const assignedShiftMap = useMemo(() => {
     const map = new Map<string, { shiftId: string; isLead: boolean }>()
 
@@ -560,11 +852,10 @@ export function ShiftEditorDialog({
   const assignedCount = dayAssignments.length
   const activeCount = selectedDay ? countActive(selectedDay) : 0
   const coverageBadge = coverageState(selectedDay, activeCount)
-  const actorPresence = selectedDay ? resolveActorPresence(selectedDay, actorUserId) : null
   const hasLotteryStatus = operationalEntries.some(
     ({ shift }) => shift.status === 'cancelled' || shift.status === 'oncall'
   )
-  const showLotteryLink = canEdit && (assignedCount > 4 || hasLotteryStatus)
+  const showLotteryLink = assignedCount > 4 || hasLotteryStatus
   const lotteryHref = selectedDay
     ? `/lottery?date=${selectedDay.isoDate}&shift=${selectedDay.shiftType.toLowerCase()}`
     : '/lottery'
@@ -573,51 +864,53 @@ export function ShiftEditorDialog({
       ? 'This shift has more scheduled staff than the normal active target.'
       : 'This shift has Cancelled or On Call status in Team Schedule.'
 
-  const leadTherapists = useMemo(
-    () =>
-      therapists
-        .filter((therapist) => therapist.isLeadEligible)
-        .sort(
-          (a, b) =>
-            getCandidatePriority({
-              role: 'lead',
-              therapist: a,
-              assignment: assignedShiftMap.get(a.id),
-              weeklyTherapistCounts,
-              hasLead,
-            }).sortValue -
-              getCandidatePriority({
-                role: 'lead',
-                therapist: b,
-                assignment: assignedShiftMap.get(b.id),
-                weeklyTherapistCounts,
-                hasLead,
-              }).sortValue || a.full_name.localeCompare(b.full_name)
-        ),
-    [assignedShiftMap, hasLead, therapists, weeklyTherapistCounts]
-  )
+  const pickerCandidates = useMemo<PickerCandidate[]>(() => {
+    if (!pickerMode) return []
 
-  const staffTherapists = useMemo(
-    () =>
-      [...therapists].sort(
+    const baseTherapists =
+      pickerMode === 'lead'
+        ? therapists.filter((therapist) => {
+            if (!therapist.isLeadEligible) return false
+            const assignment = assignedShiftMap.get(therapist.id)
+            if (assignment?.isLead) return false
+            return hasLead ? assignment?.isLead === false : true
+          })
+        : therapists.filter((therapist) => !assignedShiftMap.has(therapist.id))
+
+    return baseTherapists
+      .map((therapist) => ({
+        therapist,
+        priority: getCandidatePriority({
+          role: pickerMode,
+          therapist,
+          assignment: assignedShiftMap.get(therapist.id),
+          weeklyTherapistCounts,
+          hasLead,
+        }),
+      }))
+      .sort(
         (a, b) =>
-          getCandidatePriority({
-            role: 'staff',
-            therapist: a,
-            assignment: assignedShiftMap.get(a.id),
-            weeklyTherapistCounts,
-            hasLead,
-          }).sortValue -
-            getCandidatePriority({
-              role: 'staff',
-              therapist: b,
-              assignment: assignedShiftMap.get(b.id),
-              weeklyTherapistCounts,
-              hasLead,
-            }).sortValue || a.full_name.localeCompare(b.full_name)
-      ),
-    [assignedShiftMap, hasLead, therapists, weeklyTherapistCounts]
-  )
+          a.priority.sortValue - b.priority.sortValue ||
+          a.therapist.full_name.localeCompare(b.therapist.full_name)
+      )
+  }, [assignedShiftMap, hasLead, pickerMode, therapists, weeklyTherapistCounts])
+
+  const openPicker = (mode: PickerMode) => {
+    setPickerState({ mode, query: '', dayId: selectedDayId })
+  }
+
+  const closePicker = () => {
+    setPickerState({ mode: null, query: '', dayId: selectedDayId })
+  }
+
+  const setPickerQuery = (query: string) => {
+    setPickerState({ mode: pickerMode, query, dayId: selectedDayId })
+  }
+
+  const handleAssign = (userId: string, role: 'lead' | 'staff') => {
+    closePicker()
+    void onAssignTherapist(userId, role)
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -628,42 +921,20 @@ export function ShiftEditorDialog({
       >
         {selectedDay ? (
           <>
-            <DialogHeader className="gap-2 border-b border-border bg-background px-5 pb-3 pt-4 text-left">
-              <div className="flex flex-wrap items-start justify-between gap-3 pr-10">
-                <div className="min-w-0">
-                  <DialogTitle className="font-heading text-[1.4rem] font-semibold tracking-tight text-foreground">
-                    {formatDrawerDate(selectedDay.isoDate)}
-                  </DialogTitle>
-                  <DialogDescription className="sr-only">
-                    {canEdit
-                      ? 'Review daily staffing details, operational statuses, notes, and edit actions for this shift.'
-                      : canUpdateAssignmentStatus
-                        ? 'Review Team Schedule details and operational statuses for this shift.'
-                        : 'Review read-only Team Schedule details for this selected day.'}
-                  </DialogDescription>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span>{selectedDay.shiftType} shift</span>
-                    <span className="tabular-nums">{assignedCount} scheduled / 4 needed</span>
-                    <span className="tabular-nums">{activeCount} active</span>
-                  </div>
-                </div>
-                <span
-                  className={cn(
-                    'rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]',
-                    coverageBadge.tone === 'success' &&
-                      'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]',
-                    coverageBadge.tone === 'warning' &&
-                      'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]',
-                    coverageBadge.tone === 'critical' &&
-                      'border-[var(--error-border)] bg-[var(--error-subtle)] text-[var(--error-text)]'
-                  )}
-                >
-                  {coverageBadge.label}
-                </span>
-              </div>
-            </DialogHeader>
-
-            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+            <PanelHeader
+              selectedDay={selectedDay}
+              activeCount={activeCount}
+              assignedCount={assignedCount}
+              coverageBadge={coverageBadge}
+            />
+            <PastDateBar
+              canEdit={canEdit}
+              canUpdateAssignmentStatus={canUpdateAssignmentStatus}
+              coverageCycleId={coverageCycleId}
+              isPastDate={isPastDate}
+              hasOperationalEntries={hasOperationalEntries}
+            />
+            <div key={selectedDay.id} className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
               {assignError ? (
                 <div
                   role="alert"
@@ -674,290 +945,70 @@ export function ShiftEditorDialog({
                 </div>
               ) : null}
 
-              {!canEdit ? (
-                <div className="rounded-xl border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-2 text-[12px] font-medium text-[var(--warning-text)]">
-                  {!coverageCycleId
-                    ? 'This view has no active Schedule Block, so assignments are read-only.'
-                    : canUpdateAssignmentStatus
-                      ? 'Staffing edits stay in Coverage for managers. Leads can still update on-call, call-in, cancelled, and leave-early statuses from this drawer.'
-                      : 'This Team Schedule is read-only. Managers use Coverage for staffing changes; leads handle operational status updates.'}
+              <LeadSection
+                selectedDay={selectedDay}
+                canEdit={canEdit}
+                canUpdateAssignmentStatus={canUpdateAssignmentStatus}
+                unassigningShiftId={unassigningShiftId}
+                operationalDetail={
+                  selectedDay.leadShift
+                    ? activeOperationalDetails.get(selectedDay.leadShift.id) ?? null
+                    : null
+                }
+                onOpenPicker={() => openPicker('lead')}
+                onChangeStatus={onChangeStatus}
+                onUnassign={onUnassign}
+              />
+
+              {pickerMode === 'lead' ? (
+                <TherapistPicker
+                  mode="lead"
+                  candidates={pickerCandidates}
+                  query={pickerQuery}
+                  assigning={assigning}
+                  onQueryChange={setPickerQuery}
+                  onAssign={handleAssign}
+                  onClose={closePicker}
+                />
+              ) : null}
+
+              <StaffSection
+                selectedDay={selectedDay}
+                canEdit={canEdit}
+                canUpdateAssignmentStatus={canUpdateAssignmentStatus}
+                unassigningShiftId={unassigningShiftId}
+                activeOperationalDetails={activeOperationalDetails}
+                onOpenPicker={() => openPicker('staff')}
+                onChangeStatus={onChangeStatus}
+                onUnassign={onUnassign}
+              />
+
+              {pickerMode === 'staff' ? (
+                <TherapistPicker
+                  mode="staff"
+                  candidates={pickerCandidates}
+                  query={pickerQuery}
+                  assigning={assigning}
+                  onQueryChange={setPickerQuery}
+                  onAssign={handleAssign}
+                  onClose={closePicker}
+                />
+              ) : null}
+
+              {selectedDay.constraintBlocked ? (
+                <div className="flex items-start gap-2 rounded-xl border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-[12px] text-[var(--error-text)]">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>No eligible therapists for this shift because of current constraints.</span>
                 </div>
               ) : null}
 
-              {(isPastDate || hasOperationalEntries) && canEdit ? (
-                <div
-                  role="alert"
-                  data-testid="coverage-guardrail-banner"
-                  className="rounded-xl border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-2 text-[12px] font-medium text-[var(--warning-text)]"
-                >
-                  {isPastDate
-                    ? 'This date is in the past. Changes will be logged as a post-publish modification.'
-                    : 'This date has active operational entries. Changes will be logged as a post-publish modification.'}
-                </div>
-              ) : null}
-
-              {!hasLead && canEdit ? (
-                <div className="flex items-start gap-2 rounded-xl border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-3 py-2 text-[12px] text-[var(--warning-text)]">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>No lead assigned. A lead therapist is required for this shift.</span>
-                </div>
-              ) : null}
-
-              {showLotteryLink ? (
-                <div className="rounded-xl border border-border/70 bg-muted/15 px-3 py-3 text-sm">
-                  <p className="font-semibold text-foreground">Lottery decision available</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{lotteryLinkReason}</p>
-                  <Link
-                    href={lotteryHref}
-                    className="mt-3 inline-flex min-h-9 items-center rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground hover:bg-muted"
-                  >
-                    Open Lottery for this shift
-                  </Link>
-                </div>
-              ) : null}
-
-              <section className="space-y-2">
-                <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Your status
-                </h2>
-                {actorPresence ? (
-                  <div className="rounded-xl border border-border/70 bg-card px-3 py-2.5">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground">
-                          {actorPresence.label}
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {actorPresence.detail}
-                        </p>
-                      </div>
-                      {actorPresence.shift ? (
-                        <div className="flex shrink-0 items-center gap-1.5">
-                          {actorPresence.isLead ? (
-                            <span className="rounded-full border border-[var(--info-border)] bg-[var(--info-subtle)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--info-text)]">
-                              Lead
-                            </span>
-                          ) : null}
-                          <InlineStatusChip status={actorPresence.shift.status} />
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : null}
-              </section>
-
-              <section className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    {canEdit ? 'Coverage details' : 'Team Schedule details'}
-                  </h2>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="rounded-xl border border-border/70 bg-card px-3 py-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                      Target
-                    </p>
-                    <p className="mt-1 tabular-nums text-sm font-semibold text-foreground">4</p>
-                  </div>
-                  <div className="rounded-xl border border-border/70 bg-card px-3 py-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                      Scheduled
-                    </p>
-                    <p className="mt-1 tabular-nums text-sm font-semibold text-foreground">
-                      {assignedCount}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-border/70 bg-card px-3 py-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                      Active
-                    </p>
-                    <p className="mt-1 tabular-nums text-sm font-semibold text-foreground">
-                      {activeCount}
-                    </p>
-                  </div>
-                </div>
-              </section>
-
-              <section className="space-y-2">
-                <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Lead
-                </h2>
-                {selectedDay.leadShift ? (
-                  <DrawerPersonRow
-                    dayId={selectedDay.id}
-                    shift={selectedDay.leadShift}
-                    isLead
-                    canUpdateAssignmentStatus={canUpdateAssignmentStatus}
-                    operationalDetail={activeOperationalDetails.get(selectedDay.leadShift.id) ?? null}
-                    onChangeStatus={onChangeStatus}
-                  />
-                ) : (
-                  <div className="rounded-xl border border-dashed border-[var(--warning-border)] bg-[var(--warning-subtle)]/35 px-3 py-2 text-sm text-[var(--warning-text)]">
-                    No lead assigned.
-                  </div>
-                )}
-              </section>
-
-              <section className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    Staff
-                  </h2>
-                  <span className="text-xs text-muted-foreground">
-                    {selectedDay.staffShifts.length} assigned
-                  </span>
-                </div>
-                {selectedDay.staffShifts.length > 0 ? (
-                  <div className="space-y-2">
-                    {selectedDay.staffShifts.map((shift) => (
-                      <DrawerPersonRow
-                        key={shift.id}
-                        dayId={selectedDay.id}
-                        shift={shift}
-                        isLead={false}
-                        canUpdateAssignmentStatus={canUpdateAssignmentStatus}
-                        operationalDetail={activeOperationalDetails.get(shift.id) ?? null}
-                        onChangeStatus={onChangeStatus}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-border/70 bg-card px-3 py-2 text-sm text-muted-foreground">
-                    No staff assigned.
-                  </div>
-                )}
-              </section>
-
-              <section className="space-y-2">
-                <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Operational statuses
-                </h2>
-                {operationalEntries.length > 0 ? (
-                  <div className="space-y-2">
-                    {operationalEntries.map(({ shift, isLead, detail }) => (
-                      <div
-                        key={`operational-${shift.id}`}
-                        className="rounded-xl border border-border/70 bg-card px-3 py-2.5"
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-semibold text-foreground">{shift.name}</p>
-                          {isLead ? (
-                            <span className="rounded-full border border-[var(--info-border)] bg-[var(--info-subtle)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--info-text)]">
-                              Lead
-                            </span>
-                          ) : null}
-                          <InlineStatusChip status={shift.status} />
-                        </div>
-                        {detail?.leftEarlyTime ? (
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Left at {formatLeftEarlyTime(detail.leftEarlyTime)}
-                          </p>
-                        ) : null}
-                        {detail?.note ? (
-                          <p className="mt-1 text-xs text-foreground/75">{detail.note}</p>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-border/70 bg-card px-3 py-2 text-sm text-muted-foreground">
-                    None
-                  </div>
-                )}
-              </section>
-
-              <section className="space-y-2">
-                <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Notes
-                </h2>
-                {selectedDayNotes.length > 0 ? (
-                  <div className="space-y-2">
-                    {selectedDayNotes.map((note) => (
-                      <div key={note} className="rounded-xl border border-border/70 bg-card px-3 py-2 text-sm text-foreground/80">
-                        {note}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-border/70 bg-card px-3 py-2 text-sm text-muted-foreground">
-                    —
-                  </div>
-                )}
-              </section>
-
-              {canEdit ? (
-                <section className="space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      Edit staffing
-                    </h2>
-                    <span className="text-xs text-muted-foreground">
-                      Manager-only actions
-                    </span>
-                  </div>
-
-                  <section className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-sm font-semibold text-foreground">Lead therapists</h3>
-                      <span className="text-[11px] text-muted-foreground">
-                        {leadTherapists.length} options
-                      </span>
-                    </div>
-                    <div className="space-y-1">
-                      {leadTherapists.map((therapist) => (
-                        <TherapistRow
-                          key={`lead-${therapist.id}`}
-                          therapist={therapist}
-                          role="lead"
-                          selectedDay={selectedDay}
-                          canEdit={canEdit}
-                          assigning={assigning}
-                          unassigningShiftId={unassigningShiftId}
-                          weeklyTherapistCounts={weeklyTherapistCounts}
-                          assignedShiftMap={assignedShiftMap}
-                          hasLead={hasLead}
-                          onAssignTherapist={onAssignTherapist}
-                          onUnassign={onUnassign}
-                        />
-                      ))}
-                    </div>
-                  </section>
-
-                  <section className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-sm font-semibold text-foreground">Staff therapists</h3>
-                      <span className="text-[11px] text-muted-foreground">
-                        {staffTherapists.length} options
-                      </span>
-                    </div>
-                    <div className="space-y-1">
-                      {staffTherapists.map((therapist) => (
-                        <TherapistRow
-                          key={`staff-${therapist.id}`}
-                          therapist={therapist}
-                          role="staff"
-                          selectedDay={selectedDay}
-                          canEdit={canEdit}
-                          assigning={assigning}
-                          unassigningShiftId={unassigningShiftId}
-                          weeklyTherapistCounts={weeklyTherapistCounts}
-                          assignedShiftMap={assignedShiftMap}
-                          hasLead={hasLead}
-                          onAssignTherapist={onAssignTherapist}
-                          onUnassign={onUnassign}
-                        />
-                      ))}
-                    </div>
-                  </section>
-
-                  {selectedDay.constraintBlocked ? (
-                    <div className="flex items-start gap-2 rounded-xl border border-[var(--error-border)] bg-[var(--error-subtle)] px-3 py-2 text-[12px] text-[var(--error-text)]">
-                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span>No eligible therapists for this shift because of current constraints.</span>
-                    </div>
-                  ) : null}
-                </section>
-              ) : null}
+              <OperationalNotesSection
+                operationalEntries={operationalEntries}
+                selectedDayNotes={selectedDayNotes}
+                showLotteryLink={showLotteryLink}
+                lotteryHref={lotteryHref}
+                lotteryLinkReason={lotteryLinkReason}
+              />
             </div>
           </>
         ) : null}

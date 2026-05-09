@@ -30,7 +30,7 @@ function makeDay(overrides: Partial<DayItem> = {}): DayItem {
     isoDate: '2026-03-01',
     date: 1,
     label: 'Mar 1',
-    dayStatus: 'draft',
+    dayStatus: 'missing_lead',
     constraintBlocked: false,
     leadShift: null,
     staffShifts: [],
@@ -234,13 +234,13 @@ describe('buildDayItems', () => {
     expect(item.staffShifts).toHaveLength(0)
   })
 
-  it('lead row populates leadShift; dayStatus becomes published', () => {
+  it('lead row populates leadShift; dayStatus becomes ok', () => {
     const lead = makeRow({ id: 'l1', role: 'lead', name: 'Alice Lead', date: START })
     const [item] = buildDayItems('day', [lead], START, START, new Set())
     expect(item.leadShift?.name).toBe('Alice Lead')
     expect(item.leadShift?.id).toBe('l1')
     expect(item.staffShifts).toHaveLength(0)
-    expect(item.dayStatus).toBe('published')
+    expect(item.dayStatus).toBe('ok')
   })
 
   it('staff rows are sorted alphabetically', () => {
@@ -266,12 +266,6 @@ describe('buildDayItems', () => {
     const lead = makeRow({ id: 'l', role: 'lead', name: 'Lead', date: START, status: 'called_off' })
     const [item] = buildDayItems('day', [lead], START, START, new Set())
     expect(item.dayStatus).toBe('override')
-  })
-
-  it('dayStatus is draft when any row has sick status (no called_off)', () => {
-    const lead = makeRow({ id: 'l', role: 'lead', name: 'Lead', date: START, status: 'sick' })
-    const [item] = buildDayItems('day', [lead], START, START, new Set())
-    expect(item.dayStatus).toBe('draft')
   })
 
   it('applies toUiStatus for assignment_status mapping', () => {
