@@ -8,12 +8,22 @@ import { MANAGED_TEAM_ROLE_VALUES, parseRole } from '@/lib/auth/roles'
 import { writeAuditLog } from '@/lib/audit-log'
 import { normalizeRosterFullName, parseBulkEmployeeRosterText } from '@/lib/employee-roster-bulk'
 import { parseTeamQuickEditFormData } from '@/lib/team-quick-edit'
+import type { TeamErrorCode, TeamSuccessCode } from '@/lib/team-feedback'
 import { parseTherapistRosterSource } from '@/lib/therapist-roster-source'
 import { createClient } from '@/lib/supabase/server'
 
 type ManagedRole = 'manager' | 'therapist' | 'lead'
 type ShiftType = 'day' | 'night'
 type EmploymentType = 'full_time' | 'part_time' | 'prn'
+type TeamUrlParams = {
+  success?: TeamSuccessCode
+  error?: TeamErrorCode
+  tab?: string
+  edit_profile?: string
+  bulk_count?: string
+  bulk_line?: string
+  roster_bulk_count?: string
+}
 type EmployeeRosterSnapshotRow = {
   id?: string
   full_name?: string | null
@@ -32,7 +42,7 @@ type EmployeeRosterSnapshotRow = {
   updated_by?: string | null
 }
 
-function buildTeamUrl(params: Record<string, string | undefined>): string {
+function buildTeamUrl(params: TeamUrlParams): string {
   const search = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
     if (!value) continue
@@ -42,11 +52,11 @@ function buildTeamUrl(params: Record<string, string | undefined>): string {
   return query.length > 0 ? `/team?${query}` : '/team'
 }
 
-function buildRosterAdminUrl(params: Record<string, string | undefined>): string {
+function buildRosterAdminUrl(params: TeamUrlParams): string {
   return buildTeamUrl({ ...params, tab: 'roster' })
 }
 
-function buildWorkPatternsUrl(params: Record<string, string | undefined> = {}): string {
+function buildWorkPatternsUrl(params: TeamUrlParams = {}): string {
   const search = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
     if (!value) continue

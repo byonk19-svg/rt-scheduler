@@ -55,6 +55,13 @@ type AvailabilityRow = {
   created_at: string
   updated_at?: string | null
   source?: 'therapist' | 'manager' | null
+  intent?:
+    | 'therapist_need_off'
+    | 'therapist_wants_work'
+    | 'manager_block'
+    | 'manager_force'
+    | 'email_intake'
+    | null
   therapist_id: string
   cycle_id: string
   profiles: { full_name: string } | { full_name: string }[] | null
@@ -80,6 +87,13 @@ type ManagerPlannerOverrideRow = {
   override_type: AvailabilityOverrideType
   note: string | null
   source: 'manager' | 'therapist'
+  intent?:
+    | 'therapist_need_off'
+    | 'therapist_wants_work'
+    | 'manager_block'
+    | 'manager_force'
+    | 'email_intake'
+    | null
 }
 
 type AvailabilityPageSearchParams = {
@@ -363,7 +377,7 @@ export default async function AvailabilityPage({
   const entriesResult = await supabase
     .from('availability_overrides')
     .select(
-      'id, date, shift_type, override_type, note, created_by, created_at, updated_at, source, therapist_id, cycle_id, profiles!availability_overrides_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
+      'id, date, shift_type, override_type, note, created_by, created_at, updated_at, source, intent, therapist_id, cycle_id, profiles!availability_overrides_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
     )
     .order('date', { ascending: true })
     .order('created_at', { ascending: false })
@@ -383,7 +397,9 @@ export default async function AvailabilityPage({
     cycles.length > 0
       ? await supabase
           .from('availability_overrides')
-          .select('id, therapist_id, cycle_id, date, shift_type, override_type, note, source')
+          .select(
+            'id, therapist_id, cycle_id, date, shift_type, override_type, note, source, intent'
+          )
           .eq('source', 'manager')
           .in(
             'cycle_id',
@@ -427,6 +443,15 @@ export default async function AvailabilityPage({
       created_at: entry.created_at,
       updated_at: entry.updated_at ?? entry.created_at,
       source: entry.source === 'manager' ? 'manager' : 'therapist',
+      intent:
+        entry.intent ??
+        (entry.source === 'manager'
+          ? entry.override_type === 'force_off'
+            ? 'manager_block'
+            : 'manager_force'
+          : entry.override_type === 'force_off'
+            ? 'therapist_need_off'
+            : 'therapist_wants_work'),
     })),
     selectedCycleId,
     { officialSubmissionTherapistIds }

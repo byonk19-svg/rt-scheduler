@@ -31,6 +31,9 @@ import type { ShiftLimitRow, ShiftRole } from '@/app/schedule/types'
 
 import { buildCoverageUrl, getOne, getRoleForUser, getWeeklyLimitFromProfile } from './helpers'
 
+// Primary schedule publish toggle. Publish history/email requeue actions live in
+// `src/app/(app)/publish/actions.ts` because they are event-history operations.
+
 type ShiftPublishValidationRow = {
   id: string
   date: string
@@ -48,6 +51,16 @@ type PublishRecipientRow = {
   email: string | null
   full_name: string | null
   notification_email_enabled?: boolean | null
+}
+
+type PublishCycleMutationClient = {
+  rpc: (
+    fn: 'app_publish_schedule_cycle',
+    args: { p_actor_id: string; p_cycle_id: string }
+  ) => PromiseLike<{
+    data: Array<{ id: string }> | { id: string } | null
+    error: { message?: string } | null
+  }>
 }
 
 export async function toggleCyclePublishedAction(formData: FormData) {
@@ -254,13 +267,18 @@ export async function toggleCyclePublishedAction(formData: FormData) {
     }
   }
 
-  const { data: updatedCycle, error } = await supabase
-    .from('schedule_cycles')
-    .update({ published: !currentlyPublished })
-    .eq('id', cycleId)
-    .eq('published', currentlyPublished)
-    .select('id')
-    .maybeSingle()
+  const { data: updatedCycle, error } = currentlyPublished
+    ? await supabase
+        .from('schedule_cycles')
+        .update({ published: false })
+        .eq('id', cycleId)
+        .eq('published', true)
+        .select('id')
+        .maybeSingle()
+    : await (supabase as unknown as PublishCycleMutationClient).rpc('app_publish_schedule_cycle', {
+        p_actor_id: user.id,
+        p_cycle_id: cycleId,
+      })
 
   if (error) {
     console.error('Failed to toggle schedule publication state:', error)
@@ -272,7 +290,11 @@ export async function toggleCyclePublishedAction(formData: FormData) {
     )
   }
 
-  if (!updatedCycle && !error) {
+  const hasUpdatedCycle = Array.isArray(updatedCycle)
+    ? updatedCycle.length > 0
+    : Boolean(updatedCycle)
+
+  if (!hasUpdatedCycle && !error) {
     redirect(
       buildReturnUrl(cycleId, {
         ...viewParams,
@@ -281,7 +303,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
     )
   }
 
-  if (!currentlyPublished && !error && updatedCycle) {
+  if (!currentlyPublished && !error && hasUpdatedCycle) {
     const emailConfig = getPublishEmailConfig()
     let publishEventId: string | null = null
     let publishedAt: string | null = null

@@ -388,6 +388,7 @@ describe('availability actions', () => {
       note: 'doctor visit',
       created_by: 'therapist-1',
       source: 'therapist',
+      intent: 'therapist_need_off',
     })
     expect(
       supabase.state.inserts.some((row) => row.table === 'therapist_availability_submissions')
@@ -455,6 +456,7 @@ describe('availability actions', () => {
         note: null,
         created_by: 'manager-1',
         source: 'manager',
+        intent: 'manager_force',
       },
       {
         cycle_id: 'cycle-1',
@@ -465,6 +467,7 @@ describe('availability actions', () => {
         note: null,
         created_by: 'manager-1',
         source: 'manager',
+        intent: 'manager_force',
       },
     ])
   })
@@ -544,6 +547,7 @@ describe('availability actions', () => {
         note: 'existing note',
         created_by: 'manager-1',
         source: 'therapist',
+        intent: 'therapist_need_off',
       },
     ])
   })
@@ -595,6 +599,7 @@ describe('availability actions', () => {
         note: 'Please schedule if census is high',
         created_by: 'therapist-1',
         source: 'therapist',
+        intent: 'therapist_wants_work',
       },
       {
         therapist_id: 'therapist-1',
@@ -605,6 +610,7 @@ describe('availability actions', () => {
         note: 'Family appointment',
         created_by: 'therapist-1',
         source: 'therapist',
+        intent: 'therapist_need_off',
       },
     ])
     expect(supabase.state.inserts).toHaveLength(1)
@@ -718,6 +724,7 @@ describe('availability actions', () => {
         note: 'Imported from email: Off Mar 24',
         created_by: 'manager-1',
         source: 'manager',
+        intent: 'email_intake',
       },
       {
         cycle_id: 'cycle-1',
@@ -728,6 +735,7 @@ describe('availability actions', () => {
         note: 'Imported from email: Work Mar 26',
         created_by: 'manager-1',
         source: 'manager',
+        intent: 'email_intake',
       },
     ])
     expect(supabase.state.updates).toEqual([

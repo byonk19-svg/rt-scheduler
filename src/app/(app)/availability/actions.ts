@@ -23,7 +23,7 @@ import {
   removeIntakeRequest,
 } from '@/lib/availability-intake-request-cycler'
 import { shiftOverridesToCycle } from '@/lib/copy-cycle-availability'
-import { buildManagerOverrideInput } from '@/lib/employee-directory'
+import { buildManagerOverrideInput, intentForTherapistOverride } from '@/lib/employee-directory'
 import { extractTextFromAttachment } from '@/lib/openai-ocr'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
@@ -111,7 +111,13 @@ function revalidateTherapistAvailabilitySurfaces() {
 
 type AvailabilityOverrideType = 'force_off' | 'force_on'
 type AvailabilityShiftType = 'day' | 'night' | 'both'
-type AvailabilityEmailItemStatus = 'parsed' | 'auto_applied' | 'needs_review' | 'failed'
+type AvailabilityEmailItemStatus =
+  | 'parsed'
+  | 'ready_to_apply'
+  | 'applied'
+  | 'auto_applied'
+  | 'needs_review'
+  | 'failed'
 
 type AvailabilityEmailItemSummaryRow = {
   parse_status: AvailabilityEmailItemStatus
@@ -174,7 +180,7 @@ function summarizeAvailabilityItemRows(rows: AvailabilityEmailItemSummaryRow[]) 
       ? 'failed'
       : rows.some((row) => row.parse_status === 'needs_review' || row.parse_status === 'failed')
         ? 'needs_review'
-        : rows.every((row) => row.parse_status === 'auto_applied')
+        : rows.every((row) => row.parse_status === 'applied' || row.parse_status === 'auto_applied')
           ? 'applied'
           : 'parsed'
 
@@ -183,7 +189,9 @@ function summarizeAvailabilityItemRows(rows: AvailabilityEmailItemSummaryRow[]) 
     parseSummary: batchSummary.summary,
     parsedRequests: rows.flatMap((row) => sanitizeParsedRequests(row.parsed_requests)),
     itemCount: rows.length,
-    autoAppliedCount: rows.filter((row) => row.parse_status === 'auto_applied').length,
+    autoAppliedCount: rows.filter(
+      (row) => row.parse_status === 'applied' || row.parse_status === 'auto_applied'
+    ).length,
     needsReviewCount: rows.filter((row) => row.parse_status === 'needs_review').length,
     failedCount: rows.filter((row) => row.parse_status === 'failed').length,
   }
@@ -317,6 +325,7 @@ export async function submitAvailabilityEntryAction(formData: FormData) {
       note: note || null,
       created_by: user.id,
       source: 'therapist',
+      intent: intentForTherapistOverride(overrideType),
     },
     { onConflict: 'cycle_id,therapist_id,date,shift_type' }
   )
@@ -428,6 +437,7 @@ export async function submitTherapistAvailabilityGridAction(formData: FormData) 
       note: notesByDate[date] ?? null,
       created_by: user.id,
       source: 'therapist' as const,
+      intent: intentForTherapistOverride('force_on'),
     })),
     ...uniqueCannotWorkDates.map((date) => ({
       therapist_id: user.id,
@@ -438,6 +448,7 @@ export async function submitTherapistAvailabilityGridAction(formData: FormData) 
       note: notesByDate[date] ?? null,
       created_by: user.id,
       source: 'therapist' as const,
+      intent: intentForTherapistOverride('force_off'),
     })),
   ]
 
@@ -712,6 +723,7 @@ export async function saveManagerAvailabilityRequestsAction(formData: FormData) 
     note: notesByDate.get(date) ?? null,
     created_by: user.id,
     source: 'therapist' as const,
+    intent: intentForTherapistOverride(overrideType),
   }))
 
   const keepDates = new Set(uniqueDates)
@@ -925,6 +937,7 @@ export async function applyEmailAvailabilityImportAction(formData: FormData) {
       overrideType: request.override_type,
       note: request.note ?? `Imported from email: ${request.source_line}`,
       managerId: user.id,
+      intent: 'email_intake',
     })
   )
 
@@ -941,7 +954,10 @@ export async function applyEmailAvailabilityImportAction(formData: FormData) {
     const { error: itemUpdateError } = await supabase
       .from('availability_email_intake_items')
       .update({
-        parse_status: 'auto_applied',
+        parse_status: 'applied',
+        applied_at: new Date().toISOString(),
+        applied_by: user.id,
+        apply_method: 'manual',
         auto_applied_at: new Date().toISOString(),
         auto_applied_by: user.id,
         apply_error: null,
@@ -949,10 +965,7 @@ export async function applyEmailAvailabilityImportAction(formData: FormData) {
       .eq('id', itemId)
 
     if (itemUpdateError) {
-      console.error(
-        'Failed to mark availability email intake item as auto-applied:',
-        itemUpdateError
-      )
+      console.error('Failed to mark availability email intake item as applied:', itemUpdateError)
       redirect(buildEmailIntakeAvailabilityUrl({ error: 'email_intake_apply_failed' }))
     }
   } else {
@@ -1462,6 +1475,7 @@ export async function copyAvailabilityFromPreviousCycleAction(formData: FormData
     note: row.note,
     created_by: user.id,
     source: 'manager' as const,
+    intent: row.override_type === 'force_off' ? 'manager_block' : 'manager_force',
   }))
 
   const { error: upsertError } = await supabase

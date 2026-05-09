@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { fetchActiveOperationalCodeMap, isWorkingScheduledShift } from '@/lib/operational-codes'
 
 type RequestType = 'swap' | 'pickup'
 
@@ -66,6 +67,23 @@ function getShiftSlotKey(date: string, shiftType: ShiftRow['shift_type']): strin
   return `${date}:${shiftType}`
 }
 
+async function filterWorkingScheduledShifts<T extends { id: string; status?: string | null }>(
+  admin: unknown,
+  rows: T[]
+): Promise<T[]> {
+  const activeOperationalCodes = await fetchActiveOperationalCodeMap(
+    admin,
+    rows.map((row) => row.id)
+  )
+
+  return rows.filter((row) =>
+    isWorkingScheduledShift({
+      status: row.status,
+      activeOperationalCode: activeOperationalCodes.get(row.id),
+    })
+  )
+}
+
 export async function GET(request: Request) {
   const supabase = await createClient()
   const {
@@ -103,33 +121,43 @@ export async function GET(request: Request) {
     ((requesterProfile ?? null) as Pick<ProfileRow, 'is_lead_eligible'> | null)
       ?.is_lead_eligible === true
 
+  const requestShiftActiveOperationalCodes = await fetchActiveOperationalCodeMap(admin, [
+    requestShift?.id ?? '',
+  ])
+
   if (
     shiftError ||
     !requestShift ||
     requestShift.user_id !== user.id ||
     !isPublishedCycle(requestShift.schedule_cycles) ||
-    requestShift.status !== 'scheduled' ||
-    requestShift.assignment_status !== 'scheduled'
+    !isWorkingScheduledShift({
+      status: requestShift.status,
+      activeOperationalCode: requestShiftActiveOperationalCodes.get(requestShift.id),
+    })
   ) {
     return NextResponse.json({ error: 'Shift was not found.' }, { status: 404 })
   }
 
   const { data: slotLeadRows, error: slotLeadRowsError } = await admin
     .from('shifts')
-    .select('id, user_id, schedule_cycles!inner(published)')
+    .select('id, user_id, status, schedule_cycles!inner(published)')
     .eq('date', requestShift.date)
     .eq('shift_type', requestShift.shift_type)
     .eq('role', 'lead')
     .eq('status', 'scheduled')
-    .eq('assignment_status', 'scheduled')
     .eq('schedule_cycles.published', true)
 
   if (slotLeadRowsError) {
     return NextResponse.json({ error: 'Could not load eligible teammates.' }, { status: 500 })
   }
 
-  const leadShiftRows = ((slotLeadRows ?? []) as Array<Pick<ShiftRow, 'id' | 'user_id'>>).filter(
-    (row): row is Pick<ShiftRow, 'id' | 'user_id'> & { user_id: string } => Boolean(row.user_id)
+  const leadShiftRows = (
+    await filterWorkingScheduledShifts(
+      admin,
+      (slotLeadRows ?? []) as Array<Pick<ShiftRow, 'id' | 'user_id' | 'status'>>
+    )
+  ).filter((row): row is Pick<ShiftRow, 'id' | 'user_id' | 'status'> & { user_id: string } =>
+    Boolean(row.user_id)
   )
   const leadUserIds = Array.from(new Set(leadShiftRows.map((row) => row.user_id)))
 
@@ -159,12 +187,11 @@ export async function GET(request: Request) {
   if (requestTypeValue === 'swap') {
     const { data: candidateShiftRows, error: candidateShiftRowsError } = await admin
       .from('shifts')
-      .select('id, user_id, date, shift_type, role, schedule_cycles!inner(published)')
+      .select('id, user_id, date, shift_type, role, status, schedule_cycles!inner(published)')
       .eq('cycle_id', requestShift.cycle_id)
       .eq('shift_type', requestShift.shift_type)
       .gte('date', todayKey)
       .eq('status', 'scheduled')
-      .eq('assignment_status', 'scheduled')
       .eq('schedule_cycles.published', true)
       .neq('date', requestShift.date)
       .neq('user_id', user.id)
@@ -173,7 +200,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Could not load eligible teammates.' }, { status: 500 })
     }
 
-    const sortedCandidateShiftRows = ((candidateShiftRows ?? []) as ShiftRow[])
+    const sortedCandidateShiftRows = (
+      await filterWorkingScheduledShifts(admin, (candidateShiftRows ?? []) as ShiftRow[])
+    )
       .filter((row): row is ShiftRow & { user_id: string } => Boolean(row.user_id))
       .sort((left, right) => left.date.localeCompare(right.date))
     const candidateShiftByUserId = new Map<string, ShiftRow & { user_id: string }>()
@@ -209,22 +238,21 @@ export async function GET(request: Request) {
     )
     const { data: swapLeadRows, error: swapLeadRowsError } = await admin
       .from('shifts')
-      .select('id, user_id, date, shift_type, schedule_cycles!inner(published)')
+      .select('id, user_id, date, shift_type, status, schedule_cycles!inner(published)')
       .eq('cycle_id', requestShift.cycle_id)
       .in('date', leadCoverageDates)
       .eq('shift_type', requestShift.shift_type)
       .eq('role', 'lead')
       .eq('status', 'scheduled')
-      .eq('assignment_status', 'scheduled')
       .eq('schedule_cycles.published', true)
 
     if (swapLeadRowsError) {
       return NextResponse.json({ error: 'Could not load eligible teammates.' }, { status: 500 })
     }
 
-    const swapLeadShiftRows = ((swapLeadRows ?? []) as ShiftRow[]).filter(
-      (row): row is ShiftRow & { user_id: string } => Boolean(row.user_id)
-    )
+    const swapLeadShiftRows = (
+      await filterWorkingScheduledShifts(admin, (swapLeadRows ?? []) as ShiftRow[])
+    ).filter((row): row is ShiftRow & { user_id: string } => Boolean(row.user_id))
     const swapLeadUserIds = Array.from(new Set(swapLeadShiftRows.map((row) => row.user_id)))
     let swapLeadEligibilityByUserId = new Map<string, boolean>()
 
@@ -361,10 +389,9 @@ export async function GET(request: Request) {
   if (pickupCandidateIds.length > 0) {
     const { data: scheduledRows, error: scheduledRowsError } = await admin
       .from('shifts')
-      .select('user_id, schedule_cycles!inner(published)')
+      .select('id, user_id, status, schedule_cycles!inner(published)')
       .eq('date', requestShift.date)
       .eq('status', 'scheduled')
-      .eq('assignment_status', 'scheduled')
       .eq('schedule_cycles.published', true)
       .in('user_id', pickupCandidateIds)
 
@@ -372,8 +399,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Could not load eligible teammates.' }, { status: 500 })
     }
 
+    const workingScheduledRows = await filterWorkingScheduledShifts(
+      admin,
+      (scheduledRows ?? []) as Array<Pick<ShiftRow, 'id' | 'user_id' | 'status'>>
+    )
     scheduledUserIds = new Set(
-      ((scheduledRows ?? []) as Array<Pick<ShiftRow, 'user_id'>>)
+      workingScheduledRows
         .map((row) => row.user_id)
         .filter((value): value is string => Boolean(value))
     )

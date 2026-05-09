@@ -26,6 +26,9 @@ export function toCoverageAssignmentPayload(value: CoverageUiStatus): {
   assignment_status: AssignmentStatus
   status: ShiftStatus
 } {
+  // Legacy `shifts.assignment_status` and `shifts.status` are a paired UI
+  // compatibility payload. Live operational truth is `shift_operational_entries`;
+  // callers that still write these columns must keep this mapping intact.
   if (value === 'oncall') return { assignment_status: 'on_call', status: 'on_call' }
   if (value === 'leave_early') return { assignment_status: 'left_early', status: 'scheduled' }
   if (value === 'cancelled') return { assignment_status: 'cancelled', status: 'called_off' }

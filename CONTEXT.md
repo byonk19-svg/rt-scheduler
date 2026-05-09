@@ -53,6 +53,7 @@ _Avoid_: reopening availability silently or clearing draft planning as a side ef
 **Manager Availability Plan**:
 Manager-entered scheduling intent for a therapist within a Schedule Block. It is a separate layer from therapist-submitted availability exceptions and should not erase who submitted what.
 _Avoid_: overwriting therapist submission language with manager planning language
+_Avoid_: using creator, source, or intake provenance as a substitute for why the planning entry exists
 
 **Manager Availability Queue**:
 The manager review order for availability submissions: missing submissions first, submitted with exceptions second, submitted with no exceptions third.
@@ -61,6 +62,10 @@ _Avoid_: burying missing submissions below detailed submitted entries
 **Availability Readiness Summary**:
 A manager-facing summary of whether availability collection is ready for schedule building, including submitted count, missing count, exception count, lock state, and warnings.
 _Avoid_: blocking schedule building without explaining what is missing
+
+**Applied Intake Item**:
+An email or manual intake item whose parsed availability requests have actually been written into Availability Exceptions or a Manager Availability Plan. Parser confidence alone is not applied state.
+_Avoid_: labeling an intake item as applied before the availability write succeeds
 
 **My Shifts**:
 The therapist-facing view of the full Schedule Block, with the therapist's scheduled days highlighted and non-working days still visible for orientation.
@@ -74,6 +79,7 @@ _Avoid_: splitting Team Schedule and Live Schedule into separate primary workflo
 A live post-publish status update on a scheduled shift, such as On Call, Cancelled, Call In, or Left Early. Managers and leads may toggle these changes from Team Schedule when permitted; staff see the resulting status.
 _Avoid_: treating operational status changes as draft schedule edits
 _Avoid_: Sick as a top-level operational status; use Call In instead
+_Avoid_: using legacy `shifts.status` or `shifts.assignment_status` fields as the source of truth for live operational state
 
 **Left Early**:
 An operational status meaning a scheduled therapist left before the scheduled shift ended. It is informational for the day and does not affect the staffing ratio for that day.
@@ -115,6 +121,7 @@ _Avoid_: showing approved swaps only as request history without updating the liv
 **Shift Board**:
 The shared workflow for therapists, leads, and managers to handle swaps, pickups, and direct shift requests after a schedule exists.
 _Avoid_: using Requests, Pickups, or Shift Swaps as separate primary navigation concepts
+_Avoid_: treating route/API action names as the lifecycle model; Shift Board state transitions should be explicit domain commands
 
 **Shift Board Section**:
 A shared section name used across roles: Needs Action, Open Shifts, My Requests, and History. Section contents and available actions vary by role and permission.
@@ -203,6 +210,10 @@ _Avoid_: blocking all warnings as if they were critical errors
 **Schedule Blocks Utility**:
 A manager utility inside Coverage for viewing current and past Schedule Blocks, publish status, publish history, take-offline actions, safe delete where allowed, and start-over actions.
 _Avoid_: treating Publish as a separate primary workflow
+
+**Schedule Block State**:
+The resolved lifecycle state of a Schedule Block, such as draft, preliminary active, published live, offline, or archived. The state should be derived in one place before it is relied on across Coverage, Team Schedule, Availability, Publish History, and therapist dashboards.
+_Avoid_: scattering raw `published`, preliminary snapshot, shift-count, and archive checks across workflow code
 
 **Take Schedule Block Offline**:
 A reversible manager action that removes a published Schedule Block from staff live schedule visibility while preserving history and dependencies.
@@ -333,6 +344,7 @@ _Avoid_: embedded form, generic request page, mini composer
 - **Team Schedule** is the canonical live published schedule; **Roster View** is only a display mode for table, print, or export needs
 - **Operational Status Change** controls belong on Team Schedule for managers and leads when permitted, while staff see those statuses read-only
 - The same **Operational Status Change** control may appear in Coverage, but Team Schedule and Coverage must share one persistence, permission, notification, and lifecycle model
+- Client-side Coverage permissions are display hints only; server actions and API routes are the authority and must return clear denied-state feedback when access changes
 - When an **Operational Status Change** creates a coverage issue, the live status should still be saved; the app should surface the coverage impact and route managers to Coverage or Shift Board rather than auto-filling another therapist
 - **Cancelled** means the staff member was not needed and should not create a coverage gap
 - **Left Early** should show on Team Schedule but should not affect the staffing ratio for that day
@@ -370,6 +382,7 @@ _Avoid_: embedded form, generic request page, mini composer
 - Missing required lead coverage is a **Publish Blocker** until resolved or acknowledged with manager reason; after acknowledgement it remains visible as a warning
 - Published operational warnings are manager/lead visible by default; staff see only warnings that directly affect them personally, such as their own Need Off override, Need to Work not honored, or operational status
 - Publish belongs inside **Coverage**; **Schedule Blocks Utility** handles published block history, take-offline, safe delete, and start-over actions
+- Publishing a **Schedule Block** supersedes any active preliminary snapshot for that same block; staff must not see a block as both preliminary-active and published-live
 - Published Schedule Blocks should be taken offline rather than hard-deleted; delete is limited to safe drafts/unpublished blocks, and start-over requires impact review
 - Taking a Schedule Block offline does not require staff notification by default, but manager UI should preserve who took it offline and when
 - Offline Schedule Blocks are hidden from active staff My Shifts and Team Schedule, and from normal staff history by default; managers retain access in Schedule Blocks utility

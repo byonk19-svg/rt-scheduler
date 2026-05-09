@@ -155,6 +155,7 @@ describe('employee directory helpers', () => {
       note: 'Vacation',
       created_by: 'manager-1',
       source: 'manager',
+      intent: 'manager_block',
     })
   })
 
@@ -170,11 +171,13 @@ describe('employee directory helpers', () => {
       created_at: '2026-02-27T12:00:00.000Z',
       updated_at: '2026-02-27T12:00:00.000Z',
       source: 'manager',
+      intent: 'manager_block',
     }
     const therapistOverride: EmployeeAvailabilityOverride = {
       ...managerOverride,
       id: 'ov-2',
       source: 'therapist',
+      intent: 'therapist_need_off',
     }
 
     expect(canTherapistMutateOverride(managerOverride, 'therapist-1')).toBe(false)
@@ -196,6 +199,7 @@ describe('employee directory helpers', () => {
           created_at: '2026-02-27T12:00:00.000Z',
           updated_at: '2026-02-27T12:00:00.000Z',
           source: 'therapist',
+          intent: 'therapist_need_off',
         },
       ],
       'cycle-a',
@@ -223,6 +227,7 @@ describe('employee directory helpers', () => {
           created_at: '2026-02-27T12:00:00.000Z',
           updated_at: '2026-02-27T12:00:00.000Z',
           source: 'therapist',
+          intent: 'therapist_need_off',
         },
       ],
       'cycle-a',
@@ -249,6 +254,7 @@ describe('employee directory helpers', () => {
           created_at: '2026-02-27T12:00:00.000Z',
           updated_at: '2026-02-27T12:00:00.000Z',
           source: 'therapist',
+          intent: 'therapist_need_off',
         },
       ],
       'cycle-a'
@@ -272,6 +278,7 @@ describe('employee directory helpers', () => {
           created_at: '2026-02-28T12:00:00.000Z',
           updated_at: '2026-02-28T12:00:00.000Z',
           source: 'manager',
+          intent: 'manager_force',
         },
         {
           id: 'ov-t',
@@ -284,6 +291,7 @@ describe('employee directory helpers', () => {
           created_at: '2026-02-27T12:00:00.000Z',
           updated_at: '2026-03-01T12:00:00.000Z',
           source: 'therapist',
+          intent: 'therapist_need_off',
         },
       ],
       'cycle-a',
@@ -311,6 +319,7 @@ describe('employee directory helpers', () => {
           created_at: '2026-02-28T12:00:00.000Z',
           updated_at: '2026-02-28T12:00:00.000Z',
           source: 'manager',
+          intent: 'manager_force',
         },
       ],
       'cycle-a',

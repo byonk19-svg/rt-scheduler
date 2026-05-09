@@ -3,6 +3,11 @@ import { NextResponse } from 'next/server'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { isTrustedMutationRequest } from '@/lib/security/request-origin'
+import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
+import {
+  isShiftPostCommand,
+  shiftPostCommandRequiresManager,
+} from '@/lib/shift-post-transition-model'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -163,18 +168,24 @@ async function resolveSameCycleSwapShiftId(params: {
     .neq('date', shift.date)
     .eq('shift_type', shift.shift_type)
     .eq('status', 'scheduled')
-    .eq('assignment_status', 'scheduled')
     .eq('schedule_cycles.published', true)
     .order('date', { ascending: true })
     .order('id', { ascending: true })
-    .limit(1)
-    .maybeSingle()
+    .limit(10)
 
   if (partnerShiftError || !partnerShift) {
     return null
   }
 
-  return (partnerShift as { id: string }).id
+  const partnerRows = Array.isArray(partnerShift)
+    ? (partnerShift as Array<{ id: string }>)
+    : [partnerShift as { id: string }]
+  const activeOperationalCodes = await fetchActiveOperationalCodeMap(
+    admin,
+    partnerRows.map((row) => row.id)
+  )
+
+  return partnerRows.find((row) => !activeOperationalCodes.has(row.id))?.id ?? null
 }
 
 export async function POST(request: Request) {
@@ -192,10 +203,10 @@ export async function POST(request: Request) {
   }
 
   const payload = (await request.json().catch(() => null)) as ShiftPostMutationBody | null
-  const action = payload?.action
-  if (!action) {
+  if (!payload || !isShiftPostCommand(payload.action)) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
   }
+  const action = payload.action
 
   const admin = createAdminClient()
 
@@ -352,14 +363,16 @@ export async function POST(request: Request) {
       })
     }
 
-    const actorProfile = await getActorProfile(user.id)
-    if (
-      !can(parseRole(actorProfile?.role), 'review_shift_posts', {
-        isActive: actorProfile?.is_active !== false,
-        archivedAt: actorProfile?.archived_at ?? null,
-      })
-    ) {
-      return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    if (shiftPostCommandRequiresManager(action)) {
+      const actorProfile = await getActorProfile(user.id)
+      if (
+        !can(parseRole(actorProfile?.role), 'review_shift_posts', {
+          isActive: actorProfile?.is_active !== false,
+          archivedAt: actorProfile?.archived_at ?? null,
+        })
+      ) {
+        return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+      }
     }
 
     if (action === 'review_request') {

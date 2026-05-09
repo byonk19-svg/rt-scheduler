@@ -124,6 +124,9 @@ export type Database = {
           unresolved_lines: Json
           auto_applied_at: string | null
           auto_applied_by: string | null
+          applied_at: string | null
+          applied_by: string | null
+          apply_method: string | null
           apply_error: string | null
           reviewed_at: string | null
           reviewed_by: string | null
@@ -153,6 +156,9 @@ export type Database = {
           unresolved_lines?: Json
           auto_applied_at?: string | null
           auto_applied_by?: string | null
+          applied_at?: string | null
+          applied_by?: string | null
+          apply_method?: string | null
           apply_error?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -182,6 +188,9 @@ export type Database = {
           unresolved_lines?: Json
           auto_applied_at?: string | null
           auto_applied_by?: string | null
+          applied_at?: string | null
+          applied_by?: string | null
+          apply_method?: string | null
           apply_error?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -191,6 +200,13 @@ export type Database = {
           manually_edited_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'availability_email_intake_items_applied_by_fkey'
+            columns: ['applied_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'availability_email_intake_items_attachment_id_fkey'
             columns: ['attachment_id']
@@ -411,6 +427,7 @@ export type Database = {
           created_by: string
           created_at: string
           source: string
+          intent: string
           updated_at: string
           source_intake_id: string | null
           source_intake_item_id: string | null
@@ -426,6 +443,7 @@ export type Database = {
           created_by: string
           created_at?: string
           source?: string
+          intent: string
           updated_at?: string
           source_intake_id?: string | null
           source_intake_item_id?: string | null
@@ -441,6 +459,7 @@ export type Database = {
           created_by?: string
           created_at?: string
           source?: string
+          intent?: string
           updated_at?: string
           source_intake_id?: string | null
           source_intake_item_id?: string | null
@@ -2073,6 +2092,15 @@ export type Database = {
           p_actor_id: string
           p_cycle_id: string
           p_shifts: Json
+        }
+        Returns: Array<{
+          id: string
+        }>
+      }
+      app_publish_schedule_cycle: {
+        Args: {
+          p_actor_id: string
+          p_cycle_id: string
         }
         Returns: Array<{
           id: string

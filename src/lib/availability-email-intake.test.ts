@@ -401,7 +401,7 @@ describe('summarizeAvailabilityEmailBatch', () => {
           rawText: '',
         },
       ]).summary
-    ).toBe('2 items | 1 parsed | 1 need review | 0 failed')
+    ).toBe('2 items | 1 parsed | 0 ready to apply | 1 need review | 0 failed')
   })
 })
 
@@ -482,7 +482,7 @@ describe('summarizeAvailabilityEmailBatch', () => {
           rawText: '',
         },
       ]).summary
-    ).toBe('2 items | 1 parsed | 1 need review | 0 failed')
+    ).toBe('2 items | 1 parsed | 0 ready to apply | 1 need review | 0 failed')
   })
 })
 
@@ -563,7 +563,7 @@ describe('summarizeAvailabilityEmailBatch', () => {
           rawText: '',
         },
       ]).summary
-    ).toBe('2 items | 1 parsed | 1 need review | 0 failed')
+    ).toBe('2 items | 1 parsed | 0 ready to apply | 1 need review | 0 failed')
   })
 })
 

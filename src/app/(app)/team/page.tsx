@@ -16,6 +16,7 @@ import type { WorkPatternRecord } from '@/components/team/team-directory-model'
 import { can } from '@/lib/auth/can'
 import { MANAGED_TEAM_ROLE_VALUES, parseRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
+import { getTeamFeedbackMessage, isTeamErrorCode, isTeamSuccessCode } from '@/lib/team-feedback'
 import { getInitialTeamTab, getSearchParam } from './team-page-tabs'
 
 export const metadata: Metadata = {
@@ -81,6 +82,14 @@ function getTeamFeedback(params?: TeamSearchParams): {
 } | null {
   const success = getSearchParam(params?.success)
   const error = getSearchParam(params?.error)
+  const typedFeedback = getTeamFeedbackMessage({
+    success: isTeamSuccessCode(success) ? success : undefined,
+    error: isTeamErrorCode(error) ? error : undefined,
+    bulk_count: getSearchParam(params?.bulk_count),
+    bulk_line: getSearchParam(params?.bulk_line),
+    roster_bulk_count: getSearchParam(params?.roster_bulk_count),
+  })
+  if (typedFeedback) return typedFeedback
 
   if (success === 'profile_saved') {
     return { message: 'Team member updated.', variant: 'success' }

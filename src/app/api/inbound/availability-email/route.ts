@@ -187,7 +187,7 @@ function buildItemParseStatus(
     item.matchedCycleId &&
     item.requests.length > 0
   ) {
-    return senderTrustedForMatchedTherapist ? 'auto_applied' : 'needs_review'
+    return senderTrustedForMatchedTherapist ? 'ready_to_apply' : 'needs_review'
   }
 
   return item.parseStatus
@@ -369,9 +369,7 @@ async function processInboundAvailabilityEmail(emailId: string) {
         ? 'failed'
         : parsedItems.some((item) => item.parseStatus === 'needs_review')
           ? 'needs_review'
-          : parsedItems.some((item) => item.parseStatus === 'auto_applied')
-            ? 'applied'
-            : 'parsed'
+          : 'parsed'
   const intakeInsert = {
     provider: 'resend',
     provider_email_id: emailId,
@@ -430,62 +428,132 @@ async function processInboundAvailabilityEmail(emailId: string) {
   }
 
   if (parsedItems.length > 0) {
-    await admin.from('availability_email_intake_items').insert(
-      parsedItems.map((item) => ({
-        intake_id: savedIntake.id,
-        source_type: item.sourceType,
-        source_label: item.sourceLabel,
-        attachment_id: item.attachmentId,
-        raw_text: item.rawText || null,
-        ocr_status: item.ocrStatus,
-        ocr_model: item.ocrModel,
-        ocr_error: item.ocrError,
-        parse_status: item.parseStatus,
-        confidence_level: item.confidenceLevel,
-        confidence_reasons: item.confidenceReasons,
-        extracted_employee_name: item.extractedEmployeeName,
-        employee_match_candidates: item.employeeMatchCandidates,
-        matched_therapist_id: item.matchedTherapistId,
-        matched_cycle_id: item.matchedCycleId,
-        original_parsed_requests: item.requests as Json,
-        parsed_requests: item.requests as Json,
-        unresolved_lines: item.unresolvedLines as Json,
-        manually_edited_at: null,
-        auto_applied_at: item.parseStatus === 'auto_applied' ? new Date().toISOString() : null,
-        auto_applied_by: null,
-        apply_error: null,
-      }))
-    )
-  }
+    const { data: savedItemRows, error: itemInsertError } = await admin
+      .from('availability_email_intake_items')
+      .insert(
+        parsedItems.map((item) => ({
+          intake_id: savedIntake.id,
+          source_type: item.sourceType,
+          source_label: item.sourceLabel,
+          attachment_id: item.attachmentId,
+          raw_text: item.rawText || null,
+          ocr_status: item.ocrStatus,
+          ocr_model: item.ocrModel,
+          ocr_error: item.ocrError,
+          parse_status: item.parseStatus,
+          confidence_level: item.confidenceLevel,
+          confidence_reasons: item.confidenceReasons,
+          extracted_employee_name: item.extractedEmployeeName,
+          employee_match_candidates: item.employeeMatchCandidates,
+          matched_therapist_id: item.matchedTherapistId,
+          matched_cycle_id: item.matchedCycleId,
+          original_parsed_requests: item.requests as Json,
+          parsed_requests: item.requests as Json,
+          unresolved_lines: item.unresolvedLines as Json,
+          manually_edited_at: null,
+          auto_applied_at: null,
+          auto_applied_by: null,
+          applied_at: null,
+          applied_by: null,
+          apply_method: null,
+          apply_error: null,
+        }))
+      )
+      .select('id, parse_status')
 
-  const autoApplyPayload = parsedItems
-    .filter(
-      (item) =>
-        item.parseStatus === 'auto_applied' &&
-        item.matchedTherapistId &&
-        item.matchedCycleId &&
-        item.requests.length > 0
-    )
-    .flatMap((item) =>
-      item.requests.map((request) => ({
-        cycle_id: item.matchedCycleId!,
-        therapist_id: item.matchedTherapistId!,
-        date: request.date,
-        shift_type: request.shift_type,
-        override_type: request.override_type,
-        note: request.note ?? `Imported from ${item.sourceLabel}: ${request.source_line}`,
-        created_by: item.matchedTherapistId!,
-        source: 'therapist' as const,
-      }))
-    )
+    if (itemInsertError) {
+      throw new Error(`Could not store intake items: ${itemInsertError.message}`)
+    }
 
-  if (autoApplyPayload.length > 0) {
-    const { error: applyError } = await admin
-      .from('availability_overrides')
-      .upsert(autoApplyPayload, { onConflict: 'cycle_id,therapist_id,date,shift_type' })
+    const readyItemIds = ((savedItemRows ?? []) as Array<{ id: string; parse_status: string }>)
+      .filter((item) => item.parse_status === 'ready_to_apply')
+      .map((item) => item.id)
 
-    if (applyError) {
-      console.error('Failed to auto-apply inbound availability items:', applyError)
+    if (readyItemIds.length > 0) {
+      const now = new Date().toISOString()
+      const autoApplyPayload = parsedItems
+        .filter(
+          (item) =>
+            item.parseStatus === 'ready_to_apply' &&
+            item.matchedTherapistId &&
+            item.matchedCycleId &&
+            item.requests.length > 0
+        )
+        .flatMap((item) =>
+          item.requests.map((request) => ({
+            cycle_id: item.matchedCycleId!,
+            therapist_id: item.matchedTherapistId!,
+            date: request.date,
+            shift_type: request.shift_type,
+            override_type: request.override_type,
+            note: request.note ?? `Imported from ${item.sourceLabel}: ${request.source_line}`,
+            created_by: item.matchedTherapistId!,
+            source: 'therapist' as const,
+            intent: 'email_intake' as const,
+          }))
+        )
+
+      if (autoApplyPayload.length > 0) {
+        const { error: applyError } = await admin
+          .from('availability_overrides')
+          .upsert(autoApplyPayload, { onConflict: 'cycle_id,therapist_id,date,shift_type' })
+
+        const finalParsedItems = parsedItems.map((item) =>
+          item.parseStatus === 'ready_to_apply'
+            ? {
+                ...item,
+                parseStatus: applyError ? ('needs_review' as const) : ('applied' as const),
+              }
+            : item
+        )
+        const finalSummary = summarizeAvailabilityEmailBatch(finalParsedItems)
+        const finalBatchStatus: AvailabilityEmailBatchStatus = applyError
+          ? 'needs_review'
+          : finalParsedItems.every(
+                (item) => item.parseStatus === 'applied' || item.parseStatus === 'auto_applied'
+              )
+            ? 'applied'
+            : finalParsedItems.some((item) => item.parseStatus === 'needs_review')
+              ? 'needs_review'
+              : 'parsed'
+
+        if (applyError) {
+          console.error('Failed to auto-apply inbound availability items:', applyError)
+          await admin
+            .from('availability_email_intake_items')
+            .update({
+              parse_status: 'needs_review',
+              apply_error: applyError.message ?? 'auto_apply_failed',
+            })
+            .in('id', readyItemIds)
+        } else {
+          await admin
+            .from('availability_email_intake_items')
+            .update({
+              parse_status: 'applied',
+              applied_at: now,
+              apply_method: 'auto',
+              auto_applied_at: now,
+              apply_error: null,
+            })
+            .in('id', readyItemIds)
+        }
+
+        await admin
+          .from('availability_email_intakes')
+          .update({
+            parse_status: finalBatchStatus,
+            batch_status: finalBatchStatus,
+            parse_summary: finalSummary.summary,
+            parsed_requests: flattenBatchRequests(finalParsedItems) as Json,
+            auto_applied_count: finalSummary.autoAppliedCount,
+            needs_review_count: finalSummary.needsReviewCount,
+            failed_count: finalSummary.failedCount,
+            applied_at: applyError ? null : now,
+            applied_by: null,
+          })
+          .eq('id', savedIntake.id)
+      }
     }
   }
 

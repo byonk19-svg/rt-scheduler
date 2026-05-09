@@ -14,6 +14,9 @@ import {
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
+// Publish event/history operations. The primary schedule publish toggle lives
+// in `src/app/(app)/schedule/actions/publish-actions.ts`.
+
 async function requireManagerUser() {
   const supabase = await createClient()
   const {

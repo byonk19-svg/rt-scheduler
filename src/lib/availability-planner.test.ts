@@ -100,6 +100,7 @@ describe('availability planner helpers', () => {
         note: 'hard block',
         created_by: 'manager-1',
         source: 'manager',
+        intent: 'manager_block',
       },
       {
         cycle_id: 'cycle-1',
@@ -110,6 +111,7 @@ describe('availability planner helpers', () => {
         note: 'hard block',
         created_by: 'manager-1',
         source: 'manager',
+        intent: 'manager_block',
       },
     ])
   })

@@ -1,4 +1,4 @@
-import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
+import { fetchActiveOperationalCodeMap, isWorkingScheduledShift } from '@/lib/operational-codes'
 import {
   formatRequestRelativeTime,
   formatRequestShiftLabel,
@@ -243,11 +243,10 @@ async function loadLeadCountsBySlot(supabase: SupabaseLike, uniqueDates: string[
 
   const { data: leadRows, error: leadRowsError } = await supabase
     .from('shifts')
-    .select('date, shift_type, status, assignment_status, schedule_cycles!inner(published)')
+    .select('id, date, shift_type, status, schedule_cycles!inner(published)')
     .eq('role', 'lead')
     .in('date', uniqueDates)
     .eq('status', 'scheduled')
-    .eq('assignment_status', 'scheduled')
     .eq('schedule_cycles.published', true)
 
   if (leadRowsError) {
@@ -255,14 +254,29 @@ async function loadLeadCountsBySlot(supabase: SupabaseLike, uniqueDates: string[
     return {}
   }
 
-  return ((leadRows ?? []) as Array<Pick<RequestShiftRow, 'date' | 'shift_type'>>).reduce(
-    (acc, row) => {
-      const key = requestSlotKey(row.date, row.shift_type)
-      acc[key] = (acc[key] ?? 0) + 1
-      return acc
-    },
-    {} as Record<string, number>
+  const typedLeadRows = (leadRows ?? []) as Array<
+    Pick<RequestShiftRow, 'id' | 'date' | 'shift_type' | 'status'>
+  >
+  const activeOperationalCodes = await fetchActiveOperationalCodeMap(
+    supabase as never,
+    typedLeadRows.map((row) => row.id)
   )
+
+  return typedLeadRows
+    .filter((row) =>
+      isWorkingScheduledShift({
+        status: row.status,
+        activeOperationalCode: activeOperationalCodes.get(row.id),
+      })
+    )
+    .reduce(
+      (acc, row) => {
+        const key = requestSlotKey(row.date, row.shift_type)
+        acc[key] = (acc[key] ?? 0) + 1
+        return acc
+      },
+      {} as Record<string, number>
+    )
 }
 
 async function mapOpenRequests(params: {

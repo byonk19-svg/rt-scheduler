@@ -637,6 +637,9 @@ export function CoverageClientPage({
   const canSendPreliminary = Boolean(activeCycleId) && !activeCyclePublished && selectedCycleHasShiftRows
   const canPublishCycle = Boolean(activeCycleId) && selectedCycleHasShiftRows
   const planningNotices = [
+    actorRole === 'manager' && !canManageCoverage
+      ? 'Coverage editing is unavailable for this session. Refresh or sign in again if your manager access was just restored.'
+      : null,
     successParam === 'cycle_published' ? 'Published - visible to employees.' : null,
     successParam === 'preliminary_sent'
       ? 'Preliminary schedule sent. Therapists can now review it in the app.'

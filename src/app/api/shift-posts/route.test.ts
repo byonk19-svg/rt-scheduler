@@ -80,11 +80,13 @@ function makeAdminQuery(result: { data: unknown; error: unknown }) {
   const query = {
     select: vi.fn(() => query),
     eq: vi.fn(() => query),
+    in: vi.fn(() => query),
     gte: vi.fn(() => query),
     neq: vi.fn(() => query),
     order: vi.fn(() => query),
     limit: vi.fn(() => query),
     maybeSingle: vi.fn(async () => result),
+    then: vi.fn((resolve: (value: unknown) => unknown) => Promise.resolve(resolve(result))),
   }
   return query
 }
@@ -111,6 +113,9 @@ describe('shift-post mutation API', () => {
       }),
     ]
     const fromMock = vi.fn((table: string) => {
+      if (table === 'shift_operational_entries') {
+        return makeAdminQuery({ data: [], error: null })
+      }
       if (table !== 'shifts') {
         throw new Error(`Unexpected admin table ${table}`)
       }

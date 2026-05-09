@@ -38,6 +38,8 @@ function createAdminMock() {
     intakeUpserts: [] as Array<Record<string, unknown>>,
     attachmentUpserts: [] as Array<Record<string, unknown>>,
     itemInserts: [] as Array<Array<Record<string, unknown>>>,
+    itemUpdates: [] as Array<Record<string, unknown>>,
+    intakeUpdates: [] as Array<Record<string, unknown>>,
     overrideUpserts: [] as Array<Array<Record<string, unknown>>>,
     receiptInserts: [] as Array<Record<string, unknown>>,
     receiptUpdates: [] as Array<Record<string, unknown>>,
@@ -101,7 +103,17 @@ function createAdminMock() {
           }
 
           if (table === 'availability_email_intake_items') {
-            state.itemInserts.push(payload as Array<Record<string, unknown>>)
+            const rows = payload as Array<Record<string, unknown>>
+            state.itemInserts.push(rows)
+            return {
+              select: async () => ({
+                data: rows.map((row, index) => ({
+                  id: `item-${index + 1}`,
+                  parse_status: String(row.parse_status ?? ''),
+                })),
+                error: null,
+              }),
+            }
           }
           return Promise.resolve({ error: null })
         },
@@ -109,8 +121,15 @@ function createAdminMock() {
           if (table === 'resend_webhook_receipts') {
             state.receiptUpdates.push(payload)
           }
+          if (table === 'availability_email_intake_items') {
+            state.itemUpdates.push(payload)
+          }
+          if (table === 'availability_email_intakes') {
+            state.intakeUpdates.push(payload)
+          }
           return {
             eq: async () => ({ error: null }),
+            in: async () => ({ error: null }),
           }
         },
         maybeSingle: async () => {
@@ -286,6 +305,11 @@ describe('POST /api/inbound/availability-email', () => {
     await waitForAfterWork()
     expect(admin.state.intakeUpserts[0]).toMatchObject({
       item_count: 2,
+      auto_applied_count: 0,
+      needs_review_count: 1,
+      failed_count: 0,
+    })
+    expect(admin.state.intakeUpdates.at(-1)).toMatchObject({
       auto_applied_count: 1,
       needs_review_count: 1,
       failed_count: 0,
@@ -374,6 +398,10 @@ describe('POST /api/inbound/availability-email', () => {
         date: '2026-03-24',
       }),
     ])
+    expect(admin.state.intakeUpdates.at(-1)).toMatchObject({
+      parse_status: 'parsed',
+      auto_applied_count: 1,
+    })
   })
 
   it('keeps processing when one attachment download fails', async () => {
@@ -455,6 +483,10 @@ describe('POST /api/inbound/availability-email', () => {
     await waitForAfterWork()
     expect(admin.state.intakeUpserts[0]).toMatchObject({
       failed_count: 1,
+      auto_applied_count: 0,
+    })
+    expect(admin.state.intakeUpdates.at(-1)).toMatchObject({
+      failed_count: 1,
       auto_applied_count: 1,
     })
     expect(admin.state.itemInserts[0]).toHaveLength(2)
@@ -534,6 +566,11 @@ describe('POST /api/inbound/availability-email', () => {
     })
     await waitForAfterWork()
     expect(admin.state.intakeUpserts[0]).toMatchObject({
+      auto_applied_count: 0,
+      needs_review_count: 0,
+      failed_count: 0,
+    })
+    expect(admin.state.intakeUpdates.at(-1)).toMatchObject({
       auto_applied_count: 1,
       needs_review_count: 0,
       failed_count: 0,

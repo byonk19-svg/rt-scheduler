@@ -52,7 +52,9 @@ describe('schedule lifecycle hardening', () => {
   })
 
   it('does not trust client-passed cycle publication or template dates', () => {
-    expect(publishActionsSource).toContain(".eq('published', currentlyPublished)")
+    expect(publishActionsSource).toContain("rpc('app_publish_schedule_cycle'")
+    expect(publishActionsSource).toContain('p_actor_id: user.id')
+    expect(publishActionsSource).toContain(".eq('published', true)")
     expect(publishActionsSource).toContain("error: currentlyPublished ? 'unpublish_state_changed'")
     expect(cycleActionsSource).toContain(".eq('published', false)")
     expect(templateActionsSource).not.toContain('new_cycle_start_date')
