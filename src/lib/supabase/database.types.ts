@@ -1,34 +1,32 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-empty-object-type */
-
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+﻿export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type Database = {
   public: {
     Tables: {
       audit_log: {
         Row: {
-          id: string
-          user_id: string
           action: string
-          target_type: string
-          target_id: string
           created_at: string
+          id: string
+          target_id: string
+          target_type: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          user_id: string
           action: string
-          target_type: string
-          target_id: string
           created_at?: string
+          id?: string
+          target_id: string
+          target_type: string
+          user_id: string
         }
         Update: {
-          id?: string
-          user_id?: string
           action?: string
-          target_type?: string
-          target_id?: string
           created_at?: string
+          id?: string
+          target_id?: string
+          target_type?: string
+          user_id?: string
         }
         Relationships: [
           {
@@ -42,55 +40,55 @@ export type Database = {
       }
       availability_email_attachments: {
         Row: {
+          content_base64: string | null
+          content_disposition: string | null
+          content_type: string
+          created_at: string
+          download_error: string | null
+          download_status: string
+          filename: string
           id: string
           intake_id: string
-          provider_attachment_id: string
-          filename: string
-          content_type: string
-          content_disposition: string | null
-          size_bytes: number | null
-          content_base64: string | null
-          download_status: string
-          download_error: string | null
-          created_at: string
+          ocr_error: string | null
+          ocr_model: string | null
           ocr_status: string
           ocr_text: string | null
-          ocr_model: string | null
-          ocr_error: string | null
+          provider_attachment_id: string
+          size_bytes: number | null
         }
         Insert: {
+          content_base64?: string | null
+          content_disposition?: string | null
+          content_type: string
+          created_at?: string
+          download_error?: string | null
+          download_status?: string
+          filename: string
           id?: string
           intake_id: string
-          provider_attachment_id: string
-          filename: string
-          content_type: string
-          content_disposition?: string | null
-          size_bytes?: number | null
-          content_base64?: string | null
-          download_status?: string
-          download_error?: string | null
-          created_at?: string
+          ocr_error?: string | null
+          ocr_model?: string | null
           ocr_status?: string
           ocr_text?: string | null
-          ocr_model?: string | null
-          ocr_error?: string | null
+          provider_attachment_id: string
+          size_bytes?: number | null
         }
         Update: {
+          content_base64?: string | null
+          content_disposition?: string | null
+          content_type?: string
+          created_at?: string
+          download_error?: string | null
+          download_status?: string
+          filename?: string
           id?: string
           intake_id?: string
-          provider_attachment_id?: string
-          filename?: string
-          content_type?: string
-          content_disposition?: string | null
-          size_bytes?: number | null
-          content_base64?: string | null
-          download_status?: string
-          download_error?: string | null
-          created_at?: string
+          ocr_error?: string | null
+          ocr_model?: string | null
           ocr_status?: string
           ocr_text?: string | null
-          ocr_model?: string | null
-          ocr_error?: string | null
+          provider_attachment_id?: string
+          size_bytes?: number | null
         }
         Relationships: [
           {
@@ -104,100 +102,100 @@ export type Database = {
       }
       availability_email_intake_items: {
         Row: {
-          id: string
-          intake_id: string
-          source_type: string
-          source_label: string
-          attachment_id: string | null
-          raw_text: string | null
-          ocr_status: string
-          ocr_model: string | null
-          ocr_error: string | null
-          parse_status: string
-          confidence_level: string
-          confidence_reasons: Json
-          extracted_employee_name: string | null
-          employee_match_candidates: Json
-          matched_therapist_id: string | null
-          matched_cycle_id: string | null
-          parsed_requests: Json
-          unresolved_lines: Json
-          auto_applied_at: string | null
-          auto_applied_by: string | null
           applied_at: string | null
           applied_by: string | null
-          apply_method: string | null
           apply_error: string | null
+          apply_method: string | null
+          attachment_id: string | null
+          auto_applied_at: string | null
+          auto_applied_by: string | null
+          confidence_level: string
+          confidence_reasons: Json
+          created_at: string
+          employee_match_candidates: Json
+          extracted_employee_name: string | null
+          id: string
+          intake_id: string
+          manually_edited_at: string | null
+          matched_cycle_id: string | null
+          matched_therapist_id: string | null
+          ocr_error: string | null
+          ocr_model: string | null
+          ocr_status: string
+          original_parsed_requests: Json | null
+          parse_status: string
+          parsed_requests: Json
+          raw_text: string | null
           reviewed_at: string | null
           reviewed_by: string | null
-          created_at: string
+          source_label: string
+          source_type: string
+          unresolved_lines: Json
           updated_at: string
-          original_parsed_requests: Json | null
-          manually_edited_at: string | null
         }
         Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
+          apply_error?: string | null
+          apply_method?: string | null
+          attachment_id?: string | null
+          auto_applied_at?: string | null
+          auto_applied_by?: string | null
+          confidence_level?: string
+          confidence_reasons?: Json
+          created_at?: string
+          employee_match_candidates?: Json
+          extracted_employee_name?: string | null
           id?: string
           intake_id: string
-          source_type: string
-          source_label: string
-          attachment_id?: string | null
-          raw_text?: string | null
-          ocr_status?: string
-          ocr_model?: string | null
-          ocr_error?: string | null
-          parse_status?: string
-          confidence_level?: string
-          confidence_reasons?: Json
-          extracted_employee_name?: string | null
-          employee_match_candidates?: Json
-          matched_therapist_id?: string | null
+          manually_edited_at?: string | null
           matched_cycle_id?: string | null
+          matched_therapist_id?: string | null
+          ocr_error?: string | null
+          ocr_model?: string | null
+          ocr_status?: string
+          original_parsed_requests?: Json | null
+          parse_status?: string
           parsed_requests?: Json
-          unresolved_lines?: Json
-          auto_applied_at?: string | null
-          auto_applied_by?: string | null
-          applied_at?: string | null
-          applied_by?: string | null
-          apply_method?: string | null
-          apply_error?: string | null
+          raw_text?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
-          created_at?: string
+          source_label: string
+          source_type: string
+          unresolved_lines?: Json
           updated_at?: string
-          original_parsed_requests?: Json | null
-          manually_edited_at?: string | null
         }
         Update: {
-          id?: string
-          intake_id?: string
-          source_type?: string
-          source_label?: string
-          attachment_id?: string | null
-          raw_text?: string | null
-          ocr_status?: string
-          ocr_model?: string | null
-          ocr_error?: string | null
-          parse_status?: string
-          confidence_level?: string
-          confidence_reasons?: Json
-          extracted_employee_name?: string | null
-          employee_match_candidates?: Json
-          matched_therapist_id?: string | null
-          matched_cycle_id?: string | null
-          parsed_requests?: Json
-          unresolved_lines?: Json
-          auto_applied_at?: string | null
-          auto_applied_by?: string | null
           applied_at?: string | null
           applied_by?: string | null
-          apply_method?: string | null
           apply_error?: string | null
+          apply_method?: string | null
+          attachment_id?: string | null
+          auto_applied_at?: string | null
+          auto_applied_by?: string | null
+          confidence_level?: string
+          confidence_reasons?: Json
+          created_at?: string
+          employee_match_candidates?: Json
+          extracted_employee_name?: string | null
+          id?: string
+          intake_id?: string
+          manually_edited_at?: string | null
+          matched_cycle_id?: string | null
+          matched_therapist_id?: string | null
+          ocr_error?: string | null
+          ocr_model?: string | null
+          ocr_status?: string
+          original_parsed_requests?: Json | null
+          parse_status?: string
+          parsed_requests?: Json
+          raw_text?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
-          created_at?: string
+          source_label?: string
+          source_type?: string
+          unresolved_lines?: Json
           updated_at?: string
-          original_parsed_requests?: Json | null
-          manually_edited_at?: string | null
         }
         Relationships: [
           {
@@ -253,85 +251,85 @@ export type Database = {
       }
       availability_email_intakes: {
         Row: {
-          id: string
-          provider: string
-          provider_email_id: string
-          provider_message_id: string | null
+          applied_at: string | null
+          applied_by: string | null
+          auto_applied_count: number
+          batch_status: string
+          created_at: string
+          failed_count: number
           from_email: string
           from_name: string | null
-          subject: string | null
-          text_content: string | null
           html_content: string | null
-          received_at: string
-          matched_therapist_id: string | null
+          id: string
+          item_count: number
           matched_cycle_id: string | null
+          matched_therapist_id: string | null
+          needs_review_count: number
           parse_status: string
           parse_summary: string | null
           parsed_requests: Json
+          provider: string
+          provider_email_id: string
+          provider_message_id: string | null
           raw_payload: Json
-          applied_at: string | null
-          applied_by: string | null
-          created_at: string
+          received_at: string
+          subject: string | null
+          text_content: string | null
           updated_at: string
-          batch_status: string
-          item_count: number
-          auto_applied_count: number
-          needs_review_count: number
-          failed_count: number
         }
         Insert: {
+          applied_at?: string | null
+          applied_by?: string | null
+          auto_applied_count?: number
+          batch_status?: string
+          created_at?: string
+          failed_count?: number
+          from_email: string
+          from_name?: string | null
+          html_content?: string | null
           id?: string
+          item_count?: number
+          matched_cycle_id?: string | null
+          matched_therapist_id?: string | null
+          needs_review_count?: number
+          parse_status?: string
+          parse_summary?: string | null
+          parsed_requests?: Json
           provider?: string
           provider_email_id: string
           provider_message_id?: string | null
-          from_email: string
-          from_name?: string | null
+          raw_payload?: Json
+          received_at: string
           subject?: string | null
           text_content?: string | null
+          updated_at?: string
+        }
+        Update: {
+          applied_at?: string | null
+          applied_by?: string | null
+          auto_applied_count?: number
+          batch_status?: string
+          created_at?: string
+          failed_count?: number
+          from_email?: string
+          from_name?: string | null
           html_content?: string | null
-          received_at: string
-          matched_therapist_id?: string | null
+          id?: string
+          item_count?: number
           matched_cycle_id?: string | null
+          matched_therapist_id?: string | null
+          needs_review_count?: number
           parse_status?: string
           parse_summary?: string | null
           parsed_requests?: Json
-          raw_payload?: Json
-          applied_at?: string | null
-          applied_by?: string | null
-          created_at?: string
-          updated_at?: string
-          batch_status?: string
-          item_count?: number
-          auto_applied_count?: number
-          needs_review_count?: number
-          failed_count?: number
-        }
-        Update: {
-          id?: string
           provider?: string
           provider_email_id?: string
           provider_message_id?: string | null
-          from_email?: string
-          from_name?: string | null
+          raw_payload?: Json
+          received_at?: string
           subject?: string | null
           text_content?: string | null
-          html_content?: string | null
-          received_at?: string
-          matched_therapist_id?: string | null
-          matched_cycle_id?: string | null
-          parse_status?: string
-          parse_summary?: string | null
-          parsed_requests?: Json
-          raw_payload?: Json
-          applied_at?: string | null
-          applied_by?: string | null
-          created_at?: string
           updated_at?: string
-          batch_status?: string
-          item_count?: number
-          auto_applied_count?: number
-          needs_review_count?: number
-          failed_count?: number
         }
         Relationships: [
           {
@@ -359,37 +357,37 @@ export type Database = {
       }
       availability_entries: {
         Row: {
-          id: string
-          therapist_id: string
+          created_at: string
+          created_by: string
           cycle_id: string
           date: string
-          shift_type: Database['public']['Enums']['availability_shift_type']
           entry_type: Database['public']['Enums']['availability_entry_type']
+          id: string
           reason: string | null
-          created_by: string
-          created_at: string
+          shift_type: Database['public']['Enums']['availability_shift_type']
+          therapist_id: string
         }
         Insert: {
-          id?: string
-          therapist_id: string
+          created_at?: string
+          created_by: string
           cycle_id: string
           date: string
-          shift_type?: Database['public']['Enums']['availability_shift_type']
           entry_type: Database['public']['Enums']['availability_entry_type']
+          id?: string
           reason?: string | null
-          created_by: string
-          created_at?: string
+          shift_type?: Database['public']['Enums']['availability_shift_type']
+          therapist_id: string
         }
         Update: {
-          id?: string
-          therapist_id?: string
+          created_at?: string
+          created_by?: string
           cycle_id?: string
           date?: string
-          shift_type?: Database['public']['Enums']['availability_shift_type']
           entry_type?: Database['public']['Enums']['availability_entry_type']
+          id?: string
           reason?: string | null
-          created_by?: string
-          created_at?: string
+          shift_type?: Database['public']['Enums']['availability_shift_type']
+          therapist_id?: string
         }
         Relationships: [
           {
@@ -417,52 +415,52 @@ export type Database = {
       }
       availability_overrides: {
         Row: {
-          id: string
-          cycle_id: string
-          therapist_id: string
-          date: string
-          shift_type: string
-          override_type: string
-          note: string | null
-          created_by: string
           created_at: string
-          source: string
+          created_by: string
+          cycle_id: string
+          date: string
+          id: string
           intent: string
-          updated_at: string
+          note: string | null
+          override_type: string
+          shift_type: string
+          source: string
           source_intake_id: string | null
           source_intake_item_id: string | null
+          therapist_id: string
+          updated_at: string
         }
         Insert: {
-          id?: string
-          cycle_id: string
-          therapist_id: string
-          date: string
-          shift_type?: string
-          override_type: string
-          note?: string | null
-          created_by: string
           created_at?: string
-          source?: string
+          created_by: string
+          cycle_id: string
+          date: string
+          id?: string
           intent: string
-          updated_at?: string
+          note?: string | null
+          override_type: string
+          shift_type?: string
+          source?: string
           source_intake_id?: string | null
           source_intake_item_id?: string | null
+          therapist_id: string
+          updated_at?: string
         }
         Update: {
-          id?: string
-          cycle_id?: string
-          therapist_id?: string
-          date?: string
-          shift_type?: string
-          override_type?: string
-          note?: string | null
-          created_by?: string
           created_at?: string
-          source?: string
+          created_by?: string
+          cycle_id?: string
+          date?: string
+          id?: string
           intent?: string
-          updated_at?: string
+          note?: string | null
+          override_type?: string
+          shift_type?: string
+          source?: string
           source_intake_id?: string | null
           source_intake_item_id?: string | null
+          therapist_id?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -480,6 +478,20 @@ export type Database = {
             referencedColumns: ['id']
           },
           {
+            foreignKeyName: 'availability_overrides_source_intake_id_fkey'
+            columns: ['source_intake_id']
+            isOneToOne: false
+            referencedRelation: 'availability_email_intakes'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'availability_overrides_source_intake_item_id_fkey'
+            columns: ['source_intake_item_id']
+            isOneToOne: false
+            referencedRelation: 'availability_email_intake_items'
+            referencedColumns: ['id']
+          },
+          {
             foreignKeyName: 'availability_overrides_therapist_id_fkey'
             columns: ['therapist_id']
             isOneToOne: false
@@ -490,28 +502,28 @@ export type Database = {
       }
       availability_requests: {
         Row: {
-          id: string
-          user_id: string | null
+          created_at: string
           cycle_id: string | null
           date: string
+          id: string
           reason: string | null
-          created_at: string | null
+          user_id: string | null
         }
         Insert: {
-          id?: string
-          user_id?: string | null
+          created_at?: string
           cycle_id?: string | null
           date: string
+          id?: string
           reason?: string | null
-          created_at?: string | null
+          user_id?: string | null
         }
         Update: {
-          id?: string
-          user_id?: string | null
+          created_at?: string
           cycle_id?: string | null
           date?: string
+          id?: string
           reason?: string | null
-          created_at?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -530,85 +542,33 @@ export type Database = {
           },
         ]
       }
-      availability_reviews: {
-        Row: {
-          id: string
-          therapist_id: string
-          cycle_id: string
-          status: string
-          reviewed_by: string | null
-          reviewed_at: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          therapist_id: string
-          cycle_id: string
-          status?: string
-          reviewed_by?: string | null
-          reviewed_at?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          therapist_id?: string
-          cycle_id?: string
-          status?: string
-          reviewed_by?: string | null
-          reviewed_at?: string | null
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: 'availability_reviews_cycle_id_fkey'
-            columns: ['cycle_id']
-            isOneToOne: false
-            referencedRelation: 'schedule_cycles'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'availability_reviews_reviewed_by_fkey'
-            columns: ['reviewed_by']
-            isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'availability_reviews_therapist_id_fkey'
-            columns: ['therapist_id']
-            isOneToOne: false
-            referencedRelation: 'profiles'
-            referencedColumns: ['id']
-          },
-        ]
-      }
       cycle_templates: {
         Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
           id: string
           name: string
-          description: string | null
-          created_by: string | null
-          created_at: string
-          site_id: string
           shift_data: Json
+          site_id: string
         }
         Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
           id?: string
           name: string
-          description?: string | null
-          created_by?: string | null
-          created_at?: string
-          site_id?: string
           shift_data: Json
+          site_id?: string
         }
         Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
           id?: string
           name?: string
-          description?: string | null
-          created_by?: string | null
-          created_at?: string
-          site_id?: string
           shift_data?: Json
+          site_id?: string
         }
         Relationships: [
           {
@@ -618,65 +578,72 @@ export type Database = {
             referencedRelation: 'profiles'
             referencedColumns: ['id']
           },
+          {
+            foreignKeyName: 'cycle_templates_site_id_fkey'
+            columns: ['site_id']
+            isOneToOne: false
+            referencedRelation: 'sites'
+            referencedColumns: ['id']
+          },
         ]
       }
       employee_roster: {
         Row: {
-          id: string
+          created_at: string
+          created_by: string | null
+          employment_type: string
           full_name: string
+          id: string
+          is_active: boolean
+          is_lead_eligible: boolean
+          matched_at: string | null
+          matched_email: string | null
+          matched_profile_id: string | null
+          max_work_days_per_week: number
           normalized_full_name: string
+          phone_number: string | null
           role: string
           shift_type: string
-          employment_type: string
-          max_work_days_per_week: number
-          is_lead_eligible: boolean
-          is_active: boolean
-          matched_profile_id: string | null
-          matched_email: string | null
-          matched_at: string | null
-          created_by: string | null
-          updated_by: string | null
-          created_at: string
           updated_at: string
-          phone_number: string | null
+          updated_by: string | null
         }
         Insert: {
-          id?: string
+          created_at?: string
+          created_by?: string | null
+          employment_type?: string
           full_name: string
+          id?: string
+          is_active?: boolean
+          is_lead_eligible?: boolean
+          matched_at?: string | null
+          matched_email?: string | null
+          matched_profile_id?: string | null
+          max_work_days_per_week?: number
           normalized_full_name: string
+          phone_number?: string | null
           role: string
           shift_type?: string
-          employment_type?: string
-          max_work_days_per_week?: number
-          is_lead_eligible?: boolean
-          is_active?: boolean
-          matched_profile_id?: string | null
-          matched_email?: string | null
-          matched_at?: string | null
-          created_by?: string | null
-          updated_by?: string | null
-          created_at?: string
           updated_at?: string
-          phone_number?: string | null
+          updated_by?: string | null
         }
         Update: {
-          id?: string
+          created_at?: string
+          created_by?: string | null
+          employment_type?: string
           full_name?: string
+          id?: string
+          is_active?: boolean
+          is_lead_eligible?: boolean
+          matched_at?: string | null
+          matched_email?: string | null
+          matched_profile_id?: string | null
+          max_work_days_per_week?: number
           normalized_full_name?: string
+          phone_number?: string | null
           role?: string
           shift_type?: string
-          employment_type?: string
-          max_work_days_per_week?: number
-          is_lead_eligible?: boolean
-          is_active?: boolean
-          matched_profile_id?: string | null
-          matched_email?: string | null
-          matched_at?: string | null
-          created_by?: string | null
-          updated_by?: string | null
-          created_at?: string
           updated_at?: string
-          phone_number?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -704,53 +671,53 @@ export type Database = {
       }
       lottery_decisions: {
         Row: {
-          id: string
-          site_id: string
-          shift_date: string
-          shift_type: string
-          keep_to_work: number
-          scheduled_count: number
-          reductions_needed: number
-          context_signature: string
-          recommended_actions: Json
           applied_actions: Json
-          override_applied: boolean
           applied_at: string
           applied_by: string
+          context_signature: string
+          id: string
+          keep_to_work: number
+          override_applied: boolean
+          recommended_actions: Json
+          reductions_needed: number
+          scheduled_count: number
+          shift_date: string
+          shift_type: string
+          site_id: string
           superseded_at: string | null
           superseded_by: string | null
         }
         Insert: {
-          id?: string
-          site_id: string
-          shift_date: string
-          shift_type: string
-          keep_to_work: number
-          scheduled_count: number
-          reductions_needed: number
-          context_signature: string
-          recommended_actions?: Json
           applied_actions?: Json
-          override_applied?: boolean
           applied_at?: string
           applied_by: string
+          context_signature: string
+          id?: string
+          keep_to_work: number
+          override_applied?: boolean
+          recommended_actions?: Json
+          reductions_needed: number
+          scheduled_count: number
+          shift_date: string
+          shift_type: string
+          site_id: string
           superseded_at?: string | null
           superseded_by?: string | null
         }
         Update: {
-          id?: string
-          site_id?: string
-          shift_date?: string
-          shift_type?: string
-          keep_to_work?: number
-          scheduled_count?: number
-          reductions_needed?: number
-          context_signature?: string
-          recommended_actions?: Json
           applied_actions?: Json
-          override_applied?: boolean
           applied_at?: string
           applied_by?: string
+          context_signature?: string
+          id?: string
+          keep_to_work?: number
+          override_applied?: boolean
+          recommended_actions?: Json
+          reductions_needed?: number
+          scheduled_count?: number
+          shift_date?: string
+          shift_type?: string
+          site_id?: string
           superseded_at?: string | null
           superseded_by?: string | null
         }
@@ -760,6 +727,13 @@ export type Database = {
             columns: ['applied_by']
             isOneToOne: false
             referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'lottery_decisions_site_id_fkey'
+            columns: ['site_id']
+            isOneToOne: false
+            referencedRelation: 'sites'
             referencedColumns: ['id']
           },
           {
@@ -773,55 +747,55 @@ export type Database = {
       }
       lottery_history_entries: {
         Row: {
-          id: string
-          site_id: string
-          shift_id: string
-          decision_id: string | null
-          therapist_id: string
-          shift_date: string
-          shift_type: string
           applied_status: Database['public']['Enums']['assignment_status']
           created_at: string
           created_by: string
+          decision_id: string | null
+          id: string
           invalidated_at: string | null
           invalidated_by: string | null
           invalidated_reason: string | null
           override_applied: boolean
           request_restored: boolean
+          shift_date: string
+          shift_id: string
+          shift_type: string
+          site_id: string
+          therapist_id: string
         }
         Insert: {
-          id?: string
-          site_id: string
-          shift_id: string
-          decision_id?: string | null
-          therapist_id: string
-          shift_date: string
-          shift_type: string
           applied_status: Database['public']['Enums']['assignment_status']
           created_at?: string
           created_by: string
+          decision_id?: string | null
+          id?: string
           invalidated_at?: string | null
           invalidated_by?: string | null
           invalidated_reason?: string | null
           override_applied?: boolean
           request_restored?: boolean
+          shift_date: string
+          shift_id: string
+          shift_type: string
+          site_id: string
+          therapist_id: string
         }
         Update: {
-          id?: string
-          site_id?: string
-          shift_id?: string
-          decision_id?: string | null
-          therapist_id?: string
-          shift_date?: string
-          shift_type?: string
           applied_status?: Database['public']['Enums']['assignment_status']
           created_at?: string
           created_by?: string
+          decision_id?: string | null
+          id?: string
           invalidated_at?: string | null
           invalidated_by?: string | null
           invalidated_reason?: string | null
           override_applied?: boolean
           request_restored?: boolean
+          shift_date?: string
+          shift_id?: string
+          shift_type?: string
+          site_id?: string
+          therapist_id?: string
         }
         Relationships: [
           {
@@ -853,6 +827,13 @@ export type Database = {
             referencedColumns: ['id']
           },
           {
+            foreignKeyName: 'lottery_history_entries_site_id_fkey'
+            columns: ['site_id']
+            isOneToOne: false
+            referencedRelation: 'sites'
+            referencedColumns: ['id']
+          },
+          {
             foreignKeyName: 'lottery_history_entries_therapist_id_fkey'
             columns: ['therapist_id']
             isOneToOne: false
@@ -863,35 +844,35 @@ export type Database = {
       }
       lottery_list_entries: {
         Row: {
-          id: string
-          site_id: string
-          shift_type: string
-          therapist_id: string
-          display_order: number
           created_at: string
           created_by: string
+          display_order: number
+          id: string
+          shift_type: string
+          site_id: string
+          therapist_id: string
           updated_at: string
           updated_by: string
         }
         Insert: {
-          id?: string
-          site_id: string
-          shift_type: string
-          therapist_id: string
-          display_order: number
           created_at?: string
           created_by: string
+          display_order: number
+          id?: string
+          shift_type: string
+          site_id: string
+          therapist_id: string
           updated_at?: string
           updated_by: string
         }
         Update: {
-          id?: string
-          site_id?: string
-          shift_type?: string
-          therapist_id?: string
-          display_order?: number
           created_at?: string
           created_by?: string
+          display_order?: number
+          id?: string
+          shift_type?: string
+          site_id?: string
+          therapist_id?: string
           updated_at?: string
           updated_by?: string
         }
@@ -901,6 +882,13 @@ export type Database = {
             columns: ['created_by']
             isOneToOne: false
             referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'lottery_list_entries_site_id_fkey'
+            columns: ['site_id']
+            isOneToOne: false
+            referencedRelation: 'sites'
             referencedColumns: ['id']
           },
           {
@@ -921,49 +909,49 @@ export type Database = {
       }
       lottery_requests: {
         Row: {
-          id: string
-          site_id: string
-          therapist_id: string
-          shift_date: string
-          shift_type: string
-          requested_at: string
-          state: string
           created_at: string
           created_by: string
-          suppressed_at: string | null
-          suppressed_by: string | null
+          id: string
+          requested_at: string
           restored_at: string | null
           restored_by: string | null
-        }
-        Insert: {
-          id?: string
-          site_id: string
-          therapist_id: string
           shift_date: string
           shift_type: string
-          requested_at: string
+          site_id: string
           state: string
+          suppressed_at: string | null
+          suppressed_by: string | null
+          therapist_id: string
+        }
+        Insert: {
           created_at?: string
           created_by: string
-          suppressed_at?: string | null
-          suppressed_by?: string | null
+          id?: string
+          requested_at: string
           restored_at?: string | null
           restored_by?: string | null
+          shift_date: string
+          shift_type: string
+          site_id: string
+          state: string
+          suppressed_at?: string | null
+          suppressed_by?: string | null
+          therapist_id: string
         }
         Update: {
-          id?: string
-          site_id?: string
-          therapist_id?: string
-          shift_date?: string
-          shift_type?: string
-          requested_at?: string
-          state?: string
           created_at?: string
           created_by?: string
-          suppressed_at?: string | null
-          suppressed_by?: string | null
+          id?: string
+          requested_at?: string
           restored_at?: string | null
           restored_by?: string | null
+          shift_date?: string
+          shift_type?: string
+          site_id?: string
+          state?: string
+          suppressed_at?: string | null
+          suppressed_by?: string | null
+          therapist_id?: string
         }
         Relationships: [
           {
@@ -978,6 +966,13 @@ export type Database = {
             columns: ['restored_by']
             isOneToOne: false
             referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'lottery_requests_site_id_fkey'
+            columns: ['site_id']
+            isOneToOne: false
+            referencedRelation: 'sites'
             referencedColumns: ['id']
           },
           {
@@ -998,43 +993,43 @@ export type Database = {
       }
       notification_outbox: {
         Row: {
-          id: string
-          publish_event_id: string
-          user_id: string | null
-          email: string
-          name: string | null
-          channel: string
-          status: string
           attempt_count: number
-          last_error: string | null
-          sent_at: string | null
+          channel: string
           created_at: string
+          email: string
+          id: string
+          last_error: string | null
+          name: string | null
+          publish_event_id: string
+          sent_at: string | null
+          status: string
+          user_id: string | null
         }
         Insert: {
-          id?: string
-          publish_event_id: string
-          user_id?: string | null
-          email: string
-          name?: string | null
-          channel?: string
-          status?: string
           attempt_count?: number
-          last_error?: string | null
-          sent_at?: string | null
+          channel?: string
           created_at?: string
+          email: string
+          id?: string
+          last_error?: string | null
+          name?: string | null
+          publish_event_id: string
+          sent_at?: string | null
+          status?: string
+          user_id?: string | null
         }
         Update: {
-          id?: string
-          publish_event_id?: string
-          user_id?: string | null
-          email?: string
-          name?: string | null
-          channel?: string
-          status?: string
           attempt_count?: number
-          last_error?: string | null
-          sent_at?: string | null
+          channel?: string
           created_at?: string
+          email?: string
+          id?: string
+          last_error?: string | null
+          name?: string | null
+          publish_event_id?: string
+          sent_at?: string | null
+          status?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -1055,37 +1050,37 @@ export type Database = {
       }
       notifications: {
         Row: {
-          id: string
-          user_id: string
-          event_type: string
-          title: string
-          message: string
-          target_type: string | null
-          target_id: string | null
           created_at: string
+          event_type: string
+          id: string
+          message: string
           read_at: string | null
+          target_id: string | null
+          target_type: string | null
+          title: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          user_id: string
-          event_type: string
-          title: string
-          message: string
-          target_type?: string | null
-          target_id?: string | null
           created_at?: string
+          event_type: string
+          id?: string
+          message: string
           read_at?: string | null
+          target_id?: string | null
+          target_type?: string | null
+          title: string
+          user_id: string
         }
         Update: {
-          id?: string
-          user_id?: string
-          event_type?: string
-          title?: string
-          message?: string
-          target_type?: string | null
-          target_id?: string | null
           created_at?: string
+          event_type?: string
+          id?: string
+          message?: string
           read_at?: string | null
+          target_id?: string | null
+          target_type?: string | null
+          title?: string
+          user_id?: string
         }
         Relationships: [
           {
@@ -1099,43 +1094,43 @@ export type Database = {
       }
       preliminary_requests: {
         Row: {
-          id: string
-          snapshot_id: string
-          shift_id: string
-          requester_id: string
-          type: string
-          status: string
-          note: string | null
-          decision_note: string | null
-          approved_by: string | null
           approved_at: string | null
+          approved_by: string | null
           created_at: string
+          decision_note: string | null
+          id: string
+          note: string | null
+          requester_id: string
+          shift_id: string
+          snapshot_id: string
+          status: string
+          type: string
         }
         Insert: {
-          id?: string
-          snapshot_id: string
-          shift_id: string
-          requester_id: string
-          type: string
-          status: string
-          note?: string | null
-          decision_note?: string | null
-          approved_by?: string | null
           approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
+          decision_note?: string | null
+          id?: string
+          note?: string | null
+          requester_id: string
+          shift_id: string
+          snapshot_id: string
+          status: string
+          type: string
         }
         Update: {
-          id?: string
-          snapshot_id?: string
-          shift_id?: string
-          requester_id?: string
-          type?: string
-          status?: string
-          note?: string | null
-          decision_note?: string | null
-          approved_by?: string | null
           approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
+          decision_note?: string | null
+          id?: string
+          note?: string | null
+          requester_id?: string
+          shift_id?: string
+          snapshot_id?: string
+          status?: string
+          type?: string
         }
         Relationships: [
           {
@@ -1170,30 +1165,30 @@ export type Database = {
       }
       preliminary_shift_states: {
         Row: {
-          id: string
-          snapshot_id: string
-          shift_id: string
-          state: string
-          reserved_by: string | null
           active_request_id: string | null
+          id: string
+          reserved_by: string | null
+          shift_id: string
+          snapshot_id: string
+          state: string
           updated_at: string
         }
         Insert: {
-          id?: string
-          snapshot_id: string
-          shift_id: string
-          state: string
-          reserved_by?: string | null
           active_request_id?: string | null
+          id?: string
+          reserved_by?: string | null
+          shift_id: string
+          snapshot_id: string
+          state: string
           updated_at?: string
         }
         Update: {
-          id?: string
-          snapshot_id?: string
-          shift_id?: string
-          state?: string
-          reserved_by?: string | null
           active_request_id?: string | null
+          id?: string
+          reserved_by?: string | null
+          shift_id?: string
+          snapshot_id?: string
+          state?: string
           updated_at?: string
         }
         Relationships: [
@@ -1229,28 +1224,28 @@ export type Database = {
       }
       preliminary_snapshots: {
         Row: {
-          id: string
-          cycle_id: string
+          created_at: string
           created_by: string
+          cycle_id: string
+          id: string
           sent_at: string
           status: string
-          created_at: string
         }
         Insert: {
-          id?: string
-          cycle_id: string
+          created_at?: string
           created_by: string
+          cycle_id: string
+          id?: string
           sent_at?: string
           status: string
-          created_at?: string
         }
         Update: {
-          id?: string
-          cycle_id?: string
+          created_at?: string
           created_by?: string
+          cycle_id?: string
+          id?: string
           sent_at?: string
           status?: string
-          created_at?: string
         }
         Relationships: [
           {
@@ -1271,94 +1266,94 @@ export type Database = {
       }
       profiles: {
         Row: {
-          id: string
-          full_name: string
-          email: string
-          role: string | null
-          shift_type: string
-          created_at: string | null
-          is_lead_eligible: boolean
-          phone_number: string | null
-          employment_type: string
-          max_work_days_per_week: number
-          on_fmla: boolean
-          fmla_return_date: string | null
-          is_active: boolean
-          preferred_work_days: number[]
-          default_calendar_view: string
-          default_landing_page: string
-          site_id: string
           archived_at: string | null
           archived_by: string | null
+          created_at: string
+          default_calendar_view: string
+          default_landing_page: string
           default_schedule_view: string
+          email: string
+          employment_type: string
+          fmla_return_date: string | null
+          full_name: string
+          id: string
+          is_active: boolean
+          is_lead_eligible: boolean
           max_consecutive_days: number
-          notification_in_app_enabled: boolean
+          max_work_days_per_week: number
           notification_email_enabled: boolean
+          notification_in_app_enabled: boolean
+          on_fmla: boolean
+          phone_number: string | null
+          preferred_work_days: number[]
           preferred_work_days_mode: string
-          staff_onboarding_required: boolean
-          staff_onboarding_preferences_confirmed_at: string | null
-          staff_onboarding_theme_confirmed_at: string | null
+          role: string
+          shift_type: string
+          site_id: string
           staff_onboarding_completed_at: string | null
+          staff_onboarding_preferences_confirmed_at: string | null
+          staff_onboarding_required: boolean
+          staff_onboarding_theme_confirmed_at: string | null
         }
         Insert: {
-          id: string
-          full_name: string
-          email: string
-          role?: string | null
-          shift_type?: string
-          created_at?: string | null
-          is_lead_eligible?: boolean
-          phone_number?: string | null
-          employment_type?: string
-          max_work_days_per_week?: number
-          on_fmla?: boolean
-          fmla_return_date?: string | null
-          is_active?: boolean
-          preferred_work_days?: number[]
-          default_calendar_view?: string
-          default_landing_page?: string
-          site_id?: string
           archived_at?: string | null
           archived_by?: string | null
+          created_at?: string
+          default_calendar_view?: string
+          default_landing_page?: string
           default_schedule_view?: string
+          email: string
+          employment_type?: string
+          fmla_return_date?: string | null
+          full_name: string
+          id: string
+          is_active?: boolean
+          is_lead_eligible?: boolean
           max_consecutive_days?: number
-          notification_in_app_enabled?: boolean
+          max_work_days_per_week?: number
           notification_email_enabled?: boolean
+          notification_in_app_enabled?: boolean
+          on_fmla?: boolean
+          phone_number?: string | null
+          preferred_work_days?: number[]
           preferred_work_days_mode?: string
-          staff_onboarding_required?: boolean
-          staff_onboarding_preferences_confirmed_at?: string | null
-          staff_onboarding_theme_confirmed_at?: string | null
+          role?: string
+          shift_type?: string
+          site_id?: string
           staff_onboarding_completed_at?: string | null
+          staff_onboarding_preferences_confirmed_at?: string | null
+          staff_onboarding_required?: boolean
+          staff_onboarding_theme_confirmed_at?: string | null
         }
         Update: {
-          id?: string
-          full_name?: string
-          email?: string
-          role?: string | null
-          shift_type?: string
-          created_at?: string | null
-          is_lead_eligible?: boolean
-          phone_number?: string | null
-          employment_type?: string
-          max_work_days_per_week?: number
-          on_fmla?: boolean
-          fmla_return_date?: string | null
-          is_active?: boolean
-          preferred_work_days?: number[]
-          default_calendar_view?: string
-          default_landing_page?: string
-          site_id?: string
           archived_at?: string | null
           archived_by?: string | null
+          created_at?: string
+          default_calendar_view?: string
+          default_landing_page?: string
           default_schedule_view?: string
+          email?: string
+          employment_type?: string
+          fmla_return_date?: string | null
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          is_lead_eligible?: boolean
           max_consecutive_days?: number
-          notification_in_app_enabled?: boolean
+          max_work_days_per_week?: number
           notification_email_enabled?: boolean
+          notification_in_app_enabled?: boolean
+          on_fmla?: boolean
+          phone_number?: string | null
+          preferred_work_days?: number[]
           preferred_work_days_mode?: string
-          staff_onboarding_required?: boolean
-          staff_onboarding_preferences_confirmed_at?: string | null
-          staff_onboarding_theme_confirmed_at?: string | null
+          role?: string
+          shift_type?: string
+          site_id?: string
           staff_onboarding_completed_at?: string | null
+          staff_onboarding_preferences_confirmed_at?: string | null
+          staff_onboarding_required?: boolean
+          staff_onboarding_theme_confirmed_at?: string | null
         }
         Relationships: [
           {
@@ -1369,53 +1364,53 @@ export type Database = {
             referencedColumns: ['id']
           },
           {
-            foreignKeyName: 'profiles_id_fkey'
-            columns: ['id']
+            foreignKeyName: 'profiles_site_id_fkey'
+            columns: ['site_id']
             isOneToOne: false
-            referencedRelation: 'users'
+            referencedRelation: 'sites'
             referencedColumns: ['id']
           },
         ]
       }
       publish_events: {
         Row: {
-          id: string
+          channel: string
           cycle_id: string
+          error_message: string | null
+          failed_count: number
+          id: string
           published_at: string
           published_by: string
-          status: string
-          recipient_count: number
-          channel: string
           queued_count: number
+          recipient_count: number
           sent_count: number
-          failed_count: number
-          error_message: string | null
+          status: string
         }
         Insert: {
-          id?: string
+          channel?: string
           cycle_id: string
+          error_message?: string | null
+          failed_count?: number
+          id?: string
           published_at?: string
           published_by: string
-          status?: string
-          recipient_count?: number
-          channel?: string
           queued_count?: number
+          recipient_count?: number
           sent_count?: number
-          failed_count?: number
-          error_message?: string | null
+          status?: string
         }
         Update: {
-          id?: string
+          channel?: string
           cycle_id?: string
+          error_message?: string | null
+          failed_count?: number
+          id?: string
           published_at?: string
           published_by?: string
-          status?: string
-          recipient_count?: number
-          channel?: string
           queued_count?: number
+          recipient_count?: number
           sent_count?: number
-          failed_count?: number
-          error_message?: string | null
+          status?: string
         }
         Relationships: [
           {
@@ -1436,116 +1431,110 @@ export type Database = {
       }
       resend_webhook_receipts: {
         Row: {
-          svix_id: string
-          event_type: string
           email_id: string | null
-          received_at: string
+          event_type: string
           processed_at: string | null
+          received_at: string
+          svix_id: string
         }
         Insert: {
-          svix_id: string
-          event_type: string
           email_id?: string | null
-          received_at?: string
+          event_type: string
           processed_at?: string | null
+          received_at?: string
+          svix_id: string
         }
         Update: {
-          svix_id?: string
-          event_type?: string
           email_id?: string | null
-          received_at?: string
+          event_type?: string
           processed_at?: string | null
+          received_at?: string
+          svix_id?: string
         }
         Relationships: []
       }
       schedule_cycles: {
         Row: {
-          id: string
-          label: string
-          start_date: string
-          end_date: string
-          published: boolean | null
-          created_at: string | null
           archived_at: string | null
           availability_due_at: string | null
+          created_at: string
+          end_date: string
+          id: string
+          label: string
+          published: boolean
           site_id: string
+          start_date: string
         }
         Insert: {
+          archived_at?: string | null
+          availability_due_at?: string | null
+          created_at?: string
+          end_date: string
           id?: string
           label: string
-          start_date: string
-          end_date: string
-          published?: boolean | null
-          created_at?: string | null
-          archived_at?: string | null
-          availability_due_at?: string | null
+          published?: boolean
           site_id?: string
+          start_date: string
         }
         Update: {
+          archived_at?: string | null
+          availability_due_at?: string | null
+          created_at?: string
+          end_date?: string
           id?: string
           label?: string
-          start_date?: string
-          end_date?: string
-          published?: boolean | null
-          created_at?: string | null
-          archived_at?: string | null
-          availability_due_at?: string | null
+          published?: boolean
           site_id?: string
-        }
-        Relationships: []
-      }
-      shift_operational_entries: {
-        Row: {
-          id: string
-          shift_id: string
-          code: Database['public']['Enums']['assignment_status']
-          note: string | null
-          left_early_time: string | null
-          active: boolean
-          created_at: string
-          created_by: string
-          replaced_at: string | null
-          replaced_by: string | null
-        }
-        Insert: {
-          id?: string
-          shift_id: string
-          code: Database['public']['Enums']['assignment_status']
-          note?: string | null
-          left_early_time?: string | null
-          active?: boolean
-          created_at?: string
-          created_by: string
-          replaced_at?: string | null
-          replaced_by?: string | null
-        }
-        Update: {
-          id?: string
-          shift_id?: string
-          code?: Database['public']['Enums']['assignment_status']
-          note?: string | null
-          left_early_time?: string | null
-          active?: boolean
-          created_at?: string
-          created_by?: string
-          replaced_at?: string | null
-          replaced_by?: string | null
+          start_date?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'shift_operational_entries_created_by_fkey'
-            columns: ['created_by']
+            foreignKeyName: 'schedule_cycles_site_id_fkey'
+            columns: ['site_id']
             isOneToOne: false
-            referencedRelation: 'users'
+            referencedRelation: 'sites'
             referencedColumns: ['id']
           },
-          {
-            foreignKeyName: 'shift_operational_entries_replaced_by_fkey'
-            columns: ['replaced_by']
-            isOneToOne: false
-            referencedRelation: 'users'
-            referencedColumns: ['id']
-          },
+        ]
+      }
+      shift_operational_entries: {
+        Row: {
+          active: boolean
+          code: Database['public']['Enums']['assignment_status']
+          created_at: string
+          created_by: string
+          id: string
+          left_early_time: string | null
+          note: string | null
+          replaced_at: string | null
+          replaced_by: string | null
+          shift_id: string
+        }
+        Insert: {
+          active?: boolean
+          code: Database['public']['Enums']['assignment_status']
+          created_at?: string
+          created_by: string
+          id?: string
+          left_early_time?: string | null
+          note?: string | null
+          replaced_at?: string | null
+          replaced_by?: string | null
+          shift_id: string
+        }
+        Update: {
+          active?: boolean
+          code?: Database['public']['Enums']['assignment_status']
+          created_at?: string
+          created_by?: string
+          id?: string
+          left_early_time?: string | null
+          note?: string | null
+          replaced_at?: string | null
+          replaced_by?: string | null
+          shift_id?: string
+        }
+        Relationships: [
           {
             foreignKeyName: 'shift_operational_entries_shift_id_fkey'
             columns: ['shift_id']
@@ -1557,46 +1546,39 @@ export type Database = {
       }
       shift_operational_entry_audit: {
         Row: {
-          id: string
-          shift_id: string
-          entry_id: string | null
+          acted_at: string
+          acted_by: string
           action_type: string
           code: Database['public']['Enums']['assignment_status']
-          note: string | null
+          entry_id: string | null
+          id: string
           left_early_time: string | null
-          acted_by: string
-          acted_at: string
+          note: string | null
+          shift_id: string
         }
         Insert: {
-          id?: string
-          shift_id: string
-          entry_id?: string | null
+          acted_at?: string
+          acted_by: string
           action_type: string
           code: Database['public']['Enums']['assignment_status']
-          note?: string | null
+          entry_id?: string | null
+          id?: string
           left_early_time?: string | null
-          acted_by: string
-          acted_at?: string
+          note?: string | null
+          shift_id: string
         }
         Update: {
-          id?: string
-          shift_id?: string
-          entry_id?: string | null
+          acted_at?: string
+          acted_by?: string
           action_type?: string
           code?: Database['public']['Enums']['assignment_status']
-          note?: string | null
+          entry_id?: string | null
+          id?: string
           left_early_time?: string | null
-          acted_by?: string
-          acted_at?: string
+          note?: string | null
+          shift_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: 'shift_operational_entry_audit_acted_by_fkey'
-            columns: ['acted_by']
-            isOneToOne: false
-            referencedRelation: 'users'
-            referencedColumns: ['id']
-          },
           {
             foreignKeyName: 'shift_operational_entry_audit_entry_id_fkey'
             columns: ['entry_id']
@@ -1615,28 +1597,28 @@ export type Database = {
       }
       shift_post_interests: {
         Row: {
-          id: string
-          shift_post_id: string
-          therapist_id: string
-          status: string
           created_at: string
+          id: string
           responded_at: string | null
+          shift_post_id: string
+          status: string
+          therapist_id: string
         }
         Insert: {
-          id?: string
-          shift_post_id: string
-          therapist_id: string
-          status?: string
           created_at?: string
+          id?: string
           responded_at?: string | null
+          shift_post_id: string
+          status?: string
+          therapist_id: string
         }
         Update: {
-          id?: string
-          shift_post_id?: string
-          therapist_id?: string
-          status?: string
           created_at?: string
+          id?: string
           responded_at?: string | null
+          shift_post_id?: string
+          status?: string
+          therapist_id?: string
         }
         Relationships: [
           {
@@ -1657,58 +1639,58 @@ export type Database = {
       }
       shift_posts: {
         Row: {
-          id: string
-          shift_id: string | null
-          posted_by: string | null
-          message: string
-          type: string
-          status: string
-          created_at: string | null
           claimed_by: string | null
-          swap_shift_id: string | null
+          created_at: string
           expired_at: string | null
+          id: string
           manager_override: boolean
+          message: string
           override_reason: string | null
-          visibility: string
-          recipient_response: string | null
+          posted_by: string | null
           recipient_responded_at: string | null
+          recipient_response: string | null
           request_kind: string
+          shift_id: string | null
+          status: string
+          swap_shift_id: string | null
+          type: string
+          visibility: string
         }
         Insert: {
-          id?: string
-          shift_id?: string | null
-          posted_by?: string | null
-          message: string
-          type: string
-          status?: string
-          created_at?: string | null
           claimed_by?: string | null
-          swap_shift_id?: string | null
+          created_at?: string
           expired_at?: string | null
+          id?: string
           manager_override?: boolean
+          message: string
           override_reason?: string | null
-          visibility?: string
-          recipient_response?: string | null
+          posted_by?: string | null
           recipient_responded_at?: string | null
+          recipient_response?: string | null
           request_kind?: string
+          shift_id?: string | null
+          status?: string
+          swap_shift_id?: string | null
+          type: string
+          visibility?: string
         }
         Update: {
-          id?: string
-          shift_id?: string | null
-          posted_by?: string | null
-          message?: string
-          type?: string
-          status?: string
-          created_at?: string | null
           claimed_by?: string | null
-          swap_shift_id?: string | null
+          created_at?: string
           expired_at?: string | null
+          id?: string
           manager_override?: boolean
+          message?: string
           override_reason?: string | null
-          visibility?: string
-          recipient_response?: string | null
+          posted_by?: string | null
           recipient_responded_at?: string | null
+          recipient_response?: string | null
           request_kind?: string
+          shift_id?: string | null
+          status?: string
+          swap_shift_id?: string | null
+          type?: string
+          visibility?: string
         }
         Relationships: [
           {
@@ -1743,46 +1725,46 @@ export type Database = {
       }
       shift_reminder_outbox: {
         Row: {
-          id: string
-          user_id: string | null
-          shift_id: string | null
-          remind_type: string
-          status: string
-          email: string
-          name: string | null
           attempt_count: number
+          created_at: string
+          email: string
+          id: string
           last_error: string | null
+          name: string | null
+          remind_type: string
           send_after: string
           sent_at: string | null
-          created_at: string
+          shift_id: string
+          status: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          user_id?: string | null
-          shift_id?: string | null
-          remind_type: string
-          status?: string
-          email: string
-          name?: string | null
           attempt_count?: number
+          created_at?: string
+          email: string
+          id?: string
           last_error?: string | null
+          name?: string | null
+          remind_type: string
           send_after: string
           sent_at?: string | null
-          created_at?: string
+          shift_id: string
+          status?: string
+          user_id: string
         }
         Update: {
-          id?: string
-          user_id?: string | null
-          shift_id?: string | null
-          remind_type?: string
-          status?: string
-          email?: string
-          name?: string | null
           attempt_count?: number
+          created_at?: string
+          email?: string
+          id?: string
           last_error?: string | null
+          name?: string | null
+          remind_type?: string
           send_after?: string
           sent_at?: string | null
-          created_at?: string
+          shift_id?: string
+          status?: string
+          user_id?: string
         }
         Relationships: [
           {
@@ -1803,40 +1785,33 @@ export type Database = {
       }
       shift_status_changes: {
         Row: {
+          changed_at: string
+          changed_by: string
+          from_status: string
           id: string
           shift_id: string
           therapist_name: string
-          from_status: string
           to_status: string
-          changed_at: string
-          changed_by: string
         }
         Insert: {
+          changed_at?: string
+          changed_by: string
+          from_status: string
           id?: string
           shift_id: string
           therapist_name: string
-          from_status: string
           to_status: string
-          changed_at?: string
-          changed_by: string
         }
         Update: {
+          changed_at?: string
+          changed_by?: string
+          from_status?: string
           id?: string
           shift_id?: string
           therapist_name?: string
-          from_status?: string
           to_status?: string
-          changed_at?: string
-          changed_by?: string
         }
         Relationships: [
-          {
-            foreignKeyName: 'shift_status_changes_changed_by_fkey'
-            columns: ['changed_by']
-            isOneToOne: false
-            referencedRelation: 'users'
-            referencedColumns: ['id']
-          },
           {
             foreignKeyName: 'shift_status_changes_shift_id_fkey'
             columns: ['shift_id']
@@ -1848,67 +1823,67 @@ export type Database = {
       }
       shifts: {
         Row: {
-          id: string
-          cycle_id: string | null
-          user_id: string | null
-          date: string
-          shift_type: string
-          status: string
-          created_at: string | null
-          role: Database['public']['Enums']['shift_role']
-          site_id: string
           assignment_status: Database['public']['Enums']['assignment_status']
-          status_note: string | null
+          availability_override: boolean
+          availability_override_at: string | null
+          availability_override_by: string | null
+          availability_override_reason: string | null
+          created_at: string
+          cycle_id: string | null
+          date: string
+          id: string
           left_early_time: string | null
+          role: Database['public']['Enums']['shift_role']
+          shift_type: string
+          site_id: string
+          status: string
+          status_note: string | null
           status_updated_at: string | null
           status_updated_by: string | null
-          availability_override: boolean
-          availability_override_reason: string | null
-          availability_override_by: string | null
-          availability_override_at: string | null
           unfilled_reason: string | null
+          user_id: string | null
         }
         Insert: {
-          id?: string
-          cycle_id?: string | null
-          user_id?: string | null
-          date: string
-          shift_type: string
-          status?: string
-          created_at?: string | null
-          role?: Database['public']['Enums']['shift_role']
-          site_id?: string
           assignment_status?: Database['public']['Enums']['assignment_status']
-          status_note?: string | null
+          availability_override?: boolean
+          availability_override_at?: string | null
+          availability_override_by?: string | null
+          availability_override_reason?: string | null
+          created_at?: string
+          cycle_id?: string | null
+          date: string
+          id?: string
           left_early_time?: string | null
+          role?: Database['public']['Enums']['shift_role']
+          shift_type: string
+          site_id?: string
+          status?: string
+          status_note?: string | null
           status_updated_at?: string | null
           status_updated_by?: string | null
-          availability_override?: boolean
-          availability_override_reason?: string | null
-          availability_override_by?: string | null
-          availability_override_at?: string | null
           unfilled_reason?: string | null
+          user_id?: string | null
         }
         Update: {
-          id?: string
-          cycle_id?: string | null
-          user_id?: string | null
-          date?: string
-          shift_type?: string
-          status?: string
-          created_at?: string | null
-          role?: Database['public']['Enums']['shift_role']
-          site_id?: string
           assignment_status?: Database['public']['Enums']['assignment_status']
-          status_note?: string | null
+          availability_override?: boolean
+          availability_override_at?: string | null
+          availability_override_by?: string | null
+          availability_override_reason?: string | null
+          created_at?: string
+          cycle_id?: string | null
+          date?: string
+          id?: string
           left_early_time?: string | null
+          role?: Database['public']['Enums']['shift_role']
+          shift_type?: string
+          site_id?: string
+          status?: string
+          status_note?: string | null
           status_updated_at?: string | null
           status_updated_by?: string | null
-          availability_override?: boolean
-          availability_override_reason?: string | null
-          availability_override_by?: string | null
-          availability_override_at?: string | null
           unfilled_reason?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -1923,6 +1898,13 @@ export type Database = {
             columns: ['cycle_id']
             isOneToOne: false
             referencedRelation: 'schedule_cycles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'shifts_site_id_fkey'
+            columns: ['site_id']
+            isOneToOne: false
+            referencedRelation: 'sites'
             referencedColumns: ['id']
           },
           {
@@ -1941,32 +1923,50 @@ export type Database = {
           },
         ]
       }
+      sites: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       therapist_availability_submissions: {
         Row: {
+          created_at: string
           id: string
-          therapist_id: string
+          last_edited_at: string
           schedule_cycle_id: string
           submitted_at: string
-          last_edited_at: string
-          created_at: string
+          therapist_id: string
           updated_at: string
         }
         Insert: {
+          created_at?: string
           id?: string
-          therapist_id: string
+          last_edited_at: string
           schedule_cycle_id: string
           submitted_at: string
-          last_edited_at: string
-          created_at?: string
+          therapist_id: string
           updated_at?: string
         }
         Update: {
+          created_at?: string
           id?: string
-          therapist_id?: string
+          last_edited_at?: string
           schedule_cycle_id?: string
           submitted_at?: string
-          last_edited_at?: string
-          created_at?: string
+          therapist_id?: string
           updated_at?: string
         }
         Relationships: [
@@ -1988,58 +1988,58 @@ export type Database = {
       }
       work_patterns: {
         Row: {
-          therapist_id: string
-          works_dow: number[]
-          offs_dow: number[]
-          weekend_rotation: string
-          weekend_anchor_date: string | null
-          works_dow_mode: string
-          shift_preference: string
           created_at: string
-          updated_at: string
-          pattern_type: string
-          weekly_weekdays: number[]
-          weekend_rule: string
           cycle_anchor_date: string | null
           cycle_segments: Json
+          offs_dow: number[]
+          pattern_type: string
+          shift_preference: string
+          therapist_id: string
+          updated_at: string
+          weekend_anchor_date: string | null
+          weekend_rotation: string
+          weekend_rule: string
+          weekly_weekdays: number[]
+          works_dow: number[]
+          works_dow_mode: string
         }
         Insert: {
-          therapist_id: string
-          works_dow?: number[]
-          offs_dow?: number[]
-          weekend_rotation?: string
-          weekend_anchor_date?: string | null
-          works_dow_mode?: string
-          shift_preference?: string
           created_at?: string
-          updated_at?: string
-          pattern_type?: string
-          weekly_weekdays?: number[]
-          weekend_rule?: string
           cycle_anchor_date?: string | null
           cycle_segments?: Json
+          offs_dow?: number[]
+          pattern_type?: string
+          shift_preference?: string
+          therapist_id: string
+          updated_at?: string
+          weekend_anchor_date?: string | null
+          weekend_rotation?: string
+          weekend_rule?: string
+          weekly_weekdays?: number[]
+          works_dow?: number[]
+          works_dow_mode?: string
         }
         Update: {
-          therapist_id?: string
-          works_dow?: number[]
-          offs_dow?: number[]
-          weekend_rotation?: string
-          weekend_anchor_date?: string | null
-          works_dow_mode?: string
-          shift_preference?: string
           created_at?: string
-          updated_at?: string
-          pattern_type?: string
-          weekly_weekdays?: number[]
-          weekend_rule?: string
           cycle_anchor_date?: string | null
           cycle_segments?: Json
+          offs_dow?: number[]
+          pattern_type?: string
+          shift_preference?: string
+          therapist_id?: string
+          updated_at?: string
+          weekend_anchor_date?: string | null
+          weekend_rotation?: string
+          weekend_rule?: string
+          weekly_weekdays?: number[]
+          works_dow?: number[]
+          works_dow_mode?: string
         }
         Relationships: [
           {
             foreignKeyName: 'work_patterns_therapist_id_fkey'
             columns: ['therapist_id']
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: 'profiles'
             referencedColumns: ['id']
           },
@@ -2050,34 +2050,47 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      app_assert_pickup_claimant_eligible: {
+        Args: {
+          p_allow_direct?: boolean
+          p_claimant_id: string
+          p_post_id: string
+        }
+        Returns: undefined
+      }
       app_create_shift_post_request: {
         Args: {
           p_actor_id: string
+          p_claimed_by: string | null
+          p_message: string
           p_shift_id: string
           p_type: string
           p_visibility: string
-          p_claimed_by: string | null
-          p_message: string
         }
-        Returns: any
-      }
-      app_deny_pickup_claimant: {
-        Args: {
-          p_actor_id: string
-          p_post_id: string
-          p_interest_id: string
-        }
-        Returns: any
-      }
-      app_express_shift_post_interest: {
-        Args: {
-          p_actor_id: string
-          p_post_id: string
-        }
-        Returns: Array<{
+        Returns: {
+          claimed_by: string | null
+          created_at: string
+          expired_at: string | null
           id: string
+          manager_override: boolean
+          message: string
+          override_reason: string | null
+          posted_by: string | null
+          recipient_responded_at: string | null
+          recipient_response: string | null
+          request_kind: string
+          shift_id: string | null
           status: string
-        }>
+          swap_shift_id: string | null
+          type: string
+          visibility: string
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'shift_posts'
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       app_delete_unpublished_cycle_shifts: {
         Args: {
@@ -2087,116 +2100,153 @@ export type Database = {
         }
         Returns: number
       }
-      app_insert_unpublished_cycle_shifts: {
-        Args: {
-          p_actor_id: string
-          p_cycle_id: string
-          p_shifts: Json
-        }
-        Returns: Array<{
+      app_deny_pickup_claimant: {
+        Args: { p_actor_id: string; p_interest_id: string; p_post_id: string }
+        Returns: {
+          denied_interest_id: string
+          promoted_interest_id: string
+        }[]
+      }
+      app_express_shift_post_interest: {
+        Args: { p_actor_id: string; p_post_id: string }
+        Returns: {
           id: string
-        }>
+          status: string
+        }[]
+      }
+      app_insert_unpublished_cycle_shifts: {
+        Args: { p_actor_id: string; p_cycle_id: string; p_shifts: Json }
+        Returns: {
+          id: string
+        }[]
+      }
+      app_promote_next_shift_post_interest: {
+        Args: { p_post_id: string }
+        Returns: string
       }
       app_publish_schedule_cycle: {
-        Args: {
-          p_actor_id: string
-          p_cycle_id: string
-        }
-        Returns: Array<{
+        Args: { p_actor_id: string; p_cycle_id: string }
+        Returns: {
           id: string
-        }>
+        }[]
       }
       app_respond_direct_shift_post: {
-        Args: {
-          p_actor_id: string
-          p_post_id: string
-          p_response: string
+        Args: { p_actor_id: string; p_post_id: string; p_response: string }
+        Returns: {
+          claimed_by: string | null
+          created_at: string
+          expired_at: string | null
+          id: string
+          manager_override: boolean
+          message: string
+          override_reason: string | null
+          posted_by: string | null
+          recipient_responded_at: string | null
+          recipient_response: string | null
+          request_kind: string
+          shift_id: string | null
+          status: string
+          swap_shift_id: string | null
+          type: string
+          visibility: string
         }
-        Returns: any
+        SetofOptions: {
+          from: '*'
+          to: 'shift_posts'
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       app_review_shift_post: {
         Args: {
           p_actor_id: string
-          p_post_id: string
           p_decision: string
-          p_selected_interest_id?: string | null
-          p_swap_partner_id?: string | null
           p_manager_override?: boolean
           p_override_reason?: string | null
+          p_post_id: string
+          p_selected_interest_id?: string | null
+          p_swap_partner_id?: string | null
         }
-        Returns: any
+        Returns: {
+          claimed_by: string | null
+          created_at: string
+          expired_at: string | null
+          id: string
+          manager_override: boolean
+          message: string
+          override_reason: string | null
+          posted_by: string | null
+          recipient_responded_at: string | null
+          recipient_response: string | null
+          request_kind: string
+          shift_id: string | null
+          status: string
+          swap_shift_id: string | null
+          type: string
+          visibility: string
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'shift_posts'
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       app_withdraw_shift_post: {
-        Args: {
-          p_actor_id: string
-          p_post_id: string
+        Args: { p_actor_id: string; p_post_id: string }
+        Returns: {
+          claimed_by: string | null
+          created_at: string
+          expired_at: string | null
+          id: string
+          manager_override: boolean
+          message: string
+          override_reason: string | null
+          posted_by: string | null
+          recipient_responded_at: string | null
+          recipient_response: string | null
+          request_kind: string
+          shift_id: string | null
+          status: string
+          swap_shift_id: string | null
+          type: string
+          visibility: string
         }
-        Returns: any
+        SetofOptions: {
+          from: '*'
+          to: 'shift_posts'
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       app_withdraw_shift_post_interest: {
-        Args: {
-          p_actor_id: string
-          p_interest_id: string
-        }
-        Returns: any
+        Args: { p_actor_id: string; p_interest_id: string }
+        Returns: {
+          promoted_interest_id: string
+          shift_post_id: string
+          withdrawn_interest_id: string
+        }[]
       }
-      apply_approved_shift_post: {
-        Args: {}
-        Returns: any
+      custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      expire_unclaimed_swap_requests: { Args: never; Returns: number }
+      find_invalid_shift_status_pairs: {
+        Args: never
+        Returns: {
+          assignment_status: Database['public']['Enums']['assignment_status']
+          shift_id: string
+          status: string
+        }[]
       }
-      custom_access_token_hook: {
-        Args: {
-          event: Json
-        }
-        Returns: any
-      }
-      deny_sibling_pickup_posts: {
-        Args: {}
-        Returns: any
-      }
-      enforce_shift_post_interest_parent_state: {
-        Args: {}
-        Returns: any
-      }
-      enforce_shift_post_status_transitions: {
-        Args: {}
-        Returns: any
-      }
-      expire_unclaimed_swap_requests: {
-        Args: {}
-        Returns: any
-      }
-      handle_new_user: {
-        Args: {}
-        Returns: any
-      }
-      is_lead: {
-        Args: {}
-        Returns: any
-      }
-      is_manager: {
-        Args: {}
-        Returns: any
-      }
+      is_lead: { Args: never; Returns: boolean }
+      is_manager: { Args: never; Returns: boolean }
       list_cron_jobs: {
-        Args: {}
-        Returns: any
-      }
-      notify_on_shift_post_change: {
-        Args: {}
-        Returns: any
-      }
-      restrict_availability_override_cycle_updates: {
-        Args: {}
-        Returns: any
-      }
-      restrict_profile_staffing_field_updates: {
-        Args: {}
-        Returns: any
-      }
-      restrict_shift_availability_override_updates: {
-        Args: {}
-        Returns: any
+        Args: never
+        Returns: {
+          active: boolean
+          command: string
+          jobname: string
+          schedule: string
+        }[]
       }
       set_designated_shift_lead: {
         Args: {
@@ -2205,42 +2255,44 @@ export type Database = {
           p_shift_type: string
           p_therapist_id: string
         }
-        Returns: any
+        Returns: undefined
       }
-      touch_availability_email_intake_items_updated_at: {
-        Args: {}
-        Returns: any
-      }
-      touch_availability_email_intakes_updated_at: {
-        Args: {}
-        Returns: any
-      }
-      touch_availability_overrides_updated_at: {
-        Args: {}
-        Returns: any
-      }
-      touch_employee_roster_updated_at: {
-        Args: {}
-        Returns: any
-      }
-      touch_therapist_availability_submissions_updated_at: {
-        Args: {}
-        Returns: any
-      }
-      touch_work_patterns_updated_at: {
-        Args: {}
-        Returns: any
-      }
-      update_assignment_status: {
-        Args: {
-          p_assignment_id: string
-          p_status: Database['public']['Enums']['assignment_status']
-          p_note?: string | null
-          p_left_early_time?: string | null
-          p_actor_id: string
-        }
-        Returns: any
-      }
+      update_assignment_status:
+        | {
+            Args: {
+              p_actor_id: string
+              p_assignment_id: string
+              p_left_early_time?: string | null
+              p_note?: string | null
+              p_status: Database['public']['Enums']['assignment_status']
+            }
+            Returns: {
+              assignment_status: Database['public']['Enums']['assignment_status']
+              id: string
+              left_early_time: string | null
+              status_note: string | null
+              status_updated_at: string
+              status_updated_by: string | null
+              status_updated_by_name: string | null
+            }[]
+          }
+        | {
+            Args: {
+              p_assignment_id: string
+              p_left_early_time?: string | null
+              p_note?: string | null
+              p_status: Database['public']['Enums']['assignment_status']
+            }
+            Returns: {
+              assignment_status: Database['public']['Enums']['assignment_status']
+              id: string
+              left_early_time: string | null
+              status_note: string | null
+              status_updated_at: string
+              status_updated_by: string | null
+              status_updated_by_name: string | null
+            }[]
+          }
     }
     Enums: {
       assignment_status: 'scheduled' | 'call_in' | 'cancelled' | 'on_call' | 'left_early'
@@ -2255,12 +2307,127 @@ export type Database = {
 }
 
 type DatabaseWithoutInternals = Omit<Database, '__InternalSupabase'>
+
 type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, 'public'>]
 
-export type Tables<TableName extends keyof DefaultSchema['Tables']> =
-  DefaultSchema['Tables'][TableName]['Row']
-export type TablesInsert<TableName extends keyof DefaultSchema['Tables']> =
-  DefaultSchema['Tables'][TableName]['Insert']
-export type TablesUpdate<TableName extends keyof DefaultSchema['Tables']> =
-  DefaultSchema['Tables'][TableName]['Update']
-export type Enums<EnumName extends keyof DefaultSchema['Enums']> = DefaultSchema['Enums'][EnumName]
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
+    ? (DefaultSchema['Tables'] & DefaultSchema['Views'])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema['Tables']
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
+    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema['Tables']
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
+    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema['Enums']
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums'][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema['Enums']
+    ? DefaultSchema['Enums'][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema['CompositeTypes']
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes'][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema['CompositeTypes']
+    ? DefaultSchema['CompositeTypes'][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      assignment_status: ['scheduled', 'call_in', 'cancelled', 'on_call', 'left_early'],
+      availability_entry_type: ['unavailable', 'available'],
+      availability_shift_type: ['day', 'night', 'both'],
+      shift_role: ['lead', 'staff'],
+    },
+  },
+} as const

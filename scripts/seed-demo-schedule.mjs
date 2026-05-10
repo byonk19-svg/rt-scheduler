@@ -207,6 +207,11 @@ async function upsertProfile(row) {
   if (error) throw error
 }
 
+async function ensureSite(id, name = id) {
+  const { error } = await supabase.from('sites').upsert({ id, name }, { onConflict: 'id' })
+  if (error) throw error
+}
+
 async function ensureWorkPattern(therapistId, shiftPreference) {
   const { error } = await supabase.from('work_patterns').upsert(
     {
@@ -381,6 +386,7 @@ function printCountSanity(rows, days) {
 async function seedDemoSchedule() {
   const days = validateFixture()
   const cycleId = stableUuid('schedule-cycle:2026-05-03:2026-06-13')
+  await ensureSite(DEMO_PAPER_SCHEDULE.siteId, DEMO_PAPER_SCHEDULE.siteId)
 
   const authUsers = await listAllAuthUsers()
   const userByEmail = new Map(authUsers.map((u) => [String(u.email ?? '').toLowerCase(), u]))
