@@ -9,10 +9,14 @@ describe('schedule pre-flight route', () => {
       resolve(process.cwd(), 'src/app/api/schedule/pre-flight/route.ts'),
       'utf8'
     )
+    const draftInputSource = readFileSync(
+      resolve(process.cwd(), 'src/lib/coverage/draft-inputs.ts'),
+      'utf8'
+    )
 
-    expect(source).toContain(".from('shifts')")
-    expect(source).toContain(".eq('cycle_id', cycleId)")
-    expect(source).toContain('existingShifts')
+    expect(draftInputSource).toContain(".from('shifts')")
+    expect(draftInputSource).toContain(".eq('cycle_id', cycle.id)")
+    expect(draftInputSource).toContain('existingShifts')
     expect(source).toContain('runPreFlight')
     expect(source).toContain('summarizePreFlight')
   })
@@ -23,7 +27,6 @@ describe('schedule pre-flight route', () => {
       'utf8'
     )
 
-    expect(source).toContain(".eq('is_active', true)")
-    expect(source).toContain(".eq('on_fmla', false)")
+    expect(source).toContain("therapistScope: 'active-non-fmla'")
   })
 })

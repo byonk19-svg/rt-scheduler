@@ -22,10 +22,9 @@ const inboundRoutePath = path.join(
 const availabilityActionsPath = path.join(
   repoRoot,
   'src',
-  'app',
-  '(app)',
+  'lib',
   'availability',
-  'actions.ts'
+  'email-intake-lifecycle.ts'
 )
 
 describe('intake request edit tracking contract', () => {
@@ -43,8 +42,7 @@ describe('intake request edit tracking contract', () => {
     const inboundRouteSource = readFileSync(inboundRoutePath, 'utf8')
     const availabilityActionsSource = readFileSync(availabilityActionsPath, 'utf8')
 
-    expect(inboundRouteSource).toContain('original_parsed_requests: item.requests')
-    expect(inboundRouteSource).toContain('manually_edited_at: null')
+    expect(inboundRouteSource).toContain('buildAvailabilityEmailIntakeItemRows')
 
     expect(availabilityActionsSource).toContain('original_parsed_requests: item.requests')
     expect(availabilityActionsSource).toContain('manually_edited_at: null')
@@ -56,7 +54,7 @@ describe('intake request edit tracking contract', () => {
     expect(availabilityActionsSource).toContain('markRequestsEdited')
     expect(availabilityActionsSource).toContain('original_parsed_requests')
     expect(availabilityActionsSource).toContain('manually_edited_at:')
-    expect(availabilityActionsSource).toContain('manually_edited_at: item.original_parsed_requests')
+    expect(availabilityActionsSource).toContain('originalRequests: item.original_parsed_requests')
     expect(availabilityActionsSource).toContain('markRequestsEdited({')
   })
 })

@@ -8,7 +8,7 @@ import {
 import {
   deleteAvailabilityEntryAction,
   submitTherapistAvailabilityGridAction,
-} from '@/app/availability/actions'
+} from '@/app/(app)/availability/therapist-actions'
 import { TherapistAvailabilityWorkspace } from '@/components/availability/TherapistAvailabilityWorkspace'
 import type { TableToolbarFilters } from '@/components/TableToolbar'
 import { FeedbackToast } from '@/components/feedback-toast'

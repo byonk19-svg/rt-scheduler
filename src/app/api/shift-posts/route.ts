@@ -8,6 +8,7 @@ import {
   isShiftPostCommand,
   shiftPostCommandRequiresManager,
 } from '@/lib/shift-post-transition-model'
+import { buildShiftPostReviewRpcCall } from '@/lib/shift-board/review-classifier'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -388,15 +389,16 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
       }
 
-      const { data, error } = await admin.rpc('app_review_shift_post', {
-        p_actor_id: user.id,
-        p_post_id: requestId,
-        p_decision: decision,
-        p_selected_interest_id: selectedInterestId || null,
-        p_swap_partner_id: swapPartnerId || null,
-        p_manager_override: override,
-        p_override_reason: overrideReason,
+      const review = buildShiftPostReviewRpcCall({
+        actorId: user.id,
+        requestId,
+        decision,
+        selectedInterestId,
+        swapPartnerId,
+        override,
+        overrideReason,
       })
+      const { data, error } = await admin.rpc(review.rpcName, review.rpcParams)
 
       if (error) {
         return toErrorResponse(error.message)

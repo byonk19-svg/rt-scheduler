@@ -1,19 +1,27 @@
+import { classifyOverrideOutcome } from '@/lib/availability-override-model'
+
 export type ConflictItem = { date: string; shiftType: 'day' | 'night' | 'both' }
 
 export function findScheduledConflicts(
-  overrides: Array<{ date: string; shift_type: string; override_type: string }>,
-  scheduledShifts: Array<{ date: string; shift_type: string }>
+  overrides: Array<{
+    date: string
+    shift_type: 'day' | 'night' | 'both'
+    override_type: 'force_off' | 'force_on'
+  }>,
+  scheduledShifts: Array<{ date: string; shift_type: 'day' | 'night' }>
 ): ConflictItem[] {
   return overrides.flatMap((override) => {
-    if (override.override_type !== 'force_off') return []
-
-    const hasConflict = scheduledShifts.some((shift) => {
-      if (shift.date !== override.date) return false
-      if (override.shift_type === 'both') return true
-      return shift.shift_type === override.shift_type
+    const outcome = classifyOverrideOutcome({
+      override: {
+        cycle_id: '',
+        therapist_id: '',
+        source: 'therapist',
+        ...override,
+      },
+      scheduledShifts,
     })
 
-    if (!hasConflict) return []
+    if (outcome.kind !== 'violated' || outcome.reason !== 'force_off_scheduled') return []
 
     const shiftType: ConflictItem['shiftType'] =
       override.shift_type === 'day' || override.shift_type === 'night'

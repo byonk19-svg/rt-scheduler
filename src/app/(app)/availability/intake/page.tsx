@@ -8,7 +8,7 @@ import {
   reparseEmailIntakeAction,
   updateEmailIntakeItemRequestAction,
   updateEmailIntakeTherapistAction,
-} from '@/app/availability/actions'
+} from '@/app/(app)/availability/email-intake-actions'
 import {
   EmailIntakePanel,
   type EmailIntakePanelRow,

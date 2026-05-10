@@ -41,12 +41,7 @@ import type {
 } from '@/app/(app)/coverage/coverage-page-snapshot'
 import type { RosterMemberRow } from '@/components/coverage/RosterScheduleView'
 import { updateCoverageAssignmentStatus } from '@/lib/coverage/updateAssignmentStatus'
-import {
-  assignCoverageShiftViaApi,
-  persistCoverageShiftStatus,
-  setCoverageDesignatedLeadViaApi,
-  unassignCoverageShiftViaApi,
-} from '@/lib/coverage/mutations'
+import { useCoverageShiftMutator } from '@/lib/coverage/useCoverageShiftMutator'
 import {
   countActive,
   flatten,
@@ -60,7 +55,6 @@ import { getCoverageStatusLabel, toCoverageAssignmentPayload } from '@/lib/cover
 import type { Role } from '@/lib/auth/roles'
 import { formatHumanCycleRange, toIsoDate } from '@/lib/calendar-utils'
 import { getScheduleFeedback, getWeekBoundsForDate } from '@/lib/schedule-helpers'
-import { createClient } from '@/lib/supabase/client'
 import type { AssignmentStatus, ShiftStatus } from '@/lib/shift-types'
 import type { ScheduleSearchParams } from '@/app/schedule/types'
 import {
@@ -300,7 +294,7 @@ export function CoverageClientPage({
   const leadMissingParam = search.get('lead_missing')
   const leadMultipleParam = search.get('lead_multiple')
   const leadIneligibleParam = search.get('lead_ineligible')
-  const supabase = useMemo(() => createClient(), [])
+  const coverageMutator = useCoverageShiftMutator()
   const therapistOptionsByShift = initialSnapshot.allTherapistsByShift
   const rosterProfilesByShift = initialSnapshot.rosterProfilesByShift
   const urlShiftTab = useMemo(
@@ -754,7 +748,7 @@ export function CoverageClientPage({
           Boolean(staffShift) && (existingLead ? existingLead.userId !== userId : true)
 
         if (needsDesignatedLeadChange) {
-          const { error: leadError } = await setCoverageDesignatedLeadViaApi({
+          const { error: leadError } = await coverageMutator.setDesignatedLead({
             cycleId: activeCycleId,
             therapistId: userId,
             isoDate: targetDay.isoDate,
@@ -775,7 +769,7 @@ export function CoverageClientPage({
         }
 
         if (existingLead && existingLead.userId !== userId) {
-          const { data: inserted, error: insertError } = await assignCoverageShiftViaApi({
+          const { data: inserted, error: insertError } = await coverageMutator.assign({
             cycleId: activeCycleId,
             userId,
             isoDate: targetDay.isoDate,
@@ -825,7 +819,7 @@ export function CoverageClientPage({
         }
       }
 
-      const { data: inserted, error: insertError } = await assignCoverageShiftViaApi({
+      const { data: inserted, error: insertError } = await coverageMutator.assign({
         cycleId: activeCycleId,
         userId,
         isoDate: targetDay.isoDate,
@@ -883,7 +877,7 @@ export function CoverageClientPage({
 
       setAssigning(false)
     },
-    [activeCycleId, allTherapists, days, router, setDays, shiftTab]
+    [activeCycleId, allTherapists, coverageMutator, days, router, setDays, shiftTab]
   )
 
   const handleAssignTherapist = useCallback(
@@ -997,7 +991,7 @@ export function CoverageClientPage({
         applyOptimisticUpdate: buildStatusUpdater('optimistic'),
         rollbackOptimisticUpdate: buildStatusUpdater('rollback'),
         persistAssignmentStatus: async (id, payload) =>
-          await persistCoverageShiftStatus(supabase as never, id, payload),
+          await coverageMutator.updateStatus(id, payload),
         logError: (message, error) => {
           console.error(message, error)
         },
@@ -1007,7 +1001,7 @@ export function CoverageClientPage({
         syncOperationalState(targetShift.id, nextStatus)
       }
     },
-    [canUpdateAssignmentStatus, days, setDays, shiftTab, supabase, syncOperationalState]
+    [canUpdateAssignmentStatus, coverageMutator, days, setDays, shiftTab, syncOperationalState]
   )
 
   const handleUnassign = useCallback(
@@ -1031,7 +1025,7 @@ export function CoverageClientPage({
         })
       )
 
-      const { error: deleteError } = await unassignCoverageShiftViaApi({
+      const { error: deleteError } = await coverageMutator.unassign({
         cycleId: activeCycleId ?? '',
         shiftId,
       })
@@ -1056,7 +1050,7 @@ export function CoverageClientPage({
       setError('Could not unassign therapist. Changes were rolled back.')
       setUnassigningShiftId(null)
     },
-    [activeCycleId, days, setDays, unassigningShiftId]
+    [activeCycleId, coverageMutator, days, setDays, unassigningShiftId]
   )
 
   return (

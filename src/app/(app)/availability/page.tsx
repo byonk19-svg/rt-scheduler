@@ -6,9 +6,9 @@ import { Download } from 'lucide-react'
 
 import {
   copyAvailabilityFromPreviousCycleAction,
-  saveManagerAvailabilityRequestsAction,
   saveManagerPlannerDatesAction,
-} from '@/app/availability/actions'
+} from '@/app/(app)/availability/manager-planner-actions'
+import { saveManagerAvailabilityRequestsAction } from '@/app/(app)/availability/manager-request-actions'
 import { AvailabilityPlannerFocusProvider } from '@/components/availability/availability-planner-focus-context'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { MoreActionsMenu } from '@/components/more-actions-menu'

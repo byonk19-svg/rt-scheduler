@@ -2,12 +2,6 @@ import 'server-only'
 
 import { redirect } from 'next/navigation'
 
-import type {
-  AutoScheduleShiftRow,
-  AvailabilityOverrideRow,
-  ShiftLimitRow,
-  Therapist,
-} from '@/app/schedule/types'
 import type { RosterMemberRow } from '@/components/coverage/RosterScheduleView'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
@@ -17,6 +11,10 @@ import {
   normalizeActorShiftType,
   parseCoverageShiftSearchParam,
 } from '@/lib/coverage/coverage-shift-tab'
+import {
+  loadDraftInputsForCycle,
+  toDraftInputSupabaseClient,
+} from '@/lib/coverage/draft-inputs'
 import { generateDraftForCycle } from '@/lib/coverage/generate-draft'
 import { buildCoverageRiskAlert } from '@/lib/coverage/proactive-risk'
 import { resolveCoverageCycle } from '@/lib/coverage/active-cycle'
@@ -26,15 +24,11 @@ import {
   type BuildDayRowInput,
   type DayItem,
 } from '@/lib/coverage/selectors'
-import { normalizeWorkPattern, type WorkPattern } from '@/lib/coverage/work-patterns'
 import {
   fetchActiveOperationalDetailMap,
   toLegacyShiftStatusFromOperationalCode,
 } from '@/lib/operational-codes'
-import {
-  getWeekBoundsForDate,
-  normalizeViewMode,
-} from '@/lib/schedule-helpers'
+import { normalizeViewMode } from '@/lib/schedule-helpers'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import type { AssignmentStatus, ShiftRole, ShiftStatus } from '@/lib/shift-types'
@@ -92,21 +86,6 @@ type ManagerTherapistRow = {
   is_active: boolean | null
 }
 
-type WorkPatternRow = {
-  therapist_id: string
-  pattern_type: WorkPattern['pattern_type'] | null
-  works_dow: number[] | null
-  offs_dow: number[] | null
-  weekend_rotation: 'none' | 'every_other' | null
-  weekend_anchor_date: string | null
-  works_dow_mode: 'hard' | 'soft' | null
-  weekly_weekdays: number[] | null
-  weekend_rule: WorkPattern['weekend_rule'] | null
-  cycle_anchor_date: string | null
-  cycle_segments: WorkPattern['cycle_segments'] | null
-  shift_preference: 'day' | 'night' | 'either' | null
-}
-
 const NO_ELIGIBLE_CONSTRAINT_REASON = 'no_eligible_candidates_due_to_constraints'
 
 function firstSearchParam(value: string | string[] | undefined): string | undefined {
@@ -140,64 +119,6 @@ function buildEmptyCoverageDays(cycleStartDate: string, cycleEndDate: string): D
       leadShift: null,
       staffShifts: [],
     } satisfies DayItem
-  })
-}
-
-function buildPreFlightTherapists(
-  rawTherapists: ManagerTherapistRow[],
-  workPatterns: WorkPatternRow[]
-): Therapist[] {
-  const patternByTherapist = new Map(
-    workPatterns.map((row) => [
-      row.therapist_id,
-      normalizeWorkPattern({
-        therapist_id: row.therapist_id,
-        pattern_type: row.pattern_type ?? undefined,
-        works_dow: row.works_dow ?? [],
-        offs_dow: row.offs_dow ?? [],
-        weekend_rotation: row.weekend_rotation ?? undefined,
-        weekend_anchor_date: row.weekend_anchor_date,
-        works_dow_mode: row.works_dow_mode ?? undefined,
-        weekly_weekdays: row.weekly_weekdays ?? row.works_dow ?? [],
-        weekend_rule: row.weekend_rule ?? undefined,
-        cycle_anchor_date: row.cycle_anchor_date ?? null,
-        cycle_segments: row.cycle_segments ?? [],
-        shift_preference: row.shift_preference ?? 'either',
-      }),
-    ])
-  )
-
-  return rawTherapists.map((therapist) => {
-    const pattern =
-      patternByTherapist.get(therapist.id) ??
-      normalizeWorkPattern({
-        therapist_id: therapist.id,
-        works_dow: [0, 1, 2, 3, 4, 5, 6],
-        offs_dow: [],
-        weekend_rotation: 'none',
-        weekend_anchor_date: null,
-        works_dow_mode: 'hard',
-        shift_preference: 'either',
-      })
-
-    return {
-      id: therapist.id,
-      full_name: therapist.full_name,
-      shift_type: therapist.shift_type,
-      is_lead_eligible: therapist.is_lead_eligible ?? false,
-      employment_type: therapist.employment_type ?? 'full_time',
-      max_work_days_per_week: therapist.max_work_days_per_week ?? 0,
-      works_dow: [0, 1, 2, 3, 4, 5, 6],
-      offs_dow: [],
-      weekend_rotation: 'none',
-      weekend_anchor_date: null,
-      works_dow_mode: 'hard',
-      pattern,
-      shift_preference: pattern.shift_preference,
-      on_fmla: therapist.on_fmla ?? false,
-      fmla_return_date: therapist.fmla_return_date,
-      is_active: therapist.is_active !== false,
-    } satisfies Therapist
   })
 }
 
@@ -474,69 +395,20 @@ export async function getCoveragePageServerData({
   snapshot.selectedCycleHasShiftRows = rows.length > 0
 
   if (snapshot.canManageCoverage && !selectedCycle.published) {
-    const firstWeekBounds = getWeekBoundsForDate(selectedCycle.start_date)
-    const lastWeekBounds = getWeekBoundsForDate(selectedCycle.end_date)
+    const draftInputs = await loadDraftInputsForCycle(toDraftInputSupabaseClient(supabase), {
+      cycle: {
+        id: selectedCycle.id,
+        start_date: selectedCycle.start_date,
+        end_date: selectedCycle.end_date,
+      },
+      therapistRows: managerTherapistRows,
+      existingShiftRows: rows,
+    })
 
-    if (!firstWeekBounds || !lastWeekBounds) {
-      console.error('Could not resolve coverage week bounds for proactive risk alert.')
+    if (draftInputs.error) {
+      console.error('Could not compute proactive coverage risk alert:', draftInputs.error)
     } else {
-      const therapistIds = managerTherapistRows.map((therapist) => therapist.id)
-      const [workPatternsResult, cycleOverridesResult, weeklyShiftsResult] = await Promise.all([
-        therapistIds.length > 0
-          ? supabase
-              .from('work_patterns')
-              .select(
-                'therapist_id, pattern_type, works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode, weekly_weekdays, weekend_rule, cycle_anchor_date, cycle_segments, shift_preference'
-              )
-              .in('therapist_id', therapistIds)
-          : Promise.resolve({ data: [], error: null }),
-        supabase
-          .from('availability_overrides')
-          .select('therapist_id, cycle_id, date, shift_type, override_type, note, source')
-          .eq('cycle_id', selectedCycle.id)
-          .gte('date', selectedCycle.start_date)
-          .lte('date', selectedCycle.end_date),
-        therapistIds.length > 0
-          ? supabase
-              .from('shifts')
-              .select('user_id, date, status')
-              .in('user_id', therapistIds)
-              .gte('date', firstWeekBounds.weekStart)
-              .lte('date', lastWeekBounds.weekEnd)
-          : Promise.resolve({ data: [], error: null }),
-      ])
-
-      if (workPatternsResult.error || cycleOverridesResult.error || weeklyShiftsResult.error) {
-        console.error('Could not compute proactive coverage risk alert:', {
-          workPatternsError: workPatternsResult.error,
-          cycleOverridesError: cycleOverridesResult.error,
-          weeklyShiftsError: weeklyShiftsResult.error,
-        })
-      } else {
-        const preFlightResult = generateDraftForCycle({
-          cycleId: selectedCycle.id,
-          cycleStartDate: selectedCycle.start_date,
-          cycleEndDate: selectedCycle.end_date,
-          therapists: buildPreFlightTherapists(
-            managerTherapistRows,
-            (workPatternsResult.data ?? []) as WorkPatternRow[]
-          ),
-          existingShifts: rows
-            .filter(
-              (row): row is ShiftRow & { user_id: string } => Boolean(row.user_id) && !row.unfilled_reason
-            )
-            .map<AutoScheduleShiftRow>((row) => ({
-              user_id: row.user_id,
-              date: row.date,
-              shift_type: row.shift_type,
-              status: row.status,
-              role: row.role,
-            })),
-          allAvailabilityOverrides: (cycleOverridesResult.data ?? []) as AvailabilityOverrideRow[],
-          weeklyShifts: (weeklyShiftsResult.data ?? []) as ShiftLimitRow[],
-        })
-        snapshot.proactiveCoverageRisk = buildCoverageRiskAlert(preFlightResult)
-      }
+      snapshot.proactiveCoverageRisk = buildCoverageRiskAlert(generateDraftForCycle(draftInputs.data))
     }
   }
 
