@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { applyLotteryDecision, loadLotteryActor } from '@/lib/lottery/service'
 import { isTrustedMutationRequest } from '@/lib/security/request-origin'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 type ApplyLotteryPayload = {
@@ -47,10 +48,11 @@ export async function POST(request: Request) {
     )
   }
 
+  const admin = createAdminClient()
   const result = await applyLotteryDecision({
     actor,
     authClient: {
-      rpc: supabase.rpc.bind(supabase),
+      rpc: admin.rpc.bind(admin),
     },
     shiftDate,
     shiftType: payload?.shiftType === 'night' ? 'night' : 'day',

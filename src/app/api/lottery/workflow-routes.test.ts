@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
   createClientMock,
+  createAdminClientMock,
   isTrustedMutationRequestMock,
   loadLotteryActorMock,
   addLotteryRequestMock,
@@ -12,6 +13,7 @@ const {
   loadLotteryHistoryMock,
 } = vi.hoisted(() => ({
   createClientMock: vi.fn(),
+  createAdminClientMock: vi.fn(),
   isTrustedMutationRequestMock: vi.fn(),
   loadLotteryActorMock: vi.fn(),
   addLotteryRequestMock: vi.fn(),
@@ -24,6 +26,10 @@ const {
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: createClientMock,
+}))
+
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: createAdminClientMock,
 }))
 
 vi.mock('@/lib/security/request-origin', () => ({
@@ -58,6 +64,12 @@ function createSupabaseMock(userId: string | null) {
   }
 }
 
+function createAdminMock() {
+  return {
+    rpc: vi.fn(async () => ({ data: null, error: null })),
+  }
+}
+
 const actor = {
   userId: 'manager-1',
   fullName: 'Manager User',
@@ -76,6 +88,7 @@ describe('lottery workflow routes', () => {
     addLotteryListEntryMock.mockResolvedValue({ ok: true })
     moveLotteryListEntryMock.mockResolvedValue({ ok: true })
     applyLotteryDecisionMock.mockResolvedValue({ ok: true })
+    createAdminClientMock.mockReturnValue(createAdminMock())
     loadLotteryHistoryMock.mockResolvedValue([
       {
         id: 'history-1',

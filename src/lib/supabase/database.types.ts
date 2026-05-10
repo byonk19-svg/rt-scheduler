@@ -2237,6 +2237,7 @@ export type Database = {
           p_status: Database['public']['Enums']['assignment_status']
           p_note?: string | null
           p_left_early_time?: string | null
+          p_actor_id: string
         }
         Returns: any
       }

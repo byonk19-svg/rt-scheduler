@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { createClientMock, createAdminClientMock } = vi.hoisted(() => ({
   createClientMock: vi.fn(),
@@ -158,7 +158,13 @@ function createAdminClient(state: TestState) {
 describe('eligible request teammates API', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-01T12:00:00.000Z'))
     createClientMock.mockResolvedValue(createServerClient())
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('loads therapist teammates when the published cycle join is returned as an object', async () => {

@@ -1511,6 +1511,7 @@ type SupabaseRpcClient = {
       p_status: AssignmentStatus
       p_note?: string | null
       p_left_early_time?: string | null
+      p_actor_id: string
     }
   ) => PromiseLike<{ data: unknown; error: { code?: string; message?: string } | null }>
 }
@@ -1544,6 +1545,7 @@ export async function updateAssignmentStatusWithLottery(args: {
     p_status: args.nextStatus,
     p_note: args.note ?? null,
     p_left_early_time: args.leftEarlyTime ?? null,
+    p_actor_id: args.actor.userId,
   })
 
   if (rpcResult.error) {

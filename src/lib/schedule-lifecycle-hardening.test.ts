@@ -10,6 +10,13 @@ const migrationSource = readFileSync(
   ),
   'utf8'
 )
+const rpcGrantMigrationSource = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/migrations/20260510010205_restrict_schedule_mutating_rpc_execution.sql'
+  ),
+  'utf8'
+)
 const publishActionsSource = readFileSync(
   resolve(process.cwd(), 'src/app/(app)/schedule/actions/publish-actions.ts'),
   'utf8'
@@ -24,6 +31,14 @@ const draftActionsSource = readFileSync(
 )
 const templateActionsSource = readFileSync(
   resolve(process.cwd(), 'src/app/(app)/schedule/actions/template-actions.ts'),
+  'utf8'
+)
+const assignmentStatusRouteSource = readFileSync(
+  resolve(process.cwd(), 'src/app/api/schedule/assignment-status/route.ts'),
+  'utf8'
+)
+const lotteryApplyRouteSource = readFileSync(
+  resolve(process.cwd(), 'src/app/api/lottery/apply/route.ts'),
   'utf8'
 )
 const resendRouteSource = readFileSync(
@@ -49,6 +64,27 @@ describe('schedule lifecycle hardening', () => {
     expect(draftActionsSource).toContain('app_delete_unpublished_cycle_shifts')
     expect(draftActionsSource).toContain('insertUnpublishedCycleShifts')
     expect(templateActionsSource).toContain('insertUnpublishedCycleShifts')
+  })
+
+  it('restricts schedule-mutating security definer RPCs to server execution', () => {
+    expect(rpcGrantMigrationSource).toContain(
+      'revoke all on function public.app_insert_unpublished_cycle_shifts(uuid, uuid, jsonb)'
+    )
+    expect(rpcGrantMigrationSource).toContain('from public, anon, authenticated')
+    expect(rpcGrantMigrationSource).toContain(
+      'grant execute on function public.app_insert_unpublished_cycle_shifts(uuid, uuid, jsonb)'
+    )
+    expect(rpcGrantMigrationSource).toContain(
+      'grant execute on function public.update_assignment_status('
+    )
+    expect(rpcGrantMigrationSource).toContain('to service_role')
+    expect(rpcGrantMigrationSource).toContain(
+      'revoke all on function public.apply_approved_shift_post()'
+    )
+    expect(draftActionsSource).toContain('createAdminClient')
+    expect(templateActionsSource).toContain('createAdminClient')
+    expect(assignmentStatusRouteSource).toContain('rpc: admin.rpc.bind(admin)')
+    expect(lotteryApplyRouteSource).toContain('rpc: admin.rpc.bind(admin)')
   })
 
   it('does not trust client-passed cycle publication or template dates', () => {
