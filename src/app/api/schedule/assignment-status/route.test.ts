@@ -16,6 +16,7 @@ const {
       nextStatus,
       note,
       leftEarlyTime,
+      actor,
     }: {
       authClient: {
         rpc: (
@@ -25,9 +26,11 @@ const {
             p_status: string
             p_note: string | null
             p_left_early_time: string | null
+            p_actor_id?: string | null
           }
         ) => Promise<{ data: unknown; error: { code?: string; message?: string } | null }>
       }
+      actor: { userId: string }
       shiftId: string
       nextStatus: string
       note?: string | null
@@ -38,6 +41,7 @@ const {
         p_status: nextStatus,
         p_note: note ?? null,
         p_left_early_time: leftEarlyTime ?? null,
+        p_actor_id: actor.userId,
       })
 
       if (rpcResult.error) {
@@ -216,6 +220,10 @@ function makeSupabaseMock(scenario: Scenario) {
 function makeAdminClientMock(scenario: Scenario) {
   const updateCalls: Array<{ payload: Record<string, unknown>; id: string | null }> = []
   const insertCalls: Array<Record<string, unknown>> = []
+  const rpc = vi.fn().mockResolvedValue({
+    data: scenario.rpcData ?? null,
+    error: scenario.rpcError ?? null,
+  })
 
   const from = (table: string) => {
     if (table !== 'shift_posts') {
@@ -264,7 +272,8 @@ function makeAdminClientMock(scenario: Scenario) {
   }
 
   return {
-    client: { from },
+    client: { from, rpc },
+    rpc,
     updateCalls,
     insertCalls,
   }
@@ -297,6 +306,8 @@ describe('assignment status API', () => {
 
   it('allows a lead to update status', async () => {
     const supabase = makeSupabaseMock({ role: 'lead', userId: 'lead-1' })
+    const admin = makeAdminClientMock({})
+    createAdminClientMock.mockReturnValue(admin.client)
     vi.mocked(createClient).mockResolvedValue(
       supabase as unknown as Awaited<ReturnType<typeof createClient>>
     )
@@ -314,11 +325,13 @@ describe('assignment status API', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(supabase.rpc).toHaveBeenCalledWith('update_assignment_status', {
+    expect(supabase.rpc).not.toHaveBeenCalled()
+    expect(admin.rpc).toHaveBeenCalledWith('update_assignment_status', {
       p_assignment_id: 'shift-1',
       p_status: 'call_in',
       p_note: 'Traffic delay',
       p_left_early_time: null,
+      p_actor_id: 'lead-1',
     })
     expect(updateAssignmentStatusWithLotteryMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -406,6 +419,8 @@ describe('assignment status API', () => {
         },
       ],
     })
+    const admin = makeAdminClientMock({})
+    createAdminClientMock.mockReturnValue(admin.client)
     vi.mocked(createClient).mockResolvedValue(
       supabase as unknown as Awaited<ReturnType<typeof createClient>>
     )
@@ -422,7 +437,8 @@ describe('assignment status API', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(supabase.rpc).toHaveBeenCalledOnce()
+    expect(supabase.rpc).not.toHaveBeenCalled()
+    expect(admin.rpc).toHaveBeenCalledOnce()
     expect(notifyPublishedShiftStatusChangedMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -549,8 +565,11 @@ describe('assignment status API', () => {
     const supabase = makeSupabaseMock({
       role: 'manager',
       userId: 'manager-1',
+    })
+    const admin = makeAdminClientMock({
       rpcError: { code: '42501', message: 'Assignment is outside your site scope.' },
     })
+    createAdminClientMock.mockReturnValue(admin.client)
     vi.mocked(createClient).mockResolvedValue(
       supabase as unknown as Awaited<ReturnType<typeof createClient>>
     )

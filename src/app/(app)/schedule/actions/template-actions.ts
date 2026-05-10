@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { can } from '@/lib/auth/can'
 import { applyTemplateToCycle, type TemplateShiftData } from '@/lib/cycle-template'
 import { insertUnpublishedCycleShifts } from '@/lib/coverage/auto-generated-shifts'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 import { buildCoverageUrl, getRoleForUser } from './helpers'
@@ -75,7 +76,8 @@ export async function applyTemplateAction(formData: FormData) {
   )
   const skippedCount = templateData.length - shiftsToInsert.length
 
-  const insertResult = await insertUnpublishedCycleShifts(supabase, {
+  const admin = createAdminClient()
+  const insertResult = await insertUnpublishedCycleShifts(admin, {
     actorId: user.id,
     cycleId,
     rows: shiftsToInsert,

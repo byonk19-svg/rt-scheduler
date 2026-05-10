@@ -122,9 +122,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Actor site is missing.' }, { status: 403 })
   }
 
+  const admin = createAdminClient()
   const mutation = await updateAssignmentStatusWithLottery({
     authClient: {
-      rpc: supabase.rpc.bind(supabase),
+      rpc: admin.rpc.bind(admin),
     },
     actor: {
       userId: user.id,
@@ -182,7 +183,6 @@ export async function POST(request: Request) {
   const cycle = getOne(shift?.schedule_cycles)
 
   if (shift?.user_id && cycle?.published) {
-    const admin = createAdminClient()
     await notifyPublishedShiftStatusChanged(admin as never, {
       cyclePublished: true,
       userId: shift.user_id,

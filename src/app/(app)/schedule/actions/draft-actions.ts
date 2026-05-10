@@ -17,6 +17,7 @@ import { NO_ELIGIBLE_CANDIDATES_REASON } from '@/lib/coverage/generator-slot'
 import { normalizeWorkPattern, type WorkPattern } from '@/lib/coverage/work-patterns'
 import { buildDateRange, buildScheduleUrl, getWeekBoundsForDate } from '@/lib/schedule-helpers'
 import { setDesignatedLeadMutation } from '@/lib/set-designated-lead'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 import { buildCoverageUrl, getRoleForUser } from './helpers'
@@ -181,7 +182,8 @@ export async function generateDraftScheduleAction(formData: FormData) {
     redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'auto_generate_failed' }))
   }
 
-  const { error: clearUnfilledReasonError } = await supabase.rpc(
+  const admin = createAdminClient()
+  const { error: clearUnfilledReasonError } = await admin.rpc(
     'app_delete_unpublished_cycle_shifts',
     {
       p_actor_id: user.id,
@@ -249,7 +251,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
   })
 
   if (draftShiftsToInsert.length > 0) {
-    const insertResult = await insertUnpublishedCycleShifts(supabase, {
+    const insertResult = await insertUnpublishedCycleShifts(admin, {
       actorId: user.id,
       cycleId,
       rows: draftShiftsToInsert,
@@ -301,7 +303,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
       status_note: `Missing ${slot.missingCount} required assignment${slot.missingCount === 1 ? '' : 's'} due to hard constraints.`,
     }))
 
-    const unfilledInsertResult = await insertUnpublishedCycleShifts(supabase, {
+    const unfilledInsertResult = await insertUnpublishedCycleShifts(admin, {
       actorId: user.id,
       cycleId,
       rows: unfilledReasonRows,
@@ -399,7 +401,8 @@ export async function resetDraftScheduleAction(formData: FormData) {
     redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'reset_cycle_published' }))
   }
 
-  const { data: deletedCount, error: deleteError } = await supabase.rpc(
+  const admin = createAdminClient()
+  const { data: deletedCount, error: deleteError } = await admin.rpc(
     'app_delete_unpublished_cycle_shifts',
     {
       p_actor_id: user.id,
