@@ -102,7 +102,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
   if (!currentlyPublished) {
     const { data: cycle, error: cycleError } = await supabase
       .from('schedule_cycles')
-      .select('label, start_date, end_date')
+      .select('label, start_date, end_date, status')
       .eq('id', cycleId)
       .maybeSingle()
 
@@ -114,6 +114,10 @@ export async function toggleCyclePublishedAction(formData: FormData) {
       label: cycle.label,
       startDate: cycle.start_date,
       endDate: cycle.end_date,
+    }
+
+    if (cycle.status !== 'preliminary') {
+      redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'publish_requires_preliminary' }))
     }
 
     const cycleDates = buildDateRange(cycle.start_date, cycle.end_date)
@@ -267,25 +271,37 @@ export async function toggleCyclePublishedAction(formData: FormData) {
     }
   }
 
+  const publishMutationClient = !currentlyPublished
+    ? (createAdminClient() as unknown as PublishCycleMutationClient)
+    : null
+
   const { data: updatedCycle, error } = currentlyPublished
     ? await supabase
         .from('schedule_cycles')
-        .update({ published: false })
+        .update({ published: false, status: 'draft' })
         .eq('id', cycleId)
         .eq('published', true)
         .select('id')
         .maybeSingle()
-    : await (supabase as unknown as PublishCycleMutationClient).rpc('app_publish_schedule_cycle', {
+    : await publishMutationClient!.rpc('app_publish_schedule_cycle', {
         p_actor_id: user.id,
         p_cycle_id: cycleId,
       })
 
   if (error) {
     console.error('Failed to toggle schedule publication state:', error)
+    const publishError =
+      !currentlyPublished && /resolve preliminary marks/i.test(error.message ?? '')
+        ? 'publish_unresolved_preliminary_marks'
+        : !currentlyPublished && /resolve preliminary requests/i.test(error.message ?? '')
+          ? 'publish_unresolved_preliminary_requests'
+          : !currentlyPublished && /preliminary/i.test(error.message ?? '')
+            ? 'publish_requires_preliminary'
+            : 'publish_failed'
     redirect(
       buildReturnUrl(cycleId, {
         ...viewParams,
-        error: currentlyPublished ? 'unpublish_failed' : 'publish_failed',
+        error: currentlyPublished ? 'unpublish_failed' : publishError,
       })
     )
   }

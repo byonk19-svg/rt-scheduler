@@ -41,7 +41,7 @@ test.describe.serial('coverage publish flow', () => {
     })
     createdUserIds.push(manager.id)
 
-    const cycleStart = addDays(new Date(), 14)
+    const cycleStart = addDays(new Date(), 365 + Math.floor(Math.random() * 3650))
     const cycleDate = formatDateKey(cycleStart)
     const cycleInsert = await supabase
       .from('schedule_cycles')
@@ -50,6 +50,7 @@ test.describe.serial('coverage publish flow', () => {
         start_date: cycleDate,
         end_date: cycleDate,
         published: false,
+        status: 'preliminary',
       })
       .select('id')
       .single()
@@ -189,6 +190,17 @@ test.describe.serial('coverage publish flow', () => {
       throw new Error(shiftsInsert.error.message)
     }
 
+    const preliminarySnapshot = await supabase.from('preliminary_snapshots').insert({
+      cycle_id: cycleInsert.data.id,
+      created_by: manager.id,
+      sent_at: new Date().toISOString(),
+      status: 'active',
+    })
+
+    if (preliminarySnapshot.error) {
+      throw new Error(preliminarySnapshot.error.message)
+    }
+
     ctx = {
       supabase,
       manager: { id: manager.id, email: managerEmail, password: managerPassword },
@@ -197,15 +209,22 @@ test.describe.serial('coverage publish flow', () => {
   })
 
   test.afterAll(async () => {
-    if (!ctx) return
-    await ctx.supabase.from('publish_events').delete().in('cycle_id', createdCycleIds)
-    await ctx.supabase.from('notification_outbox').delete().in('user_id', createdUserIds)
-    await ctx.supabase.from('notifications').delete().in('user_id', createdUserIds)
-    await ctx.supabase.from('shifts').delete().in('cycle_id', createdCycleIds)
-    await ctx.supabase.from('schedule_cycles').delete().in('id', createdCycleIds)
+    const supabase = ctx?.supabase ?? createServiceRoleClientOrNull()
+    if (!supabase) return
+
+    if (createdCycleIds.length > 0) {
+      await supabase.from('publish_events').delete().in('cycle_id', createdCycleIds)
+      await supabase.from('shifts').delete().in('cycle_id', createdCycleIds)
+      await supabase.from('schedule_cycles').delete().in('id', createdCycleIds)
+    }
+
+    if (createdUserIds.length > 0) {
+      await supabase.from('notification_outbox').delete().in('user_id', createdUserIds)
+      await supabase.from('notifications').delete().in('user_id', createdUserIds)
+    }
 
     for (const userId of createdUserIds) {
-      await ctx.supabase.auth.admin.deleteUser(userId).catch(() => undefined)
+      await supabase.auth.admin.deleteUser(userId).catch(() => undefined)
     }
   })
 

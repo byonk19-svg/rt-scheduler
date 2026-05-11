@@ -75,11 +75,16 @@ _Avoid_: reducing My Shifts to only a list of worked days
 The canonical live published schedule for all roles, showing who is working across a Schedule Block and current operational statuses such as Scheduled, On Call, Cancelled, Call In, and Left Early.
 _Avoid_: splitting Team Schedule and Live Schedule into separate primary workflow concepts
 
+**Designated Lead**:
+The assigned lead therapist for a specific Schedule Block date and shift. A designated lead must be an assigned therapist; missing lead coverage is represented by no designated lead for that slot, not by an empty lead row.
+_Avoid_: treating an unassigned lead slot as the same thing as a designated lead
+
 **Operational Status Change**:
 A live post-publish status update on a scheduled shift, such as On Call, Cancelled, Call In, or Left Early. Managers and leads may toggle these changes from Team Schedule when permitted; staff see the resulting status.
 _Avoid_: treating operational status changes as draft schedule edits
 _Avoid_: Sick as a top-level operational status; use Call In instead
 _Avoid_: using legacy `shifts.status` or `shifts.assignment_status` fields as the source of truth for live operational state
+_Avoid_: keeping legacy shift-row status fields as an independent write/read authority once an active operational entry exists
 
 **Left Early**:
 An operational status meaning a scheduled therapist left before the scheduled shift ended. It is informational for the day and does not affect the staffing ratio for that day.
@@ -214,6 +219,47 @@ _Avoid_: treating Publish as a separate primary workflow
 **Schedule Block State**:
 The resolved lifecycle state of a Schedule Block, such as draft, preliminary active, published live, offline, or archived. The state should be derived in one place before it is relied on across Coverage, Team Schedule, Availability, Publish History, and therapist dashboards.
 _Avoid_: scattering raw `published`, preliminary snapshot, shift-count, and archive checks across workflow code
+
+**Preliminary Schedule**:
+The staff review window for a manager's draft Schedule Block. It is the web version of a paper schedule marked preliminary: staff can review their days, PRN can claim low-coverage slots during the review period, staff changes remain visibly separate from the manager's original draft, and the manager keeps final say before publish.
+_Avoid_: treating preliminary as only a notification that a draft exists
+_Avoid_: losing the distinction between the manager's original draft and staff review edits
+_Avoid_: publishing a normal final schedule without a preliminary review window unless a manager explicitly bypasses it with confirmation and reason
+
+**Preliminary Pencil Layer**:
+The staff-entered review layer on top of a Preliminary Schedule, represented as cell marks rather than formal Shift Board requests. The pencil layer does not directly rewrite the manager's original draft; it waits for manager review before becoming part of the final published schedule.
+_Avoid_: letting staff preliminary edits silently mutate the manager's draft shifts
+_Avoid_: showing every staff member's unresolved pencil marks to all staff; staff see their own marks, while managers see all marks
+_Avoid_: bending request-style preliminary tables into the source of truth for paper-style cell marks; use a cell-mark model that matches the grid interaction
+
+**Preliminary Cell Mark**:
+A staff pencil mark on one date cell of the Preliminary Schedule. Marking out a scheduled `1` means the staff member is asking not to work that assigned day; writing a `1` into an empty eligible day means the staff member is asking to work that day. The mark is visible to the manager as staff-entered pencil until manager final review.
+_Avoid_: forcing simple paper-style preliminary edits into a heavy swap or request workflow
+_Avoid_: letting staff mark someone else's row; staff preliminary marks are limited to the signed-in staff member's own row, while managers review all rows
+_Avoid_: cross-shift staff marking by default; Day staff mark Day schedule cells and Night staff mark Night schedule cells unless a manager edits across shifts
+_Avoid_: locking a staff member's preliminary marks immediately after entry; staff can revise their own pencil marks until the manager closes review or publishes
+_Avoid_: requiring a note for every preliminary mark; notes are optional context, not the primary interaction
+_Avoid_: requiring every mark-out and add-work mark to be paired, even though pairing should be easy when a staff member is proposing a direct replacement day
+_Avoid_: limiting add-work marks only to low-coverage days; staff may mark any day they want or prefer to work, with final approval left to the manager
+_Avoid_: blocking staff from marking a day they previously submitted as Need Off; preliminary review is allowed to capture changed availability, while preserving the original Need Off context for manager review
+_Avoid_: blocking staff from marking out a scheduled day just because they were originally available; preliminary review is the chance to correct changed availability before final publish
+
+**Preliminary Mark Approval**:
+The manager's inline review action for a Preliminary Cell Mark. In the review grid, a staff mark-out should appear as a noticeable hash mark over the original scheduled `1`, and a staff add-work mark should appear as a colored `1`; approving the change removes the old normal `1`/hash mark and turns the new approved `1` into a normal schedule assignment.
+_Avoid_: hiding manager review in a separate approvals queue when the mark can be approved directly from the preliminary grid
+_Avoid_: leaving approved staff-entered `1`s visually colored after they become normal schedule truth
+_Avoid_: auto-filling coverage when a standalone mark-out is approved; approval removes that assignment and surfaces the resulting coverage count for manager action
+_Avoid_: blocking manager approval of an add-work mark solely because the slot is already at or above target coverage; warn about over-coverage and let the manager decide
+_Avoid_: publishing a final Schedule Block while preliminary marks are unresolved; managers must approve, deny, or explicitly dismiss unresolved pencil marks before publish
+_Avoid_: keeping denied or dismissed pencil marks as long-term schedule clutter; retain short-lived manager review history only as needed for near-term questions
+_Avoid_: making resolved preliminary history obvious or in the way after manager review; the current grid should prioritize unresolved marks and final schedule truth
+_Avoid_: sending noisy notifications for every approved preliminary mark; notify lightly when a mark is denied or changed materially, and let final publish communicate the settled schedule
+
+**Linked Preliminary Change**:
+A pair of Preliminary Cell Marks from the same staff member where marking out one scheduled `1` and writing a new colored `1` elsewhere represents one intended move. Managers can approve the linked change as one action, while standalone mark-outs and standalone add-work marks remain valid.
+_Avoid_: forcing every preliminary mark into a linked move
+_Avoid_: making managers approve the removal and replacement separately when staff clearly proposed them together
+_Avoid_: denying only half of a linked change; deny clears both pencil marks and leaves the original schedule unchanged
 
 **Take Schedule Block Offline**:
 A reversible manager action that removes a published Schedule Block from staff live schedule visibility while preserving history and dependencies.
@@ -380,6 +426,7 @@ _Avoid_: embedded form, generic request page, mini composer
 - Missing availability submissions are **Publish Warning** items that require manager acknowledgement but do not hard-block publish
 - Critical staffing below target is a **Publish Blocker** until a manager acknowledgement and reason is recorded; after acknowledgement it can publish as a warning
 - Missing required lead coverage is a **Publish Blocker** until resolved or acknowledged with manager reason; after acknowledgement it remains visible as a warning
+- The normal Schedule Block lifecycle is draft -> preliminary review -> manager resolves staff pencil changes -> final publish; publishing without preliminary review requires explicit manager bypass confirmation and reason
 - Published operational warnings are manager/lead visible by default; staff see only warnings that directly affect them personally, such as their own Need Off override, Need to Work not honored, or operational status
 - Publish belongs inside **Coverage**; **Schedule Blocks Utility** handles published block history, take-offline, safe delete, and start-over actions
 - Publishing a **Schedule Block** supersedes any active preliminary snapshot for that same block; staff must not see a block as both preliminary-active and published-live

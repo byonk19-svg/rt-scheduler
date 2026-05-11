@@ -37,6 +37,7 @@ const STAFF_ROUTES = ['/staff', '/dashboard/staff', '/requests/new'] as const
 type AppRole = 'manager' | 'staff'
 type ProfileAccessRow = {
   role: string | null
+  access_status: string | null
   is_active: boolean | null
   archived_at: string | null
   staff_onboarding_required: boolean | null
@@ -158,7 +159,7 @@ export async function proxy(request: NextRequest) {
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select(
-      'role, is_active, archived_at, staff_onboarding_required, preferred_work_days_mode, staff_onboarding_preferences_confirmed_at, staff_onboarding_theme_confirmed_at, staff_onboarding_completed_at, work_patterns(pattern_type)'
+      'role, access_status, is_active, archived_at, staff_onboarding_required, preferred_work_days_mode, staff_onboarding_preferences_confirmed_at, staff_onboarding_theme_confirmed_at, staff_onboarding_completed_at, work_patterns(pattern_type)'
     )
     .eq('id', user.id)
     .maybeSingle()
@@ -168,6 +169,13 @@ export async function proxy(request: NextRequest) {
   }
 
   const profileRow = (profile as ProfileAccessRow | null) ?? null
+  if (profileRow?.access_status === 'pending') {
+    if (!matchesRoute(pathname, '/pending-setup')) {
+      return NextResponse.redirect(new URL('/pending-setup', request.url))
+    }
+    return supabaseResponse
+  }
+
   if (profileRow && (profileRow.is_active === false || profileRow.archived_at)) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/signout'

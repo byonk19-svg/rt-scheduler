@@ -17,6 +17,20 @@ const rpcGrantMigrationSource = readFileSync(
   ),
   'utf8'
 )
+const preliminaryHardeningMigrationSource = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/migrations/20260511001059_finish_preliminary_workflow_hardening.sql'
+  ),
+  'utf8'
+)
+const preliminaryNotificationMigrationSource = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/migrations/20260511013000_fix_preliminary_notification_events.sql'
+  ),
+  'utf8'
+)
 const publishActionsSource = readFileSync(
   resolve(process.cwd(), 'src/app/(app)/schedule/actions/publish-actions.ts'),
   'utf8'
@@ -96,6 +110,34 @@ describe('schedule lifecycle hardening', () => {
     expect(templateActionsSource).not.toContain('new_cycle_start_date')
     expect(templateActionsSource).toContain('applyTemplateToCycle(templateData, cycle.start_date')
   })
+
+  it('models cycle lifecycle explicitly and requires preliminary before final publish', () => {
+    expect(preliminaryHardeningMigrationSource).toContain('schedule_cycle_status')
+    expect(preliminaryHardeningMigrationSource).toContain(
+      "'draft', 'preliminary', 'final', 'archived'"
+    )
+    expect(preliminaryHardeningMigrationSource).toContain(
+      'Schedule cycle must be sent as preliminary before final publish.'
+    )
+    expect(preliminaryHardeningMigrationSource).toContain(
+      'Resolve preliminary requests before publishing.'
+    )
+    expect(publishActionsSource).toContain("error: 'publish_requires_preliminary'")
+  })
+
+  it('keeps operational entries authoritative and hardens lead and PRN assignments', () => {
+    expect(preliminaryHardeningMigrationSource).toContain(
+      'reconcile_shift_legacy_operational_status'
+    )
+    expect(preliminaryHardeningMigrationSource).toContain(
+      'shift_operational_entries_sync_shift_legacy_status'
+    )
+    expect(preliminaryHardeningMigrationSource).toContain('shifts_designated_lead_assigned_check')
+    expect(preliminaryHardeningMigrationSource).toContain('enforce_prn_shift_assignment_rule')
+    expect(preliminaryHardeningMigrationSource).toContain(
+      'PRN staff require manager force-on or an approved preliminary pencil mark'
+    )
+  })
 })
 
 describe('side-effect idempotency hardening', () => {
@@ -104,6 +146,12 @@ describe('side-effect idempotency hardening', () => {
     expect(migrationSource).toContain('notification_outbox_unique_email_per_event_idx')
     expect(migrationSource).toContain('notifications_unique_idempotent_event_idx')
     expect(migrationSource).toContain('resend_webhook_receipts')
+  })
+
+  it('keeps preliminary notification event names inside the database constraint', () => {
+    expect(preliminaryNotificationMigrationSource).toContain("'preliminary_sent'")
+    expect(preliminaryNotificationMigrationSource).toContain("'preliminary_refreshed'")
+    expect(assignmentStatusRouteSource).toContain('await notifyUsers(admin as never')
   })
 
   it('records Resend webhook ids before background processing', () => {

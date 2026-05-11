@@ -101,7 +101,7 @@ function makeAdminClient() {
             return {
               eq() {
                 return {
-                  is() {
+                  eq() {
                     return {
                       maybeSingle: async () => ({
                         data: state.selectedPendingProfile,
@@ -119,7 +119,7 @@ function makeAdminClient() {
             return {
               eq() {
                 return {
-                  is: async () => ({
+                  eq: async () => ({
                     data: null,
                     error: null,
                   }),
@@ -188,6 +188,7 @@ describe('user access approval route', () => {
       expect(response.status).toBe(200)
       expect(adminClient.state.profileUpdatePayload).toMatchObject({
         role,
+        access_status: 'approved',
         is_active: true,
         archived_at: null,
         staff_onboarding_required: true,

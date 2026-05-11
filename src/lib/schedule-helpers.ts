@@ -309,6 +309,24 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
   if (error === 'publish_validation_failed') {
     return { message: 'Could not validate weekly rules before publishing.', variant: 'error' }
   }
+  if (error === 'publish_unresolved_preliminary_marks') {
+    return {
+      message: 'Resolve or dismiss all preliminary pencil marks before publishing final.',
+      variant: 'error',
+    }
+  }
+  if (error === 'publish_unresolved_preliminary_requests') {
+    return {
+      message: 'Resolve all preliminary schedule requests before publishing final.',
+      variant: 'error',
+    }
+  }
+  if (error === 'publish_requires_preliminary') {
+    return {
+      message: 'Send the schedule as preliminary before publishing final.',
+      variant: 'error',
+    }
+  }
   if (error === 'publish_coverage_rule_violation') {
     const underCoverage = parseCount(getSearchParam(params?.under_coverage))
     const overCoverage = parseCount(getSearchParam(params?.over_coverage))

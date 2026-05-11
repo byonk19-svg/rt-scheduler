@@ -48,6 +48,7 @@ type TestContext = {
   userId?: string | null
   role?: string | null
   cyclePublished?: boolean
+  cycleStatus?: 'draft' | 'preliminary' | 'final' | 'archived'
   activeSnapshotId?: string | null
   cycleStartDate?: string
   cycleEndDate?: string
@@ -74,6 +75,7 @@ function makeFormData() {
 
 function createSupabaseMock(context: TestContext) {
   const insertedShifts: Array<Record<string, unknown>> = []
+  const cycleUpdates: Array<Record<string, unknown>> = []
   return {
     auth: {
       getUser: vi.fn(async () => ({
@@ -115,6 +117,7 @@ function createSupabaseMock(context: TestContext) {
                 start_date: context.cycleStartDate ?? '2026-04-01',
                 end_date: context.cycleEndDate ?? '2026-04-30',
                 published: Boolean(context.cyclePublished),
+                status: context.cycleStatus ?? (context.cyclePublished ? 'final' : 'draft'),
               },
               error: null,
             }
@@ -194,11 +197,19 @@ function createSupabaseMock(context: TestContext) {
             },
           }
         },
+        update(payload: Record<string, unknown>) {
+          if (table === 'schedule_cycles') {
+            cycleUpdates.push(payload)
+          }
+
+          return builder
+        },
       }
 
       return builder
     },
     __insertedShifts: insertedShifts,
+    __cycleUpdates: cycleUpdates,
   }
 }
 
@@ -219,19 +230,19 @@ describe('sendPreliminaryScheduleAction', () => {
   })
 
   it('lets a manager send a preliminary schedule for a draft cycle', async () => {
-    createClientMock.mockResolvedValue(
-      createSupabaseMock({
-        userId: 'manager-1',
-        role: 'manager',
-        cyclePublished: false,
-      })
-    )
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      cyclePublished: false,
+    })
+    createClientMock.mockResolvedValue(supabase)
 
     await expect(sendPreliminaryScheduleAction(makeFormData())).rejects.toThrow(
       'REDIRECT:/coverage?cycle=cycle-1&success=preliminary_sent'
     )
 
     expect(sendPreliminarySnapshotMock).toHaveBeenCalledTimes(1)
+    expect(supabase.__cycleUpdates).toContainEqual({ status: 'preliminary' })
     expect(notifyUsersMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -257,19 +268,20 @@ describe('sendPreliminaryScheduleAction', () => {
   })
 
   it('treats a repeat send as a refresh of the active snapshot', async () => {
-    createClientMock.mockResolvedValue(
-      createSupabaseMock({
-        userId: 'manager-1',
-        role: 'manager',
-        activeSnapshotId: 'snapshot-existing',
-      })
-    )
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      activeSnapshotId: 'snapshot-existing',
+      cycleStatus: 'preliminary',
+    })
+    createClientMock.mockResolvedValue(supabase)
 
     await expect(sendPreliminaryScheduleAction(makeFormData())).rejects.toThrow(
       'REDIRECT:/coverage?cycle=cycle-1&success=preliminary_refreshed'
     )
 
     expect(sendPreliminarySnapshotMock).toHaveBeenCalledTimes(1)
+    expect(supabase.__cycleUpdates).toContainEqual({ status: 'preliminary' })
   })
 
   it('creates open placeholder shifts so underfilled drafts can still be sent preliminarily', async () => {

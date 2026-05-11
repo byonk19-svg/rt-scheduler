@@ -211,6 +211,7 @@ export async function createCycleAction(formData: FormData) {
       start_date: startDate,
       end_date: endDate,
       published,
+      status: published ? 'final' : 'draft',
       site_id: actorProfile.site_id,
     })
     .select('id')

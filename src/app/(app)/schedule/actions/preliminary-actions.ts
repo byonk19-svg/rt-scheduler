@@ -55,7 +55,7 @@ export async function sendPreliminaryScheduleAction(formData: FormData) {
     await Promise.all([
       supabase
         .from('schedule_cycles')
-        .select('id, label, start_date, end_date, published')
+        .select('id, label, start_date, end_date, published, status')
         .eq('id', cycleId)
         .maybeSingle(),
       supabase
@@ -78,6 +78,10 @@ export async function sendPreliminaryScheduleAction(formData: FormData) {
 
   if (cycle.published) {
     redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'preliminary_cycle_published' }))
+  }
+
+  if (cycle.status === 'archived') {
+    redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'preliminary_cycle_archived' }))
   }
 
   const { data: shiftsData, error: shiftsError } = await supabase
@@ -147,6 +151,17 @@ export async function sendPreliminaryScheduleAction(formData: FormData) {
 
   if (sendResult.error || !sendResult.data) {
     console.error('Failed to send preliminary schedule:', sendResult.error)
+    redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'preliminary_send_failed' }))
+  }
+
+  const { error: cycleStatusError } = await supabase
+    .from('schedule_cycles')
+    .update({ status: 'preliminary' })
+    .eq('id', cycleId)
+    .eq('published', false)
+
+  if (cycleStatusError) {
+    console.error('Failed to mark cycle as preliminary:', cycleStatusError)
     redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'preliminary_send_failed' }))
   }
 

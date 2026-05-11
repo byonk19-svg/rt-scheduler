@@ -2,10 +2,12 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import {
-  applyDirectPreliminaryEditAction,
+  cancelPreliminaryCellMarkAction,
   cancelPreliminaryRequestAction,
   claimPreliminaryShiftAction,
+  createPreliminaryCellMarkAction,
   requestPreliminaryChangeAction,
+  reviewPreliminaryCellMarkAction,
 } from '@/app/preliminary/actions'
 import { PreliminaryScheduleView } from '@/components/preliminary/PreliminaryScheduleView'
 import {
@@ -14,6 +16,9 @@ import {
 } from '@/lib/preliminary-schedule/selectors'
 import type {
   PreliminaryRequestRow,
+  PreliminaryCellMarkStatus,
+  PreliminaryCellMarkType,
+  PreliminaryCellMarkView,
   PreliminaryShiftRow,
   PreliminaryShiftStateRow,
   PreliminarySnapshotRow,
@@ -41,12 +46,27 @@ type PreliminaryProfileRow = {
 type CycleRow = {
   id: string
   label: string
+  start_date: string
+  end_date: string
 }
 
 type ProfileNameRow = {
   id: string
   full_name: string | null
   shift_type?: 'day' | 'night' | null
+}
+
+type PreliminaryCellMarkRow = {
+  id: string
+  group_id: string | null
+  requester_id: string
+  mark_type: PreliminaryCellMarkType
+  status: PreliminaryCellMarkStatus
+  shift_id: string | null
+  date: string
+  shift_type: 'day' | 'night'
+  note: string | null
+  created_at: string
 }
 
 function getSearchParam(value: string | string[] | undefined): string | undefined {
@@ -69,6 +89,15 @@ function toSuccessMessage(value: string | undefined) {
   if (value === 'preliminary_request_cancelled') {
     return 'Your preliminary request was cancelled.'
   }
+  if (value === 'preliminary_mark_saved') {
+    return 'Your pencil mark was saved for manager review.'
+  }
+  if (value === 'preliminary_mark_cancelled') {
+    return 'Your pencil mark was removed.'
+  }
+  if (value === 'preliminary_mark_reviewed') {
+    return 'Preliminary pencil mark reviewed.'
+  }
   return null
 }
 
@@ -84,6 +113,9 @@ function toErrorMessage(value: string | undefined) {
   }
   if (value === 'request_not_pending') {
     return 'That request is no longer pending.'
+  }
+  if (value === 'preliminary_mark_failed') {
+    return 'Could not update the preliminary pencil mark. Please try again.'
   }
   if (value) {
     return 'Could not update the preliminary schedule. Please try again.'
@@ -154,29 +186,47 @@ export default async function PreliminaryPage({
     )
   }
 
-  const [{ data: cycleData }, { data: shiftStatesData }, { data: requestsData }] =
-    await Promise.all([
-      supabase
-        .from('schedule_cycles')
-        .select('id, label')
-        .eq('id', snapshot.cycle_id)
-        .maybeSingle(),
-      supabase
-        .from('preliminary_shift_states')
-        .select('id, snapshot_id, shift_id, state, reserved_by, active_request_id, updated_at')
-        .eq('snapshot_id', snapshot.id),
-      supabase
-        .from('preliminary_requests')
-        .select(
-          'id, snapshot_id, shift_id, requester_id, type, status, note, decision_note, approved_by, approved_at, created_at'
-        )
-        .eq('snapshot_id', snapshot.id)
-        .eq('requester_id', user.id)
-        .order('created_at', { ascending: false }),
-    ])
+  const [
+    { data: cycleData },
+    { data: shiftStatesData },
+    { data: requestsData },
+    { data: marksData },
+  ] = await Promise.all([
+    supabase
+      .from('schedule_cycles')
+      .select('id, label, start_date, end_date')
+      .eq('id', snapshot.cycle_id)
+      .maybeSingle(),
+    supabase
+      .from('preliminary_shift_states')
+      .select('id, snapshot_id, shift_id, state, reserved_by, active_request_id, updated_at')
+      .eq('snapshot_id', snapshot.id),
+    supabase
+      .from('preliminary_requests')
+      .select(
+        'id, snapshot_id, shift_id, requester_id, type, status, note, decision_note, approved_by, approved_at, created_at'
+      )
+      .eq('snapshot_id', snapshot.id)
+      .eq('requester_id', user.id)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('preliminary_cell_marks')
+      .select(
+        'id, group_id, requester_id, mark_type, status, shift_id, date, shift_type, note, created_at'
+      )
+      .eq('snapshot_id', snapshot.id)
+      .order('created_at', { ascending: false }),
+  ])
 
   const shiftStates = (shiftStatesData ?? []) as PreliminaryShiftStateRow[]
-  const shiftIds = Array.from(new Set(shiftStates.map((state) => state.shift_id)))
+  const cellMarks = (marksData ?? []) as PreliminaryCellMarkRow[]
+  const shiftIds = Array.from(
+    new Set(
+      shiftStates
+        .map((state) => state.shift_id)
+        .concat(cellMarks.map((mark) => mark.shift_id).filter((id): id is string => Boolean(id)))
+    )
+  )
   const profileIds = Array.from(
     new Set(
       shiftStates
@@ -184,6 +234,7 @@ export default async function PreliminaryPage({
         .concat(
           ((requestsData ?? []) as PreliminaryRequestRow[]).map((request) => request.requester_id)
         )
+        .concat(cellMarks.map((mark) => mark.requester_id))
         .filter((value): value is string => Boolean(value))
     )
   )
@@ -301,6 +352,31 @@ export default async function PreliminaryPage({
       return left.shiftDate.localeCompare(right.shiftDate)
     })
 
+  const markViews: PreliminaryCellMarkView[] = cellMarks
+    .filter((mark) => mark.status === 'pending')
+    .map((mark) => ({
+      id: mark.id,
+      groupId: mark.group_id,
+      requesterId: mark.requester_id,
+      requesterName: profileNamesById.get(mark.requester_id) ?? 'Unknown',
+      markType: mark.mark_type,
+      status: mark.status,
+      shiftId: mark.shift_id,
+      shiftDate: mark.date,
+      shiftType: mark.shift_type,
+      note: mark.note,
+      createdAt: mark.created_at,
+      isCurrentUser: mark.requester_id === user.id,
+      canReview: currentProfile.role === 'manager',
+      canCancel: mark.requester_id === user.id,
+    }))
+    .sort((left, right) => {
+      if (left.shiftDate === right.shiftDate) {
+        return left.shiftType.localeCompare(right.shiftType)
+      }
+      return left.shiftDate.localeCompare(right.shiftDate)
+    })
+
   const history = toTherapistPreliminaryHistory(
     (requestsData ?? []) as PreliminaryRequestRow[],
     shiftsById,
@@ -311,18 +387,25 @@ export default async function PreliminaryPage({
     <PreliminaryScheduleView
       snapshotId={snapshot.id}
       cycleLabel={(cycleData as CycleRow | null)?.label ?? 'Preliminary schedule'}
+      cycleStartDate={(cycleData as CycleRow | null)?.start_date ?? null}
+      cycleEndDate={(cycleData as CycleRow | null)?.end_date ?? null}
       snapshotSentAt={snapshot.sent_at}
       currentUserId={user.id}
+      currentUserRole={currentProfile.role ?? null}
+      currentUserShiftType={currentProfile.shift_type ?? null}
       highlightedShiftId={highlightedShiftId}
       cards={cards}
       historyItems={history}
       teamShifts={teamShifts}
       claimAction={claimPreliminaryShiftAction}
       requestChangeAction={requestPreliminaryChangeAction}
-      directEditAction={applyDirectPreliminaryEditAction}
+      createCellMarkAction={createPreliminaryCellMarkAction}
+      cancelCellMarkAction={cancelPreliminaryCellMarkAction}
+      reviewCellMarkAction={reviewPreliminaryCellMarkAction}
       cancelAction={cancelPreliminaryRequestAction}
       successMessage={success}
       errorMessage={error}
+      cellMarks={markViews}
     />
   )
 }

@@ -103,11 +103,6 @@ export function summarizePublishWeeklyViolations({
       const workedDatesFromMap = weeklyWorkedDatesByUserWeek.get(
         weeklyCountKey(therapistId, weekStart)
       )
-      if (workedDatesFromMap === undefined && process.env.NODE_ENV !== 'production') {
-        console.warn(
-          `summarizePublishWeeklyViolations: no worked-dates entry for therapist ${therapistId} week ${weekStart}, assuming 0`
-        )
-      }
       const workedDates = workedDatesFromMap ?? new Set<string>()
       const workedCount = workedDates.size
 

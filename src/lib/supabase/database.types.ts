@@ -1092,6 +1092,160 @@ export type Database = {
           },
         ]
       }
+      preliminary_cell_marks: {
+        Row: {
+          created_at: string
+          date: string
+          decision_note: string | null
+          group_id: string | null
+          id: string
+          mark_type: string
+          note: string | null
+          requested_role: Database['public']['Enums']['shift_role']
+          requester_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          shift_id: string | null
+          shift_type: string
+          snapshot_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          decision_note?: string | null
+          group_id?: string | null
+          id?: string
+          mark_type: string
+          note?: string | null
+          requested_role?: Database['public']['Enums']['shift_role']
+          requester_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          shift_id?: string | null
+          shift_type: string
+          snapshot_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          decision_note?: string | null
+          group_id?: string | null
+          id?: string
+          mark_type?: string
+          note?: string | null
+          requested_role?: Database['public']['Enums']['shift_role']
+          requester_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          shift_id?: string | null
+          shift_type?: string
+          snapshot_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'preliminary_cell_marks_group_id_fkey'
+            columns: ['group_id']
+            isOneToOne: false
+            referencedRelation: 'preliminary_mark_groups'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'preliminary_cell_marks_requester_id_fkey'
+            columns: ['requester_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'preliminary_cell_marks_reviewed_by_fkey'
+            columns: ['reviewed_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'preliminary_cell_marks_shift_id_fkey'
+            columns: ['shift_id']
+            isOneToOne: false
+            referencedRelation: 'shifts'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'preliminary_cell_marks_snapshot_id_fkey'
+            columns: ['snapshot_id']
+            isOneToOne: false
+            referencedRelation: 'preliminary_snapshots'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      preliminary_mark_groups: {
+        Row: {
+          created_at: string
+          decision_note: string | null
+          id: string
+          note: string | null
+          requester_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          snapshot_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          decision_note?: string | null
+          id?: string
+          note?: string | null
+          requester_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          snapshot_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          decision_note?: string | null
+          id?: string
+          note?: string | null
+          requester_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          snapshot_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'preliminary_mark_groups_requester_id_fkey'
+            columns: ['requester_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'preliminary_mark_groups_reviewed_by_fkey'
+            columns: ['reviewed_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'preliminary_mark_groups_snapshot_id_fkey'
+            columns: ['snapshot_id']
+            isOneToOne: false
+            referencedRelation: 'preliminary_snapshots'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       preliminary_requests: {
         Row: {
           approved_at: string | null
@@ -1266,6 +1420,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          access_status: Database['public']['Enums']['profile_access_status']
           archived_at: string | null
           archived_by: string | null
           created_at: string
@@ -1296,6 +1451,7 @@ export type Database = {
           staff_onboarding_theme_confirmed_at: string | null
         }
         Insert: {
+          access_status?: Database['public']['Enums']['profile_access_status']
           archived_at?: string | null
           archived_by?: string | null
           created_at?: string
@@ -1326,6 +1482,7 @@ export type Database = {
           staff_onboarding_theme_confirmed_at?: string | null
         }
         Update: {
+          access_status?: Database['public']['Enums']['profile_access_status']
           archived_at?: string | null
           archived_by?: string | null
           created_at?: string
@@ -1464,6 +1621,7 @@ export type Database = {
           published: boolean
           site_id: string
           start_date: string
+          status: Database['public']['Enums']['schedule_cycle_status']
         }
         Insert: {
           archived_at?: string | null
@@ -1475,6 +1633,7 @@ export type Database = {
           published?: boolean
           site_id?: string
           start_date: string
+          status?: Database['public']['Enums']['schedule_cycle_status']
         }
         Update: {
           archived_at?: string | null
@@ -1486,6 +1645,7 @@ export type Database = {
           published?: boolean
           site_id?: string
           start_date?: string
+          status?: Database['public']['Enums']['schedule_cycle_status']
         }
         Relationships: [
           {
@@ -2092,6 +2252,34 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      app_cancel_preliminary_cell_mark: {
+        Args: { p_actor_id: string; p_mark_id: string }
+        Returns: {
+          id: string
+        }[]
+      }
+      app_create_preliminary_cell_mark: {
+        Args: {
+          p_actor_id: string
+          p_group_id?: string | null
+          p_mark_date: string
+          p_mark_type: string
+          p_note?: string | null
+          p_shift_id?: string | null
+          p_shift_type: string
+          p_snapshot_id: string
+        }
+        Returns: {
+          group_id: string | null
+          id: string
+        }[]
+      }
+      app_create_preliminary_mark_group: {
+        Args: { p_actor_id: string; p_note?: string | null; p_snapshot_id: string }
+        Returns: {
+          id: string
+        }[]
+      }
       app_delete_unpublished_cycle_shifts: {
         Args: {
           p_actor_id: string
@@ -2128,6 +2316,18 @@ export type Database = {
         Args: { p_actor_id: string; p_cycle_id: string }
         Returns: {
           id: string
+        }[]
+      }
+      app_review_preliminary_cell_mark: {
+        Args: {
+          p_actor_id: string
+          p_decision: string
+          p_decision_note?: string | null
+          p_mark_id: string
+        }
+        Returns: {
+          id: string
+          status: string
         }[]
       }
       app_respond_direct_shift_post: {
@@ -2298,6 +2498,8 @@ export type Database = {
       assignment_status: 'scheduled' | 'call_in' | 'cancelled' | 'on_call' | 'left_early'
       availability_entry_type: 'unavailable' | 'available'
       availability_shift_type: 'day' | 'night' | 'both'
+      profile_access_status: 'pending' | 'approved' | 'declined'
+      schedule_cycle_status: 'draft' | 'preliminary' | 'final' | 'archived'
       shift_role: 'lead' | 'staff'
     }
     CompositeTypes: {

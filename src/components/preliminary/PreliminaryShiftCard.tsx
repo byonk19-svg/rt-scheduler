@@ -5,12 +5,14 @@ import { cn } from '@/lib/utils'
 
 type PreliminaryShiftCardProps = {
   snapshotId: string
+  cycleStartDate: string | null
+  cycleEndDate: string | null
   card: PreliminaryShiftCardModel
   currentUserId: string
   highlighted?: boolean
   claimAction: (formData: FormData) => void | Promise<void>
   requestChangeAction: (formData: FormData) => void | Promise<void>
-  directEditAction: (formData: FormData) => void | Promise<void>
+  createCellMarkAction: (formData: FormData) => void | Promise<void>
 }
 
 function formatShiftLabel(date: string, shiftType: 'day' | 'night') {
@@ -43,12 +45,14 @@ function stateLabel(state: PreliminaryShiftCardModel['state']) {
 
 export function PreliminaryShiftCard({
   snapshotId,
+  cycleStartDate,
+  cycleEndDate,
   card,
   currentUserId,
   highlighted = false,
   claimAction,
   requestChangeAction,
-  directEditAction,
+  createCellMarkAction,
 }: PreliminaryShiftCardProps) {
   const isReservedByCurrentUser = card.reservedById === currentUserId
   const actionable =
@@ -87,7 +91,7 @@ export function PreliminaryShiftCard({
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             {card.assignedName
-              ? `${card.assignedName}${card.shiftRole === 'lead' ? ' · Lead' : ''}`
+              ? `${card.assignedName}${card.shiftRole === 'lead' ? ' - Lead' : ''}`
               : 'Help needed'}
           </p>
           {card.state === 'pending_claim' && card.assignedName ? (
@@ -104,7 +108,7 @@ export function PreliminaryShiftCard({
         <form
           action={
             card.directAction === 'add_here' || card.directAction === 'remove_me'
-              ? directEditAction
+              ? createCellMarkAction
               : card.canClaim || card.directAction === 'express_interest'
                 ? claimAction
                 : requestChangeAction
@@ -114,23 +118,49 @@ export function PreliminaryShiftCard({
           <input type="hidden" name="snapshot_id" value={snapshotId} />
           <input type="hidden" name="shift_id" value={card.shiftId} />
           {(card.directAction === 'add_here' || card.directAction === 'remove_me') && (
-            <input type="hidden" name="direct_action" value={card.directAction} />
+            <>
+              <input
+                type="hidden"
+                name="mark_type"
+                value={card.directAction === 'remove_me' ? 'mark_off' : 'add_work'}
+              />
+              <input type="hidden" name="date" value={card.shiftDate} />
+              <input type="hidden" name="shift_type" value={card.shiftType} />
+            </>
           )}
           <label htmlFor={`shift-note-${card.shiftId}`} className="sr-only">
             Optional note
           </label>
-          {card.directAction !== 'add_here' && card.directAction !== 'remove_me' ? (
-            <textarea
-              id={`shift-note-${card.shiftId}`}
-              name="note"
-              rows={2}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
-              placeholder={
-                card.canClaim
-                  ? 'Optional note for the manager'
-                  : 'Optional reason for the change request'
-              }
-            />
+          {card.directAction !== 'express_interest' ? (
+            <>
+              {card.directAction === 'remove_me' ? (
+                <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
+                  Write 1 on another day
+                  <input
+                    type="date"
+                    name="replacement_date"
+                    min={cycleStartDate ?? undefined}
+                    max={cycleEndDate ?? undefined}
+                    className="h-10 rounded-md border border-border bg-background px-3 text-sm font-normal text-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                  />
+                </label>
+              ) : null}
+              <textarea
+                id={`shift-note-${card.shiftId}`}
+                name="note"
+                rows={2}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
+                placeholder={
+                  card.directAction === 'remove_me'
+                    ? 'Optional note for marking this day out'
+                    : card.directAction === 'add_here'
+                      ? 'Optional note for wanting this day'
+                      : card.canClaim
+                        ? 'Optional note for the manager'
+                        : 'Optional reason for the change request'
+                }
+              />
+            </>
           ) : null}
           <button
             type="submit"

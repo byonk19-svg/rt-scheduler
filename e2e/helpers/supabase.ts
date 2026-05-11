@@ -51,6 +51,7 @@ export async function createE2EUser(
       full_name: payload.fullName,
       email: payload.email,
       role: payload.role,
+      access_status: 'approved',
       shift_type: payload.shiftType,
       employment_type: payload.employmentType,
       max_work_days_per_week:

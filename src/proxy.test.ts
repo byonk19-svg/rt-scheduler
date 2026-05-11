@@ -25,6 +25,7 @@ type ProxyScenario = {
   } | null
   profile?: {
     role: string | null
+    access_status?: string | null
     is_active: boolean | null
     archived_at: string | null
     staff_onboarding_required: boolean | null
@@ -53,6 +54,7 @@ function makeSupabaseMock(scenario: ProxyScenario) {
     ? scenario.profile
     : ({
         role: 'therapist',
+        access_status: 'approved',
         is_active: true,
         archived_at: null,
         staff_onboarding_required: false,
@@ -134,6 +136,7 @@ describe('proxy onboarding and pending gates', () => {
       makeSupabaseMock({
         profile: {
           role: 'therapist',
+          access_status: 'approved',
           is_active: true,
           archived_at: null,
           staff_onboarding_required: true,
@@ -159,6 +162,7 @@ describe('proxy onboarding and pending gates', () => {
       makeSupabaseMock({
         profile: {
           role: 'therapist',
+          access_status: 'approved',
           is_active: true,
           archived_at: null,
           staff_onboarding_required: true,
@@ -184,6 +188,7 @@ describe('proxy onboarding and pending gates', () => {
       makeSupabaseMock({
         profile: {
           role: 'therapist',
+          access_status: 'approved',
           is_active: true,
           archived_at: null,
           staff_onboarding_required: true,
@@ -207,6 +212,7 @@ describe('proxy onboarding and pending gates', () => {
       makeSupabaseMock({
         profile: {
           role: 'therapist',
+          access_status: 'approved',
           is_active: true,
           archived_at: null,
           staff_onboarding_required: false,
@@ -232,6 +238,7 @@ describe('proxy onboarding and pending gates', () => {
       makeSupabaseMock({
         profile: {
           role: 'manager',
+          access_status: 'approved',
           is_active: true,
           archived_at: null,
           staff_onboarding_required: true,
@@ -269,7 +276,32 @@ describe('proxy onboarding and pending gates', () => {
       makeSupabaseMock({
         profile: {
           role: null,
+          access_status: 'approved',
           is_active: true,
+          archived_at: null,
+          staff_onboarding_required: false,
+          preferred_work_days_mode: 'unset',
+          staff_onboarding_preferences_confirmed_at: null,
+          staff_onboarding_theme_confirmed_at: null,
+          staff_onboarding_completed_at: null,
+          work_patterns: null,
+        },
+      })
+    )
+
+    const response = await proxy(makeRequest('/dashboard'))
+
+    expect(response.status).toBe(307)
+    expect(response.headers.get('location')).toBe('https://teamwise.test/pending-setup')
+  })
+
+  it('redirects pending access users to pending setup before inactive signout', async () => {
+    createServerClientMock.mockReturnValue(
+      makeSupabaseMock({
+        profile: {
+          role: 'therapist',
+          access_status: 'pending',
+          is_active: false,
           archived_at: null,
           staff_onboarding_required: false,
           preferred_work_days_mode: 'unset',
@@ -292,6 +324,7 @@ describe('proxy onboarding and pending gates', () => {
       makeSupabaseMock({
         profile: {
           role: 'therapist',
+          access_status: 'approved',
           is_active: false,
           archived_at: null,
           staff_onboarding_required: false,
@@ -317,6 +350,7 @@ describe('proxy onboarding and pending gates', () => {
       makeSupabaseMock({
         profile: {
           role: 'manager',
+          access_status: 'approved',
           is_active: true,
           archived_at: null,
           staff_onboarding_required: false,

@@ -118,7 +118,7 @@ export async function restartPublishedCycleAction(formData: FormData) {
 
   const { error: cycleUpdateError } = await supabase
     .from('schedule_cycles')
-    .update({ published: false })
+    .update({ published: false, status: 'draft' })
     .eq('id', cycleId)
 
   if (cycleUpdateError) {
@@ -213,7 +213,7 @@ export async function unpublishCycleKeepShiftsAction(formData: FormData) {
 
   const { error: cycleUpdateError } = await supabase
     .from('schedule_cycles')
-    .update({ published: false })
+    .update({ published: false, status: 'preliminary' })
     .eq('id', cycleId)
 
   if (cycleUpdateError) {
@@ -338,7 +338,7 @@ export async function archiveCycleAction(formData: FormData) {
 
   const { error: archiveError } = await supabase
     .from('schedule_cycles')
-    .update({ archived_at: new Date().toISOString() })
+    .update({ archived_at: new Date().toISOString(), status: 'archived' })
     .eq('id', cycleId)
 
   if (archiveError) {

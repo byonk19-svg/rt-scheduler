@@ -258,7 +258,7 @@ export async function POST(request: Request) {
         .filter((profile) => !scheduledUserIds.has(profile.id))
         .map((profile) => profile.id)
 
-      await notifyUsers(supabase, {
+      await notifyUsers(admin as never, {
         userIds: eligibleUserIds,
         eventType: 'call_in_help_available',
         title: 'Call-in help needed',

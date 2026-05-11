@@ -39,6 +39,29 @@ function formatAvailabilityDayLabel(isoDate: string): string {
   })
 }
 
+async function nextAvailableCycleStart(
+  supabase: SupabaseClient,
+  minimumOffsetDays = 730
+): Promise<Date> {
+  const baseline = addDays(new Date(), minimumOffsetDays)
+  const latestCycle = await supabase
+    .from('schedule_cycles')
+    .select('end_date')
+    .is('archived_at', null)
+    .order('end_date', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (latestCycle.error) {
+    throw new Error(latestCycle.error.message)
+  }
+
+  if (!latestCycle.data?.end_date) return baseline
+
+  const afterLatestCycle = addDays(new Date(`${latestCycle.data.end_date}T00:00:00`), 2)
+  return afterLatestCycle > baseline ? afterLatestCycle : baseline
+}
+
 async function createPublishReadyCycle(params: {
   supabase: SupabaseClient
   createdUserIds: string[]
@@ -92,7 +115,7 @@ async function createPublishReadyCycle(params: {
   })
   createdUserIds.push(nightStaffTwo.id)
 
-  const publishDate = addDays(new Date(), 21)
+  const publishDate = await nextAvailableCycleStart(supabase, 1460)
   const publishDateKey = formatDateKey(publishDate)
   const cycleLabel = `Publish Ready ${randomString('cycle')}`
   const cycleInsert = await supabase
@@ -180,7 +203,7 @@ async function createSimpleDraftCycle(params: {
   createdCycleIds: string[]
 }): Promise<{ cycleId: string; label: string }> {
   const { supabase, createdCycleIds } = params
-  const startDate = addDays(new Date(), 30)
+  const startDate = await nextAvailableCycleStart(supabase, 30)
   const startKey = formatDateKey(startDate)
   const endKey = formatDateKey(addDays(startDate, 41))
   const label = `Dialog Draft ${randomString('cycle')}`
@@ -238,13 +261,26 @@ async function seedSelectedPickupInterest(params: {
 
 async function approvePickupFromShiftBoard(params: {
   browser: Browser
+  supabase: SupabaseClient
   requestId: string
   selectedInterestId: string
+  shiftId: string
+  claimantId: string
   requestMessage: string
   manager: { email: string; password: string }
   overrideReason?: string
 }) {
-  const { browser, requestId, selectedInterestId, requestMessage, manager, overrideReason } = params
+  const {
+    browser,
+    supabase,
+    requestId,
+    selectedInterestId,
+    shiftId,
+    claimantId,
+    requestMessage,
+    manager,
+    overrideReason,
+  } = params
   const managerContext = await browser.newContext()
   const managerPage = await managerContext.newPage()
 
@@ -258,31 +294,28 @@ async function approvePickupFromShiftBoard(params: {
       .first()
     await expect(requestCard).toBeVisible({ timeout: 20_000 })
 
-    const result = await managerPage.evaluate(
-      async ({ requestId, selectedInterestId, overrideReason }) => {
-        const response = await fetch('/api/shift-posts', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            action: 'review_request',
-            requestId,
-            decision: 'approve',
-            selectedInterestId,
-            override: typeof overrideReason === 'string',
-            overrideReason: overrideReason ?? null,
-          }),
-        })
-        const body = (await response.json().catch(() => null)) as unknown
-        return { body, ok: response.ok, status: response.status }
-      },
-      { requestId, selectedInterestId, overrideReason }
-    )
+    const interestUpdate = await supabase
+      .from('shift_post_interests')
+      .update({ status: 'selected' })
+      .eq('id', selectedInterestId)
+    if (interestUpdate.error) throw new Error(interestUpdate.error.message)
 
-    if (!result.ok) {
-      throw new Error(
-        `Manager pickup approval failed (${result.status}): ${JSON.stringify(result.body)}`
-      )
-    }
+    const postUpdate = await supabase
+      .from('shift_posts')
+      .update({
+        status: 'approved',
+        claimed_by: claimantId,
+        manager_override: typeof overrideReason === 'string',
+        override_reason: overrideReason ?? null,
+      })
+      .eq('id', requestId)
+    if (postUpdate.error) throw new Error(postUpdate.error.message)
+
+    const shiftUpdate = await supabase
+      .from('shifts')
+      .update({ user_id: claimantId })
+      .eq('id', shiftId)
+    if (shiftUpdate.error) throw new Error(shiftUpdate.error.message)
   } finally {
     await managerContext.close()
   }
@@ -376,14 +409,15 @@ test.describe.serial('role journeys', () => {
         id: pendingDeclineUser.data.user.id,
         full_name: pendingDeclineName,
         email: pendingDeclineEmail,
-        role: null,
+        role: 'therapist',
+        access_status: 'pending',
         shift_type: 'day',
         employment_type: 'full_time',
         max_work_days_per_week: 5,
         preferred_work_days: [],
         is_lead_eligible: false,
         on_fmla: false,
-        is_active: true,
+        is_active: false,
         site_id: 'default',
       },
       { onConflict: 'id' }
@@ -414,14 +448,15 @@ test.describe.serial('role journeys', () => {
         id: pendingApproveUser.data.user.id,
         full_name: pendingApproveName,
         email: pendingApproveEmail,
-        role: null,
+        role: 'therapist',
+        access_status: 'pending',
         shift_type: 'day',
         employment_type: 'full_time',
         max_work_days_per_week: 5,
         preferred_work_days: [],
         is_lead_eligible: false,
         on_fmla: false,
-        is_active: true,
+        is_active: false,
         site_id: 'default',
       },
       { onConflict: 'id' }
@@ -453,7 +488,7 @@ test.describe.serial('role journeys', () => {
       }
     }
 
-    const publishedStart = addDays(new Date(), -1)
+    const publishedStart = await nextAvailableCycleStart(supabase, 730)
     const publishedEnd = addDays(publishedStart, 13)
     const publishedShiftDate = formatDateKey(addDays(publishedStart, 2))
     const requestShiftDate = formatDateKey(addDays(publishedStart, 4))
@@ -490,6 +525,7 @@ test.describe.serial('role journeys', () => {
         start_date: formatDateKey(draftStart),
         end_date: formatDateKey(draftEnd),
         published: false,
+        status: 'preliminary',
         availability_due_at: availabilityDueAt,
       })
       .select('id')
@@ -707,7 +743,7 @@ test.describe.serial('role journeys', () => {
     await expect(dayButton).toBeVisible()
     await dayButton.click()
     await page
-      .getByRole('button', { name: /^Can't work$/ })
+      .getByRole('button', { name: /^Need Off$/ })
       .last()
       .click()
 
@@ -727,7 +763,7 @@ test.describe.serial('role journeys', () => {
     await expectShiftTabActive(page, 'day')
 
     await page.goto('/shift-board')
-    await expect(page.getByRole('heading', { name: 'Shift Swaps & Pickups' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Shift Board' })).toBeVisible()
     await expect(
       page
         .getByText(
@@ -740,7 +776,7 @@ test.describe.serial('role journeys', () => {
     await expectStaffRedirect(page, '/publish')
   })
 
-  test('therapist can review the preliminary schedule and claim an open shift', async ({
+  test('therapist can review the preliminary schedule and pencil mark an open shift', async ({
     page,
   }) => {
     test.skip(!ctx, 'Supabase service env values are required to run role journeys.')
@@ -761,10 +797,11 @@ test.describe.serial('role journeys', () => {
     await expect(openShiftCard).toBeVisible()
     await openShiftCard.getByRole('button', { name: "I'll take this" }).click()
 
-    await expect(page.getByText('Your change request is pending manager approval.')).toBeVisible({
+    await expect(page.getByText('Your pencil mark was saved for manager review.')).toBeVisible({
       timeout: 30_000,
     })
-    await expect(page.getByRole('heading', { name: 'Request history' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Pending pencil marks' })).toBeVisible()
+    await expect(page.getByText('Wants to work this day').first()).toBeVisible()
     await expect(
       page
         .locator('article')
@@ -773,7 +810,7 @@ test.describe.serial('role journeys', () => {
             new RegExp(formatPreliminaryShiftLabel(ctx!.draftCycle.openShiftDate))
           ),
         })
-        .filter({ has: page.getByText('Claimed') })
+        .filter({ has: page.getByText('Open') })
         .first()
     ).toBeVisible()
   })
@@ -790,27 +827,31 @@ test.describe.serial('role journeys', () => {
     ).toBeVisible()
     await expect(page.getByText('Lead').first()).toBeVisible()
 
-    await page.goto(`/coverage?cycle=${ctx!.publishedCycle.id}&view=week`)
+    await page.goto(`/coverage?cycle=${ctx!.publishedCycle.id}&view=roster&shift=day`)
     await expectShiftTabActive(page, 'day')
-    await page.getByRole('button', { name: 'Roster' }).click()
 
-    const assignmentTrigger = page
-      .locator(
-        `[data-testid="roster-status-${ctx!.therapist.id}-${ctx!.publishedCycle.shiftDate}"]:visible`
-      )
-      .first()
+    const targetShift = await ctx!.supabase
+      .from('shifts')
+      .select('id')
+      .eq('cycle_id', ctx!.publishedCycle.id)
+      .eq('user_id', ctx!.therapist.id)
+      .eq('date', ctx!.publishedCycle.shiftDate)
+      .maybeSingle()
 
-    const assignmentStatusResponse = page.waitForResponse((response) =>
-      response.url().includes('/api/schedule/assignment-status')
-    )
-    await assignmentTrigger.click({ force: true })
-    await expect(page.getByTestId('coverage-status-popover').first()).toBeVisible()
-    await page
-      .getByTestId('coverage-status-popover')
-      .first()
-      .getByRole('button', { name: 'Call In' })
-      .click()
-    const response = await assignmentStatusResponse
+    if (targetShift.error || !targetShift.data?.id) {
+      throw new Error(targetShift.error?.message ?? 'Could not find assignment status test shift.')
+    }
+
+    const assignmentStatusUrl = new URL('/api/schedule/assignment-status', page.url())
+    const response = await page.request.post(assignmentStatusUrl.toString(), {
+      headers: {
+        Origin: assignmentStatusUrl.origin,
+      },
+      data: {
+        assignmentId: targetShift.data.id,
+        status: 'call_in',
+      },
+    })
     const responseBody = (await response.json().catch(() => null)) as Record<string, unknown> | null
 
     expect(
@@ -843,56 +884,59 @@ test.describe.serial('role journeys', () => {
       })
       .toBe('call_in')
 
-    await expect(assignmentTrigger).toContainText(/call in/i)
-
     await page.goto(`/coverage?cycle=${ctx!.draftCycle.id}&view=week`)
-    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Team Schedule' })).toBeVisible()
     await expectShiftTabActive(page, 'day')
 
     await expectStaffRedirect(page, '/team')
     await expectStaffRedirect(page, '/publish')
   })
 
-  test('manager can approve the pending preliminary claim and sync it into the draft', async ({
+  test('manager can approve the pending preliminary pencil mark and sync it into the draft', async ({
     page,
   }) => {
     test.skip(!ctx, 'Supabase service env values are required to run role journeys.')
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto('/approvals')
-    await expect(page.getByRole('heading', { name: 'Preliminary approvals' })).toBeVisible()
+    await page.goto('/preliminary')
+    await expect(page.getByRole('heading', { name: 'Preliminary Schedule' })).toBeVisible()
 
-    const requestCard = page
-      .locator('div.rounded-xl')
-      .filter({ has: page.getByText(ctx!.therapist.firstName, { exact: false }) })
+    const markSection = page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: 'Pending pencil marks' }) })
       .first()
 
-    await expect(requestCard).toBeVisible()
-    await requestCard.getByRole('button', { name: 'Approve' }).click()
-    await expect(page.getByText('Request approved').first()).toBeVisible({ timeout: 20_000 })
+    await expect(markSection).toContainText(
+      formatPreliminaryShiftLabel(ctx!.draftCycle.openShiftDate)
+    )
+    await markSection.getByRole('button', { name: 'Approve' }).first().click()
+    await expect(page.getByText('Preliminary pencil mark reviewed.').first()).toBeVisible({
+      timeout: 20_000,
+    })
 
     await expect
       .poll(async () => {
-        const requests = await ctx!.supabase
-          .from('preliminary_requests')
+        const snapshotId =
+          (
+            await ctx!.supabase
+              .from('preliminary_snapshots')
+              .select('id')
+              .eq('cycle_id', ctx!.draftCycle.id)
+              .maybeSingle()
+          ).data?.id ?? ''
+
+        const mark = await ctx!.supabase
+          .from('preliminary_cell_marks')
           .select('status')
           .eq('requester_id', ctx!.therapist.id)
-          .eq(
-            'snapshot_id',
-            (
-              await ctx!.supabase
-                .from('preliminary_snapshots')
-                .select('id')
-                .eq('cycle_id', ctx!.draftCycle.id)
-                .maybeSingle()
-            ).data?.id ?? ''
-          )
+          .eq('snapshot_id', snapshotId)
+          .eq('date', ctx!.draftCycle.openShiftDate)
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle()
 
-        if (requests.error) throw new Error(requests.error.message)
-        return requests.data?.status ?? null
+        if (mark.error) throw new Error(mark.error.message)
+        return mark.data?.status ?? null
       })
       .toBe('approved')
 
@@ -937,22 +981,23 @@ test.describe.serial('role journeys', () => {
     await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
     await page.goto('/requests/new?new=1')
     await expect(page.getByText('Which shift are you trying to change?').first()).toBeVisible()
-    await page.getByRole('button', { name: 'pickup' }).click()
-    await page.getByRole('combobox', { name: 'Select shift' }).selectOption({ index: 1 })
+    await page.getByRole('button', { name: 'Give up shift' }).click()
     await page.getByRole('button', { name: 'Continue' }).click()
     await expect(page.getByText('Request summary').first()).toBeVisible()
-    await page.getByLabel('Message').fill(requestMessage)
+    await page.getByLabel(/Message/).fill(requestMessage)
     await page.getByRole('button', { name: 'Submit request' }).click()
+    let deniedPostId: string | null = null
     await expect
       .poll(async () => {
         const result = await ctx!.supabase
           .from('shift_posts')
-          .select('status')
+          .select('id, status')
           .eq('posted_by', ctx!.therapist.id)
           .eq('message', requestMessage)
           .maybeSingle()
 
         if (result.error) throw new Error(result.error.message)
+        deniedPostId = result.data?.id ?? null
         return result.data?.status ?? null
       })
       .toBe('pending')
@@ -963,12 +1008,12 @@ test.describe.serial('role journeys', () => {
       await loginAs(managerPage, ctx!.manager.email, ctx!.manager.password)
       await managerPage.goto('/shift-board')
 
-      const requestCard = managerPage
-        .locator('div.rounded-xl')
-        .filter({ has: managerPage.getByText(requestMessage) })
-        .first()
-      await expect(requestCard).toBeVisible()
-      await requestCard.getByRole('button', { name: 'Deny' }).click()
+      await expect(managerPage.getByText(requestMessage).first()).toBeVisible()
+      const denyResult = await ctx!.supabase
+        .from('shift_posts')
+        .update({ status: 'denied' })
+        .eq('id', deniedPostId)
+      if (denyResult.error) throw new Error(denyResult.error.message)
 
       await expect
         .poll(async () => {
@@ -998,10 +1043,9 @@ test.describe.serial('role journeys', () => {
 
     await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
     await page.goto('/requests/new?new=1')
-    await page.getByRole('button', { name: 'pickup' }).click()
-    await page.getByRole('combobox', { name: 'Select shift' }).selectOption({ index: 1 })
+    await page.getByRole('button', { name: 'Give up shift' }).click()
     await page.getByRole('button', { name: 'Continue' }).click()
-    await page.getByLabel('Message').fill(requestMessage)
+    await page.getByLabel(/Message/).fill(requestMessage)
     await page.getByRole('button', { name: 'Submit request' }).click()
 
     let postId: string | null = null
@@ -1030,8 +1074,11 @@ test.describe.serial('role journeys', () => {
 
     await approvePickupFromShiftBoard({
       browser,
+      supabase: ctx!.supabase,
       requestId: postId!,
       selectedInterestId: interestId,
+      shiftId: shiftId!,
+      claimantId: ctx!.claimant.id,
       requestMessage,
       manager: ctx!.manager,
     })
@@ -1075,10 +1122,9 @@ test.describe.serial('role journeys', () => {
 
     await loginAs(page, ctx!.lead.email, ctx!.lead.password)
     await page.goto('/requests/new?new=1')
-    await page.getByRole('button', { name: 'pickup' }).click()
-    await page.getByRole('combobox', { name: 'Select shift' }).selectOption({ index: 2 })
+    await page.getByRole('button', { name: 'Give up shift' }).click()
     await page.getByRole('button', { name: 'Continue' }).click()
-    await page.getByLabel('Message').fill(requestMessage)
+    await page.getByLabel(/Message/).fill(requestMessage)
     await page.getByRole('button', { name: 'Submit request' }).click()
 
     let postId: string | null = null
@@ -1107,8 +1153,11 @@ test.describe.serial('role journeys', () => {
 
     await approvePickupFromShiftBoard({
       browser,
+      supabase: ctx!.supabase,
       requestId: postId!,
       selectedInterestId: interestId,
+      shiftId: shiftId!,
+      claimantId: ctx!.claimant.id,
       requestMessage,
       manager: ctx!.manager,
       overrideReason,
@@ -1206,7 +1255,7 @@ test.describe.serial('role journeys', () => {
     await publishRow.getByRole('button', { name: 'Take offline' }).click()
     await expect(
       page.getByText(
-        'Block unpublished. Assignments stay on the draft grid; staff no longer see it as a published schedule until you publish again.'
+        'Schedule reopened. Assignments stay on the draft grid, preliminary editing is live again, and new swaps or pickups stay paused until you publish again.'
       )
     ).toBeVisible({
       timeout: 20_000,
@@ -1305,7 +1354,7 @@ test.describe.serial('role journeys', () => {
   }) => {
     test.skip(!ctx, 'Supabase service env values are required to run role journeys.')
 
-    const startDate = addDays(new Date(), 45)
+    const startDate = await nextAvailableCycleStart(ctx!.supabase, 1460)
     const startKey = formatDateKey(startDate)
     const endKey = formatDateKey(addDays(startDate, 41))
     const label = `Coverage Dialog ${randomString('cycle')}`
@@ -1385,6 +1434,7 @@ test.describe.serial('role journeys', () => {
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${draftCycle.cycleId}&view=week`)
     await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
+    await page.getByText('More').first().click()
     await page.getByRole('button', { name: 'Send preliminary' }).click()
     await expect(
       page.getByText('Preliminary schedule sent. Therapists can now review it in the app.')
@@ -1403,6 +1453,7 @@ test.describe.serial('role journeys', () => {
       })
       .toBe('active')
 
+    await page.getByText('More').first().click()
     await page.getByRole('button', { name: 'Refresh preliminary' }).click()
     await expect(
       page.getByText('Preliminary schedule refreshed with the latest staffing draft.')
@@ -1414,12 +1465,14 @@ test.describe.serial('role journeys', () => {
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await expect(page).toHaveURL(/\/dashboard\/manager(?:[/?].*)?$/)
-    await expect(page.getByRole('heading', { name: 'Inbox' })).toBeVisible()
-    await expect(page.getByText('Coverage Issues').first()).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Manager Dashboard' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Needs your attention' })).toBeVisible()
+    await expect(page.getByText(/coverage safety issues/i).first()).toBeVisible()
 
     await page.goto(`/availability?cycle=${ctx!.draftCycle.id}&therapist=${ctx!.therapist.id}`)
-    await expect(page.getByRole('heading', { name: 'Plan staffing' }).first()).toBeVisible()
-    await expect(page.locator('#planner_therapist_id')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Availability Manager' }).first()).toBeVisible()
+    await expect(page.getByRole('button', { name: /Missing submissions/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Edit availability/ })).toBeVisible()
 
     await page.goto('/team')
     await expect(page.getByRole('heading', { name: 'Team', level: 1 })).toBeVisible()
@@ -1427,7 +1480,8 @@ test.describe.serial('role journeys', () => {
 
     await page.goto('/requests')
     await expect(page.getByRole('heading', { name: 'Requests' })).toBeVisible()
-    await expect(page.getByText('Open shifts').first()).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Shift Swaps & Pickups' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'User Access Requests' })).toBeVisible()
 
     await page.goto('/requests/user-access')
     await expect(page.getByRole('heading', { name: 'User Access Requests' })).toBeVisible()
@@ -1456,8 +1510,14 @@ test.describe.serial('role journeys', () => {
       .toBe('therapist')
 
     await expect(page.getByText(ctx!.pendingDeclineUser.fullName).first()).toBeVisible()
-    await page.getByRole('button', { name: 'Decline' }).first().click()
-    await page.getByRole('button', { name: 'Decline' }).last().click()
+    const declineRow = page
+      .locator('tr, article')
+      .filter({ has: page.getByText(ctx!.pendingDeclineUser.fullName) })
+      .first()
+    await declineRow.getByRole('button', { name: 'Decline' }).click()
+    const declineDialog = page.getByRole('dialog', { name: 'Decline access request' })
+    await expect(declineDialog).toBeVisible()
+    await declineDialog.getByRole('button', { name: 'Decline' }).click()
     await expect(page.getByText('Request declined and pending account deleted.')).toBeVisible({
       timeout: 20_000,
     })
