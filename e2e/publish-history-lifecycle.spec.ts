@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
@@ -14,6 +14,13 @@ function nextSundayAfter(date: Date, minimumDaysAhead: number) {
   const next = addDays(date, minimumDaysAhead)
   const day = next.getDay()
   return addDays(next, (7 - day) % 7)
+}
+
+async function submitPublishForm(page: Page, buttonName: string) {
+  const button = page.getByRole('button', { name: buttonName }).first()
+  await expect(button).toBeVisible({ timeout: 30_000 })
+  await button.click()
+  await page.waitForLoadState('networkidle').catch(() => undefined)
 }
 
 test.describe.serial('publish history lifecycle', () => {
@@ -51,11 +58,22 @@ test.describe.serial('publish history lifecycle', () => {
   test.afterAll(async () => {
     if (!ctx) return
 
-    await ctx.supabase
-      .from('notification_outbox')
-      .delete()
-      .in('publish_event_id', createdPublishEventIds)
-    await ctx.supabase.from('publish_events').delete().in('id', createdPublishEventIds)
+    const cycleEventIds =
+      createdCycleIds.length > 0
+        ? await ctx.supabase.from('publish_events').select('id').in('cycle_id', createdCycleIds)
+        : { data: [], error: null }
+    if (cycleEventIds.error) {
+      throw new Error(cycleEventIds.error.message)
+    }
+    const publishEventIds = Array.from(
+      new Set([
+        ...createdPublishEventIds,
+        ...((cycleEventIds.data ?? []) as Array<{ id: string }>).map((row) => row.id),
+      ])
+    )
+
+    await ctx.supabase.from('notification_outbox').delete().in('publish_event_id', publishEventIds)
+    await ctx.supabase.from('publish_events').delete().in('id', publishEventIds)
     await ctx.supabase.from('preliminary_snapshots').delete().in('cycle_id', createdCycleIds)
     await ctx.supabase.from('notifications').delete().in('user_id', createdUserIds)
     await ctx.supabase.from('shifts').delete().in('cycle_id', createdCycleIds)
@@ -312,5 +330,108 @@ test.describe.serial('publish history lifecycle', () => {
         return snapshot.data?.status ?? null
       })
       .toBe('superseded')
+  })
+
+  test('manager can republish an offline cycle from publish history', async ({ page }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run publish lifecycle e2e.')
+
+    const cycleDate = nextSundayAfter(new Date(), dateOffsetBase + 168)
+    const cycleLabel = `Republish Offline ${randomString('cycle')}`
+    const cycleInsert = await ctx!.supabase
+      .from('schedule_cycles')
+      .insert({
+        label: cycleLabel,
+        start_date: formatDateKey(cycleDate),
+        end_date: formatDateKey(addDays(cycleDate, 41)),
+        published: false,
+        status: 'offline',
+      })
+      .select('id')
+      .single()
+
+    if (cycleInsert.error || !cycleInsert.data) {
+      throw new Error(cycleInsert.error?.message ?? 'Could not create republish cycle.')
+    }
+    createdCycleIds.push(cycleInsert.data.id)
+
+    const nightLead = await createE2EUser(ctx!.supabase, {
+      email: `${randomString('republish-night-lead')}@example.com`,
+      password: `Lead!${Math.random().toString(16).slice(2, 10)}`,
+      fullName: `Republish Night Lead ${randomString('staff')}`,
+      role: 'lead',
+      employmentType: 'full_time',
+      shiftType: 'night',
+      isLeadEligible: true,
+    })
+    createdUserIds.push(nightLead.id)
+
+    const shiftsInsert = await ctx!.supabase.from('shifts').insert(
+      Array.from({ length: 42 }, (_, index) => {
+        const date = formatDateKey(addDays(cycleDate, index))
+        return [
+          {
+            cycle_id: cycleInsert.data.id,
+            user_id: ctx!.manager.id,
+            date,
+            shift_type: 'day',
+            status: 'scheduled',
+            assignment_status: 'scheduled',
+            role: 'lead',
+          },
+          {
+            cycle_id: cycleInsert.data.id,
+            user_id: nightLead.id,
+            date,
+            shift_type: 'night',
+            status: 'scheduled',
+            assignment_status: 'scheduled',
+            role: 'lead',
+          },
+        ]
+      }).flat()
+    )
+    if (shiftsInsert.error) throw new Error(shiftsInsert.error.message)
+
+    await loginAs(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto('/publish')
+    const cycleRow = page
+      .locator('tr')
+      .filter({ has: page.getByText(cycleLabel).first() })
+      .filter({ has: page.getByRole('button', { name: 'Republish' }) })
+      .first()
+    await expect(cycleRow).toBeVisible()
+    await cycleRow.getByRole('button', { name: 'Republish' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible({ timeout: 30_000 })
+
+    const cyclePublished = async () => {
+      const cycle = await ctx!.supabase
+        .from('schedule_cycles')
+        .select('published, status')
+        .eq('id', cycleInsert.data.id)
+        .maybeSingle()
+
+      if (cycle.error) throw new Error(cycle.error.message)
+      return cycle.data ? `${cycle.data.status}:${cycle.data.published}` : null
+    }
+
+    if ((await cyclePublished()) !== 'final:true') {
+      await submitPublishForm(page, 'Publish with weekly override')
+    }
+
+    if ((await cyclePublished()) !== 'final:true') {
+      await submitPublishForm(page, 'Publish with shift override')
+    }
+
+    if ((await cyclePublished()) !== 'final:true') {
+      await submitPublishForm(page, 'Acknowledge and publish')
+    }
+
+    await expect
+      .poll(cyclePublished, {
+        timeout: 60_000,
+        message: `url=${page.url()}`,
+      })
+      .toBe('final:true')
   })
 })
