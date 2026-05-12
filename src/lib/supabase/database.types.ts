@@ -1613,7 +1613,11 @@ export type Database = {
       schedule_cycles: {
         Row: {
           archived_at: string | null
+          availability_closed_at: string | null
+          availability_closed_by: string | null
           availability_due_at: string | null
+          availability_reopened_at: string | null
+          availability_reopened_by: string | null
           created_at: string
           end_date: string
           id: string
@@ -1627,7 +1631,11 @@ export type Database = {
         }
         Insert: {
           archived_at?: string | null
+          availability_closed_at?: string | null
+          availability_closed_by?: string | null
           availability_due_at?: string | null
+          availability_reopened_at?: string | null
+          availability_reopened_by?: string | null
           created_at?: string
           end_date: string
           id?: string
@@ -1641,7 +1649,11 @@ export type Database = {
         }
         Update: {
           archived_at?: string | null
+          availability_closed_at?: string | null
+          availability_closed_by?: string | null
           availability_due_at?: string | null
+          availability_reopened_at?: string | null
+          availability_reopened_by?: string | null
           created_at?: string
           end_date?: string
           id?: string
@@ -1654,6 +1666,20 @@ export type Database = {
           status?: Database['public']['Enums']['schedule_cycle_status']
         }
         Relationships: [
+          {
+            foreignKeyName: 'schedule_cycles_availability_closed_by_fkey'
+            columns: ['availability_closed_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'schedule_cycles_availability_reopened_by_fkey'
+            columns: ['availability_reopened_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'schedule_cycles_offline_by_fkey'
             columns: ['offline_by']
@@ -2004,10 +2030,13 @@ export type Database = {
           created_at: string
           cycle_id: string | null
           date: string
+          employment_type_at_assignment: string | null
           id: string
+          lead_eligible_at_assignment: boolean | null
           left_early_time: string | null
           role: Database['public']['Enums']['shift_role']
           shift_type: string
+          shift_type_at_assignment: string | null
           site_id: string
           status: string
           status_note: string | null
@@ -2025,10 +2054,13 @@ export type Database = {
           created_at?: string
           cycle_id?: string | null
           date: string
+          employment_type_at_assignment?: string | null
           id?: string
+          lead_eligible_at_assignment?: boolean | null
           left_early_time?: string | null
           role?: Database['public']['Enums']['shift_role']
           shift_type: string
+          shift_type_at_assignment?: string | null
           site_id?: string
           status?: string
           status_note?: string | null
@@ -2046,10 +2078,13 @@ export type Database = {
           created_at?: string
           cycle_id?: string | null
           date?: string
+          employment_type_at_assignment?: string | null
           id?: string
+          lead_eligible_at_assignment?: boolean | null
           left_early_time?: string | null
           role?: Database['public']['Enums']['shift_role']
           shift_type?: string
+          shift_type_at_assignment?: string | null
           site_id?: string
           status?: string
           status_note?: string | null

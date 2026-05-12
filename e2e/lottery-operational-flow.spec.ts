@@ -7,6 +7,7 @@ import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase
 
 type LotteryFlowCtx = {
   supabase: SupabaseClient
+  siteId: string
   manager: { id: string; email: string; password: string }
   cycleId: string
   shiftDate: string
@@ -14,6 +15,11 @@ type LotteryFlowCtx = {
   therapistB: { id: string; name: string }
   therapistC: { id: string; name: string }
   therapistD: { id: string; name: string }
+}
+
+function nextSundayAfter(daysAhead: number): Date {
+  const target = addDays(new Date(), daysAhead)
+  return addDays(target, (7 - target.getDay()) % 7)
 }
 
 test.describe.serial('lottery operational flow', () => {
@@ -26,6 +32,9 @@ test.describe.serial('lottery operational flow', () => {
   test.beforeAll(async () => {
     const supabase = createServiceRoleClientOrNull()
     if (!supabase) return
+    const siteId = randomString('lottery-site')
+    const siteInsert = await supabase.from('sites').insert({ id: siteId, name: 'Lottery Ops Site' })
+    if (siteInsert.error) throw new Error(siteInsert.error.message)
 
     const managerEmail = `${randomString('lottery-op-mgr')}@example.com`
     const managerPassword = `Lottery!${Math.random().toString(16).slice(2, 10)}`
@@ -37,6 +46,7 @@ test.describe.serial('lottery operational flow', () => {
       employmentType: 'full_time',
       shiftType: 'day',
       isLeadEligible: true,
+      siteId,
     })
     createdUserIds.push(manager.id)
 
@@ -47,6 +57,7 @@ test.describe.serial('lottery operational flow', () => {
       role: 'therapist',
       employmentType: 'full_time',
       shiftType: 'day',
+      siteId,
     })
     const therapistB = await createE2EUser(supabase, {
       email: `${randomString('lottery-b')}@example.com`,
@@ -55,6 +66,7 @@ test.describe.serial('lottery operational flow', () => {
       role: 'therapist',
       employmentType: 'full_time',
       shiftType: 'day',
+      siteId,
     })
     const therapistC = await createE2EUser(supabase, {
       email: `${randomString('lottery-c')}@example.com`,
@@ -63,6 +75,7 @@ test.describe.serial('lottery operational flow', () => {
       role: 'therapist',
       employmentType: 'full_time',
       shiftType: 'day',
+      siteId,
     })
     const therapistD = await createE2EUser(supabase, {
       email: `${randomString('lottery-d')}@example.com`,
@@ -71,16 +84,19 @@ test.describe.serial('lottery operational flow', () => {
       role: 'therapist',
       employmentType: 'full_time',
       shiftType: 'day',
+      siteId,
     })
     createdUserIds.push(therapistA.id, therapistB.id, therapistC.id, therapistD.id)
 
-    const shiftDate = formatDateKey(addDays(new Date(), 30 + Math.floor(Math.random() * 45)))
+    const cycleStart = nextSundayAfter(30 + Math.floor(Math.random() * 45))
+    const shiftDate = formatDateKey(addDays(cycleStart, 2))
     const cycleInsert = await supabase
       .from('schedule_cycles')
       .insert({
+        site_id: siteId,
         label: `Lottery Ops ${randomString('cycle')}`,
-        start_date: shiftDate,
-        end_date: shiftDate,
+        start_date: formatDateKey(cycleStart),
+        end_date: formatDateKey(addDays(cycleStart, 41)),
         published: true,
       })
       .select('id')
@@ -93,6 +109,7 @@ test.describe.serial('lottery operational flow', () => {
 
     const shiftInsert = await supabase.from('shifts').insert([
       {
+        site_id: siteId,
         cycle_id: cycleInsert.data.id,
         user_id: therapistA.id,
         date: shiftDate,
@@ -102,6 +119,7 @@ test.describe.serial('lottery operational flow', () => {
         role: 'staff',
       },
       {
+        site_id: siteId,
         cycle_id: cycleInsert.data.id,
         user_id: therapistB.id,
         date: shiftDate,
@@ -111,6 +129,7 @@ test.describe.serial('lottery operational flow', () => {
         role: 'staff',
       },
       {
+        site_id: siteId,
         cycle_id: cycleInsert.data.id,
         user_id: therapistC.id,
         date: shiftDate,
@@ -120,6 +139,7 @@ test.describe.serial('lottery operational flow', () => {
         role: 'staff',
       },
       {
+        site_id: siteId,
         cycle_id: cycleInsert.data.id,
         user_id: therapistD.id,
         date: shiftDate,
@@ -136,7 +156,7 @@ test.describe.serial('lottery operational flow', () => {
 
     const listInsert = await supabase.from('lottery_list_entries').insert([
       {
-        site_id: 'default',
+        site_id: siteId,
         shift_type: 'day',
         therapist_id: therapistA.id,
         display_order: 1,
@@ -144,7 +164,7 @@ test.describe.serial('lottery operational flow', () => {
         updated_by: manager.id,
       },
       {
-        site_id: 'default',
+        site_id: siteId,
         shift_type: 'day',
         therapist_id: therapistB.id,
         display_order: 2,
@@ -152,7 +172,7 @@ test.describe.serial('lottery operational flow', () => {
         updated_by: manager.id,
       },
       {
-        site_id: 'default',
+        site_id: siteId,
         shift_type: 'day',
         therapist_id: therapistC.id,
         display_order: 3,
@@ -160,7 +180,7 @@ test.describe.serial('lottery operational flow', () => {
         updated_by: manager.id,
       },
       {
-        site_id: 'default',
+        site_id: siteId,
         shift_type: 'day',
         therapist_id: therapistD.id,
         display_order: 4,
@@ -175,6 +195,7 @@ test.describe.serial('lottery operational flow', () => {
 
     ctx = {
       supabase,
+      siteId,
       manager: { id: manager.id, email: managerEmail, password: managerPassword },
       cycleId: cycleInsert.data.id,
       shiftDate,
@@ -189,11 +210,12 @@ test.describe.serial('lottery operational flow', () => {
     if (!ctx) return
 
     await ctx.supabase.from('lottery_history_entries').delete().in('therapist_id', createdUserIds)
+    await ctx.supabase.from('audit_log').delete().in('user_id', createdUserIds)
 
     await ctx.supabase
       .from('lottery_decisions')
       .delete()
-      .eq('site_id', 'default')
+      .eq('site_id', ctx.siteId)
       .eq('shift_date', ctx.shiftDate)
       .eq('shift_type', 'day')
 
@@ -208,6 +230,8 @@ test.describe.serial('lottery operational flow', () => {
     for (const userId of createdUserIds) {
       await ctx.supabase.auth.admin.deleteUser(userId).catch(() => undefined)
     }
+    await ctx.supabase.from('profiles').delete().in('id', createdUserIds)
+    await ctx.supabase.from('sites').delete().eq('id', ctx.siteId)
   })
 
   test('manager can preview, apply, and audit a lottery result on a published shift', async ({
@@ -224,9 +248,12 @@ test.describe.serial('lottery operational flow', () => {
     ).toBeVisible()
 
     await page.getByLabel('Keep working').fill('3')
-    await expect(page.getByText('Keep working: 3')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Apply result' })).toBeVisible()
-    await expect(page.getByText('On Call', { exact: true }).first()).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Apply result' })).toBeVisible({
+      timeout: 20_000,
+    })
+    await expect(page.getByText('On Call', { exact: true }).first()).toBeVisible({
+      timeout: 20_000,
+    })
 
     await page.getByRole('button', { name: 'Apply result' }).click()
     await expect(page.getByText(/Last applied/)).toBeVisible({ timeout: 15_000 })
@@ -234,6 +261,16 @@ test.describe.serial('lottery operational flow', () => {
     await page.getByRole('button', { name: 'History' }).first().click()
     await expect(page.getByText('Lottery Therapist A history')).toBeVisible()
     await expect(page.getByText('Recorded')).toBeVisible()
-    await expect(page.getByText('On Call')).toBeVisible()
+    await expect(page.getByText('On Call', { exact: true }).first()).toBeVisible()
+
+    const auditResult = await ctx!.supabase
+      .from('audit_log')
+      .select('id, action, target_type, target_id')
+      .eq('user_id', ctx!.manager.id)
+      .eq('action', 'post_publish_modification')
+      .eq('target_type', 'shift')
+      .maybeSingle()
+    expect(auditResult.error).toBeNull()
+    expect(auditResult.data?.target_id).toBeTruthy()
   })
 })

@@ -72,6 +72,10 @@ const emptyDraftDeleteMigrationSource = readFileSync(
   resolve(process.cwd(), 'supabase/migrations/20260512183000_empty_draft_cycle_delete_guard.sql'),
   'utf8'
 )
+const assignmentSnapshotMigrationSource = readFileSync(
+  resolve(process.cwd(), 'supabase/migrations/20260512212840_assignment_context_snapshot.sql'),
+  'utf8'
+)
 const publishActionsSource = readFileSync(
   resolve(process.cwd(), 'src/app/(app)/schedule/actions/publish-actions.ts'),
   'utf8'
@@ -257,6 +261,11 @@ describe('schedule lifecycle hardening', () => {
     expect(availabilityPublishMigrationSource).toContain(
       "active_entry.code in ('on_call', 'call_in', 'cancelled', 'left_early')"
     )
+    expect(assignmentSnapshotMigrationSource).toContain('employment_type_at_assignment')
+    expect(assignmentSnapshotMigrationSource).toContain('shift_type_at_assignment')
+    expect(assignmentSnapshotMigrationSource).toContain('lead_eligible_at_assignment')
+    expect(assignmentSnapshotMigrationSource).toContain('set_shift_assignment_context_snapshot')
+    expect(assignmentSnapshotMigrationSource).toContain('before insert or update of user_id')
   })
 
   it('enforces Schedule Blocks as non-overlapping six-week Sunday-start ranges', () => {

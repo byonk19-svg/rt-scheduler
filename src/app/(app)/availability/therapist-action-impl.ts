@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 
 import { recordSubmission, touchSubmission } from '@/lib/availability/submission-lifecycle'
+import { loadAvailabilityWindowState } from '@/lib/availability-window'
 import { intentForTherapistOverride } from '@/lib/employee-directory'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
@@ -16,6 +17,7 @@ import {
 
 export async function submitAvailabilityEntryAction(formData: FormData) {
   const { supabase, user } = await getAuthenticatedUserWithRole()
+  const admin = createAdminClient()
   const returnPath = getReturnPath(String(formData.get('return_to') ?? '').trim() || null)
 
   const date = String(formData.get('date') ?? '').trim()
@@ -33,6 +35,11 @@ export async function submitAvailabilityEntryAction(formData: FormData) {
     (overrideType !== 'force_off' && overrideType !== 'force_on')
   ) {
     redirect(buildAvailabilityUrl({ error: 'submit_failed' }, returnPath))
+  }
+
+  const availabilityWindow = await loadAvailabilityWindowState(admin as never, cycleId)
+  if (availabilityWindow.locked) {
+    redirect(buildAvailabilityUrl({ error: 'submission_closed', cycle: cycleId }, returnPath))
   }
 
   const { error } = await supabase.from('availability_overrides').upsert(
@@ -94,6 +101,11 @@ export async function submitTherapistAvailabilityGridAction(formData: FormData) 
 
   if (!cycle) {
     redirect(buildAvailabilityUrl({ error: 'submit_failed', cycle: cycleId }, returnPath))
+  }
+
+  const availabilityWindow = await loadAvailabilityWindowState(admin as never, cycleId)
+  if (availabilityWindow.locked) {
+    redirect(buildAvailabilityUrl({ error: 'submission_closed', cycle: cycleId }, returnPath))
   }
 
   const isValidCycleDate = (date: string) => date >= cycle.start_date && date <= cycle.end_date
@@ -200,6 +212,14 @@ export async function deleteAvailabilityEntryAction(formData: FormData) {
   const cycleId = String(formData.get('cycle_id') ?? '').trim()
   if (!entryId) {
     redirect(returnPath)
+  }
+
+  if (cycleId) {
+    const admin = createAdminClient()
+    const availabilityWindow = await loadAvailabilityWindowState(admin as never, cycleId)
+    if (availabilityWindow.locked) {
+      redirect(buildAvailabilityUrl({ error: 'submission_closed', cycle: cycleId }, returnPath))
+    }
   }
 
   const { error } = await supabase

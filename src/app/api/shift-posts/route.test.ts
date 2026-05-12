@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { createClientMock, createAdminClientMock, isTrustedMutationRequestMock } = vi.hoisted(
-  () => ({
+const { createClientMock, createAdminClientMock, isTrustedMutationRequestMock, writeAuditLogMock } =
+  vi.hoisted(() => ({
     createClientMock: vi.fn(),
     createAdminClientMock: vi.fn(),
     isTrustedMutationRequestMock: vi.fn(() => true),
-  })
-)
+    writeAuditLogMock: vi.fn(),
+  }))
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: createClientMock,
@@ -18,6 +18,10 @@ vi.mock('@/lib/supabase/admin', () => ({
 
 vi.mock('@/lib/security/request-origin', () => ({
   isTrustedMutationRequest: isTrustedMutationRequestMock,
+}))
+
+vi.mock('@/lib/audit-log', () => ({
+  writeAuditLog: writeAuditLogMock,
 }))
 
 import { POST } from '@/app/api/shift-posts/route'
@@ -234,7 +238,7 @@ describe('shift-post mutation API', () => {
 
   it('reviews pickup requests through the transactional review function', async () => {
     const rpcMock = vi.fn(async () => ({
-      data: { id: 'post-1', status: 'approved' },
+      data: { id: 'post-1', status: 'approved', shift_id: 'shift-1', swap_shift_id: null },
       error: null,
     }))
 
@@ -264,6 +268,62 @@ describe('shift-post mutation API', () => {
       p_manager_override: true,
       p_override_reason: 'Coverage verified manually',
     })
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userId: 'manager-1',
+        action: 'post_publish_modification',
+        targetType: 'shift',
+        targetId: 'shift-1',
+      })
+    )
+  })
+
+  it('records post-publish markers for both shifts when approving a swap request', async () => {
+    const rpcMock = vi.fn(async () => ({
+      data: {
+        id: 'post-1',
+        status: 'approved',
+        shift_id: 'requester-shift-1',
+        swap_shift_id: 'partner-shift-1',
+      },
+      error: null,
+    }))
+
+    createClientMock.mockResolvedValue(makeServerClient({ userId: 'manager-1', role: 'manager' }))
+    createAdminClientMock.mockReturnValue({
+      rpc: rpcMock,
+    })
+
+    const response = await POST(
+      makeRequest({
+        action: 'review_request',
+        requestId: 'post-1',
+        decision: 'approve',
+        swapPartnerId: 'therapist-2',
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(writeAuditLogMock).toHaveBeenCalledTimes(2)
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userId: 'manager-1',
+        action: 'post_publish_modification',
+        targetType: 'shift',
+        targetId: 'requester-shift-1',
+      })
+    )
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userId: 'manager-1',
+        action: 'post_publish_modification',
+        targetType: 'shift',
+        targetId: 'partner-shift-1',
+      })
+    )
   })
 
   it('returns lead-coverage review failures as client-visible validation errors', async () => {

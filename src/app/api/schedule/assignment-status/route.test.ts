@@ -91,11 +91,18 @@ type Scenario = {
   role?: string
   isActive?: boolean | null
   archivedAt?: string | null
-  profilesData?: Array<{ id: string; shift_type: 'day' | 'night' | null }>
+  profilesData?: Array<{
+    id: string
+    role?: 'manager' | 'lead' | 'therapist' | null
+    shift_type: 'day' | 'night' | null
+    site_id?: string | null
+    archived_at?: string | null
+  }>
   scheduledRows?: Array<{ user_id: string | null }>
   existingCallInPostId?: string | null
   shiftLookup?: {
     date: string
+    cycleId?: string
     shift_type: 'day' | 'night'
     user_id: string | null
     published: boolean
@@ -177,6 +184,7 @@ function makeSupabaseMock(scenario: Scenario) {
           return {
             data: {
               id: state.id ?? 'shift-1',
+              cycle_id: scenario.shiftLookup.cycleId ?? 'cycle-1',
               date: scenario.shiftLookup.date,
               shift_type: scenario.shiftLookup.shift_type,
               user_id: scenario.shiftLookup.user_id,
@@ -476,6 +484,60 @@ describe('assignment status API', () => {
     )
   })
 
+  it('keeps left early informational without notifying the affected therapist', async () => {
+    const supabase = makeSupabaseMock({
+      role: 'manager',
+      userId: 'manager-1',
+      shiftLookup: {
+        date: '2026-02-23',
+        shift_type: 'day',
+        user_id: 'therapist-1',
+        published: true,
+      },
+      rpcData: [
+        {
+          id: 'shift-1',
+          assignment_status: 'left_early',
+          status_note: null,
+          left_early_time: '14:00:00',
+          status_updated_at: '2026-02-23T18:00:00.000Z',
+          status_updated_by: 'manager-1',
+          status_updated_by_name: 'Manager User',
+        },
+      ],
+    })
+    const admin = makeAdminClientMock({})
+    createAdminClientMock.mockReturnValue(admin.client)
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/assignment-status', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          assignmentId: 'shift-1',
+          status: 'left_early',
+          leftEarlyTime: '14:00:00',
+        }),
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userId: 'manager-1',
+        action: 'post_publish_modification',
+        targetType: 'shift',
+        targetId: 'shift-1',
+      })
+    )
+    expect(notifyPublishedShiftStatusChangedMock).not.toHaveBeenCalled()
+    expect(notifyUsersMock).not.toHaveBeenCalled()
+  })
+
   it('creates a call-in help alert and notifies eligible therapists with a shift-post target', async () => {
     const supabase = makeSupabaseMock({
       role: 'lead',
@@ -487,9 +549,12 @@ describe('assignment status API', () => {
         published: true,
       },
       profilesData: [
-        { id: 'therapist-1', shift_type: 'night' },
-        { id: 'therapist-2', shift_type: 'night' },
-        { id: 'lead-2', shift_type: 'night' },
+        { id: 'therapist-1', role: 'therapist', shift_type: 'night', site_id: 'site-1' },
+        { id: 'therapist-2', role: 'therapist', shift_type: 'night', site_id: 'site-1' },
+        { id: 'lead-2', role: 'lead', shift_type: 'night', site_id: 'site-1' },
+        { id: 'manager-2', role: 'manager', shift_type: null, site_id: 'site-1' },
+        { id: 'other-site-therapist', role: 'therapist', shift_type: 'night', site_id: 'site-2' },
+        { id: 'day-therapist', role: 'therapist', shift_type: 'day', site_id: 'site-1' },
       ],
       scheduledRows: [{ user_id: 'lead-2' }],
     })
@@ -524,6 +589,15 @@ describe('assignment status API', () => {
       expect.objectContaining({
         userIds: ['therapist-2'],
         eventType: 'call_in_help_available',
+        targetType: 'shift_post',
+        targetId: 'call-in-post-1',
+      })
+    )
+    expect(notifyUsersMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userIds: ['lead-2', 'manager-2'],
+        eventType: 'operational_status_attention',
         targetType: 'shift_post',
         targetId: 'call-in-post-1',
       })

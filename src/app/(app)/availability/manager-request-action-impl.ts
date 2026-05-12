@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { can } from '@/lib/auth/can'
 import { recordSubmission, touchSubmission } from '@/lib/availability/submission-lifecycle'
 import { getPlannerDateValidationError } from '@/lib/availability-planner'
-import { intentForTherapistOverride } from '@/lib/employee-directory'
+import { buildManagerOverrideInput, intentForTherapistOverride } from '@/lib/employee-directory'
 import {
   buildAvailabilityUrl,
   getAuthenticatedUserWithRole,
@@ -62,13 +62,15 @@ export async function saveManagerAvailabilityRequestsAction(formData: FormData) 
 
   const overrideType = mode === 'need_off' ? 'force_off' : 'force_on'
   const uniqueDates = [...new Set(dates)].sort((a, b) => a.localeCompare(b))
+  const therapistIntent = intentForTherapistOverride(overrideType)
   const { data: existingRows, error: existingRowsError } = await supabase
     .from('availability_overrides')
     .select('id, date, note, override_type')
     .eq('cycle_id', cycleId)
     .eq('therapist_id', therapistId)
     .eq('shift_type', 'both')
-    .eq('source', 'therapist')
+    .eq('source', 'manager')
+    .in('intent', ['therapist_need_off', 'therapist_wants_work'])
 
   if (existingRowsError) {
     console.error('Failed to load existing therapist availability request rows:', existingRowsError)
@@ -87,17 +89,18 @@ export async function saveManagerAvailabilityRequestsAction(formData: FormData) 
       .map((row) => [String(row.date), row.note?.trim() || null])
   )
 
-  const payload = uniqueDates.map((date) => ({
-    therapist_id: therapistId,
-    cycle_id: cycleId,
-    date,
-    shift_type: 'both' as const,
-    override_type: overrideType,
-    note: notesByDate.get(date) ?? null,
-    created_by: user.id,
-    source: 'therapist' as const,
-    intent: intentForTherapistOverride(overrideType),
-  }))
+  const payload = uniqueDates.map((date) =>
+    buildManagerOverrideInput({
+      cycleId,
+      therapistId,
+      date,
+      shiftType: 'both',
+      overrideType,
+      note: notesByDate.get(date) ?? null,
+      managerId: user.id,
+      intent: therapistIntent,
+    })
+  )
 
   const keepDates = new Set(uniqueDates)
   const rowsToDelete = (existingRows ?? [])
@@ -171,7 +174,8 @@ export async function deleteManagerAvailabilityRequestAction(formData: FormData)
     .from('availability_overrides')
     .delete()
     .eq('id', overrideId)
-    .eq('source', 'therapist')
+    .eq('source', 'manager')
+    .in('intent', ['therapist_need_off', 'therapist_wants_work'])
 
   if (error) {
     console.error('Failed to delete therapist availability request from manager editor:', error)

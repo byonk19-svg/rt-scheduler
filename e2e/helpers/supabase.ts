@@ -15,6 +15,7 @@ export type E2EUserPayload = {
   shiftType: E2EShiftType
   isLeadEligible?: boolean
   maxWorkDaysPerWeek?: number
+  siteId?: string
 }
 
 export function createServiceRoleClientOrNull(): SupabaseClient | null {
@@ -60,7 +61,7 @@ export async function createE2EUser(
       is_lead_eligible: payload.isLeadEligible ?? payload.role === 'lead',
       on_fmla: false,
       is_active: true,
-      site_id: 'default',
+      site_id: payload.siteId ?? 'default',
     },
     { onConflict: 'id' }
   )

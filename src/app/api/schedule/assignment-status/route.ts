@@ -49,6 +49,7 @@ type RpcAssignmentStatusRow = {
 
 type ShiftNotificationLookupRow = {
   id: string
+  cycle_id: string
   date: string
   shift_type: 'day' | 'night'
   user_id: string | null
@@ -68,7 +69,10 @@ type ShiftNotificationLookupRow = {
 
 type ProfileNotificationRow = {
   id: string
+  role: string | null
   shift_type: 'day' | 'night' | null
+  site_id: string | null
+  archived_at: string | null
 }
 
 function getOne<T>(value: T | T[] | null | undefined): T | null {
@@ -78,6 +82,10 @@ function getOne<T>(value: T | T[] | null | undefined): T | null {
 
 function isAllowedAssignmentStatus(value: string): value is AssignmentStatus {
   return ASSIGNMENT_STATUS_VALUES.includes(value as AssignmentStatus)
+}
+
+function shouldNotifyAffectedTherapist(nextStatus: AssignmentStatus) {
+  return nextStatus !== 'left_early'
 }
 
 export async function POST(request: Request) {
@@ -227,7 +235,9 @@ export async function POST(request: Request) {
 
   const { data: shiftLookup } = await supabase
     .from('shifts')
-    .select('id, date, shift_type, user_id, schedule_cycles(published, status, archived_at)')
+    .select(
+      'id, cycle_id, date, shift_type, user_id, schedule_cycles(published, status, archived_at)'
+    )
     .eq('id', row.id)
     .maybeSingle()
 
@@ -244,14 +254,16 @@ export async function POST(request: Request) {
   }
 
   if (shift?.user_id && cycle?.published) {
-    await notifyPublishedShiftStatusChanged(admin as never, {
-      cyclePublished: true,
-      userId: shift.user_id,
-      date: shift.date,
-      shiftType: shift.shift_type,
-      nextStatus: row.assignment_status,
-      targetId: shift.id,
-    })
+    if (shouldNotifyAffectedTherapist(row.assignment_status)) {
+      await notifyPublishedShiftStatusChanged(admin as never, {
+        cyclePublished: true,
+        userId: shift.user_id,
+        date: shift.date,
+        shiftType: shift.shift_type,
+        nextStatus: row.assignment_status,
+        targetId: shift.id,
+      })
+    }
 
     const { data: existingCallInPost } = await admin
       .from('shift_posts')
@@ -298,13 +310,15 @@ export async function POST(request: Request) {
 
       const { data: profilesData } = await supabase
         .from('profiles')
-        .select('id, shift_type')
-        .in('role', ['therapist', 'lead'])
+        .select('id, role, shift_type, site_id, archived_at')
+        .in('role', ['therapist', 'lead', 'manager'])
+        .eq('site_id', actorProfile.site_id)
         .eq('is_active', true)
 
       const { data: scheduledRows } = await supabase
         .from('shifts')
         .select('user_id')
+        .eq('cycle_id', shift.cycle_id)
         .eq('date', shift.date)
         .eq('shift_type', shift.shift_type)
 
@@ -314,15 +328,40 @@ export async function POST(request: Request) {
           .filter((value): value is string => Boolean(value))
       )
 
-      const eligibleUserIds = ((profilesData ?? []) as ProfileNotificationRow[])
+      const sameSiteActiveProfiles = ((profilesData ?? []) as ProfileNotificationRow[]).filter(
+        (profile) => profile.site_id === actorProfile.site_id && !profile.archived_at
+      )
+
+      const operationalAttentionUserIds = sameSiteActiveProfiles
+        .filter((profile) => profile.id !== user.id)
+        .filter((profile) => profile.role === 'manager' || profile.role === 'lead')
+        .map((profile) => profile.id)
+
+      const operationalAttentionSet = new Set(operationalAttentionUserIds)
+      const eligibleUserIds = sameSiteActiveProfiles
+        .filter((profile) => profile.role === 'therapist' || profile.role === 'lead')
         .filter((profile) => profile.id !== shift.user_id)
+        .filter((profile) => !operationalAttentionSet.has(profile.id))
         .filter((profile) => !scheduledUserIds.has(profile.id))
+        .filter((profile) => profile.shift_type === null || profile.shift_type === shift.shift_type)
         .map((profile) => profile.id)
 
       await notifyUsers(admin as never, {
         userIds: eligibleUserIds,
         eventType: 'call_in_help_available',
         title: 'Call-in help needed',
+        message: buildCallInAlertMessage({
+          date: shift.date,
+          shiftType: shift.shift_type,
+        }),
+        targetType: callInPostId ? 'shift_post' : 'shift',
+        targetId: callInPostId ?? shift.id,
+      })
+
+      await notifyUsers(admin as never, {
+        userIds: operationalAttentionUserIds,
+        eventType: 'operational_status_attention',
+        title: 'Call-in coverage attention',
         message: buildCallInAlertMessage({
           date: shift.date,
           shiftType: shift.shift_type,

@@ -13,6 +13,11 @@ export { copyAvailabilityFromPreviousCycleAction } from './manager-copy-action-i
 export { sendAvailabilityRemindersAction } from './manager-reminder-action-impl'
 
 export {
+  closeAvailabilityWindowAction,
+  reopenAvailabilityWindowAction,
+} from './availability-window-action-impl'
+
+export {
   deleteManagerAvailabilityRequestAction,
   saveManagerAvailabilityRequestsAction,
 } from './manager-request-action-impl'

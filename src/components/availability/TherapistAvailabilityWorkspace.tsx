@@ -42,6 +42,8 @@ type Props = {
   /** Official submission timestamps from therapist_availability_submissions (not inferred from overrides). */
   submissionsByCycleId: Record<string, { submittedAt: string; lastEditedAt: string }>
   regularShiftType?: 'day' | 'night'
+  availabilityLocked?: boolean
+  availabilityLockedReason?: string | null
   submitTherapistAvailabilityGridAction: (formData: FormData) => void | Promise<void>
   returnToPath?: '/availability' | '/therapist/availability'
 }
@@ -179,6 +181,8 @@ export function TherapistAvailabilityWorkspace({
   generatedBaselineByCycleId,
   submissionsByCycleId,
   regularShiftType = 'day',
+  availabilityLocked = false,
+  availabilityLockedReason = null,
   submitTherapistAvailabilityGridAction,
   returnToPath = '/availability',
 }: Props) {
@@ -468,6 +472,14 @@ export function TherapistAvailabilityWorkspace({
     : dueDateLabel
       ? `Due ${dueDateLabel}`
       : (deadlinePresentation?.deadlineHeadline ?? 'Save progress until you are ready to submit.')
+  const availabilityLockedMessage =
+    availabilityLockedReason === 'schedule_building_started'
+      ? 'Schedule building has started. Ask a manager to reopen availability if you need to make a late change.'
+      : availabilityLockedReason === 'manager_closed'
+        ? 'Availability is locked for this cycle. Ask a manager to reopen it if you need to make a late change.'
+        : availabilityLocked
+          ? 'Availability changes are locked for this cycle.'
+          : null
   const selectedDayOptionClass = (active: boolean, tone: 'can' | 'cant' | 'neutral') =>
     cn(
       'flex min-h-10 w-full items-center gap-3 px-3 py-2.5 text-left transition-colors',
@@ -577,6 +589,12 @@ export function TherapistAvailabilityWorkspace({
         <ScheduledConflictBanner conflicts={conflicts} onDismiss={() => {}} />
       ) : null}
 
+      {availabilityLockedMessage ? (
+        <section className="rounded-[1.1rem] border border-[var(--warning-border)] bg-[var(--warning-subtle)] px-4 py-3 text-sm font-medium text-[var(--warning-text)]">
+          {availabilityLockedMessage}
+        </section>
+      ) : null}
+
       <form
         action={submitTherapistAvailabilityGridAction}
         className="overflow-hidden rounded-[1.5rem] border border-border/70 bg-card shadow-tw-2xs-soft"
@@ -632,7 +650,7 @@ export function TherapistAvailabilityWorkspace({
                     type="button"
                     variant="outline"
                     size="sm"
-                    disabled={!hasActiveSelection}
+                    disabled={!hasActiveSelection || availabilityLocked}
                     onClick={() => applySelection('force_on')}
                     className="min-h-9 rounded-xl border-[var(--success-border)] bg-[var(--success-subtle)]/35 px-3 text-[var(--success-text)] hover:bg-[var(--success-subtle)]"
                   >
@@ -643,7 +661,7 @@ export function TherapistAvailabilityWorkspace({
                     type="button"
                     variant="outline"
                     size="sm"
-                    disabled={!hasActiveSelection}
+                    disabled={!hasActiveSelection || availabilityLocked}
                     onClick={() => applySelection('force_off')}
                     className="min-h-9 rounded-xl border-[var(--error-border)] bg-[var(--error-subtle)]/35 px-3 text-[var(--error-text)] hover:bg-[var(--error-subtle)]"
                   >
@@ -654,7 +672,7 @@ export function TherapistAvailabilityWorkspace({
                     type="button"
                     variant="outline"
                     size="sm"
-                    disabled={!hasActiveSelection}
+                    disabled={!hasActiveSelection || availabilityLocked}
                     onClick={() => applySelection(null)}
                     className="min-h-9 rounded-xl px-3"
                   >
@@ -770,6 +788,7 @@ export function TherapistAvailabilityWorkspace({
                           type="button"
                           aria-label={formatDateLabel(date)}
                           aria-pressed={selectedDate === date}
+                          disabled={availabilityLocked}
                           onClick={() => {
                             setSelectedDate(date)
                             setRangeStart('')
@@ -848,6 +867,7 @@ export function TherapistAvailabilityWorkspace({
                       value="draft"
                       variant="ghost"
                       size="sm"
+                      disabled={availabilityLocked}
                       pendingText="Saving..."
                       className="min-h-10 rounded-xl px-4 font-semibold text-muted-foreground hover:text-foreground sm:min-w-[9rem]"
                     >
@@ -858,6 +878,7 @@ export function TherapistAvailabilityWorkspace({
                       name="workflow"
                       value="submit"
                       size="sm"
+                      disabled={availabilityLocked}
                       pendingText="Submitting..."
                       className="min-h-11 gap-2 rounded-xl px-5 font-semibold shadow-sm sm:min-w-[11.5rem]"
                     >
@@ -871,6 +892,7 @@ export function TherapistAvailabilityWorkspace({
                     name="workflow"
                     value="submit"
                     size="sm"
+                    disabled={availabilityLocked}
                     pendingText="Saving changes..."
                     className="min-h-11 gap-2 rounded-xl px-5 font-semibold shadow-sm"
                   >
@@ -1029,6 +1051,7 @@ export function TherapistAvailabilityWorkspace({
                     <button
                       type="button"
                       onClick={() => setOverride(selectedDate, 'force_on')}
+                      disabled={availabilityLocked}
                       className={selectedDayOptionClass(selectedOverride === 'force_on', 'can')}
                     >
                       <span className="flex h-[1.125rem] w-[1.125rem] items-center justify-center rounded-full border border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]">
@@ -1042,6 +1065,7 @@ export function TherapistAvailabilityWorkspace({
                     <button
                       type="button"
                       onClick={() => setOverride(selectedDate, 'force_off')}
+                      disabled={availabilityLocked}
                       className={cn(
                         selectedDayOptionClass(selectedOverride === 'force_off', 'cant'),
                         'border-t border-border/70'
@@ -1058,6 +1082,7 @@ export function TherapistAvailabilityWorkspace({
                     <button
                       type="button"
                       onClick={() => setOverride(selectedDate, null)}
+                      disabled={availabilityLocked}
                       className={cn(
                         selectedDayOptionClass(selectedOverride === null, 'neutral'),
                         'border-t border-border/70'
@@ -1089,7 +1114,7 @@ export function TherapistAvailabilityWorkspace({
                       maxLength={200}
                       onChange={(event) => updateSelectedDateNote(event.target.value)}
                       placeholder="Add a note for this day..."
-                      disabled={!selectedOverride}
+                      disabled={!selectedOverride || availabilityLocked}
                       className="min-h-[86px] w-full rounded-xl border border-border/70 bg-background px-3 py-2 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                     />
                     {!selectedOverride ? (

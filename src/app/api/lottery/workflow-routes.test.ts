@@ -11,6 +11,7 @@ const {
   moveLotteryListEntryMock,
   applyLotteryDecisionMock,
   loadLotteryHistoryMock,
+  writeAuditLogMock,
 } = vi.hoisted(() => ({
   createClientMock: vi.fn(),
   createAdminClientMock: vi.fn(),
@@ -22,6 +23,7 @@ const {
   moveLotteryListEntryMock: vi.fn(),
   applyLotteryDecisionMock: vi.fn(),
   loadLotteryHistoryMock: vi.fn(),
+  writeAuditLogMock: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -46,6 +48,10 @@ vi.mock('@/lib/lottery/service', () => ({
   loadLotteryHistory: loadLotteryHistoryMock,
 }))
 
+vi.mock('@/lib/audit-log', () => ({
+  writeAuditLog: writeAuditLogMock,
+}))
+
 import { POST as applyLotteryPost } from '@/app/api/lottery/apply/route'
 import { GET as lotteryHistoryGet } from '@/app/api/lottery/history/route'
 import { POST as lotteryListPost } from '@/app/api/lottery/list/route'
@@ -65,8 +71,21 @@ function createSupabaseMock(userId: string | null) {
 }
 
 function createAdminMock() {
+  const shiftsQuery = {
+    select: vi.fn(() => shiftsQuery),
+    eq: vi.fn(() => shiftsQuery),
+    in: vi.fn(async () => ({
+      data: [{ id: 'shift-2' }],
+      error: null,
+    })),
+  }
+
   return {
     rpc: vi.fn(async () => ({ data: null, error: null })),
+    from: vi.fn((table: string) => {
+      if (table !== 'shifts') throw new Error(`Unexpected admin table ${table}`)
+      return shiftsQuery
+    }),
   }
 }
 
@@ -270,6 +289,15 @@ describe('lottery workflow routes', () => {
         authClient: {
           rpc: expect.any(Function),
         },
+      })
+    )
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userId: actor.userId,
+        action: 'post_publish_modification',
+        targetType: 'shift',
+        targetId: 'shift-2',
       })
     )
   })

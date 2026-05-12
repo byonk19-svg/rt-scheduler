@@ -4,6 +4,7 @@ import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { isTrustedMutationRequest } from '@/lib/security/request-origin'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
+import { writeAuditLog } from '@/lib/audit-log'
 import {
   isShiftPostCommand,
   shiftPostCommandRequiresManager,
@@ -77,6 +78,13 @@ type ShiftSelectionRow = {
   cycle_id: string | null
   date: string | null
   shift_type: 'day' | 'night' | null
+}
+
+type ShiftPostReviewRow = {
+  id: string
+  status: string
+  shift_id: string | null
+  swap_shift_id: string | null
 }
 
 function asTrimmedString(value: unknown): string {
@@ -187,6 +195,27 @@ async function resolveSameCycleSwapShiftId(params: {
   )
 
   return partnerRows.find((row) => !activeOperationalCodes.has(row.id))?.id ?? null
+}
+
+async function writeShiftPostApprovalPostPublishAuditLogs(params: {
+  admin: ReturnType<typeof createAdminClient>
+  actorId: string
+  post: ShiftPostReviewRow
+}): Promise<void> {
+  if (params.post.status !== 'approved') return
+
+  const targetShiftIds = [
+    ...new Set([params.post.shift_id, params.post.swap_shift_id].filter(Boolean)),
+  ]
+
+  for (const shiftId of targetShiftIds) {
+    await writeAuditLog(params.admin as never, {
+      userId: params.actorId,
+      action: 'post_publish_modification',
+      targetType: 'shift',
+      targetId: shiftId as string,
+    })
+  }
 }
 
 export async function POST(request: Request) {
@@ -402,6 +431,14 @@ export async function POST(request: Request) {
 
       if (error) {
         return toErrorResponse(error.message)
+      }
+
+      if (decision === 'approve' && data) {
+        await writeShiftPostApprovalPostPublishAuditLogs({
+          admin,
+          actorId: user.id,
+          post: data as ShiftPostReviewRow,
+        })
       }
 
       return NextResponse.json({ success: true, post: data })

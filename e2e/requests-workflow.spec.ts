@@ -9,6 +9,7 @@ import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase
 
 type RequestsCtx = {
   supabase: SupabaseClient
+  siteId: string
   manager: { id: string; email: string; password: string }
   requester: { id: string; email: string; password: string }
   scheduledPartner: { id: string; email: string; password: string }
@@ -150,8 +151,26 @@ async function openRequestComposerForShift(page: Parameters<typeof loginAs>[0], 
   }
 }
 
+function waitForShiftPostMutation(page: Parameters<typeof loginAs>[0]) {
+  return page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' && response.url().includes('/api/shift-posts'),
+    { timeout: 30_000 }
+  )
+}
+
+async function openShiftBoard(page: Parameters<typeof loginAs>[0]) {
+  await page.goto('/shift-board', { waitUntil: 'domcontentloaded' })
+  await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => undefined)
+}
+
+function nextSundayAfter(daysAhead: number): Date {
+  const target = addDays(new Date(), daysAhead)
+  return addDays(target, (7 - target.getDay()) % 7)
+}
+
 test.describe.serial('requests workflow', () => {
-  test.setTimeout(120_000)
+  test.setTimeout(240_000)
 
   let ctx: RequestsCtx | null = null
   const createdCycleIds: string[] = []
@@ -160,6 +179,14 @@ test.describe.serial('requests workflow', () => {
   test.beforeAll(async () => {
     const supabase = createServiceRoleClientOrNull()
     if (!supabase) return
+
+    const siteId = randomString('requests-site')
+    const siteInsert = await supabase
+      .from('sites')
+      .insert({ id: siteId, name: 'Requests E2E Site' })
+    if (siteInsert.error) {
+      throw new Error(`Could not create requests test site: ${siteInsert.error.message}`)
+    }
 
     const managerEmail = `${randomString('req-mgr')}@example.com`
     const managerPassword = `Mngr!${Math.random().toString(16).slice(2, 10)}`
@@ -171,6 +198,7 @@ test.describe.serial('requests workflow', () => {
       employmentType: 'full_time',
       shiftType: 'day',
       isLeadEligible: true,
+      siteId,
     })
     createdUserIds.push(manager.id)
 
@@ -184,6 +212,7 @@ test.describe.serial('requests workflow', () => {
       employmentType: 'full_time',
       shiftType: 'day',
       isLeadEligible: false,
+      siteId,
     })
     createdUserIds.push(requester.id)
 
@@ -197,6 +226,7 @@ test.describe.serial('requests workflow', () => {
       employmentType: 'full_time',
       shiftType: 'day',
       isLeadEligible: false,
+      siteId,
     })
     createdUserIds.push(scheduledPartner.id)
 
@@ -210,6 +240,7 @@ test.describe.serial('requests workflow', () => {
       employmentType: 'full_time',
       shiftType: 'day',
       isLeadEligible: false,
+      siteId,
     })
     createdUserIds.push(offDayPartner.id)
 
@@ -223,6 +254,7 @@ test.describe.serial('requests workflow', () => {
       employmentType: 'full_time',
       shiftType: 'day',
       isLeadEligible: true,
+      siteId,
     })
     createdUserIds.push(leadRequester.id)
 
@@ -236,6 +268,7 @@ test.describe.serial('requests workflow', () => {
       employmentType: 'full_time',
       shiftType: 'day',
       isLeadEligible: true,
+      siteId,
     })
     createdUserIds.push(leadEligiblePartner.id)
 
@@ -249,11 +282,13 @@ test.describe.serial('requests workflow', () => {
       employmentType: 'full_time',
       shiftType: 'day',
       isLeadEligible: false,
+      siteId,
     })
     createdUserIds.push(leadIneligiblePartner.id)
 
     ctx = {
       supabase,
+      siteId,
       manager: { id: manager.id, email: managerEmail, password: managerPassword },
       requester: { id: requester.id, email: requesterEmail, password: requesterPassword },
       scheduledPartner: {
@@ -289,12 +324,16 @@ test.describe.serial('requests workflow', () => {
 
     await ctx.supabase.from('shift_post_interests').delete().in('therapist_id', createdUserIds)
     await ctx.supabase.from('shift_posts').delete().in('posted_by', createdUserIds)
+    await ctx.supabase.from('audit_log').delete().in('user_id', createdUserIds)
+    await ctx.supabase.from('notifications').delete().in('user_id', createdUserIds)
     await ctx.supabase.from('shifts').delete().in('cycle_id', createdCycleIds)
     await ctx.supabase.from('schedule_cycles').delete().in('id', createdCycleIds)
+    await ctx.supabase.from('profiles').delete().in('id', createdUserIds)
 
     for (const userId of createdUserIds) {
       await ctx.supabase.auth.admin.deleteUser(userId).catch(() => undefined)
     }
+    await ctx.supabase.from('sites').delete().eq('id', ctx.siteId)
   })
 
   test('seeded Teamwise therapist can accept a direct swap and manager can approve it', async ({
@@ -341,13 +380,17 @@ test.describe.serial('requests workflow', () => {
     const managerPage = await managerContext.newPage()
     try {
       await loginAs(managerPage, 'demo-manager@teamwise.test', 'Teamwise123!')
-      await managerPage.goto('/shift-board', { waitUntil: 'domcontentloaded' })
+      await openShiftBoard(managerPage)
       const managerCard = managerPage
         .locator('div.rounded-xl')
         .filter({ has: managerPage.getByText(seededSwap.message) })
         .first()
       await expect(managerCard).toBeVisible({ timeout: 20_000 })
+      const approveResponsePromise = waitForShiftPostMutation(managerPage)
       await managerCard.getByRole('button', { name: 'Approve' }).click()
+      const approveResponse = await approveResponsePromise
+      const approveBody = await approveResponse.json().catch(() => null)
+      expect(approveResponse.ok(), JSON.stringify(approveBody)).toBe(true)
 
       await expect
         .poll(
@@ -388,14 +431,15 @@ test.describe.serial('requests workflow', () => {
   test('requester can create a pickup request from My Requests', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run requests workflow e2e.')
 
-    const cycleDate = addDays(new Date(), 18)
-    const cycleKey = formatDateKey(cycleDate)
+    const cycleStart = nextSundayAfter(520)
+    const cycleKey = formatDateKey(addDays(cycleStart, 3))
     const cycleInsert = await ctx!.supabase
       .from('schedule_cycles')
       .insert({
         label: `Requests Pickup ${randomString('cycle')}`,
-        start_date: cycleKey,
-        end_date: cycleKey,
+        start_date: formatDateKey(cycleStart),
+        end_date: formatDateKey(addDays(cycleStart, 41)),
+        site_id: ctx!.siteId,
         published: true,
       })
       .select('id')
@@ -416,6 +460,7 @@ test.describe.serial('requests workflow', () => {
         status: 'scheduled',
         assignment_status: 'scheduled',
         role: 'staff',
+        site_id: ctx!.siteId,
       })
       .select('id')
       .single()
@@ -428,7 +473,7 @@ test.describe.serial('requests workflow', () => {
 
     await loginAs(page, ctx!.requester.email, ctx!.requester.password)
     await openRequestComposerForShift(page, shiftInsert.data.id)
-    await page.getByRole('button', { name: 'pickup' }).click()
+    await page.getByRole('button', { name: 'Give up shift' }).click()
     await page.getByRole('button', { name: 'Continue' }).click()
     await expect(page.getByText('Request summary').first()).toBeVisible()
     await page.getByLabel('Message').fill(requestMessage)
@@ -460,15 +505,16 @@ test.describe.serial('requests workflow', () => {
   test('direct request recipient can accept from My Requests', async ({ page, browser }) => {
     test.skip(!ctx, 'Supabase service env values are required to run requests workflow e2e.')
 
-    const cycleDate = addDays(new Date(), 19)
-    const cycleKey = formatDateKey(cycleDate)
-    const partnerKey = formatDateKey(addDays(cycleDate, 1))
+    const cycleStart = nextSundayAfter(620)
+    const cycleKey = formatDateKey(addDays(cycleStart, 3))
+    const partnerKey = formatDateKey(addDays(cycleStart, 4))
     const cycleInsert = await ctx!.supabase
       .from('schedule_cycles')
       .insert({
         label: `Requests Direct ${randomString('cycle')}`,
-        start_date: cycleKey,
-        end_date: partnerKey,
+        start_date: formatDateKey(cycleStart),
+        end_date: formatDateKey(addDays(cycleStart, 41)),
+        site_id: ctx!.siteId,
         published: true,
       })
       .select('id')
@@ -490,6 +536,7 @@ test.describe.serial('requests workflow', () => {
           status: 'scheduled',
           assignment_status: 'scheduled',
           role: 'staff',
+          site_id: ctx!.siteId,
         },
         {
           cycle_id: cycleInsert.data.id,
@@ -499,6 +546,7 @@ test.describe.serial('requests workflow', () => {
           status: 'scheduled',
           assignment_status: 'scheduled',
           role: 'staff',
+          site_id: ctx!.siteId,
         },
       ])
       .select('id, user_id')
@@ -566,15 +614,16 @@ test.describe.serial('requests workflow', () => {
   }) => {
     test.skip(!ctx, 'Supabase service env values are required to run requests workflow e2e.')
 
-    const cycleDate = addDays(new Date(), 21)
-    const cycleKey = formatDateKey(cycleDate)
-    const partnerKey = formatDateKey(addDays(cycleDate, 1))
+    const cycleStart = nextSundayAfter(720)
+    const cycleKey = formatDateKey(addDays(cycleStart, 3))
+    const partnerKey = formatDateKey(addDays(cycleStart, 4))
     const cycleInsert = await ctx!.supabase
       .from('schedule_cycles')
       .insert({
         label: `Requests Direct Swap ${randomString('cycle')}`,
-        start_date: cycleKey,
-        end_date: partnerKey,
+        start_date: formatDateKey(cycleStart),
+        end_date: formatDateKey(addDays(cycleStart, 41)),
+        site_id: ctx!.siteId,
         published: true,
       })
       .select('id')
@@ -596,6 +645,7 @@ test.describe.serial('requests workflow', () => {
           status: 'scheduled',
           assignment_status: 'scheduled',
           role: 'staff',
+          site_id: ctx!.siteId,
         },
         {
           cycle_id: cycleInsert.data.id,
@@ -605,6 +655,7 @@ test.describe.serial('requests workflow', () => {
           status: 'scheduled',
           assignment_status: 'scheduled',
           role: 'staff',
+          site_id: ctx!.siteId,
         },
       ])
       .select('id, user_id')
@@ -688,13 +739,17 @@ test.describe.serial('requests workflow', () => {
     const managerPage = await managerContext.newPage()
     try {
       await loginAs(managerPage, ctx!.manager.email, ctx!.manager.password)
-      await managerPage.goto('/shift-board', { waitUntil: 'domcontentloaded' })
+      await openShiftBoard(managerPage)
       const requestCard = managerPage
         .locator('div.rounded-xl')
         .filter({ has: managerPage.getByText(requestMessage) })
         .first()
       await expect(requestCard).toBeVisible({ timeout: 20_000 })
+      const approveResponsePromise = waitForShiftPostMutation(managerPage)
       await requestCard.getByRole('button', { name: 'Approve' }).click()
+      const approveResponse = await approveResponsePromise
+      const approveBody = await approveResponse.json().catch(() => null)
+      expect(approveResponse.ok(), JSON.stringify(approveBody)).toBe(true)
 
       await expect
         .poll(async () => {
@@ -749,15 +804,16 @@ test.describe.serial('requests workflow', () => {
   }) => {
     test.skip(!ctx, 'Supabase service env values are required to run requests workflow e2e.')
 
-    const cycleDate = addDays(new Date(), 22)
-    const cycleKey = formatDateKey(cycleDate)
-    const partnerKey = formatDateKey(addDays(cycleDate, 1))
+    const cycleStart = nextSundayAfter(820)
+    const cycleKey = formatDateKey(addDays(cycleStart, 3))
+    const partnerKey = formatDateKey(addDays(cycleStart, 4))
     const cycleInsert = await ctx!.supabase
       .from('schedule_cycles')
       .insert({
         label: `Requests Suggested Swap ${randomString('cycle')}`,
-        start_date: cycleKey,
-        end_date: partnerKey,
+        start_date: formatDateKey(cycleStart),
+        end_date: formatDateKey(addDays(cycleStart, 41)),
+        site_id: ctx!.siteId,
         published: true,
       })
       .select('id')
@@ -779,6 +835,7 @@ test.describe.serial('requests workflow', () => {
           status: 'scheduled',
           assignment_status: 'scheduled',
           role: 'staff',
+          site_id: ctx!.siteId,
         },
         {
           cycle_id: cycleInsert.data.id,
@@ -788,6 +845,7 @@ test.describe.serial('requests workflow', () => {
           status: 'scheduled',
           assignment_status: 'scheduled',
           role: 'staff',
+          site_id: ctx!.siteId,
         },
       ])
       .select('id, user_id')
@@ -812,7 +870,7 @@ test.describe.serial('requests workflow', () => {
     await expect(page.getByText('Who should managers try first?').first()).toBeVisible()
     await page.getByRole('button', { name: 'Requests Partner' }).click()
     await page.getByRole('button', { name: 'Continue' }).click()
-    await expect(page.getByText('Post to the team board with a suggested teammate')).toBeVisible()
+    await expect(page.getByText('Post to Open Shifts with a suggested teammate.')).toBeVisible()
     await page.getByLabel('Message').fill(requestMessage)
     const createResponsePromise = page.waitForResponse((response) =>
       response.url().includes('/api/shift-posts')
@@ -840,14 +898,18 @@ test.describe.serial('requests workflow', () => {
     const managerPage = await managerContext.newPage()
     try {
       await loginAs(managerPage, ctx!.manager.email, ctx!.manager.password)
-      await managerPage.goto('/shift-board', { waitUntil: 'domcontentloaded' })
+      await openShiftBoard(managerPage)
       const requestCard = managerPage
         .locator('div.rounded-xl')
         .filter({ has: managerPage.getByText(requestMessage) })
         .first()
       await expect(requestCard).toBeVisible({ timeout: 20_000 })
       await expect(requestCard.getByText('Suggested partner:')).toBeVisible()
+      const approveResponsePromise = waitForShiftPostMutation(managerPage)
       await requestCard.getByRole('button', { name: 'Approve' }).click()
+      const approveResponse = await approveResponsePromise
+      const approveBody = await approveResponse.json().catch(() => null)
+      expect(approveResponse.ok(), JSON.stringify(approveBody)).toBe(true)
 
       await expect
         .poll(
@@ -905,14 +967,15 @@ test.describe.serial('requests workflow', () => {
   }) => {
     test.skip(!ctx, 'Supabase service env values are required to run requests workflow e2e.')
 
-    const cycleDate = addDays(new Date(), 20)
-    const cycleKey = formatDateKey(cycleDate)
+    const cycleStart = nextSundayAfter(920)
+    const cycleKey = formatDateKey(addDays(cycleStart, 3))
     const cycleInsert = await ctx!.supabase
       .from('schedule_cycles')
       .insert({
         label: `Requests Direct Pickup ${randomString('cycle')}`,
-        start_date: cycleKey,
-        end_date: cycleKey,
+        start_date: formatDateKey(cycleStart),
+        end_date: formatDateKey(addDays(cycleStart, 41)),
+        site_id: ctx!.siteId,
         published: true,
       })
       .select('id')
@@ -933,6 +996,7 @@ test.describe.serial('requests workflow', () => {
         status: 'scheduled',
         assignment_status: 'scheduled',
         role: 'staff',
+        site_id: ctx!.siteId,
       })
       .select('id')
       .single()
@@ -945,7 +1009,7 @@ test.describe.serial('requests workflow', () => {
 
     await loginAs(page, ctx!.requester.email, ctx!.requester.password)
     await openRequestComposerForShift(page, shiftInsert.data.id)
-    await page.getByRole('button', { name: 'pickup' }).click()
+    await page.getByRole('button', { name: 'Give up shift' }).click()
     await page.getByRole('button', { name: 'Ask a specific teammate' }).click()
     await page.getByRole('button', { name: 'Continue' }).click()
     await expect(page.getByText('Who do you want to ask?').first()).toBeVisible()
@@ -993,13 +1057,17 @@ test.describe.serial('requests workflow', () => {
     const managerPage = await managerContext.newPage()
     try {
       await loginAs(managerPage, ctx!.manager.email, ctx!.manager.password)
-      await managerPage.goto('/shift-board', { waitUntil: 'domcontentloaded' })
+      await openShiftBoard(managerPage)
       const requestCard = managerPage
         .locator('div.rounded-xl')
         .filter({ has: managerPage.getByText(requestMessage) })
         .first()
       await expect(requestCard).toBeVisible({ timeout: 20_000 })
+      const approveResponsePromise = waitForShiftPostMutation(managerPage)
       await requestCard.getByRole('button', { name: 'Approve' }).click()
+      const approveResponse = await approveResponsePromise
+      const approveBody = await approveResponse.json().catch(() => null)
+      expect(approveResponse.ok(), JSON.stringify(approveBody)).toBe(true)
 
       await expect
         .poll(
@@ -1034,6 +1102,20 @@ test.describe.serial('requests workflow', () => {
           { timeout: 20_000 }
         )
         .toBe(ctx!.offDayPartner.id)
+
+      const auditResult = await ctx!.supabase
+        .from('audit_log')
+        .select('id, action, target_type, target_id')
+        .eq('user_id', ctx!.manager.id)
+        .eq('action', 'post_publish_modification')
+        .eq('target_type', 'shift')
+        .eq('target_id', shiftInsert.data.id)
+        .maybeSingle()
+      expect(auditResult.error).toBeNull()
+      expect(auditResult.data).toMatchObject({
+        action: 'post_publish_modification',
+        target_id: shiftInsert.data.id,
+      })
     } finally {
       await managerContext.close().catch(() => undefined)
     }
@@ -1044,16 +1126,17 @@ test.describe.serial('requests workflow', () => {
   }) => {
     test.skip(!ctx, 'Supabase service env values are required to run requests workflow e2e.')
 
-    const cycleDate = addDays(new Date(), 210)
-    const cycleKey = formatDateKey(cycleDate)
-    const leadEligiblePartnerKey = formatDateKey(addDays(cycleDate, 1))
-    const leadIneligiblePartnerKey = formatDateKey(addDays(cycleDate, 2))
+    const cycleStart = nextSundayAfter(1020)
+    const cycleKey = formatDateKey(addDays(cycleStart, 3))
+    const leadEligiblePartnerKey = formatDateKey(addDays(cycleStart, 4))
+    const leadIneligiblePartnerKey = formatDateKey(addDays(cycleStart, 5))
     const cycleInsert = await ctx!.supabase
       .from('schedule_cycles')
       .insert({
         label: `Requests Lead Filter ${randomString('cycle')}`,
-        start_date: cycleKey,
-        end_date: leadIneligiblePartnerKey,
+        start_date: formatDateKey(cycleStart),
+        end_date: formatDateKey(addDays(cycleStart, 41)),
+        site_id: ctx!.siteId,
         published: true,
       })
       .select('id')
@@ -1075,6 +1158,7 @@ test.describe.serial('requests workflow', () => {
           status: 'scheduled',
           assignment_status: 'scheduled',
           role: 'lead',
+          site_id: ctx!.siteId,
         },
         {
           cycle_id: cycleInsert.data.id,
@@ -1084,6 +1168,7 @@ test.describe.serial('requests workflow', () => {
           status: 'scheduled',
           assignment_status: 'scheduled',
           role: 'staff',
+          site_id: ctx!.siteId,
         },
         {
           cycle_id: cycleInsert.data.id,
@@ -1093,6 +1178,7 @@ test.describe.serial('requests workflow', () => {
           status: 'scheduled',
           assignment_status: 'scheduled',
           role: 'staff',
+          site_id: ctx!.siteId,
         },
       ])
       .select('id, user_id')

@@ -1,4 +1,5 @@
 export * from '@/app/(app)/availability/email-intake-actions'
+export * from '@/app/(app)/availability/actions'
 export * from '@/app/(app)/availability/manager-planner-actions'
 export * from '@/app/(app)/availability/manager-request-actions'
 export * from '@/app/(app)/availability/therapist-actions'

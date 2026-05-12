@@ -13,6 +13,7 @@ import { TherapistAvailabilityWorkspace } from '@/components/availability/Therap
 import type { TableToolbarFilters } from '@/components/TableToolbar'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { buildCycleAvailabilityBaseline } from '@/lib/availability-pattern-generator'
+import { loadAvailabilityWindowState } from '@/lib/availability-window'
 import { can } from '@/lib/auth/can'
 import { findScheduledConflicts } from '@/lib/availability-scheduled-conflict'
 import { toUiRole } from '@/lib/auth/roles'
@@ -50,6 +51,9 @@ type Cycle = {
   published: boolean
   archived_at?: string | null
   availability_due_at?: string | null
+  availability_closed_at?: string | null
+  availability_reopened_at?: string | null
+  status?: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
 }
 
 type WorkPatternRow = {
@@ -225,7 +229,9 @@ export default async function TherapistAvailabilityPage({
 
   const { data: cyclesData } = await admin
     .from('schedule_cycles')
-    .select('id, label, start_date, end_date, published, archived_at, availability_due_at')
+    .select(
+      'id, label, start_date, end_date, published, status, archived_at, availability_due_at, availability_closed_at, availability_reopened_at'
+    )
     .is('archived_at', null)
     .eq('published', false)
     .gte('end_date', todayKey)
@@ -259,6 +265,9 @@ export default async function TherapistAvailabilityPage({
     cycles[0] ??
     null
   const selectedCycleId = selectedCycle?.id ?? ''
+  const availabilityWindow = selectedCycleId
+    ? await loadAvailabilityWindowState(admin as never, selectedCycleId)
+    : { locked: true, reason: null }
 
   const { data: submissionRowsData } =
     cycles.length > 0
@@ -362,6 +371,8 @@ export default async function TherapistAvailabilityPage({
         generatedBaselineByCycleId={generatedBaselineByCycleId}
         submissionsByCycleId={submissionsByCycleId}
         regularShiftType={regularShiftType}
+        availabilityLocked={availabilityWindow.locked}
+        availabilityLockedReason={availabilityWindow.reason}
         submitTherapistAvailabilityGridAction={submitTherapistAvailabilityGridAction}
         returnToPath="/therapist/availability"
       />

@@ -39,10 +39,12 @@ vi.mock('@/lib/openai-ocr', () => ({
 import {
   applyEmailAvailabilityImportAction,
   copyAvailabilityFromPreviousCycleAction,
+  closeAvailabilityWindowAction,
   deleteAvailabilityEntryAction,
   deleteAvailabilityEmailIntakeAction,
   deleteManagerPlannerDateAction,
   reparseAvailabilityEmailIntakeAction,
+  reopenAvailabilityWindowAction,
   saveManagerAvailabilityRequestsAction,
   saveManagerPlannerDatesAction,
   submitAvailabilityEntryAction,
@@ -55,6 +57,7 @@ type TestContext = {
   userId?: string | null
   role?: string | null
   therapistSubmissionExists?: boolean
+  draftShiftCount?: number
 }
 
 function createSupabaseMock(context: TestContext = {}) {
@@ -249,6 +252,15 @@ function createSupabaseMock(context: TestContext = {}) {
               })
             )
           }
+          if (table === 'shifts') {
+            return Promise.resolve(
+              resolve({
+                data: null,
+                count: context.draftShiftCount ?? 0,
+                error: null,
+              })
+            )
+          }
           if (table === 'availability_email_intake_items') {
             return Promise.resolve(
               resolve({
@@ -398,6 +410,19 @@ describe('availability actions', () => {
     expect(revalidatePathMock).toHaveBeenCalledWith('/dashboard/staff')
   })
 
+  it('blocks therapist availability edits after schedule building starts', async () => {
+    const supabase = createSupabaseMock({ userId: 'therapist-1', role: 'therapist' })
+    const admin = createSupabaseMock({ draftShiftCount: 1 })
+    createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
+
+    await expect(submitAvailabilityEntryAction(makeTherapistFormData())).rejects.toThrow(
+      'REDIRECT:/availability?error=submission_closed&cycle=cycle-1'
+    )
+
+    expect(supabase.state.upsertPayloads).toHaveLength(0)
+  })
+
   it('only lets a therapist delete their own availability row', async () => {
     const supabase = createSupabaseMock({ userId: 'therapist-1', role: 'therapist' })
     createClientMock.mockResolvedValue(supabase)
@@ -470,6 +495,41 @@ describe('availability actions', () => {
         intent: 'manager_force',
       },
     ])
+  })
+
+  it('lets a manager lock and reopen the availability window with attribution', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    const admin = createSupabaseMock({ userId: 'manager-1', role: 'manager' })
+    createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
+    const formData = new FormData()
+    formData.set('cycle_id', 'cycle-1')
+
+    await expect(closeAvailabilityWindowAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?success=availability_closed&cycle=cycle-1'
+    )
+    expect(admin.state.updates[0]).toMatchObject({
+      table: 'schedule_cycles',
+      payload: expect.objectContaining({
+        availability_closed_by: 'manager-1',
+      }),
+      filters: { id: 'cycle-1' },
+    })
+
+    vi.clearAllMocks()
+    createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
+
+    await expect(reopenAvailabilityWindowAction(formData)).rejects.toThrow(
+      'REDIRECT:/availability?success=availability_reopened&cycle=cycle-1'
+    )
+    expect(admin.state.updates.at(-1)).toMatchObject({
+      table: 'schedule_cycles',
+      payload: expect.objectContaining({
+        availability_reopened_by: 'manager-1',
+      }),
+      filters: { id: 'cycle-1' },
+    })
   })
 
   it('lets a manager clear planner dates for one therapist and mode', async () => {
@@ -546,7 +606,7 @@ describe('availability actions', () => {
         override_type: 'force_off',
         note: 'existing note',
         created_by: 'manager-1',
-        source: 'therapist',
+        source: 'manager',
         intent: 'therapist_need_off',
       },
     ])
