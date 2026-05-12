@@ -4,7 +4,7 @@ const {
   redirectMock,
   revalidatePathMock,
   createClientMock,
-  sendPreliminarySnapshotMock,
+  createAdminClientMock,
   notifyUsersMock,
   writeAuditLogMock,
 } = vi.hoisted(() => ({
@@ -13,7 +13,7 @@ const {
   }),
   revalidatePathMock: vi.fn(),
   createClientMock: vi.fn(),
-  sendPreliminarySnapshotMock: vi.fn(),
+  createAdminClientMock: vi.fn(),
   notifyUsersMock: vi.fn(),
   writeAuditLogMock: vi.fn(),
 }))
@@ -30,8 +30,8 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: createClientMock,
 }))
 
-vi.mock('@/lib/preliminary-schedule/mutations', () => ({
-  sendPreliminarySnapshot: sendPreliminarySnapshotMock,
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: createAdminClientMock,
 }))
 
 vi.mock('@/lib/notifications', () => ({
@@ -50,6 +50,8 @@ type TestContext = {
   cyclePublished?: boolean
   cycleStatus?: 'draft' | 'preliminary' | 'final' | 'archived'
   activeSnapshotId?: string | null
+  rpcError?: { message?: string } | null
+  rpcWasRefresh?: boolean
   cycleStartDate?: string
   cycleEndDate?: string
   shifts?: Array<{
@@ -74,8 +76,6 @@ function makeFormData() {
 }
 
 function createSupabaseMock(context: TestContext) {
-  const insertedShifts: Array<Record<string, unknown>> = []
-  const cycleUpdates: Array<Record<string, unknown>> = []
   return {
     auth: {
       getUser: vi.fn(async () => ({
@@ -185,48 +185,49 @@ function createSupabaseMock(context: TestContext) {
 
           return Promise.resolve(resolve({ data: [], error: null }))
         },
-        insert(payload: Record<string, unknown> | Array<Record<string, unknown>>) {
-          const rows = Array.isArray(payload) ? payload : [payload]
-          insertedShifts.push(...rows)
-          return {
-            select() {
-              return Promise.resolve({
-                data: rows,
-                error: null,
-              })
-            },
-          }
+        insert() {
+          throw new Error(`Unexpected direct insert into ${table}`)
         },
-        update(payload: Record<string, unknown>) {
-          if (table === 'schedule_cycles') {
-            cycleUpdates.push(payload)
-          }
-
-          return builder
+        update() {
+          throw new Error(`Unexpected direct update on ${table}`)
         },
       }
 
       return builder
     },
-    __insertedShifts: insertedShifts,
-    __cycleUpdates: cycleUpdates,
+  }
+}
+
+function createAdminMock(context: TestContext) {
+  return {
+    rpc: vi.fn(async (fn: string, args: Record<string, unknown>) => {
+      if (fn !== 'app_send_preliminary_schedule') {
+        return { data: null, error: { message: `Unexpected RPC ${fn}` } }
+      }
+
+      if (context.rpcError) {
+        return { data: null, error: context.rpcError }
+      }
+
+      return {
+        data: [
+          {
+            id: context.activeSnapshotId ?? 'snapshot-1',
+            label: 'April schedule',
+            was_refresh: Boolean(context.rpcWasRefresh),
+          },
+        ],
+        error: null,
+        args,
+      }
+    }),
   }
 }
 
 describe('sendPreliminaryScheduleAction', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    sendPreliminarySnapshotMock.mockResolvedValue({
-      data: {
-        id: 'snapshot-1',
-        cycle_id: 'cycle-1',
-        created_by: 'manager-1',
-        sent_at: '2026-03-19T10:30:00.000Z',
-        status: 'active',
-        created_at: '2026-03-19T10:30:00.000Z',
-      },
-      error: null,
-    })
+    createAdminClientMock.mockReturnValue(createAdminMock({}))
   })
 
   it('lets a manager send a preliminary schedule for a draft cycle', async () => {
@@ -235,14 +236,18 @@ describe('sendPreliminaryScheduleAction', () => {
       role: 'manager',
       cyclePublished: false,
     })
+    const admin = createAdminMock({})
     createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
 
     await expect(sendPreliminaryScheduleAction(makeFormData())).rejects.toThrow(
       'REDIRECT:/coverage?cycle=cycle-1&success=preliminary_sent'
     )
 
-    expect(sendPreliminarySnapshotMock).toHaveBeenCalledTimes(1)
-    expect(supabase.__cycleUpdates).toContainEqual({ status: 'preliminary' })
+    expect(admin.rpc).toHaveBeenCalledWith('app_send_preliminary_schedule', {
+      p_actor_id: 'manager-1',
+      p_cycle_id: 'cycle-1',
+    })
     expect(notifyUsersMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -264,10 +269,11 @@ describe('sendPreliminaryScheduleAction', () => {
       'REDIRECT:/schedule'
     )
 
-    expect(sendPreliminarySnapshotMock).not.toHaveBeenCalled()
+    expect(createAdminClientMock).not.toHaveBeenCalled()
   })
 
   it('treats a repeat send as a refresh of the active snapshot', async () => {
+    const admin = createAdminMock({ activeSnapshotId: 'snapshot-existing', rpcWasRefresh: true })
     const supabase = createSupabaseMock({
       userId: 'manager-1',
       role: 'manager',
@@ -275,16 +281,20 @@ describe('sendPreliminaryScheduleAction', () => {
       cycleStatus: 'preliminary',
     })
     createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
 
     await expect(sendPreliminaryScheduleAction(makeFormData())).rejects.toThrow(
       'REDIRECT:/coverage?cycle=cycle-1&success=preliminary_refreshed'
     )
 
-    expect(sendPreliminarySnapshotMock).toHaveBeenCalledTimes(1)
-    expect(supabase.__cycleUpdates).toContainEqual({ status: 'preliminary' })
+    expect(admin.rpc).toHaveBeenCalledWith('app_send_preliminary_schedule', {
+      p_actor_id: 'manager-1',
+      p_cycle_id: 'cycle-1',
+    })
   })
 
-  it('creates open placeholder shifts so underfilled drafts can still be sent preliminarily', async () => {
+  it('delegates open placeholder creation and snapshot refresh to one RPC', async () => {
+    const admin = createAdminMock({})
     const supabase = createSupabaseMock({
       userId: 'manager-1',
       role: 'manager',
@@ -304,20 +314,15 @@ describe('sendPreliminaryScheduleAction', () => {
       ],
     })
     createClientMock.mockResolvedValue(supabase)
+    createAdminClientMock.mockReturnValue(admin)
 
     await expect(sendPreliminaryScheduleAction(makeFormData())).rejects.toThrow(
       'REDIRECT:/coverage?cycle=cycle-1&success=preliminary_sent'
     )
 
-    expect(supabase.__insertedShifts).toHaveLength(5)
-    expect(sendPreliminarySnapshotMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        shifts: expect.arrayContaining([
-          expect.objectContaining({ id: 'shift-1', user_id: 'therapist-1' }),
-          expect.objectContaining({ user_id: null, shift_type: 'night' }),
-        ]),
-      })
-    )
+    expect(admin.rpc).toHaveBeenCalledWith('app_send_preliminary_schedule', {
+      p_actor_id: 'manager-1',
+      p_cycle_id: 'cycle-1',
+    })
   })
 })

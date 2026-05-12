@@ -2318,6 +2318,14 @@ export type Database = {
           id: string
         }[]
       }
+      app_send_preliminary_schedule: {
+        Args: { p_actor_id: string; p_cycle_id: string }
+        Returns: {
+          id: string
+          label: string
+          was_refresh: boolean
+        }[]
+      }
       app_start_schedule_cycle_over: {
         Args: { p_actor_id: string; p_cycle_id: string }
         Returns: {

@@ -38,6 +38,10 @@ const blockRuleMigrationSource = readFileSync(
   ),
   'utf8'
 )
+const atomicPreliminaryMigrationSource = readFileSync(
+  resolve(process.cwd(), 'supabase/migrations/20260512133013_atomic_preliminary_send.sql'),
+  'utf8'
+)
 const publishActionsSource = readFileSync(
   resolve(process.cwd(), 'src/app/(app)/schedule/actions/publish-actions.ts'),
   'utf8'
@@ -90,6 +94,21 @@ describe('schedule lifecycle hardening', () => {
     expect(draftActionsSource).toContain('app_start_schedule_cycle_over')
     expect(draftActionsSource).toContain('insertUnpublishedCycleShifts')
     expect(templateActionsSource).toContain('insertUnpublishedCycleShifts')
+  })
+
+  it('uses an atomic RPC for Send Preliminary schedule creation and refresh', () => {
+    expect(atomicPreliminaryMigrationSource).toContain('app_send_preliminary_schedule')
+    expect(atomicPreliminaryMigrationSource).toContain('for update')
+    expect(atomicPreliminaryMigrationSource).toContain('generate_series(v_cycle.start_date')
+    expect(atomicPreliminaryMigrationSource).toContain(
+      'delete from public.preliminary_shift_states'
+    )
+    expect(atomicPreliminaryMigrationSource).toContain(
+      "set status = 'preliminary'::public.schedule_cycle_status"
+    )
+    expect(atomicPreliminaryMigrationSource).toContain(
+      'grant execute on function public.app_send_preliminary_schedule(uuid, uuid) to service_role'
+    )
   })
 
   it('restricts schedule-mutating security definer RPCs to server execution', () => {
