@@ -2,6 +2,7 @@ import { parseRole, type Role } from '@/lib/auth/roles'
 
 export type Permission =
   | 'access_manager_ui'
+  | 'access_lead_tools'
   | 'manage_schedule'
   | 'manage_publish'
   | 'manage_directory'
@@ -19,6 +20,10 @@ type CanContext = {
 
 function isManagerRole(role: Role | null): boolean {
   return role === 'manager'
+}
+
+function isLeadToolsRole(role: Role | null): boolean {
+  return role === 'manager' || role === 'lead'
 }
 
 export function can(roleInput: unknown, permission: Permission, context: CanContext = {}): boolean {
@@ -42,8 +47,12 @@ export function can(roleInput: unknown, permission: Permission, context: CanCont
     return isManagerRole(role)
   }
 
+  if (permission === 'access_lead_tools') {
+    return isLeadToolsRole(role)
+  }
+
   if (permission === 'update_assignment_status') {
-    return isManagerRole(role) || role === 'lead'
+    return isLeadToolsRole(role)
   }
 
   return false

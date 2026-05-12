@@ -42,6 +42,24 @@ describe('can - manager-only permissions', () => {
   })
 })
 
+describe('can - access_lead_tools', () => {
+  it('grants access to managers and leads', () => {
+    expect(can('manager', 'access_lead_tools')).toBe(true)
+    expect(can('lead', 'access_lead_tools')).toBe(true)
+  })
+
+  it('denies access to regular therapists and unknown roles', () => {
+    expect(can('therapist', 'access_lead_tools')).toBe(false)
+    expect(can(null, 'access_lead_tools')).toBe(false)
+    expect(can('admin', 'access_lead_tools')).toBe(false)
+  })
+
+  it('denies access to inactive or archived leads', () => {
+    expect(can('lead', 'access_lead_tools', { isActive: false })).toBe(false)
+    expect(can('lead', 'access_lead_tools', { archivedAt: '2026-03-19T08:00:00.000Z' })).toBe(false)
+  })
+})
+
 describe('can - update_assignment_status', () => {
   it('grants access to manager without context', () => {
     expect(can('manager', 'update_assignment_status')).toBe(true)

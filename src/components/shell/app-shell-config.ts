@@ -225,6 +225,7 @@ export function getStaffNavItems(): readonly ShellNavItem[] {
 export function getShellContext(args: {
   pathname: string
   canAccessManagerUi: boolean
+  canAccessLeadTools?: boolean
   pendingCount: number
 }): ShellContext {
   if (args.canAccessManagerUi) {
@@ -261,6 +262,7 @@ export function getShellContext(args: {
 
 export function getMobilePrimaryItems(args: {
   canAccessManagerUi: boolean
+  canAccessLeadTools?: boolean
   pendingCount: number
 }): readonly ShellNavItem[] {
   if (args.canAccessManagerUi) {
@@ -284,6 +286,39 @@ export function getMobilePrimaryItems(args: {
         href: '/shift-board',
         label: 'Shift Board',
         active: (pathname) => pathname === '/shift-board' || pathname === '/swaps',
+      },
+    ]
+  }
+
+  if (args.canAccessLeadTools) {
+    return [
+      {
+        href: '/dashboard/staff',
+        label: 'Dashboard',
+        active: (pathname) => pathname.startsWith('/dashboard/staff'),
+      },
+      {
+        href: '/therapist/schedule',
+        label: 'My Shifts',
+        active: (pathname) =>
+          pathname === '/therapist/schedule' ||
+          pathname === '/staff/my-schedule' ||
+          pathname === '/staff/schedule',
+      },
+      {
+        href: '/coverage',
+        label: 'Team Schedule',
+        active: (pathname) =>
+          pathname === '/coverage' || pathname === '/schedule' || pathname === '/preliminary',
+      },
+      {
+        href: '/shift-board',
+        label: 'Shift Board',
+        active: (pathname) =>
+          pathname === '/shift-board' ||
+          pathname === '/therapist/swaps' ||
+          pathname === '/staff/requests' ||
+          pathname === '/requests/new',
       },
     ]
   }
@@ -322,8 +357,9 @@ export function getMobilePrimaryItems(args: {
 export function getWorkflowContext(args: {
   pathname: string
   canAccessManagerUi: boolean
+  canAccessLeadTools?: boolean
 }): WorkflowContext | null {
-  const { pathname, canAccessManagerUi } = args
+  const { pathname, canAccessManagerUi, canAccessLeadTools } = args
 
   if (canAccessManagerUi) {
     if (!isManagerScheduleRoute(pathname) && pathname !== '/shift-board' && pathname !== '/swaps') {
@@ -402,6 +438,26 @@ export function getWorkflowContext(args: {
   }
 
   if (!isStaffScheduleRoute(pathname)) return null
+
+  if (canAccessLeadTools) {
+    if (pathname === '/coverage') {
+      return {
+        workflow: 'Team Schedule',
+        context: 'Lead coverage tools',
+        state: 'Working, on call, call-in, cancelled',
+        permission: 'Lead status updates',
+      }
+    }
+
+    if (pathname === '/shift-board' || pathname === '/therapist/swaps') {
+      return {
+        workflow: 'Shift Board',
+        context: 'Swaps, pickups, and call-in help',
+        state: 'Open, waiting, approved',
+        permission: 'Lead visibility; manager approval',
+      }
+    }
+  }
 
   if (
     pathname === '/therapist/schedule' ||

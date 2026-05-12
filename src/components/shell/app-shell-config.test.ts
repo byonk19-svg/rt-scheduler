@@ -237,6 +237,27 @@ describe('staff nav items', () => {
     ])
   })
 
+  it('uses lead mobile workflow destinations without manager-only tools', () => {
+    const items = getMobilePrimaryItems({
+      canAccessManagerUi: false,
+      canAccessLeadTools: true,
+      pendingCount: 0,
+    })
+
+    expect(items.map((item) => item.label)).toEqual([
+      'Dashboard',
+      'My Shifts',
+      'Team Schedule',
+      'Shift Board',
+    ])
+    expect(items.map((item) => item.href)).toEqual([
+      '/dashboard/staff',
+      '/therapist/schedule',
+      '/coverage',
+      '/shift-board',
+    ])
+  })
+
   it('returns staff workflow context for personal schedule routes', () => {
     expect(
       getWorkflowContext({ pathname: '/therapist/schedule', canAccessManagerUi: false })
@@ -247,5 +268,28 @@ describe('staff nav items', () => {
       permission: 'Personal view',
     })
     expect(getWorkflowContext({ pathname: '/profile', canAccessManagerUi: false })).toBeNull()
+  })
+
+  it('returns lead workflow context for operational schedule tools', () => {
+    expect(
+      getWorkflowContext({
+        pathname: '/coverage',
+        canAccessManagerUi: false,
+        canAccessLeadTools: true,
+      })
+    ).toEqual({
+      workflow: 'Team Schedule',
+      context: 'Lead coverage tools',
+      state: 'Working, on call, call-in, cancelled',
+      permission: 'Lead status updates',
+    })
+
+    expect(
+      getWorkflowContext({
+        pathname: '/shift-board',
+        canAccessManagerUi: false,
+        canAccessLeadTools: true,
+      })?.permission
+    ).toBe('Lead visibility; manager approval')
   })
 })
