@@ -39,11 +39,16 @@ function formatAvailabilityDayLabel(isoDate: string): string {
   })
 }
 
+function nextSundayOnOrAfter(date: Date): Date {
+  const day = date.getDay()
+  return addDays(date, (7 - day) % 7)
+}
+
 async function nextAvailableCycleStart(
   supabase: SupabaseClient,
   minimumOffsetDays = 730
 ): Promise<Date> {
-  const baseline = addDays(new Date(), minimumOffsetDays)
+  const baseline = nextSundayOnOrAfter(addDays(new Date(), minimumOffsetDays))
   const latestCycle = await supabase
     .from('schedule_cycles')
     .select('end_date')
@@ -58,7 +63,9 @@ async function nextAvailableCycleStart(
 
   if (!latestCycle.data?.end_date) return baseline
 
-  const afterLatestCycle = addDays(new Date(`${latestCycle.data.end_date}T00:00:00`), 2)
+  const afterLatestCycle = nextSundayOnOrAfter(
+    addDays(new Date(`${latestCycle.data.end_date}T00:00:00`), 1)
+  )
   return afterLatestCycle > baseline ? afterLatestCycle : baseline
 }
 
@@ -123,7 +130,7 @@ async function createPublishReadyCycle(params: {
     .insert({
       label: cycleLabel,
       start_date: publishDateKey,
-      end_date: publishDateKey,
+      end_date: formatDateKey(addDays(publishDate, 41)),
       published: false,
     })
     .select('id')
@@ -489,7 +496,7 @@ test.describe.serial('role journeys', () => {
     }
 
     const publishedStart = await nextAvailableCycleStart(supabase, 730)
-    const publishedEnd = addDays(publishedStart, 13)
+    const publishedEnd = addDays(publishedStart, 41)
     const publishedShiftDate = formatDateKey(addDays(publishedStart, 2))
     const requestShiftDate = formatDateKey(addDays(publishedStart, 4))
     const leadRequestShiftDate = formatDateKey(addDays(publishedStart, 6))
@@ -513,7 +520,7 @@ test.describe.serial('role journeys', () => {
     createdCycleIds.push(publishedCycleInsert.data.id)
 
     const draftStart = addDays(publishedEnd, 1)
-    const draftEnd = addDays(draftStart, 13)
+    const draftEnd = addDays(draftStart, 41)
     const availabilityDate = formatDateKey(addDays(draftStart, 2))
     const openShiftDate = formatDateKey(addDays(draftStart, 3))
     const availabilityDueAt = `${availabilityDate}T17:00:00.000Z`
@@ -1255,7 +1262,7 @@ test.describe.serial('role journeys', () => {
     await publishRow.getByRole('button', { name: 'Take offline' }).click()
     await expect(
       page.getByText(
-        'Schedule reopened. Assignments stay on the draft grid, preliminary editing is live again, and new swaps or pickups stay paused until you publish again.'
+        'Schedule block taken offline. Assignments were preserved, staff live views are hidden, and new swaps or pickups stay paused until you republish.'
       )
     ).toBeVisible({
       timeout: 20_000,
@@ -1265,14 +1272,14 @@ test.describe.serial('role journeys', () => {
       .poll(async () => {
         const result = await ctx!.supabase
           .from('schedule_cycles')
-          .select('published')
+          .select('published, status')
           .eq('id', publishReady.cycleId)
           .maybeSingle()
 
         if (result.error) throw new Error(result.error.message)
-        return result.data?.published ?? null
+        return result.data ? `${result.data.status}:${result.data.published}` : null
       })
-      .toBe(false)
+      .toBe('offline:false')
   })
 
   test('manager can requeue failed recipients from publish details', async ({ page }) => {

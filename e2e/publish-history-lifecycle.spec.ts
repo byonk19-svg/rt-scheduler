@@ -10,10 +10,17 @@ type PublishLifecycleCtx = {
   manager: { id: string; email: string; password: string }
 }
 
+function nextSundayAfter(date: Date, minimumDaysAhead: number) {
+  const next = addDays(date, minimumDaysAhead)
+  const day = next.getDay()
+  return addDays(next, (7 - day) % 7)
+}
+
 test.describe.serial('publish history lifecycle', () => {
   test.setTimeout(120_000)
 
   let ctx: PublishLifecycleCtx | null = null
+  const dateOffsetBase = 14000 + Math.floor(Math.random() * 3650)
   const createdUserIds: string[] = []
   const createdCycleIds: string[] = []
   const createdPublishEventIds: string[] = []
@@ -62,14 +69,15 @@ test.describe.serial('publish history lifecycle', () => {
   test('manager can open publish details for a failed event', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run publish lifecycle e2e.')
 
-    const cycleDate = addDays(new Date(), 18)
+    const cycleDate = nextSundayAfter(new Date(), dateOffsetBase)
     const cycleInsert = await ctx!.supabase
       .from('schedule_cycles')
       .insert({
         label: `Detail Cycle ${randomString('cycle')}`,
         start_date: formatDateKey(cycleDate),
-        end_date: formatDateKey(addDays(cycleDate, 6)),
+        end_date: formatDateKey(addDays(cycleDate, 41)),
         published: false,
+        status: 'draft',
       })
       .select('id')
       .single()
@@ -124,15 +132,16 @@ test.describe.serial('publish history lifecycle', () => {
   test('manager can delete a non-live publish history entry', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run publish lifecycle e2e.')
 
-    const cycleDate = addDays(new Date(), 24)
+    const cycleDate = nextSundayAfter(new Date(), dateOffsetBase + 56)
     const cycleLabel = `Delete History ${randomString('cycle')}`
     const cycleInsert = await ctx!.supabase
       .from('schedule_cycles')
       .insert({
         label: cycleLabel,
         start_date: formatDateKey(cycleDate),
-        end_date: formatDateKey(addDays(cycleDate, 6)),
+        end_date: formatDateKey(addDays(cycleDate, 41)),
         published: false,
+        status: 'draft',
       })
       .select('id')
       .single()
@@ -188,26 +197,27 @@ test.describe.serial('publish history lifecycle', () => {
       .toBeNull()
   })
 
-  test('manager can start over a live cycle and close the active preliminary snapshot', async ({
+  test('manager can take a live cycle offline while preserving shifts and closing preliminary review', async ({
     page,
   }) => {
     test.skip(!ctx, 'Supabase service env values are required to run publish lifecycle e2e.')
 
-    const cycleDate = addDays(new Date(), 28)
-    const cycleLabel = `Restart Cycle ${randomString('cycle')}`
+    const cycleDate = nextSundayAfter(new Date(), dateOffsetBase + 112)
+    const cycleLabel = `Offline Cycle ${randomString('cycle')}`
     const cycleInsert = await ctx!.supabase
       .from('schedule_cycles')
       .insert({
         label: cycleLabel,
         start_date: formatDateKey(cycleDate),
-        end_date: formatDateKey(addDays(cycleDate, 6)),
+        end_date: formatDateKey(addDays(cycleDate, 41)),
         published: true,
+        status: 'final',
       })
       .select('id')
       .single()
 
     if (cycleInsert.error || !cycleInsert.data) {
-      throw new Error(cycleInsert.error?.message ?? 'Could not create restart cycle.')
+      throw new Error(cycleInsert.error?.message ?? 'Could not create offline lifecycle cycle.')
     }
     createdCycleIds.push(cycleInsert.data.id)
 
@@ -262,22 +272,23 @@ test.describe.serial('publish history lifecycle', () => {
     const cycleRow = page
       .locator('tr')
       .filter({ has: page.getByText(cycleLabel).first() })
-      .filter({ has: page.getByRole('button', { name: 'Clear & restart' }) })
+      .filter({ has: page.getByRole('button', { name: 'Take offline' }) })
       .first()
     await expect(cycleRow).toBeVisible()
-    await cycleRow.getByRole('button', { name: 'Clear & restart' }).click()
+    await expect(cycleRow.getByRole('button', { name: 'Clear & restart' })).toHaveCount(0)
+    await cycleRow.getByRole('button', { name: 'Take offline' }).click()
 
     await expect
       .poll(async () => {
         const cycle = await ctx!.supabase
           .from('schedule_cycles')
-          .select('published')
+          .select('published, status')
           .eq('id', cycleInsert.data.id)
           .maybeSingle()
         if (cycle.error) throw new Error(cycle.error.message)
-        return cycle.data?.published ?? null
+        return cycle.data ? `${cycle.data.status}:${cycle.data.published}` : null
       })
-      .toBe(false)
+      .toBe('offline:false')
 
     await expect
       .poll(async () => {
@@ -288,7 +299,7 @@ test.describe.serial('publish history lifecycle', () => {
         if (shifts.error) throw new Error(shifts.error.message)
         return (shifts.data ?? []).length
       })
-      .toBe(0)
+      .toBe(1)
 
     await expect
       .poll(async () => {
@@ -300,6 +311,6 @@ test.describe.serial('publish history lifecycle', () => {
         if (snapshot.error) throw new Error(snapshot.error.message)
         return snapshot.data?.status ?? null
       })
-      .toBe('closed')
+      .toBe('superseded')
   })
 })
