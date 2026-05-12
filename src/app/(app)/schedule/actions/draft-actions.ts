@@ -50,7 +50,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
 
   const { data: cycle, error: cycleError } = await supabase
     .from('schedule_cycles')
-    .select('id, start_date, end_date, published')
+    .select('id, start_date, end_date, published, status')
     .eq('id', cycleId)
     .maybeSingle()
 
@@ -61,6 +61,10 @@ export async function generateDraftScheduleAction(formData: FormData) {
 
   if (cycle.published) {
     redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'auto_cycle_published' }))
+  }
+
+  if (cycle.status !== 'draft') {
+    redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'auto_cycle_not_draft' }))
   }
 
   const cycleDates = buildDateRange(cycle.start_date, cycle.end_date)
@@ -244,7 +248,7 @@ export async function resetDraftScheduleAction(formData: FormData) {
 
   const { data: cycle, error: cycleError } = await supabase
     .from('schedule_cycles')
-    .select('id, published')
+    .select('id, published, status')
     .eq('id', cycleId)
     .maybeSingle()
 
@@ -257,25 +261,27 @@ export async function resetDraftScheduleAction(formData: FormData) {
     redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'reset_cycle_published' }))
   }
 
-  const admin = createAdminClient()
-  const { data: deletedCount, error: deleteError } = await admin.rpc(
-    'app_delete_unpublished_cycle_shifts',
-    {
-      p_actor_id: user.id,
-      p_cycle_id: cycleId,
-      p_unfilled_only: false,
-    }
-  )
+  if (cycle.status !== 'draft' && cycle.status !== 'preliminary') {
+    redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'reset_invalid_state' }))
+  }
 
-  if (deleteError) {
-    console.error('Failed to reset draft shifts:', deleteError)
+  const admin = createAdminClient()
+  const { data: resetRows, error: resetError } = await admin.rpc('app_start_schedule_cycle_over', {
+    p_actor_id: user.id,
+    p_cycle_id: cycleId,
+  })
+
+  if (resetError) {
+    console.error('Failed to reset draft shifts:', resetError)
     redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'reset_failed' }))
   }
 
-  const removedCount = deletedCount ?? 0
+  const resetRow = Array.isArray(resetRows) ? resetRows[0] : resetRows
+  const removedCount = resetRow?.deleted_count ?? 0
 
   revalidatePath('/schedule')
   revalidatePath('/coverage')
+  revalidatePath('/preliminary')
   redirect(
     buildReturnUrl(cycleId, {
       ...viewParams,

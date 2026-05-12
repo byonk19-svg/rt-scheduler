@@ -136,6 +136,28 @@ describe('createCycleAction', () => {
     expect(supabase.state.insertedCycles).toHaveLength(0)
   })
 
+  it('rejects a cycle that does not start on Sunday and last exactly six weeks', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1' })
+    createClientMock.mockResolvedValue(supabase)
+
+    await expect(createCycleAction(makeFormData('2026-05-04', '2026-06-14'))).rejects.toThrow(
+      'REDIRECT:/schedule?view=week&error=create_cycle_invalid_block_shape'
+    )
+
+    expect(supabase.state.insertedCycles).toHaveLength(0)
+  })
+
+  it('rejects a Sunday-starting cycle that is not exactly 42 days inclusive', async () => {
+    const supabase = createSupabaseMock({ userId: 'manager-1' })
+    createClientMock.mockResolvedValue(supabase)
+
+    await expect(createCycleAction(makeFormData('2026-05-03', '2026-06-14'))).rejects.toThrow(
+      'REDIRECT:/schedule?view=week&error=create_cycle_invalid_block_shape'
+    )
+
+    expect(supabase.state.insertedCycles).toHaveLength(0)
+  })
+
   it('rejects a cycle that overlaps an existing active cycle', async () => {
     const supabase = createSupabaseMock({
       userId: 'manager-1',
@@ -143,7 +165,7 @@ describe('createCycleAction', () => {
     })
     createClientMock.mockResolvedValue(supabase)
 
-    await expect(createCycleAction(makeFormData('2026-03-20', '2026-05-05'))).rejects.toThrow(
+    await expect(createCycleAction(makeFormData('2026-05-03', '2026-06-13'))).rejects.toThrow(
       'REDIRECT:/schedule?view=week&error=create_cycle_overlap'
     )
 
@@ -158,7 +180,7 @@ describe('createCycleAction', () => {
     createClientMock.mockResolvedValue(supabase)
 
     await expect(
-      createCycleAction(makeFormData('2026-03-20', '2026-05-05', { returnTo: 'coverage' }))
+      createCycleAction(makeFormData('2026-05-03', '2026-06-13', { returnTo: 'coverage' }))
     ).rejects.toThrow('REDIRECT:/coverage?view=week&error=create_cycle_overlap')
 
     expect(supabase.state.insertedCycles).toHaveLength(0)
@@ -191,7 +213,7 @@ describe('createCycleAction', () => {
     }
 
     await expect(
-      createCycleAction(makeFormData('2026-03-20', '2026-05-05', coverageContext))
+      createCycleAction(makeFormData('2026-05-03', '2026-06-13', coverageContext))
     ).rejects.toThrow(
       'REDIRECT:/coverage?cycle=cycle-current&view=roster&shift=night&error=create_cycle_overlap'
     )

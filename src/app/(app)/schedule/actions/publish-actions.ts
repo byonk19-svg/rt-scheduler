@@ -116,10 +116,6 @@ export async function toggleCyclePublishedAction(formData: FormData) {
       endDate: cycle.end_date,
     }
 
-    if (cycle.status !== 'preliminary') {
-      redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'publish_requires_preliminary' }))
-    }
-
     const cycleDates = buildDateRange(cycle.start_date, cycle.end_date)
     const cycleWeekDates = new Map<string, Set<string>>()
     const cycleWeekEnds = new Map<string, string>()
@@ -295,9 +291,12 @@ export async function toggleCyclePublishedAction(formData: FormData) {
         ? 'publish_unresolved_preliminary_marks'
         : !currentlyPublished && /resolve preliminary requests/i.test(error.message ?? '')
           ? 'publish_unresolved_preliminary_requests'
-          : !currentlyPublished && /preliminary/i.test(error.message ?? '')
-            ? 'publish_requires_preliminary'
-            : 'publish_failed'
+          : !currentlyPublished &&
+              /designated lead|lead-capable assigned/i.test(error.message ?? '')
+            ? 'publish_shift_rule_violation'
+            : !currentlyPublished && /draft or preliminary/i.test(error.message ?? '')
+              ? 'publish_invalid_state'
+              : 'publish_failed'
     redirect(
       buildReturnUrl(cycleId, {
         ...viewParams,

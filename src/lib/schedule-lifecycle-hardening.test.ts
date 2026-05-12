@@ -31,6 +31,13 @@ const preliminaryNotificationMigrationSource = readFileSync(
   ),
   'utf8'
 )
+const blockRuleMigrationSource = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/migrations/20260512024915_allow_final_bypass_and_block_rules.sql'
+  ),
+  'utf8'
+)
 const publishActionsSource = readFileSync(
   resolve(process.cwd(), 'src/app/(app)/schedule/actions/publish-actions.ts'),
   'utf8'
@@ -75,7 +82,12 @@ describe('schedule lifecycle hardening', () => {
     expect(migrationSource).toContain('app_delete_unpublished_cycle_shifts')
     expect(migrationSource).toContain('for update')
     expect(migrationSource).toContain('Published cycles cannot receive draft mutations.')
+    expect(blockRuleMigrationSource).toContain(
+      'Only Draft Schedule Blocks can receive auto-draft mutations.'
+    )
+    expect(blockRuleMigrationSource).toContain('app_start_schedule_cycle_over')
     expect(draftActionsSource).toContain('app_delete_unpublished_cycle_shifts')
+    expect(draftActionsSource).toContain('app_start_schedule_cycle_over')
     expect(draftActionsSource).toContain('insertUnpublishedCycleShifts')
     expect(templateActionsSource).toContain('insertUnpublishedCycleShifts')
   })
@@ -111,18 +123,20 @@ describe('schedule lifecycle hardening', () => {
     expect(templateActionsSource).toContain('applyTemplateToCycle(templateData, cycle.start_date')
   })
 
-  it('models cycle lifecycle explicitly and requires preliminary before final publish', () => {
+  it('models cycle lifecycle explicitly and allows final publish from draft or preliminary', () => {
     expect(preliminaryHardeningMigrationSource).toContain('schedule_cycle_status')
     expect(preliminaryHardeningMigrationSource).toContain(
       "'draft', 'preliminary', 'final', 'archived'"
     )
-    expect(preliminaryHardeningMigrationSource).toContain(
-      'Schedule cycle must be sent as preliminary before final publish.'
+    expect(blockRuleMigrationSource).toContain(
+      "v_cycle.status not in ('draft'::public.schedule_cycle_status, 'preliminary'::public.schedule_cycle_status)"
     )
-    expect(preliminaryHardeningMigrationSource).toContain(
-      'Resolve preliminary requests before publishing.'
+    expect(blockRuleMigrationSource).toContain('Resolve preliminary requests before publishing.')
+    expect(blockRuleMigrationSource).toContain(
+      'Final publish requires exactly one lead-capable assigned Designated Lead for every date and shift.'
     )
-    expect(publishActionsSource).toContain("error: 'publish_requires_preliminary'")
+    expect(publishActionsSource).not.toContain("error: 'publish_requires_preliminary'")
+    expect(publishActionsSource).toContain("'publish_invalid_state'")
   })
 
   it('keeps operational entries authoritative and hardens lead and PRN assignments', () => {
@@ -137,6 +151,20 @@ describe('schedule lifecycle hardening', () => {
     expect(preliminaryHardeningMigrationSource).toContain(
       'PRN staff require manager force-on or an approved preliminary pencil mark'
     )
+    expect(blockRuleMigrationSource).toContain('promote_next_designated_lead_for_shift')
+    expect(blockRuleMigrationSource).toContain(
+      "new.active = true and new.code in ('call_in', 'cancelled')"
+    )
+    expect(blockRuleMigrationSource).toContain("candidate.role = 'staff'")
+  })
+
+  it('enforces Schedule Blocks as non-overlapping six-week Sunday-start ranges', () => {
+    expect(blockRuleMigrationSource).toContain('enforce_schedule_cycle_block_rules')
+    expect(blockRuleMigrationSource).toContain('new.end_date <> new.start_date + 41')
+    expect(blockRuleMigrationSource).toContain('extract(dow from new.start_date) <> 0')
+    expect(blockRuleMigrationSource).toContain('schedule_cycles_enforce_block_rules')
+    expect(blockRuleMigrationSource).toContain('Active Schedule Blocks cannot overlap')
+    expect(cycleActionsSource).toContain('create_cycle_invalid_block_shape')
   })
 })
 

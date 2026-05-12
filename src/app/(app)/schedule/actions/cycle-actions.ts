@@ -25,6 +25,37 @@ type ImportedShiftRow = {
   role: ShiftRole
 }
 
+const SCHEDULE_BLOCK_DAY_COUNT = 42
+const MS_PER_DAY = 24 * 60 * 60 * 1000
+
+function parseDateKey(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return null
+
+  const year = Number(match[1])
+  const monthIndex = Number(match[2]) - 1
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, monthIndex, day))
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== monthIndex ||
+    date.getUTCDate() !== day
+  ) {
+    return null
+  }
+
+  return date
+}
+
+function isSundayToSixWeekSaturdayRange(startDate: string, endDate: string): boolean {
+  const start = parseDateKey(startDate)
+  const end = parseDateKey(endDate)
+  if (!start || !end) return false
+
+  const inclusiveDays = (end.getTime() - start.getTime()) / MS_PER_DAY + 1
+  return start.getUTCDay() === 0 && inclusiveDays === SCHEDULE_BLOCK_DAY_COUNT
+}
+
 export async function deleteCycleAction(formData: FormData) {
   const supabase = await createClient()
   const {
@@ -186,6 +217,12 @@ export async function createCycleAction(formData: FormData) {
 
   if (endDate < startDate) {
     redirect(buildReturnUrl(undefined, { ...errorViewParams, error: 'create_cycle_invalid_range' }))
+  }
+
+  if (!isSundayToSixWeekSaturdayRange(startDate, endDate)) {
+    redirect(
+      buildReturnUrl(undefined, { ...errorViewParams, error: 'create_cycle_invalid_block_shape' })
+    )
   }
 
   const { data: overlappingCycles, error: overlapError } = await supabase

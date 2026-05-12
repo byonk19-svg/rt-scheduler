@@ -2318,6 +2318,13 @@ export type Database = {
           id: string
         }[]
       }
+      app_start_schedule_cycle_over: {
+        Args: { p_actor_id: string; p_cycle_id: string }
+        Returns: {
+          deleted_count: number
+          id: string
+        }[]
+      }
       app_review_preliminary_cell_mark: {
         Args: {
           p_actor_id: string
