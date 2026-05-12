@@ -644,6 +644,7 @@ describe('drag-drop API behavior', () => {
 
     expect(response.status).toBe(200)
     expect(supabase.insertedShiftPayloads[0]).toMatchObject({
+      site_id: 'site-a',
       user_id: 'therapist-1',
       role: 'lead',
     })

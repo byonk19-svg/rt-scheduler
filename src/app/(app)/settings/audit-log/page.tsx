@@ -77,7 +77,27 @@ function targetCell(row: AuditLogRow) {
   return <span className="max-w-[12ch] truncate font-mono text-xs">{row.target_id}</span>
 }
 
+function actionLabel(action: string) {
+  switch (action) {
+    case 'post_publish_modification':
+      return 'Published schedule changed'
+    case 'shift_added':
+      return 'Shift added'
+    case 'shift_removed':
+      return 'Shift removed'
+    case 'designated_lead_assigned':
+      return 'Lead assigned'
+    case 'team_profile_updated':
+      return 'Team profile updated'
+    default:
+      return action.replaceAll('_', ' ')
+  }
+}
+
 function actionBadgeClass(action: string) {
+  if (action === 'post_publish_modification') {
+    return 'bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+  }
   if (action === 'shift_added') return 'bg-[var(--success-subtle)] text-[var(--success-text)]'
   if (action === 'shift_removed') return 'bg-[var(--error-subtle)] text-[var(--error-text)]'
   if (action === 'team_profile_updated') return 'bg-[var(--info-subtle)] text-[var(--info-text)]'
@@ -210,9 +230,10 @@ export default async function AuditLogPage({
                   <td className="px-4 py-2.5 text-sm text-muted-foreground">{getActorName(row)}</td>
                   <td className="px-4 py-2.5">
                     <span
+                      title={row.action}
                       className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${actionBadgeClass(row.action)}`}
                     >
-                      {row.action}
+                      {actionLabel(row.action)}
                     </span>
                   </td>
                   <td className="hidden px-4 py-2.5 text-sm text-muted-foreground md:table-cell">

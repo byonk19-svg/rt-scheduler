@@ -43,6 +43,7 @@ function buildWeeks(startIso: string): TherapistShiftWeek[] {
         weekdayLabel: date.toLocaleDateString('en-US', { weekday: 'short' }),
         dayLabel: `${date.getMonth() + 1}/${date.getDate()}`,
         isWeekend: date.getDay() === 0 || date.getDay() === 6,
+        needOff: false,
         userShift: isSelectedShift
           ? {
               id: 'shift-1',
@@ -191,5 +192,15 @@ describe('TherapistShiftCalendar', () => {
     expect(html).toContain('Cancelled')
     expect(html).toContain('Call In')
     expect(html).not.toContain('Called Off')
+  })
+
+  it('marks submitted Need Off days without changing working-shift counts', () => {
+    const weeks = buildWeeks('2026-03-22')
+    weeks[0].days[1].needOff = true
+
+    const html = renderCalendar({ weeks })
+
+    expect(html).toContain('* Need Off')
+    expect(html).toContain('41')
   })
 })

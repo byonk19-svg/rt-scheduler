@@ -607,6 +607,7 @@ export async function POST(request: Request) {
       .from('shifts')
       .insert({
         cycle_id: payload.cycleId,
+        site_id: managerSiteId,
         user_id: payload.userId,
         date: payload.date,
         shift_type: payload.shiftType,

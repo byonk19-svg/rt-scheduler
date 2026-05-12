@@ -81,7 +81,7 @@ describe('assignment state', () => {
 })
 
 describe('resolveMockRosterCellDisplay', () => {
-  it('shows OFF when approved off even if a mock assignment exists', () => {
+  it('shows an asterisk when approved off even if a mock assignment exists', () => {
     expect(
       resolveMockRosterCellDisplay(
         {
@@ -94,7 +94,7 @@ describe('resolveMockRosterCellDisplay', () => {
         },
         'approved_off'
       )
-    ).toEqual({ value: 'OFF', countsTowardDayTally: false })
+    ).toEqual({ value: '*', countsTowardDayTally: false })
   })
 
   it('shows 1 for approved work without an assignment', () => {

@@ -97,6 +97,7 @@ function buildWeeks(args: {
   userId: string
   userShiftType: 'day' | 'night'
   members: Map<string, TherapistShiftMember>
+  needOffDates: Set<string>
 }): TherapistShiftWeek[] {
   const weeks: TherapistShiftWeek[] = []
   for (let weekIndex = 0; weekIndex < SCHEDULE_BLOCK_WEEKS; weekIndex += 1) {
@@ -120,6 +121,7 @@ function buildWeeks(args: {
         weekdayLabel: date.toLocaleDateString('en-US', { weekday: 'short' }),
         dayLabel: `${date.getMonth() + 1}/${date.getDate()}`,
         isWeekend: date.getDay() === 0 || date.getDay() === 6,
+        needOff: args.needOffDates.has(isoDate),
         userShift: userShift
           ? {
               id: userShift.id,
@@ -187,6 +189,14 @@ export async function PublishedSchedulePage({
         ? 'night'
         : 'day'
   const userName = profile?.full_name?.trim() || user.email || 'You'
+  const { data: needOffRows } = await supabase
+    .from('availability_overrides')
+    .select('date, shift_type')
+    .eq('therapist_id', user.id)
+    .eq('override_type', 'force_off')
+    .gte('date', startIso)
+    .lte('date', endIso)
+
   const currentMember: TherapistShiftMember = {
     id: user.id,
     name: userName,
@@ -197,7 +207,19 @@ export async function PublishedSchedulePage({
     isYou: true,
   }
   const members = buildMemberMap(rows, currentMember)
-  const weeks = buildWeeks({ startIso, rows, userId: user.id, userShiftType, members })
+  const needOffDates = new Set(
+    ((needOffRows ?? []) as Array<{ date: string; shift_type: 'day' | 'night' | 'both' }>)
+      .filter((row) => row.shift_type === 'both' || row.shift_type === userShiftType)
+      .map((row) => row.date)
+  )
+  const weeks = buildWeeks({
+    startIso,
+    rows,
+    userId: user.id,
+    userShiftType,
+    members,
+    needOffDates,
+  })
   const days = weeks.flatMap((week) => week.days)
   const defaultShiftLabel = userShiftType === 'night' ? 'Night shift' : 'Day shift'
   const shiftCount = days.filter((day) => Boolean(day.userShift)).length

@@ -5,10 +5,12 @@ const {
   notifyUsersMock,
   createAdminClientMock,
   updateAssignmentStatusWithLotteryMock,
+  writeAuditLogMock,
 } = vi.hoisted(() => ({
   notifyPublishedShiftStatusChangedMock: vi.fn(async () => undefined),
   notifyUsersMock: vi.fn(async () => undefined),
   createAdminClientMock: vi.fn(),
+  writeAuditLogMock: vi.fn(async () => undefined),
   updateAssignmentStatusWithLotteryMock: vi.fn(
     async ({
       authClient,
@@ -74,6 +76,10 @@ vi.mock('@/lib/published-schedule-notifications', () => ({
 
 vi.mock('@/lib/notifications', () => ({
   notifyUsers: notifyUsersMock,
+}))
+
+vi.mock('@/lib/audit-log', () => ({
+  writeAuditLog: writeAuditLogMock,
 }))
 
 vi.mock('@/lib/lottery/service', () => ({
@@ -305,7 +311,16 @@ describe('assignment status API', () => {
   })
 
   it('allows a lead to update status', async () => {
-    const supabase = makeSupabaseMock({ role: 'lead', userId: 'lead-1' })
+    const supabase = makeSupabaseMock({
+      role: 'lead',
+      userId: 'lead-1',
+      shiftLookup: {
+        date: '2026-02-23',
+        shift_type: 'day',
+        user_id: 'therapist-1',
+        published: false,
+      },
+    })
     const admin = makeAdminClientMock({})
     createAdminClientMock.mockReturnValue(admin.client)
     vi.mocked(createClient).mockResolvedValue(
@@ -439,6 +454,15 @@ describe('assignment status API', () => {
     expect(response.status).toBe(200)
     expect(supabase.rpc).not.toHaveBeenCalled()
     expect(admin.rpc).toHaveBeenCalledOnce()
+    expect(writeAuditLogMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userId: 'manager-1',
+        action: 'post_publish_modification',
+        targetType: 'shift',
+        targetId: 'shift-1',
+      })
+    )
     expect(notifyPublishedShiftStatusChangedMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -565,6 +589,12 @@ describe('assignment status API', () => {
     const supabase = makeSupabaseMock({
       role: 'manager',
       userId: 'manager-1',
+      shiftLookup: {
+        date: '2026-02-23',
+        shift_type: 'day',
+        user_id: 'therapist-1',
+        published: false,
+      },
     })
     const admin = makeAdminClientMock({
       rpcError: { code: '42501', message: 'Assignment is outside your site scope.' },

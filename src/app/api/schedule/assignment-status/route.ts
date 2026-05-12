@@ -7,6 +7,7 @@ import { buildCallInAlertMessage, shouldCreateCallInAlert } from '@/lib/call-in-
 import { notifyUsers } from '@/lib/notifications'
 import { notifyPublishedShiftStatusChanged } from '@/lib/published-schedule-notifications'
 import { isTrustedMutationRequest } from '@/lib/security/request-origin'
+import { writeAuditLog } from '@/lib/audit-log'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -232,6 +233,15 @@ export async function POST(request: Request) {
 
   const shift = (shiftLookup ?? null) as ShiftNotificationLookupRow | null
   const cycle = getOne(shift?.schedule_cycles)
+
+  if (shift && cycle?.published) {
+    await writeAuditLog(admin as never, {
+      userId: user.id,
+      action: 'post_publish_modification',
+      targetType: 'shift',
+      targetId: shift.id,
+    })
+  }
 
   if (shift?.user_id && cycle?.published) {
     await notifyPublishedShiftStatusChanged(admin as never, {

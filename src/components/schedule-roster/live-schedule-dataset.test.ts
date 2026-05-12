@@ -75,7 +75,7 @@ describe('buildLiveScheduleDataset', () => {
     expect(dataset.cycleLabel).toContain('Cycle Alpha')
     expect(dataset.coreRows.map((row) => row.name)).toEqual(['Day Core'])
     expect(dataset.prnRows.map((row) => row.name)).toEqual(['Day PRN'])
-    expect(dataset.coreRows[0]?.codes).toEqual(['1', 'OFF'])
+    expect(dataset.coreRows[0]?.codes).toEqual(['1', '*'])
     expect(dataset.prnRows[0]?.codes).toEqual(['1', 'OC'])
     expect(dataset.coreCounts).toEqual([1, 0])
     expect(dataset.prnCounts).toEqual([1, 1])
@@ -86,7 +86,7 @@ describe('buildLiveScheduleDataset', () => {
 
     expect(dataset.coreRows.map((row) => row.name)).toEqual(['Night Core'])
     expect(dataset.prnRows).toEqual([])
-    expect(dataset.coreRows[0]?.codes).toEqual(['CI', 'OFF'])
+    expect(dataset.coreRows[0]?.codes).toEqual(['CI', '*'])
     expect(dataset.coreCounts).toEqual([1, 0])
     expect(dataset.prnCounts).toEqual([0, 0])
   })

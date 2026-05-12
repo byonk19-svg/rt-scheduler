@@ -38,6 +38,7 @@ export type TherapistShiftDay = {
   weekdayLabel: string
   dayLabel: string
   isWeekend: boolean
+  needOff: boolean
   userShift: {
     id: string
     shiftType: 'day' | 'night'
@@ -261,7 +262,10 @@ function DayCard({
             <Chip>{status}</Chip>
           </>
         ) : (
-          <Chip>Day off</Chip>
+          <>
+            <Chip>Day off</Chip>
+            {day.needOff ? <Chip>* Need Off</Chip> : null}
+          </>
         )}
       </div>
 
@@ -300,6 +304,9 @@ function DayCard({
         <div className="flex flex-1 flex-col items-center justify-center text-center">
           <CalendarDays className="h-8 w-8 text-muted-foreground/70" aria-hidden="true" />
           <p className="mt-3 text-xs font-medium text-muted-foreground">Not scheduled</p>
+          {day.needOff ? (
+            <p className="mt-1 text-xs font-semibold text-foreground">* Need Off</p>
+          ) : null}
         </div>
       )}
     </button>
@@ -635,7 +642,11 @@ export function TherapistShiftCalendar({
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-muted-foreground">Your status</span>
                   <span className="font-semibold text-foreground">
-                    {selectedDay.userShift ? 'You work this day' : 'You are not scheduled'}
+                    {selectedDay.userShift
+                      ? 'You work this day'
+                      : selectedDay.needOff
+                        ? '* Need Off'
+                        : 'You are not scheduled'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
