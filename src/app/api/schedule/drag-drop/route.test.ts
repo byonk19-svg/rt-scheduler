@@ -724,6 +724,41 @@ describe('drag-drop API behavior', () => {
     )
   })
 
+  it('records post-publish audit for any direct edit on a live final schedule', async () => {
+    const supabase = makeSupabaseMock({
+      cyclePublished: true,
+      coverageStatuses: ['scheduled', 'scheduled'],
+      weeklyShifts: [],
+    })
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          action: 'assign',
+          cycleId: 'cycle-1',
+          userId: 'therapist-1',
+          shiftType: 'day',
+          date: '2026-03-10',
+          overrideWeeklyRules: false,
+        }),
+      })
+    )
+
+    expect(response.status).toBe(200)
+    expect(writeAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: 'post_publish_modification',
+        targetId: 'shift-new-1',
+      })
+    )
+  })
+
   it('blocks PRN assignment when no force_on override and no offered pattern day exists', async () => {
     const supabase = makeSupabaseMock({
       coverageStatuses: ['scheduled'],

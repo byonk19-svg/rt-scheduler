@@ -11,20 +11,6 @@ const { redirectMock, revalidatePathMock, createClientMock, createAdminClientMoc
   })
 )
 
-const { sendPreliminarySnapshotMock } = vi.hoisted(() => ({
-  sendPreliminarySnapshotMock: vi.fn(async () => ({
-    data: {
-      id: 'snapshot-1',
-      cycle_id: 'cycle-1',
-      created_by: 'manager-1',
-      sent_at: '2026-04-24T12:00:00.000Z',
-      status: 'active',
-      created_at: '2026-04-24T12:00:00.000Z',
-    },
-    error: null,
-  })),
-}))
-
 vi.mock('next/navigation', () => ({
   redirect: redirectMock,
 }))
@@ -45,31 +31,11 @@ vi.mock('@/lib/publish-events', () => ({
   refreshPublishEventCounts: vi.fn(),
 }))
 
-vi.mock('@/lib/preliminary-schedule/mutations', () => ({
-  sendPreliminarySnapshot: sendPreliminarySnapshotMock,
-}))
-
 import {
   archiveCycleAction,
   deletePublishEventAction,
-  restartPublishedCycleAction,
-  unpublishCycleKeepShiftsAction,
+  takeScheduleBlockOfflineAction,
 } from '@/app/publish/actions'
-
-function mockAdminForSnapshotClose(cycleState: { closedSnapshots: string[] }) {
-  createAdminClientMock.mockReturnValue({
-    from: vi.fn(() => ({
-      update: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          eq: vi.fn(() => {
-            cycleState.closedSnapshots.push('cycle-1')
-            return Promise.resolve({ data: null, error: null })
-          }),
-        })),
-      })),
-    })),
-  })
-}
 
 type TestContext = {
   userId?: string | null
@@ -79,8 +45,9 @@ type TestContext = {
 function createSupabaseMock(context: TestContext) {
   const state = {
     cyclePublished: true,
+    cycleStatus: 'final',
     deletedShiftIds: [] as string[],
-    closedSnapshots: [] as string[],
+    offlineRpcCalls: [] as string[],
     publishEventPublished: false,
     deniedShiftPostIds: [] as string[],
     declinedShiftPostInterestIds: [] as string[],
@@ -137,6 +104,7 @@ function createSupabaseMock(context: TestContext) {
                 id: 'cycle-1',
                 label: 'April schedule',
                 published: state.cyclePublished,
+                status: state.cycleStatus,
               },
               error: null,
             }
@@ -177,16 +145,6 @@ function createSupabaseMock(context: TestContext) {
 
               if (table === 'schedule_cycles' && updateFilters.get('id') === 'cycle-1') {
                 state.cyclePublished = Boolean(payload.published)
-              }
-
-              if (
-                table === 'preliminary_snapshots' &&
-                updateFilters.get('cycle_id') === 'cycle-1' &&
-                updateFilters.get('status') === 'active' &&
-                payload.status === 'closed'
-              ) {
-                state.closedSnapshots.push('cycle-1')
-                return Promise.resolve({ data: null, error: null })
               }
 
               if (table === 'schedule_cycles') {
@@ -284,8 +242,21 @@ function createSupabaseMock(context: TestContext) {
   }
 }
 
-function createAdminMock(state: { closedSnapshots: string[] }) {
+function createAdminMock(state: {
+  cyclePublished: boolean
+  cycleStatus: string
+  offlineRpcCalls: string[]
+}) {
   return {
+    rpc(fn: string, args: { p_cycle_id?: string }) {
+      if (fn === 'app_take_schedule_cycle_offline' && args.p_cycle_id === 'cycle-1') {
+        state.cyclePublished = false
+        state.cycleStatus = 'offline'
+        state.offlineRpcCalls.push('cycle-1')
+        return Promise.resolve({ data: [{ id: 'cycle-1' }], error: null })
+      }
+      return Promise.resolve({ data: null, error: { message: 'unexpected rpc' } })
+    },
     from(table: string) {
       return {
         update(payload: Record<string, unknown>) {
@@ -297,16 +268,12 @@ function createAdminMock(state: { closedSnapshots: string[] }) {
               val1 = value
               return {
                 eq(column2: string, value2: unknown) {
-                  if (
-                    table === 'preliminary_snapshots' &&
-                    col1 === 'cycle_id' &&
-                    val1 === 'cycle-1' &&
-                    column2 === 'status' &&
-                    value2 === 'active' &&
-                    payload.status === 'closed'
-                  ) {
-                    state.closedSnapshots.push('cycle-1')
-                  }
+                  void table
+                  void col1
+                  void val1
+                  void column2
+                  void value2
+                  void payload
                   return Promise.resolve({ data: null, error: null })
                 },
               }
@@ -330,75 +297,29 @@ function makeDeleteFormData() {
   return formData
 }
 
-describe('restartPublishedCycleAction', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    sendPreliminarySnapshotMock.mockClear()
-  })
-
-  it('unpublishes the cycle, clears shifts, and closes active preliminary state', async () => {
-    const supabase = createSupabaseMock({
-      userId: 'manager-1',
-      role: 'manager',
-    })
-    mockAdminForSnapshotClose(supabase.state)
-    createClientMock.mockResolvedValue(supabase)
-    createAdminClientMock.mockReturnValue(createAdminMock(supabase.state))
-
-    await expect(restartPublishedCycleAction(makeFormData())).rejects.toThrow(
-      'REDIRECT:/publish?success=cycle_restarted'
-    )
-
-    expect(supabase.state.cyclePublished).toBe(false)
-    expect(supabase.state.deletedShiftIds).toEqual(['shift-1', 'shift-2'])
-    expect(supabase.state.deniedShiftPostIds).toEqual(['post-1'])
-    expect(supabase.state.declinedShiftPostInterestIds).toEqual(['post-1'])
-    expect(supabase.state.closedSnapshots).toEqual(['cycle-1'])
-    expect(revalidatePathMock).toHaveBeenCalledWith('/coverage')
-  })
-
-  it('denies non-managers', async () => {
-    createClientMock.mockResolvedValue(
-      createSupabaseMock({
-        userId: 'therapist-1',
-        role: 'therapist',
-      })
-    )
-
-    await expect(restartPublishedCycleAction(makeFormData())).rejects.toThrow('REDIRECT:/dashboard')
-  })
-})
-
-describe('unpublishCycleKeepShiftsAction', () => {
+describe('takeScheduleBlockOfflineAction', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('sets published false, keeps shifts, and reopens preliminary from the current schedule', async () => {
+  it('takes the live block offline, keeps shifts, and closes pending shift-board posts', async () => {
     const supabase = createSupabaseMock({
       userId: 'manager-1',
       role: 'manager',
     })
-    mockAdminForSnapshotClose(supabase.state)
     createClientMock.mockResolvedValue(supabase)
     createAdminClientMock.mockReturnValue(createAdminMock(supabase.state))
 
-    await expect(unpublishCycleKeepShiftsAction(makeFormData())).rejects.toThrow(
-      'REDIRECT:/publish?success=unpublished_keep_shifts'
+    await expect(takeScheduleBlockOfflineAction(makeFormData())).rejects.toThrow(
+      'REDIRECT:/publish?success=cycle_taken_offline'
     )
 
     expect(supabase.state.cyclePublished).toBe(false)
+    expect(supabase.state.cycleStatus).toBe('offline')
     expect(supabase.state.deletedShiftIds).toEqual([])
+    expect(supabase.state.offlineRpcCalls).toEqual(['cycle-1'])
     expect(supabase.state.deniedShiftPostIds).toEqual(['post-1'])
     expect(supabase.state.declinedShiftPostInterestIds).toEqual(['post-1'])
-    expect(sendPreliminarySnapshotMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        cycleId: 'cycle-1',
-        actorId: 'manager-1',
-        shifts: supabase.state.cycleShifts,
-      })
-    )
     expect(revalidatePathMock).toHaveBeenCalledWith('/coverage')
   })
 
@@ -410,7 +331,7 @@ describe('unpublishCycleKeepShiftsAction', () => {
       })
     )
 
-    await expect(unpublishCycleKeepShiftsAction(makeFormData())).rejects.toThrow(
+    await expect(takeScheduleBlockOfflineAction(makeFormData())).rejects.toThrow(
       'REDIRECT:/dashboard'
     )
   })

@@ -37,6 +37,17 @@ describe('coverage publish override affordance', () => {
 
     expect(source).toContain("override_weekly_rules: overrideWeeklyRules ? 'true' : undefined")
     expect(source).toContain("override_shift_rules: overrideShiftRules ? 'true' : undefined")
+    expect(source).toContain(
+      "acknowledge_missing_availability: acknowledgeMissingAvailability ? 'true' : undefined"
+    )
+  })
+
+  it('renders missing-availability acknowledgement without bypassing hard availability blockers', () => {
+    const source = readFileSync(coverageClientPath, 'utf8')
+
+    expect(source).toContain("errorParam === 'publish_missing_availability_warning'")
+    expect(source).toContain('name="acknowledge_missing_availability"')
+    expect(source).toContain('Acknowledge and publish')
   })
 
   it('surfaces cycle workflow controls in the coverage workspace', () => {

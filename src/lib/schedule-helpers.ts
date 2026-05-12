@@ -185,8 +185,8 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
   if (success === 'cycle_published') {
     return { message: 'Schedule cycle published.', variant: 'success' }
   }
-  if (success === 'cycle_unpublished') {
-    return { message: 'Schedule cycle moved to draft.', variant: 'success' }
+  if (success === 'cycle_taken_offline') {
+    return { message: 'Schedule Block taken offline.', variant: 'success' }
   }
   if (success === 'shift_added') {
     return { message: 'Shift added to schedule.', variant: 'success' }
@@ -344,6 +344,21 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
     const ineligibleLead = parseCount(getSearchParam(params?.lead_ineligible))
     return {
       message: `Publish blocked. Coverage under: ${underCoverage}, coverage over: ${overCoverage}, missing lead: ${missingLead}, multiple leads: ${multipleLeads}, ineligible lead: ${ineligibleLead}.`,
+      variant: 'error',
+    }
+  }
+  if (error === 'publish_availability_rule_violation') {
+    const needToWorkMisses = parseCount(getSearchParam(params?.need_to_work_misses))
+    const needOffOverrides = parseCount(getSearchParam(params?.need_off_overrides))
+    return {
+      message: `Publish blocked. Need to Work not assigned: ${needToWorkMisses}; Need Off overrides missing manager context: ${needOffOverrides}.`,
+      variant: 'error',
+    }
+  }
+  if (error === 'publish_missing_availability_warning') {
+    const missingAvailability = parseCount(getSearchParam(params?.missing_availability))
+    return {
+      message: `Missing availability for ${missingAvailability} active therapist${missingAvailability === 1 ? '' : 's'}. A manager can acknowledge this and publish if the schedule is otherwise ready.`,
       variant: 'error',
     }
   }

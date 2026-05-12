@@ -31,6 +31,13 @@ const preliminaryNotificationMigrationSource = readFileSync(
   ),
   'utf8'
 )
+const designatedLeadMigrationSource = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/migrations/20260222191647_add_lead_eligibility_and_designated_lead.sql'
+  ),
+  'utf8'
+)
 const blockRuleMigrationSource = readFileSync(
   resolve(
     process.cwd(),
@@ -51,6 +58,14 @@ const activeLeadPublishMigrationSource = readFileSync(
 )
 const standingPrnMigrationSource = readFileSync(
   resolve(process.cwd(), 'supabase/migrations/20260512140625_allow_standing_prn_patterns.sql'),
+  'utf8'
+)
+const offlineLifecycleMigrationSource = readFileSync(
+  resolve(process.cwd(), 'supabase/migrations/20260512155706_schedule_block_offline_lifecycle.sql'),
+  'utf8'
+)
+const availabilityPublishMigrationSource = readFileSync(
+  resolve(process.cwd(), 'supabase/migrations/20260512163433_publish_availability_preflight.sql'),
   'utf8'
 )
 const publishActionsSource = readFileSync(
@@ -144,10 +159,11 @@ describe('schedule lifecycle hardening', () => {
   })
 
   it('does not trust client-passed cycle publication or template dates', () => {
-    expect(publishActionsSource).toContain("rpc('app_publish_schedule_cycle'")
+    expect(publishActionsSource).toContain('publishMutationClient.rpc')
+    expect(publishActionsSource).toContain("'app_publish_schedule_cycle'")
     expect(publishActionsSource).toContain('p_actor_id: user.id')
-    expect(publishActionsSource).toContain(".eq('published', true)")
-    expect(publishActionsSource).toContain("error: currentlyPublished ? 'unpublish_state_changed'")
+    expect(publishActionsSource).toContain("'take_offline_from_publish_history'")
+    expect(publishActionsSource).not.toContain(".update({ published: false, status: 'draft' })")
     expect(cycleActionsSource).toContain(".eq('published', false)")
     expect(templateActionsSource).not.toContain('new_cycle_start_date')
     expect(templateActionsSource).toContain('applyTemplateToCycle(templateData, cycle.start_date')
@@ -158,8 +174,19 @@ describe('schedule lifecycle hardening', () => {
     expect(preliminaryHardeningMigrationSource).toContain(
       "'draft', 'preliminary', 'final', 'archived'"
     )
+    expect(offlineLifecycleMigrationSource).toContain(
+      "add value if not exists 'offline' after 'final'"
+    )
+    expect(offlineLifecycleMigrationSource).toContain('app_take_schedule_cycle_offline')
+    expect(offlineLifecycleMigrationSource).toContain(
+      "set status = 'offline'::public.schedule_cycle_status"
+    )
     expect(blockRuleMigrationSource).toContain(
       "v_cycle.status not in ('draft'::public.schedule_cycle_status, 'preliminary'::public.schedule_cycle_status)"
+    )
+    expect(offlineLifecycleMigrationSource).toContain("'offline'::public.schedule_cycle_status")
+    expect(offlineLifecycleMigrationSource).toContain(
+      'another live block covers the same date range'
     )
     expect(blockRuleMigrationSource).toContain('Resolve preliminary requests before publishing.')
     expect(blockRuleMigrationSource).toContain(
@@ -182,6 +209,9 @@ describe('schedule lifecycle hardening', () => {
     expect(preliminaryHardeningMigrationSource).toContain(
       'shift_operational_entries_sync_shift_legacy_status'
     )
+    expect(designatedLeadMigrationSource).toContain('shifts_unique_designated_lead_per_slot_idx')
+    expect(designatedLeadMigrationSource).toContain('on public.shifts (cycle_id, date, shift_type)')
+    expect(designatedLeadMigrationSource).toContain("where role = 'lead'")
     expect(preliminaryHardeningMigrationSource).toContain('shifts_designated_lead_assigned_check')
     expect(preliminaryHardeningMigrationSource).toContain('enforce_prn_shift_assignment_rule')
     expect(preliminaryHardeningMigrationSource).toContain(
@@ -203,6 +233,18 @@ describe('schedule lifecycle hardening', () => {
       'create or replace function public.promote_next_designated_lead_for_shift'
     )
     expect(blockRuleMigrationSource).toContain("candidate.role = 'staff'")
+    expect(availabilityPublishMigrationSource).toContain(
+      'assert_schedule_cycle_availability_publish_ready'
+    )
+    expect(availabilityPublishMigrationSource).toContain(
+      'Final publish requires every Need to Work entry to be assigned or resolved.'
+    )
+    expect(availabilityPublishMigrationSource).toContain(
+      'Final publish requires manager override context before scheduling over Need Off.'
+    )
+    expect(availabilityPublishMigrationSource).toContain(
+      "active_entry.code in ('on_call', 'call_in', 'cancelled', 'left_early')"
+    )
   })
 
   it('enforces Schedule Blocks as non-overlapping six-week Sunday-start ranges', () => {

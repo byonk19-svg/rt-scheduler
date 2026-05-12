@@ -24,7 +24,8 @@ describe('schedule block state', () => {
         activePreliminarySnapshotId: 'snapshot-1',
         hasPublishHistory: true,
       })
-    ).toBe('unpublished')
+    ).toBe('offline')
+    expect(resolveScheduleBlockState({ published: false, status: 'offline' })).toBe('offline')
     expect(resolveScheduleBlockState({ published: true, archivedAt: null })).toBe('published')
     expect(resolveScheduleBlockState({ published: true, archivedAt: '2026-05-09T12:00:00Z' })).toBe(
       'archived'
@@ -35,12 +36,13 @@ describe('schedule block state', () => {
     expect(canEditScheduleBlock('created')).toBe(true)
     expect(canEditScheduleBlock('preliminary_sent')).toBe(true)
     expect(canEditScheduleBlock('published')).toBe(false)
+    expect(canEditScheduleBlock('offline')).toBe(false)
     expect(canEditScheduleBlock('archived')).toBe(false)
 
     expect(canPublishScheduleBlock('created')).toBe(false)
     expect(canPublishScheduleBlock('shifts_assigned')).toBe(true)
     expect(canPublishScheduleBlock('preliminary_sent')).toBe(true)
-    expect(canPublishScheduleBlock('unpublished')).toBe(true)
+    expect(canPublishScheduleBlock('offline')).toBe(true)
     expect(canPublishScheduleBlock('archived')).toBe(false)
   })
 })

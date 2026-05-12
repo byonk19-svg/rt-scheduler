@@ -170,6 +170,7 @@ function createEmptySnapshot(): CoveragePageSnapshot {
     actorScheduleShift: { resolved: true, type: null },
     activeCycleId: null,
     activeCyclePublished: false,
+    activeCycleStatus: null,
     activePreliminarySnapshot: null,
     availableCycles: [],
     printCycle: null,
@@ -268,6 +269,7 @@ export async function getCoveragePageServerData({
 
   snapshot.activeCycleId = selectedCycle?.id ?? null
   snapshot.activeCyclePublished = Boolean(selectedCycle?.published)
+  snapshot.activeCycleStatus = selectedCycle?.status ?? null
   snapshot.printCycle = selectedCycle
     ? {
         label: selectedCycle.label,

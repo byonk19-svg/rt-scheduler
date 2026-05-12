@@ -5,12 +5,8 @@ import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
-import { sendPreliminarySnapshot } from '@/lib/preliminary-schedule/mutations'
 import { refreshPublishEventCounts } from '@/lib/publish-events'
-import {
-  closePendingShiftPostsForShiftIds,
-  preserveShiftPostHistoryBeforeShiftDeletion,
-} from '@/lib/shift-post-cleanup'
+import { closePendingShiftPostsForShiftIds } from '@/lib/shift-post-cleanup'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -43,6 +39,16 @@ async function requireManagerUser() {
 function getOne<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null
   return value ?? null
+}
+
+type TakeOfflineMutationClient = {
+  rpc: (
+    fn: 'app_take_schedule_cycle_offline',
+    args: { p_actor_id: string; p_cycle_id: string }
+  ) => PromiseLike<{
+    data: Array<{ id: string }> | { id: string } | null
+    error: { message?: string } | null
+  }>
 }
 
 export async function requeueFailedPublishEmailsAction(formData: FormData) {
@@ -87,99 +93,7 @@ export async function requeueFailedPublishEmailsAction(formData: FormData) {
   redirect(`/publish/${publishEventId}?success=failed_requeued&requeued=${requeued}`)
 }
 
-export async function restartPublishedCycleAction(formData: FormData) {
-  await requireManagerUser()
-
-  const cycleId = String(formData.get('cycle_id') ?? '').trim()
-  if (!cycleId) {
-    redirect('/publish?error=missing_cycle')
-  }
-
-  const supabase = await createClient()
-  const admin = (() => {
-    try {
-      return createAdminClient()
-    } catch (error) {
-      console.error('Failed to initialize admin client for cycle restart:', error)
-      redirect('/publish?error=cycle_restart_failed')
-    }
-  })()
-
-  const { data: cycle, error: cycleError } = await supabase
-    .from('schedule_cycles')
-    .select('id, published')
-    .eq('id', cycleId)
-    .maybeSingle()
-
-  if (cycleError || !cycle) {
-    console.error('Failed to load cycle for restart:', cycleError)
-    redirect('/publish?error=cycle_restart_failed')
-  }
-
-  const { error: cycleUpdateError } = await supabase
-    .from('schedule_cycles')
-    .update({ published: false, status: 'draft' })
-    .eq('id', cycleId)
-
-  if (cycleUpdateError) {
-    console.error('Failed to unpublish cycle during restart:', cycleUpdateError)
-    redirect('/publish?error=cycle_restart_failed')
-  }
-
-  const shiftIdsToDelete = (statefulShifts: Array<{ id: string | null }>) =>
-    statefulShifts.map((row) => row.id).filter((id): id is string => Boolean(id))
-
-  const { data: shiftsBeforeDelete, error: shiftsBeforeDeleteError } = await supabase
-    .from('shifts')
-    .select('id')
-    .eq('cycle_id', cycleId)
-
-  if (shiftsBeforeDeleteError) {
-    console.error('Failed to load shifts during cycle restart cleanup:', shiftsBeforeDeleteError)
-    redirect('/publish?error=cycle_restart_failed')
-  }
-
-  await preserveShiftPostHistoryBeforeShiftDeletion(
-    supabase,
-    shiftIdsToDelete((shiftsBeforeDelete ?? []) as Array<{ id: string | null }>),
-    'Schedule restarted before this request could be resolved.'
-  )
-
-  const { data: deletedShifts, error: deleteShiftsError } = await supabase
-    .from('shifts')
-    .delete()
-    .eq('cycle_id', cycleId)
-    .select('id')
-
-  if (deleteShiftsError) {
-    console.error('Failed to clear shifts during cycle restart:', deleteShiftsError)
-    redirect('/publish?error=cycle_restart_failed')
-  }
-
-  const { error: closeSnapshotError } = await admin
-    .from('preliminary_snapshots')
-    .update({ status: 'closed' })
-    .eq('cycle_id', cycleId)
-    .eq('status', 'active')
-
-  if (closeSnapshotError) {
-    console.error('Failed to close preliminary snapshot during cycle restart:', closeSnapshotError)
-    redirect('/publish?error=cycle_restart_failed')
-  }
-
-  void deletedShifts
-
-  revalidatePath('/publish')
-  revalidatePath('/coverage')
-  revalidatePath('/schedule')
-  revalidatePath('/preliminary')
-  revalidatePath('/approvals')
-
-  redirect('/publish?success=cycle_restarted')
-}
-
-/** Sets published=false without removing shifts (draft again, assignments preserved). */
-export async function unpublishCycleKeepShiftsAction(formData: FormData) {
+export async function takeScheduleBlockOfflineAction(formData: FormData) {
   const user = await requireManagerUser()
 
   const cycleId = String(formData.get('cycle_id') ?? '').trim()
@@ -192,43 +106,52 @@ export async function unpublishCycleKeepShiftsAction(formData: FormData) {
     try {
       return createAdminClient()
     } catch (error) {
-      console.error('Failed to initialize admin client for cycle unpublish:', error)
-      redirect('/publish?error=unpublish_keep_shifts_failed')
+      console.error('Failed to initialize admin client for take offline:', error)
+      redirect('/publish?error=take_offline_failed')
     }
-  })()
+  })() as unknown as TakeOfflineMutationClient
+
   const { data: cycle, error: cycleError } = await supabase
     .from('schedule_cycles')
-    .select('id, published')
+    .select('id, published, status')
     .eq('id', cycleId)
     .maybeSingle()
 
   if (cycleError || !cycle) {
-    console.error('Failed to load cycle for unpublish:', cycleError)
-    redirect('/publish?error=unpublish_keep_shifts_failed')
+    console.error('Failed to load cycle for take offline:', cycleError)
+    redirect('/publish?error=take_offline_failed')
   }
 
-  if (!cycle.published) {
-    redirect('/publish?error=unpublish_not_live')
-  }
-
-  const { error: cycleUpdateError } = await supabase
-    .from('schedule_cycles')
-    .update({ published: false, status: 'preliminary' })
-    .eq('id', cycleId)
-
-  if (cycleUpdateError) {
-    console.error('Failed to unpublish cycle:', cycleUpdateError)
-    redirect('/publish?error=unpublish_keep_shifts_failed')
+  if (!cycle.published || cycle.status !== 'final') {
+    redirect('/publish?error=take_offline_not_live')
   }
 
   const { data: currentShifts, error: shiftsError } = await supabase
     .from('shifts')
-    .select('*')
+    .select('id')
     .eq('cycle_id', cycleId)
 
   if (shiftsError) {
-    console.error('Failed to load shifts for preliminary reopen:', shiftsError)
-    redirect('/publish?error=unpublish_keep_shifts_failed')
+    console.error('Failed to load shifts for take offline cleanup:', shiftsError)
+    redirect('/publish?error=take_offline_failed')
+  }
+
+  const { data: offlineRows, error: offlineError } = await admin.rpc(
+    'app_take_schedule_cycle_offline',
+    {
+      p_actor_id: user.id,
+      p_cycle_id: cycleId,
+    }
+  )
+
+  if (offlineError) {
+    console.error('Failed to take schedule block offline:', offlineError)
+    redirect('/publish?error=take_offline_failed')
+  }
+
+  const hasOfflineRow = Array.isArray(offlineRows) ? offlineRows.length > 0 : Boolean(offlineRows)
+  if (!hasOfflineRow) {
+    redirect('/publish?error=take_offline_state_changed')
   }
 
   await closePendingShiftPostsForShiftIds(
@@ -236,19 +159,8 @@ export async function unpublishCycleKeepShiftsAction(formData: FormData) {
     ((currentShifts ?? []) as Array<{ id: string | null }>)
       .map((shift) => shift.id)
       .filter((id): id is string => Boolean(id)),
-    'Schedule reopened in preliminary. Submit a new request after the draft is updated.'
+    'Schedule block was taken offline. Submit a new request after it is republished.'
   )
-
-  const reopenResult = await sendPreliminarySnapshot(admin as never, {
-    cycleId,
-    actorId: user.id,
-    shifts: (currentShifts ?? []) as Array<Record<string, unknown>> as never,
-  })
-
-  if (reopenResult.error) {
-    console.error('Failed to reopen preliminary snapshot during unpublish:', reopenResult.error)
-    redirect('/publish?error=unpublish_keep_shifts_failed')
-  }
 
   revalidatePath('/publish')
   revalidatePath('/coverage')
@@ -259,7 +171,7 @@ export async function unpublishCycleKeepShiftsAction(formData: FormData) {
   revalidatePath('/shift-board')
   revalidatePath('/staff/history')
 
-  redirect('/publish?success=unpublished_keep_shifts')
+  redirect('/publish?success=cycle_taken_offline')
 }
 
 export async function deletePublishEventAction(formData: FormData) {

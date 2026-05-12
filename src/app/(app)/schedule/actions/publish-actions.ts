@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { can } from '@/lib/auth/can'
 import { notifyUsers } from '@/lib/notifications'
 import { writeAuditLog } from '@/lib/audit-log'
+import { summarizeAvailabilityPublishIssues } from '@/lib/availability-publish-validation'
 import { getPublishEmailConfig, processQueuedPublishEmails } from '@/lib/publish-events'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
@@ -38,12 +39,28 @@ type ShiftPublishValidationRow = {
   id: string
   date: string
   shift_type: 'day' | 'night'
+  status: string
   role: ShiftRole
   user_id: string
+  unfilled_reason: string | null
+  availability_override: boolean
+  availability_override_reason: string | null
+  availability_override_by: string | null
+  availability_override_at: string | null
   profiles:
     | { full_name: string; is_lead_eligible: boolean }
     | { full_name: string; is_lead_eligible: boolean }[]
     | null
+}
+
+type AvailabilityOverridePublishRow = {
+  therapist_id: string
+  cycle_id: string
+  date: string
+  shift_type: 'day' | 'night' | 'both'
+  override_type: 'force_off' | 'force_on'
+  source?: 'manager' | 'therapist' | null
+  note?: string | null
 }
 
 type PublishRecipientRow = {
@@ -85,6 +102,8 @@ export async function toggleCyclePublishedAction(formData: FormData) {
   const showUnavailable = String(formData.get('show_unavailable') ?? '').trim() === 'true'
   const overrideWeeklyRules = String(formData.get('override_weekly_rules') ?? '').trim() === 'true'
   const overrideShiftRules = String(formData.get('override_shift_rules') ?? '').trim() === 'true'
+  const acknowledgeMissingAvailability =
+    String(formData.get('acknowledge_missing_availability') ?? '').trim() === 'true'
   const viewParams = showUnavailable ? { show_unavailable: 'true' } : undefined
   const buildReturnUrl = (
     cycleIdOverride: string | undefined,
@@ -99,10 +118,14 @@ export async function toggleCyclePublishedAction(formData: FormData) {
     redirect(buildReturnUrl(undefined, viewParams))
   }
 
+  if (currentlyPublished) {
+    redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'take_offline_from_publish_history' }))
+  }
+
   if (!currentlyPublished) {
     const { data: cycle, error: cycleError } = await supabase
       .from('schedule_cycles')
-      .select('label, start_date, end_date, status')
+      .select('label, start_date, end_date, status, site_id')
       .eq('id', cycleId)
       .maybeSingle()
 
@@ -208,32 +231,34 @@ export async function toggleCyclePublishedAction(formData: FormData) {
               over: String(overCount),
               override_weekly_rules: overrideWeeklyRules ? 'true' : undefined,
               override_shift_rules: overrideShiftRules ? 'true' : undefined,
+              acknowledge_missing_availability: acknowledgeMissingAvailability ? 'true' : undefined,
             })
           )
         }
       }
     }
 
-    if (!overrideShiftRules) {
-      const { data: shiftCoverageData, error: shiftCoverageError } = await supabase
-        .from('shifts')
-        .select(
-          'id, date, shift_type, role, user_id, profiles:profiles!shifts_user_id_fkey(full_name, is_lead_eligible)'
-        )
-        .eq('cycle_id', cycleId)
-        .gte('date', cycle.start_date)
-        .lte('date', cycle.end_date)
-
-      if (shiftCoverageError) {
-        console.error('Failed to load shifts for coverage validation:', shiftCoverageError)
-        redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'publish_validation_failed' }))
-      }
-
-      const shiftCoverageRows = (shiftCoverageData ?? []) as ShiftPublishValidationRow[]
-      const activeOperationalCodesByShiftId = await fetchActiveOperationalCodeMap(
-        supabase,
-        shiftCoverageRows.map((row) => row.id)
+    const { data: shiftCoverageData, error: shiftCoverageError } = await supabase
+      .from('shifts')
+      .select(
+        'id, date, shift_type, status, role, user_id, unfilled_reason, availability_override, availability_override_reason, availability_override_by, availability_override_at, profiles:profiles!shifts_user_id_fkey(full_name, is_lead_eligible)'
       )
+      .eq('cycle_id', cycleId)
+      .gte('date', cycle.start_date)
+      .lte('date', cycle.end_date)
+
+    if (shiftCoverageError) {
+      console.error('Failed to load shifts for coverage validation:', shiftCoverageError)
+      redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'publish_validation_failed' }))
+    }
+
+    const shiftCoverageRows = (shiftCoverageData ?? []) as ShiftPublishValidationRow[]
+    const activeOperationalCodesByShiftId = await fetchActiveOperationalCodeMap(
+      supabase,
+      shiftCoverageRows.map((row) => row.id)
+    )
+
+    if (!overrideShiftRules) {
       const slotValidation = summarizeShiftSlotViolations({
         cycleDates,
         assignments: shiftCoverageRows.map((row) => ({
@@ -261,28 +286,131 @@ export async function toggleCyclePublishedAction(formData: FormData) {
             lead_ineligible: String(slotValidation.ineligibleLead),
             override_weekly_rules: overrideWeeklyRules ? 'true' : undefined,
             override_shift_rules: overrideShiftRules ? 'true' : undefined,
+            acknowledge_missing_availability: acknowledgeMissingAvailability ? 'true' : undefined,
           })
         )
       }
     }
+
+    const { data: availabilityOverrideData, error: availabilityOverrideError } = await supabase
+      .from('availability_overrides')
+      .select('therapist_id, cycle_id, date, shift_type, override_type, source, note')
+      .eq('cycle_id', cycleId)
+
+    if (availabilityOverrideError) {
+      console.error(
+        'Failed to load availability overrides for publish validation:',
+        availabilityOverrideError
+      )
+      redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'publish_validation_failed' }))
+    }
+
+    const availabilityOverrides = (availabilityOverrideData ??
+      []) as AvailabilityOverridePublishRow[]
+    let expectedTherapistIds: string[] = []
+    let submittedTherapistIds: string[] = []
+
+    if (!acknowledgeMissingAvailability) {
+      const { data: expectedTherapistsData, error: expectedTherapistsError } = await supabase
+        .from('profiles')
+        .select('id')
+        .in('role', ['therapist', 'lead'])
+        .eq('is_active', true)
+        .eq('on_fmla', false)
+        .is('archived_at', null)
+        .eq('site_id', cycle.site_id)
+
+      if (expectedTherapistsError) {
+        console.error(
+          'Failed to load therapists for availability publish validation:',
+          expectedTherapistsError
+        )
+        redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'publish_validation_failed' }))
+      }
+
+      expectedTherapistIds = ((expectedTherapistsData ?? []) as Array<{ id: string }>).map(
+        (row) => row.id
+      )
+
+      const { data: submissionData, error: submissionError } = await supabase
+        .from('therapist_availability_submissions')
+        .select('therapist_id')
+        .eq('schedule_cycle_id', cycleId)
+
+      if (submissionError) {
+        console.error(
+          'Failed to load availability submissions for publish validation:',
+          submissionError
+        )
+        redirect(buildReturnUrl(cycleId, { ...viewParams, error: 'publish_validation_failed' }))
+      }
+
+      submittedTherapistIds = ((submissionData ?? []) as Array<{ therapist_id: string }>).map(
+        (row) => row.therapist_id
+      )
+    }
+
+    const availabilitySummary = summarizeAvailabilityPublishIssues({
+      overrides: availabilityOverrides.map((override) => ({
+        ...override,
+        source:
+          override.source === 'manager' || override.source === 'therapist'
+            ? override.source
+            : undefined,
+      })),
+      scheduledShifts: shiftCoverageRows.map((row) => ({
+        user_id: row.user_id,
+        date: row.date,
+        shift_type: row.shift_type,
+        status: activeOperationalCodesByShiftId.has(row.id) ? 'called_off' : row.status,
+        availability_override: row.availability_override,
+        availability_override_reason: row.availability_override_reason,
+        availability_override_by: row.availability_override_by,
+        availability_override_at: row.availability_override_at,
+      })),
+      expectedTherapistIds,
+      submittedTherapistIds,
+    })
+
+    if (
+      availabilitySummary.needToWorkMisses > 0 ||
+      availabilitySummary.needOffOverridesMissingReason > 0
+    ) {
+      redirect(
+        buildReturnUrl(cycleId, {
+          ...viewParams,
+          error: 'publish_availability_rule_violation',
+          need_to_work_misses: String(availabilitySummary.needToWorkMisses),
+          need_off_overrides: String(availabilitySummary.needOffOverridesMissingReason),
+          override_weekly_rules: overrideWeeklyRules ? 'true' : undefined,
+          override_shift_rules: overrideShiftRules ? 'true' : undefined,
+          acknowledge_missing_availability: acknowledgeMissingAvailability ? 'true' : undefined,
+        })
+      )
+    }
+
+    if (!acknowledgeMissingAvailability && availabilitySummary.missingAvailabilitySubmissions > 0) {
+      redirect(
+        buildReturnUrl(cycleId, {
+          ...viewParams,
+          error: 'publish_missing_availability_warning',
+          missing_availability: String(availabilitySummary.missingAvailabilitySubmissions),
+          override_weekly_rules: overrideWeeklyRules ? 'true' : undefined,
+          override_shift_rules: overrideShiftRules ? 'true' : undefined,
+        })
+      )
+    }
   }
 
-  const publishMutationClient = !currentlyPublished
-    ? (createAdminClient() as unknown as PublishCycleMutationClient)
-    : null
+  const publishMutationClient = createAdminClient() as unknown as PublishCycleMutationClient
 
-  const { data: updatedCycle, error } = currentlyPublished
-    ? await supabase
-        .from('schedule_cycles')
-        .update({ published: false, status: 'draft' })
-        .eq('id', cycleId)
-        .eq('published', true)
-        .select('id')
-        .maybeSingle()
-    : await publishMutationClient!.rpc('app_publish_schedule_cycle', {
-        p_actor_id: user.id,
-        p_cycle_id: cycleId,
-      })
+  const { data: updatedCycle, error } = await publishMutationClient.rpc(
+    'app_publish_schedule_cycle',
+    {
+      p_actor_id: user.id,
+      p_cycle_id: cycleId,
+    }
+  )
 
   if (error) {
     console.error('Failed to toggle schedule publication state:', error)
@@ -291,12 +419,16 @@ export async function toggleCyclePublishedAction(formData: FormData) {
         ? 'publish_unresolved_preliminary_marks'
         : !currentlyPublished && /resolve preliminary requests/i.test(error.message ?? '')
           ? 'publish_unresolved_preliminary_requests'
-          : !currentlyPublished &&
-              /designated lead|lead-capable assigned/i.test(error.message ?? '')
-            ? 'publish_shift_rule_violation'
-            : !currentlyPublished && /draft or preliminary/i.test(error.message ?? '')
-              ? 'publish_invalid_state'
-              : 'publish_failed'
+          : !currentlyPublished && /another live block|same date range/i.test(error.message ?? '')
+            ? 'publish_republish_conflict'
+            : !currentlyPublished && /Need to Work|Need Off|availability/i.test(error.message ?? '')
+              ? 'publish_availability_rule_violation'
+              : !currentlyPublished &&
+                  /designated lead|lead-capable assigned/i.test(error.message ?? '')
+                ? 'publish_shift_rule_violation'
+                : !currentlyPublished && /draft or preliminary/i.test(error.message ?? '')
+                  ? 'publish_invalid_state'
+                  : 'publish_failed'
     redirect(
       buildReturnUrl(cycleId, {
         ...viewParams,
@@ -517,7 +649,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
   redirect(
     buildReturnUrl(cycleId, {
       ...viewParams,
-      success: currentlyPublished ? 'cycle_unpublished' : 'cycle_published',
+      success: 'cycle_published',
     })
   )
 }

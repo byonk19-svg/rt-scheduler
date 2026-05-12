@@ -278,6 +278,7 @@ export function CoverageClientPage({
   const draftParam = search.get('draft')
   const overrideWeeklyRulesParam = search.get('override_weekly_rules')
   const overrideShiftRulesParam = search.get('override_shift_rules')
+  const acknowledgeMissingAvailabilityParam = search.get('acknowledge_missing_availability')
   const addedParam = search.get('added')
   const unfilledParam = search.get('unfilled')
   const constraintsUnfilledParam = search.get('constraints_unfilled')
@@ -294,6 +295,9 @@ export function CoverageClientPage({
   const leadMissingParam = search.get('lead_missing')
   const leadMultipleParam = search.get('lead_multiple')
   const leadIneligibleParam = search.get('lead_ineligible')
+  const needToWorkMissesParam = search.get('need_to_work_misses')
+  const needOffOverridesParam = search.get('need_off_overrides')
+  const missingAvailabilityParam = search.get('missing_availability')
   const coverageMutator = useCoverageShiftMutator()
   const therapistOptionsByShift = initialSnapshot.allTherapistsByShift
   const rosterProfilesByShift = initialSnapshot.rosterProfilesByShift
@@ -310,6 +314,7 @@ export function CoverageClientPage({
   const [activeCyclePublished, setActiveCyclePublished] = useState(
     () => initialSnapshot.activeCyclePublished
   )
+  const [activeCycleStatus, setActiveCycleStatus] = useState(() => initialSnapshot.activeCycleStatus)
   const [activePreliminarySnapshot, setActivePreliminarySnapshot] =
     useState<PreliminarySnapshotRow | null>(() => initialSnapshot.activePreliminarySnapshot)
   const [availableCycles, setAvailableCycles] = useState<CycleRow[]>(() => initialSnapshot.availableCycles)
@@ -388,6 +393,10 @@ export function CoverageClientPage({
       lead_missing: leadMissingParam ?? undefined,
       lead_multiple: leadMultipleParam ?? undefined,
       lead_ineligible: leadIneligibleParam ?? undefined,
+      need_to_work_misses: needToWorkMissesParam ?? undefined,
+      need_off_overrides: needOffOverridesParam ?? undefined,
+      missing_availability: missingAvailabilityParam ?? undefined,
+      acknowledge_missing_availability: acknowledgeMissingAvailabilityParam ?? undefined,
     }),
     [
       autoParam, draftParam, errorParam, successParam,
@@ -395,6 +404,8 @@ export function CoverageClientPage({
       droppedParam, removedParam, weekStartParam, weekEndParam, violationsParam,
       underParam, overParam, underCoverageParam, overCoverageParam,
       leadMissingParam, leadMultipleParam, leadIneligibleParam,
+      needToWorkMissesParam, needOffOverridesParam, missingAvailabilityParam,
+      acknowledgeMissingAvailabilityParam,
     ]
   )
   const publishErrorMessage = useMemo(() => {
@@ -412,6 +423,8 @@ export function CoverageClientPage({
       return {
         weekly: 'true',
         shift: overrideShiftRulesParam === 'true' ? 'true' : 'false',
+        acknowledgeMissingAvailability:
+          acknowledgeMissingAvailabilityParam === 'true' ? 'true' : 'false',
         label: 'Publish with weekly override',
         description: 'Bypass weekly workload validation for this publish only.',
       }
@@ -421,13 +434,30 @@ export function CoverageClientPage({
       return {
         weekly: overrideWeeklyRulesParam === 'true' ? 'true' : 'false',
         shift: 'true',
+        acknowledgeMissingAvailability:
+          acknowledgeMissingAvailabilityParam === 'true' ? 'true' : 'false',
         label: 'Publish with shift override',
         description: 'Bypass shift coverage and lead validation for this publish only.',
       }
     }
 
+    if (errorParam === 'publish_missing_availability_warning') {
+      return {
+        weekly: overrideWeeklyRulesParam === 'true' ? 'true' : 'false',
+        shift: overrideShiftRulesParam === 'true' ? 'true' : 'false',
+        acknowledgeMissingAvailability: 'true',
+        label: 'Acknowledge and publish',
+        description: 'Publish with missing availability acknowledged for this Schedule Block.',
+      }
+    }
+
     return null
-  }, [errorParam, overrideShiftRulesParam, overrideWeeklyRulesParam])
+  }, [
+    acknowledgeMissingAvailabilityParam,
+    errorParam,
+    overrideShiftRulesParam,
+    overrideWeeklyRulesParam,
+  ])
   const syncOperationalState = useCallback((shiftId: string, nextStatus: UiStatus) => {
     const assignmentStatus = toCoverageAssignmentPayload(nextStatus).assignment_status
 
@@ -475,6 +505,7 @@ export function CoverageClientPage({
     setNightDays(initialSnapshot.nightDays)
     setActiveCycleId(initialSnapshot.activeCycleId)
     setActiveCyclePublished(initialSnapshot.activeCyclePublished)
+    setActiveCycleStatus(initialSnapshot.activeCycleStatus)
     setActivePreliminarySnapshot(initialSnapshot.activePreliminarySnapshot)
     setAvailableCycles(initialSnapshot.availableCycles)
     setPrintCycle(initialSnapshot.printCycle)
@@ -595,13 +626,17 @@ export function CoverageClientPage({
   const scheduleNeedsSetup =
     !noCycleSelected &&
     !activeCyclePublished &&
+    activeCycleStatus !== 'offline' &&
     (showEmptyDraftState ||
       coverageSummary.unassignedDays > 0 ||
       coverageSummary.missingLeadDays > 0)
+  const activeCycleOffline = activeCycleStatus === 'offline'
   const workspaceStatusTone: WorkspaceMetricTone = noCycleSelected
     ? 'neutral'
     : activeCyclePublished
       ? 'success'
+      : activeCycleOffline
+        ? 'warning'
       : scheduleNeedsSetup
         ? 'warning'
         : 'neutral'
@@ -609,6 +644,8 @@ export function CoverageClientPage({
     ? 'No active block'
     : activeCyclePublished
       ? 'Published'
+      : activeCycleOffline
+        ? 'Offline'
       : scheduleNeedsSetup
         ? 'Setup required'
         : 'Draft'
@@ -627,23 +664,29 @@ export function CoverageClientPage({
           ? 'View the live team schedule and operational status. Open a day to review details and update statuses.'
           : 'Read-only Team Schedule. Use My Shifts for your own shifts and Future Availability for the next Schedule Block.'
   const hasSchedulingContent = selectedCycleHasShiftRows && days.length > 0
-  const canRunAutoDraft = Boolean(activeCycleId) && !activeCyclePublished
-  const canSendPreliminary = Boolean(activeCycleId) && !activeCyclePublished && selectedCycleHasShiftRows
+  const canRunAutoDraft = Boolean(activeCycleId) && !activeCyclePublished && !activeCycleOffline
+  const canSendPreliminary =
+    Boolean(activeCycleId) && !activeCyclePublished && !activeCycleOffline && selectedCycleHasShiftRows
   const canPublishCycle = Boolean(activeCycleId) && selectedCycleHasShiftRows
   const planningNotices = [
     actorRole === 'manager' && !canManageCoverage
       ? 'Coverage editing is unavailable for this session. Refresh or sign in again if your manager access was just restored.'
       : null,
     successParam === 'cycle_published' ? 'Published - visible to employees.' : null,
+    activeCycleOffline
+      ? 'This Schedule Block is offline. Staff live views are hidden until you republish.'
+      : null,
     successParam === 'preliminary_sent'
       ? 'Preliminary schedule sent. Therapists can now review it in the app.'
       : null,
     successParam === 'preliminary_refreshed'
       ? 'Preliminary schedule refreshed with the latest staffing draft.'
       : null,
-    successParam === 'cycle_unpublished' ? 'Cycle unpublished.' : null,
+    successParam === 'cycle_taken_offline' ? 'Schedule Block taken offline.' : null,
     successParam === 'cycle_deleted' ? 'Cycle deleted.' : null,
-    errorParam === 'delete_cycle_published' ? 'Cannot delete a live cycle. Unpublish it first.' : null,
+    errorParam === 'delete_cycle_published'
+      ? 'Cannot delete a live Schedule Block. Take it offline or use post-publish edits instead.'
+      : null,
     successParam === 'shift_added' ? 'Shift assigned.' : null,
     autoDraftFeedback?.message ?? null,
     publishErrorMessage,
@@ -1173,7 +1216,7 @@ export function CoverageClientPage({
                           disabled={!canPublishCycle}
                         >
                           <Send className="h-4 w-4" />
-                          Publish
+                          {activeCycleOffline ? 'Republish' : 'Publish'}
                         </Button>
                       </form>
                     )}
@@ -1397,6 +1440,11 @@ export function CoverageClientPage({
                       type="hidden"
                       name="override_shift_rules"
                       value={publishOverrideConfig.shift}
+                    />
+                    <input
+                      type="hidden"
+                      name="acknowledge_missing_availability"
+                      value={publishOverrideConfig.acknowledgeMissingAvailability}
                     />
                     <input type="hidden" name="return_to" value="coverage" />
                     <Button type="submit" size="sm" className="gap-1.5 text-xs">

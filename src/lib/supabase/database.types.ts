@@ -1618,6 +1618,8 @@ export type Database = {
           end_date: string
           id: string
           label: string
+          offline_at: string | null
+          offline_by: string | null
           published: boolean
           site_id: string
           start_date: string
@@ -1630,6 +1632,8 @@ export type Database = {
           end_date: string
           id?: string
           label: string
+          offline_at?: string | null
+          offline_by?: string | null
           published?: boolean
           site_id?: string
           start_date: string
@@ -1642,12 +1646,21 @@ export type Database = {
           end_date?: string
           id?: string
           label?: string
+          offline_at?: string | null
+          offline_by?: string | null
           published?: boolean
           site_id?: string
           start_date?: string
           status?: Database['public']['Enums']['schedule_cycle_status']
         }
         Relationships: [
+          {
+            foreignKeyName: 'schedule_cycles_offline_by_fkey'
+            columns: ['offline_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'schedule_cycles_site_id_fkey'
             columns: ['site_id']
@@ -2318,6 +2331,16 @@ export type Database = {
           id: string
         }[]
       }
+      assert_schedule_cycle_availability_publish_ready: {
+        Args: { p_cycle_id: string }
+        Returns: undefined
+      }
+      app_take_schedule_cycle_offline: {
+        Args: { p_actor_id: string; p_cycle_id: string }
+        Returns: {
+          id: string
+        }[]
+      }
       app_send_preliminary_schedule: {
         Args: { p_actor_id: string; p_cycle_id: string }
         Returns: {
@@ -2514,7 +2537,7 @@ export type Database = {
       availability_entry_type: 'unavailable' | 'available'
       availability_shift_type: 'day' | 'night' | 'both'
       profile_access_status: 'pending' | 'approved' | 'declined'
-      schedule_cycle_status: 'draft' | 'preliminary' | 'final' | 'archived'
+      schedule_cycle_status: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived'
       shift_role: 'lead' | 'staff'
     }
     CompositeTypes: {

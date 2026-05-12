@@ -39,6 +39,7 @@ export type CoveragePageSnapshot = {
   }
   activeCycleId: string | null
   activeCyclePublished: boolean
+  activeCycleStatus: CycleRow['status']
   activePreliminarySnapshot: PreliminarySnapshotRow | null
   availableCycles: CycleRow[]
   printCycle: { label: string; start_date: string; end_date: string } | null

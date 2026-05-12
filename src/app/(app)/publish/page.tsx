@@ -15,10 +15,9 @@ import {
 import {
   archiveCycleAction,
   deletePublishEventAction,
-  restartPublishedCycleAction,
-  unpublishCycleKeepShiftsAction,
+  takeScheduleBlockOfflineAction,
 } from '@/app/publish/actions'
-import { deleteCycleAction } from '@/app/schedule/actions'
+import { deleteCycleAction, toggleCyclePublishedAction } from '@/app/schedule/actions'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { formatDateLabel } from '@/lib/calendar-utils'
@@ -47,10 +46,12 @@ type PublishEventRow = {
     | {
         label: string
         published: boolean
+        status: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
       }
     | {
         label: string
         published: boolean
+        status: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
       }[]
     | null
   profiles:
@@ -131,7 +132,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
   const { data: eventsData, error: eventsError } = await supabase
     .from('publish_events')
     .select(
-      'id, cycle_id, published_at, status, recipient_count, channel, queued_count, sent_count, failed_count, error_message, schedule_cycles(label,published), profiles!publish_events_published_by_fkey(full_name)'
+      'id, cycle_id, published_at, status, recipient_count, channel, queued_count, sent_count, failed_count, error_message, schedule_cycles(label,published,status), profiles!publish_events_published_by_fkey(full_name)'
     )
     .order('published_at', { ascending: false })
     .limit(50)
@@ -203,21 +204,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
         </div>
       </div>
 
-      {resolvedSearchParams.success === 'cycle_restarted' && (
-        <div
-          className="rounded-xl border px-4 py-3 text-sm font-medium"
-          style={{
-            borderColor: 'var(--warning-border)',
-            backgroundColor: 'var(--warning-subtle)',
-            color: 'var(--warning-text)',
-          }}
-        >
-          Cycle restarted. The block is draft again, published shifts were cleared, and any active
-          preliminary snapshot was closed.
-        </div>
-      )}
-
-      {resolvedSearchParams.success === 'unpublished_keep_shifts' && (
+      {resolvedSearchParams.success === 'cycle_taken_offline' && (
         <div
           className="rounded-xl border px-4 py-3 text-sm font-medium"
           style={{
@@ -226,8 +213,8 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
             color: 'var(--success-text)',
           }}
         >
-          Schedule reopened. Assignments stay on the draft grid, preliminary editing is live again,
-          and new swaps or pickups stay paused until you publish again.
+          Schedule block taken offline. Assignments were preserved, staff live views are hidden, and
+          new swaps or pickups stay paused until you republish.
         </div>
       )}
 
@@ -272,6 +259,10 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
 
       {(resolvedSearchParams.error === 'missing_cycle' ||
         resolvedSearchParams.error === 'cycle_restart_failed' ||
+        resolvedSearchParams.error === 'start_over_after_final_blocked' ||
+        resolvedSearchParams.error === 'take_offline_failed' ||
+        resolvedSearchParams.error === 'take_offline_not_live' ||
+        resolvedSearchParams.error === 'take_offline_state_changed' ||
         resolvedSearchParams.error === 'unpublish_keep_shifts_failed' ||
         resolvedSearchParams.error === 'unpublish_not_live' ||
         resolvedSearchParams.error === 'delete_publish_event_failed' ||
@@ -292,32 +283,40 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
           }}
         >
           {resolvedSearchParams.error === 'missing_cycle'
-            ? 'Could not restart that cycle because no cycle was selected.'
-            : resolvedSearchParams.error === 'cycle_restart_failed'
-              ? 'Could not restart that published cycle. Please try again.'
-              : resolvedSearchParams.error === 'unpublish_keep_shifts_failed'
-                ? 'Could not unpublish that block while keeping shifts. Please try again.'
-                : resolvedSearchParams.error === 'unpublish_not_live'
-                  ? 'That block is already a draft.'
-                  : resolvedSearchParams.error === 'delete_live_publish_event'
-                    ? 'Live publish entries must be restarted from Coverage before they can be removed from history.'
-                    : resolvedSearchParams.error === 'missing_publish_event'
-                      ? 'Could not delete that history entry because no publish event was selected.'
-                      : resolvedSearchParams.error === 'delete_publish_event_failed'
-                        ? 'Could not delete that publish history entry. Please try again.'
-                        : resolvedSearchParams.error === 'archive_live_cycle'
-                          ? 'Live blocks must be unpublished or cleared with Start over before they can be archived.'
-                          : resolvedSearchParams.error === 'cycle_archive_failed'
-                            ? 'Could not archive that cycle. Please try again.'
-                            : resolvedSearchParams.error === 'delete_cycle_unauthorized'
-                              ? 'You do not have permission to delete that schedule block.'
-                              : resolvedSearchParams.error === 'delete_cycle_not_found'
-                                ? 'That schedule block was not found.'
-                                : resolvedSearchParams.error === 'delete_cycle_published'
-                                  ? 'Published blocks cannot be deleted. Unpublish (keep shifts) or Start over, then archive or delete the draft.'
-                                  : resolvedSearchParams.error === 'delete_cycle_failed'
-                                    ? 'Could not delete that draft block. Please try again.'
-                                    : 'Something went wrong.'}
+            ? 'Could not change that Schedule Block because no block was selected.'
+            : resolvedSearchParams.error === 'start_over_after_final_blocked'
+              ? 'Published Schedule Blocks cannot be started over. Take the block offline or make post-publish edits instead.'
+              : resolvedSearchParams.error === 'take_offline_failed'
+                ? 'Could not take that Schedule Block offline. Please try again.'
+                : resolvedSearchParams.error === 'take_offline_not_live'
+                  ? 'Only live Final Schedule Blocks can be taken offline.'
+                  : resolvedSearchParams.error === 'take_offline_state_changed'
+                    ? 'That Schedule Block changed before it could be taken offline. Refresh and try again.'
+                    : resolvedSearchParams.error === 'cycle_restart_failed'
+                      ? 'Could not restart that published cycle. Please try again.'
+                      : resolvedSearchParams.error === 'unpublish_keep_shifts_failed'
+                        ? 'Could not unpublish that block while keeping shifts. Please try again.'
+                        : resolvedSearchParams.error === 'unpublish_not_live'
+                          ? 'That block is already a draft.'
+                          : resolvedSearchParams.error === 'delete_live_publish_event'
+                            ? 'Live publish entries must be restarted from Coverage before they can be removed from history.'
+                            : resolvedSearchParams.error === 'missing_publish_event'
+                              ? 'Could not delete that history entry because no publish event was selected.'
+                              : resolvedSearchParams.error === 'delete_publish_event_failed'
+                                ? 'Could not delete that publish history entry. Please try again.'
+                                : resolvedSearchParams.error === 'archive_live_cycle'
+                                  ? 'Live blocks must be taken offline before they can be archived.'
+                                  : resolvedSearchParams.error === 'cycle_archive_failed'
+                                    ? 'Could not archive that cycle. Please try again.'
+                                    : resolvedSearchParams.error === 'delete_cycle_unauthorized'
+                                      ? 'You do not have permission to delete that schedule block.'
+                                      : resolvedSearchParams.error === 'delete_cycle_not_found'
+                                        ? 'That schedule block was not found.'
+                                        : resolvedSearchParams.error === 'delete_cycle_published'
+                                          ? 'Published blocks cannot be deleted. Take the block offline or use post-publish edits instead.'
+                                          : resolvedSearchParams.error === 'delete_cycle_failed'
+                                            ? 'Could not delete that draft block. Please try again.'
+                                            : 'Something went wrong.'}
         </div>
       )}
 
@@ -335,9 +334,9 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
         <div className="px-0.5">
           <h2 className="text-sm font-bold tracking-tight text-foreground">Schedule blocks</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Live blocks: Unpublish (keep shifts) takes them offline but keeps assignments; Start
-            over clears the grid and returns to draft. Drafts: archive hides from Schedule, delete
-            removes the block. Email log is below.
+            Live blocks can be taken offline without deleting assignments. Offline blocks can be
+            republished after validation. Drafts can be archived or safely deleted when empty. Email
+            log is below.
           </p>
         </div>
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-tw-sm">
@@ -380,9 +379,13 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                           <span className="text-[11px] font-semibold text-[var(--success-text)]">
                             Live
                           </span>
+                        ) : cycle.status === 'offline' ? (
+                          <span className="text-[11px] font-semibold text-[var(--warning-text)]">
+                            Offline
+                          </span>
                         ) : (
                           <span className="text-[11px] font-medium text-muted-foreground">
-                            Draft
+                            {cycle.status === 'preliminary' ? 'Preliminary' : 'Draft'}
                           </span>
                         )}
                       </td>
@@ -396,7 +399,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                           </Link>
                           {cycle.published ? (
                             <>
-                              <form action={unpublishCycleKeepShiftsAction}>
+                              <form action={takeScheduleBlockOfflineAction}>
                                 <input type="hidden" name="cycle_id" value={cycle.id} />
                                 <button
                                   type="submit"
@@ -405,17 +408,23 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                   Take offline
                                 </button>
                               </form>
-                              <form action={restartPublishedCycleAction}>
-                                <input type="hidden" name="cycle_id" value={cycle.id} />
-                                <button
-                                  type="submit"
-                                  title="Draft again and clear all assignments for this block"
-                                  className="inline-flex h-8 items-center rounded-md px-3 text-xs font-semibold text-[var(--error)] transition-colors hover:bg-muted hover:text-[var(--error)]"
-                                >
-                                  Clear & restart
-                                </button>
-                              </form>
                             </>
+                          ) : cycle.status === 'offline' ? (
+                            <form action={toggleCyclePublishedAction}>
+                              <input type="hidden" name="cycle_id" value={cycle.id} />
+                              <input type="hidden" name="view" value="week" />
+                              <input type="hidden" name="show_unavailable" value="false" />
+                              <input type="hidden" name="currently_published" value="false" />
+                              <input type="hidden" name="override_weekly_rules" value="false" />
+                              <input type="hidden" name="override_shift_rules" value="false" />
+                              <input type="hidden" name="return_to" value="coverage" />
+                              <button
+                                type="submit"
+                                className="inline-flex h-8 items-center rounded-md px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
+                              >
+                                Republish
+                              </button>
+                            </form>
                           ) : (
                             <>
                               <form action={archiveCycleAction}>
@@ -541,23 +550,13 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                         <div className="flex justify-end gap-2">
                           {getOne(event.schedule_cycles)?.published && (
                             <>
-                              <form action={unpublishCycleKeepShiftsAction}>
+                              <form action={takeScheduleBlockOfflineAction}>
                                 <input type="hidden" name="cycle_id" value={event.cycle_id} />
                                 <button
                                   type="submit"
                                   className="inline-flex h-8 items-center rounded-md px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted"
                                 >
                                   Take offline
-                                </button>
-                              </form>
-                              <form action={restartPublishedCycleAction}>
-                                <input type="hidden" name="cycle_id" value={event.cycle_id} />
-                                <button
-                                  type="submit"
-                                  title="Draft again and clear all assignments for this block"
-                                  className="inline-flex h-8 items-center rounded-md px-3 text-xs font-semibold text-[var(--error)] transition-colors hover:bg-muted hover:text-[var(--error)]"
-                                >
-                                  Clear & restart
                                 </button>
                               </form>
                             </>

@@ -333,8 +333,13 @@ async function shouldLogPostPublishModificationForSlot(
   supabase: Awaited<ReturnType<typeof createClient>>,
   cycleId: string,
   date: string,
-  shiftType: 'day' | 'night'
+  shiftType: 'day' | 'night',
+  cyclePublished: boolean
 ): Promise<boolean> {
+  if (cyclePublished) {
+    return true
+  }
+
   if (date < toIsoDate(new Date())) {
     return true
   }
@@ -634,7 +639,8 @@ export async function POST(request: Request) {
       supabase,
       payload.cycleId,
       payload.date,
-      payload.shiftType
+      payload.shiftType,
+      Boolean(cycle.published)
     )
 
     if (shouldLogPostPublishModification && insertedShift?.id) {
@@ -871,13 +877,15 @@ export async function POST(request: Request) {
       supabase,
       payload.cycleId,
       shift.date,
-      shift.shift_type as 'day' | 'night'
+      shift.shift_type as 'day' | 'night',
+      Boolean(cycle.published)
     )
     const targetNeedsAudit = await shouldLogPostPublishModificationForSlot(
       supabase,
       payload.cycleId,
       payload.targetDate,
-      payload.targetShiftType
+      payload.targetShiftType,
+      Boolean(cycle.published)
     )
 
     if (sourceNeedsAudit || targetNeedsAudit) {
@@ -970,7 +978,8 @@ export async function POST(request: Request) {
       supabase,
       payload.cycleId,
       shift.date,
-      shift.shift_type
+      shift.shift_type,
+      Boolean(cycle.published)
     )
 
     if (shouldLogPostPublishModification) {
@@ -1204,7 +1213,8 @@ export async function POST(request: Request) {
       supabase,
       payload.cycleId,
       payload.date,
-      payload.shiftType
+      payload.shiftType,
+      Boolean(cycle.published)
     )
 
     if (shouldLogPostPublishModification) {

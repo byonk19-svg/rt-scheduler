@@ -74,6 +74,24 @@ describe('schedule feedback messaging', () => {
     expect(feedback?.message).toContain('ineligible lead: 1')
   })
 
+  it('summarizes availability-derived publish blockers and warnings', () => {
+    const blocker = getScheduleFeedback({
+      error: 'publish_availability_rule_violation',
+      need_to_work_misses: '2',
+      need_off_overrides: '1',
+    })
+    const warning = getScheduleFeedback({
+      error: 'publish_missing_availability_warning',
+      missing_availability: '3',
+    })
+
+    expect(blocker?.variant).toBe('error')
+    expect(blocker?.message).toContain('Need to Work not assigned: 2')
+    expect(blocker?.message).toContain('Need Off overrides missing manager context: 1')
+    expect(warning?.variant).toBe('error')
+    expect(warning?.message).toContain('Missing availability for 3 active therapists')
+  })
+
   it('includes constraint-driven unfilled counts after auto-generate', () => {
     const feedback = getScheduleFeedback({
       auto: 'generated',

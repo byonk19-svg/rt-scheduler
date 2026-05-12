@@ -6,12 +6,15 @@ export type CoverageScheduleCycleRow = {
   start_date: string
   end_date: string
   published: boolean
+  status: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
   archived_at: string | null
+  offline_at: string | null
+  offline_by: string | null
 }
 
 /**
- * True when the failure is specifically about `schedule_cycles.archived_at` missing from the
- * database (migration not applied) or from PostgREST's schema cache (PGRST204 after schema drift).
+ * True when the failure is specifically about newer Schedule Block lifecycle columns missing from
+ * the database (migration not applied) or from PostgREST's schema cache (PGRST204 after schema drift).
  */
 export function isScheduleCycleArchivalColumnError(err: {
   message?: string
@@ -20,25 +23,25 @@ export function isScheduleCycleArchivalColumnError(err: {
   if (!err) return false
   const msg = String(err.message ?? '')
   const code = String(err.code ?? '')
-  if (!/archived_at/i.test(msg)) return false
+  if (!/(archived_at|status|offline_at|offline_by)/i.test(msg)) return false
   return (
     code === '42703' ||
     code === 'PGRST204' ||
-    /column[^\n]*archived_at[^\n]*does not exist/i.test(msg) ||
-    /could not find[^\n]*archived_at/i.test(msg)
+    /column[^\n]*(archived_at|status|offline_at|offline_by)[^\n]*does not exist/i.test(msg) ||
+    /could not find[^\n]*(archived_at|status|offline_at|offline_by)/i.test(msg)
   )
 }
 
 /**
- * Loads non-archived schedule cycles for Coverage. If the DB has not received the
- * `schedule_cycles.archived_at` migration, falls back to a legacy query (no archival filter).
+ * Loads non-archived schedule cycles for Coverage. If the DB has not received the lifecycle
+ * migrations yet, falls back to a legacy query (no archival/offline metadata).
  */
 export async function fetchScheduleCyclesForCoverage(
   supabase: SupabaseClient
 ): Promise<{ data: CoverageScheduleCycleRow[]; error: { message: string; code?: string } | null }> {
   const primary = await supabase
     .from('schedule_cycles')
-    .select('id, label, start_date, end_date, published, archived_at')
+    .select('id, label, start_date, end_date, published, status, archived_at, offline_at, offline_by')
     .is('archived_at', null)
     .order('start_date', { ascending: false })
 
@@ -59,9 +62,11 @@ export async function fetchScheduleCyclesForCoverage(
     return { data: [], error: legacy.error }
   }
 
-  const rows = (legacy.data ?? []) as Array<Omit<CoverageScheduleCycleRow, 'archived_at'>>
+  const rows = (legacy.data ?? []) as Array<
+    Omit<CoverageScheduleCycleRow, 'archived_at' | 'status' | 'offline_at' | 'offline_by'>
+  >
   return {
-    data: rows.map((r) => ({ ...r, archived_at: null })),
+    data: rows.map((r) => ({ ...r, status: null, archived_at: null, offline_at: null, offline_by: null })),
     error: null,
   }
 }
