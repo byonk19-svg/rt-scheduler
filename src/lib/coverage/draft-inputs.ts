@@ -133,7 +133,8 @@ export function buildDraftTherapists(
       patternByTherapist.get(therapist.id) ??
       normalizeWorkPattern({
         therapist_id: therapist.id,
-        works_dow: [0, 1, 2, 3, 4, 5, 6],
+        pattern_type: therapist.employment_type === 'prn' ? 'none' : undefined,
+        works_dow: therapist.employment_type === 'prn' ? [] : [0, 1, 2, 3, 4, 5, 6],
         offs_dow: [],
         weekend_rotation: 'none',
         weekend_anchor_date: null,

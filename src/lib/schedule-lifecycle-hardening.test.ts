@@ -49,6 +49,10 @@ const activeLeadPublishMigrationSource = readFileSync(
   ),
   'utf8'
 )
+const standingPrnMigrationSource = readFileSync(
+  resolve(process.cwd(), 'supabase/migrations/20260512140625_allow_standing_prn_patterns.sql'),
+  'utf8'
+)
 const publishActionsSource = readFileSync(
   resolve(process.cwd(), 'src/app/(app)/schedule/actions/publish-actions.ts'),
   'utf8'
@@ -182,6 +186,11 @@ describe('schedule lifecycle hardening', () => {
     expect(preliminaryHardeningMigrationSource).toContain('enforce_prn_shift_assignment_rule')
     expect(preliminaryHardeningMigrationSource).toContain(
       'PRN staff require manager force-on or an approved preliminary pencil mark'
+    )
+    expect(standingPrnMigrationSource).toContain('work_pattern_allows_date')
+    expect(standingPrnMigrationSource).toContain('PRN staff cannot be scheduled on a Need Off date')
+    expect(standingPrnMigrationSource).toContain(
+      'PRN staff require a standing work pattern, manager force-on, or an approved preliminary pencil mark'
     )
     expect(blockRuleMigrationSource).toContain('promote_next_designated_lead_for_shift')
     expect(blockRuleMigrationSource).toContain(

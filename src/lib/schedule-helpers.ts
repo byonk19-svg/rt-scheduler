@@ -483,6 +483,7 @@ export function pickTherapistForDate(
           therapist.pattern ??
           normalizeWorkPattern({
             therapist_id: therapist.id,
+            pattern_type: therapist.employment_type === 'prn' ? 'none' : undefined,
             works_dow: therapist.works_dow,
             offs_dow: therapist.offs_dow,
             weekend_rotation: therapist.weekend_rotation,

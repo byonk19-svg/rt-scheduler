@@ -234,11 +234,25 @@ describe('pickTherapistForDate', () => {
     expect(pick.therapist).toBeNull()
   })
 
-  it('blocks PRN even when the recurring pattern offers the weekday', () => {
+  it('allows standing PRN when the recurring pattern offers the weekday', () => {
     const therapist = buildTherapist({
       employment_type: 'prn',
       works_dow: [1],
       works_dow_mode: 'hard',
+      pattern: {
+        therapist_id: 'therapist-1',
+        pattern_type: 'weekly_fixed',
+        works_dow: [1],
+        offs_dow: [],
+        weekend_rotation: 'none',
+        weekend_anchor_date: null,
+        works_dow_mode: 'hard',
+        weekly_weekdays: [1],
+        weekend_rule: 'none',
+        cycle_anchor_date: null,
+        cycle_segments: [],
+        shift_preference: 'either',
+      },
     })
 
     const pick = pickTherapistForDate(
@@ -253,7 +267,7 @@ describe('pickTherapistForDate', () => {
       new Map([['therapist-1', 3]])
     )
 
-    expect(pick.therapist).toBeNull()
+    expect(pick.therapist?.id).toBe('therapist-1')
   })
 
   it('prefers lower-pattern-penalty matches before cursor order when weekly counts are tied', () => {

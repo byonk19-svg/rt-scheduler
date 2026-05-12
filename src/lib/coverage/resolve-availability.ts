@@ -116,7 +116,10 @@ export function resolveEligibility(params: ResolveEligibilityParams): Eligibilit
     return resolution
   }
 
-  if (params.therapist.employment_type === 'prn') {
+  if (
+    params.therapist.employment_type === 'prn' &&
+    (!params.therapist.pattern || params.therapist.pattern.pattern_type === 'none')
+  ) {
     return buildResolution('prn_not_offered_for_date')
   }
 

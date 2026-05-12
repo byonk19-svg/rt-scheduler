@@ -48,6 +48,28 @@ describe('draft input loader helpers', () => {
     })
   })
 
+  it('keeps PRN therapists without saved work patterns in flexible mode', () => {
+    const therapists = buildDraftTherapists(
+      [
+        {
+          id: 'prn-1',
+          full_name: 'Flexible PRN',
+          shift_type: 'day',
+          is_lead_eligible: false,
+          employment_type: 'prn',
+          max_work_days_per_week: null,
+          on_fmla: false,
+          fmla_return_date: null,
+          is_active: true,
+        },
+      ],
+      []
+    )
+
+    expect(therapists[0]?.pattern?.pattern_type).toBe('none')
+    expect(therapists[0]?.pattern?.works_dow).toEqual([])
+  })
+
   it('filters unfilled placeholders out of existing draft shifts', () => {
     expect(
       toDraftExistingShifts([
