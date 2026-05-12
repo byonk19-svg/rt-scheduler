@@ -30,6 +30,17 @@ import {
   getWeeklyLimitFromProfile,
 } from './helpers'
 
+type ShiftMutationCycle = {
+  id: string
+  published: boolean
+  status: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
+  archived_at: string | null
+}
+
+function isReadOnlyScheduleBlock(cycle: ShiftMutationCycle): boolean {
+  return cycle.status === 'offline' || cycle.status === 'archived' || Boolean(cycle.archived_at)
+}
+
 export async function addShiftAction(formData: FormData) {
   const supabase = await createClient()
   const {
@@ -81,13 +92,16 @@ export async function addShiftAction(formData: FormData) {
 
   const { data: cycle, error: cycleError } = await supabase
     .from('schedule_cycles')
-    .select('id, published')
+    .select('id, published, status, archived_at')
     .eq('id', cycleId)
     .maybeSingle()
 
   if (cycleError || !cycle) {
     console.error('Failed to load cycle for shift add:', cycleError)
     redirect(buildReturnUrl(cycleId, { ...errorViewParams, error: 'add_shift_failed' }))
+  }
+  if (isReadOnlyScheduleBlock(cycle as ShiftMutationCycle)) {
+    redirect(buildReturnUrl(cycleId, { ...errorViewParams, error: 'cycle_read_only' }))
   }
 
   const therapistWeeklyLimit =
@@ -232,13 +246,16 @@ export async function deleteShiftAction(formData: FormData) {
 
   const { data: cycle, error: cycleError } = await supabase
     .from('schedule_cycles')
-    .select('id, published')
+    .select('id, published, status, archived_at')
     .eq('id', cycleId)
     .maybeSingle()
 
   if (cycleError || !cycle) {
     console.error('Failed to load cycle before delete:', cycleError)
     redirect(buildScheduleUrl(cycleId, view, { error: 'delete_shift_failed' }))
+  }
+  if (isReadOnlyScheduleBlock(cycle as ShiftMutationCycle)) {
+    redirect(buildScheduleUrl(cycleId, view, { error: 'cycle_read_only' }))
   }
 
   await preserveShiftPostHistoryBeforeShiftDeletion(
@@ -316,13 +333,16 @@ export async function setDesignatedLeadAction(formData: FormData) {
 
   const { data: cycle, error: cycleError } = await supabase
     .from('schedule_cycles')
-    .select('id, published')
+    .select('id, published, status, archived_at')
     .eq('id', cycleId)
     .maybeSingle()
 
   if (cycleError || !cycle) {
     console.error('Failed to load cycle for designated lead action:', cycleError)
     redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'set_lead_failed' }))
+  }
+  if (isReadOnlyScheduleBlock(cycle as ShiftMutationCycle)) {
+    redirect(buildScheduleUrl(cycleId, view, { ...errorViewParams, error: 'cycle_read_only' }))
   }
 
   const { data: therapist, error: therapistError } = await supabase

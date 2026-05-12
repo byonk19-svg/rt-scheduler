@@ -38,13 +38,17 @@ export async function applyTemplateAction(formData: FormData) {
       supabase.from('cycle_templates').select('id, shift_data').eq('id', templateId).maybeSingle(),
       supabase
         .from('schedule_cycles')
-        .select('id, start_date, published')
+        .select('id, start_date, published, status, archived_at')
         .eq('id', cycleId)
         .maybeSingle(),
     ])
 
-  if (templateError || !template || cycleError || !cycle || cycle.published) {
+  if (templateError || !template || cycleError || !cycle) {
     redirect(buildCoverageUrl(cycleId, { error: 'template_apply_failed' }))
+  }
+
+  if (cycle.published || cycle.status !== 'draft' || cycle.archived_at) {
+    redirect(buildCoverageUrl(cycleId, { error: 'template_cycle_not_draft' }))
   }
 
   const templateData = (

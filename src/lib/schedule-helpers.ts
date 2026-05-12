@@ -232,6 +232,31 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
   if (error === 'delete_shift_failed') {
     return { message: 'Could not delete shift. Please try again.', variant: 'error' }
   }
+  if (error === 'cycle_read_only') {
+    return {
+      message: 'This Schedule Block is read-only. Republish it before making schedule edits.',
+      variant: 'error',
+    }
+  }
+  if (error === 'template_cycle_not_draft') {
+    return {
+      message: 'Templates can only be applied to empty Draft Schedule Blocks.',
+      variant: 'error',
+    }
+  }
+  if (error === 'delete_cycle_not_draft') {
+    return {
+      message: 'Only empty unpublished Draft Schedule Blocks can be deleted.',
+      variant: 'error',
+    }
+  }
+  if (error === 'delete_cycle_not_empty') {
+    return {
+      message:
+        'This Schedule Block has schedule, availability, preliminary, or publish history. Archive it instead of deleting it.',
+      variant: 'error',
+    }
+  }
   if (error === 'auto_generate_db_error') {
     return {
       message: 'Database error while saving auto-generated shifts. Please try again.',

@@ -51,7 +51,18 @@ type ShiftNotificationLookupRow = {
   date: string
   shift_type: 'day' | 'night'
   user_id: string | null
-  schedule_cycles: { published: boolean } | { published: boolean }[] | null
+  schedule_cycles:
+    | {
+        published: boolean
+        status: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
+        archived_at: string | null
+      }
+    | {
+        published: boolean
+        status: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
+        archived_at: string | null
+      }[]
+    | null
 }
 
 type ProfileNotificationRow = {
@@ -122,6 +133,46 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Actor site is missing.' }, { status: 403 })
   }
 
+  const { data: preflightShiftLookup, error: preflightShiftError } = await supabase
+    .from('shifts')
+    .select('id, schedule_cycles(published, status, archived_at)')
+    .eq('id', assignmentId)
+    .maybeSingle()
+
+  if (preflightShiftError || !preflightShiftLookup) {
+    return NextResponse.json({ error: 'Assignment not found.' }, { status: 404 })
+  }
+
+  const preflightCycle = getOne(
+    (
+      preflightShiftLookup as {
+        schedule_cycles:
+          | {
+              published: boolean
+              status: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
+              archived_at: string | null
+            }
+          | {
+              published: boolean
+              status: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
+              archived_at: string | null
+            }[]
+          | null
+      }
+    ).schedule_cycles
+  )
+
+  if (
+    preflightCycle?.status === 'offline' ||
+    preflightCycle?.status === 'archived' ||
+    preflightCycle?.archived_at
+  ) {
+    return NextResponse.json(
+      { error: 'This Schedule Block is read-only until it is republished.' },
+      { status: 409 }
+    )
+  }
+
   const admin = createAdminClient()
   const mutation = await updateAssignmentStatusWithLottery({
     authClient: {
@@ -175,7 +226,7 @@ export async function POST(request: Request) {
 
   const { data: shiftLookup } = await supabase
     .from('shifts')
-    .select('id, date, shift_type, user_id, schedule_cycles(published)')
+    .select('id, date, shift_type, user_id, schedule_cycles(published, status, archived_at)')
     .eq('id', row.id)
     .maybeSingle()
 

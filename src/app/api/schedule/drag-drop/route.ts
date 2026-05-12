@@ -479,12 +479,18 @@ export async function POST(request: Request) {
 
   const { data: cycle, error: cycleError } = await supabase
     .from('schedule_cycles')
-    .select('id, start_date, end_date, published')
+    .select('id, start_date, end_date, published, status, archived_at')
     .eq('id', payload.cycleId)
     .maybeSingle()
 
   if (cycleError || !cycle) {
     return NextResponse.json({ error: 'Schedule cycle not found' }, { status: 404 })
+  }
+  if (cycle.status === 'offline' || cycle.status === 'archived' || cycle.archived_at) {
+    return NextResponse.json(
+      { error: 'This Schedule Block is read-only until it is republished.' },
+      { status: 409 }
+    )
   }
 
   const { data: activePreliminarySnapshot } = await supabase

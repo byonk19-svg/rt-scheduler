@@ -273,6 +273,8 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
         resolvedSearchParams.error === 'delete_cycle_unauthorized' ||
         resolvedSearchParams.error === 'delete_cycle_not_found' ||
         resolvedSearchParams.error === 'delete_cycle_published' ||
+        resolvedSearchParams.error === 'delete_cycle_not_draft' ||
+        resolvedSearchParams.error === 'delete_cycle_not_empty' ||
         resolvedSearchParams.error === 'delete_cycle_failed') && (
         <div
           className="rounded-xl border px-4 py-3 text-sm font-medium"
@@ -314,9 +316,14 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                                         ? 'That schedule block was not found.'
                                         : resolvedSearchParams.error === 'delete_cycle_published'
                                           ? 'Published blocks cannot be deleted. Take the block offline or use post-publish edits instead.'
-                                          : resolvedSearchParams.error === 'delete_cycle_failed'
-                                            ? 'Could not delete that draft block. Please try again.'
-                                            : 'Something went wrong.'}
+                                          : resolvedSearchParams.error === 'delete_cycle_not_draft'
+                                            ? 'Only empty unpublished Draft Schedule Blocks can be deleted.'
+                                            : resolvedSearchParams.error ===
+                                                'delete_cycle_not_empty'
+                                              ? 'This Schedule Block already has schedule, availability, preliminary, or publish history. Archive it instead of deleting it.'
+                                              : resolvedSearchParams.error === 'delete_cycle_failed'
+                                                ? 'Could not delete that draft block. Please try again.'
+                                                : 'Something went wrong.'}
         </div>
       )}
 

@@ -25,6 +25,16 @@ type ImportedShiftRow = {
   role: ShiftRole
 }
 
+type DeleteCycleMutationClient = {
+  rpc: (
+    fn: 'app_delete_empty_draft_schedule_cycle',
+    args: { p_actor_id: string; p_cycle_id: string }
+  ) => PromiseLike<{
+    data: Array<{ id: string }> | { id: string } | null
+    error: { code?: string; message?: string } | null
+  }>
+}
+
 const SCHEDULE_BLOCK_DAY_COUNT = 42
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
@@ -81,7 +91,7 @@ export async function deleteCycleAction(formData: FormData) {
 
   const { data: cycle } = await supabase
     .from('schedule_cycles')
-    .select('id, published')
+    .select('id, published, status, archived_at')
     .eq('id', cycleId)
     .maybeSingle()
 
@@ -101,9 +111,17 @@ export async function deleteCycleAction(formData: FormData) {
     )
   }
 
+  if (cycle.status !== 'draft' || cycle.archived_at) {
+    redirect(
+      returnToPublish
+        ? '/publish?error=delete_cycle_not_draft'
+        : '/coverage?view=week&error=delete_cycle_not_draft'
+    )
+  }
+
   const admin = (() => {
     try {
-      return createAdminClient()
+      return createAdminClient() as unknown as DeleteCycleMutationClient
     } catch (error) {
       console.error('Failed to initialize admin client for cycle delete:', error)
       redirect(
@@ -114,15 +132,27 @@ export async function deleteCycleAction(formData: FormData) {
     }
   })()
 
-  const { data: deletedRows, error } = await admin
-    .from('schedule_cycles')
-    .delete()
-    .eq('id', cycleId)
-    .eq('published', false)
-    .select('id')
+  const { data: deletedRows, error } = await admin.rpc('app_delete_empty_draft_schedule_cycle', {
+    p_actor_id: user.id,
+    p_cycle_id: cycleId,
+  })
 
   if (error) {
     console.error('Failed to delete cycle:', error)
+    if (error.code === '23503' || /cannot be deleted|has schedule/i.test(error.message ?? '')) {
+      redirect(
+        returnToPublish
+          ? '/publish?error=delete_cycle_not_empty'
+          : '/coverage?view=week&error=delete_cycle_not_empty'
+      )
+    }
+    if (error.code === '55000' || /only empty unpublished draft/i.test(error.message ?? '')) {
+      redirect(
+        returnToPublish
+          ? '/publish?error=delete_cycle_not_draft'
+          : '/coverage?view=week&error=delete_cycle_not_draft'
+      )
+    }
     redirect(
       returnToPublish
         ? '/publish?error=delete_cycle_failed'
@@ -130,7 +160,8 @@ export async function deleteCycleAction(formData: FormData) {
     )
   }
 
-  if (!deletedRows?.length) {
+  const deleted = Array.isArray(deletedRows) ? deletedRows.length > 0 : Boolean(deletedRows)
+  if (!deleted) {
     console.error('Delete cycle affected 0 rows')
     redirect(
       returnToPublish

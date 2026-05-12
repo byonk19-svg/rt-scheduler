@@ -68,6 +68,10 @@ const availabilityPublishMigrationSource = readFileSync(
   resolve(process.cwd(), 'supabase/migrations/20260512163433_publish_availability_preflight.sql'),
   'utf8'
 )
+const emptyDraftDeleteMigrationSource = readFileSync(
+  resolve(process.cwd(), 'supabase/migrations/20260512183000_empty_draft_cycle_delete_guard.sql'),
+  'utf8'
+)
 const publishActionsSource = readFileSync(
   resolve(process.cwd(), 'src/app/(app)/schedule/actions/publish-actions.ts'),
   'utf8'
@@ -80,8 +84,16 @@ const draftActionsSource = readFileSync(
   resolve(process.cwd(), 'src/app/(app)/schedule/actions/draft-actions.ts'),
   'utf8'
 )
+const shiftActionsSource = readFileSync(
+  resolve(process.cwd(), 'src/app/(app)/schedule/actions/shift-actions.ts'),
+  'utf8'
+)
 const templateActionsSource = readFileSync(
   resolve(process.cwd(), 'src/app/(app)/schedule/actions/template-actions.ts'),
+  'utf8'
+)
+const dragDropRouteSource = readFileSync(
+  resolve(process.cwd(), 'src/app/api/schedule/drag-drop/route.ts'),
   'utf8'
 )
 const assignmentStatusRouteSource = readFileSync(
@@ -164,7 +176,7 @@ describe('schedule lifecycle hardening', () => {
     expect(publishActionsSource).toContain('p_actor_id: user.id')
     expect(publishActionsSource).toContain("'take_offline_from_publish_history'")
     expect(publishActionsSource).not.toContain(".update({ published: false, status: 'draft' })")
-    expect(cycleActionsSource).toContain(".eq('published', false)")
+    expect(cycleActionsSource).toContain("'app_delete_empty_draft_schedule_cycle'")
     expect(templateActionsSource).not.toContain('new_cycle_start_date')
     expect(templateActionsSource).toContain('applyTemplateToCycle(templateData, cycle.start_date')
   })
@@ -254,6 +266,23 @@ describe('schedule lifecycle hardening', () => {
     expect(blockRuleMigrationSource).toContain('schedule_cycles_enforce_block_rules')
     expect(blockRuleMigrationSource).toContain('Active Schedule Blocks cannot overlap')
     expect(cycleActionsSource).toContain('create_cycle_invalid_block_shape')
+  })
+
+  it('keeps offline and archived Schedule Blocks read-only outside lifecycle actions', () => {
+    expect(emptyDraftDeleteMigrationSource).toContain('app_delete_empty_draft_schedule_cycle')
+    expect(emptyDraftDeleteMigrationSource).toContain(
+      "v_cycle.status <> 'draft'::public.schedule_cycle_status"
+    )
+    expect(emptyDraftDeleteMigrationSource).toContain(
+      'Schedule Block has schedule, availability, preliminary, or publish history'
+    )
+    expect(cycleActionsSource).toContain("'app_delete_empty_draft_schedule_cycle'")
+    expect(cycleActionsSource).toContain('delete_cycle_not_empty')
+    expect(shiftActionsSource).toContain('isReadOnlyScheduleBlock')
+    expect(shiftActionsSource).toContain("cycle.status === 'offline'")
+    expect(templateActionsSource).toContain("cycle.status !== 'draft'")
+    expect(dragDropRouteSource).toContain("cycle.status === 'offline'")
+    expect(assignmentStatusRouteSource).toContain("preflightCycle?.status === 'offline'")
   })
 })
 
