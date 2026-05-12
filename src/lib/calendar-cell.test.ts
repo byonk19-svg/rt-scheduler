@@ -33,4 +33,15 @@ describe('summarizeCalendarCell', () => {
     expect(summary.coverageCount).toBe(0)
     expect(summary.hiddenCount).toBe(0)
   })
+
+  it('marks the cell as missing lead when the lead is not working', () => {
+    const summary = summarizeCalendarCell([
+      { id: '1', full_name: 'Mark', shift_type: 'day', role: 'lead', status: 'called_off' },
+      { id: '2', full_name: 'Alyce', shift_type: 'day', role: 'staff', status: 'scheduled' },
+    ])
+
+    expect(summary.leadName).toBeNull()
+    expect(summary.missingLead).toBe(true)
+    expect(summary.coverageCount).toBe(1)
+  })
 })

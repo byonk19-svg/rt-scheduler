@@ -42,6 +42,13 @@ const atomicPreliminaryMigrationSource = readFileSync(
   resolve(process.cwd(), 'supabase/migrations/20260512133013_atomic_preliminary_send.sql'),
   'utf8'
 )
+const activeLeadPublishMigrationSource = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/migrations/20260512135018_active_designated_lead_publish_check.sql'
+  ),
+  'utf8'
+)
 const publishActionsSource = readFileSync(
   resolve(process.cwd(), 'src/app/(app)/schedule/actions/publish-actions.ts'),
   'utf8'
@@ -154,6 +161,12 @@ describe('schedule lifecycle hardening', () => {
     expect(blockRuleMigrationSource).toContain(
       'Final publish requires exactly one lead-capable assigned Designated Lead for every date and shift.'
     )
+    expect(activeLeadPublishMigrationSource).toContain(
+      'Final publish requires exactly one active lead-capable assigned Designated Lead for every date and shift.'
+    )
+    expect(activeLeadPublishMigrationSource).toContain(
+      "active_entry.code in ('on_call', 'call_in', 'cancelled', 'left_early')"
+    )
     expect(publishActionsSource).not.toContain("error: 'publish_requires_preliminary'")
     expect(publishActionsSource).toContain("'publish_invalid_state'")
   })
@@ -173,6 +186,12 @@ describe('schedule lifecycle hardening', () => {
     expect(blockRuleMigrationSource).toContain('promote_next_designated_lead_for_shift')
     expect(blockRuleMigrationSource).toContain(
       "new.active = true and new.code in ('call_in', 'cancelled')"
+    )
+    expect(activeLeadPublishMigrationSource).toContain(
+      "new.active = true and new.code in ('on_call', 'call_in', 'cancelled', 'left_early')"
+    )
+    expect(activeLeadPublishMigrationSource).toContain(
+      'create or replace function public.promote_next_designated_lead_for_shift'
     )
     expect(blockRuleMigrationSource).toContain("candidate.role = 'staff'")
   })

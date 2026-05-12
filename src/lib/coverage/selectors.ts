@@ -62,7 +62,10 @@ export function buildDayItems(
       return a.name.localeCompare(b.name)
     })
 
-    const leadRow = slot.find((row) => row.role === 'lead') ?? null
+    const leadRow =
+      slot.find(
+        (row) => row.role === 'lead' && toUiStatus(row.assignment_status, row.status) === 'active'
+      ) ?? null
     const leadShift: ShiftItem | null =
       leadRow === null
         ? null
