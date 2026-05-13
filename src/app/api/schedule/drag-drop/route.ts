@@ -511,12 +511,18 @@ export async function POST(request: Request) {
 
     const { data: targetProfile, error: targetProfileError } = await supabase
       .from('profiles')
-      .select('site_id')
+      .select('site_id, shift_type')
       .eq('id', payload.userId)
       .maybeSingle()
 
     if (targetProfileError || targetProfile?.site_id !== managerSiteId) {
       return NextResponse.json({ error: 'Therapist is outside your site scope.' }, { status: 403 })
+    }
+    if (targetProfile.shift_type !== payload.shiftType) {
+      return NextResponse.json(
+        { error: 'Therapist shift type does not match the selected schedule shift.' },
+        { status: 409 }
+      )
     }
 
     const availabilityState = await getTherapistAvailabilityState(
@@ -724,6 +730,17 @@ export async function POST(request: Request) {
     const assignedUserId = shift.user_id
     if (!assignedUserId) {
       return NextResponse.json({ error: 'Only assigned shifts can be moved.' }, { status: 400 })
+    }
+    const { data: assignedProfile, error: assignedProfileError } = await supabase
+      .from('profiles')
+      .select('shift_type')
+      .eq('id', assignedUserId)
+      .maybeSingle()
+    if (assignedProfileError || assignedProfile?.shift_type !== payload.targetShiftType) {
+      return NextResponse.json(
+        { error: 'Therapist shift type does not match the selected schedule shift.' },
+        { status: 409 }
+      )
     }
 
     const availabilityState = await getTherapistAvailabilityState(
@@ -1012,7 +1029,7 @@ export async function POST(request: Request) {
 
     const { data: therapist, error: therapistError } = await supabase
       .from('profiles')
-      .select('id, role, is_lead_eligible, site_id')
+      .select('id, role, is_lead_eligible, site_id, shift_type')
       .eq('id', payload.therapistId)
       .maybeSingle()
 
@@ -1029,6 +1046,12 @@ export async function POST(request: Request) {
     }
     if (therapist.site_id !== managerSiteId) {
       return NextResponse.json({ error: 'Therapist is outside your site scope.' }, { status: 403 })
+    }
+    if (therapist.shift_type !== payload.shiftType) {
+      return NextResponse.json(
+        { error: 'Therapist shift type does not match the selected schedule shift.' },
+        { status: 409 }
+      )
     }
 
     const availabilityState = await getTherapistAvailabilityState(

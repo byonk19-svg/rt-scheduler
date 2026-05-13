@@ -34,6 +34,7 @@ type StatusCellPopoverProps = {
   date: string
   cell: GridCell
   allowStatusChange: boolean
+  canUnassign: boolean
   canDesignateLead: boolean
   isCurrentlyLead: boolean
   onStatusChange: (status: AssignmentStatus) => Promise<void>
@@ -51,6 +52,7 @@ export function StatusCellPopover({
   date,
   cell,
   allowStatusChange,
+  canUnassign,
   canDesignateLead,
   isCurrentlyLead,
   onStatusChange,
@@ -96,26 +98,30 @@ export function StatusCellPopover({
             ))}
           </div>
         ) : null}
-        <div className="mt-2 flex flex-col gap-1 border-t border-border pt-2">
-          {canDesignateLead && !isCurrentlyLead ? (
-            <button
-              type="button"
-              className="rounded-md px-2 py-1.5 text-left text-sm font-medium text-primary hover:bg-muted"
-              disabled={isPending}
-              onClick={onDesignateLead}
-            >
-              Designate as lead
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="rounded-md px-2 py-1.5 text-left text-sm font-medium text-destructive hover:bg-red-50"
-            disabled={isPending}
-            onClick={onUnassign}
-          >
-            Unassign
-          </button>
-        </div>
+        {canUnassign || (canDesignateLead && !isCurrentlyLead) ? (
+          <div className="mt-2 flex flex-col gap-1 border-t border-border pt-2">
+            {canDesignateLead && !isCurrentlyLead ? (
+              <button
+                type="button"
+                className="rounded-md px-2 py-1.5 text-left text-sm font-medium text-primary hover:bg-muted"
+                disabled={isPending}
+                onClick={onDesignateLead}
+              >
+                Designate as lead
+              </button>
+            ) : null}
+            {canUnassign ? (
+              <button
+                type="button"
+                className="rounded-md px-2 py-1.5 text-left text-sm font-medium text-destructive hover:bg-red-50"
+                disabled={isPending}
+                onClick={onUnassign}
+              >
+                Unassign
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </PopoverContent>
     </Popover>
   )

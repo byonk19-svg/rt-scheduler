@@ -95,7 +95,7 @@ export function getPlannerDateValidationError(params: {
   dates: string[]
   allowEmpty?: boolean
 }): string | null {
-  if (!params.cycle) return 'Select a schedule cycle first.'
+  if (!params.cycle) return 'Select a Schedule Block first.'
   if (!params.therapistId) return 'Select a therapist first.'
   if (params.dates.length === 0) return params.allowEmpty ? null : 'Select at least one date.'
   if (hasDuplicatePlannerDates(params.dates)) {
@@ -104,7 +104,7 @@ export function getPlannerDateValidationError(params: {
 
   const outsideCycle = params.dates.find((date) => !isDateWithinCycle(date, params.cycle))
   if (outsideCycle) {
-    return 'All selected dates must fall within the chosen cycle.'
+    return 'All selected dates must fall within the chosen Schedule Block.'
   }
 
   return null

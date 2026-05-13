@@ -35,7 +35,7 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
     return (
       <div className="mx-auto max-w-7xl px-4 py-12 text-center md:px-6">
         <p className="text-sm font-medium text-muted-foreground">
-          No active schedule cycle is available yet.
+          No active Schedule Block is available yet.
         </p>
       </div>
     )
@@ -48,6 +48,7 @@ export default async function SchedulePage({ searchParams }: SchedulePageProps) 
         subtitle="One grid for draft staffing, live status, and team visibility."
       />
       <ScheduleGrid
+        key={`${result.dataset.cycleId}:${result.dataset.shiftType}`}
         initialDataset={result.dataset}
         initialShiftTab={result.initialShiftTab}
         autoDraftAction={result.dataset.canManageCoverage ? generateDraftScheduleAction : undefined}

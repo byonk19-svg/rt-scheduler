@@ -408,7 +408,7 @@ export function ManagerSchedulingInputs({
       <section className="rounded-[1.5rem] border border-border/70 bg-card px-6 py-5">
         <h2 className="text-lg font-semibold text-foreground">Availability Manager</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Create a schedule cycle before managing therapist availability.
+          Create a Schedule Block before managing therapist availability.
         </p>
       </section>
     )
@@ -434,7 +434,7 @@ export function ManagerSchedulingInputs({
 
         <div className="flex flex-wrap items-center justify-end gap-3 xl:flex-nowrap">
           <label className="space-y-1.5">
-            <span className="sr-only">Schedule cycle</span>
+            <span className="sr-only">Schedule Block</span>
             <select
               id="planner_cycle_id"
               className="min-h-11 min-w-[16rem] rounded-xl border border-border bg-background px-3 text-sm text-foreground outline-none transition focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"

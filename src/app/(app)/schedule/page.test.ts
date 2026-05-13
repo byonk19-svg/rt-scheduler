@@ -50,6 +50,7 @@ import SchedulePage from '@/app/(app)/schedule/page'
 function okDataset() {
   return {
     cycleId: 'cycle-2',
+    shiftType: 'day' as const,
     availableCycles: [{ id: 'cycle-2', label: 'May 3 - Jun 13, 2026' }],
     cycleDates: ['2026-05-03', '2026-05-04'],
     cycleDateRangeLabel: 'May 3 - Jun 13, 2026',
@@ -107,7 +108,7 @@ describe('schedule route', () => {
 
     const html = renderToStaticMarkup(await SchedulePage({ searchParams: Promise.resolve({}) }))
 
-    expect(html).toContain('No active schedule cycle is available yet.')
+    expect(html).toContain('No active Schedule Block is available yet.')
   })
 
   it('sets unified schedule metadata', () => {
@@ -115,5 +116,11 @@ describe('schedule route', () => {
 
     expect(source).toContain("title: 'Schedule'")
     expect(source).toContain('unified respiratory therapy schedule grid')
+  })
+
+  it('remounts the grid when the loaded cycle or shift changes', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/app/(app)/schedule/page.tsx'), 'utf8')
+
+    expect(source).toContain('key={`${result.dataset.cycleId}:${result.dataset.shiftType}`}')
   })
 })

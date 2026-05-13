@@ -53,27 +53,38 @@ export function ScheduleGrid({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
+  const loadedShiftTab = initialDataset.shiftType === 'night' ? 'Night' : 'Day'
   const [shiftTab, setShiftTab] = useState<'Day' | 'Night'>(initialShiftTab)
+  const [isShiftNavigating, setIsShiftNavigating] = useState(false)
   const [activeCellTarget, setActiveCellTarget] = useState<CellTarget | null>(null)
   const [showPreFlight, setShowPreFlight] = useState(false)
   const autoDraftFormRef = useRef<HTMLFormElement | null>(null)
   const publishFormRef = useRef<HTMLFormElement | null>(null)
   const mutator = useMemo(() => createCoverageShiftMutator(), [])
+  const cellsLocked = isPending || isShiftNavigating
 
   const handleShiftTabChange = useCallback(
     (tab: 'Day' | 'Night') => {
+      if (tab === loadedShiftTab) {
+        setShiftTab(tab)
+        return
+      }
       setShiftTab(tab)
+      setIsShiftNavigating(true)
+      setActiveCellTarget(null)
       const params = new URLSearchParams(searchParams.toString())
       params.set('shift', shiftTabToQueryValue(tab))
       router.replace(`${pathname}?${params.toString()}`, { scroll: false })
     },
-    [pathname, router, searchParams]
+    [loadedShiftTab, pathname, router, searchParams]
   )
 
   const handleCycleChange = useCallback(
     (cycleId: string) => {
       const params = new URLSearchParams(searchParams.toString())
       params.set('cycle', cycleId)
+      setIsShiftNavigating(true)
+      setActiveCellTarget(null)
       router.replace(`${pathname}?${params.toString()}`, { scroll: false })
     },
     [pathname, router, searchParams]
@@ -81,12 +92,10 @@ export function ScheduleGrid({
 
   const handleCellClick = useCallback(
     (userId: string, date: string, cell: GridCell, anchorEl: HTMLElement) => {
+      if (cellsLocked) return
       const row = initialDataset.therapistRows.find((candidate) => candidate.userId === userId)
       if (!row) return
-      if (
-        cell.status === 'off' &&
-        (!initialDataset.canManageCoverage || initialDataset.isPublished)
-      ) {
+      if (cell.status === 'off' && !initialDataset.canManageCoverage) {
         return
       }
       if (
@@ -98,7 +107,7 @@ export function ScheduleGrid({
       }
       setActiveCellTarget({ userId, date, cell, therapistName: row.name, anchorEl })
     },
-    [initialDataset]
+    [cellsLocked, initialDataset]
   )
 
   const refreshAfterMutation = useCallback(() => {
@@ -107,12 +116,12 @@ export function ScheduleGrid({
   }, [router])
 
   const handleAssign = useCallback(async () => {
-    if (!activeCellTarget || !initialDataset.canManageCoverage || initialDataset.isPublished) return
+    if (!activeCellTarget || !initialDataset.canManageCoverage || cellsLocked) return
     const { error } = await mutator.assign({
       cycleId: initialDataset.cycleId,
       userId: activeCellTarget.userId,
       isoDate: activeCellTarget.date,
-      shiftType: shiftTabToQueryValue(shiftTab),
+      shiftType: initialDataset.shiftType,
       role: 'staff',
       availabilityOverride: activeCellTarget.cell.hasNeedsOff,
       availabilityOverrideReason: activeCellTarget.cell.hasNeedsOff
@@ -124,10 +133,10 @@ export function ScheduleGrid({
       return
     }
     refreshAfterMutation()
-  }, [activeCellTarget, initialDataset, mutator, refreshAfterMutation, shiftTab])
+  }, [activeCellTarget, cellsLocked, initialDataset, mutator, refreshAfterMutation])
 
   const handleUnassign = useCallback(async () => {
-    if (!activeCellTarget?.cell.shiftId || !initialDataset.canManageCoverage) return
+    if (!activeCellTarget?.cell.shiftId || !initialDataset.canManageCoverage || cellsLocked) return
     const { error } = await mutator.unassign({
       cycleId: initialDataset.cycleId,
       shiftId: activeCellTarget.cell.shiftId,
@@ -137,11 +146,12 @@ export function ScheduleGrid({
       return
     }
     refreshAfterMutation()
-  }, [activeCellTarget, initialDataset, mutator, refreshAfterMutation])
+  }, [activeCellTarget, cellsLocked, initialDataset, mutator, refreshAfterMutation])
 
   const handleStatusChange = useCallback(
     async (status: AssignmentStatusValue) => {
       if (!activeCellTarget?.cell.shiftId) return
+      if (cellsLocked) return
       if (!initialDataset.canManageCoverage && !initialDataset.canUpdateAssignmentStatus) return
       const { error } = await mutator.updateStatus(
         activeCellTarget.cell.shiftId,
@@ -153,23 +163,23 @@ export function ScheduleGrid({
       }
       refreshAfterMutation()
     },
-    [activeCellTarget, initialDataset, mutator, refreshAfterMutation]
+    [activeCellTarget, cellsLocked, initialDataset, mutator, refreshAfterMutation]
   )
 
   const handleDesignateLead = useCallback(async () => {
-    if (!activeCellTarget?.cell.shiftId || !initialDataset.canManageCoverage) return
+    if (!activeCellTarget?.cell.shiftId || !initialDataset.canManageCoverage || cellsLocked) return
     const { error } = await mutator.setDesignatedLead({
       cycleId: initialDataset.cycleId,
       therapistId: activeCellTarget.userId,
       isoDate: activeCellTarget.date,
-      shiftType: shiftTabToQueryValue(shiftTab),
+      shiftType: initialDataset.shiftType,
     })
     if (error) {
       window.alert(error.message ?? 'Could not designate lead.')
       return
     }
     refreshAfterMutation()
-  }, [activeCellTarget, initialDataset, mutator, refreshAfterMutation, shiftTab])
+  }, [activeCellTarget, cellsLocked, initialDataset, mutator, refreshAfterMutation])
 
   const isAssignTarget = activeCellTarget?.cell.status === 'off'
   const isStatusTarget = Boolean(activeCellTarget && activeCellTarget.cell.status !== 'off')
@@ -219,7 +229,11 @@ export function ScheduleGrid({
           </p>
         </div>
       ) : null}
-      <ScheduleGridTable dataset={initialDataset} onCellClick={handleCellClick} />
+      <ScheduleGridTable
+        dataset={initialDataset}
+        onCellClick={handleCellClick}
+        interactionsDisabled={cellsLocked}
+      />
       {isAssignTarget && activeCellTarget ? (
         <AssignCellPopover
           open
@@ -244,7 +258,8 @@ export function ScheduleGrid({
           therapistName={activeCellTarget.therapistName}
           date={activeCellTarget.date}
           cell={activeCellTarget.cell}
-          allowStatusChange={initialDataset.isPublished && initialDataset.canUpdateAssignmentStatus}
+          allowStatusChange={initialDataset.canUpdateAssignmentStatus}
+          canUnassign={initialDataset.canManageCoverage}
           canDesignateLead={initialDataset.canManageCoverage}
           isCurrentlyLead={activeCellTarget.cell.status === 'lead'}
           onStatusChange={handleStatusChange}

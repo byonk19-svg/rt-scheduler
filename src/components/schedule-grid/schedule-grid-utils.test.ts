@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildDailyTotals, getCellDisplay } from './schedule-grid-utils'
+import { buildDailyTotals, getCellDisplay, isWorkingScheduledGridCell } from './schedule-grid-utils'
 import type { GridCell, TherapistGridRow } from './schedule-grid-types'
 
 describe('getCellDisplay', () => {
@@ -61,7 +61,7 @@ describe('getCellDisplay', () => {
 })
 
 describe('buildDailyTotals', () => {
-  it('counts scheduled, lead, and call-in shifts per date', () => {
+  it('counts only working scheduled lead and staff cells per date', () => {
     const rows: TherapistGridRow[] = [
       {
         userId: 'u1',
@@ -83,12 +83,33 @@ describe('buildDailyTotals', () => {
         cells: {
           '2026-05-04': {
             shiftId: 's2',
-            status: 'call_in',
+            status: 'staff',
             hasNeedsOff: false,
             isIneligible: false,
           },
           '2026-05-05': {
             shiftId: 's3',
+            status: 'on_call',
+            hasNeedsOff: false,
+            isIneligible: false,
+          },
+        },
+      },
+      {
+        userId: 'u3',
+        name: 'C',
+        isOnFmla: false,
+        isActive: true,
+        shiftType: 'day',
+        cells: {
+          '2026-05-04': {
+            shiftId: 's4',
+            status: 'call_in',
+            hasNeedsOff: false,
+            isIneligible: false,
+          },
+          '2026-05-05': {
+            shiftId: 's5',
             status: 'cancelled',
             hasNeedsOff: false,
             isIneligible: false,
@@ -101,5 +122,18 @@ describe('buildDailyTotals', () => {
       '2026-05-04': 2,
       '2026-05-05': 0,
     })
+  })
+
+  it('does not treat operational status cells as working scheduled coverage', () => {
+    for (const status of ['call_in', 'on_call', 'cancelled', 'left_early', 'off'] as const) {
+      expect(
+        isWorkingScheduledGridCell({
+          shiftId: status === 'off' ? null : `shift-${status}`,
+          status,
+          hasNeedsOff: false,
+          isIneligible: false,
+        })
+      ).toBe(false)
+    }
   })
 })

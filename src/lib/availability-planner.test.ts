@@ -123,7 +123,7 @@ describe('availability planner helpers', () => {
         therapistId: 'therapist-1',
         dates: ['2026-03-28'],
       })
-    ).toBe('Select a schedule cycle first.')
+    ).toBe('Select a Schedule Block first.')
 
     expect(
       getPlannerDateValidationError({
@@ -155,6 +155,6 @@ describe('availability planner helpers', () => {
         therapistId: 'therapist-1',
         dates: ['2026-05-05'],
       })
-    ).toBe('All selected dates must fall within the chosen cycle.')
+    ).toBe('All selected dates must fall within the chosen Schedule Block.')
   })
 })

@@ -1,11 +1,17 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
+import { buildScheduleRedirectPath } from '@/app/(app)/schedule/legacy-redirect'
+
 export const metadata: Metadata = {
   title: 'Schedule',
   description: 'Redirects to the unified Schedule grid.',
 }
 
-export default function StaffLegacyScheduleRoute() {
-  redirect('/schedule')
+export default async function StaffLegacyScheduleRoute({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
+}) {
+  redirect(buildScheduleRedirectPath((await searchParams) ?? {}))
 }

@@ -89,12 +89,12 @@ function formatDateLabel(date: string) {
 }
 
 function formatCycleRange(cycle: CycleSummaryRow | null | undefined) {
-  if (!cycle) return 'Current schedule cycle'
+  if (!cycle) return 'Current Schedule Block'
 
   const start = new Date(`${cycle.start_date}T00:00:00`)
   const end = new Date(`${cycle.end_date}T00:00:00`)
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return cycle.label ?? 'Current schedule cycle'
+    return cycle.label ?? 'Current Schedule Block'
   }
 
   const sameYear = start.getFullYear() === end.getFullYear()

@@ -50,7 +50,7 @@ export function ScheduledConflictBanner({ conflicts, onDismiss }: Props) {
             href="/schedule"
             className="text-sm font-semibold underline-offset-4 hover:underline"
           >
-            Review in Coverage →
+            Review in Schedule -&gt;
           </Link>
         </div>
         <Button

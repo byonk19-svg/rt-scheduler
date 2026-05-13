@@ -504,7 +504,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
 
     recipientCount = dedupedRecipients.length
     const therapistIds = dedupedRecipients.map((recipient) => recipient.id)
-    const cycleLabel = publishCycleDetails?.label ?? 'Schedule cycle'
+    const cycleLabel = publishCycleDetails?.label ?? 'Schedule Block'
     const cycleRange = publishCycleDetails
       ? `${publishCycleDetails.startDate} to ${publishCycleDetails.endDate}`
       : 'the current date range'

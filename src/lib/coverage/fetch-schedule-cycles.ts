@@ -33,7 +33,7 @@ export function isScheduleCycleArchivalColumnError(err: {
 }
 
 /**
- * Loads non-archived schedule cycles for Coverage. If the DB has not received the lifecycle
+ * Loads non-archived schedule cycles for Schedule. If the DB has not received the lifecycle
  * migrations yet, falls back to a legacy query (no archival/offline metadata).
  */
 export async function fetchScheduleCyclesForCoverage(

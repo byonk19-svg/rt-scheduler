@@ -8,6 +8,7 @@ import type { GridDataset } from './schedule-grid-types'
 function makeDataset(overrides: Partial<GridDataset> = {}): GridDataset {
   return {
     cycleId: 'c1',
+    shiftType: 'day',
     availableCycles: [{ id: 'c1', label: 'May 4 - May 5, 2026' }],
     cycleDates: ['2026-05-04', '2026-05-05'],
     cycleDateRangeLabel: 'May 4 - May 5, 2026',
@@ -44,8 +45,14 @@ function makeDataset(overrides: Partial<GridDataset> = {}): GridDataset {
   }
 }
 
-function renderTable(dataset: GridDataset) {
-  return renderToStaticMarkup(createElement(ScheduleGridTable, { dataset, onCellClick: vi.fn() }))
+function renderTable(dataset: GridDataset, interactionsDisabled = false) {
+  return renderToStaticMarkup(
+    createElement(ScheduleGridTable, { dataset, onCellClick: vi.fn(), interactionsDisabled })
+  )
+}
+
+function getCellButton(html: string, userId: string, date: string) {
+  return html.match(new RegExp(`<button[^>]*data-testid="cell-${userId}-${date}"[^>]*>`))?.[0] ?? ''
 }
 
 describe('ScheduleGridTable', () => {
@@ -83,5 +90,37 @@ describe('ScheduleGridTable', () => {
 
     expect(html).toContain('data-testid="total-2026-05-04"')
     expect(html).toContain('>1</span>')
+  })
+
+  it('lets managers assign empty cells on published schedules', () => {
+    const html = renderTable(makeDataset({ isPublished: true }))
+    const cell = getCellButton(html, 'u1', '2026-05-05')
+
+    expect(cell).toContain('data-testid="cell-u1-2026-05-05"')
+    expect(cell).not.toContain('disabled')
+  })
+
+  it('locks cell interactions while schedule navigation is pending', () => {
+    const html = renderTable(makeDataset({ isPublished: true }), true)
+    const cell = getCellButton(html, 'u1', '2026-05-04')
+
+    expect(cell).toContain('data-testid="cell-u1-2026-05-04"')
+    expect(cell).toContain('disabled=""')
+  })
+
+  it('keeps therapists read-only', () => {
+    const html = renderTable(
+      makeDataset({
+        viewerUserId: 'u1',
+        viewerRole: 'therapist',
+        canManageCoverage: false,
+        canUpdateAssignmentStatus: false,
+        isPublished: true,
+      })
+    )
+    const cell = getCellButton(html, 'u1', '2026-05-04')
+
+    expect(cell).toContain('data-testid="cell-u1-2026-05-04"')
+    expect(cell).toContain('disabled=""')
   })
 })

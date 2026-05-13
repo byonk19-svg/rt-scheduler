@@ -55,9 +55,9 @@ describe('route title consistency', () => {
     const staffSchedule = read('src/app/(app)/staff/schedule/page.tsx')
     const staffMySchedule = read('src/app/(app)/staff/my-schedule/page.tsx')
 
-    expect(therapistSchedule).toContain("redirect('/schedule')")
-    expect(staffSchedule).toContain("redirect('/schedule')")
-    expect(staffMySchedule).toContain("redirect('/schedule')")
+    expect(therapistSchedule).toContain('buildScheduleRedirectPath')
+    expect(staffSchedule).toContain('buildScheduleRedirectPath')
+    expect(staffMySchedule).toContain('buildScheduleRedirectPath')
     expect(therapistSchedule).toContain("title: 'Schedule'")
     expect(staffSchedule).toContain("title: 'Schedule'")
     expect(staffMySchedule).toContain("title: 'Schedule'")
@@ -77,9 +77,7 @@ describe('route title consistency', () => {
     const schedule = read('src/app/(app)/schedule/page.tsx')
     expect(coverage).toContain("title: 'Schedule'")
     expect(schedule).toContain("title: 'Schedule'")
-    expect(coverage).toContain(
-      "redirect(query.size > 0 ? `/schedule?${query.toString()}` : '/schedule')"
-    )
+    expect(coverage).toContain('buildScheduleRedirectPath(params, { preserveAll: true })')
     expect(schedule).not.toContain("title: 'Coverage'")
   })
 

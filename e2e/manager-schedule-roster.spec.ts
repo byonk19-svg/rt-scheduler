@@ -322,7 +322,7 @@ test.describe.serial('unified schedule grid route', () => {
     await expect(page).toHaveURL(/\/schedule\?.*cycle=.*shift=day/)
 
     await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
-    await expect(page.getByRole('combobox', { name: 'Schedule cycle' })).toHaveValue(
+    await expect(page.getByRole('combobox', { name: 'Schedule Block' })).toHaveValue(
       smoke.draftCycle.id
     )
     await expect(page.getByText('Draft', { exact: true })).toBeVisible()
@@ -347,7 +347,7 @@ test.describe.serial('unified schedule grid route', () => {
       page.getByTestId(cellTestId(smoke.nightCore.id, smoke.draftCycle.day1))
     ).toHaveText('CI')
 
-    await page.getByRole('combobox', { name: 'Schedule cycle' }).selectOption(smoke.liveCycle.id)
+    await page.getByRole('combobox', { name: 'Schedule Block' }).selectOption(smoke.liveCycle.id)
     await expect(page).toHaveURL(new RegExp(`cycle=${smoke.liveCycle.id}`))
     await expect(page.getByText('Published', { exact: true })).toBeVisible()
   })

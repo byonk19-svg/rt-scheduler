@@ -53,6 +53,7 @@ type Scenario = {
       employment_type?: 'full_time' | 'part_time' | 'prn'
       max_work_days_per_week?: number
       site_id?: string
+      shift_type?: 'day' | 'night'
     }
   >
   insertError?: { code?: string; message?: string } | null
@@ -93,6 +94,7 @@ function makeSupabaseMock(scenario: Scenario) {
         employment_type: 'full_time',
         max_work_days_per_week: 3,
         site_id: 'site-a',
+        shift_type: null,
       }
     }
     if (id === 'therapist-lead') {
@@ -103,6 +105,7 @@ function makeSupabaseMock(scenario: Scenario) {
         employment_type: 'full_time',
         max_work_days_per_week: 3,
         site_id: 'site-a',
+        shift_type: 'day',
       }
     }
     const custom = scenario.therapistProfiles?.[id]
@@ -114,6 +117,7 @@ function makeSupabaseMock(scenario: Scenario) {
         employment_type: custom.employment_type ?? 'full_time',
         max_work_days_per_week: custom.max_work_days_per_week ?? 3,
         site_id: custom.site_id ?? 'site-a',
+        shift_type: custom.shift_type ?? 'day',
       }
     }
     return {
@@ -123,6 +127,7 @@ function makeSupabaseMock(scenario: Scenario) {
       employment_type: 'full_time',
       max_work_days_per_week: 3,
       site_id: 'site-a',
+      shift_type: 'day',
     }
   }
 
@@ -467,6 +472,43 @@ describe('drag-drop API behavior', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: 'Therapist is outside your site scope.',
     })
+  })
+
+  it('rejects assignment when the selected shift does not match the therapist shift type', async () => {
+    const supabase = makeSupabaseMock({
+      coverageStatuses: ['scheduled'],
+      weeklyShifts: [],
+      therapistProfiles: {
+        'night-therapist': {
+          shift_type: 'night',
+          site_id: 'site-a',
+        },
+      },
+    })
+    vi.mocked(createClient).mockResolvedValue(
+      supabase as unknown as Awaited<ReturnType<typeof createClient>>
+    )
+
+    const response = await POST(
+      new Request('http://localhost/api/schedule/drag-drop', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: 'http://localhost' },
+        body: JSON.stringify({
+          action: 'assign',
+          cycleId: 'cycle-1',
+          userId: 'night-therapist',
+          shiftType: 'day',
+          date: '2026-03-10',
+          overrideWeeklyRules: false,
+        }),
+      })
+    )
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Therapist shift type does not match the selected schedule shift.',
+    })
+    expect(supabase.insertedShiftPayloads).toEqual([])
   })
 
   it('returns 409 when assign would exceed weekly therapist limit', async () => {
@@ -1072,7 +1114,7 @@ describe('drag-drop API behavior', () => {
           cycleId: 'cycle-1',
           shiftId: 'shift-1',
           targetDate: '2026-03-13',
-          targetShiftType: 'night',
+          targetShiftType: 'day',
           overrideWeeklyRules: false,
         }),
       })
@@ -1086,8 +1128,7 @@ describe('drag-drop API behavior', () => {
       expect.anything(),
       expect.objectContaining({
         eventType: 'published_schedule_changed',
-        message:
-          'Your published schedule changed: your shift moved from Mar 12 day to Mar 13 night.',
+        message: 'Your published schedule changed: your shift moved from Mar 12 day to Mar 13 day.',
       })
     )
   })

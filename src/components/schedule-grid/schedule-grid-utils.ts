@@ -36,6 +36,10 @@ export function getCellDisplay(cell: GridCell): CellDisplay {
   }
 }
 
+export function isWorkingScheduledGridCell(cell: GridCell | null | undefined): boolean {
+  return cell?.status === 'staff' || cell?.status === 'lead'
+}
+
 export function buildDailyTotals(
   rows: readonly TherapistGridRow[],
   dates: readonly string[]
@@ -45,10 +49,7 @@ export function buildDailyTotals(
   for (const date of dates) {
     totals[date] = rows.reduce((count, row) => {
       const cell = row.cells[date]
-      if (!cell) return count
-      return cell.status === 'staff' || cell.status === 'lead' || cell.status === 'call_in'
-        ? count + 1
-        : count
+      return isWorkingScheduledGridCell(cell) ? count + 1 : count
     }, 0)
   }
 

@@ -64,7 +64,7 @@ describe('app-shell-config', () => {
     )
   })
 
-  it('collapses Coverage and Roster View into one manager Schedule tab', () => {
+  it('collapses legacy schedule labels into one manager Schedule tab', () => {
     const sections = buildManagerSections(0)
     const scheduleSection = sections.find((section) => section.key === 'schedule')
 

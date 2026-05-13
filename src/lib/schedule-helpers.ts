@@ -160,15 +160,15 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
       return {
         message:
           skipped > 0
-            ? `Schedule cycle created. Copied ${copied} shift assignments from the previous cycle and skipped ${skipped} inactive or FMLA assignments.`
-            : `Schedule cycle created. Copied ${copied} shift assignments from the previous cycle.`,
+            ? `Schedule Block created. Copied ${copied} shift assignments from the previous Schedule Block and skipped ${skipped} inactive or FMLA assignments.`
+            : `Schedule Block created. Copied ${copied} shift assignments from the previous Schedule Block.`,
         variant: 'success',
       }
     }
-    return { message: 'Schedule cycle created.', variant: 'success' }
+    return { message: 'Schedule Block created.', variant: 'success' }
   }
   if (success === 'cycle_published') {
-    return { message: 'Schedule cycle published.', variant: 'success' }
+    return { message: 'Schedule Block published.', variant: 'success' }
   }
   if (success === 'cycle_taken_offline') {
     return { message: 'Schedule Block taken offline.', variant: 'success' }
@@ -191,26 +191,26 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
   }
   if (error === 'create_cycle_failed') {
     return {
-      message: 'Could not create schedule cycle. Please check inputs and try again.',
+      message: 'Could not create Schedule Block. Please check inputs and try again.',
       variant: 'error',
     }
   }
   if (error === 'create_cycle_invalid_range') {
     return {
-      message: 'Cycle end date must be the same as or later than the start date.',
+      message: 'Schedule Block end date must be the same as or later than the start date.',
       variant: 'error',
     }
   }
   if (error === 'create_cycle_overlap') {
     return {
-      message: 'That cycle overlaps an existing active schedule block.',
+      message: 'That Schedule Block overlaps another active Schedule Block.',
       variant: 'error',
     }
   }
   if (error === 'copy_from_last_cycle_failed') {
     return {
       message:
-        'Cycle created, but we could not copy shifts from the previous cycle. Please try again.',
+        'Schedule Block created, but we could not copy shifts from the previous Schedule Block. Please try again.',
       variant: 'error',
     }
   }
@@ -265,19 +265,22 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
     }
   }
   if (error === 'auto_missing_cycle') {
-    return { message: 'Select a schedule cycle first.', variant: 'error' }
+    return { message: 'Select a Schedule Block first.', variant: 'error' }
   }
   if (error === 'auto_cycle_published') {
-    return { message: 'Move this cycle to draft before auto-generating.', variant: 'error' }
+    return {
+      message: 'Move this Schedule Block to draft before auto-generating.',
+      variant: 'error',
+    }
   }
   if (error === 'auto_no_therapists') {
     return { message: 'No therapists found to schedule.', variant: 'error' }
   }
   if (error === 'reset_missing_cycle') {
-    return { message: 'Select a schedule cycle first.', variant: 'error' }
+    return { message: 'Select a Schedule Block first.', variant: 'error' }
   }
   if (error === 'reset_cycle_published') {
-    return { message: 'Only draft cycles can be reset.', variant: 'error' }
+    return { message: 'Only Draft Schedule Blocks can be reset.', variant: 'error' }
   }
   if (error === 'reset_failed') {
     return { message: 'Could not clear the draft schedule. Please try again.', variant: 'error' }

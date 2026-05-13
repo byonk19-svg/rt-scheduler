@@ -25,6 +25,7 @@ export type TherapistGridRow = {
 
 export type GridDataset = {
   cycleId: string
+  shiftType: 'day' | 'night'
   availableCycles: Array<{ id: string; label: string }>
   cycleDates: string[]
   cycleDateRangeLabel: string

@@ -15,7 +15,10 @@ import { fetchActiveOperationalDetailMap } from '@/lib/operational-codes'
 import { getWeekBoundsForDate } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/server'
 
-import { buildDailyTotals } from '@/components/schedule-grid/schedule-grid-utils'
+import {
+  buildDailyTotals,
+  isWorkingScheduledGridCell,
+} from '@/components/schedule-grid/schedule-grid-utils'
 import type {
   GridCell,
   GridDataset,
@@ -105,8 +108,7 @@ function countWeekAssignments(row: TherapistGridRow, cycleDates: readonly string
     const weekStart = getWeekBoundsForDate(date)?.weekStart
     if (!weekStart) continue
     dateToWeekStart.set(date, weekStart)
-    const status = row.cells[date]?.status
-    if (status === 'staff' || status === 'lead' || status === 'call_in') {
+    if (isWorkingScheduledGridCell(row.cells[date])) {
       counts.set(weekStart, (counts.get(weekStart) ?? 0) + 1)
     }
   }
@@ -153,6 +155,8 @@ export async function loadScheduleGridData(
     parseCoverageShiftSearchParam(rawShift ?? null) ??
     defaultCoverageShiftTabFromProfileShift(profile?.shift_type)
   const shiftType = shiftTabToQueryValue(initialShiftTab)
+  const canManageCoverage = can(actorRole, 'manage_coverage', permissionContext)
+  const canUpdateAssignmentStatus = can(actorRole, 'update_assignment_status', permissionContext)
 
   const cyclesQuery = supabase
     .from('schedule_cycles')
@@ -167,7 +171,7 @@ export async function loadScheduleGridData(
   const { data: cyclesData } = await cyclesQuery
 
   const cycles = ((cyclesData ?? []) as CycleRow[]).filter((cycle) =>
-    actorRole === 'therapist' ? isCyclePublished(cycle) : true
+    canManageCoverage ? true : isCyclePublished(cycle)
   )
   const cycleIdFromUrl = firstParam(searchParams?.cycle)
   const cycle =
@@ -181,8 +185,6 @@ export async function loadScheduleGridData(
 
   const cycleDates = dateRange(cycle.start_date, cycle.end_date)
   const isPublished = isCyclePublished(cycle)
-  const canManageCoverage = can(actorRole, 'manage_coverage', permissionContext)
-  const canUpdateAssignmentStatus = can(actorRole, 'update_assignment_status', permissionContext)
 
   const therapistQuery = supabase
     .from('profiles')
@@ -297,6 +299,7 @@ export async function loadScheduleGridData(
     preFlightSummary,
     dataset: {
       cycleId: cycle.id,
+      shiftType,
       availableCycles: cycles.map((candidate) => ({
         id: candidate.id,
         label:

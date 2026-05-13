@@ -29,7 +29,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
   title: 'Future Availability',
-  description: 'Plan and submit your availability for upcoming schedule cycles.',
+  description: 'Plan and submit your availability for upcoming Schedule Blocks.',
 }
 
 type ToastVariant = 'success' | 'error'

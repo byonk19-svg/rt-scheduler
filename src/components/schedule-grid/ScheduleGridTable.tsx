@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils'
 
-import { getCellDisplay } from './schedule-grid-utils'
+import { getCellDisplay, isWorkingScheduledGridCell } from './schedule-grid-utils'
 import type { GridCell, GridDataset, TherapistGridRow } from './schedule-grid-types'
 
 type CellClickHandler = (
@@ -15,6 +15,7 @@ type CellClickHandler = (
 type ScheduleGridTableProps = {
   dataset: GridDataset
   onCellClick?: CellClickHandler
+  interactionsDisabled?: boolean
 }
 
 function formatHeaderDate(date: string) {
@@ -41,12 +42,15 @@ function totalColorClass(date: string, count: number): string {
 
 function rowScheduledTotal(row: TherapistGridRow, cycleDates: readonly string[]) {
   return cycleDates.reduce((count, date) => {
-    const status = row.cells[date]?.status
-    return status === 'staff' || status === 'lead' || status === 'call_in' ? count + 1 : count
+    return isWorkingScheduledGridCell(row.cells[date]) ? count + 1 : count
   }, 0)
 }
 
-export function ScheduleGridTable({ dataset, onCellClick }: ScheduleGridTableProps) {
+export function ScheduleGridTable({
+  dataset,
+  onCellClick,
+  interactionsDisabled = false,
+}: ScheduleGridTableProps) {
   const { cycleDates, therapistRows, dailyTotals, viewerRole, viewerUserId } = dataset
   const isStaffViewer = viewerRole === 'therapist' || viewerRole === 'lead'
   const sortedRows = isStaffViewer
@@ -94,6 +98,7 @@ export function ScheduleGridTable({ dataset, onCellClick }: ScheduleGridTablePro
               canManageCoverage={dataset.canManageCoverage}
               canUpdateAssignmentStatus={dataset.canUpdateAssignmentStatus}
               isPublished={dataset.isPublished}
+              interactionsDisabled={interactionsDisabled}
               onCellClick={onCellClick}
             />
           ))}
@@ -126,6 +131,7 @@ function TherapistRow({
   canManageCoverage,
   canUpdateAssignmentStatus,
   isPublished,
+  interactionsDisabled,
   onCellClick,
 }: {
   row: TherapistGridRow
@@ -134,6 +140,7 @@ function TherapistRow({
   canManageCoverage: boolean
   canUpdateAssignmentStatus: boolean
   isPublished: boolean
+  interactionsDisabled: boolean
   onCellClick?: CellClickHandler
 }) {
   const total = rowScheduledTotal(row, cycleDates)
@@ -165,11 +172,14 @@ function TherapistRow({
           isIneligible: false,
         }
         const display = getCellDisplay(cell)
-        const canAssignInDraft = canManageCoverage && !isPublished && cell.status === 'off'
+        const canAssign = canManageCoverage && cell.status === 'off'
         const canEditAssigned =
           cell.status !== 'off' && (canManageCoverage || (canUpdateAssignmentStatus && isPublished))
         const clickable = Boolean(
-          onCellClick && !cell.isIneligible && (canAssignInDraft || canEditAssigned)
+          onCellClick &&
+          !interactionsDisabled &&
+          !cell.isIneligible &&
+          (canAssign || canEditAssigned)
         )
 
         return (

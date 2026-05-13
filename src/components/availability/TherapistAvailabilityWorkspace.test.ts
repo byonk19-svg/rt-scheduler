@@ -148,7 +148,7 @@ describe('TherapistAvailabilityWorkspace', () => {
 
     expect(html).toContain('You marked Need Off on dates that already have a scheduled shift.')
     expect(html).toContain('Mon Apr 20')
-    expect(html).toContain('Review in Coverage')
+    expect(html).toContain('Review in Schedule')
   })
 
   it('uses neutral manual-state language when no normal schedule exists', () => {

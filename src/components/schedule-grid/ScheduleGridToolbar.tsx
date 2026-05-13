@@ -38,14 +38,14 @@ export function ScheduleGridToolbar({
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-muted/30 px-4 py-2.5">
       <div className="flex flex-wrap items-center gap-3">
         <label className="sr-only" htmlFor="schedule-cycle">
-          Schedule cycle
+          Schedule Block
         </label>
         <select
           id="schedule-cycle"
           value={cycleId}
           onChange={(event) => onCycleChange(event.target.value)}
           className="h-8 rounded-md border border-border bg-card px-2 text-sm font-semibold text-foreground"
-          aria-label="Schedule cycle"
+          aria-label="Schedule Block"
         >
           {availableCycles.length > 0 ? (
             availableCycles.map((cycle) => (
