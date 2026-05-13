@@ -226,6 +226,7 @@ export async function PublishedSchedulePage({
   const leadCount = days.filter((day) => day.userShift?.role === 'lead').length
   const dayShiftCount = days.filter((day) => day.userShift?.shiftType === 'day').length
   const nightShiftCount = days.filter((day) => day.userShift?.shiftType === 'night').length
+  const todayIso = toIsoDate(new Date())
 
   return (
     <TherapistShiftCalendar
@@ -253,7 +254,7 @@ export async function PublishedSchedulePage({
         dayOffCount: days.length - shiftCount,
         totalHours: shiftCount * HOURS_PER_SHIFT,
       }}
-      todayIso={toIsoDate(new Date())}
+      todayIso={todayIso}
       backHref={backHref}
     />
   )

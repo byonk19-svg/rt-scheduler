@@ -132,10 +132,10 @@ function EmailIntakeApplyDatesButton({
     formData: FormData
   ) => void | Promise<void> | Promise<{ ok: true; cycleId: string; therapistId: string }>
 }) {
-  const router = useRouter()
+  const { refresh, replace } = useRouter()
   const [pending, startTransition] = useTransition()
 
-  function handleClick() {
+  function applyMatchedDates() {
     if (!item.matchedCycleId || !item.matchedTherapistId) return
     startTransition(async () => {
       const fd = new FormData()
@@ -149,16 +149,20 @@ function EmailIntakeApplyDatesButton({
         'cycleId' in result &&
         'therapistId' in result
       ) {
-        router.replace(
-          buildPostApplyAvailabilityHref(String(result.cycleId), String(result.therapistId))
-        )
-        router.refresh()
+        replace(buildPostApplyAvailabilityHref(String(result.cycleId), String(result.therapistId)))
+        refresh()
       }
     })
   }
 
   return (
-    <Button type="button" size="sm" disabled={pending} aria-busy={pending} onClick={handleClick}>
+    <Button
+      type="button"
+      size="sm"
+      disabled={pending}
+      aria-busy={pending}
+      onClick={applyMatchedDates}
+    >
       Apply dates
     </Button>
   )
@@ -175,7 +179,7 @@ function EmailIntakeRequestChipRow({
     formData: FormData
   ) => void | Promise<void> | Promise<{ ok: true }>
 }) {
-  const router = useRouter()
+  const { refresh } = useRouter()
   const [pending, startTransition] = useTransition()
 
   function runAction(buildFormData: () => FormData) {
@@ -183,7 +187,7 @@ function EmailIntakeRequestChipRow({
       const fd = buildFormData()
       const result = await updateEmailIntakeItemRequestAction(fd)
       if (result && typeof result === 'object' && 'ok' in result && result.ok) {
-        router.refresh()
+        refresh()
       }
     })
   }

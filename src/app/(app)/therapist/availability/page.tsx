@@ -22,6 +22,7 @@ import {
   normalizeWorkPattern,
   type WorkPattern,
 } from '@/lib/coverage/work-patterns'
+import { toIsoDate } from '@/lib/calendar-utils'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveTherapistAvailabilityCycleId } from '@/lib/therapist-workflow'
 import { createClient } from '@/lib/supabase/server'
@@ -225,7 +226,7 @@ export default async function TherapistAvailabilityPage({
       : 'day'
 
   const today = new Date()
-  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const todayKey = toIsoDate(today)
 
   const { data: cyclesData } = await admin
     .from('schedule_cycles')
@@ -356,7 +357,6 @@ export default async function TherapistAvailabilityPage({
       }),
     ])
   )
-
   return (
     <div className="space-y-7">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
@@ -366,6 +366,7 @@ export default async function TherapistAvailabilityPage({
         availabilityRows={availabilityRows}
         conflicts={conflicts}
         initialCycleId={selectedCycleId}
+        todayKey={todayKey}
         hasSavedRecurringPattern={hasSavedRecurringPattern}
         recurringPatternSummary={recurringPatternSummary}
         generatedBaselineByCycleId={generatedBaselineByCycleId}

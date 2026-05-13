@@ -69,6 +69,19 @@ function getOne<T>(value: T | T[] | null | undefined): T | null {
   return value ?? null
 }
 
+const publishEventDateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+})
+
+function formatPublishEventTime(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return publishEventDateFormatter.format(date)
+}
+
 type PublishHistoryPageProps = {
   searchParams?: Promise<{
     success?: string
@@ -126,16 +139,15 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
     redirect('/dashboard')
   }
 
-  const { data: activeCycles, error: cyclesLoadError } =
-    await fetchScheduleCyclesForCoverage(supabase)
-
-  const { data: eventsData, error: eventsError } = await supabase
+  const activeCyclesPromise = fetchScheduleCyclesForCoverage(supabase)
+  const eventsResult = await supabase
     .from('publish_events')
     .select(
       'id, cycle_id, published_at, status, recipient_count, channel, queued_count, sent_count, failed_count, error_message, schedule_cycles(label,published,status), profiles!publish_events_published_by_fkey(full_name)'
     )
     .order('published_at', { ascending: false })
     .limit(50)
+  const { data: eventsData, error: eventsError } = eventsResult
 
   if (eventsError) {
     return (
@@ -160,6 +172,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
     )
   }
 
+  const { data: activeCycles, error: cyclesLoadError } = await activeCyclesPromise
   const events = (eventsData ?? []) as PublishEventRow[]
   const successCount = events.filter((event) => event.status === 'success').length
   const failedCount = events.filter((event) => event.status === 'failed').length
@@ -473,7 +486,8 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
           <h2 className="text-sm font-bold tracking-tight text-foreground">Publish email log</h2>
           <p className="mt-1 text-xs text-muted-foreground">
             One row per time a schedule was published and emails were queued. Deleting a row here
-            only removes the log entry, not the schedule block—use Schedule blocks above to archive.
+            only removes the log entry, not the schedule block. Use Schedule blocks above to
+            archive.
           </p>
         </div>
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-tw-sm">
@@ -505,12 +519,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                   {events.map((event) => (
                     <tr key={event.id} className="group align-top">
                       <td className="px-4 py-3 text-sm text-foreground">
-                        {new Date(event.published_at).toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: 'numeric',
-                          minute: '2-digit',
-                        })}
+                        {formatPublishEventTime(event.published_at)}
                       </td>
                       <td className="px-4 py-3 text-sm font-medium text-foreground">
                         {getOne(event.schedule_cycles)?.label ?? event.cycle_id}

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 import {
@@ -321,12 +322,12 @@ export default async function TeamPage({
         subtitle="Manage staffing, roles, and roster access from one workspace."
         className="px-0"
         actions={
-          <a
+          <Link
             href="/team/import"
             className="inline-flex h-11 items-center justify-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground shadow-xs transition-colors hover:bg-secondary/70"
           >
             Import
-          </a>
+          </Link>
         }
       />
 

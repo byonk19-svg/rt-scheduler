@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 
@@ -238,5 +241,14 @@ describe('PublishHistoryPage', () => {
 
     expect(html).not.toContain('Open Lottery')
     expect(html).not.toContain('href="/lottery"')
+  })
+
+  it('keeps publish event time formatting out of table row render work', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/app/(app)/publish/page.tsx'), 'utf8')
+
+    expect(source).toContain('const publishEventDateFormatter = new Intl.DateTimeFormat')
+    expect(source).toContain('function formatPublishEventTime(value: string): string')
+    expect(source).toContain('{formatPublishEventTime(event.published_at)}')
+    expect(source).not.toContain('new Date(event.published_at).toLocaleString')
   })
 })

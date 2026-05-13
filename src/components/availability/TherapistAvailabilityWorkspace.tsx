@@ -36,6 +36,7 @@ type Props = {
   availabilityRows: AvailabilityEntryTableRow[]
   conflicts?: ConflictItem[]
   initialCycleId: string
+  todayKey: string
   hasSavedRecurringPattern: boolean
   recurringPatternSummary: string
   generatedBaselineByCycleId: Record<string, Record<string, GeneratedAvailabilityBaselineDay>>
@@ -49,6 +50,7 @@ type Props = {
 }
 
 const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'] as const
+const EMPTY_CONFLICTS: ConflictItem[] = []
 
 function monthRibbonLabel(isoDate: string, previousIsoDate: string | null): string | null {
   const d = new Date(`${isoDate}T12:00:00`)
@@ -171,11 +173,16 @@ function formatReviewDateList(dates: string[], notesByDate: Record<string, strin
   return dates.map((date) => formatReviewDateWithNote(date, notesByDate[date])).join(', ')
 }
 
+function dayOfMonthFromIsoDate(isoDate: string): number {
+  return Number.parseInt(isoDate.slice(8, 10), 10)
+}
+
 export function TherapistAvailabilityWorkspace({
   cycles,
   availabilityRows,
-  conflicts = [],
+  conflicts = EMPTY_CONFLICTS,
   initialCycleId,
+  todayKey,
   hasSavedRecurringPattern,
   recurringPatternSummary,
   generatedBaselineByCycleId,
@@ -191,7 +198,6 @@ export function TherapistAvailabilityWorkspace({
   const [rangeStart, setRangeStart] = useState('')
   const [rangeEnd, setRangeEnd] = useState('')
   const noteTextareaRef = useRef<HTMLTextAreaElement>(null)
-  const todayKey = toIsoDate(new Date())
 
   const selectedCycle = useMemo(
     () => cycles.find((cycle) => cycle.id === selectedCycleId) ?? null,
@@ -780,7 +786,7 @@ export function TherapistAvailabilityWorkspace({
                         date,
                         dayIndex > 0 ? cycleDays[dayIndex - 1] : null
                       )
-                      const dayNum = new Date(`${date}T00:00:00`).getDate()
+                      const dayNum = dayOfMonthFromIsoDate(date)
 
                       return (
                         <button

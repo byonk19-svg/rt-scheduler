@@ -39,10 +39,20 @@ type AuditLogRow = {
 }
 
 const PAGE_SIZE = 25
+const auditLogDateFormatter = new Intl.DateTimeFormat('en-US', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+})
 
 function getSearchParam(value: string | string[] | undefined): string {
   if (Array.isArray(value)) return value[0] ?? ''
   return value ?? ''
+}
+
+function formatAuditLogTime(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return auditLogDateFormatter.format(date)
 }
 
 function getAuditLogHref(query: AuditLogSearchParams | undefined, page: number): string {
@@ -158,8 +168,10 @@ export default async function AuditLogPage({
     return q
   }
 
-  let countResult = await buildCountQuery(supabase)
-  let rowsResult = await buildRowsQuery(supabase)
+  let [countResult, rowsResult] = await Promise.all([
+    buildCountQuery(supabase),
+    buildRowsQuery(supabase),
+  ])
 
   const rowsErrorMessage = rowsResult.error?.message ?? ''
   const joinBlocked =
@@ -168,8 +180,12 @@ export default async function AuditLogPage({
 
   if (joinBlocked) {
     const admin = createAdminClient()
-    countResult = await buildCountQuery(admin)
-    rowsResult = await buildRowsQuery(admin)
+    const [adminCountResult, adminRowsResult] = await Promise.all([
+      buildCountQuery(admin),
+      buildRowsQuery(admin),
+    ])
+    countResult = adminCountResult
+    rowsResult = adminRowsResult
   }
 
   const totalCount = countResult.error ? 0 : (countResult.count ?? 0)
@@ -222,10 +238,7 @@ export default async function AuditLogPage({
               rows.map((row) => (
                 <tr key={row.id} className="hover:bg-secondary/20">
                   <td className="whitespace-nowrap px-4 py-2.5 text-sm text-foreground">
-                    {new Date(row.created_at).toLocaleString('en-US', {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    })}
+                    {formatAuditLogTime(row.created_at)}
                   </td>
                   <td className="px-4 py-2.5 text-sm text-muted-foreground">{getActorName(row)}</td>
                   <td className="px-4 py-2.5">
