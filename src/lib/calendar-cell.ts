@@ -29,7 +29,8 @@ export function summarizeCalendarCell(
     return a.full_name.localeCompare(b.full_name)
   })
 
-  const lead = sorted.find((shift) => shift.role === 'lead') ?? null
+  const lead =
+    sorted.find((shift) => shift.role === 'lead' && countsTowardCoverage(shift.status)) ?? null
   const coverageCount = sorted.filter((shift) => countsTowardCoverage(shift.status)).length
   const visibleShifts = sorted.slice(0, maxVisible)
   const hiddenCount = Math.max(sorted.length - maxVisible, 0)

@@ -22,8 +22,11 @@ type TestContext = {
   userId?: string | null
   role?: string | null
   cyclePublished?: boolean
+  cycleStatus?: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
+  cycleArchivedAt?: string | null
   cycleExists?: boolean
   deleteError?: boolean
+  rpcError?: { code?: string; message?: string }
 }
 
 function makeFormData(cycleId = 'cycle-1', returnTo?: 'publish') {
@@ -42,6 +45,18 @@ function createSupabaseMock(context: TestContext) {
         data: { user: context.userId ? { id: context.userId } : null },
       })),
     },
+    rpc: vi.fn(async (fn: string) => {
+      if (fn !== 'app_delete_empty_draft_schedule_cycle') {
+        return { data: null, error: { message: 'unknown rpc' } }
+      }
+      if (context.rpcError) {
+        return { data: null, error: context.rpcError }
+      }
+      if (context.deleteError) {
+        return { data: null, error: { message: 'delete failed' } }
+      }
+      return { data: [{ id: 'cycle-1' }], error: null }
+    }),
     from(table: string) {
       const filters = new Map<string, unknown>()
       let op: 'read' | 'delete' = 'read'
@@ -78,6 +93,8 @@ function createSupabaseMock(context: TestContext) {
                 id: filters.get('id') ?? 'cycle-1',
                 label: 'Test Cycle',
                 published: Boolean(context.cyclePublished),
+                status: context.cycleStatus ?? (context.cyclePublished ? 'final' : 'draft'),
+                archived_at: context.cycleArchivedAt ?? null,
               },
               error: null,
             }
@@ -114,7 +131,7 @@ describe('deleteCycleAction', () => {
     createClientMock.mockResolvedValue(mock)
 
     await expect(deleteCycleAction(makeFormData())).rejects.toThrow(
-      'REDIRECT:/coverage?view=week&error=delete_cycle_unauthorized'
+      'REDIRECT:/schedule?error=delete_cycle_unauthorized'
     )
   })
 
@@ -123,7 +140,7 @@ describe('deleteCycleAction', () => {
     createClientMock.mockResolvedValue(mock)
 
     await expect(deleteCycleAction(makeFormData())).rejects.toThrow(
-      'REDIRECT:/coverage?view=week&error=delete_cycle_not_found'
+      'REDIRECT:/schedule?error=delete_cycle_not_found'
     )
   })
 
@@ -137,7 +154,42 @@ describe('deleteCycleAction', () => {
     createClientMock.mockResolvedValue(mock)
 
     await expect(deleteCycleAction(makeFormData())).rejects.toThrow(
-      'REDIRECT:/coverage?view=week&error=delete_cycle_published'
+      'REDIRECT:/schedule?error=delete_cycle_published'
+    )
+  })
+
+  it('refuses to delete a non-draft unpublished cycle', async () => {
+    const mock = createSupabaseMock({
+      userId: 'u1',
+      role: 'manager',
+      cyclePublished: false,
+      cycleStatus: 'preliminary',
+      cycleExists: true,
+    })
+    createClientMock.mockResolvedValue(mock)
+
+    await expect(deleteCycleAction(makeFormData())).rejects.toThrow(
+      'REDIRECT:/schedule?error=delete_cycle_not_draft'
+    )
+  })
+
+  it('refuses to delete a draft with dependent data', async () => {
+    const mock = createSupabaseMock({
+      userId: 'u1',
+      role: 'manager',
+      cyclePublished: false,
+      cycleStatus: 'draft',
+      cycleExists: true,
+      rpcError: {
+        code: '23503',
+        message: 'Schedule Block has schedule, availability, preliminary, or publish history.',
+      },
+    })
+    createClientMock.mockResolvedValue(mock)
+    createAdminClientMock.mockReturnValue(mock)
+
+    await expect(deleteCycleAction(makeFormData())).rejects.toThrow(
+      'REDIRECT:/schedule?error=delete_cycle_not_empty'
     )
   })
 
@@ -152,8 +204,12 @@ describe('deleteCycleAction', () => {
     createAdminClientMock.mockReturnValue(mock)
 
     await expect(deleteCycleAction(makeFormData('cycle-1'))).rejects.toThrow(
-      'REDIRECT:/coverage?view=week&success=cycle_deleted'
+      'REDIRECT:/schedule?success=cycle_deleted'
     )
+    expect(mock.rpc).toHaveBeenCalledWith('app_delete_empty_draft_schedule_cycle', {
+      p_actor_id: 'u1',
+      p_cycle_id: 'cycle-1',
+    })
   })
 
   it('redirects to publish history when return_to is publish', async () => {

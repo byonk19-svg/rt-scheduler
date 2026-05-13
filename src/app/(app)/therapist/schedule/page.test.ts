@@ -9,16 +9,15 @@ const therapistScheduleSource = fs.readFileSync(
 )
 
 describe('therapist schedule route', () => {
-  it('stays on a therapist-owned page instead of redirecting to shared coverage', () => {
-    expect(therapistScheduleSource).toContain('My Shifts')
-    expect(therapistScheduleSource).toContain('/dashboard/staff')
+  it('redirects to the unified schedule page instead of shared coverage', () => {
+    expect(therapistScheduleSource).toContain("redirect('/schedule')")
     expect(therapistScheduleSource).not.toContain(
       "redirect(query ? `/coverage?${query}` : '/coverage')"
     )
   })
 
-  it('sets route-specific metadata for the therapist schedule surface', () => {
-    expect(therapistScheduleSource).toContain("title: 'My Shifts'")
-    expect(therapistScheduleSource).toContain('upcoming published shifts')
+  it('sets redirect metadata for the unified schedule surface', () => {
+    expect(therapistScheduleSource).toContain("title: 'Schedule'")
+    expect(therapistScheduleSource).toContain('unified Schedule grid')
   })
 })

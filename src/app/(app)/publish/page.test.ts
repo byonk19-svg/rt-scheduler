@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 
@@ -17,14 +20,14 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 vi.mock('@/app/publish/actions', () => ({
-  restartPublishedCycleAction: vi.fn(),
-  unpublishCycleKeepShiftsAction: vi.fn(),
+  takeScheduleBlockOfflineAction: vi.fn(),
   deletePublishEventAction: vi.fn(),
   archiveCycleAction: vi.fn(),
 }))
 
 vi.mock('@/app/schedule/actions', () => ({
   deleteCycleAction: vi.fn(),
+  toggleCyclePublishedAction: vi.fn(),
 }))
 
 vi.mock('@/lib/coverage/fetch-schedule-cycles', () => ({
@@ -89,7 +92,11 @@ function createSupabaseMock(context: TestContext) {
               sent_count: number
               failed_count: number
               error_message: string | null
-              schedule_cycles: { label: string; published: boolean }
+              schedule_cycles: {
+                label: string
+                published: boolean
+                status: 'final' | 'offline'
+              }
               profiles: { full_name: string | null }
             }>
             error: null
@@ -110,7 +117,7 @@ function createSupabaseMock(context: TestContext) {
                     sent_count: 12,
                     failed_count: 0,
                     error_message: null,
-                    schedule_cycles: { label: 'Live cycle', published: true },
+                    schedule_cycles: { label: 'Live cycle', published: true, status: 'final' },
                     profiles: { full_name: 'Manager A.' },
                   },
                   {
@@ -124,7 +131,7 @@ function createSupabaseMock(context: TestContext) {
                     sent_count: 10,
                     failed_count: 0,
                     error_message: null,
-                    schedule_cycles: { label: 'Old cycle', published: false },
+                    schedule_cycles: { label: 'Old cycle', published: false, status: 'offline' },
                     profiles: { full_name: 'Manager B.' },
                   },
                 ],
@@ -147,7 +154,7 @@ describe('PublishHistoryPage', () => {
     vi.clearAllMocks()
   })
 
-  it('shows start over for currently published cycles and marks reopened cycles as no longer live', async () => {
+  it('shows take-offline and offline lifecycle actions without start-over for live blocks', async () => {
     createClientMock.mockResolvedValue(
       createSupabaseMock({
         userId: 'manager-1',
@@ -160,7 +167,7 @@ describe('PublishHistoryPage', () => {
     expect(html).toContain('Schedule blocks')
     expect(html).toContain('Publish email log')
     expect(html).toContain('Take offline')
-    expect(html).toContain('Clear &amp; restart')
+    expect(html).not.toContain('Clear &amp; restart')
     expect(html).toContain('Archive cycle')
     expect(html).toContain('Delete history')
     expect(html).toContain('Open cycle')
@@ -169,7 +176,7 @@ describe('PublishHistoryPage', () => {
     expect(html).toContain('Old cycle')
   })
 
-  it('shows a success banner after restarting a cycle', async () => {
+  it('shows a success banner after taking a cycle offline', async () => {
     createClientMock.mockResolvedValue(
       createSupabaseMock({
         userId: 'manager-1',
@@ -179,12 +186,12 @@ describe('PublishHistoryPage', () => {
 
     const html = renderToStaticMarkup(
       await PublishHistoryPage({
-        searchParams: Promise.resolve({ success: 'cycle_restarted' }),
+        searchParams: Promise.resolve({ success: 'cycle_taken_offline' }),
       })
     )
 
-    expect(html).toContain('Cycle restarted')
-    expect(html).toContain('published shifts were cleared')
+    expect(html).toContain('Schedule block taken offline')
+    expect(html).toContain('Assignments were preserved')
   })
 
   it('shows a success banner after deleting publish history', async () => {
@@ -219,7 +226,7 @@ describe('PublishHistoryPage', () => {
     )
 
     expect(html).toContain('Cycle archived')
-    expect(html).toContain('will no longer appear in Coverage')
+    expect(html).toContain('will no longer appear in Schedule')
   })
 
   it('does not duplicate the canonical dashboard Lottery entry point from publish history', async () => {
@@ -234,5 +241,14 @@ describe('PublishHistoryPage', () => {
 
     expect(html).not.toContain('Open Lottery')
     expect(html).not.toContain('href="/lottery"')
+  })
+
+  it('keeps publish event time formatting out of table row render work', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/app/(app)/publish/page.tsx'), 'utf8')
+
+    expect(source).toContain('const publishEventDateFormatter = new Intl.DateTimeFormat')
+    expect(source).toContain('function formatPublishEventTime(value: string): string')
+    expect(source).toContain('{formatPublishEventTime(event.published_at)}')
+    expect(source).not.toContain('new Date(event.published_at).toLocaleString')
   })
 })

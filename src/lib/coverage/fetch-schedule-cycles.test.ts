@@ -22,6 +22,16 @@ describe('isScheduleCycleArchivalColumnError', () => {
     ).toBe(true)
   })
 
+  it('returns true for schema cache misses on offline lifecycle fields', () => {
+    expect(
+      isScheduleCycleArchivalColumnError({
+        code: 'PGRST204',
+        message:
+          "Could not find the 'offline_at' column of 'schedule_cycles' in the schema cache",
+      })
+    ).toBe(true)
+  })
+
   it('returns false for unrelated errors', () => {
     expect(
       isScheduleCycleArchivalColumnError({

@@ -2,6 +2,12 @@ export type EmployeeShiftType = 'day' | 'night'
 export type EmployeeEmploymentType = 'full_time' | 'part_time' | 'prn'
 export type EmployeeDirectoryTab = 'all' | 'day' | 'night'
 export type AvailabilityOverrideSource = 'therapist' | 'manager'
+export type AvailabilityOverrideIntent =
+  | 'therapist_need_off'
+  | 'therapist_wants_work'
+  | 'manager_block'
+  | 'manager_force'
+  | 'email_intake'
 
 export type EmployeeDirectoryRecord = {
   id: string
@@ -41,6 +47,7 @@ export type EmployeeAvailabilityOverride = {
   created_at: string
   updated_at: string
   source: AvailabilityOverrideSource
+  intent: AvailabilityOverrideIntent
 }
 
 export type MissingAvailabilityRow = {
@@ -83,6 +90,7 @@ export function buildManagerOverrideInput(params: {
   overrideType: 'force_off' | 'force_on'
   note?: string | null
   managerId: string
+  intent?: AvailabilityOverrideIntent
 }) {
   return {
     cycle_id: params.cycleId,
@@ -93,7 +101,20 @@ export function buildManagerOverrideInput(params: {
     note: params.note?.trim() || null,
     created_by: params.managerId,
     source: 'manager' as const,
+    intent: params.intent ?? intentForManagerOverride(params.overrideType),
   }
+}
+
+export function intentForTherapistOverride(
+  overrideType: 'force_off' | 'force_on'
+): AvailabilityOverrideIntent {
+  return overrideType === 'force_off' ? 'therapist_need_off' : 'therapist_wants_work'
+}
+
+export function intentForManagerOverride(
+  overrideType: 'force_off' | 'force_on'
+): AvailabilityOverrideIntent {
+  return overrideType === 'force_off' ? 'manager_block' : 'manager_force'
 }
 
 export function canTherapistMutateOverride(

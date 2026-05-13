@@ -60,7 +60,7 @@ export async function countWorkingScheduledForSlot(
   return slotRows.filter((row) => !activeOperationalCodesByShiftId.has(row.id)).length
 }
 
-export function buildCoverageUrl(
+export function buildScheduleActionUrl(
   cycleId?: string,
   params?: Record<string, string | undefined>
 ): string {
@@ -74,7 +74,7 @@ export function buildCoverageUrl(
     }
   }
   const query = search.toString()
-  return query.length > 0 ? `/coverage?${query}` : '/coverage'
+  return query.length > 0 ? `/schedule?${query}` : '/schedule'
 }
 
 export function getOne<T>(value: T | T[] | null | undefined): T | null {

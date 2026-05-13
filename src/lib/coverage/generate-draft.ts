@@ -5,7 +5,7 @@ import type {
   ShiftLimitRow,
   Therapist,
 } from '@/app/schedule/types'
-import { shiftTypeMatches } from '@/lib/coverage/work-patterns'
+import { countViolatedForceOnOverrides } from '@/lib/availability-override-model'
 import { fillCoverageSlot, NO_ELIGIBLE_CANDIDATES_REASON } from '@/lib/coverage/generator-slot'
 import { getAutoDraftCoveragePolicy } from '@/lib/coverage/auto-draft-policy'
 import {
@@ -389,17 +389,10 @@ export function generateDraftForCycle(input: GenerateDraftInput): GenerateDraftR
     }
   }
 
-  const finalAssignedShifts = [...existingShifts, ...draftShiftsToInsert]
-  const forcedMustWorkMisses = allAvailabilityOverrides.filter((override) => {
-    if (override.override_type !== 'force_on') return false
-    if (override.source !== 'manager' && override.source !== 'therapist') return false
-
-    return !finalAssignedShifts.some((shift) => {
-      if (shift.user_id !== override.therapist_id || shift.date !== override.date) return false
-      if (!countsTowardWeeklyLimit(shift.status)) return false
-      return shiftTypeMatches(override.shift_type, shift.shift_type)
-    })
-  }).length
+  const forcedMustWorkMisses = countViolatedForceOnOverrides({
+    overrides: allAvailabilityOverrides,
+    scheduledShifts: [...existingShifts, ...draftShiftsToInsert],
+  })
 
   return {
     draftShiftsToInsert,

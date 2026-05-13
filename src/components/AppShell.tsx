@@ -266,6 +266,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const canAccessManagerUi = can(user?.role, 'access_manager_ui')
+  const canAccessLeadTools = can(user?.role, 'access_lead_tools')
   const [fetchedPendingCount, setFetchedPendingCount] = useState<number | null>(null)
 
   const shouldRenderShell = useMemo(() => Boolean(user) && usesAppShell(pathname), [pathname, user])
@@ -274,12 +275,12 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
   const pendingCount = user?.pendingAccessRequests ?? fetchedPendingCount ?? 0
   const managerSections = useMemo(() => buildManagerSections(pendingCount), [pendingCount])
   const shellContext = useMemo(
-    () => getShellContext({ pathname, canAccessManagerUi, pendingCount }),
-    [pathname, canAccessManagerUi, pendingCount]
+    () => getShellContext({ pathname, canAccessManagerUi, canAccessLeadTools, pendingCount }),
+    [pathname, canAccessManagerUi, canAccessLeadTools, pendingCount]
   )
   const workflowContext = useMemo(
-    () => getWorkflowContext({ pathname, canAccessManagerUi }),
-    [pathname, canAccessManagerUi]
+    () => getWorkflowContext({ pathname, canAccessManagerUi, canAccessLeadTools }),
+    [pathname, canAccessManagerUi, canAccessLeadTools]
   )
 
   const primaryItems = useMemo(
@@ -306,13 +307,15 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
   const mobileTitle = primaryItems.find((item) => item.current)?.label ?? 'Dashboard'
   const mobileQuickItems = useMemo(
     () =>
-      getMobilePrimaryItems({ canAccessManagerUi, pendingCount }).map((item) => ({
-        href: item.href,
-        label: item.label,
-        current: item.active(pathname),
-        badgeCount: item.badgeCount,
-      })),
-    [canAccessManagerUi, pathname, pendingCount]
+      getMobilePrimaryItems({ canAccessManagerUi, canAccessLeadTools, pendingCount }).map(
+        (item) => ({
+          href: item.href,
+          label: item.label,
+          current: item.active(pathname),
+          badgeCount: item.badgeCount,
+        })
+      ),
+    [canAccessManagerUi, canAccessLeadTools, pathname, pendingCount]
   )
   const moreNavCurrent = !mobileQuickItems.some((item) => item.current)
 
@@ -354,7 +357,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
   const isAvailabilityPage = pathname === '/availability'
   const isTherapistSchedulePage =
     pathname === '/therapist/schedule' || pathname === '/staff/my-schedule'
-  const hideLocalSectionNav = pathname === '/schedule' || pathname.startsWith('/availability')
+  const hideLocalSectionNav = pathname.startsWith('/availability')
 
   return (
     <ThemeProvider>
@@ -474,7 +477,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
               icon={<Home className="h-4 w-4" aria-hidden="true" />}
             />
             <MobileNavLink
-              href={mobileQuickItems[1]?.href ?? '/coverage'}
+              href={mobileQuickItems[1]?.href ?? '/schedule'}
               label={mobileQuickItems[1]?.label ?? 'Schedule'}
               current={Boolean(mobileQuickItems[1]?.current)}
               icon={<CalendarDays className="h-4 w-4" aria-hidden="true" />}

@@ -8,7 +8,6 @@ function read(filePath: string): string {
 }
 
 const routes = [
-  // Pre-existing
   ['src/app/(app)/dashboard/page.tsx', "title: 'Dashboard'"],
   ['src/app/(app)/dashboard/manager/page.tsx', "title: 'Dashboard'"],
   ['src/app/(app)/dashboard/staff/page.tsx', "title: 'Dashboard'"],
@@ -19,22 +18,18 @@ const routes = [
   ['src/app/(app)/requests/user-access/page.tsx', "title: 'User Access Requests'"],
   ['src/app/(app)/team/page.tsx', "title: 'Team'"],
   ['src/app/(app)/lottery/page.tsx', "title: 'Lottery'"],
-  // Manager schedule section
-  ['src/app/(app)/coverage/page.tsx', "title: 'Coverage'"],
-  ['src/app/(app)/schedule/page.tsx', "title: 'Roster View'"],
+  ['src/app/(app)/coverage/page.tsx', "title: 'Schedule'"],
+  ['src/app/(app)/schedule/page.tsx', "title: 'Schedule'"],
   ['src/app/(app)/approvals/page.tsx', "title: 'Approvals'"],
   ['src/app/(app)/analytics/page.tsx', "title: 'Analytics'"],
-  // Profile / settings
   ['src/app/(app)/profile/page.tsx', "title: 'Profile'"],
   ['src/app/(app)/settings/audit-log/page.tsx', "title: 'Audit Log'"],
-  // Therapist routes
-  ['src/app/(app)/therapist/schedule/page.tsx', "title: 'My Shifts'"],
+  ['src/app/(app)/therapist/schedule/page.tsx', "title: 'Schedule'"],
   ['src/app/(app)/therapist/availability/page.tsx', "title: 'Future Availability'"],
   ['src/app/(app)/therapist/swaps/page.tsx', "title: 'Shift Swaps & Pickups'"],
-  // Staff compat routes — must match their canonical counterparts
-  ['src/app/(app)/staff/my-schedule/page.tsx', "title: 'My Shifts'"],
+  ['src/app/(app)/staff/my-schedule/page.tsx', "title: 'Schedule'"],
+  ['src/app/(app)/staff/schedule/page.tsx', "title: 'Schedule'"],
   ['src/app/(app)/staff/history/page.tsx', "title: 'Shift Swaps & Pickups History'"],
-  // Manager shift board
   ['src/app/(app)/shift-board/page.tsx', "title: 'Shift Board'"],
 ] as const
 
@@ -48,22 +43,26 @@ describe('app route metadata sweep', () => {
 })
 
 describe('route title consistency', () => {
-  it('/schedule empty-state h1 matches its metadata title casing (Roster View)', () => {
+  it('/schedule uses the canonical Schedule title', () => {
     const source = read('src/app/(app)/schedule/page.tsx')
-    // Metadata title uses title case
-    expect(source).toContain("title: 'Roster View'")
-    // h1 in the no-cycle empty state must match — not lowercase "roster view"
+    expect(source).toContain("title: 'Schedule'")
     expect(source).not.toContain('>Schedule roster<')
     expect(source).not.toContain('>Roster view<')
   })
 
-  it('/staff/my-schedule and /therapist/schedule both render "My Shifts" as their page title', () => {
-    const mySchedule = read('src/app/(app)/staff/my-schedule/page.tsx')
+  it('/therapist/schedule, /staff/schedule, and /staff/my-schedule redirect to Schedule', () => {
     const therapistSchedule = read('src/app/(app)/therapist/schedule/page.tsx')
-    expect(mySchedule).toContain('"My Shifts"')
-    expect(therapistSchedule).toContain('"My Shifts"')
-    // Old divergent name must be gone
-    expect(mySchedule).not.toContain('"My Schedule"')
+    const staffSchedule = read('src/app/(app)/staff/schedule/page.tsx')
+    const staffMySchedule = read('src/app/(app)/staff/my-schedule/page.tsx')
+
+    expect(therapistSchedule).toContain("redirect('/schedule')")
+    expect(staffSchedule).toContain("redirect('/schedule')")
+    expect(staffMySchedule).toContain("redirect('/schedule')")
+    expect(therapistSchedule).toContain("title: 'Schedule'")
+    expect(staffSchedule).toContain("title: 'Schedule'")
+    expect(staffMySchedule).toContain("title: 'Schedule'")
+    expect(therapistSchedule).not.toContain('"My Shifts"')
+    expect(staffMySchedule).not.toContain('"My Shifts"')
   })
 
   it('/shift-board is the canonical board while /therapist/swaps keeps legacy therapist wording', () => {
@@ -73,13 +72,20 @@ describe('route title consistency', () => {
     expect(therapistSwaps).toContain("title: 'Shift Swaps & Pickups'")
   })
 
-  it('/coverage (editable) and /schedule (read-only) have distinct metadata titles', () => {
+  it('/coverage redirects into the canonical Schedule surface', () => {
     const coverage = read('src/app/(app)/coverage/page.tsx')
     const schedule = read('src/app/(app)/schedule/page.tsx')
-    expect(coverage).toContain("title: 'Coverage'")
-    expect(schedule).toContain("title: 'Roster View'")
-    // They must not share the same title
-    expect(coverage).not.toContain("title: 'Roster View'")
+    expect(coverage).toContain("title: 'Schedule'")
+    expect(schedule).toContain("title: 'Schedule'")
+    expect(coverage).toContain(
+      "redirect(query.size > 0 ? `/schedule?${query.toString()}` : '/schedule')"
+    )
     expect(schedule).not.toContain("title: 'Coverage'")
+  })
+
+  it('/coverage metadata describes redirect behavior', () => {
+    const coverageLayout = read('src/app/(app)/coverage/layout.tsx')
+
+    expect(coverageLayout).toContain('Redirects to the unified Schedule grid.')
   })
 })

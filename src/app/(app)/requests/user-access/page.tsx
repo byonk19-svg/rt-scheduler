@@ -64,7 +64,7 @@ export default async function UserAccessRequestsPage({
   const { data: pendingRows, error: pendingError } = await supabase
     .from('profiles')
     .select('id, full_name, email, phone_number, created_at')
-    .is('role', null)
+    .eq('access_status', 'pending')
     .order('created_at', { ascending: false })
 
   const requests: PendingAccessRequest[] = ((pendingRows ?? []) as PendingRow[]).map((row) => ({

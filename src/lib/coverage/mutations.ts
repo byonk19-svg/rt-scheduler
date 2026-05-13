@@ -3,28 +3,14 @@ import type { CoverageAssignmentPayload } from '@/lib/coverage/updateAssignmentS
 
 export type CoverageMutationError = { code?: string; message?: string } | null
 
-type SupabaseLike = {
-  from: (table: string) => {
-    insert: (value: Record<string, unknown>) => {
-      select: (columns: string) => {
-        maybeSingle: () => PromiseLike<{ data: unknown; error: CoverageMutationError }>
-      }
-    }
-    delete: () => {
-      eq: (column: string, value: string) => PromiseLike<{ error: CoverageMutationError }>
-    }
-    update: (value: Record<string, unknown>) => {
-      eq: (column: string, value: string) => PromiseLike<{ error: CoverageMutationError }>
-    }
-  }
-}
-
 export type AssignCoverageShiftParams = {
   cycleId: string
   userId: string
   isoDate: string
   shiftType: 'day' | 'night'
   role?: 'lead' | 'staff'
+  availabilityOverride?: boolean
+  availabilityOverrideReason?: string
 }
 
 export type AssignedCoverageShiftRow = {
@@ -36,59 +22,41 @@ export type AssignedCoverageShiftRow = {
   assignment_status: AssignmentStatus | null
 }
 
+export type CoverageMutationResult<T = null> = {
+  data: T | null
+  error: CoverageMutationError
+}
+
+export type CoverageShiftMutator = {
+  assign: (params: AssignCoverageShiftParams) => Promise<CoverageMutationResult<AssignedCoverageShiftRow>>
+  unassign: (params: { cycleId: string; shiftId: string }) => Promise<{ error: CoverageMutationError }>
+  setDesignatedLead: (
+    params: SetCoverageDesignatedLeadParams
+  ) => Promise<{ error: CoverageMutationError }>
+  updateStatus: (
+    shiftId: string,
+    payload: CoverageAssignmentPayload
+  ) => Promise<{ error: CoverageMutationError }>
+}
+
 type CoverageApiErrorResponse = {
   error?: string
   code?: string
   shift?: AssignedCoverageShiftRow
 }
 
-export async function assignCoverageShift(
-  supabase: SupabaseLike,
-  params: AssignCoverageShiftParams
-): Promise<{ data: AssignedCoverageShiftRow | null; error: CoverageMutationError }> {
-  const { data, error } = await supabase
-    .from('shifts')
-    .insert({
-      cycle_id: params.cycleId,
-      user_id: params.userId,
-      date: params.isoDate,
-      shift_type: params.shiftType,
-      role: params.role ?? 'staff',
-      status: 'scheduled',
-    })
-    .select('id, user_id, date, shift_type, status, assignment_status')
-    .maybeSingle()
-
-  return {
-    data: (data ?? null) as AssignedCoverageShiftRow | null,
-    error: error ?? (!data ? { message: 'Could not create coverage shift.' } : null),
-  }
-}
-
-export async function unassignCoverageShift(
-  supabase: SupabaseLike,
-  shiftId: string
-): Promise<{ error: CoverageMutationError }> {
-  return await supabase.from('shifts').delete().eq('id', shiftId)
-}
-
-export async function assignCoverageShiftViaApi(
-  params: AssignCoverageShiftParams
-): Promise<{ data: AssignedCoverageShiftRow | null; error: CoverageMutationError }> {
-  const response = await fetch('/api/schedule/drag-drop', {
+async function postCoverageMutation<T = null>(params: {
+  url: '/api/schedule/drag-drop' | '/api/schedule/assignment-status'
+  body: Record<string, unknown>
+  fallbackMessage: string
+  readData?: (payload: CoverageApiErrorResponse | null) => T | null
+}): Promise<CoverageMutationResult<T>> {
+  const response = await fetch(params.url, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
     },
-    body: JSON.stringify({
-      action: 'assign',
-      cycleId: params.cycleId,
-      userId: params.userId,
-      date: params.isoDate,
-      shiftType: params.shiftType,
-      role: params.role ?? 'staff',
-      overrideWeeklyRules: false,
-    }),
+    body: JSON.stringify(params.body),
   })
 
   const payload = (await response.json().catch(() => null)) as CoverageApiErrorResponse | null
@@ -97,15 +65,36 @@ export async function assignCoverageShiftViaApi(
       data: null,
       error: {
         code: payload?.code,
-        message: payload?.error ?? 'Could not assign therapist.',
+        message: payload?.error ?? params.fallbackMessage,
       },
     }
   }
 
   return {
-    data: (payload?.shift ?? null) as AssignedCoverageShiftRow | null,
+    data: params.readData?.(payload) ?? null,
     error: null,
   }
+}
+
+async function assignCoverageShiftViaApi(
+  params: AssignCoverageShiftParams
+): Promise<{ data: AssignedCoverageShiftRow | null; error: CoverageMutationError }> {
+  return postCoverageMutation({
+    url: '/api/schedule/drag-drop',
+    fallbackMessage: 'Could not assign therapist.',
+    body: {
+      action: 'assign',
+      cycleId: params.cycleId,
+      userId: params.userId,
+      date: params.isoDate,
+      shiftType: params.shiftType,
+      role: params.role ?? 'staff',
+      overrideWeeklyRules: false,
+      availabilityOverride: params.availabilityOverride === true,
+      availabilityOverrideReason: params.availabilityOverrideReason,
+    },
+    readData: (payload) => payload?.shift ?? null,
+  })
 }
 
 export type SetCoverageDesignatedLeadParams = {
@@ -116,91 +105,63 @@ export type SetCoverageDesignatedLeadParams = {
 }
 
 /** Calls drag-drop `set_lead` — promotes an existing slot or swaps designated lead. */
-export async function setCoverageDesignatedLeadViaApi(
+async function setCoverageDesignatedLeadViaApi(
   params: SetCoverageDesignatedLeadParams
 ): Promise<{ error: CoverageMutationError }> {
-  const response = await fetch('/api/schedule/drag-drop', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
+  const result = await postCoverageMutation({
+    url: '/api/schedule/drag-drop',
+    fallbackMessage: 'Could not update designated lead.',
+    body: {
       action: 'set_lead',
       cycleId: params.cycleId,
       therapistId: params.therapistId,
       date: params.isoDate,
       shiftType: params.shiftType,
       overrideWeeklyRules: false,
-    }),
+    },
   })
 
-  if (response.ok) {
-    return { error: null }
-  }
-
-  const payload = (await response.json().catch(() => null)) as CoverageApiErrorResponse | null
-  return {
-    error: {
-      code: payload?.code,
-      message: payload?.error ?? 'Could not update designated lead.',
-    },
-  }
+  return { error: result.error }
 }
 
-export async function unassignCoverageShiftViaApi(params: {
+async function unassignCoverageShiftViaApi(params: {
   cycleId: string
   shiftId: string
 }): Promise<{ error: CoverageMutationError }> {
-  const response = await fetch('/api/schedule/drag-drop', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
+  const result = await postCoverageMutation({
+    url: '/api/schedule/drag-drop',
+    fallbackMessage: 'Could not remove shift.',
+    body: {
       action: 'remove',
       cycleId: params.cycleId,
       shiftId: params.shiftId,
-    }),
+    },
   })
 
-  if (response.ok) {
-    return { error: null }
-  }
-
-  const payload = (await response.json().catch(() => null)) as CoverageApiErrorResponse | null
-  return {
-    error: {
-      code: payload?.code,
-      message: payload?.error ?? 'Could not remove shift.',
-    },
-  }
+  return { error: result.error }
 }
 
-export async function persistCoverageShiftStatus(
-  _supabase: SupabaseLike,
+async function persistCoverageShiftStatus(
   shiftId: string,
   payload: CoverageAssignmentPayload
 ): Promise<{ error: CoverageMutationError }> {
-  const response = await fetch('/api/schedule/assignment-status', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
+  const result = await postCoverageMutation({
+    url: '/api/schedule/assignment-status',
+    fallbackMessage: 'Could not save assignment status.',
+    body: {
       assignmentId: shiftId,
       status: payload.assignment_status,
-    }),
+    },
   })
 
-  if (response.ok) {
-    return { error: null }
-  }
+  return { error: result.error }
+}
 
-  const payloadBody = (await response.json().catch(() => null)) as CoverageApiErrorResponse | null
+export function createCoverageShiftMutator(): CoverageShiftMutator {
   return {
-    error: {
-      code: payloadBody?.code,
-      message: payloadBody?.error ?? 'Could not save assignment status.',
-    },
+    assign: assignCoverageShiftViaApi,
+    unassign: unassignCoverageShiftViaApi,
+    setDesignatedLead: setCoverageDesignatedLeadViaApi,
+    updateStatus: persistCoverageShiftStatus,
   }
 }

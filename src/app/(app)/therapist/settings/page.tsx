@@ -24,7 +24,6 @@ import {
   parsePreferredWorkDaysSelection,
   resolvePreferredWorkDaysMode,
 } from '@/lib/preferred-work-days'
-import { normalizeDefaultScheduleView } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/server'
 import { isTheme } from '@/lib/theme'
 
@@ -68,7 +67,6 @@ type ProfileRow = {
   staff_onboarding_preferences_confirmed_at: string | null
   staff_onboarding_theme_confirmed_at: string | null
   default_calendar_view: string | null
-  default_schedule_view: string | null
   default_landing_page: string | null
   notification_in_app_enabled: boolean | null
   notification_email_enabled: boolean | null
@@ -191,7 +189,6 @@ async function saveTherapistSettingsAction(formData: FormData) {
   const preferredWorkDays = parsePreferredWorkDaysSelection(formData)
   const maxConsecutiveDays = Number.parseInt(String(formData.get('max_consecutive_days') ?? ''), 10)
   const defaultCalendarView = String(formData.get('default_calendar_view') ?? '').trim()
-  const defaultScheduleView = String(formData.get('default_schedule_view') ?? '').trim()
   const defaultLandingPage = String(formData.get('default_landing_page') ?? '').trim()
   const notificationInAppEnabled = formData.get('notification_in_app_enabled') === 'on'
   const notificationEmailEnabled = formData.get('notification_email_enabled') === 'on'
@@ -206,7 +203,6 @@ async function saveTherapistSettingsAction(formData: FormData) {
     maxConsecutiveDays < 1 ||
     maxConsecutiveDays > 7 ||
     (defaultCalendarView !== 'day' && defaultCalendarView !== 'night') ||
-    (defaultScheduleView !== 'week' && defaultScheduleView !== 'roster') ||
     (defaultLandingPage !== 'dashboard' && defaultLandingPage !== 'coverage') ||
     !isTheme(selectedTheme)
   ) {
@@ -243,7 +239,7 @@ async function saveTherapistSettingsAction(formData: FormData) {
       preferred_work_days_mode: preferredWorkDays.mode,
       max_consecutive_days: maxConsecutiveDays,
       default_calendar_view: defaultCalendarView,
-      default_schedule_view: defaultScheduleView,
+      default_schedule_view: 'week',
       default_landing_page: defaultLandingPage,
       notification_in_app_enabled: notificationInAppEnabled,
       notification_email_enabled: notificationEmailEnabled,
@@ -283,7 +279,7 @@ export default async function TherapistSettingsPage({
   const { data: profile } = await supabase
     .from('profiles')
     .select(
-      'id, full_name, role, shift_type, employment_type, is_lead_eligible, max_work_days_per_week, max_consecutive_days, preferred_work_days, preferred_work_days_mode, staff_onboarding_preferences_confirmed_at, staff_onboarding_theme_confirmed_at, default_calendar_view, default_schedule_view, default_landing_page, notification_in_app_enabled, notification_email_enabled, work_patterns(pattern_type, works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode, weekly_weekdays, weekend_rule, cycle_anchor_date, cycle_segments, shift_preference)'
+      'id, full_name, role, shift_type, employment_type, is_lead_eligible, max_work_days_per_week, max_consecutive_days, preferred_work_days, preferred_work_days_mode, staff_onboarding_preferences_confirmed_at, staff_onboarding_theme_confirmed_at, default_calendar_view, default_landing_page, notification_in_app_enabled, notification_email_enabled, work_patterns(pattern_type, works_dow, offs_dow, weekend_rotation, weekend_anchor_date, works_dow_mode, weekly_weekdays, weekend_rule, cycle_anchor_date, cycle_segments, shift_preference)'
     )
     .eq('id', user.id)
     .maybeSingle()
@@ -305,9 +301,6 @@ export default async function TherapistSettingsPage({
     preferredWorkDays
   )
   const defaultCalendarView = profile.default_calendar_view === 'night' ? 'night' : 'day'
-  const defaultScheduleView = normalizeDefaultScheduleView(
-    profile.default_schedule_view ?? undefined
-  )
   const defaultLandingPage = profile.default_landing_page === 'coverage' ? 'coverage' : 'dashboard'
   const pattern = toPatternRecord(
     profile.id,
@@ -419,7 +412,7 @@ export default async function TherapistSettingsPage({
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-1">
                 <label
                   htmlFor="default_calendar_view"
@@ -439,23 +432,6 @@ export default async function TherapistSettingsPage({
               </div>
               <div className="space-y-1">
                 <label
-                  htmlFor="default_schedule_view"
-                  className="text-sm font-medium text-foreground"
-                >
-                  Default schedule layout
-                </label>
-                <select
-                  id="default_schedule_view"
-                  name="default_schedule_view"
-                  defaultValue={defaultScheduleView}
-                  className="h-9 w-full rounded-md border border-border bg-[var(--input-background)] px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                >
-                  <option value="week">Grid</option>
-                  <option value="roster">Roster</option>
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label
                   htmlFor="default_landing_page"
                   className="text-sm font-medium text-foreground"
                 >
@@ -468,7 +444,7 @@ export default async function TherapistSettingsPage({
                   className="h-9 w-full rounded-md border border-border bg-[var(--input-background)] px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 >
                   <option value="dashboard">Dashboard</option>
-                  <option value="coverage">Coverage</option>
+                  <option value="coverage">Schedule</option>
                 </select>
               </div>
             </div>

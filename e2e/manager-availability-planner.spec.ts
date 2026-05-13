@@ -7,9 +7,10 @@ import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase
 
 type TestContext = {
   supabase: SupabaseClient
+  siteId: string
   manager: { id: string; email: string; password: string }
   leadTherapist: { id: string }
-  therapist: { id: string; fullName: string }
+  therapist: { id: string; email: string; password: string; fullName: string }
   prnTherapist: { id: string; fullName: string }
   cycle: { id: string; startDate: string; endDate: string }
   secondCycle: { id: string; startDate: string; endDate: string }
@@ -31,13 +32,19 @@ async function selectCalendarDay(root: Locator, isoDate: string) {
   await target.click()
 }
 
-async function createCycle(supabase: SupabaseClient) {
-  const startDate = addDays(new Date(), -1)
-  const endDate = addDays(startDate, 13)
+function nextSundayAfter(daysAhead: number): Date {
+  const target = addDays(new Date(), daysAhead)
+  return addDays(target, (7 - target.getDay()) % 7)
+}
+
+async function createCycle(supabase: SupabaseClient, siteId: string, daysAhead: number) {
+  const startDate = nextSundayAfter(daysAhead)
+  const endDate = addDays(startDate, 41)
   const label = `Planner E2E ${randomString('cycle')}`
   const { data, error } = await supabase
     .from('schedule_cycles')
     .insert({
+      site_id: siteId,
       label,
       start_date: formatDateKey(startDate),
       end_date: formatDateKey(endDate),
@@ -66,6 +73,9 @@ test.describe.serial('/availability manager planner', () => {
   test.beforeAll(async () => {
     const supabase = createServiceRoleClientOrNull()
     if (!supabase) return
+    const siteId = randomString('planner-site')
+    const siteInsert = await supabase.from('sites').insert({ id: siteId, name: 'Planner E2E Site' })
+    if (siteInsert.error) throw new Error(siteInsert.error.message)
 
     const managerEmail = `${randomString('planner-mgr')}@example.com`
     const managerPassword = `Mngr!${Math.random().toString(16).slice(2, 8)}`
@@ -77,6 +87,7 @@ test.describe.serial('/availability manager planner', () => {
       employmentType: 'full_time',
       shiftType: 'day',
       isLeadEligible: true,
+      siteId,
     })
 
     const leadTherapist = await createE2EUser(supabase, {
@@ -87,17 +98,21 @@ test.describe.serial('/availability manager planner', () => {
       employmentType: 'full_time',
       shiftType: 'day',
       isLeadEligible: true,
+      siteId,
     })
 
     const therapistFullName = `E2E Planner Therapist ${randomString('ther')}`
+    const therapistEmail = `${randomString('planner-ther')}@example.com`
+    const therapistPassword = `Ther!${Math.random().toString(16).slice(2, 8)}`
     const therapist = await createE2EUser(supabase, {
-      email: `${randomString('planner-ther')}@example.com`,
-      password: `Ther!${Math.random().toString(16).slice(2, 8)}`,
+      email: therapistEmail,
+      password: therapistPassword,
       fullName: therapistFullName,
       role: 'therapist',
       employmentType: 'full_time',
       shiftType: 'day',
       isLeadEligible: false,
+      siteId,
     })
 
     const prnFullName = `E2E Planner PRN ${randomString('prn')}`
@@ -109,10 +124,11 @@ test.describe.serial('/availability manager planner', () => {
       employmentType: 'prn',
       shiftType: 'day',
       isLeadEligible: false,
+      siteId,
     })
 
-    const cycle = await createCycle(supabase)
-    const secondCycle = await createCycle(supabase)
+    const cycle = await createCycle(supabase, siteId, 120)
+    const secondCycle = await createCycle(supabase, siteId, 190)
     const cycleStartDate = new Date(`${cycle.startDate}T00:00:00`)
     const therapistWillWorkDate = formatDateKey(addDays(cycleStartDate, 2))
     const therapistCannotWorkDate = formatDateKey(addDays(cycleStartDate, 4))
@@ -133,9 +149,15 @@ test.describe.serial('/availability manager planner', () => {
 
     ctx = {
       supabase,
+      siteId,
       manager: { id: manager.id, email: managerEmail, password: managerPassword },
       leadTherapist,
-      therapist: { id: therapist.id, fullName: therapistFullName },
+      therapist: {
+        id: therapist.id,
+        email: therapistEmail,
+        password: therapistPassword,
+        fullName: therapistFullName,
+      },
       prnTherapist: { id: prnTherapist.id, fullName: prnFullName },
       cycle,
       secondCycle,
@@ -157,6 +179,8 @@ test.describe.serial('/availability manager planner', () => {
     for (const userId of createdUserIds) {
       await ctx.supabase.auth.admin.deleteUser(userId)
     }
+    await ctx.supabase.from('profiles').delete().in('id', createdUserIds)
+    await ctx.supabase.from('sites').delete().eq('id', ctx.siteId)
   })
 
   test('manager can focus a missing responder from the roster and switch cycles without a hard reload', async ({
@@ -239,6 +263,60 @@ test.describe.serial('/availability manager planner', () => {
       () => performance.getEntriesByType('navigation').length
     )
     expect(afterCycleNavigationCount).toBe(initialNavigationCount)
+  })
+
+  test('manager can reopen locked availability after draft work starts', async ({ page }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    const lockedDate = ctx!.secondCycle.startDate
+    const lateChangeDate = formatDateKey(
+      addDays(new Date(`${ctx!.secondCycle.startDate}T00:00:00`), 1)
+    )
+    const shiftInsert = await ctx!.supabase.from('shifts').insert({
+      cycle_id: ctx!.secondCycle.id,
+      user_id: ctx!.therapist.id,
+      date: lockedDate,
+      shift_type: 'day',
+      status: 'scheduled',
+      role: 'staff',
+    })
+    if (shiftInsert.error) throw new Error(shiftInsert.error.message)
+
+    await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
+    await page.goto(`/therapist/availability?cycle=${ctx!.secondCycle.id}`, {
+      waitUntil: 'networkidle',
+    })
+    await expect(page.getByText('Schedule building has started.')).toBeVisible({
+      timeout: 20_000,
+    })
+    await expect(page.getByRole('button', { name: /Submit availability/ })).toBeDisabled()
+
+    await loginAs(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto(
+      `/availability?cycle=${ctx!.secondCycle.id}&therapist=${ctx!.therapist.id}&roster=all`,
+      {
+        waitUntil: 'networkidle',
+      }
+    )
+    await page.getByText('Utilities', { exact: true }).click()
+    await expect(page.getByText('Existing draft schedule work stays unchanged')).toBeVisible()
+    await page.getByRole('button', { name: 'Reopen availability' }).click()
+    await expect(page.getByText('Availability reopened.')).toBeVisible({ timeout: 20_000 })
+
+    await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
+    await page.goto(`/therapist/availability?cycle=${ctx!.secondCycle.id}`, {
+      waitUntil: 'networkidle',
+    })
+    await expect(page.getByText('Schedule building has started.')).toHaveCount(0)
+    await selectCalendarDay(page.locator('main'), lateChangeDate)
+    await page
+      .getByRole('button', { name: /^Need Off$/ })
+      .first()
+      .click()
+    await page.getByRole('button', { name: /Submit availability/ }).click()
+    await expect(page.getByText('Availability submitted for this cycle.')).toBeVisible({
+      timeout: 20_000,
+    })
   })
 
   test('manager can save hard dates from Availability Manager', async ({ page }) => {
@@ -341,6 +419,52 @@ test.describe.serial('/availability manager planner', () => {
         { timeout: 20_000 }
       )
       .toBe(0)
+
+    await page.goto(
+      `/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}&roster=submitted`,
+      {
+        waitUntil: 'networkidle',
+      }
+    )
+    const managerRequestEditor = page.locator('[data-availability-editor]')
+    await managerRequestEditor.getByRole('button', { name: /^Need Off$/ }).click()
+    await selectCalendarDay(managerRequestEditor, ctx!.therapistCannotWorkDate)
+    await managerRequestEditor.getByRole('button', { name: /^Save for E2E$/ }).click()
+
+    await expect
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('availability_overrides')
+            .select('source, intent, created_by')
+            .eq('cycle_id', ctx!.cycle.id)
+            .eq('therapist_id', ctx!.therapist.id)
+            .eq('date', ctx!.therapistCannotWorkDate)
+            .eq('shift_type', 'both')
+            .eq('override_type', 'force_off')
+            .maybeSingle()
+          if (result.error) throw new Error(result.error.message)
+          return `${result.data?.source ?? ''}:${result.data?.intent ?? ''}:${result.data?.created_by ?? ''}`
+        },
+        { timeout: 20_000 }
+      )
+      .toBe(`manager:therapist_need_off:${ctx!.manager.id}`)
+
+    await page.goto(
+      `/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}&roster=submitted`,
+      {
+        waitUntil: 'networkidle',
+      }
+    )
+    const requestsOnFile = page
+      .getByRole('heading', { name: 'Requests on file' })
+      .locator('xpath=ancestor::section[1]')
+    const savedRequestCard = requestsOnFile
+      .locator('div')
+      .filter({ hasText: formatCalendarLabel(ctx!.therapistCannotWorkDate) })
+      .first()
+    await expect(savedRequestCard.getByText('Manager edited', { exact: true })).toBeVisible()
+    await expect(savedRequestCard.getByText('Need Off', { exact: true })).toBeVisible()
 
     await page.goto(
       `/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.prnTherapist.id}&roster=all`,

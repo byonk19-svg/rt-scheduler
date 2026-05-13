@@ -36,7 +36,7 @@ const baseProps = {
   nightShiftsTotal: 21,
   approvalsHref: '/approvals',
   lotteryHref: '/lottery',
-  scheduleHref: '/coverage?view=week',
+  scheduleHref: '/schedule',
   reviewHref: '/approvals',
   activeCycleDateRange: 'Mar 17 - Apr 13',
 }
@@ -79,7 +79,7 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('2 review items waiting')
     expect(html).toContain('Review updates')
     expect(html).toContain('href="/approvals"')
-    expect(html).toContain('href="/coverage?view=week"')
+    expect(html).toContain('href="/schedule"')
     expect(html).not.toContain('Coverage Issues')
     expect(html).not.toContain('Pending Approvals')
     expect(html).not.toContain('Upcoming Shifts')
@@ -194,6 +194,6 @@ describe('ManagerTriageDashboard', () => {
     expect(html).toContain('Loading...')
     expect(html).toContain('Review requests')
     expect(html).toContain('href="/approvals"')
-    expect(html).toContain('href="/coverage?view=week"')
+    expect(html).toContain('href="/schedule"')
   })
 })

@@ -8,11 +8,12 @@ import {
 import {
   deleteAvailabilityEntryAction,
   submitTherapistAvailabilityGridAction,
-} from '@/app/availability/actions'
+} from '@/app/(app)/availability/therapist-actions'
 import { TherapistAvailabilityWorkspace } from '@/components/availability/TherapistAvailabilityWorkspace'
 import type { TableToolbarFilters } from '@/components/TableToolbar'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { buildCycleAvailabilityBaseline } from '@/lib/availability-pattern-generator'
+import { loadAvailabilityWindowState } from '@/lib/availability-window'
 import { can } from '@/lib/auth/can'
 import { findScheduledConflicts } from '@/lib/availability-scheduled-conflict'
 import { toUiRole } from '@/lib/auth/roles'
@@ -21,6 +22,7 @@ import {
   normalizeWorkPattern,
   type WorkPattern,
 } from '@/lib/coverage/work-patterns'
+import { toIsoDate } from '@/lib/calendar-utils'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveTherapistAvailabilityCycleId } from '@/lib/therapist-workflow'
 import { createClient } from '@/lib/supabase/server'
@@ -50,6 +52,9 @@ type Cycle = {
   published: boolean
   archived_at?: string | null
   availability_due_at?: string | null
+  availability_closed_at?: string | null
+  availability_reopened_at?: string | null
+  status?: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
 }
 
 type WorkPatternRow = {
@@ -221,11 +226,13 @@ export default async function TherapistAvailabilityPage({
       : 'day'
 
   const today = new Date()
-  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const todayKey = toIsoDate(today)
 
   const { data: cyclesData } = await admin
     .from('schedule_cycles')
-    .select('id, label, start_date, end_date, published, archived_at, availability_due_at')
+    .select(
+      'id, label, start_date, end_date, published, status, archived_at, availability_due_at, availability_closed_at, availability_reopened_at'
+    )
     .is('archived_at', null)
     .eq('published', false)
     .gte('end_date', todayKey)
@@ -259,6 +266,9 @@ export default async function TherapistAvailabilityPage({
     cycles[0] ??
     null
   const selectedCycleId = selectedCycle?.id ?? ''
+  const availabilityWindow = selectedCycleId
+    ? await loadAvailabilityWindowState(admin as never, selectedCycleId)
+    : { locked: true, reason: null }
 
   const { data: submissionRowsData } =
     cycles.length > 0
@@ -347,7 +357,6 @@ export default async function TherapistAvailabilityPage({
       }),
     ])
   )
-
   return (
     <div className="space-y-7">
       {feedback && <FeedbackToast message={feedback.message} variant={feedback.variant} />}
@@ -357,11 +366,14 @@ export default async function TherapistAvailabilityPage({
         availabilityRows={availabilityRows}
         conflicts={conflicts}
         initialCycleId={selectedCycleId}
+        todayKey={todayKey}
         hasSavedRecurringPattern={hasSavedRecurringPattern}
         recurringPatternSummary={recurringPatternSummary}
         generatedBaselineByCycleId={generatedBaselineByCycleId}
         submissionsByCycleId={submissionsByCycleId}
         regularShiftType={regularShiftType}
+        availabilityLocked={availabilityWindow.locked}
+        availabilityLockedReason={availabilityWindow.reason}
         submitTherapistAvailabilityGridAction={submitTherapistAvailabilityGridAction}
         returnToPath="/therapist/availability"
       />

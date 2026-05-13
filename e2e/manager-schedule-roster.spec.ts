@@ -5,93 +5,118 @@ import { loginAs } from './helpers/auth'
 import { addDays, formatDateKey, randomString } from './helpers/env'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
+type TestUser = { id: string; email: string; password: string; name: string }
+
 type ManagerScheduleCtx = {
   supabase: SupabaseClient
-  manager: { id: string; email: string; password: string }
-  draftCycle: { id: string; label: string; shortLabel: string }
-  liveCycle: { id: string; label: string; shortLabel: string }
-  dayCore: { id: string; name: string }
-  dayPrn: { id: string; name: string }
-  nightCore: { id: string; name: string }
+  manager: TestUser
+  draftCycle: { id: string; label: string; day1: string; day2: string }
+  liveCycle: { id: string; label: string; day1: string; day2: string }
+  dayCore: TestUser
+  dayPrn: TestUser
+  nightCore: TestUser
 }
 
-function formatShortCycleLabel(start: Date, end: Date): string {
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  })
-  return `${formatter.format(start)} – ${formatter.format(end)}, ${start.getUTCFullYear()}`
+function cellTestId(userId: string, isoDate: string) {
+  return `cell-${userId}-${isoDate}`
 }
 
-test.describe.serial('manager schedule roster route', () => {
+function nextSunday(from = new Date()): Date {
+  const start = new Date(from)
+  start.setDate(start.getDate() + ((7 - start.getDay()) % 7))
+  return start
+}
+
+test.describe.serial('unified schedule grid route', () => {
   test.setTimeout(120_000)
 
   let ctx: ManagerScheduleCtx | null = null
+  let cleanupSupabase: SupabaseClient | null = null
   const createdUserIds: string[] = []
   const createdCycleIds: string[] = []
+  const createdSiteIds: string[] = []
 
   test.beforeAll(async () => {
     const supabase = createServiceRoleClientOrNull()
     if (!supabase) return
+    cleanupSupabase = supabase
+    const siteId = randomString('grid-site')
+    const siteInsert = await supabase.from('sites').insert({
+      id: siteId,
+      name: `Schedule Grid ${siteId}`,
+    })
+    if (siteInsert.error) {
+      throw new Error(`Could not create test site: ${siteInsert.error.message}`)
+    }
+    createdSiteIds.push(siteId)
 
     const managerEmail = `${randomString('sched-mgr')}@example.com`
     const managerPassword = `Mngr!${Math.random().toString(16).slice(2, 10)}`
+    const managerName = `Schedule Manager ${randomString('mgr')}`
     const manager = await createE2EUser(supabase, {
       email: managerEmail,
       password: managerPassword,
-      fullName: `Schedule Manager ${randomString('mgr')}`,
+      fullName: managerName,
       role: 'manager',
       employmentType: 'full_time',
       shiftType: 'day',
       isLeadEligible: true,
+      siteId,
     })
     createdUserIds.push(manager.id)
 
-    const dayCoreName = `Roster Day Core ${randomString('daycore')}`
+    const dayCoreName = `Grid Day Core ${randomString('daycore')}`
+    const dayCoreEmail = `${randomString('daycore')}@example.com`
+    const dayCorePassword = `Ther!${Math.random().toString(16).slice(2, 10)}`
     const dayCore = await createE2EUser(supabase, {
-      email: `${randomString('daycore')}@example.com`,
-      password: `Ther!${Math.random().toString(16).slice(2, 10)}`,
+      email: dayCoreEmail,
+      password: dayCorePassword,
       fullName: dayCoreName,
       role: 'therapist',
       employmentType: 'full_time',
       shiftType: 'day',
-      isLeadEligible: false,
+      isLeadEligible: true,
+      siteId,
     })
     createdUserIds.push(dayCore.id)
 
-    const dayPrnName = `Roster Day PRN ${randomString('dayprn')}`
+    const dayPrnName = `Grid Day PRN ${randomString('dayprn')}`
+    const dayPrnEmail = `${randomString('dayprn')}@example.com`
+    const dayPrnPassword = `Ther!${Math.random().toString(16).slice(2, 10)}`
     const dayPrn = await createE2EUser(supabase, {
-      email: `${randomString('dayprn')}@example.com`,
-      password: `Ther!${Math.random().toString(16).slice(2, 10)}`,
+      email: dayPrnEmail,
+      password: dayPrnPassword,
       fullName: dayPrnName,
       role: 'therapist',
-      employmentType: 'prn',
+      employmentType: 'full_time',
       shiftType: 'day',
       isLeadEligible: false,
-      maxWorkDaysPerWeek: 1,
+      siteId,
     })
     createdUserIds.push(dayPrn.id)
 
-    const nightCoreName = `Roster Night Core ${randomString('nightcore')}`
+    const nightCoreName = `Grid Night Core ${randomString('nightcore')}`
+    const nightCoreEmail = `${randomString('nightcore')}@example.com`
+    const nightCorePassword = `Ther!${Math.random().toString(16).slice(2, 10)}`
     const nightCore = await createE2EUser(supabase, {
-      email: `${randomString('nightcore')}@example.com`,
-      password: `Ther!${Math.random().toString(16).slice(2, 10)}`,
+      email: nightCoreEmail,
+      password: nightCorePassword,
       fullName: nightCoreName,
       role: 'therapist',
       employmentType: 'full_time',
       shiftType: 'night',
       isLeadEligible: false,
+      siteId,
     })
     createdUserIds.push(nightCore.id)
 
-    const draftStart = addDays(new Date(), 3)
-    const draftEnd = addDays(draftStart, 13)
-    const liveStart = addDays(draftStart, 14)
-    const liveEnd = addDays(liveStart, 13)
+    const draftStart = nextSunday(addDays(new Date(), 3))
+    const draftEnd = addDays(draftStart, 41)
+    const liveStart = addDays(draftEnd, 1)
+    const liveEnd = addDays(liveStart, 41)
 
-    const draftLabel = `Roster Draft ${randomString('draft')}`
-    const liveLabel = `Roster Live ${randomString('live')}`
+    const draftLabel = `Grid Draft ${randomString('draft')}`
+    const liveLabel = `Grid Live ${randomString('live')}`
     const draftInsert = await supabase
       .from('schedule_cycles')
       .insert({
@@ -99,6 +124,7 @@ test.describe.serial('manager schedule roster route', () => {
         start_date: formatDateKey(draftStart),
         end_date: formatDateKey(draftEnd),
         published: false,
+        site_id: siteId,
       })
       .select('id')
       .single()
@@ -113,6 +139,7 @@ test.describe.serial('manager schedule roster route', () => {
         start_date: formatDateKey(liveStart),
         end_date: formatDateKey(liveEnd),
         published: true,
+        site_id: siteId,
       })
       .select('id')
       .single()
@@ -128,30 +155,6 @@ test.describe.serial('manager schedule roster route', () => {
     const liveDay1 = formatDateKey(liveStart)
     const liveDay2 = formatDateKey(addDays(liveStart, 1))
 
-    const submissionInsert = await supabase.from('therapist_availability_submissions').insert([
-      {
-        therapist_id: dayCore.id,
-        schedule_cycle_id: draftInsert.data.id,
-        submitted_at: new Date().toISOString(),
-        last_edited_at: new Date().toISOString(),
-      },
-      {
-        therapist_id: dayPrn.id,
-        schedule_cycle_id: draftInsert.data.id,
-        submitted_at: new Date().toISOString(),
-        last_edited_at: new Date().toISOString(),
-      },
-      {
-        therapist_id: nightCore.id,
-        schedule_cycle_id: draftInsert.data.id,
-        submitted_at: new Date().toISOString(),
-        last_edited_at: new Date().toISOString(),
-      },
-    ])
-    if (submissionInsert.error) {
-      throw new Error(`Could not seed submissions: ${submissionInsert.error.message}`)
-    }
-
     const overrideInsert = await supabase.from('availability_overrides').insert([
       {
         therapist_id: dayCore.id,
@@ -159,18 +162,9 @@ test.describe.serial('manager schedule roster route', () => {
         date: draftDay2,
         shift_type: 'day',
         override_type: 'force_off',
-        note: 'manager-schedule off',
+        intent: 'therapist_need_off',
+        note: 'unified schedule off',
         created_by: dayCore.id,
-        source: 'therapist',
-      },
-      {
-        therapist_id: dayPrn.id,
-        cycle_id: draftInsert.data.id,
-        date: draftDay1,
-        shift_type: 'day',
-        override_type: 'force_on',
-        note: 'manager-schedule work',
-        created_by: dayPrn.id,
         source: 'therapist',
       },
       {
@@ -179,7 +173,8 @@ test.describe.serial('manager schedule roster route', () => {
         date: draftDay3,
         shift_type: 'night',
         override_type: 'force_off',
-        note: 'manager-schedule night off',
+        intent: 'therapist_need_off',
+        note: 'unified schedule night off',
         created_by: nightCore.id,
         source: 'therapist',
       },
@@ -194,45 +189,50 @@ test.describe.serial('manager schedule roster route', () => {
         user_id: dayCore.id,
         date: draftDay1,
         shift_type: 'day',
-        site_id: 'default',
+        site_id: siteId,
         status: 'scheduled',
         assignment_status: 'scheduled',
+        role: 'staff',
       },
       {
         cycle_id: draftInsert.data.id,
         user_id: dayPrn.id,
         date: draftDay2,
         shift_type: 'day',
-        site_id: 'default',
-        status: 'scheduled',
+        site_id: siteId,
+        status: 'on_call',
         assignment_status: 'on_call',
+        role: 'staff',
       },
       {
         cycle_id: draftInsert.data.id,
         user_id: nightCore.id,
         date: draftDay1,
         shift_type: 'night',
-        site_id: 'default',
-        status: 'scheduled',
+        site_id: siteId,
+        status: 'called_off',
         assignment_status: 'call_in',
+        role: 'staff',
       },
       {
         cycle_id: liveInsert.data.id,
         user_id: dayCore.id,
         date: liveDay1,
         shift_type: 'day',
-        site_id: 'default',
+        site_id: siteId,
         status: 'scheduled',
         assignment_status: 'scheduled',
+        role: 'staff',
       },
       {
         cycle_id: liveInsert.data.id,
         user_id: nightCore.id,
         date: liveDay2,
         shift_type: 'night',
-        site_id: 'default',
+        site_id: siteId,
         status: 'scheduled',
         assignment_status: 'scheduled',
+        role: 'staff',
       },
     ])
     if (shiftsInsert.error) {
@@ -241,91 +241,163 @@ test.describe.serial('manager schedule roster route', () => {
 
     ctx = {
       supabase,
-      manager: { id: manager.id, email: managerEmail, password: managerPassword },
-      draftCycle: {
-        id: draftInsert.data.id,
-        label: draftLabel,
-        shortLabel: formatShortCycleLabel(draftStart, draftEnd),
+      manager: {
+        id: manager.id,
+        email: managerEmail,
+        password: managerPassword,
+        name: managerName,
       },
-      liveCycle: {
-        id: liveInsert.data.id,
-        label: liveLabel,
-        shortLabel: formatShortCycleLabel(liveStart, liveEnd),
+      draftCycle: { id: draftInsert.data.id, label: draftLabel, day1: draftDay1, day2: draftDay2 },
+      liveCycle: { id: liveInsert.data.id, label: liveLabel, day1: liveDay1, day2: liveDay2 },
+      dayCore: {
+        id: dayCore.id,
+        email: dayCoreEmail,
+        password: dayCorePassword,
+        name: dayCoreName,
       },
-      dayCore: { id: dayCore.id, name: dayCoreName },
-      dayPrn: { id: dayPrn.id, name: dayPrnName },
-      nightCore: { id: nightCore.id, name: nightCoreName },
+      dayPrn: { id: dayPrn.id, email: dayPrnEmail, password: dayPrnPassword, name: dayPrnName },
+      nightCore: {
+        id: nightCore.id,
+        email: nightCoreEmail,
+        password: nightCorePassword,
+        name: nightCoreName,
+      },
     }
   })
 
   test.afterAll(async () => {
-    if (!ctx) return
+    const supabase = ctx?.supabase ?? cleanupSupabase
+    if (!supabase) return
 
     if (createdCycleIds.length > 0) {
-      await ctx.supabase
-        .from('therapist_availability_submissions')
-        .delete()
-        .in('schedule_cycle_id', createdCycleIds)
-      await ctx.supabase.from('availability_overrides').delete().in('cycle_id', createdCycleIds)
-      await ctx.supabase.from('shifts').delete().in('cycle_id', createdCycleIds)
-      await ctx.supabase.from('schedule_cycles').delete().in('id', createdCycleIds)
+      await supabase.from('availability_overrides').delete().in('cycle_id', createdCycleIds)
+      await supabase.from('shifts').delete().in('cycle_id', createdCycleIds)
+      await supabase.from('schedule_cycles').delete().in('id', createdCycleIds)
     }
 
     for (const userId of createdUserIds) {
-      await ctx.supabase.auth.admin.deleteUser(userId).catch(() => undefined)
+      await supabase.auth.admin.deleteUser(userId).catch(() => undefined)
+    }
+    if (createdSiteIds.length > 0) {
+      await supabase.from('sites').delete().in('id', createdSiteIds)
     }
   })
 
-  test('manager schedule route renders live roster data, filters by shift, and switches cycles', async ({
+  test('manager sees one schedule grid, legacy coverage redirects, and shift/cycle controls work', async ({
     page,
   }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
     const smoke = ctx!
 
     await loginAs(page, smoke.manager.email, smoke.manager.password)
-    await page.goto(`/schedule?cycle=${smoke.draftCycle.id}`)
+    await page.goto(`/coverage?cycle=${smoke.draftCycle.id}&view=week&shift=day`)
+    await expect(page).toHaveURL(/\/schedule\?.*cycle=.*shift=day/)
 
-    await expect(
-      page.getByRole('heading', { name: 'Respiratory Therapy - Day Shift' })
-    ).toBeVisible()
-    await expect(
-      page.getByText(`${smoke.draftCycle.label} (${smoke.draftCycle.shortLabel})`)
-    ).toBeVisible()
-    await expect(page.getByText('DRAFT', { exact: true })).toBeVisible()
-
-    const dayCoreRow = page.locator('tr').filter({ hasText: smoke.dayCore.name }).first()
-    const dayPrnRow = page.locator('tr').filter({ hasText: smoke.dayPrn.name }).first()
-    await expect(dayCoreRow).toBeVisible()
-    await expect(dayCoreRow).toContainText('OFF')
-    await expect(dayPrnRow).toBeVisible()
-    await expect(dayPrnRow).toContainText('OC')
-    await expect(page.getByText(smoke.nightCore.name)).toHaveCount(0)
-
-    await page.getByRole('button', { name: 'Night Shift' }).click()
-    await expect(
-      page.getByRole('heading', { name: 'Respiratory Therapy - Night Shift' })
-    ).toBeVisible()
-    const nightRow = page.locator('tr').filter({ hasText: smoke.nightCore.name }).first()
-    await expect(nightRow).toBeVisible()
-    await expect(nightRow).toContainText('CI')
-    await expect(page.getByText(smoke.dayCore.name)).toHaveCount(0)
-
-    await page.getByRole('combobox', { name: 'Cycle' }).selectOption({ value: smoke.liveCycle.id })
-    await page.waitForURL(new RegExp(`/schedule\\?cycle=${smoke.liveCycle.id}$`), {
-      timeout: 30_000,
-    })
-    await expect(
-      page.getByText(`${smoke.liveCycle.label} (${smoke.liveCycle.shortLabel})`)
-    ).toBeVisible()
-    await expect(page.getByText('LIVE', { exact: true })).toBeVisible()
-
-    await page.getByRole('button', { name: 'Day Shift' }).click()
-    await expect(
-      page.getByRole('heading', { name: 'Respiratory Therapy - Day Shift' })
-    ).toBeVisible()
-    await expect(page.locator('tr').filter({ hasText: smoke.dayCore.name }).first()).toContainText(
-      '1'
+    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: 'Schedule cycle' })).toHaveValue(
+      smoke.draftCycle.id
     )
+    await expect(page.getByText('Draft', { exact: true })).toBeVisible()
+    await expect(page.getByText('Coverage', { exact: true })).toHaveCount(0)
+    await expect(page.getByText('Roster View', { exact: true })).toHaveCount(0)
+
+    await expect(page.getByText(smoke.dayCore.name)).toBeVisible()
+    await expect(page.getByText(smoke.dayPrn.name)).toBeVisible()
     await expect(page.getByText(smoke.nightCore.name)).toHaveCount(0)
+    await expect(page.getByTestId(cellTestId(smoke.dayPrn.id, smoke.draftCycle.day2))).toHaveText(
+      'OC'
+    )
+    await expect(page.getByTestId(cellTestId(smoke.dayCore.id, smoke.draftCycle.day2))).toHaveText(
+      '·*'
+    )
+
+    await page.getByRole('button', { name: 'Night' }).click()
+    await expect(page).toHaveURL(/shift=night/)
+    await expect(page.getByText(smoke.nightCore.name)).toBeVisible()
+    await expect(page.getByText(smoke.dayCore.name)).toHaveCount(0)
+    await expect(
+      page.getByTestId(cellTestId(smoke.nightCore.id, smoke.draftCycle.day1))
+    ).toHaveText('CI')
+
+    await page.getByRole('combobox', { name: 'Schedule cycle' }).selectOption(smoke.liveCycle.id)
+    await expect(page).toHaveURL(new RegExp(`cycle=${smoke.liveCycle.id}`))
+    await expect(page.getByText('Published', { exact: true })).toBeVisible()
+  })
+
+  test('manager can assign requested-off draft cells, unassign, and designate lead inline', async ({
+    page,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+    const smoke = ctx!
+
+    await loginAs(page, smoke.manager.email, smoke.manager.password)
+    await page.goto(`/schedule?cycle=${smoke.draftCycle.id}&shift=day`)
+
+    const requestedOffCell = page.getByTestId(cellTestId(smoke.dayCore.id, smoke.draftCycle.day2))
+    await expect(requestedOffCell).toHaveText('·*')
+    await requestedOffCell.click()
+    await expect(page.getByText('Requested this day off.')).toBeVisible()
+    await page.getByRole('button', { name: 'Assign anyway' }).click()
+    await expect(requestedOffCell).toHaveText('1*', { timeout: 30_000 })
+
+    const inserted = await smoke.supabase
+      .from('shifts')
+      .select('id, availability_override, availability_override_reason')
+      .eq('cycle_id', smoke.draftCycle.id)
+      .eq('user_id', smoke.dayCore.id)
+      .eq('date', smoke.draftCycle.day2)
+      .eq('shift_type', 'day')
+      .single()
+    expect(inserted.error).toBeNull()
+    expect(inserted.data?.availability_override).toBe(true)
+
+    await requestedOffCell.click()
+    await page.getByRole('button', { name: 'Unassign' }).click()
+    await expect(requestedOffCell).toHaveText('·*', { timeout: 30_000 })
+
+    const scheduledCell = page.getByTestId(cellTestId(smoke.dayCore.id, smoke.draftCycle.day1))
+    await scheduledCell.click()
+    await page.getByRole('button', { name: 'Designate as lead' }).click()
+    await expect(scheduledCell).toHaveClass(/bg-yellow-200/, { timeout: 30_000 })
+  })
+
+  test('manager can update published assignment status from the same grid', async ({ page }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+    const smoke = ctx!
+
+    await loginAs(page, smoke.manager.email, smoke.manager.password)
+    await page.goto(`/schedule?cycle=${smoke.liveCycle.id}&shift=day`)
+
+    const liveCell = page.getByTestId(cellTestId(smoke.dayCore.id, smoke.liveCycle.day1))
+    await expect(page.getByText('Published', { exact: true })).toBeVisible()
+    await liveCell.click()
+    await page.getByRole('button', { name: 'On call' }).click()
+    await expect(liveCell).toHaveText('OC', { timeout: 30_000 })
+
+    const updated = await smoke.supabase
+      .from('shifts')
+      .select('assignment_status')
+      .eq('cycle_id', smoke.liveCycle.id)
+      .eq('user_id', smoke.dayCore.id)
+      .eq('date', smoke.liveCycle.day1)
+      .single()
+    expect(updated.error).toBeNull()
+    expect(updated.data?.assignment_status).toBe('on_call')
+  })
+
+  test('therapist sees the same schedule as read-only with their row pinned', async ({ page }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+    const smoke = ctx!
+
+    await loginAs(page, smoke.dayCore.email, smoke.dayCore.password)
+    await page.goto(`/schedule?cycle=${smoke.liveCycle.id}`)
+
+    const firstBodyRow = page.locator('tbody tr').first()
+    await expect(firstBodyRow).toContainText(`You (${smoke.dayCore.name})`)
+    await expect(page.getByRole('button', { name: 'Auto-draft' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Publish ->' })).toHaveCount(0)
+    await expect(
+      page.getByTestId(cellTestId(smoke.dayCore.id, smoke.liveCycle.day1))
+    ).toBeDisabled()
   })
 })

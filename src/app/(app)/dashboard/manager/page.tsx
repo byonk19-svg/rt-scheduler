@@ -95,10 +95,10 @@ function getNotificationHref(item: NotificationRow): string {
   if (item.event_type === 'preliminary_request_submitted') return '/approvals'
   if (item.event_type.startsWith('preliminary_')) return '/preliminary'
   if (item.target_type === 'shift_post') return '/requests'
-  if (item.target_type === 'shift') return '/coverage?view=week'
-  if (item.target_type === 'schedule_cycle') return '/coverage?view=week'
+  if (item.target_type === 'shift') return '/schedule'
+  if (item.target_type === 'schedule_cycle') return '/schedule'
   if (item.event_type.includes('request')) return '/requests'
-  return '/coverage?view=week'
+  return '/schedule'
 }
 
 function formatShiftLine(row: ShiftAssignmentRow): { label: string; detail: string } {
@@ -301,7 +301,7 @@ export default async function ManagerDashboardPage() {
     href: getNotificationHref(row),
   }))
 
-  const scheduleHref = buildCycleRoute('/coverage', activeCycle?.id ?? null)
+  const scheduleHref = buildCycleRoute('/schedule', activeCycle?.id ?? null)
   const nextCyclePlanning = getNextCyclePlanningWindow(nextCycle?.start_date ?? null)
   const activeCycleHasNoShifts =
     Boolean(activeCycle) && dayRows.length === 0 && nightRows.length === 0
@@ -360,10 +360,10 @@ export default async function ManagerDashboardPage() {
       approvalsHref={MANAGER_WORKFLOW_LINKS.approvals}
       lotteryHref={MANAGER_WORKFLOW_LINKS.lottery}
       scheduleHref={scheduleHref}
-      reviewHref={latestUnread ? getNotificationHref(latestUnread) : '/coverage?view=week'}
+      reviewHref={latestUnread ? getNotificationHref(latestUnread) : '/schedule'}
       activeCycleDateRange={activeCycleDateRange ?? undefined}
-      currentCycleCtaHref={!activeCycle ? '/coverage' : undefined}
-      nextCycleCtaHref={!nextCycle ? '/coverage' : undefined}
+      currentCycleCtaHref={!activeCycle ? '/schedule' : undefined}
+      nextCycleCtaHref={!nextCycle ? '/schedule' : undefined}
     />
   )
 }

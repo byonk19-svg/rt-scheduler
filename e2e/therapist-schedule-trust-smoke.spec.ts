@@ -10,14 +10,21 @@ function addOneDayIso(iso: string): string {
   return formatDateKey(addDays(d, 1))
 }
 
-/** Matches `formatDateLabel` / therapist grid `aria-label` date prefix. */
+function nextSunday(from = new Date()): Date {
+  const start = new Date(from)
+  start.setDate(start.getDate() + ((7 - start.getDay()) % 7))
+  return start
+}
+
+/** Matches the therapist availability day button accessible name. */
 function formatDateLabelE2E(iso: string): string {
   const parsed = new Date(`${iso}T00:00:00`)
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 async function expectShiftTabActive(page: import('@playwright/test').Page, tab: 'day' | 'night') {
-  const btn = page.getByTestId(`coverage-shift-tab-${tab}`).first()
+  const label = tab === 'day' ? 'Day' : 'Night'
+  const btn = page.getByRole('button', { name: label }).first()
   await expect(btn).toBeVisible()
   const cls = await btn.evaluate((el) => el.className)
   expect(cls).toMatch(/bg-primary/)
@@ -26,8 +33,9 @@ async function expectShiftTabActive(page: import('@playwright/test').Page, tab: 
 type SmokeCtx = {
   supabase: SupabaseClient
   manager: { id: string; email: string; password: string }
-  dayTherapist: { id: string; email: string; password: string; firstName: string }
-  nightTherapist: { id: string; email: string; password: string; firstName: string }
+  dayTherapist: { id: string; email: string; password: string; firstName: string; name: string }
+  nightTherapist: { id: string; email: string; password: string; firstName: string; name: string }
+  scheduleCycleId: string
   cycleId: string
   availabilityDate: string
   availabilityDate2: string
@@ -36,12 +44,24 @@ type SmokeCtx = {
 test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
   test.setTimeout(120_000)
   let ctx: SmokeCtx | null = null
+  let cleanupSupabase: SupabaseClient | null = null
   const createdUserIds: string[] = []
-  let createdCycleId: string | null = null
+  const createdSiteIds: string[] = []
+  const createdCycleIds: string[] = []
 
   test.beforeAll(async () => {
     const supabase = createServiceRoleClientOrNull()
     if (!supabase) return
+    cleanupSupabase = supabase
+    const siteId = randomString('trust-site')
+    const siteInsert = await supabase.from('sites').insert({
+      id: siteId,
+      name: `Trust Smoke ${siteId}`,
+    })
+    if (siteInsert.error) {
+      throw new Error(`Could not create test site: ${siteInsert.error.message}`)
+    }
+    createdSiteIds.push(siteId)
 
     const managerEmail = `${randomString('trust-mgr')}@example.com`
     const managerPassword = `Mngr!${Math.random().toString(16).slice(2, 8)}`
@@ -53,6 +73,7 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
       employmentType: 'full_time',
       shiftType: 'day',
       isLeadEligible: true,
+      siteId,
     })
     createdUserIds.push(manager.id)
 
@@ -67,6 +88,7 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
       employmentType: 'full_time',
       shiftType: 'day',
       isLeadEligible: false,
+      siteId,
     })
     createdUserIds.push(dayT.id)
 
@@ -81,33 +103,56 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
       employmentType: 'full_time',
       shiftType: 'night',
       isLeadEligible: false,
+      siteId,
     })
     createdUserIds.push(nightT.id)
 
-    const cycleStart = new Date()
-    cycleStart.setDate(cycleStart.getDate() - 2)
-    const cycleEnd = new Date(cycleStart)
-    cycleEnd.setDate(cycleEnd.getDate() + 41)
-    const startKey = formatDateKey(cycleStart)
-    const endKey = formatDateKey(cycleEnd)
-    const availabilityDate = formatDateKey(new Date(cycleStart.getTime() + 3 * 86400000))
+    const availabilityCycleStart = nextSunday(addDays(new Date(), 3))
+    const availabilityCycleEnd = addDays(availabilityCycleStart, 41)
+    const scheduleCycleStart = addDays(availabilityCycleEnd, 1)
+    const scheduleCycleEnd = addDays(scheduleCycleStart, 41)
+    const availabilityStartKey = formatDateKey(availabilityCycleStart)
+    const availabilityEndKey = formatDateKey(availabilityCycleEnd)
+    const scheduleStartKey = formatDateKey(scheduleCycleStart)
+    const scheduleEndKey = formatDateKey(scheduleCycleEnd)
+    const availabilityDate = formatDateKey(
+      new Date(availabilityCycleStart.getTime() + 3 * 86400000)
+    )
     const availabilityDate2 = addOneDayIso(availabilityDate)
 
-    const cycleInsert = await supabase
+    const availabilityCycleInsert = await supabase
       .from('schedule_cycles')
       .insert({
-        label: `Trust Smoke ${randomString('c')}`,
-        start_date: startKey,
-        end_date: endKey,
-        published: true,
+        label: `Trust Availability ${randomString('c')}`,
+        start_date: availabilityStartKey,
+        end_date: availabilityEndKey,
+        published: false,
+        site_id: siteId,
       })
       .select('id')
       .single()
 
-    if (cycleInsert.error || !cycleInsert.data) {
-      throw new Error(cycleInsert.error?.message ?? 'cycle insert failed')
+    if (availabilityCycleInsert.error || !availabilityCycleInsert.data) {
+      throw new Error(availabilityCycleInsert.error?.message ?? 'availability cycle insert failed')
     }
-    createdCycleId = cycleInsert.data.id
+
+    const scheduleCycleInsert = await supabase
+      .from('schedule_cycles')
+      .insert({
+        label: `Trust Schedule ${randomString('c')}`,
+        start_date: scheduleStartKey,
+        end_date: scheduleEndKey,
+        published: true,
+        site_id: siteId,
+      })
+      .select('id')
+      .single()
+
+    if (scheduleCycleInsert.error || !scheduleCycleInsert.data) {
+      throw new Error(scheduleCycleInsert.error?.message ?? 'schedule cycle insert failed')
+    }
+
+    createdCycleIds.push(availabilityCycleInsert.data.id, scheduleCycleInsert.data.id)
 
     ctx = {
       supabase,
@@ -117,60 +162,67 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
         email: dayEmail,
         password: dayPassword,
         firstName: dayTherapistFull.split(' ')[0]!,
+        name: dayTherapistFull,
       },
       nightTherapist: {
         id: nightT.id,
         email: nightEmail,
         password: nightPassword,
         firstName: nightTherapistFull.split(' ')[0]!,
+        name: nightTherapistFull,
       },
-      cycleId: cycleInsert.data.id,
+      scheduleCycleId: scheduleCycleInsert.data.id,
+      cycleId: availabilityCycleInsert.data.id,
       availabilityDate,
       availabilityDate2,
     }
   })
 
   test.afterAll(async () => {
-    if (!ctx) return
-    if (createdCycleId) {
-      await ctx.supabase
+    const supabase = ctx?.supabase ?? cleanupSupabase
+    if (!supabase) return
+    if (createdCycleIds.length > 0) {
+      await supabase
         .from('therapist_availability_submissions')
         .delete()
-        .eq('schedule_cycle_id', createdCycleId)
-      await ctx.supabase.from('availability_overrides').delete().eq('cycle_id', createdCycleId)
-      await ctx.supabase.from('shifts').delete().eq('cycle_id', createdCycleId)
-      await ctx.supabase.from('schedule_cycles').delete().eq('id', createdCycleId)
+        .in('schedule_cycle_id', createdCycleIds)
+      await supabase.from('availability_overrides').delete().in('cycle_id', createdCycleIds)
+      await supabase.from('shifts').delete().in('cycle_id', createdCycleIds)
+      await supabase.from('schedule_cycles').delete().in('id', createdCycleIds)
     }
     for (const userId of createdUserIds) {
-      await ctx.supabase.auth.admin.deleteUser(userId)
+      await supabase.auth.admin.deleteUser(userId)
+    }
+    if (createdSiteIds.length > 0) {
+      await supabase.from('sites').delete().in('id', createdSiteIds)
     }
   })
 
   test('day-shift therapist lands on Day Shift tab on schedule', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required.')
     await loginAs(page, ctx!.dayTherapist.email, ctx!.dayTherapist.password)
-    await page.goto(`/coverage?view=week&cycle=${ctx!.cycleId}`)
+    await page.goto(`/schedule?cycle=${ctx!.scheduleCycleId}`)
     await expectShiftTabActive(page, 'day')
   })
 
   test('night-shift therapist lands on Night Shift tab on schedule', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required.')
     await loginAs(page, ctx!.nightTherapist.email, ctx!.nightTherapist.password)
-    await page.goto(`/coverage?view=week&cycle=${ctx!.cycleId}`)
+    await page.goto(`/schedule?cycle=${ctx!.scheduleCycleId}`)
     await expectShiftTabActive(page, 'night')
   })
 
   test('explicit ?shift=day wins over night profile default', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required.')
     await loginAs(page, ctx!.nightTherapist.email, ctx!.nightTherapist.password)
-    await page.goto(`/coverage?view=week&cycle=${ctx!.cycleId}&shift=day`)
+    await page.goto(`/schedule?cycle=${ctx!.scheduleCycleId}&shift=day`)
     await expectShiftTabActive(page, 'day')
   })
 
   test('explicit ?shift=night wins over day profile default', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required.')
     await loginAs(page, ctx!.dayTherapist.email, ctx!.dayTherapist.password)
-    await page.goto(`/coverage?view=week&cycle=${ctx!.cycleId}&shift=night`)
+    await page.goto(`/schedule?cycle=${ctx!.scheduleCycleId}&shift=night`)
     await expectShiftTabActive(page, 'night')
   })
 
@@ -182,19 +234,21 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
     await page.goto(`/therapist/availability?cycle=${ctx!.cycleId}`)
 
     const dayBtn = page
-      .getByRole('button', { name: new RegExp(`^${formatDateLabelE2E(iso)}:`) })
+      .getByRole('button', { name: new RegExp(`^${formatDateLabelE2E(iso)}$`) })
       .first()
     await expect(dayBtn).toBeVisible({ timeout: 30_000 })
     await dayBtn.click()
     await expect(page.getByText('Selected Day')).toBeVisible()
+    await page.getByRole('button', { name: 'Need Off' }).first().click()
     const noteBox = page.locator(`textarea#therapist-day-note-${iso}`)
     await expect(noteBox).toBeVisible()
+    await expect(noteBox).toBeEnabled()
     await noteBox.fill(noteText)
 
     await page.getByRole('button', { name: /submit availability/i }).click()
-    await expect(
-      page.getByText(/availability saved and submitted/i).or(page.getByText(/saved and submitted/i))
-    ).toBeVisible({ timeout: 45_000 })
+    await expect(page.getByText('Submitted with cycle-specific changes.')).toBeVisible({
+      timeout: 45_000,
+    })
 
     await page.goto(`/therapist/availability?cycle=${ctx!.cycleId}`)
     await expect(page.getByText(noteText).first()).toBeVisible({ timeout: 20_000 })
@@ -211,6 +265,7 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
         date: ctx!.availabilityDate,
         shift_type: 'both',
         override_type: 'force_off',
+        intent: 'therapist_need_off',
         note: detailNote,
         created_by: ctx!.dayTherapist.id,
         source: 'therapist',
@@ -242,25 +297,21 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
     await expect(page.getByText(detailNote).last()).toBeVisible({ timeout: 15_000 })
   })
 
-  test('selecting Available shows truthful note copy (no editable note field)', async ({
-    page,
-  }) => {
+  test('unmarked days show truthful note copy without an editable note field', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required.')
     const iso2 = ctx!.availabilityDate2
     await loginAs(page, ctx!.dayTherapist.email, ctx!.dayTherapist.password)
     await page.goto(`/therapist/availability?cycle=${ctx!.cycleId}`)
 
     const dayBtn = page
-      .getByRole('button', { name: new RegExp(`^${formatDateLabelE2E(iso2)}:`) })
+      .getByRole('button', { name: new RegExp(`^${formatDateLabelE2E(iso2)}$`) })
       .first()
     await expect(dayBtn).toBeVisible({ timeout: 30_000 })
     await dayBtn.click()
-    await dayBtn.click()
-    await dayBtn.click()
     await expect(
-      page.getByText('Notes are only saved for Need Off or Request to Work days.')
+      page.getByText('Notes are only saved for days you change for this cycle.')
     ).toBeVisible()
-    await expect(page.locator(`textarea#therapist-day-note-${iso2}`)).toHaveCount(0)
+    await expect(page.locator(`textarea#therapist-day-note-${iso2}`)).toBeDisabled()
   })
 
   test('manager response roster matches official submission for same therapist/cycle', async ({
@@ -283,21 +334,24 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
       date: availabilityDate,
       shift_type: 'both',
       override_type: 'force_off',
+      intent: 'therapist_need_off',
       note: 'e2e roster test',
       created_by: nightTherapist.id,
       source: 'therapist',
     })
 
     await loginAs(page, manager.email, manager.password)
-    const responseRoster = page
-      .locator('section')
-      .filter({ has: page.locator('#availability-response-heading') })
-    const rosterPanels = responseRoster.locator('div.overflow-y-auto > div.space-y-3')
 
     await page.goto(`/availability?cycle=${cycleId}`)
-    await responseRoster.getByRole('button', { name: /Not submitted yet/ }).click()
+    await page.getByRole('button', { name: 'Night shift' }).click()
+    await page.getByPlaceholder('Search therapists...').fill(nightTherapist.name)
+    await page.getByRole('button', { name: /Missing submissions/ }).click()
     await expect(
-      rosterPanels.nth(0).getByText(nightTherapist.firstName, { exact: false })
+      page
+        .getByRole('button', {
+          name: new RegExp(`${nightTherapist.name}.*Not submitted`, 'i'),
+        })
+        .first()
     ).toBeVisible({ timeout: 20_000 })
 
     await supabase.from('therapist_availability_submissions').insert({
@@ -308,10 +362,15 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
     })
 
     await page.goto(`/availability?cycle=${cycleId}`)
-    // Official submission moves this therapist off "Not submitted"; name only exists in Submitted panel.
-    await responseRoster.getByRole('button', { name: /^Submitted\b/ }).click()
+    await page.getByRole('button', { name: 'Night shift' }).click()
+    await page.getByPlaceholder('Search therapists...').fill(nightTherapist.name)
+    await page.getByRole('button', { name: /Submitted with exceptions/ }).click()
     await expect(
-      rosterPanels.nth(1).getByText(nightTherapist.firstName, { exact: false })
+      page
+        .getByRole('button', {
+          name: new RegExp(`${nightTherapist.name}.*Submitted`, 'i'),
+        })
+        .first()
     ).toBeVisible({ timeout: 20_000 })
   })
 })

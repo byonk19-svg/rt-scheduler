@@ -18,7 +18,6 @@ import type {
   ScheduleSearchParams,
   Therapist,
   ToastVariant,
-  ViewMode,
 } from '@/app/schedule/types'
 
 export function getOne<T>(value: T | T[] | null | undefined): T | null {
@@ -119,34 +118,20 @@ export function isDateWithinRange(date: string, startDate: string, endDate: stri
   return date >= startDate && date <= endDate
 }
 
-export function normalizeViewMode(value: string | undefined): ViewMode {
-  if (value === 'roster') return 'roster' as ViewMode
-  if (value === 'list') return 'week'
-  if (value === 'grid') return 'week'
-  if (value === 'calendar') return 'calendar'
-  if (value === 'week') return 'week'
-  return 'week'
-}
-
-export function normalizeDefaultScheduleView(value: string | undefined): 'week' | 'roster' {
-  return value === 'roster' ? 'roster' : 'week'
-}
-
 export function buildScheduleUrl(
   cycleId?: string,
-  view?: string,
+  _view?: string,
   extraParams?: Record<string, string | undefined>
 ): string {
   const params = new URLSearchParams()
   if (cycleId) params.set('cycle', cycleId)
-  const normalizedView = normalizeViewMode(view)
-  params.set('view', normalizedView)
   if (extraParams) {
     for (const [key, value] of Object.entries(extraParams)) {
       if (value) params.set(key, value)
     }
   }
-  return `/schedule?${params.toString()}`
+  const query = params.toString()
+  return query ? `/schedule?${query}` : '/schedule'
 }
 
 export function getSearchParam(value: string | string[] | undefined): string | undefined {
@@ -185,8 +170,8 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
   if (success === 'cycle_published') {
     return { message: 'Schedule cycle published.', variant: 'success' }
   }
-  if (success === 'cycle_unpublished') {
-    return { message: 'Schedule cycle moved to draft.', variant: 'success' }
+  if (success === 'cycle_taken_offline') {
+    return { message: 'Schedule Block taken offline.', variant: 'success' }
   }
   if (success === 'shift_added') {
     return { message: 'Shift added to schedule.', variant: 'success' }
@@ -231,6 +216,31 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
   }
   if (error === 'delete_shift_failed') {
     return { message: 'Could not delete shift. Please try again.', variant: 'error' }
+  }
+  if (error === 'cycle_read_only') {
+    return {
+      message: 'This Schedule Block is read-only. Republish it before making schedule edits.',
+      variant: 'error',
+    }
+  }
+  if (error === 'template_cycle_not_draft') {
+    return {
+      message: 'Templates can only be applied to empty Draft Schedule Blocks.',
+      variant: 'error',
+    }
+  }
+  if (error === 'delete_cycle_not_draft') {
+    return {
+      message: 'Only empty unpublished Draft Schedule Blocks can be deleted.',
+      variant: 'error',
+    }
+  }
+  if (error === 'delete_cycle_not_empty') {
+    return {
+      message:
+        'This Schedule Block has schedule, availability, preliminary, or publish history. Archive it instead of deleting it.',
+      variant: 'error',
+    }
   }
   if (error === 'auto_generate_db_error') {
     return {
@@ -309,6 +319,24 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
   if (error === 'publish_validation_failed') {
     return { message: 'Could not validate weekly rules before publishing.', variant: 'error' }
   }
+  if (error === 'publish_unresolved_preliminary_marks') {
+    return {
+      message: 'Resolve or dismiss all preliminary pencil marks before publishing final.',
+      variant: 'error',
+    }
+  }
+  if (error === 'publish_unresolved_preliminary_requests') {
+    return {
+      message: 'Resolve all preliminary schedule requests before publishing final.',
+      variant: 'error',
+    }
+  }
+  if (error === 'publish_requires_preliminary') {
+    return {
+      message: 'Send the schedule as preliminary before publishing final.',
+      variant: 'error',
+    }
+  }
   if (error === 'publish_coverage_rule_violation') {
     const underCoverage = parseCount(getSearchParam(params?.under_coverage))
     const overCoverage = parseCount(getSearchParam(params?.over_coverage))
@@ -326,6 +354,21 @@ export function getScheduleFeedback(params?: ScheduleSearchParams): {
     const ineligibleLead = parseCount(getSearchParam(params?.lead_ineligible))
     return {
       message: `Publish blocked. Coverage under: ${underCoverage}, coverage over: ${overCoverage}, missing lead: ${missingLead}, multiple leads: ${multipleLeads}, ineligible lead: ${ineligibleLead}.`,
+      variant: 'error',
+    }
+  }
+  if (error === 'publish_availability_rule_violation') {
+    const needToWorkMisses = parseCount(getSearchParam(params?.need_to_work_misses))
+    const needOffOverrides = parseCount(getSearchParam(params?.need_off_overrides))
+    return {
+      message: `Publish blocked. Need to Work not assigned: ${needToWorkMisses}; Need Off overrides missing manager context: ${needOffOverrides}.`,
+      variant: 'error',
+    }
+  }
+  if (error === 'publish_missing_availability_warning') {
+    const missingAvailability = parseCount(getSearchParam(params?.missing_availability))
+    return {
+      message: `Missing availability for ${missingAvailability} active therapist${missingAvailability === 1 ? '' : 's'}. A manager can acknowledge this and publish if the schedule is otherwise ready.`,
       variant: 'error',
     }
   }
@@ -465,6 +508,7 @@ export function pickTherapistForDate(
           therapist.pattern ??
           normalizeWorkPattern({
             therapist_id: therapist.id,
+            pattern_type: therapist.employment_type === 'prn' ? 'none' : undefined,
             works_dow: therapist.works_dow,
             offs_dow: therapist.offs_dow,
             weekend_rotation: therapist.weekend_rotation,

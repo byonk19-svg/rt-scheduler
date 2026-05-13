@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
@@ -10,10 +10,24 @@ type PublishLifecycleCtx = {
   manager: { id: string; email: string; password: string }
 }
 
+function nextSundayAfter(date: Date, minimumDaysAhead: number) {
+  const next = addDays(date, minimumDaysAhead)
+  const day = next.getDay()
+  return addDays(next, (7 - day) % 7)
+}
+
+async function submitPublishForm(page: Page, buttonName: string) {
+  const button = page.getByRole('button', { name: buttonName }).first()
+  await expect(button).toBeVisible({ timeout: 30_000 })
+  await button.click()
+  await page.waitForLoadState('networkidle').catch(() => undefined)
+}
+
 test.describe.serial('publish history lifecycle', () => {
   test.setTimeout(120_000)
 
   let ctx: PublishLifecycleCtx | null = null
+  const dateOffsetBase = 14000 + Math.floor(Math.random() * 3650)
   const createdUserIds: string[] = []
   const createdCycleIds: string[] = []
   const createdPublishEventIds: string[] = []
@@ -44,11 +58,22 @@ test.describe.serial('publish history lifecycle', () => {
   test.afterAll(async () => {
     if (!ctx) return
 
-    await ctx.supabase
-      .from('notification_outbox')
-      .delete()
-      .in('publish_event_id', createdPublishEventIds)
-    await ctx.supabase.from('publish_events').delete().in('id', createdPublishEventIds)
+    const cycleEventIds =
+      createdCycleIds.length > 0
+        ? await ctx.supabase.from('publish_events').select('id').in('cycle_id', createdCycleIds)
+        : { data: [], error: null }
+    if (cycleEventIds.error) {
+      throw new Error(cycleEventIds.error.message)
+    }
+    const publishEventIds = Array.from(
+      new Set([
+        ...createdPublishEventIds,
+        ...((cycleEventIds.data ?? []) as Array<{ id: string }>).map((row) => row.id),
+      ])
+    )
+
+    await ctx.supabase.from('notification_outbox').delete().in('publish_event_id', publishEventIds)
+    await ctx.supabase.from('publish_events').delete().in('id', publishEventIds)
     await ctx.supabase.from('preliminary_snapshots').delete().in('cycle_id', createdCycleIds)
     await ctx.supabase.from('notifications').delete().in('user_id', createdUserIds)
     await ctx.supabase.from('shifts').delete().in('cycle_id', createdCycleIds)
@@ -62,14 +87,15 @@ test.describe.serial('publish history lifecycle', () => {
   test('manager can open publish details for a failed event', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run publish lifecycle e2e.')
 
-    const cycleDate = addDays(new Date(), 18)
+    const cycleDate = nextSundayAfter(new Date(), dateOffsetBase)
     const cycleInsert = await ctx!.supabase
       .from('schedule_cycles')
       .insert({
         label: `Detail Cycle ${randomString('cycle')}`,
         start_date: formatDateKey(cycleDate),
-        end_date: formatDateKey(addDays(cycleDate, 6)),
+        end_date: formatDateKey(addDays(cycleDate, 41)),
         published: false,
+        status: 'draft',
       })
       .select('id')
       .single()
@@ -124,15 +150,16 @@ test.describe.serial('publish history lifecycle', () => {
   test('manager can delete a non-live publish history entry', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run publish lifecycle e2e.')
 
-    const cycleDate = addDays(new Date(), 24)
+    const cycleDate = nextSundayAfter(new Date(), dateOffsetBase + 56)
     const cycleLabel = `Delete History ${randomString('cycle')}`
     const cycleInsert = await ctx!.supabase
       .from('schedule_cycles')
       .insert({
         label: cycleLabel,
         start_date: formatDateKey(cycleDate),
-        end_date: formatDateKey(addDays(cycleDate, 6)),
+        end_date: formatDateKey(addDays(cycleDate, 41)),
         published: false,
+        status: 'draft',
       })
       .select('id')
       .single()
@@ -188,26 +215,27 @@ test.describe.serial('publish history lifecycle', () => {
       .toBeNull()
   })
 
-  test('manager can start over a live cycle and close the active preliminary snapshot', async ({
+  test('manager can take a live cycle offline while preserving shifts and closing preliminary review', async ({
     page,
   }) => {
     test.skip(!ctx, 'Supabase service env values are required to run publish lifecycle e2e.')
 
-    const cycleDate = addDays(new Date(), 28)
-    const cycleLabel = `Restart Cycle ${randomString('cycle')}`
+    const cycleDate = nextSundayAfter(new Date(), dateOffsetBase + 112)
+    const cycleLabel = `Offline Cycle ${randomString('cycle')}`
     const cycleInsert = await ctx!.supabase
       .from('schedule_cycles')
       .insert({
         label: cycleLabel,
         start_date: formatDateKey(cycleDate),
-        end_date: formatDateKey(addDays(cycleDate, 6)),
+        end_date: formatDateKey(addDays(cycleDate, 41)),
         published: true,
+        status: 'final',
       })
       .select('id')
       .single()
 
     if (cycleInsert.error || !cycleInsert.data) {
-      throw new Error(cycleInsert.error?.message ?? 'Could not create restart cycle.')
+      throw new Error(cycleInsert.error?.message ?? 'Could not create offline lifecycle cycle.')
     }
     createdCycleIds.push(cycleInsert.data.id)
 
@@ -262,22 +290,23 @@ test.describe.serial('publish history lifecycle', () => {
     const cycleRow = page
       .locator('tr')
       .filter({ has: page.getByText(cycleLabel).first() })
-      .filter({ has: page.getByRole('button', { name: 'Clear & restart' }) })
+      .filter({ has: page.getByRole('button', { name: 'Take offline' }) })
       .first()
     await expect(cycleRow).toBeVisible()
-    await cycleRow.getByRole('button', { name: 'Clear & restart' }).click()
+    await expect(cycleRow.getByRole('button', { name: 'Clear & restart' })).toHaveCount(0)
+    await cycleRow.getByRole('button', { name: 'Take offline' }).click()
 
     await expect
       .poll(async () => {
         const cycle = await ctx!.supabase
           .from('schedule_cycles')
-          .select('published')
+          .select('published, status')
           .eq('id', cycleInsert.data.id)
           .maybeSingle()
         if (cycle.error) throw new Error(cycle.error.message)
-        return cycle.data?.published ?? null
+        return cycle.data ? `${cycle.data.status}:${cycle.data.published}` : null
       })
-      .toBe(false)
+      .toBe('offline:false')
 
     await expect
       .poll(async () => {
@@ -288,7 +317,7 @@ test.describe.serial('publish history lifecycle', () => {
         if (shifts.error) throw new Error(shifts.error.message)
         return (shifts.data ?? []).length
       })
-      .toBe(0)
+      .toBe(1)
 
     await expect
       .poll(async () => {
@@ -300,6 +329,109 @@ test.describe.serial('publish history lifecycle', () => {
         if (snapshot.error) throw new Error(snapshot.error.message)
         return snapshot.data?.status ?? null
       })
-      .toBe('closed')
+      .toBe('superseded')
+  })
+
+  test('manager can republish an offline cycle from publish history', async ({ page }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run publish lifecycle e2e.')
+
+    const cycleDate = nextSundayAfter(new Date(), dateOffsetBase + 168)
+    const cycleLabel = `Republish Offline ${randomString('cycle')}`
+    const cycleInsert = await ctx!.supabase
+      .from('schedule_cycles')
+      .insert({
+        label: cycleLabel,
+        start_date: formatDateKey(cycleDate),
+        end_date: formatDateKey(addDays(cycleDate, 41)),
+        published: false,
+        status: 'offline',
+      })
+      .select('id')
+      .single()
+
+    if (cycleInsert.error || !cycleInsert.data) {
+      throw new Error(cycleInsert.error?.message ?? 'Could not create republish cycle.')
+    }
+    createdCycleIds.push(cycleInsert.data.id)
+
+    const nightLead = await createE2EUser(ctx!.supabase, {
+      email: `${randomString('republish-night-lead')}@example.com`,
+      password: `Lead!${Math.random().toString(16).slice(2, 10)}`,
+      fullName: `Republish Night Lead ${randomString('staff')}`,
+      role: 'lead',
+      employmentType: 'full_time',
+      shiftType: 'night',
+      isLeadEligible: true,
+    })
+    createdUserIds.push(nightLead.id)
+
+    const shiftsInsert = await ctx!.supabase.from('shifts').insert(
+      Array.from({ length: 42 }, (_, index) => {
+        const date = formatDateKey(addDays(cycleDate, index))
+        return [
+          {
+            cycle_id: cycleInsert.data.id,
+            user_id: ctx!.manager.id,
+            date,
+            shift_type: 'day',
+            status: 'scheduled',
+            assignment_status: 'scheduled',
+            role: 'lead',
+          },
+          {
+            cycle_id: cycleInsert.data.id,
+            user_id: nightLead.id,
+            date,
+            shift_type: 'night',
+            status: 'scheduled',
+            assignment_status: 'scheduled',
+            role: 'lead',
+          },
+        ]
+      }).flat()
+    )
+    if (shiftsInsert.error) throw new Error(shiftsInsert.error.message)
+
+    await loginAs(page, ctx!.manager.email, ctx!.manager.password)
+    await page.goto('/publish')
+    const cycleRow = page
+      .locator('tr')
+      .filter({ has: page.getByText(cycleLabel).first() })
+      .filter({ has: page.getByRole('button', { name: 'Republish' }) })
+      .first()
+    await expect(cycleRow).toBeVisible()
+    await cycleRow.getByRole('button', { name: 'Republish' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible({ timeout: 30_000 })
+
+    const cyclePublished = async () => {
+      const cycle = await ctx!.supabase
+        .from('schedule_cycles')
+        .select('published, status')
+        .eq('id', cycleInsert.data.id)
+        .maybeSingle()
+
+      if (cycle.error) throw new Error(cycle.error.message)
+      return cycle.data ? `${cycle.data.status}:${cycle.data.published}` : null
+    }
+
+    if ((await cyclePublished()) !== 'final:true') {
+      await submitPublishForm(page, 'Publish with weekly override')
+    }
+
+    if ((await cyclePublished()) !== 'final:true') {
+      await submitPublishForm(page, 'Publish with shift override')
+    }
+
+    if ((await cyclePublished()) !== 'final:true') {
+      await submitPublishForm(page, 'Acknowledge and publish')
+    }
+
+    await expect
+      .poll(cyclePublished, {
+        timeout: 60_000,
+        message: `url=${page.url()}`,
+      })
+      .toBe('final:true')
   })
 })

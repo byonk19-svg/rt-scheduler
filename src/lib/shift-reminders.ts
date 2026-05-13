@@ -152,7 +152,7 @@ export async function queueAndSendShiftReminders(
   }
 
   const emailConfig = getPublishEmailConfig()
-  const scheduleUrl = `${emailConfig.appBaseUrl.replace(/\/$/, '')}/therapist/schedule`
+  const scheduleUrl = `${emailConfig.appBaseUrl.replace(/\/$/, '')}/schedule`
 
   let sent = 0
   let failed = 0

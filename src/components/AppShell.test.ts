@@ -75,9 +75,9 @@ describe('AppShell mobile menu', () => {
     expect(appShellSource).toContain('<LocalSectionNav')
   })
 
-  it('suppresses the local section nav on schedule and availability surfaces so the page layout can own the space', () => {
+  it('suppresses the local section nav only where the page layout owns the space', () => {
     expect(appShellSource).toContain(
-      "const hideLocalSectionNav = pathname === '/schedule' || pathname.startsWith('/availability')"
+      "const hideLocalSectionNav = pathname.startsWith('/availability')"
     )
     expect(appShellSource).toContain('shellContext.localNav && !hideLocalSectionNav')
   })
@@ -106,16 +106,15 @@ describe('AppShell navigation structure', () => {
     expect(scheduleSection?.isActive('/schedule')).toBe(true)
   })
 
-  it('sends the manager Schedule entry to the editable coverage workspace and keeps roster view as a separate local item', () => {
+  it('sends the manager Schedule entry to the unified schedule grid', () => {
     const scheduleSection = buildManagerSections(0).find((section) => section.key === 'schedule')
 
-    expect(scheduleSection?.href).toBe('/coverage')
-    expect(scheduleSection?.subItems.find((item) => item.label === 'Coverage')?.href).toBe(
-      '/coverage'
-    )
-    expect(scheduleSection?.subItems.find((item) => item.label === 'Roster View')?.href).toBe(
+    expect(scheduleSection?.href).toBe('/schedule')
+    expect(scheduleSection?.subItems.find((item) => item.label === 'Schedule')?.href).toBe(
       '/schedule'
     )
+    expect(scheduleSection?.subItems.find((item) => item.label === 'Coverage')).toBeUndefined()
+    expect(scheduleSection?.subItems.find((item) => item.label === 'Roster View')).toBeUndefined()
   })
 
   it('uses Shift Board wording in staff shell navigation', () => {
@@ -129,10 +128,11 @@ describe('AppShell navigation structure', () => {
     expect(shellConfigSource).toContain("label: 'History'")
   })
 
-  it('includes the personal schedule route in the flat staff nav', () => {
-    expect(shellConfigSource).toContain("href: '/therapist/schedule'")
-    expect(shellConfigSource).toContain("label: 'My Shifts'")
-    expect(shellConfigSource).toContain("label: 'Team Schedule'")
+  it('includes the unified schedule route in the flat staff nav', () => {
+    expect(shellConfigSource).toContain("href: '/schedule'")
+    expect(shellConfigSource).toContain("label: 'Schedule'")
+    expect(shellConfigSource).not.toContain("label: 'My Shifts'")
+    expect(shellConfigSource).not.toContain("label: 'Team Schedule'")
   })
 
   it('routes manager Dashboard section to the manager dashboard', () => {
@@ -146,9 +146,10 @@ describe('AppShell navigation structure', () => {
     expect(shellConfigSource).toContain("key: 'people'")
   })
 
-  it('puts Coverage, Roster View, Availability, Lottery, Publish, and Approvals under the Schedule section', () => {
-    expect(shellConfigSource).toContain("label: 'Coverage'")
-    expect(shellConfigSource).toContain("label: 'Roster View'")
+  it('puts Schedule, Availability, Lottery, Publish, and Approvals under the Schedule section', () => {
+    expect(shellConfigSource).toContain("label: 'Schedule'")
+    expect(shellConfigSource).not.toContain("label: 'Coverage'")
+    expect(shellConfigSource).not.toContain("label: 'Roster View'")
     expect(shellConfigSource).toContain("label: 'Availability'")
     expect(shellConfigSource).toContain("label: 'Lottery'")
     expect(shellConfigSource).toContain("label: 'Publish'")

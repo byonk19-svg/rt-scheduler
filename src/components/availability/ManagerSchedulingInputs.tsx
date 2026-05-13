@@ -12,7 +12,7 @@ import type {
 } from '@/components/availability/AvailabilityStatusSummary'
 import type { PlannerMode, PlannerOverrideRow } from '@/lib/availability-planner'
 import { splitPlannerDatesByMode } from '@/lib/availability-planner'
-import { sendAvailabilityRemindersAction } from '@/app/(app)/availability/actions'
+import { sendAvailabilityRemindersAction } from '@/app/(app)/availability/manager-planner-actions'
 import { formatHumanCycleRange } from '@/lib/calendar-utils'
 import { isDateWithinCycle } from '@/lib/employee-directory'
 import { cn } from '@/lib/utils'
@@ -46,6 +46,7 @@ type TherapistOption = {
 type PlannerOverrideRecord = PlannerOverrideRow & {
   therapist_id: string
   cycle_id: string
+  intent?: string | null
 }
 
 type AvailabilityEntryRow = {
@@ -61,6 +62,7 @@ type AvailabilityEntryRow = {
   entryType: 'force_off' | 'force_on'
   shiftType: 'day' | 'night' | 'both'
   source: 'manager' | 'therapist'
+  intent?: string | null
 }
 
 type AvailabilityEditorMode = PlannerMode | 'need_off' | 'request_to_work'
@@ -98,8 +100,29 @@ function getSavedBucketsForSelection(
   therapistId: string
 ) {
   return splitPlannerDatesByMode(
-    overrides.filter((row) => row.cycle_id === cycleId && row.therapist_id === therapistId),
+    overrides.filter(
+      (row) =>
+        row.cycle_id === cycleId &&
+        row.therapist_id === therapistId &&
+        isManagerPlanIntent(row.intent)
+    ),
     { source: 'manager' }
+  )
+}
+
+function isManagerPlanIntent(intent: string | null | undefined) {
+  return intent === 'manager_block' || intent === 'manager_force'
+}
+
+function isTherapistAvailabilityIntent(row: {
+  source: 'manager' | 'therapist'
+  intent?: string | null
+}) {
+  return (
+    row.source === 'therapist' ||
+    row.intent === 'therapist_need_off' ||
+    row.intent === 'therapist_wants_work' ||
+    row.intent === 'email_intake'
   )
 }
 
@@ -218,7 +241,11 @@ export function ManagerSchedulingInputs({
   )
 
   const savedBuckets = useMemo(
-    () => splitPlannerDatesByMode(savedOverrides, { source: 'manager' }),
+    () =>
+      splitPlannerDatesByMode(
+        savedOverrides.filter((row) => isManagerPlanIntent(row.intent)),
+        { source: 'manager' }
+      ),
     [savedOverrides]
   )
 
@@ -229,7 +256,7 @@ export function ManagerSchedulingInputs({
           (row) =>
             row.cycleId === selectedCycleId &&
             row.therapistId === selectedTherapistId &&
-            row.source === 'therapist'
+            isTherapistAvailabilityIntent(row)
         )
         .sort((a, b) => a.date.localeCompare(b.date)),
     [availabilityEntries, selectedCycleId, selectedTherapistId]
@@ -258,7 +285,7 @@ export function ManagerSchedulingInputs({
           (row) =>
             row.cycleId === cycleId &&
             row.therapistId === therapistId &&
-            row.source === 'therapist' &&
+            isTherapistAvailabilityIntent(row) &&
             row.entryType === entryType
         )
         .map((row) => row.date)

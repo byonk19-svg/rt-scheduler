@@ -15,6 +15,14 @@ async function submitPublishForm(page: Page, buttonName: string) {
   const button = page.getByRole('button', { name: buttonName }).first()
   await expect(button).toBeVisible()
   await button.click()
+  await page.waitForLoadState('networkidle').catch(() => undefined)
+  await page.waitForTimeout(750)
+}
+
+function nextSundayAfter(date: Date, minimumDaysAhead: number) {
+  const next = addDays(date, minimumDaysAhead)
+  const day = next.getDay()
+  return addDays(next, (7 - day) % 7)
 }
 
 test.describe.serial('coverage publish flow', () => {
@@ -41,15 +49,17 @@ test.describe.serial('coverage publish flow', () => {
     })
     createdUserIds.push(manager.id)
 
-    const cycleStart = addDays(new Date(), 14)
+    const cycleStart = nextSundayAfter(new Date(), 8000 + Math.floor(Math.random() * 3650))
     const cycleDate = formatDateKey(cycleStart)
+    const cycleEndDate = formatDateKey(addDays(cycleStart, 41))
     const cycleInsert = await supabase
       .from('schedule_cycles')
       .insert({
         label: `Publish Coverage ${randomString('cycle')}`,
         start_date: cycleDate,
-        end_date: cycleDate,
+        end_date: cycleEndDate,
         published: false,
+        status: 'preliminary',
       })
       .select('id')
       .single()
@@ -59,9 +69,9 @@ test.describe.serial('coverage publish flow', () => {
     }
     createdCycleIds.push(cycleInsert.data.id)
 
-    // Seed a publishable one-day draft with both day and night coverage, while still
-    // triggering the weekly-validation override path because the broader dataset includes
-    // many active therapists outside this cycle.
+    // Seed the full six-week block with exactly one designated lead for every
+    // day/night slot. Coverage remains intentionally below minimum so the browser
+    // exercises the manager override flow before the final RPC accepts publish.
     const dayLead = await createE2EUser(supabase, {
       email: `${randomString('pub-day-lead')}@example.com`,
       password: `Lead!${Math.random().toString(16).slice(2, 10)}`,
@@ -72,28 +82,6 @@ test.describe.serial('coverage publish flow', () => {
       isLeadEligible: true,
     })
     createdUserIds.push(dayLead.id)
-
-    const dayStaffOne = await createE2EUser(supabase, {
-      email: `${randomString('pub-day-one')}@example.com`,
-      password: `Staff!${Math.random().toString(16).slice(2, 10)}`,
-      fullName: `Publish Staff One ${randomString('staff')}`,
-      role: 'therapist',
-      employmentType: 'full_time',
-      shiftType: 'day',
-      isLeadEligible: false,
-    })
-    createdUserIds.push(dayStaffOne.id)
-
-    const dayStaffTwo = await createE2EUser(supabase, {
-      email: `${randomString('pub-day-two')}@example.com`,
-      password: `Staff!${Math.random().toString(16).slice(2, 10)}`,
-      fullName: `Publish Staff Two ${randomString('staff')}`,
-      role: 'therapist',
-      employmentType: 'full_time',
-      shiftType: 'day',
-      isLeadEligible: false,
-    })
-    createdUserIds.push(dayStaffTwo.id)
 
     const nightLead = await createE2EUser(supabase, {
       email: `${randomString('pub-night-lead')}@example.com`,
@@ -106,87 +94,45 @@ test.describe.serial('coverage publish flow', () => {
     })
     createdUserIds.push(nightLead.id)
 
-    const nightStaffOne = await createE2EUser(supabase, {
-      email: `${randomString('pub-night-one')}@example.com`,
-      password: `Staff!${Math.random().toString(16).slice(2, 10)}`,
-      fullName: `Publish Night One ${randomString('staff')}`,
-      role: 'therapist',
-      employmentType: 'full_time',
-      shiftType: 'night',
-      isLeadEligible: false,
-    })
-    createdUserIds.push(nightStaffOne.id)
-
-    const nightStaffTwo = await createE2EUser(supabase, {
-      email: `${randomString('pub-night-two')}@example.com`,
-      password: `Staff!${Math.random().toString(16).slice(2, 10)}`,
-      fullName: `Publish Night Two ${randomString('staff')}`,
-      role: 'therapist',
-      employmentType: 'full_time',
-      shiftType: 'night',
-      isLeadEligible: false,
-    })
-    createdUserIds.push(nightStaffTwo.id)
-
-    const shiftsInsert = await supabase.from('shifts').insert([
-      {
-        cycle_id: cycleInsert.data.id,
-        user_id: dayLead.id,
-        date: cycleDate,
-        shift_type: 'day',
-        status: 'scheduled',
-        assignment_status: 'scheduled',
-        role: 'lead',
-      },
-      {
-        cycle_id: cycleInsert.data.id,
-        user_id: dayStaffOne.id,
-        date: cycleDate,
-        shift_type: 'day',
-        status: 'scheduled',
-        assignment_status: 'scheduled',
-        role: 'staff',
-      },
-      {
-        cycle_id: cycleInsert.data.id,
-        user_id: dayStaffTwo.id,
-        date: cycleDate,
-        shift_type: 'day',
-        status: 'scheduled',
-        assignment_status: 'scheduled',
-        role: 'staff',
-      },
-      {
-        cycle_id: cycleInsert.data.id,
-        user_id: nightLead.id,
-        date: cycleDate,
-        shift_type: 'night',
-        status: 'scheduled',
-        assignment_status: 'scheduled',
-        role: 'lead',
-      },
-      {
-        cycle_id: cycleInsert.data.id,
-        user_id: nightStaffOne.id,
-        date: cycleDate,
-        shift_type: 'night',
-        status: 'scheduled',
-        assignment_status: 'scheduled',
-        role: 'staff',
-      },
-      {
-        cycle_id: cycleInsert.data.id,
-        user_id: nightStaffTwo.id,
-        date: cycleDate,
-        shift_type: 'night',
-        status: 'scheduled',
-        assignment_status: 'scheduled',
-        role: 'staff',
-      },
-    ])
+    const shiftsInsert = await supabase.from('shifts').insert(
+      Array.from({ length: 42 }, (_, index) => {
+        const date = formatDateKey(addDays(cycleStart, index))
+        return [
+          {
+            cycle_id: cycleInsert.data.id,
+            user_id: dayLead.id,
+            date,
+            shift_type: 'day',
+            status: 'scheduled',
+            assignment_status: 'scheduled',
+            role: 'lead',
+          },
+          {
+            cycle_id: cycleInsert.data.id,
+            user_id: nightLead.id,
+            date,
+            shift_type: 'night',
+            status: 'scheduled',
+            assignment_status: 'scheduled',
+            role: 'lead',
+          },
+        ]
+      }).flat()
+    )
 
     if (shiftsInsert.error) {
       throw new Error(shiftsInsert.error.message)
+    }
+
+    const preliminarySnapshot = await supabase.from('preliminary_snapshots').insert({
+      cycle_id: cycleInsert.data.id,
+      created_by: manager.id,
+      sent_at: new Date().toISOString(),
+      status: 'active',
+    })
+
+    if (preliminarySnapshot.error) {
+      throw new Error(preliminarySnapshot.error.message)
     }
 
     ctx = {
@@ -197,15 +143,22 @@ test.describe.serial('coverage publish flow', () => {
   })
 
   test.afterAll(async () => {
-    if (!ctx) return
-    await ctx.supabase.from('publish_events').delete().in('cycle_id', createdCycleIds)
-    await ctx.supabase.from('notification_outbox').delete().in('user_id', createdUserIds)
-    await ctx.supabase.from('notifications').delete().in('user_id', createdUserIds)
-    await ctx.supabase.from('shifts').delete().in('cycle_id', createdCycleIds)
-    await ctx.supabase.from('schedule_cycles').delete().in('id', createdCycleIds)
+    const supabase = ctx?.supabase ?? createServiceRoleClientOrNull()
+    if (!supabase) return
+
+    if (createdCycleIds.length > 0) {
+      await supabase.from('publish_events').delete().in('cycle_id', createdCycleIds)
+      await supabase.from('shifts').delete().in('cycle_id', createdCycleIds)
+      await supabase.from('schedule_cycles').delete().in('id', createdCycleIds)
+    }
+
+    if (createdUserIds.length > 0) {
+      await supabase.from('notification_outbox').delete().in('user_id', createdUserIds)
+      await supabase.from('notifications').delete().in('user_id', createdUserIds)
+    }
 
     for (const userId of createdUserIds) {
-      await ctx.supabase.auth.admin.deleteUser(userId).catch(() => undefined)
+      await supabase.auth.admin.deleteUser(userId).catch(() => undefined)
     }
   })
 
@@ -231,7 +184,6 @@ test.describe.serial('coverage publish flow', () => {
 
     await expect.poll(async () => requests.some((request) => request.method === 'POST')).toBe(true)
 
-    const overrideButton = page.getByRole('button', { name: 'Publish with weekly override' })
     const cyclePublished = async () => {
       const cycle = await ctx!.supabase
         .from('schedule_cycles')
@@ -247,8 +199,21 @@ test.describe.serial('coverage publish flow', () => {
       await expect(page.getByText(/Weekly workload rule failed/i).first()).toBeVisible({
         timeout: 30_000,
       })
-      await expect(overrideButton).toBeVisible({ timeout: 30_000 })
       await submitPublishForm(page, 'Publish with weekly override')
+    }
+
+    if (!(await cyclePublished())) {
+      await expect(page.getByText(/Publish blocked\. Coverage under:/i).first()).toBeVisible({
+        timeout: 30_000,
+      })
+      await submitPublishForm(page, 'Publish with shift override')
+    }
+
+    if (!(await cyclePublished())) {
+      await expect(page.getByText(/Missing availability for/i).first()).toBeVisible({
+        timeout: 30_000,
+      })
+      await submitPublishForm(page, 'Acknowledge and publish')
     }
 
     await expect

@@ -2,9 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import type { AvailabilityOverrideRow, Therapist } from '@/app/schedule/types'
 import {
+  buildScheduleUrl,
   getScheduleFeedback,
-  normalizeDefaultScheduleView,
-  normalizeViewMode,
   pickTherapistForDate,
   wouldExceedMaxConsecutiveDays,
 } from '@/lib/schedule-helpers'
@@ -45,15 +44,11 @@ function buildOverride(overrides?: Partial<AvailabilityOverrideRow>): Availabili
 }
 
 describe('schedule feedback messaging', () => {
-  it('accepts roster as a first-class schedule view', () => {
-    expect(normalizeViewMode('roster')).toBe('roster')
-  })
-
-  it('normalizes persisted default schedule view to week or roster', () => {
-    expect(normalizeDefaultScheduleView('roster')).toBe('roster')
-    expect(normalizeDefaultScheduleView('week')).toBe('week')
-    expect(normalizeDefaultScheduleView('calendar')).toBe('week')
-    expect(normalizeDefaultScheduleView(undefined)).toBe('week')
+  it('builds canonical schedule URLs without retired layout params', () => {
+    expect(buildScheduleUrl('cycle-1', 'roster', { error: 'missing' })).toBe(
+      '/schedule?cycle=cycle-1&error=missing'
+    )
+    expect(buildScheduleUrl(undefined, 'week')).toBe('/schedule')
   })
 
   it('summarizes publish blocking with lead and coverage issue counts', () => {
@@ -72,6 +67,24 @@ describe('schedule feedback messaging', () => {
     expect(feedback?.message).toContain('missing lead: 3')
     expect(feedback?.message).toContain('multiple leads: 1')
     expect(feedback?.message).toContain('ineligible lead: 1')
+  })
+
+  it('summarizes availability-derived publish blockers and warnings', () => {
+    const blocker = getScheduleFeedback({
+      error: 'publish_availability_rule_violation',
+      need_to_work_misses: '2',
+      need_off_overrides: '1',
+    })
+    const warning = getScheduleFeedback({
+      error: 'publish_missing_availability_warning',
+      missing_availability: '3',
+    })
+
+    expect(blocker?.variant).toBe('error')
+    expect(blocker?.message).toContain('Need to Work not assigned: 2')
+    expect(blocker?.message).toContain('Need Off overrides missing manager context: 1')
+    expect(warning?.variant).toBe('error')
+    expect(warning?.message).toContain('Missing availability for 3 active therapists')
   })
 
   it('includes constraint-driven unfilled counts after auto-generate', () => {
@@ -234,11 +247,25 @@ describe('pickTherapistForDate', () => {
     expect(pick.therapist).toBeNull()
   })
 
-  it('blocks PRN even when the recurring pattern offers the weekday', () => {
+  it('allows standing PRN when the recurring pattern offers the weekday', () => {
     const therapist = buildTherapist({
       employment_type: 'prn',
       works_dow: [1],
       works_dow_mode: 'hard',
+      pattern: {
+        therapist_id: 'therapist-1',
+        pattern_type: 'weekly_fixed',
+        works_dow: [1],
+        offs_dow: [],
+        weekend_rotation: 'none',
+        weekend_anchor_date: null,
+        works_dow_mode: 'hard',
+        weekly_weekdays: [1],
+        weekend_rule: 'none',
+        cycle_anchor_date: null,
+        cycle_segments: [],
+        shift_preference: 'either',
+      },
     })
 
     const pick = pickTherapistForDate(
@@ -253,7 +280,7 @@ describe('pickTherapistForDate', () => {
       new Map([['therapist-1', 3]])
     )
 
-    expect(pick.therapist).toBeNull()
+    expect(pick.therapist?.id).toBe('therapist-1')
   })
 
   it('prefers lower-pattern-penalty matches before cursor order when weekly counts are tied', () => {

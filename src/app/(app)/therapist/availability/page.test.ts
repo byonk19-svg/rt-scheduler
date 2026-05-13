@@ -70,4 +70,19 @@ describe('therapist availability route', () => {
     expect(source).toContain('findScheduledConflicts(entries, scheduledShifts)')
     expect(source).toContain('conflicts={conflicts}')
   })
+
+  it('passes a server-owned today key into the client workspace', () => {
+    const pagePath = resolve(process.cwd(), 'src/app/(app)/therapist/availability/page.tsx')
+    const workspacePath = resolve(
+      process.cwd(),
+      'src/components/availability/TherapistAvailabilityWorkspace.tsx'
+    )
+    const pageSource = readFileSync(pagePath, 'utf8')
+    const workspaceSource = readFileSync(workspacePath, 'utf8')
+
+    expect(pageSource).toContain('const todayKey = toIsoDate(today)')
+    expect(pageSource).toContain('todayKey={todayKey}')
+    expect(workspaceSource).toContain('todayKey: string')
+    expect(workspaceSource).not.toContain('const todayKey = toIsoDate(new Date())')
+  })
 })

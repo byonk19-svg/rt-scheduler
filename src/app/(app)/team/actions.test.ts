@@ -505,7 +505,7 @@ describe('replaceTherapistRosterAction', () => {
     expect(revalidatePathMock).toHaveBeenCalledWith('/dashboard/manager')
     expect(revalidatePathMock).toHaveBeenCalledWith('/availability')
     expect(revalidatePathMock).toHaveBeenCalledWith('/schedule')
-    expect(revalidatePathMock).toHaveBeenCalledWith('/coverage')
+    expect(revalidatePathMock).toHaveBeenCalledWith('/schedule')
   })
 
   it('does not delete stale rows or archive profiles when the staged roster write fails', async () => {

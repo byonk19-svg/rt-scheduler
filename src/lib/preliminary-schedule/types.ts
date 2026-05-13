@@ -9,6 +9,13 @@ export type PreliminaryShiftState =
 export type PreliminaryRequestType = 'claim_open_shift' | 'request_change'
 export type PreliminaryRequestStatus = 'pending' | 'approved' | 'denied' | 'cancelled'
 export type PreliminaryDirectEditAction = 'add_here' | 'remove_me' | 'express_interest'
+export type PreliminaryCellMarkType = 'mark_off' | 'add_work'
+export type PreliminaryCellMarkStatus =
+  | 'pending'
+  | 'approved'
+  | 'denied'
+  | 'dismissed'
+  | 'cancelled'
 
 export type PreliminarySnapshotRow = {
   id: string
@@ -81,6 +88,23 @@ export type PreliminaryTeamScheduleShift = {
   state: PreliminaryShiftState
   isCurrentUser: boolean
   pendingApproval: boolean
+}
+
+export type PreliminaryCellMarkView = {
+  id: string
+  groupId: string | null
+  requesterId: string
+  requesterName: string
+  markType: PreliminaryCellMarkType
+  status: PreliminaryCellMarkStatus
+  shiftId: string | null
+  shiftDate: string
+  shiftType: 'day' | 'night'
+  note: string | null
+  createdAt: string
+  isCurrentUser: boolean
+  canReview: boolean
+  canCancel: boolean
 }
 
 export type PreliminaryHistoryItem = {

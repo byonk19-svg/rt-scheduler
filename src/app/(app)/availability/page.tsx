@@ -6,17 +6,23 @@ import { Download } from 'lucide-react'
 
 import {
   copyAvailabilityFromPreviousCycleAction,
-  saveManagerAvailabilityRequestsAction,
   saveManagerPlannerDatesAction,
-} from '@/app/availability/actions'
+} from '@/app/(app)/availability/manager-planner-actions'
+import {
+  closeAvailabilityWindowAction,
+  reopenAvailabilityWindowAction,
+} from '@/app/(app)/availability/actions'
+import { saveManagerAvailabilityRequestsAction } from '@/app/(app)/availability/manager-request-actions'
 import { AvailabilityPlannerFocusProvider } from '@/components/availability/availability-planner-focus-context'
 import { FeedbackToast } from '@/components/feedback-toast'
 import { MoreActionsMenu } from '@/components/more-actions-menu'
 import { PrintMenuItem } from '@/components/print-menu-item'
 import { can } from '@/lib/auth/can'
+import { loadAvailabilityWindowState } from '@/lib/availability-window'
 import { buildMissingAvailabilityRows } from '@/lib/employee-directory'
 import { toUiRole } from '@/lib/auth/roles'
 import { formatHumanCycleRange } from '@/lib/calendar-utils'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
@@ -43,6 +49,9 @@ type Cycle = {
   published: boolean
   archived_at?: string | null
   availability_due_at?: string | null
+  availability_closed_at?: string | null
+  availability_reopened_at?: string | null
+  status?: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
 }
 
 type AvailabilityRow = {
@@ -55,6 +64,13 @@ type AvailabilityRow = {
   created_at: string
   updated_at?: string | null
   source?: 'therapist' | 'manager' | null
+  intent?:
+    | 'therapist_need_off'
+    | 'therapist_wants_work'
+    | 'manager_block'
+    | 'manager_force'
+    | 'email_intake'
+    | null
   therapist_id: string
   cycle_id: string
   profiles: { full_name: string } | { full_name: string }[] | null
@@ -80,6 +96,13 @@ type ManagerPlannerOverrideRow = {
   override_type: AvailabilityOverrideType
   note: string | null
   source: 'manager' | 'therapist'
+  intent?:
+    | 'therapist_need_off'
+    | 'therapist_wants_work'
+    | 'manager_block'
+    | 'manager_force'
+    | 'email_intake'
+    | null
 }
 
 type AvailabilityPageSearchParams = {
@@ -197,6 +220,21 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
     }
   }
 
+  if (success === 'availability_closed') {
+    return {
+      message: 'Availability locked for this Schedule Block.',
+      variant: 'success',
+    }
+  }
+
+  if (success === 'availability_reopened') {
+    return {
+      message:
+        'Availability reopened. Draft schedules will not update until a manager reviews changes.',
+      variant: 'success',
+    }
+  }
+
   if (success === 'copy_success') {
     const count = getSearchParam(params?.copied)
     return {
@@ -238,6 +276,13 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
   if (error === 'manager_request_delete_failed') {
     return {
       message: "Couldn't remove that therapist availability request. Try again.",
+      variant: 'error',
+    }
+  }
+
+  if (error === 'availability_window_failed') {
+    return {
+      message: "Couldn't update the availability window. Refresh and try again.",
       variant: 'error',
     }
   }
@@ -306,6 +351,7 @@ export default async function AvailabilityPage({
   searchParams?: Promise<AvailabilityPageSearchParams>
 }) {
   const supabase = await createClient()
+  const admin = createAdminClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -345,7 +391,9 @@ export default async function AvailabilityPage({
 
   const { data: cyclesData } = await supabase
     .from('schedule_cycles')
-    .select('id, label, start_date, end_date, published, archived_at, availability_due_at')
+    .select(
+      'id, label, start_date, end_date, published, status, archived_at, availability_due_at, availability_closed_at, availability_reopened_at'
+    )
     .is('archived_at', null)
     .gte('end_date', todayKey)
     .order('start_date', { ascending: true })
@@ -359,11 +407,14 @@ export default async function AvailabilityPage({
     cycles[0] ??
     null
   const selectedCycleId = selectedCycle?.id ?? ''
+  const availabilityWindow = selectedCycleId
+    ? await loadAvailabilityWindowState(admin as never, selectedCycleId)
+    : { locked: true, reason: null }
 
   const entriesResult = await supabase
     .from('availability_overrides')
     .select(
-      'id, date, shift_type, override_type, note, created_by, created_at, updated_at, source, therapist_id, cycle_id, profiles!availability_overrides_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
+      'id, date, shift_type, override_type, note, created_by, created_at, updated_at, source, intent, therapist_id, cycle_id, profiles!availability_overrides_therapist_id_fkey(full_name), schedule_cycles(label, start_date, end_date)'
     )
     .order('date', { ascending: true })
     .order('created_at', { ascending: false })
@@ -383,7 +434,9 @@ export default async function AvailabilityPage({
     cycles.length > 0
       ? await supabase
           .from('availability_overrides')
-          .select('id, therapist_id, cycle_id, date, shift_type, override_type, note, source')
+          .select(
+            'id, therapist_id, cycle_id, date, shift_type, override_type, note, source, intent'
+          )
           .eq('source', 'manager')
           .in(
             'cycle_id',
@@ -427,6 +480,15 @@ export default async function AvailabilityPage({
       created_at: entry.created_at,
       updated_at: entry.updated_at ?? entry.created_at,
       source: entry.source === 'manager' ? 'manager' : 'therapist',
+      intent:
+        entry.intent ??
+        (entry.source === 'manager'
+          ? entry.override_type === 'force_off'
+            ? 'manager_block'
+            : 'manager_force'
+          : entry.override_type === 'force_off'
+            ? 'therapist_need_off'
+            : 'therapist_wants_work'),
     })),
     selectedCycleId,
     { officialSubmissionTherapistIds }
@@ -456,6 +518,7 @@ export default async function AvailabilityPage({
       entryType: entry.override_type,
       shiftType: entry.shift_type,
       source: (entry.source === 'manager' ? 'manager' : 'therapist') as 'manager' | 'therapist',
+      intent: entry.intent ?? null,
       canDelete: entry.therapist_id === user.id,
     }
   })
@@ -514,6 +577,33 @@ export default async function AvailabilityPage({
               >
                 Email intake{intakeNeedsReviewCount > 0 ? ` (${intakeNeedsReviewCount})` : ''}
               </Link>
+              {selectedCycleId ? (
+                availabilityWindow.locked ? (
+                  <form action={reopenAvailabilityWindowAction} className="px-3 py-2">
+                    <input type="hidden" name="cycle_id" value={selectedCycleId} />
+                    <p className="mb-2 text-xs leading-5 text-muted-foreground">
+                      Reopens therapist edits. Existing draft schedule work stays unchanged until
+                      reviewed.
+                    </p>
+                    <button
+                      type="submit"
+                      className="flex h-10 w-full items-center rounded-sm text-left text-sm font-medium hover:bg-secondary"
+                    >
+                      Reopen availability
+                    </button>
+                  </form>
+                ) : (
+                  <form action={closeAvailabilityWindowAction} className="px-3 py-2">
+                    <input type="hidden" name="cycle_id" value={selectedCycleId} />
+                    <button
+                      type="submit"
+                      className="flex h-10 w-full items-center rounded-sm text-left text-sm font-medium hover:bg-secondary"
+                    >
+                      Lock availability
+                    </button>
+                  </form>
+                )
+              ) : null}
               <PrintMenuItem />
             </MoreActionsMenu>
           }

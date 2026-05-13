@@ -1,54 +1,59 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
-import { loadScheduleRosterPageData } from '@/app/(app)/schedule/schedule-roster-live-data'
-import { ScheduleRosterScreen } from '@/components/schedule-roster/ScheduleRosterScreen'
-import { Button } from '@/components/ui/button'
+import { ManagerWorkspaceHeader } from '@/components/manager/ManagerWorkspaceHeader'
+import { ScheduleGrid } from '@/components/schedule-grid/ScheduleGrid'
+import { generateDraftScheduleAction } from '@/app/(app)/schedule/actions/draft-actions'
+import { toggleCyclePublishedAction } from '@/app/(app)/schedule/actions/publish-actions'
+
+import { loadScheduleGridData } from './schedule-grid-data'
 
 export const metadata: Metadata = {
-  title: 'Roster View',
-  description:
-    'Review the table and print view of the Team Schedule for the active Schedule Block.',
+  title: 'Schedule',
+  description: 'Review and manage the unified respiratory therapy schedule grid.',
 }
+
+export const dynamic = 'force-dynamic'
 
 type SchedulePageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>
 }
 
-export default async function SchedulePage(props: SchedulePageProps) {
-  const searchParams = (await props.searchParams) ?? {}
-  const pageData = await loadScheduleRosterPageData(searchParams)
+export default async function SchedulePage({ searchParams }: SchedulePageProps) {
+  const params = (await searchParams) ?? {}
+  const result = await loadScheduleGridData(params)
 
-  if (pageData.status === 'unauthenticated') {
+  if (result.status === 'unauthenticated') {
     redirect('/login')
   }
 
-  if (pageData.status === 'forbidden') {
+  if (result.status === 'forbidden') {
     redirect('/dashboard/staff')
   }
 
-  if (pageData.status === 'no_cycle') {
+  if (result.status === 'no_cycle') {
     return (
-      <div className="mx-auto flex w-full max-w-[960px] flex-col px-2 py-2 sm:px-3 lg:px-5">
-        <section className="rounded-[26px] border border-border/70 bg-card px-6 py-8 shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
-          <h1 className="font-heading text-[1.75rem] font-semibold tracking-[-0.04em] text-foreground sm:text-[1.9rem]">
-            Roster View
-          </h1>
-          <p className="mt-3 text-base font-medium text-foreground">No active Schedule Block yet</p>
-          <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            Create or reopen a Schedule Block in Coverage, then return here for the Team Schedule
-            roster view.
-          </p>
-          <div className="mt-5">
-            <Button asChild>
-              <Link href="/coverage">Open Coverage</Link>
-            </Button>
-          </div>
-        </section>
+      <div className="mx-auto max-w-7xl px-4 py-12 text-center md:px-6">
+        <p className="text-sm font-medium text-muted-foreground">
+          No active schedule cycle is available yet.
+        </p>
       </div>
     )
   }
 
-  return <ScheduleRosterScreen live={pageData.data} />
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-6 md:px-6">
+      <ManagerWorkspaceHeader
+        title="Schedule"
+        subtitle="One grid for draft staffing, live status, and team visibility."
+      />
+      <ScheduleGrid
+        initialDataset={result.dataset}
+        initialShiftTab={result.initialShiftTab}
+        autoDraftAction={result.dataset.canManageCoverage ? generateDraftScheduleAction : undefined}
+        publishAction={result.dataset.canManageCoverage ? toggleCyclePublishedAction : undefined}
+        preFlightSummary={result.preFlightSummary}
+      />
+    </div>
+  )
 }

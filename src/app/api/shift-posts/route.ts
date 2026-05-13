@@ -3,6 +3,13 @@ import { NextResponse } from 'next/server'
 import { can } from '@/lib/auth/can'
 import { parseRole } from '@/lib/auth/roles'
 import { isTrustedMutationRequest } from '@/lib/security/request-origin'
+import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
+import { writeAuditLog } from '@/lib/audit-log'
+import {
+  isShiftPostCommand,
+  shiftPostCommandRequiresManager,
+} from '@/lib/shift-post-transition-model'
+import { buildShiftPostReviewRpcCall } from '@/lib/shift-board/review-classifier'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -71,6 +78,13 @@ type ShiftSelectionRow = {
   cycle_id: string | null
   date: string | null
   shift_type: 'day' | 'night' | null
+}
+
+type ShiftPostReviewRow = {
+  id: string
+  status: string
+  shift_id: string | null
+  swap_shift_id: string | null
 }
 
 function asTrimmedString(value: unknown): string {
@@ -163,18 +177,45 @@ async function resolveSameCycleSwapShiftId(params: {
     .neq('date', shift.date)
     .eq('shift_type', shift.shift_type)
     .eq('status', 'scheduled')
-    .eq('assignment_status', 'scheduled')
     .eq('schedule_cycles.published', true)
     .order('date', { ascending: true })
     .order('id', { ascending: true })
-    .limit(1)
-    .maybeSingle()
+    .limit(10)
 
   if (partnerShiftError || !partnerShift) {
     return null
   }
 
-  return (partnerShift as { id: string }).id
+  const partnerRows = Array.isArray(partnerShift)
+    ? (partnerShift as Array<{ id: string }>)
+    : [partnerShift as { id: string }]
+  const activeOperationalCodes = await fetchActiveOperationalCodeMap(
+    admin,
+    partnerRows.map((row) => row.id)
+  )
+
+  return partnerRows.find((row) => !activeOperationalCodes.has(row.id))?.id ?? null
+}
+
+async function writeShiftPostApprovalPostPublishAuditLogs(params: {
+  admin: ReturnType<typeof createAdminClient>
+  actorId: string
+  post: ShiftPostReviewRow
+}): Promise<void> {
+  if (params.post.status !== 'approved') return
+
+  const targetShiftIds = [
+    ...new Set([params.post.shift_id, params.post.swap_shift_id].filter(Boolean)),
+  ]
+
+  for (const shiftId of targetShiftIds) {
+    await writeAuditLog(params.admin as never, {
+      userId: params.actorId,
+      action: 'post_publish_modification',
+      targetType: 'shift',
+      targetId: shiftId as string,
+    })
+  }
 }
 
 export async function POST(request: Request) {
@@ -192,10 +233,10 @@ export async function POST(request: Request) {
   }
 
   const payload = (await request.json().catch(() => null)) as ShiftPostMutationBody | null
-  const action = payload?.action
-  if (!action) {
+  if (!payload || !isShiftPostCommand(payload.action)) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
   }
+  const action = payload.action
 
   const admin = createAdminClient()
 
@@ -352,14 +393,16 @@ export async function POST(request: Request) {
       })
     }
 
-    const actorProfile = await getActorProfile(user.id)
-    if (
-      !can(parseRole(actorProfile?.role), 'review_shift_posts', {
-        isActive: actorProfile?.is_active !== false,
-        archivedAt: actorProfile?.archived_at ?? null,
-      })
-    ) {
-      return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    if (shiftPostCommandRequiresManager(action)) {
+      const actorProfile = await getActorProfile(user.id)
+      if (
+        !can(parseRole(actorProfile?.role), 'review_shift_posts', {
+          isActive: actorProfile?.is_active !== false,
+          archivedAt: actorProfile?.archived_at ?? null,
+        })
+      ) {
+        return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+      }
     }
 
     if (action === 'review_request') {
@@ -375,18 +418,27 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
       }
 
-      const { data, error } = await admin.rpc('app_review_shift_post', {
-        p_actor_id: user.id,
-        p_post_id: requestId,
-        p_decision: decision,
-        p_selected_interest_id: selectedInterestId || null,
-        p_swap_partner_id: swapPartnerId || null,
-        p_manager_override: override,
-        p_override_reason: overrideReason,
+      const review = buildShiftPostReviewRpcCall({
+        actorId: user.id,
+        requestId,
+        decision,
+        selectedInterestId,
+        swapPartnerId,
+        override,
+        overrideReason,
       })
+      const { data, error } = await admin.rpc(review.rpcName, review.rpcParams)
 
       if (error) {
         return toErrorResponse(error.message)
+      }
+
+      if (decision === 'approve' && data) {
+        await writeShiftPostApprovalPostPublishAuditLogs({
+          admin,
+          actorId: user.id,
+          post: data as ShiftPostReviewRow,
+        })
       }
 
       return NextResponse.json({ success: true, post: data })

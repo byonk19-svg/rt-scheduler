@@ -333,8 +333,13 @@ async function shouldLogPostPublishModificationForSlot(
   supabase: Awaited<ReturnType<typeof createClient>>,
   cycleId: string,
   date: string,
-  shiftType: 'day' | 'night'
+  shiftType: 'day' | 'night',
+  cyclePublished: boolean
 ): Promise<boolean> {
+  if (cyclePublished) {
+    return true
+  }
+
   if (date < toIsoDate(new Date())) {
     return true
   }
@@ -474,12 +479,18 @@ export async function POST(request: Request) {
 
   const { data: cycle, error: cycleError } = await supabase
     .from('schedule_cycles')
-    .select('id, start_date, end_date, published')
+    .select('id, start_date, end_date, published, status, archived_at')
     .eq('id', payload.cycleId)
     .maybeSingle()
 
   if (cycleError || !cycle) {
     return NextResponse.json({ error: 'Schedule cycle not found' }, { status: 404 })
+  }
+  if (cycle.status === 'offline' || cycle.status === 'archived' || cycle.archived_at) {
+    return NextResponse.json(
+      { error: 'This Schedule Block is read-only until it is republished.' },
+      { status: 409 }
+    )
   }
 
   const { data: activePreliminarySnapshot } = await supabase
@@ -596,6 +607,7 @@ export async function POST(request: Request) {
       .from('shifts')
       .insert({
         cycle_id: payload.cycleId,
+        site_id: managerSiteId,
         user_id: payload.userId,
         date: payload.date,
         shift_type: payload.shiftType,
@@ -634,7 +646,8 @@ export async function POST(request: Request) {
       supabase,
       payload.cycleId,
       payload.date,
-      payload.shiftType
+      payload.shiftType,
+      Boolean(cycle.published)
     )
 
     if (shouldLogPostPublishModification && insertedShift?.id) {
@@ -871,13 +884,15 @@ export async function POST(request: Request) {
       supabase,
       payload.cycleId,
       shift.date,
-      shift.shift_type as 'day' | 'night'
+      shift.shift_type as 'day' | 'night',
+      Boolean(cycle.published)
     )
     const targetNeedsAudit = await shouldLogPostPublishModificationForSlot(
       supabase,
       payload.cycleId,
       payload.targetDate,
-      payload.targetShiftType
+      payload.targetShiftType,
+      Boolean(cycle.published)
     )
 
     if (sourceNeedsAudit || targetNeedsAudit) {
@@ -970,7 +985,8 @@ export async function POST(request: Request) {
       supabase,
       payload.cycleId,
       shift.date,
-      shift.shift_type
+      shift.shift_type,
+      Boolean(cycle.published)
     )
 
     if (shouldLogPostPublishModification) {
@@ -1204,7 +1220,8 @@ export async function POST(request: Request) {
       supabase,
       payload.cycleId,
       payload.date,
-      payload.shiftType
+      payload.shiftType,
+      Boolean(cycle.published)
     )
 
     if (shouldLogPostPublishModification) {

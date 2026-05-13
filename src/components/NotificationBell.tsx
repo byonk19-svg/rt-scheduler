@@ -55,8 +55,8 @@ export function resolveNotificationHref(
     return isManager ? '/requests' : '/therapist/swaps'
   }
   if (item.target_type === 'shift_post') return isManager ? '/requests' : '/therapist/swaps'
-  if (item.target_type === 'shift') return isManager ? '/coverage' : '/therapist/schedule'
-  if (item.target_type === 'schedule_cycle') return isManager ? '/schedule' : '/therapist/schedule'
+  if (item.target_type === 'shift') return '/schedule'
+  if (item.target_type === 'schedule_cycle') return '/schedule'
   if (item.event_type.includes('request')) return isManager ? '/requests' : '/therapist/swaps'
   return null
 }

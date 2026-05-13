@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import {
   approvePreliminaryRequest,
   cancelPreliminaryRequest,
-  applyDirectPreliminaryEdit,
   denyPreliminaryRequest,
   refreshPreliminarySnapshot,
   sendPreliminarySnapshot,
@@ -379,56 +378,6 @@ describe('submitPreliminaryChangeRequest', () => {
     })
 
     expect(result.error?.code).toBe('not_shift_owner')
-  })
-})
-
-describe('applyDirectPreliminaryEdit', () => {
-  it('lets a therapist remove themselves from their own tentative assignment immediately', async () => {
-    const supabase = createSupabaseMock({
-      preliminaryShiftStates: [
-        makeShiftState({ shift_id: 'shift-1', state: 'tentative_assignment' }),
-      ],
-      shifts: [makeShift({ id: 'shift-1', user_id: 'therapist-1' })],
-      profiles: [{ id: 'therapist-1', role: 'therapist', shift_type: 'day' }],
-    })
-
-    const result = await applyDirectPreliminaryEdit(supabase as never, {
-      snapshotId: 'snapshot-1',
-      shiftId: 'shift-1',
-      requesterId: 'therapist-1',
-      action: 'remove_me',
-    })
-
-    expect(result.error).toBeNull()
-    expect(supabase.state.shifts[0]).toMatchObject({ user_id: null })
-    expect(supabase.state.preliminaryShiftStates[0]).toMatchObject({
-      state: 'open',
-      reserved_by: null,
-      active_request_id: null,
-    })
-  })
-
-  it('lets a therapist add themselves to an open same-shift slot immediately', async () => {
-    const supabase = createSupabaseMock({
-      preliminaryShiftStates: [makeShiftState({ shift_id: 'shift-open', state: 'open' })],
-      shifts: [makeShift({ id: 'shift-open', user_id: null, full_name: null })],
-      profiles: [{ id: 'therapist-2', role: 'therapist', shift_type: 'day' }],
-    })
-
-    const result = await applyDirectPreliminaryEdit(supabase as never, {
-      snapshotId: 'snapshot-1',
-      shiftId: 'shift-open',
-      requesterId: 'therapist-2',
-      action: 'add_here',
-    })
-
-    expect(result.error).toBeNull()
-    expect(supabase.state.shifts[0]).toMatchObject({ user_id: 'therapist-2' })
-    expect(supabase.state.preliminaryShiftStates[0]).toMatchObject({
-      state: 'tentative_assignment',
-      reserved_by: 'therapist-2',
-      active_request_id: null,
-    })
   })
 })
 

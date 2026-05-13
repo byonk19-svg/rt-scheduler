@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { applyLotteryDecision, loadLotteryActor } from '@/lib/lottery/service'
 import { isTrustedMutationRequest } from '@/lib/security/request-origin'
+import { writeAuditLog } from '@/lib/audit-log'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -11,6 +12,44 @@ type ApplyLotteryPayload = {
   keepToWork?: number
   contextSignature?: string
   actions?: Array<{ therapistId: string; status: 'cancelled' | 'on_call' }>
+}
+
+type AppliedLotteryShiftRow = {
+  id: string
+}
+
+async function writeLotteryPostPublishAuditLogs(params: {
+  admin: ReturnType<typeof createAdminClient>
+  actorId: string
+  siteId: string
+  shiftDate: string
+  shiftType: 'day' | 'night'
+  therapistIds: string[]
+}): Promise<void> {
+  const therapistIds = [...new Set(params.therapistIds.filter(Boolean))]
+  if (therapistIds.length === 0) return
+
+  const { data, error } = await params.admin
+    .from('shifts')
+    .select('id')
+    .eq('site_id', params.siteId)
+    .eq('date', params.shiftDate)
+    .eq('shift_type', params.shiftType)
+    .in('user_id', therapistIds)
+
+  if (error) {
+    console.error('Failed to load Lottery-modified shifts for audit:', error.message)
+    return
+  }
+
+  for (const shift of (data ?? []) as AppliedLotteryShiftRow[]) {
+    await writeAuditLog(params.admin as never, {
+      userId: params.actorId,
+      action: 'post_publish_modification',
+      targetType: 'shift',
+      targetId: shift.id,
+    })
+  }
 }
 
 export async function POST(request: Request) {
@@ -49,6 +88,10 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient()
+  const sanitizedActions = actions.map((action) => ({
+    therapistId: String(action.therapistId ?? '').trim(),
+    status: action.status,
+  }))
   const result = await applyLotteryDecision({
     actor,
     authClient: {
@@ -58,15 +101,21 @@ export async function POST(request: Request) {
     shiftType: payload?.shiftType === 'night' ? 'night' : 'day',
     keepToWork,
     contextSignature,
-    actions: actions.map((action) => ({
-      therapistId: String(action.therapistId ?? '').trim(),
-      status: action.status,
-    })),
+    actions: sanitizedActions,
   })
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 })
   }
+
+  await writeLotteryPostPublishAuditLogs({
+    admin,
+    actorId: user.id,
+    siteId: actor.siteId,
+    shiftDate,
+    shiftType: payload?.shiftType === 'night' ? 'night' : 'day',
+    therapistIds: sanitizedActions.map((action) => action.therapistId),
+  })
 
   return NextResponse.json({ ok: true })
 }

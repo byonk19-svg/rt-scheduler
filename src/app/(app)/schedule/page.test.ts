@@ -1,197 +1,119 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
+import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createAssignmentKey } from '@/lib/mock-coverage-roster'
-
-const { redirectMock, replaceMock, loadScheduleRosterPageDataMock } = vi.hoisted(() => ({
+const { redirectMock, loadScheduleGridDataMock } = vi.hoisted(() => ({
   redirectMock: vi.fn((url: string) => {
     throw new Error(`REDIRECT:${url}`)
   }),
-  replaceMock: vi.fn(),
-  loadScheduleRosterPageDataMock: vi.fn(),
+  loadScheduleGridDataMock: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
   redirect: redirectMock,
-  useRouter: () => ({
-    replace: replaceMock,
-  }),
 }))
 
-vi.mock('@/app/(app)/schedule/schedule-roster-live-data', () => ({
-  loadScheduleRosterPageData: loadScheduleRosterPageDataMock,
+vi.mock('@/app/(app)/schedule/schedule-grid-data', () => ({
+  loadScheduleGridData: loadScheduleGridDataMock,
+}))
+
+vi.mock('@/app/(app)/schedule/actions/draft-actions', () => ({
+  generateDraftScheduleAction: vi.fn(),
+}))
+
+vi.mock('@/app/(app)/schedule/actions/publish-actions', () => ({
+  toggleCyclePublishedAction: vi.fn(),
+}))
+
+vi.mock('@/components/schedule-grid/ScheduleGrid', () => ({
+  ScheduleGrid: ({
+    initialDataset,
+    initialShiftTab,
+  }: {
+    initialDataset: { cycleDateRangeLabel: string }
+    initialShiftTab: 'Day' | 'Night'
+  }) =>
+    createElement(
+      'section',
+      null,
+      createElement('h2', null, 'Mock Schedule Grid'),
+      createElement('p', null, initialDataset.cycleDateRangeLabel),
+      createElement('p', null, initialShiftTab)
+    ),
 }))
 
 import SchedulePage from '@/app/(app)/schedule/page'
+
+function okDataset() {
+  return {
+    cycleId: 'cycle-2',
+    availableCycles: [{ id: 'cycle-2', label: 'May 3 - Jun 13, 2026' }],
+    cycleDates: ['2026-05-03', '2026-05-04'],
+    cycleDateRangeLabel: 'May 3 - Jun 13, 2026',
+    isPublished: false,
+    therapistRows: [],
+    dailyTotals: {},
+    viewerUserId: 'manager-1',
+    viewerRole: 'manager' as const,
+    canManageCoverage: true,
+    canUpdateAssignmentStatus: true,
+  }
+}
 
 describe('schedule route', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('loads the selected cycle and renders the live roster screen for managers', async () => {
-    loadScheduleRosterPageDataMock.mockResolvedValue({
+  it('loads the unified schedule grid data and renders ScheduleGrid', async () => {
+    loadScheduleGridDataMock.mockResolvedValue({
       status: 'ok',
-      data: {
-        cycleId: 'cycle-2',
-        label: 'Cycle Beta',
-        startDate: '2026-05-03',
-        endDate: '2026-05-09',
-        shortLabel: 'May 3 - May 9, 2026',
-        isPublished: false,
-        defaultShiftType: 'day',
-        availableCycles: [
-          { id: 'cycle-1', label: 'Cycle Alpha' },
-          { id: 'cycle-2', label: 'Cycle Beta' },
-        ],
-        staff: [
-          {
-            id: 'day-core',
-            name: 'Day Core',
-            roleLabel: 'Therapist',
-            rosterKind: 'core',
-            shiftType: 'day',
-          },
-          {
-            id: 'day-prn',
-            name: 'Day PRN',
-            roleLabel: 'Therapist',
-            rosterKind: 'prn',
-            shiftType: 'day',
-          },
-          {
-            id: 'night-core',
-            name: 'Night Core',
-            roleLabel: 'Therapist',
-            rosterKind: 'core',
-            shiftType: 'night',
-          },
-        ],
-        assignments: {
-          [createAssignmentKey('day-core', '2026-05-03', 'day')]: {
-            id: 'shift-1',
-            staffId: 'day-core',
-            isoDate: '2026-05-03',
-            shiftType: 'day',
-            status: 'assigned',
-            assignmentStatus: null,
-          },
-          [createAssignmentKey('day-prn', '2026-05-04', 'day')]: {
-            id: 'shift-2',
-            staffId: 'day-prn',
-            isoDate: '2026-05-04',
-            shiftType: 'day',
-            status: 'assigned',
-            assignmentStatus: 'on_call',
-          },
-        },
-        availabilityApprovals: {
-          [createAssignmentKey('day-core', '2026-05-04', 'day')]: 'approved_off',
-          [createAssignmentKey('day-prn', '2026-05-03', 'day')]: 'approved_work',
-        },
-      },
+      dataset: okDataset(),
+      initialShiftTab: 'Day',
+      preFlightSummary: null,
     })
 
     const html = renderToStaticMarkup(
       await SchedulePage({ searchParams: Promise.resolve({ cycle: 'cycle-2' }) })
     )
 
-    expect(loadScheduleRosterPageDataMock).toHaveBeenCalledWith({ cycle: 'cycle-2' })
-    expect(html).toContain('Roster View - Day Shift')
-    expect(html).toContain('Cycle Beta')
-    expect(html).toContain('May 3 - May 9, 2026')
-    expect(html).toContain('Day Core')
-    expect(html).toContain('Day PRN')
-    expect(html).not.toContain('Night Core')
-    expect(html).toContain('OFF')
-    expect(html).toContain('OC')
-    expect(html).toContain('Cycle Alpha')
-  })
-
-  it('opens the roster on the actor default shift when supplied by the live payload', async () => {
-    loadScheduleRosterPageDataMock.mockResolvedValue({
-      status: 'ok',
-      data: {
-        cycleId: 'cycle-2',
-        label: 'Cycle Beta',
-        startDate: '2026-05-03',
-        endDate: '2026-05-09',
-        shortLabel: 'May 3 - May 9, 2026',
-        isPublished: true,
-        defaultShiftType: 'night',
-        availableCycles: [{ id: 'cycle-2', label: 'Cycle Beta' }],
-        staff: [
-          {
-            id: 'day-core',
-            name: 'Day Core',
-            roleLabel: 'Therapist',
-            rosterKind: 'core',
-            shiftType: 'day',
-          },
-          {
-            id: 'night-core',
-            name: 'Night Core',
-            roleLabel: 'Therapist',
-            rosterKind: 'core',
-            shiftType: 'night',
-          },
-        ],
-        assignments: {
-          [createAssignmentKey('night-core', '2026-05-03', 'night')]: {
-            id: 'shift-3',
-            staffId: 'night-core',
-            isoDate: '2026-05-03',
-            shiftType: 'night',
-            status: 'assigned',
-            assignmentStatus: null,
-          },
-        },
-        availabilityApprovals: {},
-      },
-    })
-
-    const html = renderToStaticMarkup(
-      await SchedulePage({ searchParams: Promise.resolve({ cycle: 'cycle-2' }) })
-    )
-
-    expect(html).toContain('Roster View - Night Shift')
-    expect(html).toContain('Night Core')
-    expect(html).not.toContain('Day Core')
+    expect(loadScheduleGridDataMock).toHaveBeenCalledWith({ cycle: 'cycle-2' })
+    expect(html).toContain('Schedule')
+    expect(html).toContain('Mock Schedule Grid')
+    expect(html).toContain('May 3 - Jun 13, 2026')
   })
 
   it('redirects unauthenticated users to login', async () => {
-    loadScheduleRosterPageDataMock.mockResolvedValue({ status: 'unauthenticated' })
+    loadScheduleGridDataMock.mockResolvedValue({ status: 'unauthenticated' })
 
     await expect(SchedulePage({ searchParams: Promise.resolve({}) })).rejects.toThrow(
       'REDIRECT:/login'
     )
   })
 
-  it('redirects non-manager users to the staff dashboard', async () => {
-    loadScheduleRosterPageDataMock.mockResolvedValue({ status: 'forbidden' })
+  it('redirects forbidden users to the staff dashboard', async () => {
+    loadScheduleGridDataMock.mockResolvedValue({ status: 'forbidden' })
 
     await expect(SchedulePage({ searchParams: Promise.resolve({}) })).rejects.toThrow(
       'REDIRECT:/dashboard/staff'
     )
   })
 
-  it('renders a setup message when there is no active cycle yet', async () => {
-    loadScheduleRosterPageDataMock.mockResolvedValue({ status: 'no_cycle' })
+  it('renders an empty state when there is no cycle visible to the user', async () => {
+    loadScheduleGridDataMock.mockResolvedValue({ status: 'no_cycle' })
 
     const html = renderToStaticMarkup(await SchedulePage({ searchParams: Promise.resolve({}) }))
 
-    expect(html).toContain('No active Schedule Block yet')
-    expect(html).toContain('Create or reopen a Schedule Block in Coverage')
-    expect(html).toContain('Open Coverage')
+    expect(html).toContain('No active schedule cycle is available yet.')
   })
 
-  it('sets route-specific roster-view metadata', async () => {
+  it('sets unified schedule metadata', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/app/(app)/schedule/page.tsx'), 'utf8')
 
-    expect(source).toContain("title: 'Roster View'")
-    expect(source).toContain('Team Schedule for the active Schedule Block')
+    expect(source).toContain("title: 'Schedule'")
+    expect(source).toContain('unified respiratory therapy schedule grid')
   })
 })

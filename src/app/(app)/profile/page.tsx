@@ -21,7 +21,6 @@ import {
   parsePreferredWorkDaysSelection,
   resolvePreferredWorkDaysMode,
 } from '@/lib/preferred-work-days'
-import { normalizeDefaultScheduleView } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/server'
 import { cn } from '@/lib/utils'
 
@@ -125,12 +124,10 @@ async function savePreferencesAction(formData: FormData) {
   }
 
   const defaultCalendarView = String(formData.get('default_calendar_view') ?? '').trim()
-  const defaultScheduleView = String(formData.get('default_schedule_view') ?? '').trim()
   const defaultLandingPage = String(formData.get('default_landing_page') ?? '').trim()
 
   if (
     (defaultCalendarView !== 'day' && defaultCalendarView !== 'night') ||
-    (defaultScheduleView !== 'week' && defaultScheduleView !== 'roster') ||
     (defaultLandingPage !== 'dashboard' && defaultLandingPage !== 'coverage')
   ) {
     redirect('/profile?error=preferences_failed')
@@ -140,7 +137,7 @@ async function savePreferencesAction(formData: FormData) {
     .from('profiles')
     .update({
       default_calendar_view: defaultCalendarView,
-      default_schedule_view: defaultScheduleView,
+      default_schedule_view: 'week',
       default_landing_page: defaultLandingPage,
     })
     .eq('id', user.id)
@@ -153,7 +150,6 @@ async function savePreferencesAction(formData: FormData) {
   revalidatePath('/profile')
   revalidatePath('/dashboard')
   revalidatePath('/schedule')
-  revalidatePath('/coverage')
   redirect('/profile?success=preferences_saved')
 }
 
@@ -177,7 +173,7 @@ export default async function ProfilePage({
   const { data: profile } = await supabase
     .from('profiles')
     .select(
-      'full_name, email, role, shift_type, is_lead_eligible, employment_type, max_work_days_per_week, preferred_work_days, preferred_work_days_mode, default_calendar_view, default_schedule_view, default_landing_page'
+      'full_name, email, role, shift_type, is_lead_eligible, employment_type, max_work_days_per_week, preferred_work_days, preferred_work_days_mode, default_calendar_view, default_landing_page'
     )
     .eq('id', user.id)
     .maybeSingle()
@@ -213,10 +209,6 @@ export default async function ProfilePage({
         ? preferredDayLabels.join(', ')
         : 'Not set'
   const defaultCalendarView = profile?.default_calendar_view === 'night' ? 'night' : 'day'
-  const defaultScheduleView = normalizeDefaultScheduleView(
-    (profile as { default_schedule_view?: string | null } | null)?.default_schedule_view ??
-      undefined
-  )
   const defaultLandingPage = profile?.default_landing_page === 'coverage' ? 'coverage' : 'dashboard'
 
   return (
@@ -312,7 +304,7 @@ export default async function ProfilePage({
           </CardHeader>
           <CardContent>
             <form action={savePreferencesAction} className="space-y-5">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1">
                   <label
                     htmlFor="default_calendar_view"
@@ -332,23 +324,6 @@ export default async function ProfilePage({
                 </div>
                 <div className="space-y-1">
                   <label
-                    htmlFor="default_schedule_view"
-                    className="text-sm font-medium text-foreground"
-                  >
-                    Default schedule layout
-                  </label>
-                  <select
-                    id="default_schedule_view"
-                    name="default_schedule_view"
-                    defaultValue={defaultScheduleView}
-                    className="h-9 w-full rounded-md border border-border bg-[var(--input-background)] px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  >
-                    <option value="week">Grid</option>
-                    <option value="roster">Roster</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label
                     htmlFor="default_landing_page"
                     className="text-sm font-medium text-foreground"
                   >
@@ -361,7 +336,7 @@ export default async function ProfilePage({
                     className="h-9 w-full rounded-md border border-border bg-[var(--input-background)] px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                   >
                     <option value="dashboard">Dashboard</option>
-                    <option value="coverage">Coverage</option>
+                    <option value="coverage">Schedule</option>
                   </select>
                 </div>
               </div>

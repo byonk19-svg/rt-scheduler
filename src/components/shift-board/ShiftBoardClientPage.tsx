@@ -487,18 +487,18 @@ export default function ShiftBoardClientPage({
     (shiftDate: string | null) => {
       if (canReview) {
         if (shiftDate) {
-          router.push(`/coverage?date=${shiftDate}`)
+          router.push(`/schedule?date=${shiftDate}`)
           return
         }
-        router.push('/coverage')
+        router.push('/schedule')
         return
       }
 
       if (shiftDate) {
-        router.push(`/therapist/schedule?date=${shiftDate}`)
+        router.push(`/schedule?date=${shiftDate}`)
         return
       }
-      router.push('/therapist/schedule')
+      router.push('/schedule')
     },
     [canReview, router]
   )
@@ -551,7 +551,7 @@ export default function ShiftBoardClientPage({
             )}
             {canReview && (
               <Button asChild size="sm" variant="outline" className="text-xs">
-                <Link href="/coverage">Open schedule</Link>
+                <Link href="/schedule">Open schedule</Link>
               </Button>
             )}
           </div>

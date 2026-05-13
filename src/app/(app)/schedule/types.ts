@@ -102,6 +102,10 @@ export type ScheduleSearchParams = {
   lead_missing?: string
   lead_ineligible?: string
   lead_multiple?: string
+  need_to_work_misses?: string
+  need_off_overrides?: string
+  missing_availability?: string
+  acknowledge_missing_availability?: string
   affected?: string
   set_lead_error?: string
   filter?: string

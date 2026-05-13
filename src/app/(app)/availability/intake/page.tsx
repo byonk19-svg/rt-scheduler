@@ -8,7 +8,7 @@ import {
   reparseEmailIntakeAction,
   updateEmailIntakeItemRequestAction,
   updateEmailIntakeTherapistAction,
-} from '@/app/availability/actions'
+} from '@/app/(app)/availability/email-intake-actions'
 import {
   EmailIntakePanel,
   type EmailIntakePanelRow,
@@ -78,7 +78,7 @@ type AvailabilityEmailIntakeItemRow = {
   intake_id: string
   source_type: 'body' | 'attachment'
   source_label: string
-  parse_status: 'parsed' | 'auto_applied' | 'needs_review' | 'failed'
+  parse_status: 'parsed' | 'ready_to_apply' | 'applied' | 'auto_applied' | 'needs_review' | 'failed'
   confidence_level: 'high' | 'medium' | 'low'
   confidence_reasons: string[] | null
   extracted_employee_name: string | null
@@ -306,7 +306,7 @@ export default async function AvailabilityIntakePage({
       needsReviewCount: row.needs_review_count,
       failedCount: row.failed_count,
       reviewItems: childItems
-        .filter((item) => item.parse_status !== 'auto_applied')
+        .filter((item) => item.parse_status !== 'applied' && item.parse_status !== 'auto_applied')
         .map((item) => {
           const matchedTherapist = getOne(item.profiles)
           const matchedCycle = getOne(item.schedule_cycles)
@@ -332,7 +332,7 @@ export default async function AvailabilityIntakePage({
           }
         }),
       autoAppliedItems: childItems
-        .filter((item) => item.parse_status === 'auto_applied')
+        .filter((item) => item.parse_status === 'applied' || item.parse_status === 'auto_applied')
         .map((item) => {
           const matchedTherapist = getOne(item.profiles)
           const matchedCycle = getOne(item.schedule_cycles)

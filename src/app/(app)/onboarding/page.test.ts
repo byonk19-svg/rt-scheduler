@@ -141,7 +141,7 @@ describe('onboarding route copy', () => {
     expect(actionSource).toContain("formData.getAll('offs_dow')")
     expect(actionSource).toContain('offs_dow: neverWorkDays')
     expect(actionSource).toContain('safePreferredWorkDays')
-    expect(source).toContain('View my schedule')
+    expect(source).toContain('View schedule')
     expect(source).toContain('completeScheduleSetupOnboardingAction')
   })
 
@@ -156,7 +156,7 @@ describe('onboarding route copy', () => {
 
     expect(html).toContain('You&#x27;re all set')
     expect(html).toContain('Your schedule is ready. You can adjust anything anytime.')
-    expect(html).toContain('View my schedule')
+    expect(html).toContain('View schedule')
     expect(html).not.toContain('Open settings')
   })
 })

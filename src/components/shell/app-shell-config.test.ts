@@ -64,24 +64,20 @@ describe('app-shell-config', () => {
     )
   })
 
-  it('separates the editable schedule workspace from the read-only roster view', () => {
+  it('collapses Coverage and Roster View into one manager Schedule tab', () => {
     const sections = buildManagerSections(0)
     const scheduleSection = sections.find((section) => section.key === 'schedule')
 
-    expect(scheduleSection?.href).toBe('/coverage')
+    expect(scheduleSection?.href).toBe('/schedule')
     expect(scheduleSection?.subItems.map((item) => item.label)).toEqual([
-      'Coverage',
-      'Roster View',
+      'Schedule',
       'Analytics',
       'Availability',
       'Lottery',
       'Publish',
       'Approvals',
     ])
-    expect(scheduleSection?.subItems.find((item) => item.label === 'Coverage')?.href).toBe(
-      '/coverage'
-    )
-    expect(scheduleSection?.subItems.find((item) => item.label === 'Roster View')?.href).toBe(
+    expect(scheduleSection?.subItems.find((item) => item.label === 'Schedule')?.href).toBe(
       '/schedule'
     )
   })
@@ -96,8 +92,7 @@ describe('app-shell-config', () => {
     expect(context.primaryKey).toBe('schedule')
     expect(usesAppShell('/lottery')).toBe(true)
     expect(context.localNav?.items.map((item) => item.label)).toEqual([
-      'Coverage',
-      'Roster View',
+      'Schedule',
       'Analytics',
       'Availability',
       'Lottery',
@@ -145,25 +140,26 @@ describe('app-shell-config', () => {
 
     expect(items.map((item) => item.label)).toEqual([
       'Dashboard',
-      'Coverage',
+      'Schedule',
       'Availability',
       'Shift Board',
     ])
     expect(items.map((item) => item.href)).toEqual([
       '/dashboard/manager',
-      '/coverage',
+      '/schedule',
       '/availability',
       '/shift-board',
     ])
   })
 
   it('returns manager workflow context for schedule routes', () => {
-    expect(getWorkflowContext({ pathname: '/coverage', canAccessManagerUi: true })).toEqual({
-      workflow: 'Coverage',
-      context: 'Schedule Block workbench',
-      state: 'Draft, review, publish',
+    expect(getWorkflowContext({ pathname: '/schedule', canAccessManagerUi: true })).toEqual({
+      workflow: 'Schedule',
+      context: 'Unified grid workspace',
+      state: 'Draft or published',
       permission: 'Manager editable',
     })
+    expect(getWorkflowContext({ pathname: '/coverage', canAccessManagerUi: true })).toBeNull()
     expect(getWorkflowContext({ pathname: '/settings', canAccessManagerUi: true })).toBeNull()
   })
 })
@@ -173,24 +169,25 @@ describe('staff nav items', () => {
     const items = getStaffNavItems()
     expect(items.map((item) => item.label)).toEqual([
       'Dashboard',
-      'My Shifts',
+      'Schedule',
       'Availability',
-      'Team Schedule',
       'Shift Board',
       'History',
     ])
   })
 
-  it('"My Shifts" routes to /therapist/schedule', () => {
+  it('"Schedule" routes to /schedule', () => {
     const items = getStaffNavItems()
-    const myShifts = items.find((item) => item.label === 'My Shifts')
-    expect(myShifts?.href).toBe('/therapist/schedule')
+    const schedule = items.find((item) => item.label === 'Schedule')
+    expect(schedule?.href).toBe('/schedule')
   })
 
-  it('"My Shifts" is also active for the /staff/my-schedule compat URL', () => {
+  it('"Schedule" is active for legacy personal and team schedule URLs', () => {
     const items = getStaffNavItems()
-    const myShifts = items.find((item) => item.label === 'My Shifts')
-    expect(myShifts?.active('/staff/my-schedule')).toBe(true)
+    const schedule = items.find((item) => item.label === 'Schedule')
+    expect(schedule?.active('/staff/my-schedule')).toBe(true)
+    expect(schedule?.active('/therapist/schedule')).toBe(true)
+    expect(schedule?.active('/coverage')).toBe(true)
   })
 
   it('"Shift Board" routes to /shift-board and remains active for the legacy therapist swaps URL', () => {
@@ -199,12 +196,6 @@ describe('staff nav items', () => {
     expect(shiftBoard?.href).toBe('/shift-board')
     expect(shiftBoard?.active('/shift-board')).toBe(true)
     expect(shiftBoard?.active('/therapist/swaps')).toBe(true)
-  })
-
-  it('"Team Schedule" links to /coverage (the shared schedule workspace)', () => {
-    const items = getStaffNavItems()
-    const teamSchedule = items.find((item) => item.label === 'Team Schedule')
-    expect(teamSchedule?.href).toBe('/coverage')
   })
 
   it('staff shell context has no local nav', () => {
@@ -216,14 +207,14 @@ describe('staff nav items', () => {
     expect(context.localNav).toBeNull()
   })
 
-  it('"My Shifts" item is active on /therapist/schedule', () => {
+  it('"Schedule" item is active on /therapist/schedule', () => {
     const context = getShellContext({
       pathname: '/therapist/schedule',
       canAccessManagerUi: false,
       pendingCount: 0,
     })
-    const myShifts = context.primaryItems.find((item) => item.label === 'My Shifts')
-    expect(myShifts?.active('/therapist/schedule')).toBe(true)
+    const schedule = context.primaryItems.find((item) => item.label === 'Schedule')
+    expect(schedule?.active('/therapist/schedule')).toBe(true)
   })
 
   it('uses explicit staff mobile workflow destinations', () => {
@@ -231,21 +222,59 @@ describe('staff nav items', () => {
 
     expect(items.map((item) => item.label)).toEqual([
       'Dashboard',
-      'My Shifts',
+      'Schedule',
       'Availability',
       'Shift Board',
     ])
   })
 
-  it('returns staff workflow context for personal schedule routes', () => {
+  it('uses lead mobile workflow destinations without manager-only tools', () => {
+    const items = getMobilePrimaryItems({
+      canAccessManagerUi: false,
+      canAccessLeadTools: true,
+      pendingCount: 0,
+    })
+
+    expect(items.map((item) => item.label)).toEqual(['Dashboard', 'Schedule', 'Shift Board'])
+    expect(items.map((item) => item.href)).toEqual([
+      '/dashboard/staff',
+      '/schedule',
+      '/shift-board',
+    ])
+  })
+
+  it('returns staff workflow context for schedule routes', () => {
     expect(
       getWorkflowContext({ pathname: '/therapist/schedule', canAccessManagerUi: false })
     ).toEqual({
-      workflow: 'My Shifts',
-      context: 'Your Schedule Block',
-      state: 'Scheduled days and coworkers',
-      permission: 'Personal view',
+      workflow: 'Schedule',
+      context: 'Your row and team grid',
+      state: 'Day, night, or both shifts',
+      permission: 'Read-only for staff',
     })
     expect(getWorkflowContext({ pathname: '/profile', canAccessManagerUi: false })).toBeNull()
+  })
+
+  it('returns lead workflow context for operational schedule tools', () => {
+    expect(
+      getWorkflowContext({
+        pathname: '/coverage',
+        canAccessManagerUi: false,
+        canAccessLeadTools: true,
+      })
+    ).toEqual({
+      workflow: 'Schedule',
+      context: 'Team schedule grid',
+      state: 'Working, on call, call-in, cancelled',
+      permission: 'Lead status updates',
+    })
+
+    expect(
+      getWorkflowContext({
+        pathname: '/shift-board',
+        canAccessManagerUi: false,
+        canAccessLeadTools: true,
+      })?.permission
+    ).toBe('Lead visibility; manager approval')
   })
 })

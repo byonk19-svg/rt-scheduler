@@ -39,6 +39,13 @@ export function toLegacyShiftStatusFromOperationalCode(
   return fallback
 }
 
+export function isWorkingScheduledShift(params: {
+  status: ShiftStatus | string | null | undefined
+  activeOperationalCode?: OperationalCode | null
+}): boolean {
+  return params.status === 'scheduled' && !params.activeOperationalCode
+}
+
 export async function fetchActiveOperationalCodeMap(
   supabase: unknown,
   shiftIds: string[]

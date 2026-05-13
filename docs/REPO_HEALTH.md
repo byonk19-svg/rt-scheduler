@@ -1,39 +1,38 @@
-# Repository Health Snapshot (April 11, 2026)
+# Repository Health Snapshot (May 13, 2026)
 
 ## Current Shape
 
 - Single-package Next.js App Router app with TypeScript.
 - Supabase-backed auth/data model with manager, lead, therapist, and pending-access flows.
-- Core manager surfaces: coverage, availability, team, approvals, publish, shift board.
-- Core therapist surfaces: shared schedule on `/coverage`, therapist availability grid, swaps.
+- Core manager surfaces: unified Schedule grid, availability, team, approvals, publish, shift board.
+- Core therapist surfaces: read-only shared schedule on `/schedule`, therapist availability grid, swaps.
 
 ## Architecture Highlights
 
 - Planning data in `shifts` is intentionally separate from live operational state in `shift_operational_entries`.
 - Scheduling mutation APIs enforce both role checks and trusted-request origin checks.
-- Coverage mutations live under `src/app/api/schedule/*` with shared logic in `src/lib/coverage/*`.
+- Schedule mutations live under `src/app/api/schedule/*` with shared legacy coverage-domain logic in `src/lib/coverage/*`.
 - Therapist availability submission state is explicit in `therapist_availability_submissions`, not inferred from override rows alone.
 - Publish history (`/publish`) remains distinct from schedule-cycle state.
-- Coverage post-publish audit logging is now derived server-side from slot state instead of client request flags.
+- Schedule post-publish audit logging is derived server-side from slot state instead of client request flags.
 
 ## Quality Status
 
-Last verified on branch `main`:
+Last verified on branch `codex/verify-ui-visibility`:
 
 - `npm run lint` passed
-- `npx tsc --noEmit` passed
+- `npm run typecheck` passed
 - `npm run build` passed
-- targeted Vitest lanes passed:
-  - `src/app/availability/actions.test.ts`
-  - `src/app/api/schedule/drag-drop/route.test.ts`
-  - `src/lib/coverage/mutations.test.ts`
+- `npm run test:unit` passed (`1103` tests across `209` files)
+- `npx playwright test e2e/manager-schedule-roster.spec.ts --project=chromium --workers=1` passed (`4` tests)
+- `npx playwright test e2e/therapist-schedule-trust-smoke.spec.ts --project=chromium --workers=1` passed (`8` tests)
 - `npm run test:e2e` previously passed (`42` passed) with the checked-in Playwright worker count set to `2`
-- `npm audit --omit=dev` passed with `0` vulnerabilities after the lockfile bump to `next@16.2.3`
+- `npm audit --omit=dev` previously passed with `0` vulnerabilities after the lockfile bump; current local build reports `next@16.2.4`
 
 ## Known Exceptions / Gaps
 
 - `e2e/directory-date-override.spec.ts` remains intentionally removed because `/directory` is now a redirect to the team-management surface.
-- Authenticated manager browser verification for the latest coverage mutation changes was not rerun end-to-end in this session; the trust-boundary behavior is covered by route/unit tests plus unauthenticated browser smoke.
+- Unified Schedule grid has focused authenticated browser coverage in `e2e/manager-schedule-roster.spec.ts` for manager redirects, draft assign/unassign, lead designation, published status updates, and therapist read-only pinned rows.
 
 ## Risk Notes
 
@@ -44,6 +43,6 @@ Last verified on branch `main`:
 
 ## Suggested Next Maintenance Steps
 
-1. Run an authenticated manager Playwright smoke around coverage assign/unassign and status-change flows.
+1. Run an authenticated manager Playwright smoke around Schedule assign/unassign and status-change flows.
 2. Keep route ownership and workflow docs aligned as manager surfaces evolve.
 3. Preserve dependency hygiene on the Next.js patch line; rerun `npm audit --omit=dev` after lockfile updates.

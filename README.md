@@ -5,9 +5,9 @@ Web app for respiratory therapy scheduling with role-based workflows:
 - Auth + role-aware dashboard with pending-access approval plus required first-run staff onboarding
 - Availability requests
 - 6-week schedule cycle management
-- **Canonical staff schedule:** [`/coverage`](<./src/app/(app)/coverage/page.tsx>) supports both `Grid` and `Roster` layouts; server entry is `page.tsx`, initial snapshot loading lives in [`coverage-page-data.ts`](<./src/app/(app)/coverage/coverage-page-data.ts>), and interactive client logic lives in [`CoverageClientPage.tsx`](<./src/app/(app)/coverage/CoverageClientPage.tsx>). The therapist compatibility route (`/therapist/schedule`) still redirects there and preserves explicit `view` params
-- **Mobile coverage:** on small screens, `/coverage` now shows one week at a time with previous/next controls and swipe navigation; print still renders the full desktop grid
-- **Roster matrix (read-only):** [`/schedule`](<./src/app/(app)/schedule/page.tsx>) — managers and leads only; shows the active cycle’s coverage assignments and officially submitted therapist availability, and the Day/Night toggle now filters therapists by their configured `profiles.shift_type` so opposite-shift staff do not appear in the wrong roster (login required; not a public mock)
+- **Canonical staff schedule:** [`/schedule`](<./src/app/(app)/schedule/page.tsx>) is the single live schedule surface. Managers edit the row-by-date grid inline; leads can update published assignment status; therapists see the same grid read-only with their own row pinned at the top.
+- **Schedule compatibility:** [`/coverage`](<./src/app/(app)/coverage/page.tsx>), `/staff/schedule`, `/staff/my-schedule`, and `/therapist/schedule` redirect to `/schedule` while preserving query context for old bookmarks and action redirects.
+- **Unified grid:** [`src/components/schedule-grid`](./src/components/schedule-grid) renders cycle selection, Draft/Published state, Day/Night switching, totals, needs-off markers, assign/status popovers, and print entrypoints.
 - **Therapist availability:** 6-week grid on `/therapist/availability` — **Available** (default: neutral day, no forced on/off), **Unavailable**, **Must work** (hard autodraft `force_on`). When a therapist marks **Need Off** on a date that already has an active-cycle scheduled shift, the page shows a warning banner but still allows saving; see [`CLAUDE.md`](./CLAUDE.md)
 - Shift board (swap/pickup posts with manager approval)
 
@@ -26,13 +26,13 @@ Current architecture and quality snapshot: [`docs/REPO_HEALTH.md`](docs/REPO_HEA
 
 ## Cycle Workflow
 
-- [`/schedule`](<./src/app/(app)/schedule/page.tsx>) is a read-only roster view tied to the live cycle (assignments + submitted availability); its Day/Night toggle now filters therapists by `profiles.shift_type`, and staffing changes are still made in Coverage.
+- [`/schedule`](<./src/app/(app)/schedule/page.tsx>) is the live schedule grid for all roles. It uses [`schedule-grid-data.ts`](<./src/app/(app)/schedule/schedule-grid-data.ts>) to load cycles, shifts, force-off markers, operational status, pre-flight data, and role permissions.
 
-- **Schedule** (nav label; route [`/coverage`](<./src/app/(app)/coverage/page.tsx>), rendered via [`CoverageClientPage.tsx`](<./src/app/(app)/coverage/CoverageClientPage.tsx>)) — create **New 6-week block**, staff the schedule in either **Grid** or **Roster** view, auto-draft, preliminary, **Publish**. Same cycle-selection rule everywhere: URL cycle if valid, else active window, else next upcoming, else none (empty state, not a fake grid).
+- **Schedule** (nav label; route [`/schedule`](<./src/app/(app)/schedule/page.tsx>), rendered via [`ScheduleGrid`](./src/components/schedule-grid/ScheduleGrid.tsx)) - create and staff 6-week blocks, auto-draft, pre-flight, inline assign/unassign, designate lead, update published assignment status, print, and publish. Same cycle-selection rule everywhere: URL cycle if valid, else draft, else published, else none (empty state, not a fake grid).
 - Auto-draft now opens a pre-flight report first, summarizing likely unfilled slots, missing leads, and forced must-work misses using the real current shift set for that cycle.
-- Managers can edit staffing from either schedule layout by clicking a day cell. Leads can update assignment status (`OC`, `LE`, `CX`, `CI`) from staffed cells in either layout.
-- Users can save a default schedule layout preference (`Grid` or `Roster`) in [`/profile`](<./src/app/(app)/profile/page.tsx>); the therapist compatibility route still defers default layout selection to `/coverage` so that saved preference wins unless an explicit `view` query is present.
-- `/coverage` now also supports cycle templates:
+- Managers edit staffing by clicking grid cells. Leads can update published assignment status (`OC`, `LE`, `CX`, `CI`) from staffed cells.
+- `/coverage` is now a compatibility redirect to `/schedule`; the old block-board and roster-layout toggle have been removed.
+- Schedule cycle templates:
   - **Save as template** from a published cycle
   - **Start from template** for draft cycles
   - templates serialize staffing only; availability settings are intentionally not included
@@ -66,9 +66,9 @@ Local tooling noise (Playwright MCP dumps, generated `artifacts/`) is gitignored
 
 - `shifts` stores planned assignments for cycle/date/role.
 - Real-time operational status (for example `on_call`, `call_in`, `cancelled`, `left_early`) is stored in `shift_operational_entries`.
-- Coverage/headcount metrics use "working scheduled" semantics: planned assignments minus active operational entries.
+- Schedule/headcount metrics use "working scheduled" semantics: planned assignments minus active operational entries.
 - Assignment status updates are written through `update_assignment_status` RPC and audited.
-- Lead-only schedule behavior is role-driven in product logic: `role = 'lead'` is the source of truth across Team, Coverage, print/export, and swap-partner filtering.
+- Lead-only schedule behavior is role-driven in product logic: `role = 'lead'` is the source of truth across Team, Schedule, print/export, and swap-partner filtering.
 
 ## Mutation Guardrails
 
@@ -278,8 +278,9 @@ Recommended lane:
 
 Focused workflow suites:
 
-- `e2e/coverage-publish-flow.spec.ts` - direct Coverage publish and override flow
-- `e2e/coverage-cycle-controls.spec.ts` - cycle create/delete plus auto-draft / clear-draft controls
+- `e2e/manager-schedule-roster.spec.ts` - unified Schedule grid render/edit/status smoke
+- `e2e/coverage-publish-flow.spec.ts` - publish validation and override flow through the schedule APIs
+- `e2e/coverage-cycle-controls.spec.ts` - legacy coverage-route compatibility around cycle controls
 - `e2e/manager-specialized-controls.spec.ts` - swap partner approval and draft-cycle archive lifecycle
 - `e2e/publish-history-lifecycle.spec.ts` - publish details, delete history, and start-over lifecycle
 

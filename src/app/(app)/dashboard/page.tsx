@@ -69,9 +69,9 @@ export default async function DashboardPage({
 
   if (preferredLanding === 'coverage') {
     if (isManager) {
-      redirect(`/coverage?view=week${suffix ? `&${suffix.slice(1)}` : ''}`)
+      redirect(`/schedule${suffix ? `?${suffix.slice(1)}` : ''}`)
     }
-    redirect(`/staff/schedule${suffix}`)
+    redirect(`/schedule${suffix}`)
   }
 
   redirect(`${isManager ? '/dashboard/manager' : '/dashboard/staff'}${suffix}`)

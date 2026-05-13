@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { PreliminaryScheduleView } from '@/components/preliminary/PreliminaryScheduleView'
 import type {
+  PreliminaryCellMarkView,
   PreliminaryHistoryItem,
   PreliminaryShiftCard,
   PreliminaryTeamScheduleShift,
@@ -61,14 +62,38 @@ function makeTeamShift(
   }
 }
 
+function makeCellMark(overrides: Partial<PreliminaryCellMarkView> = {}): PreliminaryCellMarkView {
+  return {
+    id: 'mark-1',
+    groupId: null,
+    requesterId: 'therapist-1',
+    requesterName: 'Barbara C.',
+    markType: 'mark_off',
+    status: 'pending',
+    shiftId: 'assigned-shift',
+    shiftDate: '2026-03-22',
+    shiftType: 'day',
+    note: 'Schedule changed',
+    createdAt: '2026-03-19T10:00:00.000Z',
+    isCurrentUser: true,
+    canReview: false,
+    canCancel: true,
+    ...overrides,
+  }
+}
+
 describe('PreliminaryScheduleView', () => {
   it('renders tentative assignments, open slots, pending claims, and request history', () => {
     const html = renderToStaticMarkup(
       createElement(PreliminaryScheduleView, {
         snapshotId: 'snapshot-1',
         cycleLabel: 'April schedule',
+        cycleStartDate: '2026-03-22',
+        cycleEndDate: '2026-05-02',
         snapshotSentAt: '2026-03-19T10:00:00.000Z',
         currentUserId: 'therapist-1',
+        currentUserRole: 'therapist',
+        currentUserShiftType: 'day',
         cards: [
           makeCard({
             shiftId: 'assigned-shift',
@@ -109,8 +134,13 @@ describe('PreliminaryScheduleView', () => {
             note: 'Can cover this PRN shift',
           }),
         ],
+        cellMarks: [makeCellMark()],
         teamShifts: [
-          makeTeamShift({ shiftId: 'team-1', assignedName: 'Barbara C.', isCurrentUser: true }),
+          makeTeamShift({
+            shiftId: 'assigned-shift',
+            assignedName: 'Barbara C.',
+            isCurrentUser: true,
+          }),
           makeTeamShift({
             shiftId: 'team-2',
             shiftDate: '2026-03-23',
@@ -128,7 +158,9 @@ describe('PreliminaryScheduleView', () => {
         ],
         claimAction: async () => {},
         requestChangeAction: async () => {},
-        directEditAction: async () => {},
+        createCellMarkAction: async () => {},
+        cancelCellMarkAction: async () => {},
+        reviewCellMarkAction: async () => {},
         cancelAction: async () => {},
       })
     )
@@ -147,9 +179,59 @@ describe('PreliminaryScheduleView', () => {
     expect(html).toContain('Alex P.')
     expect(html).toContain('Pending manager approval.')
     expect(html).toContain('Tentative Assignment')
+    expect(html).toContain('Pencil mark: Marked out scheduled day by Barbara C.')
+    expect(html).toContain('Write a 1 on another day')
+    expect(html).toContain('Pending pencil marks')
+    expect(html).toContain('Marked out scheduled day')
+    expect(html).toContain('Remove')
     expect(html).toContain('Request history')
     expect(html).toContain('Expressed opposite-shift interest')
     expect(html).toContain('Can cover this PRN shift')
+  })
+
+  it('renders manager review controls for pending pencil marks', () => {
+    const html = renderToStaticMarkup(
+      createElement(PreliminaryScheduleView, {
+        snapshotId: 'snapshot-1',
+        cycleLabel: 'April schedule',
+        cycleStartDate: '2026-03-22',
+        cycleEndDate: '2026-05-02',
+        snapshotSentAt: '2026-03-19T10:00:00.000Z',
+        currentUserId: 'manager-1',
+        currentUserRole: 'manager',
+        currentUserShiftType: null,
+        cards: [],
+        historyItems: [],
+        cellMarks: [
+          makeCellMark({
+            id: 'mark-2',
+            markType: 'add_work',
+            shiftId: null,
+            shiftDate: '2026-03-24',
+            requesterName: 'Kim S.',
+            isCurrentUser: false,
+            canReview: true,
+            canCancel: false,
+          }),
+        ],
+        teamShifts: [],
+        claimAction: async () => {},
+        requestChangeAction: async () => {},
+        createCellMarkAction: async () => {},
+        cancelCellMarkAction: async () => {},
+        reviewCellMarkAction: async () => {},
+        cancelAction: async () => {},
+      })
+    )
+
+    expect(html).toContain('Pending pencil marks')
+    expect(html).toContain('No draft row yet')
+    expect(html).toContain('Pencil mark: Wants to work this day by Kim S.')
+    expect(html).toContain('Wants to work this day')
+    expect(html).toContain('Approve')
+    expect(html).toContain('Deny')
+    expect(html).toContain('Dismiss')
+    expect(html).not.toContain('Write a 1 on another day')
   })
 
   it('uses the calmer empty-state wording for live preliminary previews', () => {
@@ -157,14 +239,21 @@ describe('PreliminaryScheduleView', () => {
       createElement(PreliminaryScheduleView, {
         snapshotId: 'snapshot-1',
         cycleLabel: 'April schedule',
+        cycleStartDate: '2026-03-22',
+        cycleEndDate: '2026-05-02',
         snapshotSentAt: '2026-03-19T10:00:00.000Z',
         currentUserId: 'therapist-1',
+        currentUserRole: 'therapist',
+        currentUserShiftType: 'day',
         cards: [],
         historyItems: [],
+        cellMarks: [],
         teamShifts: [],
         claimAction: async () => {},
         requestChangeAction: async () => {},
-        directEditAction: async () => {},
+        createCellMarkAction: async () => {},
+        cancelCellMarkAction: async () => {},
+        reviewCellMarkAction: async () => {},
         cancelAction: async () => {},
       })
     )

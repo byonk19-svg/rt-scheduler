@@ -11,7 +11,7 @@ export type EmailIntakePanelItemRow = {
   id: string
   sourceType: 'body' | 'attachment'
   sourceLabel: string
-  parseStatus: 'parsed' | 'auto_applied' | 'needs_review' | 'failed'
+  parseStatus: 'parsed' | 'ready_to_apply' | 'applied' | 'auto_applied' | 'needs_review' | 'failed'
   confidenceLevel: 'high' | 'medium' | 'low'
   confidenceReasons: string[]
   extractedEmployeeName: string | null
@@ -65,7 +65,7 @@ function formatStatusVariant(
   status: EmailIntakePanelRow['batchStatus'] | EmailIntakePanelItemRow['parseStatus']
 ): 'outline' | 'secondary' | 'destructive' | 'default' {
   if (status === 'applied' || status === 'auto_applied') return 'secondary'
-  if (status === 'parsed') return 'default'
+  if (status === 'parsed' || status === 'ready_to_apply') return 'default'
   if (status === 'failed') return 'destructive'
   return 'outline'
 }
@@ -132,10 +132,10 @@ function EmailIntakeApplyDatesButton({
     formData: FormData
   ) => void | Promise<void> | Promise<{ ok: true; cycleId: string; therapistId: string }>
 }) {
-  const router = useRouter()
+  const { refresh, replace } = useRouter()
   const [pending, startTransition] = useTransition()
 
-  function handleClick() {
+  function applyMatchedDates() {
     if (!item.matchedCycleId || !item.matchedTherapistId) return
     startTransition(async () => {
       const fd = new FormData()
@@ -149,16 +149,20 @@ function EmailIntakeApplyDatesButton({
         'cycleId' in result &&
         'therapistId' in result
       ) {
-        router.replace(
-          buildPostApplyAvailabilityHref(String(result.cycleId), String(result.therapistId))
-        )
-        router.refresh()
+        replace(buildPostApplyAvailabilityHref(String(result.cycleId), String(result.therapistId)))
+        refresh()
       }
     })
   }
 
   return (
-    <Button type="button" size="sm" disabled={pending} aria-busy={pending} onClick={handleClick}>
+    <Button
+      type="button"
+      size="sm"
+      disabled={pending}
+      aria-busy={pending}
+      onClick={applyMatchedDates}
+    >
       Apply dates
     </Button>
   )
@@ -175,7 +179,7 @@ function EmailIntakeRequestChipRow({
     formData: FormData
   ) => void | Promise<void> | Promise<{ ok: true }>
 }) {
-  const router = useRouter()
+  const { refresh } = useRouter()
   const [pending, startTransition] = useTransition()
 
   function runAction(buildFormData: () => FormData) {
@@ -183,7 +187,7 @@ function EmailIntakeRequestChipRow({
       const fd = buildFormData()
       const result = await updateEmailIntakeItemRequestAction(fd)
       if (result && typeof result === 'object' && 'ok' in result && result.ok) {
-        router.refresh()
+        refresh()
       }
     })
   }
@@ -253,8 +257,14 @@ function EmailIntakeRequestChipRow({
 }
 
 function getItemNextStep(item: EmailIntakePanelItemRow): string {
+  if (item.parseStatus === 'applied') {
+    return 'Applied to availability.'
+  }
   if (item.parseStatus === 'auto_applied') {
-    return 'Already auto-applied to availability.'
+    return 'Applied automatically to availability.'
+  }
+  if (item.parseStatus === 'ready_to_apply') {
+    return 'Ready to apply to availability.'
   }
   if (!item.matchedTherapistId || !item.matchedCycleId) {
     return 'Match the therapist and schedule block before applying this item.'
@@ -304,7 +314,11 @@ function renderItemCard(params: {
           <p className="text-xs text-muted-foreground">{getItemNextStep(item)}</p>
         </div>
 
-        {item.matchedTherapistId && item.matchedCycleId && item.parsedRequests.length > 0 ? (
+        {item.parseStatus !== 'applied' &&
+        item.parseStatus !== 'auto_applied' &&
+        item.matchedTherapistId &&
+        item.matchedCycleId &&
+        item.parsedRequests.length > 0 ? (
           <EmailIntakeApplyDatesButton
             item={item}
             applyEmailAvailabilityImportAction={applyEmailAvailabilityImportAction}
@@ -353,7 +367,9 @@ function renderItemCard(params: {
         </div>
       ) : null}
 
-      {(!item.matchedTherapistId || !item.matchedCycleId) && item.parseStatus !== 'auto_applied' ? (
+      {(!item.matchedTherapistId || !item.matchedCycleId) &&
+      item.parseStatus !== 'applied' &&
+      item.parseStatus !== 'auto_applied' ? (
         <div className="mt-3 border-l-2 border-warning pl-3">
           <p className="mb-2 text-xs font-medium text-warning-text">Action needed</p>
           <form action={updateEmailIntakeTherapistAction} className="flex flex-wrap gap-3">
@@ -456,8 +472,8 @@ export function EmailIntakePanel({
       <div className="border-b border-border/70 pb-4">
         <h2 className="app-section-title">Email Intake</h2>
         <p className="text-sm text-muted-foreground">
-          Forward staff request emails or forms into your intake inbox. Clear items can be
-          auto-applied while unclear items stay in the review queue.
+          Forward staff request emails or forms into your intake inbox. Clear items are applied only
+          after the override write succeeds; unclear items stay in the review queue.
         </p>
         {rows.length > 0 ? (
           <div>
@@ -530,7 +546,7 @@ export function EmailIntakePanel({
                         className: statChipClass('default', row.itemCount),
                       },
                       {
-                        label: `${row.autoAppliedCount} auto-applied`,
+                        label: `${row.autoAppliedCount} applied`,
                         className: statChipClass('applied', row.autoAppliedCount),
                       },
                       {
@@ -645,7 +661,7 @@ export function EmailIntakePanel({
               {row.autoAppliedItems.length > 0 ? (
                 <details className="mt-4 rounded-lg border border-border/70 bg-muted/10 p-3">
                   <summary className="cursor-pointer text-sm font-semibold text-foreground">
-                    {row.autoAppliedItems.length} auto-applied - show
+                    {row.autoAppliedItems.length} applied - show
                   </summary>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {row.autoAppliedItems.map((item) => (

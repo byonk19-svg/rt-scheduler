@@ -72,7 +72,7 @@ async function reviewPreliminaryRequestAction(formData: FormData, mode: 'approve
 
   revalidatePath('/approvals')
   revalidatePath('/preliminary')
-  revalidatePath('/coverage')
+  revalidatePath('/schedule')
   revalidatePath('/dashboard/manager')
 
   redirect(

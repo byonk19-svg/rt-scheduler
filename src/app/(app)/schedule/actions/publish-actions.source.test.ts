@@ -12,4 +12,14 @@ describe('publish actions immediate email processing', () => {
     expect(source).toContain('const admin = createAdminClient()')
     expect(source).toContain('await processQueuedPublishEmails(admin, {')
   })
+
+  it('validates availability blockers before final publish', () => {
+    const filePath = resolve(process.cwd(), 'src/app/(app)/schedule/actions/publish-actions.ts')
+    const source = readFileSync(filePath, 'utf8')
+
+    expect(source).toContain('summarizeAvailabilityPublishIssues')
+    expect(source).toContain("'publish_availability_rule_violation'")
+    expect(source).toContain("'publish_missing_availability_warning'")
+    expect(source).toContain("from('therapist_availability_submissions')")
+  })
 })

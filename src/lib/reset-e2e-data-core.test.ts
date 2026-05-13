@@ -19,6 +19,7 @@ describe('loadResetSchemaPlan', () => {
     expect(plan.tables.map((table) => table.name)).toContain('work_patterns')
     expect(plan.tables.map((table) => table.name)).toContain('schedule_cycles')
     expect(plan.tables.map((table) => table.name)).toContain('profiles')
+    expect(plan.tables.map((table) => table.name)).toContain('sites')
     expect(plan.tables.map((table) => table.name)).not.toContain('users')
 
     expect(plan.deleteOrder.indexOf('therapist_availability_submissions')).toBeLessThan(
@@ -37,7 +38,7 @@ describe('loadResetSchemaPlan', () => {
     expect(plan.deleteOrder.indexOf('shifts')).toBeLessThan(
       plan.deleteOrder.indexOf('schedule_cycles')
     )
-    expect(plan.deleteOrder.at(-1)).toBe('profiles')
+    expect(plan.deleteOrder.indexOf('profiles')).toBeLessThan(plan.deleteOrder.indexOf('sites'))
   })
 })
 

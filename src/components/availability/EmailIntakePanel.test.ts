@@ -25,7 +25,7 @@ const baseRow = {
     },
   ],
   batchStatus: 'needs_review' as const,
-  parseSummary: '2 items | 1 parsed | 1 need review | 0 failed',
+  parseSummary: '2 items | 1 parsed | 0 ready to apply | 1 need review | 0 failed',
   itemCount: 2,
   autoAppliedCount: 1,
   needsReviewCount: 1,
@@ -64,7 +64,7 @@ const baseRow = {
       id: 'item-2',
       sourceType: 'body' as const,
       sourceLabel: 'Email body',
-      parseStatus: 'auto_applied' as const,
+      parseStatus: 'applied' as const,
       confidenceLevel: 'high' as const,
       confidenceReasons: [],
       extractedEmployeeName: 'Employee Example',
@@ -85,7 +85,7 @@ const baseRow = {
 }
 
 describe('EmailIntakePanel', () => {
-  it('renders separate review and auto-applied sections for a batch', () => {
+  it('renders separate review and applied sections for a batch', () => {
     const html = renderToStaticMarkup(
       createElement(EmailIntakePanel, {
         rows: [baseRow],
@@ -100,7 +100,7 @@ describe('EmailIntakePanel', () => {
     )
 
     expect(html).toContain('Needs review')
-    expect(html).toContain('auto-applied - show')
+    expect(html).toContain('applied - show')
     expect(html).toContain('form-1.jpg')
     expect(html).toContain('Email body')
     expect(html).toContain('Name match uncertain')
@@ -143,7 +143,7 @@ describe('EmailIntakePanel', () => {
     expect(html).not.toContain('Save matches')
     expect(html).toContain('form-1.jpg')
     expect(html).toContain('Email body')
-    expect(html).toContain('1 auto-applied - show')
+    expect(html).toContain('1 applied - show')
     expect(html).toContain('Name match uncertain')
   })
 

@@ -3,7 +3,7 @@ export type ShiftType = 'day' | 'night'
 export type RosterShiftStatus = 'scheduled' | 'on_call' | 'cancelled' | 'left_early' | 'call_in'
 
 /** Display value for a roster cell. Empty string = unassigned/blank. */
-export type RosterCellValue = '' | '1' | 'OFF' | 'OC' | 'CX' | 'LE' | 'CI'
+export type RosterCellValue = '' | '1' | 'OFF' | 'OC' | 'CX' | 'LE' | 'CI' | '*'
 
 export type Staff = {
   id: string
@@ -262,7 +262,7 @@ export function resolveMockRosterCellDisplay(
   approval: AvailabilityApprovalKind | null
 ): { value: RosterCellValue; countsTowardDayTally: boolean } {
   if (approval === 'approved_off') {
-    return { value: 'OFF', countsTowardDayTally: false }
+    return { value: '*', countsTowardDayTally: false }
   }
   if (assignment != null) {
     const code = assignment.assignmentStatus

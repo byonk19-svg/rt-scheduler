@@ -1,223 +1,47 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { describe, expect, it } from 'vitest'
+const { redirectMock } = vi.hoisted(() => ({
+  redirectMock: vi.fn((url: string) => {
+    throw new Error(`REDIRECT:${url}`)
+  }),
+}))
 
-const coverageClientPath = resolve(process.cwd(), 'src/app/(app)/coverage/CoverageClientPage.tsx')
-const coverageServerDataPath = resolve(
-  process.cwd(),
-  'src/app/(app)/coverage/coverage-page-data.ts'
-)
-const publishActionsPath = resolve(
-  process.cwd(),
-  'src/app/(app)/schedule/actions/publish-actions.ts'
-)
+vi.mock('next/navigation', () => ({
+  redirect: redirectMock,
+}))
 
-describe('coverage publish override affordance', () => {
-  it('renders a weekly-rule override publish action when weekly validation blocks publish', () => {
-    const source = readFileSync(coverageClientPath, 'utf8')
+import CoverageRedirectPage, { metadata } from '@/app/(app)/coverage/page'
 
-    expect(source).toContain("errorParam === 'publish_weekly_rule_violation'")
-    expect(source).toContain("weekly: 'true'")
-    expect(source).toContain('name="override_weekly_rules"')
-    expect(source).toContain('Publish with weekly override')
+describe('coverage redirect route', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
   })
 
-  it('preserves a weekly override when shift validation fails afterward', () => {
-    const source = readFileSync(coverageClientPath, 'utf8')
-
-    expect(source).toContain("const overrideWeeklyRulesParam = search.get('override_weekly_rules')")
-    expect(source).toContain("const overrideShiftRulesParam = search.get('override_shift_rules')")
-    expect(source).toContain("weekly: overrideWeeklyRulesParam === 'true' ? 'true' : 'false'")
-    expect(source).toContain("shift: overrideShiftRulesParam === 'true' ? 'true' : 'false'")
-  })
-
-  it('keeps override flags in publish validation redirects', () => {
-    const source = readFileSync(publishActionsPath, 'utf8')
-
-    expect(source).toContain("override_weekly_rules: overrideWeeklyRules ? 'true' : undefined")
-    expect(source).toContain("override_shift_rules: overrideShiftRules ? 'true' : undefined")
-  })
-
-  it('surfaces cycle workflow controls in the coverage workspace', () => {
-    const source = readFileSync(coverageClientPath, 'utf8')
-
-    expect(source).toContain('New 6-week block')
-    expect(source).toContain('ClearDraftConfirmDialog')
-    expect(source).toContain('CycleManagementDialog')
-    expect(source).toContain('formatHumanCycleRange')
-    expect(source).toContain('Publish history')
-  })
-
-  it('defaults schedule shift tab from profile shift_type and honors ?shift= query', () => {
-    const client = readFileSync(coverageClientPath, 'utf8')
-    const server = readFileSync(coverageServerDataPath, 'utf8')
-
-    expect(server).toContain('parseCoverageShiftSearchParam')
-    expect(server).toContain('normalizeActorShiftType')
-    expect(server).toContain('defaultCoverageShiftTabFromProfileShift')
-    expect(server).toContain('getCoveragePageServerData')
-    expect(server).toContain('shiftTabLockedFromUrl')
-    expect(server).toContain("const initialViewMode = viewRaw ? normalizeViewMode(viewRaw) : 'week'")
-    expect(client).toContain('initialShiftTab')
-    expect(client).toContain('COVERAGE_SHIFT_QUERY_KEY')
-    expect(client).toContain('router.replace')
-    expect(client).toContain('handleTabSwitch')
-  })
-
-  it('shows an explicit empty state instead of a synthetic 6-week window when no cycle exists', () => {
-    const source = readFileSync(coverageClientPath, 'utf8')
-
-    expect(source).toContain('No open 6-week block')
-    expect(source).toContain('No open 6-week block - create a new draft block to start staffing.')
-    expect(source).not.toContain('Current 6-week window')
-  })
-
-  it('shows an explicit empty-draft state when a cycle exists but has no staffing rows yet', () => {
-    const source = readFileSync(coverageClientPath, 'utf8')
-
-    expect(source).toContain('No staffing drafted yet.')
-    expect(source).toContain('No shifts assigned yet. Run Auto-draft or click a day to assign manually.')
-  })
-
-  it('uses therapist-safe copy when the shared coverage page is read-only', () => {
-    const source = readFileSync(coverageClientPath, 'utf8')
-
-    expect(source).toContain(
-      'Read-only Team Schedule. Use My Shifts for your own shifts and Future Availability for the next Schedule Block.'
+  it('redirects /coverage to the unified /schedule route', async () => {
+    await expect(CoverageRedirectPage({ searchParams: Promise.resolve({}) })).rejects.toThrow(
+      'REDIRECT:/schedule'
     )
-    expect(source).toContain('Team Schedule')
-    expect(source).toContain('Setup required')
-    expect(source).toContain('Block board')
-    expect(source).not.toContain('title="Next step"')
   })
 
-  it('keeps coverage naming and context prominent in the route header', () => {
-    const source = readFileSync(coverageClientPath, 'utf8')
-
-    expect(source).toContain("const workspaceTitle = canManageCoverage ? 'Coverage' : 'Team Schedule'")
-    expect(source).toContain('Schedule status: {workspaceStatusLabel}')
-    expect(source).toContain('{shiftTab} shift coverage')
-    expect(source).toContain('Schedule Block context')
-    expect(source).toContain('aria-labelledby="coverage-cycle-context-heading"')
-    expect(source).toContain('sticky top-2 z-20')
-    expect(source).toContain('lg:static')
-    expect(source).toContain('Current block: {cycleRangeLabel}')
-    expect(source).toContain('Day/Night')
+  it('preserves query params when redirecting to /schedule', async () => {
+    await expect(
+      CoverageRedirectPage({
+        searchParams: Promise.resolve({
+          cycle: 'cycle-1',
+          shift: 'night',
+          success: 'preliminary_sent',
+        }),
+      })
+    ).rejects.toThrow('REDIRECT:/schedule?cycle=cycle-1&shift=night&success=preliminary_sent')
   })
 
-  it('keeps Day/Night ahead of layout controls in the cycle context bar', () => {
-    const source = readFileSync(coverageClientPath, 'utf8')
-
-    const contextIndex = source.indexOf('coverage-cycle-context-heading')
-    const dayNightIndex = source.indexOf('label="Day/Night"', contextIndex)
-    const layoutIndex = source.indexOf('label="Layout"', contextIndex)
-
-    expect(contextIndex).toBeGreaterThan(-1)
-    expect(dayNightIndex).toBeGreaterThan(contextIndex)
-    expect(layoutIndex).toBeGreaterThan(dayNightIndex)
+  it('preserves repeated query params when redirecting to /schedule', async () => {
+    await expect(
+      CoverageRedirectPage({ searchParams: Promise.resolve({ panel: ['setup', 'new-cycle'] }) })
+    ).rejects.toThrow('REDIRECT:/schedule?panel=setup&panel=new-cycle')
   })
 
-  it('keeps proactive risk on the server while rendering a quieter planning surface', () => {
-    const client = readFileSync(coverageClientPath, 'utf8')
-    const server = readFileSync(coverageServerDataPath, 'utf8')
-
-    expect(server).toContain('buildCoverageRiskAlert')
-    expect(server).toContain('snapshot.proactiveCoverageRisk')
-    expect(client).toContain('title="Planning note"')
-    expect(client).not.toContain('title="Next step"')
-  })
-
-  it('passes forced must-work misses into the final auto-draft feedback params', () => {
-    const source = readFileSync(coverageClientPath, 'utf8')
-
-    expect(source).toContain("const forcedMissesParam = search.get('forced_misses')")
-    expect(source).toContain('forced_misses: forcedMissesParam ?? undefined')
-    expect(source).toContain('const autoDraftFeedback = useMemo(() => {')
-    expect(source).toContain('return getScheduleFeedback(scheduleFeedbackParams)')
-  })
-
-  it('exposes segmented-control state to assistive technology', () => {
-    const source = readFileSync(coverageClientPath, 'utf8')
-
-    expect(source).toContain('role="group"')
-    expect(source).toContain('aria-labelledby={labelId}')
-    expect(source).toContain('aria-pressed={value === option.value}')
-  })
-
-  it('calls out live operational status badges on the published schedule', () => {
-    const source = readFileSync(coverageClientPath, 'utf8')
-
-    expect(source).toContain('Operational updates visible to everyone:')
-    expect(source).toContain('<StatusPill status="oncall" />')
-    expect(source).toContain('<StatusPill status="cancelled" />')
-    expect(source).toContain('<StatusPill status="call_in" />')
-  })
-
-  it('does not duplicate the canonical dashboard Lottery entry point in the schedule workspace', () => {
-    const source = readFileSync(coverageClientPath, 'utf8')
-
-    expect(source).not.toContain('MANAGER_WORKFLOW_LINKS.lottery')
-    expect(source).not.toContain('Open Lottery')
-  })
-
-  it('lazy-loads coverage dialogs instead of bundling closed overlays into first paint', () => {
-    const source = readFileSync(coverageClientPath, 'utf8')
-
-    expect(source).toContain('const ShiftEditorDialog = dynamic<ComponentProps<ShiftEditorDialogComponent>>(')
-    expect(source).toContain('const PreFlightDialog = dynamic<ComponentProps<PreFlightDialogComponent>>(')
-    expect(source).toContain(
-      'const ClearDraftConfirmDialog = dynamic<ComponentProps<ClearDraftConfirmDialogComponent>>('
-    )
-    expect(source).toContain(
-      'const CycleManagementDialog = dynamic<ComponentProps<CycleManagementDialogComponent>>('
-    )
-    expect(source).toContain('{selectedDay ? (')
-    expect(source).toContain('{preFlightDialogOpen ? (')
-    expect(source).toContain('{clearDraftDialogOpen ? (')
-    expect(source).toContain('{cycleDialogOpen ? (')
-  })
-
-  it('passes operational detail metadata into the selected-day drawer', () => {
-    const client = readFileSync(coverageClientPath, 'utf8')
-    const server = readFileSync(coverageServerDataPath, 'utf8')
-
-    expect(server).toContain('fetchActiveOperationalDetailMap')
-    expect(server).toContain('snapshot.activeOperationalDetails')
-    expect(client).toContain('const [activeOperationalDetails, setActiveOperationalDetails]')
-    expect(client).toContain('activeOperationalDetails={activeOperationalDetails}')
-    expect(client).toContain('selectedDayNotes={selectedDayNotes}')
-  })
-
-  it('passes actor identity into the selected-day drawer for staff context', () => {
-    const client = readFileSync(coverageClientPath, 'utf8')
-    const server = readFileSync(coverageServerDataPath, 'utf8')
-
-    expect(server).toContain('snapshot.actorUserId = user.id')
-    expect(client).toContain('const actorUserId = initialSnapshot.actorUserId')
-    expect(client).toContain('actorUserId={actorUserId}')
-  })
-
-  it('declares each lazy-loaded dialog exactly once', () => {
-    const source = readFileSync(coverageClientPath, 'utf8')
-
-    expect(source.match(/const PreFlightDialog = dynamic<ComponentProps<PreFlightDialogComponent>>\(/g)).toHaveLength(1)
-    expect(source.match(/const SaveAsTemplateDialog = dynamic<ComponentProps<SaveAsTemplateDialogComponent>>\(/g)).toHaveLength(1)
-    expect(source.match(/const StartFromTemplateDialog = dynamic<ComponentProps<StartFromTemplateDialogComponent>>\(/g)).toHaveLength(1)
-  })
-
-  it('resolves lazy coverage components from named exports or transpiled default namespaces', () => {
-    const source = readFileSync(coverageClientPath, 'utf8')
-
-    expect(source).toContain('function resolveDynamicExport')
-    expect(source).toContain("module.default?.[exportName as string]")
-    expect(source).toContain("resolveDynamicExport<CalendarGridComponent>(module, 'CalendarGrid')")
-    expect(source).toContain(
-      "resolveDynamicExport<RosterScheduleViewComponent>(module, 'RosterScheduleView')"
-    )
-    expect(source).toContain("resolveDynamicExport<PrintScheduleComponent>(module, 'PrintSchedule')")
-    expect(source).toContain(
-      "resolveDynamicExport<PreFlightDialogComponent>(module, 'PreFlightDialog')"
-    )
+  it('uses Schedule metadata', () => {
+    expect(metadata.title).toBe('Schedule')
   })
 })

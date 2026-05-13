@@ -18,6 +18,7 @@ import { pathToFileURL } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 
 const DEMO_LABEL_PREFIX = 'Teamwise UAT'
+const DEMO_SITE_ID = 'teamwise-uat'
 export const FUNCTIONAL_DEMO_DOMAIN = 'teamwise.test'
 export const FUNCTIONAL_DEMO_PASSWORD = 'Teamwise123!'
 export const FUNCTIONAL_DEMO_ACCOUNTS = [
@@ -109,12 +110,11 @@ function addDays(date, days) {
   return next
 }
 
-/** Monday 00:00 local of the week containing `date` (Sun=0 → Monday start). */
-function mondayOfWeekContaining(date) {
+/** Sunday 00:00 local of the week containing `date` (Schedule Blocks must start Sunday). */
+function sundayOfWeekContaining(date) {
   const base = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0)
   const dow = base.getDay()
-  const daysFromMonday = dow === 0 ? 6 : dow - 1
-  base.setDate(base.getDate() - daysFromMonday)
+  base.setDate(base.getDate() - dow)
   return base
 }
 
@@ -210,6 +210,11 @@ async function upsertProfile(row) {
   if (error) throw error
 }
 
+async function ensureSite(id, name = 'Default') {
+  const { error } = await supabase.from('sites').upsert({ id, name }, { onConflict: 'id' })
+  if (error) throw error
+}
+
 async function ensureWorkPattern(therapistId, worksDow) {
   const { error } = await supabase.from('work_patterns').upsert(
     {
@@ -285,7 +290,7 @@ async function seedShiftsForCycle(cycleId, cycleStartIso, cycleEndIso, rosterRow
           shift_type: shiftType,
           status: 'scheduled',
           role,
-          site_id: 'default',
+          site_id: DEMO_SITE_ID,
         })
       }
     }
@@ -579,7 +584,7 @@ async function seedPickupInterestScenarios({ publishedCycleId }) {
       therapist_id: therapistId,
       status: index === 0 ? 'selected' : 'pending',
       created_at: new Date(Date.now() - (20 - index) * 60 * 1000).toISOString(),
-      responded_at: index === 0 ? new Date(Date.now() - 19 * 60 * 1000).toISOString() : null,
+      responded_at: null,
     }))
   )
   if (interestError) throw interestError
@@ -677,6 +682,7 @@ export async function seedFunctionalDemo(options = {}) {
 
   console.log('Removing any prior Teamwise UAT demo cycles, then seeding users + schedules.')
   await wipeDemoCycles()
+  await ensureSite(DEMO_SITE_ID, 'Teamwise UAT')
 
   const authUsers = await listAllAuthUsers()
   const userByEmail = new Map(authUsers.map((u) => [String(u.email ?? '').toLowerCase(), u]))
@@ -693,7 +699,7 @@ export async function seedFunctionalDemo(options = {}) {
     email: managerEmail,
     role: 'manager',
     shift_type: 'day',
-    site_id: 'default',
+    site_id: DEMO_SITE_ID,
     employment_type: 'full_time',
     max_work_days_per_week: 5,
     is_active: true,
@@ -720,7 +726,7 @@ export async function seedFunctionalDemo(options = {}) {
       email: spec.email,
       role: 'lead',
       shift_type: spec.shift,
-      site_id: 'default',
+      site_id: DEMO_SITE_ID,
       employment_type: 'full_time',
       max_work_days_per_week: 5,
       is_active: true,
@@ -749,7 +755,7 @@ export async function seedFunctionalDemo(options = {}) {
       email,
       role: 'therapist',
       shift_type: shiftType,
-      site_id: 'default',
+      site_id: DEMO_SITE_ID,
       employment_type: 'full_time',
       max_work_days_per_week: 5,
       is_active: true,
@@ -780,7 +786,7 @@ export async function seedFunctionalDemo(options = {}) {
   ]
 
   const today = new Date()
-  const publishedStart = mondayOfWeekContaining(addDays(today, -3))
+  const publishedStart = sundayOfWeekContaining(addDays(today, -3))
   const publishedStartIso = formatDate(publishedStart)
   const publishedEndIso = formatDate(addDays(publishedStart, 41))
 
@@ -797,6 +803,7 @@ export async function seedFunctionalDemo(options = {}) {
       label: publishedLabel,
       start_date: publishedStartIso,
       end_date: publishedEndIso,
+      site_id: DEMO_SITE_ID,
       published: true,
     })
     .select('id')
@@ -811,6 +818,7 @@ export async function seedFunctionalDemo(options = {}) {
       label: draftLabel,
       start_date: draftStartIso,
       end_date: draftEndIso,
+      site_id: DEMO_SITE_ID,
       published: false,
     })
     .select('id')

@@ -1,6 +1,7 @@
 import type { AvailabilityOverrideRow, ShiftTypeForAvailability } from '@/lib/coverage/types'
 import type { WorkPattern } from '@/lib/coverage/work-patterns'
-import { isAllowedByPattern, shiftTypeMatches } from '@/lib/coverage/work-patterns'
+import { findMatchingOverride } from '@/lib/availability-override-model'
+import { isAllowedByPattern } from '@/lib/coverage/work-patterns'
 
 export type EligibilityReason =
   | 'inactive'
@@ -81,38 +82,6 @@ function buildResolution(
   }
 }
 
-function findMatchingOverride(
-  overrides: AvailabilityOverrideRow[],
-  therapistId: string,
-  cycleId: string,
-  date: string,
-  shiftType: Exclude<ShiftTypeForAvailability, 'both'>
-): AvailabilityOverrideRow | null {
-  const sameScope = overrides.filter(
-    (override) =>
-      override.therapist_id === therapistId &&
-      override.cycle_id === cycleId &&
-      override.date === date &&
-      shiftTypeMatches(override.shift_type, shiftType)
-  )
-  if (sameScope.length === 0) return null
-  const ranked = sameScope
-    .slice()
-    .sort((a, b) => {
-      const aExact = a.shift_type === shiftType ? 1 : 0
-      const bExact = b.shift_type === shiftType ? 1 : 0
-      if (aExact !== bExact) return bExact - aExact
-
-      const aManager = a.source === 'manager' ? 1 : 0
-      const bManager = b.source === 'manager' ? 1 : 0
-      if (aManager !== bManager) return bManager - aManager
-
-      return 0
-    })
-
-  return ranked[0] ?? null
-}
-
 export function resolveEligibility(params: ResolveEligibilityParams): EligibilityResolution {
   if (!params.therapist.is_active) {
     return buildResolution('inactive')
@@ -122,13 +91,13 @@ export function resolveEligibility(params: ResolveEligibilityParams): Eligibilit
     return buildResolution('on_fmla')
   }
 
-  const override = findMatchingOverride(
-    params.overrides,
-    params.therapist.id,
-    params.cycleId,
-    params.date,
-    params.shiftType
-  )
+  const override = findMatchingOverride({
+    overrides: params.overrides,
+    therapistId: params.therapist.id,
+    cycleId: params.cycleId,
+    date: params.date,
+    shiftType: params.shiftType,
+  })
 
   if (override?.override_type === 'force_off') {
     const resolution = buildResolution('override_force_off', {
@@ -147,7 +116,10 @@ export function resolveEligibility(params: ResolveEligibilityParams): Eligibilit
     return resolution
   }
 
-  if (params.therapist.employment_type === 'prn') {
+  if (
+    params.therapist.employment_type === 'prn' &&
+    (!params.therapist.pattern || params.therapist.pattern.pattern_type === 'none')
+  ) {
     return buildResolution('prn_not_offered_for_date')
   }
 

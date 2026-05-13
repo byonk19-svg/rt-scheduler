@@ -33,7 +33,7 @@ export default async function RequestsPage() {
   const { count: pendingCount } = await supabase
     .from('profiles')
     .select('id', { count: 'exact', head: true })
-    .is('role', null)
+    .eq('access_status', 'pending')
 
   const totalPending = pendingCount ?? 0
 

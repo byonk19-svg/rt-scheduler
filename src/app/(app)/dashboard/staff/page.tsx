@@ -339,7 +339,7 @@ export default async function StaffDashboardPage({
   const workflowAlreadyLinksToSchedule = [
     workflow.primaryAction.href,
     workflow.secondaryAction?.href ?? null,
-  ].some((href) => href?.startsWith('/therapist/schedule'))
+  ].some((href) => href?.startsWith('/schedule'))
 
   return (
     <div className="space-y-4">
@@ -429,7 +429,7 @@ export default async function StaffDashboardPage({
           )}
           <div className="mt-4">
             <Button asChild size="sm" variant="outline">
-              <Link href="/therapist/schedule">View my shifts</Link>
+              <Link href="/schedule">View schedule</Link>
             </Button>
           </div>
         </article>

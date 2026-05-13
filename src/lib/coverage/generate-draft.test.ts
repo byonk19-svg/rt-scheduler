@@ -110,4 +110,53 @@ describe('generateDraftForCycle', () => {
 
     expect(result.draftShiftsToInsert.some((shift) => shift.user_id === therapist.id)).toBe(false)
   })
+
+  it('auto-drafts standing PRN weekend patterns without requiring one-off availability rows', () => {
+    const therapist: Therapist = {
+      id: 'prn-weekend',
+      full_name: 'Weekend PRN',
+      shift_type: 'day',
+      is_lead_eligible: false,
+      employment_type: 'prn',
+      max_work_days_per_week: 2,
+      works_dow: [0, 6],
+      offs_dow: [],
+      weekend_rotation: 'none',
+      weekend_anchor_date: null,
+      works_dow_mode: 'hard',
+      pattern: {
+        therapist_id: 'prn-weekend',
+        pattern_type: 'weekly_with_weekend_rotation',
+        works_dow: [0, 6],
+        offs_dow: [],
+        weekend_rotation: 'none',
+        weekend_anchor_date: null,
+        works_dow_mode: 'hard',
+        weekly_weekdays: [],
+        weekend_rule: 'every_weekend',
+        cycle_anchor_date: null,
+        cycle_segments: [],
+        shift_preference: 'day',
+      },
+      shift_preference: 'day',
+      on_fmla: false,
+      fmla_return_date: null,
+      is_active: true,
+    }
+
+    const result = generateDraftForCycle({
+      ...BASE_INPUT,
+      cycleStartDate: '2026-04-11',
+      cycleEndDate: '2026-04-11',
+      therapists: [therapist],
+    })
+
+    expect(result.draftShiftsToInsert).toContainEqual(
+      expect.objectContaining({
+        user_id: 'prn-weekend',
+        date: '2026-04-11',
+        shift_type: 'day',
+      })
+    )
+  })
 })

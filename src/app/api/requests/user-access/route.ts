@@ -64,7 +64,7 @@ export async function GET(request: Request) {
   const pendingQuery = admin
     .from('profiles')
     .select('id', { count: 'exact', head: summaryOnly })
-    .is('role', null)
+    .eq('access_status', 'pending')
 
   const pendingResult = await pendingQuery
   if (pendingResult.error) {
@@ -78,7 +78,7 @@ export async function GET(request: Request) {
   const { data: pendingRows, count } = await admin
     .from('profiles')
     .select('id, full_name, email, phone_number, created_at', { count: 'exact' })
-    .is('role', null)
+    .eq('access_status', 'pending')
     .order('created_at', { ascending: false })
 
   if (!pendingRows) {
@@ -155,7 +155,7 @@ export async function POST(request: Request) {
       .from('profiles')
       .select('id, email, full_name')
       .eq('id', profileId)
-      .is('role', null)
+      .eq('access_status', 'pending')
       .maybeSingle()
 
     if (profileError || !profile) {
@@ -166,6 +166,7 @@ export async function POST(request: Request) {
       .from('profiles')
       .update({
         role: assignedRole,
+        access_status: 'approved',
         is_active: true,
         archived_at: null,
         staff_onboarding_required: true,
@@ -176,7 +177,7 @@ export async function POST(request: Request) {
         preferred_work_days_mode: 'unset',
       })
       .eq('id', profileId)
-      .is('role', null)
+      .eq('access_status', 'pending')
 
     if (updateError) {
       console.error('Failed to approve access request:', updateError)
@@ -221,7 +222,7 @@ export async function POST(request: Request) {
     .from('profiles')
     .select('id')
     .eq('id', profileId)
-    .is('role', null)
+    .eq('access_status', 'pending')
     .maybeSingle()
 
   if (profileError || !profile) {

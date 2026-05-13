@@ -143,12 +143,38 @@ describe('resolveAvailability', () => {
     expect(onFmla.reason).toBe('on_fmla')
   })
 
-  it('blocks PRN when no explicit available-to-work date exists', () => {
+  it('blocks flexible PRN when no explicit available-to-work date exists', () => {
     const pattern = buildPattern({
-      works_dow: [2],
+      pattern_type: 'none',
+      works_dow: [],
       offs_dow: [],
       weekend_rotation: 'none',
       works_dow_mode: 'soft',
+    })
+
+    const resolution = resolveAvailability({
+      therapistId: 'therapist-1',
+      cycleId: 'cycle-a',
+      date: '2026-03-06',
+      shiftType: 'day',
+      isActive: true,
+      onFmla: false,
+      employmentType: 'prn',
+      pattern,
+      overrides: [],
+    })
+
+    expect(resolution.allowed).toBe(false)
+    expect(resolution.reason).toBe('prn_not_offered_for_date')
+  })
+
+  it('allows standing PRN when the recurring pattern offers the date', () => {
+    const pattern = buildPattern({
+      pattern_type: 'weekly_fixed',
+      works_dow: [1],
+      offs_dow: [],
+      weekend_rotation: 'none',
+      works_dow_mode: 'hard',
     })
 
     const resolution = resolveAvailability({
@@ -163,8 +189,8 @@ describe('resolveAvailability', () => {
       overrides: [],
     })
 
-    expect(resolution.allowed).toBe(false)
-    expect(resolution.reason).toBe('prn_not_offered_for_date')
+    expect(resolution.allowed).toBe(true)
+    expect(resolution.reason).toBe('allowed')
   })
 
   it('allows PRN with force_on override even when recurring pattern blocks', () => {
@@ -252,7 +278,7 @@ describe('resolveAvailability', () => {
     expect(resolution.forcedByManager).toBe(true)
   })
 
-  it('blocks PRN even when recurring pattern offers the weekday without explicit availability', () => {
+  it('blocks standing PRN when the recurring pattern does not offer the date', () => {
     const pattern = buildPattern({
       works_dow: [1],
       offs_dow: [],
@@ -263,7 +289,7 @@ describe('resolveAvailability', () => {
     const resolution = resolveAvailability({
       therapistId: 'therapist-1',
       cycleId: 'cycle-a',
-      date: '2026-03-02',
+      date: '2026-03-06',
       shiftType: 'day',
       isActive: true,
       onFmla: false,
@@ -273,6 +299,6 @@ describe('resolveAvailability', () => {
     })
 
     expect(resolution.allowed).toBe(false)
-    expect(resolution.reason).toBe('prn_not_offered_for_date')
+    expect(resolution.reason).toBe('blocked_outside_works_dow_hard')
   })
 })

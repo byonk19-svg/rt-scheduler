@@ -7,6 +7,7 @@ import { buildCallInAlertMessage, shouldCreateCallInAlert } from '@/lib/call-in-
 import { notifyUsers } from '@/lib/notifications'
 import { notifyPublishedShiftStatusChanged } from '@/lib/published-schedule-notifications'
 import { isTrustedMutationRequest } from '@/lib/security/request-origin'
+import { writeAuditLog } from '@/lib/audit-log'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
@@ -48,15 +49,30 @@ type RpcAssignmentStatusRow = {
 
 type ShiftNotificationLookupRow = {
   id: string
+  cycle_id: string
   date: string
   shift_type: 'day' | 'night'
   user_id: string | null
-  schedule_cycles: { published: boolean } | { published: boolean }[] | null
+  schedule_cycles:
+    | {
+        published: boolean
+        status: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
+        archived_at: string | null
+      }
+    | {
+        published: boolean
+        status: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
+        archived_at: string | null
+      }[]
+    | null
 }
 
 type ProfileNotificationRow = {
   id: string
+  role: string | null
   shift_type: 'day' | 'night' | null
+  site_id: string | null
+  archived_at: string | null
 }
 
 function getOne<T>(value: T | T[] | null | undefined): T | null {
@@ -66,6 +82,10 @@ function getOne<T>(value: T | T[] | null | undefined): T | null {
 
 function isAllowedAssignmentStatus(value: string): value is AssignmentStatus {
   return ASSIGNMENT_STATUS_VALUES.includes(value as AssignmentStatus)
+}
+
+function shouldNotifyAffectedTherapist(nextStatus: AssignmentStatus) {
+  return nextStatus !== 'left_early'
 }
 
 export async function POST(request: Request) {
@@ -122,6 +142,46 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Actor site is missing.' }, { status: 403 })
   }
 
+  const { data: preflightShiftLookup, error: preflightShiftError } = await supabase
+    .from('shifts')
+    .select('id, schedule_cycles(published, status, archived_at)')
+    .eq('id', assignmentId)
+    .maybeSingle()
+
+  if (preflightShiftError || !preflightShiftLookup) {
+    return NextResponse.json({ error: 'Assignment not found.' }, { status: 404 })
+  }
+
+  const preflightCycle = getOne(
+    (
+      preflightShiftLookup as {
+        schedule_cycles:
+          | {
+              published: boolean
+              status: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
+              archived_at: string | null
+            }
+          | {
+              published: boolean
+              status: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
+              archived_at: string | null
+            }[]
+          | null
+      }
+    ).schedule_cycles
+  )
+
+  if (
+    preflightCycle?.status === 'offline' ||
+    preflightCycle?.status === 'archived' ||
+    preflightCycle?.archived_at
+  ) {
+    return NextResponse.json(
+      { error: 'This Schedule Block is read-only until it is republished.' },
+      { status: 409 }
+    )
+  }
+
   const admin = createAdminClient()
   const mutation = await updateAssignmentStatusWithLottery({
     authClient: {
@@ -175,22 +235,35 @@ export async function POST(request: Request) {
 
   const { data: shiftLookup } = await supabase
     .from('shifts')
-    .select('id, date, shift_type, user_id, schedule_cycles(published)')
+    .select(
+      'id, cycle_id, date, shift_type, user_id, schedule_cycles(published, status, archived_at)'
+    )
     .eq('id', row.id)
     .maybeSingle()
 
   const shift = (shiftLookup ?? null) as ShiftNotificationLookupRow | null
   const cycle = getOne(shift?.schedule_cycles)
 
-  if (shift?.user_id && cycle?.published) {
-    await notifyPublishedShiftStatusChanged(admin as never, {
-      cyclePublished: true,
-      userId: shift.user_id,
-      date: shift.date,
-      shiftType: shift.shift_type,
-      nextStatus: row.assignment_status,
+  if (shift && cycle?.published) {
+    await writeAuditLog(admin as never, {
+      userId: user.id,
+      action: 'post_publish_modification',
+      targetType: 'shift',
       targetId: shift.id,
     })
+  }
+
+  if (shift?.user_id && cycle?.published) {
+    if (shouldNotifyAffectedTherapist(row.assignment_status)) {
+      await notifyPublishedShiftStatusChanged(admin as never, {
+        cyclePublished: true,
+        userId: shift.user_id,
+        date: shift.date,
+        shiftType: shift.shift_type,
+        nextStatus: row.assignment_status,
+        targetId: shift.id,
+      })
+    }
 
     const { data: existingCallInPost } = await admin
       .from('shift_posts')
@@ -237,13 +310,15 @@ export async function POST(request: Request) {
 
       const { data: profilesData } = await supabase
         .from('profiles')
-        .select('id, shift_type')
-        .in('role', ['therapist', 'lead'])
+        .select('id, role, shift_type, site_id, archived_at')
+        .in('role', ['therapist', 'lead', 'manager'])
+        .eq('site_id', actorProfile.site_id)
         .eq('is_active', true)
 
       const { data: scheduledRows } = await supabase
         .from('shifts')
         .select('user_id')
+        .eq('cycle_id', shift.cycle_id)
         .eq('date', shift.date)
         .eq('shift_type', shift.shift_type)
 
@@ -253,15 +328,40 @@ export async function POST(request: Request) {
           .filter((value): value is string => Boolean(value))
       )
 
-      const eligibleUserIds = ((profilesData ?? []) as ProfileNotificationRow[])
-        .filter((profile) => profile.id !== shift.user_id)
-        .filter((profile) => !scheduledUserIds.has(profile.id))
+      const sameSiteActiveProfiles = ((profilesData ?? []) as ProfileNotificationRow[]).filter(
+        (profile) => profile.site_id === actorProfile.site_id && !profile.archived_at
+      )
+
+      const operationalAttentionUserIds = sameSiteActiveProfiles
+        .filter((profile) => profile.id !== user.id)
+        .filter((profile) => profile.role === 'manager' || profile.role === 'lead')
         .map((profile) => profile.id)
 
-      await notifyUsers(supabase, {
+      const operationalAttentionSet = new Set(operationalAttentionUserIds)
+      const eligibleUserIds = sameSiteActiveProfiles
+        .filter((profile) => profile.role === 'therapist' || profile.role === 'lead')
+        .filter((profile) => profile.id !== shift.user_id)
+        .filter((profile) => !operationalAttentionSet.has(profile.id))
+        .filter((profile) => !scheduledUserIds.has(profile.id))
+        .filter((profile) => profile.shift_type === null || profile.shift_type === shift.shift_type)
+        .map((profile) => profile.id)
+
+      await notifyUsers(admin as never, {
         userIds: eligibleUserIds,
         eventType: 'call_in_help_available',
         title: 'Call-in help needed',
+        message: buildCallInAlertMessage({
+          date: shift.date,
+          shiftType: shift.shift_type,
+        }),
+        targetType: callInPostId ? 'shift_post' : 'shift',
+        targetId: callInPostId ?? shift.id,
+      })
+
+      await notifyUsers(admin as never, {
+        userIds: operationalAttentionUserIds,
+        eventType: 'operational_status_attention',
+        title: 'Call-in coverage attention',
         message: buildCallInAlertMessage({
           date: shift.date,
           shiftType: shift.shift_type,

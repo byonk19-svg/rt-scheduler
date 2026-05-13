@@ -410,7 +410,7 @@ export default async function ApprovalsPage({
         }
         actions={
           <Button asChild variant="outline" size="sm" className="text-xs">
-            <Link href="/coverage?view=week">
+            <Link href="/schedule">
               <CalendarDays className="h-3.5 w-3.5" />
               Back to schedule
             </Link>
@@ -434,10 +434,10 @@ export default async function ApprovalsPage({
             <p className="text-sm text-muted-foreground">
               {hasActivePreliminary
                 ? 'Claims and change requests appear here while the preliminary schedule is live.'
-                : 'Send a preliminary schedule from Coverage to open this queue.'}
+                : 'Send a preliminary schedule from Schedule to open this queue.'}
             </p>
             <Button asChild variant="default">
-              <Link href="/coverage">Open Coverage</Link>
+              <Link href="/schedule">Open Schedule</Link>
             </Button>
           </div>
         </div>

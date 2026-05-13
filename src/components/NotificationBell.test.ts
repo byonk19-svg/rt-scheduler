@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { resolveNotificationHref } from '@/components/NotificationBell'
 
 describe('resolveNotificationHref', () => {
-  it('routes therapist shift notifications to the therapist schedule page', () => {
+  it('routes therapist shift notifications to the unified schedule page', () => {
     expect(
       resolveNotificationHref(
         {
@@ -18,7 +18,7 @@ describe('resolveNotificationHref', () => {
         },
         'therapist'
       )
-    ).toBe('/therapist/schedule')
+    ).toBe('/schedule')
   })
 
   it('deep-links preliminary shift notifications to the affected shift', () => {

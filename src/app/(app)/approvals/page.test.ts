@@ -416,7 +416,7 @@ describe('approvals preliminary queue', () => {
     )
   })
 
-  it('renders a compact empty state with a coverage CTA when the queue is clear', async () => {
+  it('renders a compact empty state with a schedule CTA when the queue is clear', async () => {
     createClientMock.mockResolvedValue(
       createSupabaseMock({
         userId: 'manager-1',
@@ -429,8 +429,8 @@ describe('approvals preliminary queue', () => {
     const html = renderToStaticMarkup(await ApprovalsPage({ searchParams: Promise.resolve({}) }))
 
     expect(html).toContain('No pending preliminary requests')
-    expect(html).toContain('Send a preliminary schedule from Coverage to open this queue.')
-    expect(html).toContain('Open Coverage')
+    expect(html).toContain('Send a preliminary schedule from Schedule to open this queue.')
+    expect(html).toContain('Open Schedule')
     expect(html).not.toContain('Approve')
   })
 

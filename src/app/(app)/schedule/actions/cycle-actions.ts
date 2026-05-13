@@ -4,12 +4,12 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/can'
-import { buildDateRange, buildScheduleUrl, normalizeViewMode } from '@/lib/schedule-helpers'
+import { buildDateRange, buildScheduleUrl } from '@/lib/schedule-helpers'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import type { ShiftRole, ShiftStatus } from '@/app/schedule/types'
 
-import { buildCoverageUrl, getPanelParam, getRoleForUser } from './helpers'
+import { buildScheduleActionUrl, getPanelParam, getRoleForUser } from './helpers'
 
 type CycleImportSourceRow = {
   id: string
@@ -23,6 +23,47 @@ type ImportedShiftRow = {
   shift_type: 'day' | 'night'
   status: ShiftStatus
   role: ShiftRole
+}
+
+type DeleteCycleMutationClient = {
+  rpc: (
+    fn: 'app_delete_empty_draft_schedule_cycle',
+    args: { p_actor_id: string; p_cycle_id: string }
+  ) => PromiseLike<{
+    data: Array<{ id: string }> | { id: string } | null
+    error: { code?: string; message?: string } | null
+  }>
+}
+
+const SCHEDULE_BLOCK_DAY_COUNT = 42
+const MS_PER_DAY = 24 * 60 * 60 * 1000
+
+function parseDateKey(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return null
+
+  const year = Number(match[1])
+  const monthIndex = Number(match[2]) - 1
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, monthIndex, day))
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== monthIndex ||
+    date.getUTCDate() !== day
+  ) {
+    return null
+  }
+
+  return date
+}
+
+function isSundayToSixWeekSaturdayRange(startDate: string, endDate: string): boolean {
+  const start = parseDateKey(startDate)
+  const end = parseDateKey(endDate)
+  if (!start || !end) return false
+
+  const inclusiveDays = (end.getTime() - start.getTime()) / MS_PER_DAY + 1
+  return start.getUTCDay() === 0 && inclusiveDays === SCHEDULE_BLOCK_DAY_COUNT
 }
 
 export async function deleteCycleAction(formData: FormData) {
@@ -42,7 +83,7 @@ export async function deleteCycleAction(formData: FormData) {
     redirect(
       returnToPublish
         ? '/publish?error=delete_cycle_unauthorized'
-        : '/coverage?view=week&error=delete_cycle_unauthorized'
+        : '/schedule?error=delete_cycle_unauthorized'
     )
   }
 
@@ -50,7 +91,7 @@ export async function deleteCycleAction(formData: FormData) {
 
   const { data: cycle } = await supabase
     .from('schedule_cycles')
-    .select('id, published')
+    .select('id, published, status, archived_at')
     .eq('id', cycleId)
     .maybeSingle()
 
@@ -58,7 +99,7 @@ export async function deleteCycleAction(formData: FormData) {
     redirect(
       returnToPublish
         ? '/publish?error=delete_cycle_not_found'
-        : '/coverage?view=week&error=delete_cycle_not_found'
+        : '/schedule?error=delete_cycle_not_found'
     )
   }
 
@@ -66,58 +107,72 @@ export async function deleteCycleAction(formData: FormData) {
     redirect(
       returnToPublish
         ? '/publish?error=delete_cycle_published'
-        : '/coverage?view=week&error=delete_cycle_published'
+        : '/schedule?error=delete_cycle_published'
+    )
+  }
+
+  if (cycle.status !== 'draft' || cycle.archived_at) {
+    redirect(
+      returnToPublish
+        ? '/publish?error=delete_cycle_not_draft'
+        : '/schedule?error=delete_cycle_not_draft'
     )
   }
 
   const admin = (() => {
     try {
-      return createAdminClient()
+      return createAdminClient() as unknown as DeleteCycleMutationClient
     } catch (error) {
       console.error('Failed to initialize admin client for cycle delete:', error)
       redirect(
         returnToPublish
           ? '/publish?error=delete_cycle_failed'
-          : '/coverage?view=week&error=delete_cycle_failed'
+          : '/schedule?error=delete_cycle_failed'
       )
     }
   })()
 
-  const { data: deletedRows, error } = await admin
-    .from('schedule_cycles')
-    .delete()
-    .eq('id', cycleId)
-    .eq('published', false)
-    .select('id')
+  const { data: deletedRows, error } = await admin.rpc('app_delete_empty_draft_schedule_cycle', {
+    p_actor_id: user.id,
+    p_cycle_id: cycleId,
+  })
 
   if (error) {
     console.error('Failed to delete cycle:', error)
+    if (error.code === '23503' || /cannot be deleted|has schedule/i.test(error.message ?? '')) {
+      redirect(
+        returnToPublish
+          ? '/publish?error=delete_cycle_not_empty'
+          : '/schedule?error=delete_cycle_not_empty'
+      )
+    }
+    if (error.code === '55000' || /only empty unpublished draft/i.test(error.message ?? '')) {
+      redirect(
+        returnToPublish
+          ? '/publish?error=delete_cycle_not_draft'
+          : '/schedule?error=delete_cycle_not_draft'
+      )
+    }
     redirect(
-      returnToPublish
-        ? '/publish?error=delete_cycle_failed'
-        : '/coverage?view=week&error=delete_cycle_failed'
+      returnToPublish ? '/publish?error=delete_cycle_failed' : '/schedule?error=delete_cycle_failed'
     )
   }
 
-  if (!deletedRows?.length) {
+  const deleted = Array.isArray(deletedRows) ? deletedRows.length > 0 : Boolean(deletedRows)
+  if (!deleted) {
     console.error('Delete cycle affected 0 rows')
     redirect(
-      returnToPublish
-        ? '/publish?error=delete_cycle_failed'
-        : '/coverage?view=week&error=delete_cycle_failed'
+      returnToPublish ? '/publish?error=delete_cycle_failed' : '/schedule?error=delete_cycle_failed'
     )
   }
 
   revalidatePath('/publish')
-  revalidatePath('/coverage')
   revalidatePath('/schedule')
   revalidatePath('/availability')
   revalidatePath('/dashboard')
   revalidatePath('/dashboard/manager')
   revalidatePath('/dashboard/staff')
-  redirect(
-    returnToPublish ? '/publish?success=cycle_deleted' : '/coverage?view=week&success=cycle_deleted'
-  )
+  redirect(returnToPublish ? '/publish?success=cycle_deleted' : '/schedule?success=cycle_deleted')
 }
 
 export async function createCycleAction(formData: FormData) {
@@ -159,7 +214,6 @@ export async function createCycleAction(formData: FormData) {
   const coverageContextParams =
     returnTo === 'coverage'
       ? {
-          view: normalizeViewMode(view),
           shift: coverageShift === 'day' || coverageShift === 'night' ? coverageShift : undefined,
         }
       : undefined
@@ -170,14 +224,13 @@ export async function createCycleAction(formData: FormData) {
     params?: Record<string, string | undefined>
   ) =>
     returnTo === 'coverage'
-      ? buildCoverageUrl((cycleIdOverride ?? coverageCurrentCycleId) || undefined, {
+      ? buildScheduleActionUrl((cycleIdOverride ?? coverageCurrentCycleId) || undefined, {
           ...coverageContextParams,
           ...params,
         })
       : buildScheduleUrl(cycleIdOverride, view, params)
   const revalidateCreatedCycleSurfaces = () => {
     revalidatePath('/schedule')
-    revalidatePath('/coverage')
   }
 
   if (!label || !startDate || !endDate) {
@@ -186,6 +239,12 @@ export async function createCycleAction(formData: FormData) {
 
   if (endDate < startDate) {
     redirect(buildReturnUrl(undefined, { ...errorViewParams, error: 'create_cycle_invalid_range' }))
+  }
+
+  if (!isSundayToSixWeekSaturdayRange(startDate, endDate)) {
+    redirect(
+      buildReturnUrl(undefined, { ...errorViewParams, error: 'create_cycle_invalid_block_shape' })
+    )
   }
 
   const { data: overlappingCycles, error: overlapError } = await supabase
@@ -211,6 +270,7 @@ export async function createCycleAction(formData: FormData) {
       start_date: startDate,
       end_date: endDate,
       published,
+      status: published ? 'final' : 'draft',
       site_id: actorProfile.site_id,
     })
     .select('id')

@@ -37,12 +37,22 @@ export async function GET(request: Request) {
   }
 
   const [{ data: profile }, { data: cycle }] = await Promise.all([
-    supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+    supabase
+      .from('profiles')
+      .select('role, is_active, archived_at')
+      .eq('id', user.id)
+      .maybeSingle(),
     supabase.from('schedule_cycles').select('id, published').eq('id', cycleId).maybeSingle(),
   ])
 
   const role = parseRole(profile?.role)
-  const canReadDraftCoverage = can(role, 'manage_coverage') || role === 'lead'
+  const permissionContext = {
+    isActive: profile?.is_active !== false,
+    archivedAt: profile?.archived_at ?? null,
+  }
+  const canReadDraftCoverage =
+    can(role, 'manage_coverage', permissionContext) ||
+    can(role, 'access_lead_tools', permissionContext)
   const cycleRow = (cycle ?? null) as CycleLookupRow | null
 
   if (!cycleRow) {

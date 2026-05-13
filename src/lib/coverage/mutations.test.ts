@@ -1,100 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import {
-  assignCoverageShift,
-  assignCoverageShiftViaApi,
-  persistCoverageShiftStatus,
-  setCoverageDesignatedLeadViaApi,
-  unassignCoverageShift,
-  unassignCoverageShiftViaApi,
-} from '@/lib/coverage/mutations'
-import type { CoverageMutationError } from '@/lib/coverage/mutations'
+import { createCoverageShiftMutator } from '@/lib/coverage/mutations'
 
-function makeSupabase({
-  insertResult = { data: null, error: null } as { data: unknown; error: CoverageMutationError },
-  deleteResult = { error: null } as { error: CoverageMutationError },
-  updateResult = { error: null } as { error: CoverageMutationError },
-} = {}) {
-  return {
-    from: vi.fn().mockReturnValue({
-      insert: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          maybeSingle: vi.fn().mockResolvedValue(insertResult),
-        }),
-      }),
-      delete: vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue(deleteResult),
-      }),
-      update: vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue(updateResult),
-      }),
-    }),
-  }
-}
-
-describe('assignCoverageShift', () => {
-  it('returns data row on success', async () => {
-    const row = {
-      id: 'shift-1',
-      user_id: 'user-1',
-      date: '2026-03-01',
-      shift_type: 'day',
-      status: 'scheduled',
-      assignment_status: null,
-    }
-    const supabase = makeSupabase({ insertResult: { data: row, error: null } })
-
-    const result = await assignCoverageShift(supabase, {
-      cycleId: 'cycle-1',
-      userId: 'user-1',
-      isoDate: '2026-03-01',
-      shiftType: 'day',
-    })
-
-    expect(result.error).toBe(null)
-    expect(result.data).toMatchObject({ id: 'shift-1', user_id: 'user-1' })
-  })
-
-  it('returns null data and the error on failure', async () => {
-    const dbError: CoverageMutationError = { code: '23505', message: 'duplicate key' }
-    const supabase = makeSupabase({ insertResult: { data: null, error: dbError } })
-
-    const result = await assignCoverageShift(supabase, {
-      cycleId: 'cycle-1',
-      userId: 'user-1',
-      isoDate: '2026-03-01',
-      shiftType: 'day',
-    })
-
-    expect(result.data).toBe(null)
-    expect(result.error).toEqual(dbError)
-  })
-
-  it('calls insert with correct fields', async () => {
-    const supabase = makeSupabase()
-    const fromMock = supabase.from('shifts')
-
-    await assignCoverageShift(supabase, {
-      cycleId: 'cycle-abc',
-      userId: 'user-xyz',
-      isoDate: '2026-04-15',
-      shiftType: 'night',
-    })
-
-    expect(fromMock.insert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        cycle_id: 'cycle-abc',
-        user_id: 'user-xyz',
-        date: '2026-04-15',
-        shift_type: 'night',
-        role: 'staff',
-        status: 'scheduled',
-      })
-    )
-  })
-})
-
-describe('assignCoverageShiftViaApi', () => {
+describe('CoverageShiftMutator.assign', () => {
   it('returns inserted shift data from the drag-drop API', async () => {
     const fetchMock = vi.fn(async () =>
       new Response(
@@ -113,7 +21,7 @@ describe('assignCoverageShiftViaApi', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    const result = await assignCoverageShiftViaApi({
+    const result = await createCoverageShiftMutator().assign({
       cycleId: 'cycle-1',
       userId: 'user-1',
       isoDate: '2026-03-01',
@@ -136,17 +44,50 @@ describe('assignCoverageShiftViaApi', () => {
         shiftType: 'day',
         role: 'lead',
         overrideWeeklyRules: false,
+        availabilityOverride: false,
+      }),
+    })
+  })
+
+  it('passes the requested-off confirmation flag for assign-anyway cells', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ shift: null }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await createCoverageShiftMutator().assign({
+      cycleId: 'cycle-1',
+      userId: 'user-1',
+      isoDate: '2026-03-02',
+      shiftType: 'day',
+      availabilityOverride: true,
+      availabilityOverrideReason: 'Manager confirmed.',
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/schedule/drag-drop', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'assign',
+        cycleId: 'cycle-1',
+        userId: 'user-1',
+        date: '2026-03-02',
+        shiftType: 'day',
+        role: 'staff',
+        overrideWeeklyRules: false,
+        availabilityOverride: true,
+        availabilityOverrideReason: 'Manager confirmed.',
       }),
     })
   })
 })
 
-describe('setCoverageDesignatedLeadViaApi', () => {
+describe('CoverageShiftMutator.setDesignatedLead', () => {
   it('posts set_lead to drag-drop with therapist id and date', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ message: 'ok' }), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
 
-    const result = await setCoverageDesignatedLeadViaApi({
+    const result = await createCoverageShiftMutator().setDesignatedLead({
       cycleId: 'cycle-1',
       therapistId: 'therapist-9',
       isoDate: '2026-05-16',
@@ -169,24 +110,30 @@ describe('setCoverageDesignatedLeadViaApi', () => {
       }),
     })
   })
+
+  it('surfaces API errors with the same normalized shape as other coverage mutations', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(JSON.stringify({ code: 'lead_gap', error: 'Lead coverage gap' }), {
+          status: 400,
+          headers: { 'content-type': 'application/json' },
+        })
+      )
+    )
+
+    const result = await createCoverageShiftMutator().setDesignatedLead({
+      cycleId: 'cycle-1',
+      therapistId: 'therapist-9',
+      isoDate: '2026-05-16',
+      shiftType: 'day',
+    })
+
+    expect(result.error).toEqual({ code: 'lead_gap', message: 'Lead coverage gap' })
+  })
 })
 
-describe('unassignCoverageShift', () => {
-  it('returns no error on success', async () => {
-    const supabase = makeSupabase({ deleteResult: { error: null } })
-    const result = await unassignCoverageShift(supabase, 'shift-1')
-    expect(result.error).toBe(null)
-  })
-
-  it('returns the error on failure', async () => {
-    const dbError: CoverageMutationError = { message: 'row not found' }
-    const supabase = makeSupabase({ deleteResult: { error: dbError } })
-    const result = await unassignCoverageShift(supabase, 'shift-1')
-    expect(result.error).toEqual(dbError)
-  })
-})
-
-describe('unassignCoverageShiftViaApi', () => {
+describe('CoverageShiftMutator.unassign', () => {
   it('surfaces the API error when delete fails', async () => {
     vi.stubGlobal(
       'fetch',
@@ -201,7 +148,7 @@ describe('unassignCoverageShiftViaApi', () => {
       )
     )
 
-    const result = await unassignCoverageShiftViaApi({
+    const result = await createCoverageShiftMutator().unassign({
       cycleId: 'cycle-1',
       shiftId: 'shift-1',
     })
@@ -212,7 +159,7 @@ describe('unassignCoverageShiftViaApi', () => {
     const fetchMock = vi.fn(async () => new Response(null, { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await unassignCoverageShiftViaApi({
+    await createCoverageShiftMutator().unassign({
       cycleId: 'cycle-1',
       shiftId: 'shift-1',
     })
@@ -231,15 +178,14 @@ describe('unassignCoverageShiftViaApi', () => {
   })
 })
 
-describe('persistCoverageShiftStatus', () => {
+describe('CoverageShiftMutator.updateStatus', () => {
   it('returns no error on success', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => new Response(JSON.stringify({ assignment: { id: 'shift-1' } }), { status: 200 }))
     )
 
-    const supabase = makeSupabase()
-    const result = await persistCoverageShiftStatus(supabase, 'shift-1', {
+    const result = await createCoverageShiftMutator().updateStatus('shift-1', {
       assignment_status: 'on_call',
       status: 'on_call',
     })
@@ -257,8 +203,7 @@ describe('persistCoverageShiftStatus', () => {
       )
     )
 
-    const supabase = makeSupabase()
-    const result = await persistCoverageShiftStatus(supabase, 'shift-1', {
+    const result = await createCoverageShiftMutator().updateStatus('shift-1', {
       assignment_status: 'cancelled',
       status: 'scheduled',
     })
@@ -268,9 +213,8 @@ describe('persistCoverageShiftStatus', () => {
   it('calls assignment-status API with correct assignment_status', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ assignment: { id: 'shift-99' } }), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
-    const supabase = makeSupabase()
 
-    await persistCoverageShiftStatus(supabase, 'shift-99', {
+    await createCoverageShiftMutator().updateStatus('shift-99', {
       assignment_status: 'left_early',
       status: 'scheduled',
     })
@@ -285,5 +229,18 @@ describe('persistCoverageShiftStatus', () => {
         status: 'left_early',
       }),
     })
+  })
+})
+
+describe('createCoverageShiftMutator', () => {
+  it('presents one callable surface for coverage shift mutations', () => {
+    const mutator = createCoverageShiftMutator()
+
+    expect(Object.keys(mutator).sort()).toEqual([
+      'assign',
+      'setDesignatedLead',
+      'unassign',
+      'updateStatus',
+    ])
   })
 })

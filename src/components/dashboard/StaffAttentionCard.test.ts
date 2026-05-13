@@ -36,12 +36,12 @@ describe('StaffAttentionCard', () => {
             label: 'Finish and send availability',
           },
           secondaryAction: {
-            href: '/therapist/schedule',
-            label: 'View my shifts',
+            href: '/schedule',
+            label: 'View schedule',
           },
           scheduleAction: {
-            href: '/therapist/schedule',
-            label: 'View my shifts',
+            href: '/schedule',
+            label: 'View schedule',
           },
           swapSummary: {
             pendingCount: 0,
@@ -71,6 +71,6 @@ describe('StaffAttentionCard', () => {
     expect(html).toContain('Need something else?')
     expect(html).toContain('Past due')
     expect(html).toContain('Draft saved')
-    expect(html).not.toContain('View my shifts</a></div></div></div><div class="mt-5 space-y-3"><a')
+    expect(html).not.toContain('View schedule</a></div></div></div><div class="mt-5 space-y-3"><a')
   })
 })

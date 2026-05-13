@@ -39,7 +39,7 @@ export type ParsedAvailabilityEmailItem = {
   employeeMatchCandidates: AvailabilityEmailEmployeeCandidate[]
   matchedTherapistId: string | null
   matchedCycleId: string | null
-  parseStatus: 'parsed' | 'auto_applied' | 'needs_review' | 'failed'
+  parseStatus: 'parsed' | 'ready_to_apply' | 'applied' | 'auto_applied' | 'needs_review' | 'failed'
   confidenceLevel: 'high' | 'medium' | 'low'
   confidenceReasons: string[]
   requests: ParsedAvailabilityRequest[]
@@ -593,10 +593,13 @@ export function parseAvailabilityEmailItem(params: {
 export function summarizeAvailabilityEmailBatch(
   items: ParsedAvailabilityEmailItem[]
 ): ParsedAvailabilityEmailBatch {
-  const autoAppliedCount = items.filter((item) => item.parseStatus === 'auto_applied').length
+  const autoAppliedCount = items.filter(
+    (item) => item.parseStatus === 'applied' || item.parseStatus === 'auto_applied'
+  ).length
   const failedCount = items.filter((item) => item.parseStatus === 'failed').length
   const needsReviewCount = items.filter((item) => item.parseStatus === 'needs_review').length
   const parsedCount = items.filter((item) => item.parseStatus === 'parsed').length
+  const readyCount = items.filter((item) => item.parseStatus === 'ready_to_apply').length
 
   return {
     items,
@@ -607,6 +610,7 @@ export function summarizeAvailabilityEmailBatch(
     summary: [
       `${items.length} item${items.length === 1 ? '' : 's'}`,
       `${parsedCount} parsed`,
+      `${readyCount} ready to apply`,
       `${needsReviewCount} need review`,
       `${failedCount} failed`,
     ].join(' | '),
@@ -661,7 +665,7 @@ function buildItemParseStatus(params: {
     params.item.matchedCycleId &&
     params.item.requests.length > 0
   ) {
-    return 'auto_applied'
+    return 'ready_to_apply'
   }
 
   return params.item.parseStatus
@@ -672,7 +676,9 @@ function getBatchStatus(items: ParsedAvailabilityEmailItem[]): AvailabilityEmail
   if (items.some((item) => item.parseStatus === 'needs_review' || item.parseStatus === 'failed')) {
     return 'needs_review'
   }
-  if (items.every((item) => item.parseStatus === 'auto_applied')) {
+  if (
+    items.every((item) => item.parseStatus === 'applied' || item.parseStatus === 'auto_applied')
+  ) {
     return 'applied'
   }
   return 'parsed'

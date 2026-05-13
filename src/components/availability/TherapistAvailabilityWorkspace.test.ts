@@ -43,6 +43,7 @@ describe('TherapistAvailabilityWorkspace', () => {
         ],
         conflicts: [],
         initialCycleId: 'cycle-1',
+        todayKey: '2026-03-22',
         hasSavedRecurringPattern: true,
         recurringPatternSummary:
           'Works Mon, Tue, Thu, Fri. Every other weekend starting May 2, 2026.',
@@ -136,6 +137,7 @@ describe('TherapistAvailabilityWorkspace', () => {
         availabilityRows: [],
         conflicts: [{ date: '2026-04-20', shiftType: 'day' }],
         initialCycleId: 'cycle-1',
+        todayKey: '2026-04-19',
         hasSavedRecurringPattern: false,
         recurringPatternSummary: 'No normal schedule saved yet.',
         generatedBaselineByCycleId: { 'cycle-1': {} },
@@ -164,6 +166,7 @@ describe('TherapistAvailabilityWorkspace', () => {
         availabilityRows: [],
         conflicts: [],
         initialCycleId: 'cycle-1',
+        todayKey: '2026-04-24',
         hasSavedRecurringPattern: false,
         recurringPatternSummary: 'No normal schedule saved yet.',
         generatedBaselineByCycleId: { 'cycle-1': {} },
@@ -195,6 +198,7 @@ describe('TherapistAvailabilityWorkspace', () => {
         availabilityRows: [],
         conflicts: [],
         initialCycleId: 'cycle-1',
+        todayKey: '2026-05-03',
         hasSavedRecurringPattern: false,
         recurringPatternSummary: 'No normal schedule saved yet.',
         generatedBaselineByCycleId: { 'cycle-1': {} },
@@ -232,6 +236,7 @@ describe('TherapistAvailabilityWorkspace', () => {
         availabilityRows: [],
         conflicts: [],
         initialCycleId: 'cycle-1',
+        todayKey: '2026-05-03',
         hasSavedRecurringPattern: false,
         recurringPatternSummary: 'No normal schedule saved yet.',
         generatedBaselineByCycleId: {
@@ -296,5 +301,10 @@ describe('TherapistAvailabilityWorkspace', () => {
     expect(src).toContain('value="submit"')
     expect(src).toContain('pendingText="Submitting..."')
     expect(src).toContain('Submit availability sends this cycle to managers.')
+    expect(src).toContain('todayKey: string')
+    expect(src).not.toContain('const todayKey = toIsoDate(new Date())')
+    expect(src).toContain('function dayOfMonthFromIsoDate(isoDate: string): number')
+    expect(src).toContain('const dayNum = dayOfMonthFromIsoDate(date)')
+    expect(src).not.toContain('new Date(`${date}T00:00:00`).getDate()')
   })
 })

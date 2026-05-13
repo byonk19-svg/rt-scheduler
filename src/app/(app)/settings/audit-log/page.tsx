@@ -39,10 +39,20 @@ type AuditLogRow = {
 }
 
 const PAGE_SIZE = 25
+const auditLogDateFormatter = new Intl.DateTimeFormat('en-US', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+})
 
 function getSearchParam(value: string | string[] | undefined): string {
   if (Array.isArray(value)) return value[0] ?? ''
   return value ?? ''
+}
+
+function formatAuditLogTime(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return auditLogDateFormatter.format(date)
 }
 
 function getAuditLogHref(query: AuditLogSearchParams | undefined, page: number): string {
@@ -68,7 +78,7 @@ function targetCell(row: AuditLogRow) {
     return (
       <Link
         className="max-w-[12ch] truncate font-mono text-xs text-primary underline-offset-2 hover:underline"
-        href={`/coverage?cycle=${row.target_id}`}
+        href={`/schedule?cycle=${row.target_id}`}
       >
         {row.target_id}
       </Link>
@@ -77,7 +87,27 @@ function targetCell(row: AuditLogRow) {
   return <span className="max-w-[12ch] truncate font-mono text-xs">{row.target_id}</span>
 }
 
+function actionLabel(action: string) {
+  switch (action) {
+    case 'post_publish_modification':
+      return 'Published schedule changed'
+    case 'shift_added':
+      return 'Shift added'
+    case 'shift_removed':
+      return 'Shift removed'
+    case 'designated_lead_assigned':
+      return 'Lead assigned'
+    case 'team_profile_updated':
+      return 'Team profile updated'
+    default:
+      return action.replaceAll('_', ' ')
+  }
+}
+
 function actionBadgeClass(action: string) {
+  if (action === 'post_publish_modification') {
+    return 'bg-[var(--warning-subtle)] text-[var(--warning-text)]'
+  }
   if (action === 'shift_added') return 'bg-[var(--success-subtle)] text-[var(--success-text)]'
   if (action === 'shift_removed') return 'bg-[var(--error-subtle)] text-[var(--error-text)]'
   if (action === 'team_profile_updated') return 'bg-[var(--info-subtle)] text-[var(--info-text)]'
@@ -138,8 +168,10 @@ export default async function AuditLogPage({
     return q
   }
 
-  let countResult = await buildCountQuery(supabase)
-  let rowsResult = await buildRowsQuery(supabase)
+  let [countResult, rowsResult] = await Promise.all([
+    buildCountQuery(supabase),
+    buildRowsQuery(supabase),
+  ])
 
   const rowsErrorMessage = rowsResult.error?.message ?? ''
   const joinBlocked =
@@ -148,8 +180,12 @@ export default async function AuditLogPage({
 
   if (joinBlocked) {
     const admin = createAdminClient()
-    countResult = await buildCountQuery(admin)
-    rowsResult = await buildRowsQuery(admin)
+    const [adminCountResult, adminRowsResult] = await Promise.all([
+      buildCountQuery(admin),
+      buildRowsQuery(admin),
+    ])
+    countResult = adminCountResult
+    rowsResult = adminRowsResult
   }
 
   const totalCount = countResult.error ? 0 : (countResult.count ?? 0)
@@ -202,17 +238,15 @@ export default async function AuditLogPage({
               rows.map((row) => (
                 <tr key={row.id} className="hover:bg-secondary/20">
                   <td className="whitespace-nowrap px-4 py-2.5 text-sm text-foreground">
-                    {new Date(row.created_at).toLocaleString('en-US', {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    })}
+                    {formatAuditLogTime(row.created_at)}
                   </td>
                   <td className="px-4 py-2.5 text-sm text-muted-foreground">{getActorName(row)}</td>
                   <td className="px-4 py-2.5">
                     <span
+                      title={row.action}
                       className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${actionBadgeClass(row.action)}`}
                     >
-                      {row.action}
+                      {actionLabel(row.action)}
                     </span>
                   </td>
                   <td className="hidden px-4 py-2.5 text-sm text-muted-foreground md:table-cell">

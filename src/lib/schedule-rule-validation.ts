@@ -103,11 +103,6 @@ export function summarizePublishWeeklyViolations({
       const workedDatesFromMap = weeklyWorkedDatesByUserWeek.get(
         weeklyCountKey(therapistId, weekStart)
       )
-      if (workedDatesFromMap === undefined && process.env.NODE_ENV !== 'production') {
-        console.warn(
-          `summarizePublishWeeklyViolations: no worked-dates entry for therapist ${therapistId} week ${weekStart}, assuming 0`
-        )
-      }
       const workedDates = workedDatesFromMap ?? new Set<string>()
       const workedCount = workedDates.size
 
@@ -168,8 +163,7 @@ export function summarizeShiftSlotViolations({
         (assignment) => assignment.status === 'scheduled'
       )
       const activeCoverage = activeAssignments.length
-      const leadAssignments = slotAssignments.filter((assignment) => assignment.role === 'lead')
-      const hasEligibleCoverage = activeAssignments.some((assignment) => assignment.isLeadEligible)
+      const leadAssignments = activeAssignments.filter((assignment) => assignment.role === 'lead')
       const leadName = leadAssignments[0]?.therapistName ?? null
 
       const reasons: ShiftSlotValidationIssue['reasons'] = []
@@ -181,7 +175,7 @@ export function summarizeShiftSlotViolations({
         overCoverage += 1
         reasons.push('over_coverage')
       }
-      if (leadAssignments.length === 0 || !hasEligibleCoverage) {
+      if (leadAssignments.length === 0) {
         missingLead += 1
         reasons.push('missing_lead')
       }

@@ -243,6 +243,23 @@ describe('buildDayItems', () => {
     expect(item.dayStatus).toBe('ok')
   })
 
+  it('does not treat a call-in lead row as current lead coverage', () => {
+    const lead = makeRow({
+      id: 'l1',
+      role: 'lead',
+      name: 'Alice Lead',
+      date: START,
+      assignment_status: 'call_in',
+      status: 'called_off',
+    })
+    const staff = makeRow({ id: 's1', role: 'staff', name: 'Beth Staff', date: START })
+    const [item] = buildDayItems('day', [lead, staff], START, START, new Set())
+
+    expect(item.leadShift).toBeNull()
+    expect(item.staffShifts.map((shift) => shift.id)).toEqual(['l1', 's1'])
+    expect(item.dayStatus).toBe('missing_lead')
+  })
+
   it('staff rows are sorted alphabetically', () => {
     const lead = makeRow({ id: 'l', role: 'lead', name: 'Lead', date: START })
     const staffZ = makeRow({ id: 'sz', role: 'staff', name: 'Zara', date: START })
@@ -262,16 +279,18 @@ describe('buildDayItems', () => {
     expect(item.constraintBlocked).toBe(false)
   })
 
-  it('dayStatus is override when any row has called_off status', () => {
+  it('dayStatus is missing_lead when the only lead row is called off', () => {
     const lead = makeRow({ id: 'l', role: 'lead', name: 'Lead', date: START, status: 'called_off' })
     const [item] = buildDayItems('day', [lead], START, START, new Set())
-    expect(item.dayStatus).toBe('override')
+    expect(item.dayStatus).toBe('missing_lead')
+    expect(item.staffShifts[0]?.status).toBe('cancelled')
   })
 
-  it('applies toUiStatus for assignment_status mapping', () => {
+  it('keeps an on-call lead row visible without counting it as lead coverage', () => {
     const lead = makeRow({ id: 'l', role: 'lead', date: START, assignment_status: 'on_call' })
     const [item] = buildDayItems('day', [lead], START, START, new Set())
-    expect(item.leadShift?.status).toBe('oncall')
+    expect(item.leadShift).toBeNull()
+    expect(item.staffShifts[0]?.status).toBe('oncall')
   })
 
   it('each new shift has an empty log array', () => {

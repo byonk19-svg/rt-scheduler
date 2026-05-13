@@ -9,6 +9,7 @@ type TestContext = {
   supabase: SupabaseClient
   manager: { id: string; email: string; password: string }
   staffViewer: { id: string; email: string; password: string }
+  leadViewer: { id: string; email: string; password: string }
   publishedCycle: {
     id: string
     startDate: string
@@ -63,9 +64,11 @@ test.describe.serial('coverage display regressions', () => {
     const secondTherapistName = `FloatDisplay ${randomString('float')}`
     const nightLeadName = `NightDisplay ${randomString('lead')}`
 
+    const leadEmail = `${randomString('coverage-lead')}@example.com`
+    const leadPassword = `Lead!${Math.random().toString(16).slice(2, 8)}`
     const lead = await createE2EUser(supabase, {
-      email: `${randomString('coverage-lead')}@example.com`,
-      password: `Lead!${Math.random().toString(16).slice(2, 8)}`,
+      email: leadEmail,
+      password: leadPassword,
       fullName: leadName,
       role: 'lead',
       employmentType: 'full_time',
@@ -249,6 +252,11 @@ test.describe.serial('coverage display regressions', () => {
         email: staffViewerEmail,
         password: staffViewerPassword,
       },
+      leadViewer: {
+        id: lead.id,
+        email: leadEmail,
+        password: leadPassword,
+      },
       publishedCycle: {
         id: publishedCycleInsert.data.id,
         startDate: formatDateKey(cycleStart),
@@ -316,7 +324,34 @@ test.describe.serial('coverage display regressions', () => {
     await expect(drawer.getByText('Your status')).toBeVisible()
     await expect(drawer.getByText('You are not scheduled')).toBeVisible()
     await expect(drawer.getByText('No assignment for you on this Day shift.')).toBeVisible()
+    await expect(drawer.getByRole('heading', { name: 'Team Schedule details' })).toBeVisible()
     await expect(drawer.getByText('Manager-only actions')).toHaveCount(0)
+    await expect(drawer.getByText('Lottery decision available')).toHaveCount(0)
+  })
+
+  test('lead selected-day drawer stays framed as Team Schedule without manager staffing actions', async ({
+    page,
+  }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+
+    await loginAs(page, ctx!.leadViewer.email, ctx!.leadViewer.password)
+    await page.goto(`/coverage?cycle=${ctx!.publishedCycle.id}&view=week&shift=day`)
+
+    await expect(page.getByRole('heading', { name: 'Team Schedule' })).toBeVisible()
+
+    const dayPanel = page.locator(
+      `[data-testid="coverage-day-panel-${ctx!.publishedCycle.targetDate}"]:visible`
+    )
+    await expect(dayPanel).toBeVisible({ timeout: 15_000 })
+    await dayPanel.click()
+
+    const drawer = page.getByTestId('coverage-shift-editor-dialog')
+    await expect(drawer).toBeVisible()
+    await expect(drawer.getByRole('heading', { name: 'Team Schedule details' })).toBeVisible()
+    await expect(drawer.getByText('Staffing edits stay in Coverage for managers.')).toBeVisible()
+    await expect(drawer.getByTestId(/^coverage-drawer-status-/).first()).toBeVisible()
+    await expect(drawer.getByText('Manager-only actions')).toHaveCount(0)
+    await expect(drawer.getByText('Lottery decision available')).toHaveCount(0)
   })
 
   test('manager calendar renders the full cycle and keeps day/night cells independent', async ({
@@ -398,6 +433,14 @@ test.describe.serial('coverage display regressions', () => {
     )
     await expect(dayCellButton).toBeVisible()
     await dayCellButton.click({ position: { x: 18, y: 18 } })
-    await expect(page.getByTestId('coverage-shift-editor-dialog')).toBeVisible()
+    const drawer = page.getByTestId('coverage-shift-editor-dialog')
+    await expect(drawer).toBeVisible()
+    await expect(drawer.getByText('Coverage shift editor')).toBeVisible()
+    await expect(
+      drawer.getByText(
+        'Manager staffing changes and post-publish guardrails for this selected shift.'
+      )
+    ).toBeVisible()
+    await expect(drawer.getByText('Your status')).toHaveCount(0)
   })
 })

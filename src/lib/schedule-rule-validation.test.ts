@@ -282,4 +282,45 @@ describe('schedule rule validation', () => {
 
     expect(result.underCoverage).toBe(2)
   })
+
+  it('treats a non-working designated lead as missing lead coverage', () => {
+    const result = summarizeShiftSlotViolations({
+      cycleDates: ['2026-03-01'],
+      assignments: [
+        {
+          date: '2026-03-01',
+          shiftType: 'day',
+          status: 'called_off',
+          role: 'lead',
+          therapistId: 't1',
+          therapistName: 'Lead One',
+          isLeadEligible: true,
+        },
+        {
+          date: '2026-03-01',
+          shiftType: 'day',
+          status: 'scheduled',
+          role: 'staff',
+          therapistId: 't2',
+          therapistName: 'Staff Lead Eligible',
+          isLeadEligible: true,
+        },
+        {
+          date: '2026-03-01',
+          shiftType: 'day',
+          status: 'scheduled',
+          role: 'staff',
+          therapistId: 't3',
+          therapistName: 'Staff',
+          isLeadEligible: false,
+        },
+      ],
+      minCoveragePerShift: 2,
+      maxCoveragePerShift: 5,
+    })
+
+    const dayIssue = result.issues.find((issue) => issue.slotKey === '2026-03-01:day')
+    expect(dayIssue?.reasons).toContain('missing_lead')
+    expect(dayIssue?.leadName).toBeNull()
+  })
 })
