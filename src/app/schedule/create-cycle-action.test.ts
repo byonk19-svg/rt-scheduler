@@ -130,7 +130,7 @@ describe('createCycleAction', () => {
     createClientMock.mockResolvedValue(supabase)
 
     await expect(createCycleAction(makeFormData('2026-05-02', '2026-03-22'))).rejects.toThrow(
-      'REDIRECT:/schedule?view=week&error=create_cycle_invalid_range'
+      'REDIRECT:/schedule?error=create_cycle_invalid_range'
     )
 
     expect(supabase.state.insertedCycles).toHaveLength(0)
@@ -141,7 +141,7 @@ describe('createCycleAction', () => {
     createClientMock.mockResolvedValue(supabase)
 
     await expect(createCycleAction(makeFormData('2026-05-04', '2026-06-14'))).rejects.toThrow(
-      'REDIRECT:/schedule?view=week&error=create_cycle_invalid_block_shape'
+      'REDIRECT:/schedule?error=create_cycle_invalid_block_shape'
     )
 
     expect(supabase.state.insertedCycles).toHaveLength(0)
@@ -152,7 +152,7 @@ describe('createCycleAction', () => {
     createClientMock.mockResolvedValue(supabase)
 
     await expect(createCycleAction(makeFormData('2026-05-03', '2026-06-14'))).rejects.toThrow(
-      'REDIRECT:/schedule?view=week&error=create_cycle_invalid_block_shape'
+      'REDIRECT:/schedule?error=create_cycle_invalid_block_shape'
     )
 
     expect(supabase.state.insertedCycles).toHaveLength(0)
@@ -166,7 +166,7 @@ describe('createCycleAction', () => {
     createClientMock.mockResolvedValue(supabase)
 
     await expect(createCycleAction(makeFormData('2026-05-03', '2026-06-13'))).rejects.toThrow(
-      'REDIRECT:/schedule?view=week&error=create_cycle_overlap'
+      'REDIRECT:/schedule?error=create_cycle_overlap'
     )
 
     expect(supabase.state.insertedCycles).toHaveLength(0)

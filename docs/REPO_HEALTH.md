@@ -23,14 +23,16 @@ Last verified on branch `codex/verify-ui-visibility`:
 - `npm run lint` passed
 - `npm run typecheck` passed
 - `npm run build` passed
-- `npm run test:unit` passed (`1112` tests across `212` files)
+- `npm run test:unit` passed (`1103` tests across `209` files)
+- `npx playwright test e2e/manager-schedule-roster.spec.ts --project=chromium --workers=1` passed (`4` tests)
+- `npx playwright test e2e/therapist-schedule-trust-smoke.spec.ts --project=chromium --workers=1` passed (`8` tests)
 - `npm run test:e2e` previously passed (`42` passed) with the checked-in Playwright worker count set to `2`
 - `npm audit --omit=dev` previously passed with `0` vulnerabilities after the lockfile bump; current local build reports `next@16.2.4`
 
 ## Known Exceptions / Gaps
 
 - `e2e/directory-date-override.spec.ts` remains intentionally removed because `/directory` is now a redirect to the team-management surface.
-- Authenticated browser verification for the unified Schedule grid still depends on fresh local Supabase auth state; route/unit tests and unauthenticated protected-route smoke cover the current code path.
+- Unified Schedule grid has focused authenticated browser coverage in `e2e/manager-schedule-roster.spec.ts` for manager redirects, draft assign/unassign, lead designation, published status updates, and therapist read-only pinned rows.
 
 ## Risk Notes
 

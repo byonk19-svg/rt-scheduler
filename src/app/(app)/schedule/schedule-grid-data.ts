@@ -154,11 +154,17 @@ export async function loadScheduleGridData(
     defaultCoverageShiftTabFromProfileShift(profile?.shift_type)
   const shiftType = shiftTabToQueryValue(initialShiftTab)
 
-  const { data: cyclesData } = await supabase
+  const cyclesQuery = supabase
     .from('schedule_cycles')
     .select('id, label, start_date, end_date, published, status')
     .is('archived_at', null)
     .order('start_date', { ascending: false })
+
+  if (profile?.site_id) {
+    cyclesQuery.eq('site_id', profile.site_id)
+  }
+
+  const { data: cyclesData } = await cyclesQuery
 
   const cycles = ((cyclesData ?? []) as CycleRow[]).filter((cycle) =>
     actorRole === 'therapist' ? isCyclePublished(cycle) : true

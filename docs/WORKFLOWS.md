@@ -128,8 +128,8 @@ Current operational guidance:
 - Allowed actors: manager or lead
 - Persists via RPC `update_assignment_status`
 - Updates status metadata on `shifts` and writes `shift_status_changes` audit rows
-- Used by manager month/week calendar and Coverage status flows
-- The roster layout reuses the same assignment-status popover/status write path as the grid view. Leads can update staffed roster cells to `OC`, `LE`, `CX`, or `CI`.
+- Used by the unified `/schedule` grid status popover.
+- Managers can update assigned cells in the grid. Leads can update staffed published cells to `OC`, `LE`, `CX`, or `CI`.
 - If the cycle is already published, the affected therapist also receives a `published_schedule_changed` in-app notification describing the new status.
 
 ## 5) Shift Board Requests
@@ -157,7 +157,7 @@ Current operational guidance:
 
 - `/publish` is an event log for publish deliveries, not the primary cycle-management surface.
 - `Delete history` removes a `publish_events` record only.
-- `Archive cycle` sets the cycle aside at the `schedule_cycles` level so it no longer appears in Coverage, Availability, or dashboard cycle pickers.
+- `Archive cycle` sets the cycle aside at the `schedule_cycles` level so it no longer appears in Schedule, Availability, or dashboard cycle pickers.
 - Archival is limited to non-live cycles. Live cycles must be restarted as drafts before they can be archived.
 
 ## 8) Manager: Analytics

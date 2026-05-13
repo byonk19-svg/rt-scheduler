@@ -46,7 +46,7 @@ Key additions from PR `#43`: centralized therapist workflow state (`src/lib/ther
 2. **Production UAT for newer manager workflows** - verify `/availability`, `/schedule`, `/team`, `/approvals`, `/preliminary`, and `/publish` together against a real cycle before broader visual/branding work.
 3. Run a full browser QA pass on desktop, tablet, and mobile before shipping (shared headers, `/schedule`, `/team/import`, `/settings/audit-log`).
 4. **Add "Send reminders" bulk action** to the response roster on `/availability` — bulk email nudge for non-respondents is still the top operational gap.
-5. **Print confidentiality footer** - `print-schedule.tsx` still lacks the "Internal Use Only" footer.
+5. **Print confidentiality footer** - unified schedule printing still needs an "Internal Use Only" footer.
 6. **Wire GitHub -> Vercel auto-deploy** (optional) - connect `byonk19-svg/rt-scheduler` repo in Vercel dashboard under Git Integration so pushes trigger builds automatically.
 7. Keep hardening the intake parser with concrete real-message examples before changing heuristics.
 8. Deploy production after significant public-surface changes (`vercel deploy --prod`) so `www.teamwise.work` matches `main`.
@@ -480,6 +480,7 @@ Core tables:
 - `20260409145500_fix_custom_access_token_hook_for_pending_users.sql` (omit null `user_role` claim)
 - `20260412164000_sync_lead_eligibility_to_role.sql` (sync legacy `is_lead_eligible` to `role`)
 - `20260413083000_add_default_schedule_view_to_profiles.sql` (`profiles.default_schedule_view`)
+- `20260513150000_freeze_default_schedule_view.sql` freezes the retired layout preference at `week` for Schedule Grid Unification compatibility.
 - `20260413123000_add_employee_roster_and_name_match_signup.sql` (`employee_roster`, name-match **`handle_new_user`**)
 - `20260424190000_add_shift_post_visibility.sql`
 - `20260424203000_add_shift_post_recipient_response.sql`

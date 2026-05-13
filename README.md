@@ -278,8 +278,9 @@ Recommended lane:
 
 Focused workflow suites:
 
-- `e2e/coverage-publish-flow.spec.ts` - direct Coverage publish and override flow
-- `e2e/coverage-cycle-controls.spec.ts` - cycle create/delete plus auto-draft / clear-draft controls
+- `e2e/manager-schedule-roster.spec.ts` - unified Schedule grid render/edit/status smoke
+- `e2e/coverage-publish-flow.spec.ts` - publish validation and override flow through the schedule APIs
+- `e2e/coverage-cycle-controls.spec.ts` - legacy coverage-route compatibility around cycle controls
 - `e2e/manager-specialized-controls.spec.ts` - swap partner approval and draft-cycle archive lifecycle
 - `e2e/publish-history-lifecycle.spec.ts` - publish details, delete history, and start-over lifecycle
 

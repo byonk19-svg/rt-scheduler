@@ -18,7 +18,6 @@ import type {
   ScheduleSearchParams,
   Therapist,
   ToastVariant,
-  ViewMode,
 } from '@/app/schedule/types'
 
 export function getOne<T>(value: T | T[] | null | undefined): T | null {
@@ -119,34 +118,20 @@ export function isDateWithinRange(date: string, startDate: string, endDate: stri
   return date >= startDate && date <= endDate
 }
 
-export function normalizeViewMode(value: string | undefined): ViewMode {
-  if (value === 'roster') return 'roster' as ViewMode
-  if (value === 'list') return 'week'
-  if (value === 'grid') return 'week'
-  if (value === 'calendar') return 'calendar'
-  if (value === 'week') return 'week'
-  return 'week'
-}
-
-export function normalizeDefaultScheduleView(value: string | undefined): 'week' | 'roster' {
-  return value === 'roster' ? 'roster' : 'week'
-}
-
 export function buildScheduleUrl(
   cycleId?: string,
-  view?: string,
+  _view?: string,
   extraParams?: Record<string, string | undefined>
 ): string {
   const params = new URLSearchParams()
   if (cycleId) params.set('cycle', cycleId)
-  const normalizedView = normalizeViewMode(view)
-  params.set('view', normalizedView)
   if (extraParams) {
     for (const [key, value] of Object.entries(extraParams)) {
       if (value) params.set(key, value)
     }
   }
-  return `/schedule?${params.toString()}`
+  const query = params.toString()
+  return query ? `/schedule?${query}` : '/schedule'
 }
 
 export function getSearchParam(value: string | string[] | undefined): string | undefined {

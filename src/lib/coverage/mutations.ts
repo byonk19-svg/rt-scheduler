@@ -9,6 +9,8 @@ export type AssignCoverageShiftParams = {
   isoDate: string
   shiftType: 'day' | 'night'
   role?: 'lead' | 'staff'
+  availabilityOverride?: boolean
+  availabilityOverrideReason?: string
 }
 
 export type AssignedCoverageShiftRow = {
@@ -88,6 +90,8 @@ async function assignCoverageShiftViaApi(
       shiftType: params.shiftType,
       role: params.role ?? 'staff',
       overrideWeeklyRules: false,
+      availabilityOverride: params.availabilityOverride === true,
+      availabilityOverrideReason: params.availabilityOverrideReason,
     },
     readData: (payload) => payload?.shift ?? null,
   })

@@ -2,9 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import type { AvailabilityOverrideRow, Therapist } from '@/app/schedule/types'
 import {
+  buildScheduleUrl,
   getScheduleFeedback,
-  normalizeDefaultScheduleView,
-  normalizeViewMode,
   pickTherapistForDate,
   wouldExceedMaxConsecutiveDays,
 } from '@/lib/schedule-helpers'
@@ -45,15 +44,11 @@ function buildOverride(overrides?: Partial<AvailabilityOverrideRow>): Availabili
 }
 
 describe('schedule feedback messaging', () => {
-  it('accepts roster as a first-class schedule view', () => {
-    expect(normalizeViewMode('roster')).toBe('roster')
-  })
-
-  it('normalizes persisted default schedule view to week or roster', () => {
-    expect(normalizeDefaultScheduleView('roster')).toBe('roster')
-    expect(normalizeDefaultScheduleView('week')).toBe('week')
-    expect(normalizeDefaultScheduleView('calendar')).toBe('week')
-    expect(normalizeDefaultScheduleView(undefined)).toBe('week')
+  it('builds canonical schedule URLs without retired layout params', () => {
+    expect(buildScheduleUrl('cycle-1', 'roster', { error: 'missing' })).toBe(
+      '/schedule?cycle=cycle-1&error=missing'
+    )
+    expect(buildScheduleUrl(undefined, 'week')).toBe('/schedule')
   })
 
   it('summarizes publish blocking with lead and coverage issue counts', () => {

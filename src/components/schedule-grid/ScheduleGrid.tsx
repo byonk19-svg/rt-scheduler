@@ -114,6 +114,10 @@ export function ScheduleGrid({
       isoDate: activeCellTarget.date,
       shiftType: shiftTabToQueryValue(shiftTab),
       role: 'staff',
+      availabilityOverride: activeCellTarget.cell.hasNeedsOff,
+      availabilityOverrideReason: activeCellTarget.cell.hasNeedsOff
+        ? 'Manager assigned from schedule grid despite requested day off.'
+        : undefined,
     })
     if (error) {
       window.alert(error.message ?? 'Could not assign therapist.')

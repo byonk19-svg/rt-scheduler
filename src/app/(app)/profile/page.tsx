@@ -21,7 +21,6 @@ import {
   parsePreferredWorkDaysSelection,
   resolvePreferredWorkDaysMode,
 } from '@/lib/preferred-work-days'
-import { normalizeDefaultScheduleView } from '@/lib/schedule-helpers'
 import { createClient } from '@/lib/supabase/server'
 import { cn } from '@/lib/utils'
 
@@ -125,12 +124,10 @@ async function savePreferencesAction(formData: FormData) {
   }
 
   const defaultCalendarView = String(formData.get('default_calendar_view') ?? '').trim()
-  const defaultScheduleView = String(formData.get('default_schedule_view') ?? 'week').trim()
   const defaultLandingPage = String(formData.get('default_landing_page') ?? '').trim()
 
   if (
     (defaultCalendarView !== 'day' && defaultCalendarView !== 'night') ||
-    (defaultScheduleView !== 'week' && defaultScheduleView !== 'roster') ||
     (defaultLandingPage !== 'dashboard' && defaultLandingPage !== 'coverage')
   ) {
     redirect('/profile?error=preferences_failed')
@@ -140,7 +137,7 @@ async function savePreferencesAction(formData: FormData) {
     .from('profiles')
     .update({
       default_calendar_view: defaultCalendarView,
-      default_schedule_view: defaultScheduleView,
+      default_schedule_view: 'week',
       default_landing_page: defaultLandingPage,
     })
     .eq('id', user.id)
@@ -176,7 +173,7 @@ export default async function ProfilePage({
   const { data: profile } = await supabase
     .from('profiles')
     .select(
-      'full_name, email, role, shift_type, is_lead_eligible, employment_type, max_work_days_per_week, preferred_work_days, preferred_work_days_mode, default_calendar_view, default_schedule_view, default_landing_page'
+      'full_name, email, role, shift_type, is_lead_eligible, employment_type, max_work_days_per_week, preferred_work_days, preferred_work_days_mode, default_calendar_view, default_landing_page'
     )
     .eq('id', user.id)
     .maybeSingle()
@@ -212,10 +209,6 @@ export default async function ProfilePage({
         ? preferredDayLabels.join(', ')
         : 'Not set'
   const defaultCalendarView = profile?.default_calendar_view === 'night' ? 'night' : 'day'
-  const defaultScheduleView = normalizeDefaultScheduleView(
-    (profile as { default_schedule_view?: string | null } | null)?.default_schedule_view ??
-      undefined
-  )
   const defaultLandingPage = profile?.default_landing_page === 'coverage' ? 'coverage' : 'dashboard'
 
   return (
@@ -329,7 +322,6 @@ export default async function ProfilePage({
                     <option value="night">Night</option>
                   </select>
                 </div>
-                <input type="hidden" name="default_schedule_view" value={defaultScheduleView} />
                 <div className="space-y-1">
                   <label
                     htmlFor="default_landing_page"

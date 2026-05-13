@@ -44,6 +44,39 @@ describe('CoverageShiftMutator.assign', () => {
         shiftType: 'day',
         role: 'lead',
         overrideWeeklyRules: false,
+        availabilityOverride: false,
+      }),
+    })
+  })
+
+  it('passes the requested-off confirmation flag for assign-anyway cells', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ shift: null }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await createCoverageShiftMutator().assign({
+      cycleId: 'cycle-1',
+      userId: 'user-1',
+      isoDate: '2026-03-02',
+      shiftType: 'day',
+      availabilityOverride: true,
+      availabilityOverrideReason: 'Manager confirmed.',
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/schedule/drag-drop', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'assign',
+        cycleId: 'cycle-1',
+        userId: 'user-1',
+        date: '2026-03-02',
+        shiftType: 'day',
+        role: 'staff',
+        overrideWeeklyRules: false,
+        availabilityOverride: true,
+        availabilityOverrideReason: 'Manager confirmed.',
       }),
     })
   })

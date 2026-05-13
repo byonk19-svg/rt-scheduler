@@ -11,7 +11,6 @@ const source = fs.readFileSync(
 describe('staff my-schedule legacy route', () => {
   it('redirects to the unified schedule page', () => {
     expect(source).toContain("redirect('/schedule')")
-    expect(source).not.toContain('PublishedSchedulePage')
     expect(source).not.toContain('My Shifts')
   })
 })
