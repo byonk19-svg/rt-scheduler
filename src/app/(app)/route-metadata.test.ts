@@ -74,7 +74,7 @@ describe('route title consistency', () => {
     expect(coverage).toContain("title: 'Schedule'")
     expect(schedule).toContain("title: 'Schedule'")
     expect(coverage).toContain(
-      "redirect(shift ? `/schedule?shift=${encodeURIComponent(shift)}` : '/schedule')"
+      "redirect(query.size > 0 ? `/schedule?${query.toString()}` : '/schedule')"
     )
     expect(schedule).not.toContain("title: 'Coverage'")
   })

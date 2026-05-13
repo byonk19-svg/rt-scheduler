@@ -23,10 +23,22 @@ describe('coverage redirect route', () => {
     )
   })
 
-  it('preserves the shift query when redirecting to /schedule', async () => {
+  it('preserves query params when redirecting to /schedule', async () => {
     await expect(
-      CoverageRedirectPage({ searchParams: Promise.resolve({ shift: 'night' }) })
-    ).rejects.toThrow('REDIRECT:/schedule?shift=night')
+      CoverageRedirectPage({
+        searchParams: Promise.resolve({
+          cycle: 'cycle-1',
+          shift: 'night',
+          success: 'preliminary_sent',
+        }),
+      })
+    ).rejects.toThrow('REDIRECT:/schedule?cycle=cycle-1&shift=night&success=preliminary_sent')
+  })
+
+  it('preserves repeated query params when redirecting to /schedule', async () => {
+    await expect(
+      CoverageRedirectPage({ searchParams: Promise.resolve({ panel: ['setup', 'new-cycle'] }) })
+    ).rejects.toThrow('REDIRECT:/schedule?panel=setup&panel=new-cycle')
   })
 
   it('uses Schedule metadata', () => {
