@@ -131,7 +131,7 @@ describe('deleteCycleAction', () => {
     createClientMock.mockResolvedValue(mock)
 
     await expect(deleteCycleAction(makeFormData())).rejects.toThrow(
-      'REDIRECT:/coverage?view=week&error=delete_cycle_unauthorized'
+      'REDIRECT:/schedule?error=delete_cycle_unauthorized'
     )
   })
 
@@ -140,7 +140,7 @@ describe('deleteCycleAction', () => {
     createClientMock.mockResolvedValue(mock)
 
     await expect(deleteCycleAction(makeFormData())).rejects.toThrow(
-      'REDIRECT:/coverage?view=week&error=delete_cycle_not_found'
+      'REDIRECT:/schedule?error=delete_cycle_not_found'
     )
   })
 
@@ -154,7 +154,7 @@ describe('deleteCycleAction', () => {
     createClientMock.mockResolvedValue(mock)
 
     await expect(deleteCycleAction(makeFormData())).rejects.toThrow(
-      'REDIRECT:/coverage?view=week&error=delete_cycle_published'
+      'REDIRECT:/schedule?error=delete_cycle_published'
     )
   })
 
@@ -169,7 +169,7 @@ describe('deleteCycleAction', () => {
     createClientMock.mockResolvedValue(mock)
 
     await expect(deleteCycleAction(makeFormData())).rejects.toThrow(
-      'REDIRECT:/coverage?view=week&error=delete_cycle_not_draft'
+      'REDIRECT:/schedule?error=delete_cycle_not_draft'
     )
   })
 
@@ -189,7 +189,7 @@ describe('deleteCycleAction', () => {
     createAdminClientMock.mockReturnValue(mock)
 
     await expect(deleteCycleAction(makeFormData())).rejects.toThrow(
-      'REDIRECT:/coverage?view=week&error=delete_cycle_not_empty'
+      'REDIRECT:/schedule?error=delete_cycle_not_empty'
     )
   })
 
@@ -204,7 +204,7 @@ describe('deleteCycleAction', () => {
     createAdminClientMock.mockReturnValue(mock)
 
     await expect(deleteCycleAction(makeFormData('cycle-1'))).rejects.toThrow(
-      'REDIRECT:/coverage?view=week&success=cycle_deleted'
+      'REDIRECT:/schedule?success=cycle_deleted'
     )
     expect(mock.rpc).toHaveBeenCalledWith('app_delete_empty_draft_schedule_cycle', {
       p_actor_id: 'u1',

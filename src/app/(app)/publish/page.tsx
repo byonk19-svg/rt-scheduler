@@ -194,7 +194,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button asChild variant="outline" size="sm" className="text-xs">
-              <Link href="/coverage">
+              <Link href="/schedule">
                 <CalendarDays className="h-3.5 w-3.5" />
                 Back to schedule
               </Link>
@@ -253,7 +253,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
             color: 'var(--success-text)',
           }}
         >
-          Cycle archived. It will no longer appear in Coverage or availability views.
+          Cycle archived. It will no longer appear in Schedule or availability views.
         </div>
       )}
 
@@ -314,7 +314,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                         : resolvedSearchParams.error === 'unpublish_not_live'
                           ? 'That block is already a draft.'
                           : resolvedSearchParams.error === 'delete_live_publish_event'
-                            ? 'Live publish entries must be restarted from Coverage before they can be removed from history.'
+                            ? 'Live publish entries must be restarted from Schedule before they can be removed from history.'
                             : resolvedSearchParams.error === 'missing_publish_event'
                               ? 'Could not delete that history entry because no publish event was selected.'
                               : resolvedSearchParams.error === 'delete_publish_event_failed'
@@ -412,7 +412,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                       <td className="px-4 py-3 text-right">
                         <div className="flex flex-wrap justify-end gap-2">
                           <Link
-                            href={`/coverage?cycle=${cycle.id}&view=week`}
+                            href={`/schedule?cycle=${cycle.id}`}
                             className="inline-flex h-8 items-center gap-1 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground no-underline hover:no-underline"
                           >
                             {cycle.published ? 'Open in Schedule' : 'Open to publish'}
@@ -602,7 +602,7 @@ export default async function PublishHistoryPage(props: PublishHistoryPageProps)
                             </>
                           )}
                           <Link
-                            href={`/coverage?cycle=${event.cycle_id}&view=week`}
+                            href={`/schedule?cycle=${event.cycle_id}`}
                             className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
                           >
                             Open cycle

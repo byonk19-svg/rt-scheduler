@@ -24,21 +24,21 @@ On `/team`, use Employee roster (single add or bulk paste) so names match what s
 
 ## 1) Manager: Build and Publish a Cycle
 
-1. Create or select a cycle in `/coverage`.
+1. Create or select a cycle in `/schedule`.
    - `New 6-week block` creates a draft cycle.
-   - `/schedule` is a read-only authenticated roster matrix for managers and leads, backed by live cycle, shift, and submission data.
-   - The `/schedule` Day/Night toggle filters therapists by `profiles.shift_type` before splitting Core vs PRN sections, so opposite-shift therapists do not appear on the wrong roster.
-   - `/coverage` remains the canonical protected scheduling workspace for staffing edits, publish actions, and availability-linked coverage work.
-   - The manager AppShell treats both `/schedule` and `/coverage` as part of the `Schedule` section.
+   - `/schedule` is the canonical authenticated schedule grid for managers, leads, and therapists.
+   - Managers edit draft assignments inline from grid cells; leads can update published assignment status but cannot assign new therapists.
+   - Therapists see the same grid read-only with their own row pinned at the top.
+   - The `/schedule` Day/Night toggle filters the grid by shift and preserves the `shift` query param.
+   - `/coverage`, `/staff/schedule`, `/staff/my-schedule`, and `/therapist/schedule` redirect to `/schedule` for bookmark compatibility.
    - The fixed manager secondary nav must stay horizontally scrollable on narrow widths rather than shrinking or clipping workflow tabs.
-   - `/coverage` supports both `Grid` and `Roster` layouts. Explicit `view` params are preserved through `/therapist/schedule`, and the saved profile layout preference is resolved in `/coverage` when no explicit `view` is supplied.
 2. Build draft assignments:
-   - Manual add, move, remove, or set lead.
+   - Manual assign, unassign, status update, or set lead from grid cell popovers.
    - Auto-generate (`generateDraftScheduleAction`) using recurring patterns and cycle overrides.
    - Auto-draft now runs a pre-flight report first so managers can review likely unfilled slots, missing leads, and forced must-work misses before generation.
    - `Clear draft` removes all draft assignments for the active unpublished cycle.
    - Managers can save a published cycle as a staffing template and apply a saved template to a draft cycle. Template data is shift-only (`day_of_cycle`) and intentionally excludes availability overrides.
-3. Resolve blockers in Coverage:
+3. Resolve blockers in Schedule:
    - under or over coverage
    - missing, multiple, or ineligible lead
    - unfilled slots due to constraints
@@ -51,22 +51,22 @@ On `/team`, use Employee roster (single add or bulk paste) so names match what s
 
 ## 1.1) Manager: Work on a Published Cycle
 
-- Published cycles stay editable in `/coverage`.
-- Coverage presents the active published cycle as a live schedule rather than a locked artifact.
+- Published cycles stay editable in `/schedule`.
+- Schedule presents the active published cycle as a live schedule rather than a locked artifact.
 - Manual assignment changes, removals, and lead changes remain available and are treated as post-publish modifications.
 - Published assignment status changes (`on_call`, `cancelled`, `call_in`, `left_early`) are shown on the shared schedule UI and included in therapist published-schedule change notifications.
 - `Start over` on a currently live cycle unpublishes it, clears shifts, and closes any active preliminary snapshot.
 
-## 2) Manager: Coverage Edits (Drag/Drop and Picker)
+## 2) Manager: Schedule Grid Edits
 
 - Endpoint: `POST /api/schedule/drag-drop`
-- Supported actions: `assign`, `move`, `remove`, `set_lead`
+- Supported actions: `assign`, `remove`, `set_lead`
 - Applies eligibility checks (inactive/FMLA, cycle overrides, recurring pattern, PRN strict).
 - Enforces daily coverage max and weekly limits unless manager override flag is set.
 - Returns conflict payload when override confirmation is required.
-- Shift editor surfaces compact in-dialog staffing guidance: `X / 5 covered` progress (3-5 target), non-FT employment badges (`[PRN]`, `[PT]`), and a persistent lead-required warning when editable shifts have no assigned lead.
-- Managers can open staffing edits from the roster layout by clicking a day cell. The roster view reuses the same assignment editor and schedule mutations as the grid view.
-- On small screens, Coverage shows one week at a time with previous/next controls and swipe navigation; desktop and print keep the full multi-week layout.
+- Grid cells show current assignment state (`1`, `OC`, `CX`, `CI`, `LE`, or `.`) and append `*` when the therapist requested the day off.
+- `*` is informational; managers can assign anyway after confirming the warning.
+- The old block-board and roster-layout toggle are removed.
 
 ## 3) Therapist/Manager: Availability Input
 

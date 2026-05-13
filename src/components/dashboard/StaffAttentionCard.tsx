@@ -147,10 +147,10 @@ export function StaffAttentionCard({
               ) : null}
               {!workflowAlreadyLinksToSchedule ? (
                 <Link
-                  href="/therapist/schedule"
+                  href="/schedule"
                   className="font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                 >
-                  View my shifts
+                  View schedule
                 </Link>
               ) : null}
             </div>

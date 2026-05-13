@@ -241,7 +241,7 @@ describe('sendPreliminaryScheduleAction', () => {
     createAdminClientMock.mockReturnValue(admin)
 
     await expect(sendPreliminaryScheduleAction(makeFormData())).rejects.toThrow(
-      'REDIRECT:/coverage?cycle=cycle-1&success=preliminary_sent'
+      'REDIRECT:/schedule?cycle=cycle-1&success=preliminary_sent'
     )
 
     expect(admin.rpc).toHaveBeenCalledWith('app_send_preliminary_schedule', {
@@ -284,7 +284,7 @@ describe('sendPreliminaryScheduleAction', () => {
     createAdminClientMock.mockReturnValue(admin)
 
     await expect(sendPreliminaryScheduleAction(makeFormData())).rejects.toThrow(
-      'REDIRECT:/coverage?cycle=cycle-1&success=preliminary_refreshed'
+      'REDIRECT:/schedule?cycle=cycle-1&success=preliminary_refreshed'
     )
 
     expect(admin.rpc).toHaveBeenCalledWith('app_send_preliminary_schedule', {
@@ -317,7 +317,7 @@ describe('sendPreliminaryScheduleAction', () => {
     createAdminClientMock.mockReturnValue(admin)
 
     await expect(sendPreliminaryScheduleAction(makeFormData())).rejects.toThrow(
-      'REDIRECT:/coverage?cycle=cycle-1&success=preliminary_sent'
+      'REDIRECT:/schedule?cycle=cycle-1&success=preliminary_sent'
     )
 
     expect(admin.rpc).toHaveBeenCalledWith('app_send_preliminary_schedule', {

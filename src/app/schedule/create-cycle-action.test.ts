@@ -22,7 +22,7 @@ vi.mock('@/lib/supabase/server', () => ({ createClient: createClientMock }))
 vi.mock('@/app/(app)/schedule/actions/helpers', () => ({
   getRoleForUser: getRoleForUserMock,
   getPanelParam: getPanelParamMock,
-  buildCoverageUrl: (cycleId?: string, params?: Record<string, string | undefined>) => {
+  buildScheduleActionUrl: (cycleId?: string, params?: Record<string, string | undefined>) => {
     const search = new URLSearchParams()
     if (cycleId) search.set('cycle', cycleId)
     if (params) {
@@ -31,7 +31,7 @@ vi.mock('@/app/(app)/schedule/actions/helpers', () => ({
       }
     }
     const query = search.toString()
-    return query ? `/coverage?${query}` : '/coverage'
+    return query ? `/schedule?${query}` : '/schedule'
   },
 }))
 
@@ -172,7 +172,7 @@ describe('createCycleAction', () => {
     expect(supabase.state.insertedCycles).toHaveLength(0)
   })
 
-  it('keeps coverage-origin overlap errors on the coverage route', async () => {
+  it('keeps schedule-origin overlap errors on the schedule route', async () => {
     const supabase = createSupabaseMock({
       userId: 'manager-1',
       overlappingCycles: [{ id: 'cycle-existing' }],
@@ -181,24 +181,24 @@ describe('createCycleAction', () => {
 
     await expect(
       createCycleAction(makeFormData('2026-05-03', '2026-06-13', { returnTo: 'coverage' }))
-    ).rejects.toThrow('REDIRECT:/coverage?view=week&error=create_cycle_overlap')
+    ).rejects.toThrow('REDIRECT:/schedule?error=create_cycle_overlap')
 
     expect(supabase.state.insertedCycles).toHaveLength(0)
   })
 
-  it('keeps coverage-origin success redirects on the coverage route', async () => {
+  it('keeps schedule-origin success redirects on the schedule route', async () => {
     const supabase = createSupabaseMock({ userId: 'manager-1', overlappingCycles: [] })
     createClientMock.mockResolvedValue(supabase)
 
     await expect(
       createCycleAction(makeFormData('2026-05-03', '2026-06-13', { returnTo: 'coverage' }))
-    ).rejects.toThrow('REDIRECT:/coverage?cycle=cycle-new&view=week&success=cycle_created')
+    ).rejects.toThrow('REDIRECT:/schedule?cycle=cycle-new&success=cycle_created')
 
-    expect(revalidatePathMock).toHaveBeenCalledWith('/coverage')
+    expect(revalidatePathMock).toHaveBeenCalledWith('/schedule')
     expect(supabase.state.insertedCycles).toHaveLength(1)
   })
 
-  it('keeps coverage-origin retry and success redirects in the current coverage context', async () => {
+  it('keeps schedule-origin retry and success redirects in the current schedule context', async () => {
     const overlapSupabase = createSupabaseMock({
       userId: 'manager-1',
       overlappingCycles: [{ id: 'cycle-existing' }],
@@ -215,7 +215,7 @@ describe('createCycleAction', () => {
     await expect(
       createCycleAction(makeFormData('2026-05-03', '2026-06-13', coverageContext))
     ).rejects.toThrow(
-      'REDIRECT:/coverage?cycle=cycle-current&view=roster&shift=night&error=create_cycle_overlap'
+      'REDIRECT:/schedule?cycle=cycle-current&shift=night&error=create_cycle_overlap'
     )
 
     const successSupabase = createSupabaseMock({ userId: 'manager-1', overlappingCycles: [] })
@@ -223,8 +223,6 @@ describe('createCycleAction', () => {
 
     await expect(
       createCycleAction(makeFormData('2026-05-03', '2026-06-13', coverageContext))
-    ).rejects.toThrow(
-      'REDIRECT:/coverage?cycle=cycle-new&view=roster&shift=night&success=cycle_created'
-    )
+    ).rejects.toThrow('REDIRECT:/schedule?cycle=cycle-new&shift=night&success=cycle_created')
   })
 })

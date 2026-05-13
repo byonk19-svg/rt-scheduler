@@ -149,9 +149,9 @@ function buildWeeks(args: {
 }
 
 export async function PublishedSchedulePage({
-  title = 'My Shifts',
+  title = 'Schedule',
   backHref = '/dashboard/staff',
-  scheduleHref = '/therapist/schedule',
+  scheduleHref = '/schedule',
   searchParams,
 }: {
   title?: string

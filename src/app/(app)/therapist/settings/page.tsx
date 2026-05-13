@@ -191,7 +191,7 @@ async function saveTherapistSettingsAction(formData: FormData) {
   const preferredWorkDays = parsePreferredWorkDaysSelection(formData)
   const maxConsecutiveDays = Number.parseInt(String(formData.get('max_consecutive_days') ?? ''), 10)
   const defaultCalendarView = String(formData.get('default_calendar_view') ?? '').trim()
-  const defaultScheduleView = String(formData.get('default_schedule_view') ?? '').trim()
+  const defaultScheduleView = String(formData.get('default_schedule_view') ?? 'week').trim()
   const defaultLandingPage = String(formData.get('default_landing_page') ?? '').trim()
   const notificationInAppEnabled = formData.get('notification_in_app_enabled') === 'on'
   const notificationEmailEnabled = formData.get('notification_email_enabled') === 'on'
@@ -419,7 +419,7 @@ export default async function TherapistSettingsPage({
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-1">
                 <label
                   htmlFor="default_calendar_view"
@@ -437,23 +437,7 @@ export default async function TherapistSettingsPage({
                   <option value="night">Night</option>
                 </select>
               </div>
-              <div className="space-y-1">
-                <label
-                  htmlFor="default_schedule_view"
-                  className="text-sm font-medium text-foreground"
-                >
-                  Default schedule layout
-                </label>
-                <select
-                  id="default_schedule_view"
-                  name="default_schedule_view"
-                  defaultValue={defaultScheduleView}
-                  className="h-9 w-full rounded-md border border-border bg-[var(--input-background)] px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                >
-                  <option value="week">Grid</option>
-                  <option value="roster">Roster</option>
-                </select>
-              </div>
+              <input type="hidden" name="default_schedule_view" value={defaultScheduleView} />
               <div className="space-y-1">
                 <label
                   htmlFor="default_landing_page"
@@ -468,7 +452,7 @@ export default async function TherapistSettingsPage({
                   className="h-9 w-full rounded-md border border-border bg-[var(--input-background)] px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 >
                   <option value="dashboard">Dashboard</option>
-                  <option value="coverage">Coverage</option>
+                  <option value="coverage">Schedule</option>
                 </select>
               </div>
             </div>

@@ -22,7 +22,7 @@ import { createClient } from '@/lib/supabase/server'
 import type { ShiftStatus } from '@/app/schedule/types'
 
 import {
-  buildCoverageUrl,
+  buildScheduleActionUrl,
   countWorkingScheduledForSlot,
   getPanelParam,
   getRoleForUser,
@@ -72,7 +72,7 @@ export async function addShiftAction(formData: FormData) {
     params?: Record<string, string | undefined>
   ) =>
     returnTo === 'coverage'
-      ? buildCoverageUrl(cycleIdOverride, params)
+      ? buildScheduleActionUrl(cycleIdOverride, params)
       : buildScheduleUrl(cycleIdOverride, view, params)
   const panelParams =
     panel === 'add-shift'
@@ -206,7 +206,6 @@ export async function addShiftAction(formData: FormData) {
   })
 
   revalidatePath('/schedule')
-  revalidatePath('/coverage')
   redirect(buildReturnUrl(cycleId, { ...viewParams, success: 'shift_added' }))
 }
 
@@ -286,7 +285,6 @@ export async function deleteShiftAction(formData: FormData) {
   })
 
   revalidatePath('/schedule')
-  revalidatePath('/coverage')
   redirect(buildScheduleUrl(cycleId, view, { success: 'shift_deleted' }))
 }
 
@@ -471,6 +469,5 @@ export async function setDesignatedLeadAction(formData: FormData) {
   }
 
   revalidatePath('/schedule')
-  revalidatePath('/coverage')
   redirect(buildScheduleUrl(cycleId, view, { ...viewParams, success: 'lead_updated' }))
 }

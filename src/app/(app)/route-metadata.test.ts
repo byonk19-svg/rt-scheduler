@@ -27,7 +27,7 @@ const routes = [
   ['src/app/(app)/therapist/schedule/page.tsx', "title: 'Schedule'"],
   ['src/app/(app)/therapist/availability/page.tsx', "title: 'Future Availability'"],
   ['src/app/(app)/therapist/swaps/page.tsx', "title: 'Shift Swaps & Pickups'"],
-  ['src/app/(app)/staff/my-schedule/page.tsx', "title: 'My Shifts'"],
+  ['src/app/(app)/staff/my-schedule/page.tsx', "title: 'Schedule'"],
   ['src/app/(app)/staff/schedule/page.tsx', "title: 'Schedule'"],
   ['src/app/(app)/staff/history/page.tsx', "title: 'Shift Swaps & Pickups History'"],
   ['src/app/(app)/shift-board/page.tsx', "title: 'Shift Board'"],
@@ -50,15 +50,19 @@ describe('route title consistency', () => {
     expect(source).not.toContain('>Roster view<')
   })
 
-  it('/therapist/schedule and /staff/schedule redirect to the unified Schedule route', () => {
+  it('/therapist/schedule, /staff/schedule, and /staff/my-schedule redirect to Schedule', () => {
     const therapistSchedule = read('src/app/(app)/therapist/schedule/page.tsx')
     const staffSchedule = read('src/app/(app)/staff/schedule/page.tsx')
+    const staffMySchedule = read('src/app/(app)/staff/my-schedule/page.tsx')
 
     expect(therapistSchedule).toContain("redirect('/schedule')")
     expect(staffSchedule).toContain("redirect('/schedule')")
+    expect(staffMySchedule).toContain("redirect('/schedule')")
     expect(therapistSchedule).toContain("title: 'Schedule'")
     expect(staffSchedule).toContain("title: 'Schedule'")
+    expect(staffMySchedule).toContain("title: 'Schedule'")
     expect(therapistSchedule).not.toContain('"My Shifts"')
+    expect(staffMySchedule).not.toContain('"My Shifts"')
   })
 
   it('/shift-board is the canonical board while /therapist/swaps keeps legacy therapist wording', () => {

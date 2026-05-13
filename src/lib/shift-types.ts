@@ -1,4 +1,4 @@
-// Core domain primitives shared across /coverage and /schedule pages.
+// Core domain primitives for schedule planning and published schedule views.
 // src/app/schedule/types.ts re-exports these for backward compatibility.
 
 export type ShiftType = 'day' | 'night'

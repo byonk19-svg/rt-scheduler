@@ -4,12 +4,12 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/can'
-import { buildDateRange, buildScheduleUrl, normalizeViewMode } from '@/lib/schedule-helpers'
+import { buildDateRange, buildScheduleUrl } from '@/lib/schedule-helpers'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import type { ShiftRole, ShiftStatus } from '@/app/schedule/types'
 
-import { buildCoverageUrl, getPanelParam, getRoleForUser } from './helpers'
+import { buildScheduleActionUrl, getPanelParam, getRoleForUser } from './helpers'
 
 type CycleImportSourceRow = {
   id: string
@@ -83,7 +83,7 @@ export async function deleteCycleAction(formData: FormData) {
     redirect(
       returnToPublish
         ? '/publish?error=delete_cycle_unauthorized'
-        : '/coverage?view=week&error=delete_cycle_unauthorized'
+        : '/schedule?error=delete_cycle_unauthorized'
     )
   }
 
@@ -99,7 +99,7 @@ export async function deleteCycleAction(formData: FormData) {
     redirect(
       returnToPublish
         ? '/publish?error=delete_cycle_not_found'
-        : '/coverage?view=week&error=delete_cycle_not_found'
+        : '/schedule?error=delete_cycle_not_found'
     )
   }
 
@@ -107,7 +107,7 @@ export async function deleteCycleAction(formData: FormData) {
     redirect(
       returnToPublish
         ? '/publish?error=delete_cycle_published'
-        : '/coverage?view=week&error=delete_cycle_published'
+        : '/schedule?error=delete_cycle_published'
     )
   }
 
@@ -115,7 +115,7 @@ export async function deleteCycleAction(formData: FormData) {
     redirect(
       returnToPublish
         ? '/publish?error=delete_cycle_not_draft'
-        : '/coverage?view=week&error=delete_cycle_not_draft'
+        : '/schedule?error=delete_cycle_not_draft'
     )
   }
 
@@ -127,7 +127,7 @@ export async function deleteCycleAction(formData: FormData) {
       redirect(
         returnToPublish
           ? '/publish?error=delete_cycle_failed'
-          : '/coverage?view=week&error=delete_cycle_failed'
+          : '/schedule?error=delete_cycle_failed'
       )
     }
   })()
@@ -143,20 +143,18 @@ export async function deleteCycleAction(formData: FormData) {
       redirect(
         returnToPublish
           ? '/publish?error=delete_cycle_not_empty'
-          : '/coverage?view=week&error=delete_cycle_not_empty'
+          : '/schedule?error=delete_cycle_not_empty'
       )
     }
     if (error.code === '55000' || /only empty unpublished draft/i.test(error.message ?? '')) {
       redirect(
         returnToPublish
           ? '/publish?error=delete_cycle_not_draft'
-          : '/coverage?view=week&error=delete_cycle_not_draft'
+          : '/schedule?error=delete_cycle_not_draft'
       )
     }
     redirect(
-      returnToPublish
-        ? '/publish?error=delete_cycle_failed'
-        : '/coverage?view=week&error=delete_cycle_failed'
+      returnToPublish ? '/publish?error=delete_cycle_failed' : '/schedule?error=delete_cycle_failed'
     )
   }
 
@@ -164,22 +162,17 @@ export async function deleteCycleAction(formData: FormData) {
   if (!deleted) {
     console.error('Delete cycle affected 0 rows')
     redirect(
-      returnToPublish
-        ? '/publish?error=delete_cycle_failed'
-        : '/coverage?view=week&error=delete_cycle_failed'
+      returnToPublish ? '/publish?error=delete_cycle_failed' : '/schedule?error=delete_cycle_failed'
     )
   }
 
   revalidatePath('/publish')
-  revalidatePath('/coverage')
   revalidatePath('/schedule')
   revalidatePath('/availability')
   revalidatePath('/dashboard')
   revalidatePath('/dashboard/manager')
   revalidatePath('/dashboard/staff')
-  redirect(
-    returnToPublish ? '/publish?success=cycle_deleted' : '/coverage?view=week&success=cycle_deleted'
-  )
+  redirect(returnToPublish ? '/publish?success=cycle_deleted' : '/schedule?success=cycle_deleted')
 }
 
 export async function createCycleAction(formData: FormData) {
@@ -221,7 +214,6 @@ export async function createCycleAction(formData: FormData) {
   const coverageContextParams =
     returnTo === 'coverage'
       ? {
-          view: normalizeViewMode(view),
           shift: coverageShift === 'day' || coverageShift === 'night' ? coverageShift : undefined,
         }
       : undefined
@@ -232,14 +224,13 @@ export async function createCycleAction(formData: FormData) {
     params?: Record<string, string | undefined>
   ) =>
     returnTo === 'coverage'
-      ? buildCoverageUrl((cycleIdOverride ?? coverageCurrentCycleId) || undefined, {
+      ? buildScheduleActionUrl((cycleIdOverride ?? coverageCurrentCycleId) || undefined, {
           ...coverageContextParams,
           ...params,
         })
       : buildScheduleUrl(cycleIdOverride, view, params)
   const revalidateCreatedCycleSurfaces = () => {
     revalidatePath('/schedule')
-    revalidatePath('/coverage')
   }
 
   if (!label || !startDate || !endDate) {

@@ -117,7 +117,7 @@ function CompletionScreen() {
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
           <Button asChild>
-            <Link href="/therapist/schedule">View my schedule</Link>
+            <Link href="/schedule">View schedule</Link>
           </Button>
         </CardContent>
       </Card>

@@ -78,7 +78,7 @@ function targetCell(row: AuditLogRow) {
     return (
       <Link
         className="max-w-[12ch] truncate font-mono text-xs text-primary underline-offset-2 hover:underline"
-        href={`/coverage?cycle=${row.target_id}`}
+        href={`/schedule?cycle=${row.target_id}`}
       >
         {row.target_id}
       </Link>

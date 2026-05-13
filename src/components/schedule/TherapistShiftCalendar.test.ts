@@ -86,11 +86,11 @@ function renderCalendar({
 } = {}) {
   return renderToStaticMarkup(
     createElement(TherapistShiftCalendar, {
-      title: 'My Shifts',
+      title: 'Schedule',
       subtitle: 'Your personal view of the published Schedule Block.',
       periodLabel: 'Mar 22 - May 2, 2026',
-      previousHref: '/therapist/schedule?start=2026-02-08',
-      nextHref: '/therapist/schedule?start=2026-05-03',
+      previousHref: '/schedule?start=2026-02-08',
+      nextHref: '/schedule?start=2026-05-03',
       weeks,
       teammates: [you, lead],
       defaultShiftLabel: 'Day shift',
@@ -112,7 +112,7 @@ describe('TherapistShiftCalendar', () => {
   it('shows shared Schedule Block context and the therapist default shift', () => {
     const html = renderCalendar()
 
-    expect(html).toContain('My Shifts')
+    expect(html).toContain('Schedule')
     expect(html).toContain('Schedule Block')
     expect(html).toContain('Mar 22 - May 2, 2026')
     expect(html).toContain('Sunday-start, 6 weeks')
@@ -158,7 +158,7 @@ describe('TherapistShiftCalendar', () => {
     expect(html).toContain('Sun, Mar 22')
   })
 
-  it('keeps post-publish status changes visible in My Shifts', () => {
+  it('keeps post-publish status changes visible in Schedule', () => {
     const weeks = buildWeeks('2026-03-22')
     weeks[0].days[1].userShift = {
       id: 'shift-cancelled',

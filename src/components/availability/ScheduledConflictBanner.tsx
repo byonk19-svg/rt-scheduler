@@ -47,7 +47,7 @@ export function ScheduledConflictBanner({ conflicts, onDismiss }: Props) {
             ))}
           </ul>
           <Link
-            href="/coverage"
+            href="/schedule"
             className="text-sm font-semibold underline-offset-4 hover:underline"
           >
             Review in Coverage →

@@ -1,8 +1,8 @@
 export const MANAGER_WORKFLOW_LINKS = {
   dashboard: '/dashboard/manager',
   approvals: '/approvals?status=pending',
-  coverage: '/coverage?view=week',
+  coverage: '/schedule',
   lottery: '/lottery',
-  publish: '/coverage?view=week',
+  publish: '/schedule',
   team: '/team',
 } as const

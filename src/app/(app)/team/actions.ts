@@ -226,7 +226,6 @@ export async function saveTeamQuickEditAction(formData: FormData) {
 
   revalidatePath('/team')
   revalidatePath('/schedule')
-  revalidatePath('/coverage')
   revalidatePath('/dashboard/manager')
 
   redirect(buildTeamUrl({ success: 'profile_saved' }))
@@ -341,7 +340,6 @@ export async function saveWorkPatternAction(formData: FormData) {
 
   revalidatePath('/team/work-patterns')
   revalidatePath('/team')
-  revalidatePath('/coverage')
   revalidatePath('/schedule')
 
   redirect('/team/work-patterns?success=work_pattern_saved')
@@ -432,7 +430,6 @@ export async function bulkUpdateTeamMembersAction(formData: FormData) {
 
   revalidatePath('/team')
   revalidatePath('/schedule')
-  revalidatePath('/coverage')
   revalidatePath('/dashboard/manager')
 
   redirect(
@@ -484,7 +481,6 @@ export async function archiveTeamMemberAction(formData: FormData) {
 
   revalidatePath('/team')
   revalidatePath('/schedule')
-  revalidatePath('/coverage')
   revalidatePath('/dashboard/manager')
 
   redirect(buildTeamUrl({ success: 'profile_archived' }))
@@ -831,7 +827,6 @@ export async function replaceTherapistRosterAction(formData: FormData) {
 
   revalidatePath('/team')
   revalidatePath('/schedule')
-  revalidatePath('/coverage')
   revalidatePath('/dashboard/manager')
   revalidatePath('/availability')
 

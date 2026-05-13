@@ -70,12 +70,12 @@ function getRecommendationStateCopy(
   state: NonNullable<LotteryPageSnapshot['recommendation']>['state']
 ) {
   if (state === 'applied') {
-    return 'This exact recommendation is already applied to the live Team Schedule.'
+    return 'This exact recommendation is already applied to the live Schedule.'
   }
   if (state === 'stale') {
     return 'The live schedule, requests, or keep-working count no longer matches the latest applied decision. Review before applying again.'
   }
-  return 'This is a preview. Nothing changes in the live Team Schedule until the result is applied.'
+  return 'This is a preview. Nothing changes in the live Schedule until the result is applied.'
 }
 
 function sameActions(
@@ -653,7 +653,7 @@ export default function LotteryClientPage({
     <div className="max-w-6xl space-y-5">
       <PageIntro
         title="Lottery Decision Center"
-        subtitle="Review the live Team Schedule shift, volunteers, and recommendation before applying a staff reduction."
+        subtitle="Review the live Schedule shift, volunteers, and recommendation before applying a staff reduction."
         summary={
           <>
             <Badge variant="outline">
@@ -730,7 +730,7 @@ export default function LotteryClientPage({
         <CardHeader>
           <CardTitle>Decision context</CardTitle>
           <CardDescription>
-            Live Team Schedule staff for the selected date and shift before any recommendation is
+            Live Schedule staff for the selected date and shift before any recommendation is
             applied.
           </CardDescription>
         </CardHeader>

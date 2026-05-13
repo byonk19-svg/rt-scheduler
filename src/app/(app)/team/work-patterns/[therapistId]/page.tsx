@@ -181,7 +181,6 @@ async function saveManagerRecurringPatternAction(therapistId: string, formData: 
   revalidatePath(`/team/work-patterns/${therapistId}`)
   revalidatePath('/team/work-patterns')
   revalidatePath('/team')
-  revalidatePath('/coverage')
   revalidatePath('/schedule')
   redirect(`/team/work-patterns/${therapistId}?success=work_pattern_saved`)
 }

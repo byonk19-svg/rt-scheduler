@@ -71,12 +71,14 @@ function getOne<T>(value: T | T[] | null | undefined): T | null {
 }
 
 function buildCoverageBaseLink(activeCycleId: string | null): string {
-  if (!activeCycleId) return '/coverage?view=week'
-  return `/coverage?cycle=${activeCycleId}&view=week`
+  if (!activeCycleId) return '/schedule'
+  return `/schedule?cycle=${activeCycleId}`
 }
 
 function buildCoverageFilterLink(activeCycleId: string | null, filter: string): string {
-  return `${buildCoverageBaseLink(activeCycleId)}&filter=${filter}&focus=first`
+  const base = buildCoverageBaseLink(activeCycleId)
+  const joiner = base.includes('?') ? '&' : '?'
+  return `${base}${joiner}filter=${filter}&focus=first`
 }
 
 export function getManagerAttentionLinks(activeCycleId: string | null): DashboardLinks {

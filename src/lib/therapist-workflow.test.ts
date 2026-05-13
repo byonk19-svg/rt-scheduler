@@ -199,7 +199,7 @@ describe('therapist-workflow', () => {
 
     expect(workflow.state).toBe('published_schedule_available')
     expect(workflow.stateLabel).toBe('Final schedule ready')
-    expect(workflow.primaryAction.href).toBe('/therapist/schedule?cycle=cycle-published')
+    expect(workflow.primaryAction.href).toBe('/schedule?cycle=cycle-published')
     expect(workflow.secondaryAction).toEqual({
       href: '/therapist/swaps',
       label: 'Shift Swaps & Pickups',

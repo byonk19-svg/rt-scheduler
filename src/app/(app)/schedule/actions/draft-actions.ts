@@ -14,7 +14,7 @@ import { setDesignatedLeadMutation } from '@/lib/set-designated-lead'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
-import { buildCoverageUrl, getRoleForUser } from './helpers'
+import { buildScheduleActionUrl, getRoleForUser } from './helpers'
 
 export async function generateDraftScheduleAction(formData: FormData) {
   const supabase = await createClient()
@@ -41,7 +41,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
     params?: Record<string, string | undefined>
   ) =>
     returnTo === 'coverage'
-      ? buildCoverageUrl(cycleIdOverride, params)
+      ? buildScheduleActionUrl(cycleIdOverride, params)
       : buildScheduleUrl(cycleIdOverride, view, params)
 
   if (!cycleId) {
@@ -200,7 +200,6 @@ export async function generateDraftScheduleAction(formData: FormData) {
   })
 
   revalidatePath('/schedule')
-  revalidatePath('/coverage')
   redirect(
     buildReturnUrl(cycleId, {
       ...viewParams,
@@ -239,7 +238,7 @@ export async function resetDraftScheduleAction(formData: FormData) {
     params?: Record<string, string | undefined>
   ) =>
     returnTo === 'coverage'
-      ? buildCoverageUrl(cycleIdOverride, params)
+      ? buildScheduleActionUrl(cycleIdOverride, params)
       : buildScheduleUrl(cycleIdOverride, view, params)
 
   if (!cycleId) {
@@ -280,7 +279,6 @@ export async function resetDraftScheduleAction(formData: FormData) {
   const removedCount = resetRow?.deleted_count ?? 0
 
   revalidatePath('/schedule')
-  revalidatePath('/coverage')
   revalidatePath('/preliminary')
   redirect(
     buildReturnUrl(cycleId, {

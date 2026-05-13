@@ -163,7 +163,6 @@ export async function takeScheduleBlockOfflineAction(formData: FormData) {
   )
 
   revalidatePath('/publish')
-  revalidatePath('/coverage')
   revalidatePath('/schedule')
   revalidatePath('/preliminary')
   revalidatePath('/approvals')
@@ -218,7 +217,6 @@ export async function deletePublishEventAction(formData: FormData) {
   }
 
   revalidatePath('/publish')
-  revalidatePath('/coverage')
   revalidatePath('/schedule')
 
   redirect('/publish?success=publish_event_deleted')
@@ -259,7 +257,6 @@ export async function archiveCycleAction(formData: FormData) {
   }
 
   revalidatePath('/publish')
-  revalidatePath('/coverage')
   revalidatePath('/schedule')
   revalidatePath('/availability')
   revalidatePath('/dashboard')

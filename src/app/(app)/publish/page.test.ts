@@ -226,7 +226,7 @@ describe('PublishHistoryPage', () => {
     )
 
     expect(html).toContain('Cycle archived')
-    expect(html).toContain('will no longer appear in Coverage')
+    expect(html).toContain('will no longer appear in Schedule')
   })
 
   it('does not duplicate the canonical dashboard Lottery entry point from publish history', async () => {

@@ -1,5 +1,6 @@
-export function buildCycleRoute(path: '/coverage' | '/schedule', cycleId: string | null): string {
-  const params = new URLSearchParams({ view: 'week' })
+export function buildCycleRoute(path: '/schedule', cycleId: string | null): string {
+  const params = new URLSearchParams()
   if (cycleId) params.set('cycle', cycleId)
-  return `${path}?${params.toString()}`
+  const query = params.toString()
+  return query ? `${path}?${query}` : path
 }

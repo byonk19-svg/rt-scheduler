@@ -10,7 +10,7 @@ import { buildScheduleUrl } from '@/lib/schedule-helpers'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
-import { buildCoverageUrl, getRoleForUser } from './helpers'
+import { buildScheduleActionUrl, getRoleForUser } from './helpers'
 
 type SendPreliminaryScheduleRpcClient = {
   rpc: (
@@ -47,7 +47,7 @@ export async function sendPreliminaryScheduleAction(formData: FormData) {
     params?: Record<string, string | undefined>
   ) =>
     returnTo === 'coverage'
-      ? buildCoverageUrl(cycleIdOverride, params)
+      ? buildScheduleActionUrl(cycleIdOverride, params)
       : buildScheduleUrl(cycleIdOverride, view, params)
 
   if (!cycleId) {
@@ -100,7 +100,6 @@ export async function sendPreliminaryScheduleAction(formData: FormData) {
     targetId: cycleId,
   })
 
-  revalidatePath('/coverage')
   revalidatePath('/schedule')
   revalidatePath('/preliminary')
   revalidatePath('/approvals')

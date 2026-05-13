@@ -16,16 +16,16 @@ describe('staff dashboard future availability links', () => {
     expect(staffDashboardSource).toContain("'therapist_availability_submissions'")
   })
 
-  it('routes published-schedule and swap actions through therapist-owned pages', () => {
-    expect(staffDashboardSource).toContain('/therapist/schedule')
+  it('routes published-schedule actions through the unified schedule and swaps through therapist pages', () => {
+    expect(staffDashboardSource).toContain('/schedule')
     expect(staffDashboardSource).toContain('/therapist/swaps')
     expect(staffDashboardSource).not.toContain('href="/shift-board"')
     expect(staffDashboardSource).not.toContain('href="/staff/my-schedule"')
   })
 
-  it('avoids rendering a duplicate schedule CTA when the workflow already points to the therapist schedule', () => {
+  it('avoids rendering a duplicate schedule CTA when the workflow already points to schedule', () => {
     expect(staffDashboardSource).toContain('workflowAlreadyLinksToSchedule')
-    expect(staffDashboardSource).toContain("href?.startsWith('/therapist/schedule')")
+    expect(staffDashboardSource).toContain("href?.startsWith('/schedule')")
   })
 })
 

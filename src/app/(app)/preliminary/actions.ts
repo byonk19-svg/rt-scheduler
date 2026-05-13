@@ -233,7 +233,7 @@ export async function createPreliminaryCellMarkAction(formData: FormData) {
     await notifyManagersOfPreliminaryRequest(admin as never, userId, 'pencil_mark')
 
     revalidatePath('/preliminary')
-    revalidatePath('/coverage')
+    revalidatePath('/schedule')
     await redirectWithResult('preliminary_mark_saved')
   }
 
@@ -255,7 +255,7 @@ export async function createPreliminaryCellMarkAction(formData: FormData) {
   await notifyManagersOfPreliminaryRequest(admin as never, userId, 'pencil_mark')
 
   revalidatePath('/preliminary')
-  revalidatePath('/coverage')
+  revalidatePath('/schedule')
   await redirectWithResult('preliminary_mark_saved')
 }
 
@@ -275,7 +275,7 @@ export async function cancelPreliminaryCellMarkAction(formData: FormData) {
   }
 
   revalidatePath('/preliminary')
-  revalidatePath('/coverage')
+  revalidatePath('/schedule')
   await redirectWithResult('preliminary_mark_cancelled')
 }
 
@@ -305,7 +305,6 @@ export async function reviewPreliminaryCellMarkAction(formData: FormData) {
   }
 
   revalidatePath('/preliminary')
-  revalidatePath('/coverage')
   revalidatePath('/schedule')
   await redirectWithResult('preliminary_mark_reviewed')
 }

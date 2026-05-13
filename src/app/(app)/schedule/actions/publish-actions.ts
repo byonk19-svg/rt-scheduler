@@ -30,7 +30,12 @@ import { createClient } from '@/lib/supabase/server'
 import { fetchActiveOperationalCodeMap } from '@/lib/operational-codes'
 import type { ShiftLimitRow, ShiftRole } from '@/app/schedule/types'
 
-import { buildCoverageUrl, getOne, getRoleForUser, getWeeklyLimitFromProfile } from './helpers'
+import {
+  buildScheduleActionUrl,
+  getOne,
+  getRoleForUser,
+  getWeeklyLimitFromProfile,
+} from './helpers'
 
 // Primary schedule publish toggle. Publish history/email requeue actions live in
 // `src/app/(app)/publish/actions.ts` because they are event-history operations.
@@ -110,7 +115,7 @@ export async function toggleCyclePublishedAction(formData: FormData) {
     params?: Record<string, string | undefined>
   ) =>
     returnTo === 'coverage'
-      ? buildCoverageUrl(cycleIdOverride, params)
+      ? buildScheduleActionUrl(cycleIdOverride, params)
       : buildScheduleUrl(cycleIdOverride, view, params)
   let publishCycleDetails: { label: string; startDate: string; endDate: string } | null = null
 
@@ -627,7 +632,6 @@ export async function toggleCyclePublishedAction(formData: FormData) {
     }
 
     revalidatePath('/schedule')
-    revalidatePath('/coverage')
     redirect(
       buildReturnUrl(cycleId, {
         ...viewParams,
@@ -645,7 +649,6 @@ export async function toggleCyclePublishedAction(formData: FormData) {
   }
 
   revalidatePath('/schedule')
-  revalidatePath('/coverage')
   redirect(
     buildReturnUrl(cycleId, {
       ...viewParams,

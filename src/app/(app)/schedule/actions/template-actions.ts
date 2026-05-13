@@ -9,7 +9,7 @@ import { insertUnpublishedCycleShifts } from '@/lib/coverage/auto-generated-shif
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 
-import { buildCoverageUrl, getRoleForUser } from './helpers'
+import { buildScheduleActionUrl, getRoleForUser } from './helpers'
 
 export async function applyTemplateAction(formData: FormData) {
   const supabase = await createClient()
@@ -30,7 +30,7 @@ export async function applyTemplateAction(formData: FormData) {
   const cycleId = String(formData.get('new_cycle_id') ?? '').trim()
 
   if (!templateId || !cycleId) {
-    redirect(buildCoverageUrl(cycleId || undefined, { error: 'template_apply_failed' }))
+    redirect(buildScheduleActionUrl(cycleId || undefined, { error: 'template_apply_failed' }))
   }
 
   const [{ data: template, error: templateError }, { data: cycle, error: cycleError }] =
@@ -44,11 +44,11 @@ export async function applyTemplateAction(formData: FormData) {
     ])
 
   if (templateError || !template || cycleError || !cycle) {
-    redirect(buildCoverageUrl(cycleId, { error: 'template_apply_failed' }))
+    redirect(buildScheduleActionUrl(cycleId, { error: 'template_apply_failed' }))
   }
 
   if (cycle.published || cycle.status !== 'draft' || cycle.archived_at) {
-    redirect(buildCoverageUrl(cycleId, { error: 'template_cycle_not_draft' }))
+    redirect(buildScheduleActionUrl(cycleId, { error: 'template_cycle_not_draft' }))
   }
 
   const templateData = (
@@ -68,7 +68,7 @@ export async function applyTemplateAction(formData: FormData) {
       : { data: [], error: null }
 
   if (activeProfilesError) {
-    redirect(buildCoverageUrl(cycleId, { error: 'template_apply_failed' }))
+    redirect(buildScheduleActionUrl(cycleId, { error: 'template_apply_failed' }))
   }
 
   const activeProfileIds = new Set((activeProfiles ?? []).map((row) => row.id as string))
@@ -87,14 +87,13 @@ export async function applyTemplateAction(formData: FormData) {
     rows: shiftsToInsert,
   })
   if (insertResult.error && !insertResult.duplicateConflict) {
-    redirect(buildCoverageUrl(cycleId, { error: 'template_apply_failed' }))
+    redirect(buildScheduleActionUrl(cycleId, { error: 'template_apply_failed' }))
   }
 
-  revalidatePath('/coverage')
   revalidatePath('/schedule')
 
   redirect(
-    buildCoverageUrl(cycleId, {
+    buildScheduleActionUrl(cycleId, {
       success: 'template_applied',
       imported: String(insertResult.insertedCount),
       skipped: skippedCount > 0 ? String(skippedCount) : undefined,

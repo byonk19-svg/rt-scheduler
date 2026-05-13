@@ -320,7 +320,7 @@ describe('takeScheduleBlockOfflineAction', () => {
     expect(supabase.state.offlineRpcCalls).toEqual(['cycle-1'])
     expect(supabase.state.deniedShiftPostIds).toEqual(['post-1'])
     expect(supabase.state.declinedShiftPostInterestIds).toEqual(['post-1'])
-    expect(revalidatePathMock).toHaveBeenCalledWith('/coverage')
+    expect(revalidatePathMock).toHaveBeenCalledWith('/schedule')
   })
 
   it('denies non-managers', async () => {
@@ -396,7 +396,7 @@ describe('archiveCycleAction', () => {
       'REDIRECT:/publish?success=cycle_archived'
     )
 
-    expect(revalidatePathMock).toHaveBeenCalledWith('/coverage')
+    expect(revalidatePathMock).toHaveBeenCalledWith('/schedule')
   })
 
   it('blocks archiving live cycles', async () => {

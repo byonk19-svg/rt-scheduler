@@ -1,6 +1,6 @@
 import type { ShiftTab } from '@/lib/coverage/selectors'
 
-/** Query key for explicit Day/Night schedule tab on `/coverage`. */
+/** Query key for explicit Day/Night schedule tab on `/schedule`. */
 export const COVERAGE_SHIFT_QUERY_KEY = 'shift' as const
 
 /**
@@ -21,7 +21,7 @@ export function shiftTabToQueryValue(tab: ShiftTab): 'day' | 'night' {
   return tab === 'Night' ? 'night' : 'day'
 }
 
-/** Maps profile `shift_type` to the schedule tab; anything other than `night` → Day. */
+/** Maps profile `shift_type` to the schedule tab; anything other than `night` -> Day. */
 export function defaultCoverageShiftTabFromProfileShift(
   shiftType: unknown
 ): ShiftTab {
