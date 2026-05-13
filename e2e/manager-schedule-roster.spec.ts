@@ -15,6 +15,7 @@ type ManagerScheduleCtx = {
   dayCore: TestUser
   dayPrn: TestUser
   nightCore: TestUser
+  lead: TestUser
 }
 
 function cellTestId(userId: string, isoDate: string) {
@@ -109,6 +110,21 @@ test.describe.serial('unified schedule grid route', () => {
       siteId,
     })
     createdUserIds.push(nightCore.id)
+
+    const leadName = `Grid Lead ${randomString('lead')}`
+    const leadEmail = `${randomString('lead')}@example.com`
+    const leadPassword = `Lead!${Math.random().toString(16).slice(2, 10)}`
+    const lead = await createE2EUser(supabase, {
+      email: leadEmail,
+      password: leadPassword,
+      fullName: leadName,
+      role: 'lead',
+      employmentType: 'full_time',
+      shiftType: 'day',
+      isLeadEligible: true,
+      siteId,
+    })
+    createdUserIds.push(lead.id)
 
     const draftStart = nextSunday(addDays(new Date(), 3))
     const draftEnd = addDays(draftStart, 41)
@@ -262,6 +278,12 @@ test.describe.serial('unified schedule grid route', () => {
         password: nightCorePassword,
         name: nightCoreName,
       },
+      lead: {
+        id: lead.id,
+        email: leadEmail,
+        password: leadPassword,
+        name: leadName,
+      },
     }
   })
 
@@ -290,6 +312,12 @@ test.describe.serial('unified schedule grid route', () => {
     const smoke = ctx!
 
     await loginAs(page, smoke.manager.email, smoke.manager.password)
+    await page.goto('/coverage')
+    await expect(page).toHaveURL(/\/schedule$/)
+
+    await page.goto('/coverage?shift=night')
+    await expect(page).toHaveURL(/\/schedule\?shift=night$/)
+
     await page.goto(`/coverage?cycle=${smoke.draftCycle.id}&view=week&shift=day`)
     await expect(page).toHaveURL(/\/schedule\?.*cycle=.*shift=day/)
 
@@ -337,6 +365,7 @@ test.describe.serial('unified schedule grid route', () => {
     await expect(requestedOffCell).toHaveText('·*')
     await requestedOffCell.click()
     await expect(page.getByText('Requested this day off.')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Assign anyway' })).toBeVisible()
     await page.getByRole('button', { name: 'Assign anyway' }).click()
     await expect(requestedOffCell).toHaveText('1*', { timeout: 30_000 })
 
@@ -371,6 +400,7 @@ test.describe.serial('unified schedule grid route', () => {
     const liveCell = page.getByTestId(cellTestId(smoke.dayCore.id, smoke.liveCycle.day1))
     await expect(page.getByText('Published', { exact: true })).toBeVisible()
     await liveCell.click()
+    await expect(page.getByRole('button', { name: 'On call' })).toBeVisible()
     await page.getByRole('button', { name: 'On call' }).click()
     await expect(liveCell).toHaveText('OC', { timeout: 30_000 })
 
@@ -385,11 +415,36 @@ test.describe.serial('unified schedule grid route', () => {
     expect(updated.data?.assignment_status).toBe('on_call')
   })
 
+  test('lead can update status but cannot see assignment controls', async ({ page }) => {
+    test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
+    const smoke = ctx!
+
+    await loginAs(page, smoke.lead.email, smoke.lead.password)
+    await page.goto(`/schedule?cycle=${smoke.liveCycle.id}&shift=day`)
+
+    await expect(page.getByText('Published', { exact: true })).toBeVisible()
+    await expect(page.getByText('Draft', { exact: true })).toHaveCount(0)
+
+    const assignedCell = page.getByTestId(cellTestId(smoke.dayCore.id, smoke.liveCycle.day1))
+    await expect(assignedCell).toBeEnabled()
+    await assignedCell.click()
+    await expect(page.getByRole('button', { name: 'On call' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Unassign' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Designate as lead' })).toHaveCount(0)
+
+    const emptyCell = page.getByTestId(cellTestId(smoke.lead.id, smoke.liveCycle.day1))
+    await expect(emptyCell).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Assign anyway' })).toHaveCount(0)
+  })
+
   test('therapist sees the same schedule as read-only with their row pinned', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
     const smoke = ctx!
 
     await loginAs(page, smoke.dayCore.email, smoke.dayCore.password)
+    await page.goto('/therapist/schedule')
+    await expect(page).toHaveURL(/\/schedule$/)
+
     await page.goto(`/schedule?cycle=${smoke.liveCycle.id}`)
 
     const firstBodyRow = page.locator('tbody tr').first()
@@ -399,5 +454,8 @@ test.describe.serial('unified schedule grid route', () => {
     await expect(
       page.getByTestId(cellTestId(smoke.dayCore.id, smoke.liveCycle.day1))
     ).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'On call' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Unassign' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Designate as lead' })).toHaveCount(0)
   })
 })
