@@ -68,7 +68,7 @@ Collapse everything into a single `/schedule` route that is the one live truth. 
 
 ### Grid
 
-Columns: therapist name (fixed left) + one column per cycle date + total (fixed right)  
+Columns: therapist name (fixed left) + one column per cycle date + total (fixed right, shows count of `scheduled`/`call_in` shifts for that therapist in the cycle)  
 Rows: one per therapist, grouped by shift type (day staff first, then night), FMLA rows muted
 
 **Cell rendering:**
@@ -97,14 +97,17 @@ Rows: one per therapist, grouped by shift type (day staff first, then night), FM
 
 ### Manager / Lead — Draft state
 
+Each cell in the grid belongs to one therapist (the row) on one date (the column). A manager clicks **any therapist's cell** to assign or unassign that specific therapist on that specific date.
+
 **Click `·` (off, no conflict):**  
-→ Small popover: "Assign [Name] to [Date]?" with **Assign** / **Cancel**. Only eligible therapists' own cells are clickable.
+→ Small popover: "Assign [Name] to [Date]?" with **Assign** / **Cancel**.  
+Cells for therapists who are ineligible on that date (FMLA, inactive, `force_off` override, or at their weekly max) are not clickable and render without a hover state. Eligibility follows the same rules as `generateDraftForCycle` in `src/lib/coverage/generate-draft.ts`.
 
 **Click `·*` (off, requested off):**  
-→ Same popover with an amber warning banner: "⚠ Requested this day off." Actions: **Assign anyway** / **Cancel**.
+→ Same popover with an amber warning banner: "⚠ Requested this day off." Actions: **Assign anyway** / **Cancel**. The `·*` cell is clickable — the `*` is informational only, never a hard block.
 
 **Click `1` or `1*` (scheduled):**  
-→ Popover showing current status with **Unassign** action. If `1*`, includes the "Requested this day off" warning.
+→ Popover showing current status with **Unassign** and **Designate as lead** actions (manager only). **Designate as lead** calls the existing `setCoverageDesignatedLeadViaApi` (`action: 'set_lead'`) mutation — this replaces the lead designation that previously lived in the shift editor dialog. If `1*`, includes the "Requested this day off" warning.
 
 ### Manager / Lead — Published state
 
@@ -119,7 +122,7 @@ Rows: one per therapist, grouped by shift type (day staff first, then night), FM
 - ──
 - Unassign
 
-Leads can update status but cannot assign new therapists (manager-only).
+Leads can update status but cannot assign new therapists (manager-only). Lead designation is also manager-only in published state.
 
 ### Therapist — all states
 
