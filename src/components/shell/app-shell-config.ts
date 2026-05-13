@@ -63,9 +63,8 @@ function isRouteActive(pathname: string, href: string): boolean {
 
 function isManagerScheduleRoute(pathname: string): boolean {
   return (
-    pathname === '/coverage' ||
-    pathname === '/analytics' ||
     pathname === '/schedule' ||
+    pathname === '/analytics' ||
     pathname === '/availability' ||
     pathname === '/lottery' ||
     pathname === '/publish' ||
@@ -108,17 +107,12 @@ export function buildManagerSections(pendingCount: number): readonly ShellSectio
     {
       key: 'schedule',
       label: 'Schedule',
-      href: '/coverage',
+      href: '/schedule',
       isActive: (pathname) => isManagerScheduleRoute(pathname),
       subItems: [
         {
-          href: '/coverage',
-          label: 'Coverage',
-          active: (pathname) => pathname === '/coverage',
-        },
-        {
           href: '/schedule',
-          label: 'Roster View',
+          label: 'Schedule',
           active: (pathname) => pathname === '/schedule',
         },
         {
@@ -194,20 +188,20 @@ export function getStaffNavItems(): readonly ShellNavItem[] {
       active: (pathname) => pathname.startsWith('/dashboard/staff'),
     },
     {
-      href: '/therapist/schedule',
-      label: 'My Shifts',
-      active: (pathname) => pathname === '/therapist/schedule' || pathname === '/staff/my-schedule',
+      href: '/schedule',
+      label: 'Schedule',
+      active: (pathname) =>
+        pathname === '/schedule' ||
+        pathname === '/therapist/schedule' ||
+        pathname === '/staff/my-schedule' ||
+        pathname === '/staff/schedule' ||
+        pathname === '/coverage' ||
+        pathname === '/preliminary',
     },
     {
       href: '/therapist/availability',
       label: 'Availability',
       active: (pathname) => pathname === '/therapist/availability' || pathname === '/availability',
-    },
-    {
-      href: '/coverage',
-      label: 'Team Schedule',
-      active: (pathname) =>
-        pathname === '/coverage' || pathname === '/schedule' || pathname === '/preliminary',
     },
     {
       href: '/shift-board',
@@ -273,9 +267,9 @@ export function getMobilePrimaryItems(args: {
         active: (pathname) => pathname.startsWith('/dashboard/manager'),
       },
       {
-        href: '/coverage',
-        label: 'Coverage',
-        active: (pathname) => pathname === '/coverage',
+        href: '/schedule',
+        label: 'Schedule',
+        active: (pathname) => pathname === '/schedule' || pathname === '/coverage',
       },
       {
         href: '/availability',
@@ -298,18 +292,15 @@ export function getMobilePrimaryItems(args: {
         active: (pathname) => pathname.startsWith('/dashboard/staff'),
       },
       {
-        href: '/therapist/schedule',
-        label: 'My Shifts',
+        href: '/schedule',
+        label: 'Schedule',
         active: (pathname) =>
+          pathname === '/schedule' ||
           pathname === '/therapist/schedule' ||
           pathname === '/staff/my-schedule' ||
-          pathname === '/staff/schedule',
-      },
-      {
-        href: '/coverage',
-        label: 'Team Schedule',
-        active: (pathname) =>
-          pathname === '/coverage' || pathname === '/schedule' || pathname === '/preliminary',
+          pathname === '/staff/schedule' ||
+          pathname === '/coverage' ||
+          pathname === '/preliminary',
       },
       {
         href: '/shift-board',
@@ -330,12 +321,15 @@ export function getMobilePrimaryItems(args: {
       active: (pathname) => pathname.startsWith('/dashboard/staff'),
     },
     {
-      href: '/therapist/schedule',
-      label: 'My Shifts',
+      href: '/schedule',
+      label: 'Schedule',
       active: (pathname) =>
+        pathname === '/schedule' ||
         pathname === '/therapist/schedule' ||
         pathname === '/staff/my-schedule' ||
-        pathname === '/staff/schedule',
+        pathname === '/staff/schedule' ||
+        pathname === '/coverage' ||
+        pathname === '/preliminary',
     },
     {
       href: '/therapist/availability',
@@ -366,21 +360,12 @@ export function getWorkflowContext(args: {
       return null
     }
 
-    if (pathname === '/coverage') {
-      return {
-        workflow: 'Coverage',
-        context: 'Schedule Block workbench',
-        state: 'Draft, review, publish',
-        permission: 'Manager editable',
-      }
-    }
-
     if (pathname === '/schedule') {
       return {
-        workflow: 'Team Schedule',
-        context: 'Published roster view',
-        state: 'Live schedule truth',
-        permission: 'Review, print, export',
+        workflow: 'Schedule',
+        context: 'Unified grid workspace',
+        state: 'Draft or published',
+        permission: 'Manager editable',
       }
     }
 
@@ -440,10 +425,10 @@ export function getWorkflowContext(args: {
   if (!isStaffScheduleRoute(pathname)) return null
 
   if (canAccessLeadTools) {
-    if (pathname === '/coverage') {
+    if (pathname === '/schedule' || pathname === '/coverage') {
       return {
-        workflow: 'Team Schedule',
-        context: 'Lead coverage tools',
+        workflow: 'Schedule',
+        context: 'Team schedule grid',
         state: 'Working, on call, call-in, cancelled',
         permission: 'Lead status updates',
       }
@@ -462,13 +447,16 @@ export function getWorkflowContext(args: {
   if (
     pathname === '/therapist/schedule' ||
     pathname === '/staff/my-schedule' ||
-    pathname === '/staff/schedule'
+    pathname === '/staff/schedule' ||
+    pathname === '/coverage' ||
+    pathname === '/schedule' ||
+    pathname === '/preliminary'
   ) {
     return {
-      workflow: 'My Shifts',
-      context: 'Your Schedule Block',
-      state: 'Scheduled days and coworkers',
-      permission: 'Personal view',
+      workflow: 'Schedule',
+      context: 'Your row and team grid',
+      state: 'Day, night, or both shifts',
+      permission: 'Read-only for staff',
     }
   }
 
@@ -478,15 +466,6 @@ export function getWorkflowContext(args: {
       context: 'Need Off and Need to Work',
       state: 'Editable while the window is open',
       permission: 'Your exceptions',
-    }
-  }
-
-  if (pathname === '/coverage' || pathname === '/schedule' || pathname === '/preliminary') {
-    return {
-      workflow: 'Team Schedule',
-      context: 'Published schedule visibility',
-      state: 'Day, night, or both shifts',
-      permission: 'Read-only for staff',
     }
   }
 

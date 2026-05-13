@@ -1,21 +1,18 @@
 import type { Metadata } from 'next'
-
-import { CoverageClientPage } from '@/app/coverage/CoverageClientPage'
-import { getCoveragePageServerData } from '@/app/(app)/coverage/coverage-page-data'
+import { redirect } from 'next/navigation'
 
 export const metadata: Metadata = {
-  title: 'Coverage',
-  description: 'Edit and manage the respiratory therapy shift schedule.',
+  title: 'Schedule',
+  description: 'Open the unified respiratory therapy schedule grid.',
 }
 
-export default async function CoveragePage({
+export default async function CoverageRedirectPage({
   searchParams,
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const data = await getCoveragePageServerData({
-    searchParams: (await searchParams) ?? {},
-  })
-
-  return <CoverageClientPage {...data} />
+  const params = (await searchParams) ?? {}
+  const rawShift = params.shift
+  const shift = typeof rawShift === 'string' ? rawShift : null
+  redirect(shift ? `/schedule?shift=${encodeURIComponent(shift)}` : '/schedule')
 }

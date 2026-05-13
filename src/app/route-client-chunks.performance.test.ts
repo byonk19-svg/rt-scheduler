@@ -3,10 +3,6 @@ import { resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const coverageClientSource = readFileSync(
-  resolve(process.cwd(), 'src/app/(app)/coverage/CoverageClientPage.tsx'),
-  'utf8'
-)
 const availabilityPageSource = readFileSync(
   resolve(process.cwd(), 'src/app/(app)/availability/page.tsx'),
   'utf8'
@@ -15,26 +11,6 @@ const shiftBoardPageSource = readFileSync(
   resolve(process.cwd(), 'src/app/(app)/shift-board/page.tsx'),
   'utf8'
 )
-
-describe('coverage client performance contract', () => {
-  it('lazy-loads the heavy coverage views instead of statically importing both', () => {
-    expect(coverageClientSource).not.toContain(
-      "import { CalendarGrid } from '@/components/coverage/CalendarGrid'"
-    )
-    expect(coverageClientSource).not.toContain(
-      "import { RosterScheduleView, type RosterMemberRow } from '@/components/coverage/RosterScheduleView'"
-    )
-    expect(coverageClientSource).toMatch(/const CalendarGrid = dynamic</)
-    expect(coverageClientSource).toMatch(/const RosterScheduleView = dynamic</)
-  })
-
-  it('lazy-loads the print surface instead of bundling it eagerly with the main coverage client chunk', () => {
-    expect(coverageClientSource).not.toContain(
-      "import { PrintSchedule } from '@/components/print-schedule'"
-    )
-    expect(coverageClientSource).toMatch(/const PrintSchedule = dynamic</)
-  })
-})
 
 describe('availability route performance contract', () => {
   it('lazy-loads the major availability client workspaces instead of statically bundling them together', () => {

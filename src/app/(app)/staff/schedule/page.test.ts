@@ -9,8 +9,9 @@ const source = fs.readFileSync(
 )
 
 describe('staff legacy schedule route', () => {
-  it('redirects to the therapist-owned published schedule page', () => {
-    expect(source).toContain("redirect('/therapist/schedule')")
+  it('redirects to the unified schedule page', () => {
+    expect(source).toContain("redirect('/schedule')")
+    expect(source).not.toContain("redirect('/therapist/schedule')")
     expect(source).not.toContain("redirect('/coverage?view=week')")
   })
 })

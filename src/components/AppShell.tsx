@@ -357,7 +357,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
   const isAvailabilityPage = pathname === '/availability'
   const isTherapistSchedulePage =
     pathname === '/therapist/schedule' || pathname === '/staff/my-schedule'
-  const hideLocalSectionNav = pathname === '/schedule' || pathname.startsWith('/availability')
+  const hideLocalSectionNav = pathname.startsWith('/availability')
 
   return (
     <ThemeProvider>
@@ -477,7 +477,7 @@ export default function AppShell({ user, unreadNotificationCount = 0, children }
               icon={<Home className="h-4 w-4" aria-hidden="true" />}
             />
             <MobileNavLink
-              href={mobileQuickItems[1]?.href ?? '/coverage'}
+              href={mobileQuickItems[1]?.href ?? '/schedule'}
               label={mobileQuickItems[1]?.label ?? 'Schedule'}
               current={Boolean(mobileQuickItems[1]?.current)}
               icon={<CalendarDays className="h-4 w-4" aria-hidden="true" />}

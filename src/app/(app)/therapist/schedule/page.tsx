@@ -1,21 +1,11 @@
 import type { Metadata } from 'next'
-
-import { PublishedSchedulePage } from '@/components/schedule/PublishedSchedulePage'
+import { redirect } from 'next/navigation'
 
 export const metadata: Metadata = {
-  title: 'My Shifts',
-  description: 'View upcoming published shifts on your schedule.',
+  title: 'Schedule',
+  description: 'Redirects to the unified Schedule grid.',
 }
 
-type TherapistScheduleSearchParams = Record<string, string | string[] | undefined>
-
-export default async function TherapistSchedulePage({
-  searchParams,
-}: {
-  searchParams?: Promise<TherapistScheduleSearchParams>
-}) {
-  const params = searchParams ? await searchParams : undefined
-  return (
-    <PublishedSchedulePage title="My Shifts" backHref="/dashboard/staff" searchParams={params} />
-  )
+export default function TherapistScheduleRedirectPage() {
+  redirect('/schedule')
 }
