@@ -15,6 +15,7 @@ function loadPlaywrightEnvFile(fileName: string) {
     if (!match) continue
 
     const [, key, rawValue] = match
+    if (process.env[key] != null) continue
     process.env[key] = rawValue.replace(/^(['"])(.*)\1$/, '$2')
   }
 }

@@ -152,7 +152,7 @@ describe('LotteryClientPage', () => {
       'The live schedule, requests, or keep-working count no longer matches the latest applied decision.'
     )
     expect(html).not.toContain('Apply result')
-    expect(html).not.toContain('Manager override')
+    expect(html).not.toContain('Override recommendation')
     expect(html).not.toContain('Add on behalf of a therapist')
   })
 })

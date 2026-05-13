@@ -5,6 +5,7 @@ import {
   countActive,
   countBy,
   flatten,
+  getCoverageHealth,
   headcountThreshold,
   shouldShowMonthTag,
   toUiStatus,
@@ -100,7 +101,7 @@ describe('countActive', () => {
     expect(countActive(day)).toBe(1)
   })
 
-  it('excludes oncall and leave_early from active count', () => {
+  it('excludes oncall while keeping left_early in the active count', () => {
     const day = makeDay({
       leadShift: makeShift({ status: 'active' }),
       staffShifts: [
@@ -109,7 +110,7 @@ describe('countActive', () => {
         makeShift({ status: 'active' }),
       ],
     })
-    expect(countActive(day)).toBe(2)
+    expect(countActive(day)).toBe(3)
   })
 
   it('returns 0 when all shifts are cancelled', () => {
@@ -127,6 +128,64 @@ describe('countActive', () => {
     })
 
     expect(countActive(day)).toBe(1)
+  })
+})
+
+describe('getCoverageHealth', () => {
+  it('uses the shared staffing safety model for minimum, target, and maximum states', () => {
+    const lead = makeShift({ id: 'lead' })
+    const staff = [1, 2].map((n) => makeShift({ id: `staff-${n}`, name: `Staff ${n}` }))
+    expect(getCoverageHealth(makeDay({ leadShift: lead, staffShifts: staff }))).toMatchObject({
+      activeCount: 3,
+      tone: 'warning',
+      statusLabel: 'Minimum staffed',
+      openToTarget: 1,
+    })
+
+    expect(
+      getCoverageHealth(
+        makeDay({
+          leadShift: lead,
+          staffShifts: [
+            ...staff,
+            makeShift({ id: 'staff-3' }),
+            makeShift({ id: 'staff-4' }),
+            makeShift({ id: 'staff-5' }),
+          ],
+        })
+      )
+    ).toMatchObject({
+      activeCount: 6,
+      tone: 'warning',
+      statusLabel: 'Overstaffed',
+      overMaximum: 1,
+    })
+  })
+
+  it('does not count cancelled, on-call, or call-in assignments as active staffing', () => {
+    const health = getCoverageHealth(
+      makeDay({
+        leadShift: makeShift({ id: 'lead', status: 'call_in' }),
+        staffShifts: [
+          makeShift({ id: 'staff-1', status: 'active' }),
+          makeShift({ id: 'staff-2', status: 'cancelled' }),
+          makeShift({ id: 'staff-3', status: 'oncall' }),
+          makeShift({ id: 'staff-4', status: 'leave_early' }),
+        ],
+      })
+    )
+
+    expect(health).toMatchObject({
+      activeCount: 2,
+      activeLeadCount: 0,
+      missingLead: true,
+      callInCount: 1,
+      cancelledCount: 1,
+      onCallCount: 1,
+      leftEarlyCount: 1,
+      tone: 'critical',
+      statusLabel: 'Missing lead',
+    })
   })
 })
 
@@ -312,7 +371,7 @@ describe('headcountThreshold', () => {
     expect(headcountThreshold(5)).toBe('green')
   })
 
-  it('returns "green" for activeCount above 5', () => {
-    expect(headcountThreshold(10)).toBe('green')
+  it('returns "yellow" for activeCount above 5', () => {
+    expect(headcountThreshold(10)).toBe('yellow')
   })
 })

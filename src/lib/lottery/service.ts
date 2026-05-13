@@ -10,6 +10,7 @@ import {
   type LotteryRequest,
 } from '@/lib/lottery/recommendation'
 import { deriveLotteryStatusReconciliation } from '@/lib/lottery/status-reconciliation'
+import { countsAsActiveWorkingStatus, toStaffingSafetyStatus } from '@/lib/staffing-safety'
 
 export type LotteryShiftType = 'day' | 'night'
 
@@ -261,15 +262,15 @@ function getOne<T>(value: T | T[] | null | undefined): T | null {
 }
 
 function canManageList(role: UiRole): boolean {
-  return role === 'manager'
+  return role === 'manager' || role === 'lead'
 }
 
 function canApplyLottery(role: UiRole): boolean {
-  return role === 'manager'
+  return role === 'manager' || role === 'lead'
 }
 
 function canReadLotteryHistory(actor: LotteryActor, therapistId: string): boolean {
-  return actor.userId === therapistId || actor.role === 'manager'
+  return actor.userId === therapistId || actor.role === 'manager' || actor.role === 'lead'
 }
 
 function lotteryServiceError(
@@ -624,7 +625,15 @@ async function loadPrnPresenceByDate(args: {
   for (const row of rows) {
     const profile = getOne(row.profiles)
     if (profile?.employment_type !== 'prn') continue
-    if (resolveLiveAssignmentStatus(row.status, activeCodes.get(row.id)) !== 'scheduled') continue
+    if (
+      !countsAsActiveWorkingStatus(
+        toStaffingSafetyStatus({
+          assignmentStatus: resolveLiveAssignmentStatus(row.status, activeCodes.get(row.id)),
+        })
+      )
+    ) {
+      continue
+    }
     prnDates.add(row.date)
   }
 
@@ -718,7 +727,11 @@ async function suppressInvalidRequestsForSlot(args: {
 
   const eligibleIds = new Set(
     slotAssignments
-      .filter((assignment) => assignment.liveStatus === 'scheduled')
+      .filter((assignment) =>
+        countsAsActiveWorkingStatus(
+          toStaffingSafetyStatus({ assignmentStatus: assignment.liveStatus })
+        )
+      )
       .map((assignment) => assignment.therapistId)
   )
   const toSuppress = requests
@@ -981,8 +994,8 @@ export async function loadLotterySnapshot(args: {
       }),
     ])
 
-  const workingAssignments = workingAssignmentsAll.filter(
-    (assignment) => assignment.liveStatus === 'scheduled'
+  const workingAssignments = workingAssignmentsAll.filter((assignment) =>
+    countsAsActiveWorkingStatus(toStaffingSafetyStatus({ assignmentStatus: assignment.liveStatus }))
   )
   const lastLotteriedDates = await loadLastLotteriedDates({
     siteId: args.actor.siteId,
@@ -1296,7 +1309,7 @@ export async function addLotteryListEntry(args: {
   shiftType: LotteryShiftType
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!canManageList(args.actor.role)) {
-    return { ok: false, error: 'Only managers can edit the Lottery list.' }
+    return { ok: false, error: 'Only managers or leads can edit the Lottery list.' }
   }
 
   const [profileResult, currentList] = await Promise.all([
@@ -1365,7 +1378,7 @@ export async function moveLotteryListEntry(
   }
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!canManageList(args.actor.role)) {
-    return { ok: false, error: 'Only managers can edit the Lottery list.' }
+    return { ok: false, error: 'Only managers or leads can edit the Lottery list.' }
   }
 
   const loadList = deps?.loadLotteryList ?? loadLotteryList
@@ -1957,7 +1970,7 @@ export async function applyLotteryDecision(
   const deleteDecision = deps?.deleteLotteryDecision ?? deleteLotteryDecision
 
   if (!canApplyLottery(args.actor.role)) {
-    return { ok: false, error: 'Only managers can apply Lottery results.' }
+    return { ok: false, error: 'Only managers or leads can apply Lottery results.' }
   }
 
   const snapshot = await loadSnapshot({
@@ -1995,8 +2008,8 @@ export async function applyLotteryDecision(
       }))
     ) !== recommendedSignature
 
-  if (overrideApplied && args.actor.role !== 'manager') {
-    return { ok: false, error: 'Only managers can override the recommended result.' }
+  if (overrideApplied && !canApplyLottery(args.actor.role)) {
+    return { ok: false, error: 'Only managers or leads can override the recommended result.' }
   }
 
   if (args.actions.length !== snapshot.recommendation.reductionsNeeded) {
@@ -2028,8 +2041,8 @@ export async function applyLotteryDecision(
     shiftDate: args.shiftDate,
     shiftType: args.shiftType,
   })
-  const eligibleAssignments = shiftAssignments.filter(
-    (assignment) => assignment.liveStatus === 'scheduled'
+  const eligibleAssignments = shiftAssignments.filter((assignment) =>
+    countsAsActiveWorkingStatus(toStaffingSafetyStatus({ assignmentStatus: assignment.liveStatus }))
   )
   const targetAssignments = eligibleAssignments.filter((assignment) =>
     actionSet.has(assignment.therapistId)

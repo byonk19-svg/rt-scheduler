@@ -354,6 +354,11 @@ export default function LotteryClientPage({
   )
   const currentUserLotteryPosition =
     currentUserLotteryIndex >= 0 ? currentUserLotteryIndex + 1 : null
+  const actorPermissionLabel = snapshot.actor.canApply
+    ? snapshot.actor.role === 'lead'
+      ? 'Lead permissions: manage the Lottery list and apply decisions to the live Team Schedule.'
+      : 'Manager permissions: manage the Lottery list and apply decisions to the live Team Schedule.'
+    : 'Therapist view: review your request and Lottery position.'
 
   function renderStaffGroup(title: string, staff: LotteryScheduledStaffItem[]) {
     return (
@@ -668,6 +673,7 @@ export default function LotteryClientPage({
               <ClipboardList className="h-3 w-3" />
               {snapshot.workingScheduledCount} working
             </Badge>
+            <Badge variant="outline">{actorPermissionLabel}</Badge>
           </>
         }
       />
@@ -924,7 +930,7 @@ export default function LotteryClientPage({
                     >
                       {recommendation.state === 'applied' ? 'Reapply result' : 'Apply result'}
                     </Button>
-                    {snapshot.actor.role === 'manager' ? (
+                    {snapshot.actor.canApply ? (
                       <Button
                         type="button"
                         variant="outline"
@@ -933,7 +939,7 @@ export default function LotteryClientPage({
                           setOverrideOpen(true)
                         }}
                       >
-                        Manager override
+                        Override recommendation
                       </Button>
                     ) : null}
                   </div>
@@ -1042,7 +1048,7 @@ export default function LotteryClientPage({
       <Dialog open={overrideOpen} onOpenChange={setOverrideOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Manager override</DialogTitle>
+            <DialogTitle>Override recommendation</DialogTitle>
             <DialogDescription>
               Override the recommended set as one confirmed action. The final applied statuses will
               be logged.

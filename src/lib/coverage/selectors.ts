@@ -4,6 +4,13 @@ import {
   toCoverageUiStatus,
   type CoverageUiStatus,
 } from '@/lib/coverage/status-ui'
+import {
+  evaluateStaffingSafety,
+  STAFFING_MAXIMUM,
+  STAFFING_MINIMUM,
+  STAFFING_TARGET,
+  type StaffingSafetyTone,
+} from '@/lib/staffing-safety'
 
 export type UiStatus = CoverageUiStatus
 export type DayStatus = 'ok' | 'override' | 'missing_lead'
@@ -128,7 +135,7 @@ export function countBy(day: DayItem, status: UiStatus): number {
 }
 
 export function countActive(day: DayItem): number {
-  return flatten(day).filter((row) => row.status === 'active').length
+  return getCoverageHealth(day).activeCount
 }
 
 export function countAssigned(day: DayItem): number {
@@ -141,62 +148,79 @@ export function shouldShowMonthTag(index: number, isoDate: string): boolean {
 }
 
 export type HeadcountThreshold = 'red' | 'yellow' | 'green'
-export type CoverageHealthTone = 'critical' | 'warning' | 'healthy'
+export type CoverageHealthTone = StaffingSafetyTone
 export type CoverageHealth = {
   activeCount: number
   assignedCount: number
+  activeLeadCount: number
   tone: CoverageHealthTone
   statusLabel: string
   activeStaffingLabel: string
   assignedRowsLabel: string
   showAssignedRowsContext: boolean
+  missingLead: boolean
+  callInCount: number
+  cancelledCount: number
+  onCallCount: number
+  leftEarlyCount: number
+  openToMinimum: number
+  openToTarget: number
+  overMaximum: number
+  hasCoverageGap: boolean
+  hasCallInGap: boolean
 }
-export const ACTIVE_STAFFING_TARGET = 4
-export const ASSIGNED_ROWS_TARGET = 5
+export const ACTIVE_STAFFING_TARGET = STAFFING_TARGET
+export const ASSIGNED_ROWS_TARGET = STAFFING_MAXIMUM
+export const COVERAGE_STAFFING_RULE_LABEL =
+  `Lead required. Target is ${STAFFING_TARGET} active therapists; ${STAFFING_MINIMUM} active is a warning, fewer than ${STAFFING_MINIMUM} is critical.`
+export const COVERAGE_OPERATIONAL_STATUS_RULE_LABEL =
+  'Call In, On Call, and Cancelled remain visible but do not count as active staffing. Left Early remains visible and counts for the day.'
 
 /**
  * PRD §9.3: Red < 3, Yellow = 3, Green >= 4.
  * Pass countActive(day) as the argument.
  */
 export function headcountThreshold(activeCount: number): HeadcountThreshold {
-  if (activeCount < 3) return 'red'
-  if (activeCount === 3) return 'yellow'
+  if (activeCount < STAFFING_MINIMUM) return 'red'
+  if (activeCount === STAFFING_MINIMUM || activeCount > STAFFING_MAXIMUM) return 'yellow'
   return 'green'
 }
 
 export function getCoverageHealth(day: DayItem): CoverageHealth {
-  const activeCount = countActive(day)
-  const assignedCount = countAssigned(day)
-
-  let tone: CoverageHealthTone
-  if (day.constraintBlocked) {
-    tone = 'critical'
-  } else if (!day.leadShift) {
-    tone = activeCount > 0 ? 'warning' : 'critical'
-  } else {
-    const threshold = headcountThreshold(activeCount)
-    tone = threshold === 'green' ? 'healthy' : threshold === 'yellow' ? 'warning' : 'critical'
-  }
-
-  let statusLabel: string
-  if (day.constraintBlocked) {
-    statusLabel = 'No eligible therapists'
-  } else if (activeCount === 0) {
-    statusLabel = 'Unstaffed'
-  } else if (!day.leadShift) {
-    statusLabel = 'No lead'
-  } else {
-    const openSlots = Math.max(ACTIVE_STAFFING_TARGET - activeCount, 0)
-    statusLabel = openSlots > 0 ? `${openSlots} ${openSlots === 1 ? 'gap' : 'gaps'}` : 'Set'
-  }
+  const safety = evaluateStaffingSafety(
+    flatten(day).map((row) => ({
+      id: row.id,
+      role: row.isLead ? 'lead' : 'staff',
+      status:
+        row.status === 'active'
+          ? 'working'
+          : row.status === 'oncall'
+            ? 'on_call'
+            : row.status === 'leave_early'
+              ? 'left_early'
+              : row.status,
+    })),
+    { constraintBlocked: day.constraintBlocked }
+  )
 
   return {
-    activeCount,
-    assignedCount,
-    tone,
-    statusLabel,
-    activeStaffingLabel: `${activeCount}/${ACTIVE_STAFFING_TARGET} active staffing`,
-    assignedRowsLabel: `${assignedCount}/${ASSIGNED_ROWS_TARGET} assigned rows`,
-    showAssignedRowsContext: assignedCount !== activeCount,
+    activeCount: safety.activeWorkingCount,
+    assignedCount: safety.assignedCount,
+    activeLeadCount: safety.activeLeadCount,
+    tone: safety.tone,
+    statusLabel: safety.label,
+    activeStaffingLabel: safety.activeStaffingLabel,
+    assignedRowsLabel: safety.assignedRowsLabel,
+    showAssignedRowsContext: safety.assignedCount !== safety.activeWorkingCount,
+    missingLead: safety.missingLead,
+    callInCount: safety.callInCount,
+    cancelledCount: safety.cancelledCount,
+    onCallCount: safety.onCallCount,
+    leftEarlyCount: safety.leftEarlyCount,
+    openToMinimum: safety.openToMinimum,
+    openToTarget: safety.openToTarget,
+    overMaximum: safety.overMaximum,
+    hasCoverageGap: safety.hasCoverageGap,
+    hasCallInGap: safety.hasCallInGap,
   }
 }

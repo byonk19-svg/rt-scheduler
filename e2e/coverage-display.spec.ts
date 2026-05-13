@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
-import { addDays, formatDateKey, randomString } from './helpers/env'
+import { addDays, findNextScheduleBlockWindow, formatDateKey, randomString } from './helpers/env'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type TestContext = {
@@ -128,12 +128,16 @@ test.describe.serial('coverage display regressions', () => {
       ...extraTherapists.map((row) => row.id)
     )
 
-    const cycleStart = addDays(new Date(), -1)
-    const cycleEnd = addDays(cycleStart, 41)
+    const { startDate: cycleStart, endDate: cycleEnd } = await findNextScheduleBlockWindow(
+      supabase,
+      addDays(new Date(), 7)
+    )
     const underDate = formatDateKey(cycleStart)
     const healthyDate = formatDateKey(addDays(cycleStart, 1))
     const overDate = formatDateKey(addDays(cycleStart, 2))
     const nightDate = healthyDate
+    const draftStart = addDays(cycleEnd, 1)
+    const draftEnd = addDays(draftStart, 41)
 
     const publishedCycleInsert = await supabase
       .from('schedule_cycles')
@@ -142,6 +146,7 @@ test.describe.serial('coverage display regressions', () => {
         start_date: formatDateKey(cycleStart),
         end_date: formatDateKey(cycleEnd),
         published: true,
+        site_id: 'default',
       })
       .select('id')
       .single()
@@ -156,9 +161,10 @@ test.describe.serial('coverage display regressions', () => {
       .from('schedule_cycles')
       .insert({
         label: `Coverage Display Draft ${randomString('cycle')}`,
-        start_date: formatDateKey(cycleStart),
-        end_date: formatDateKey(cycleEnd),
+        start_date: formatDateKey(draftStart),
+        end_date: formatDateKey(draftEnd),
         published: false,
+        site_id: 'default',
       })
       .select('id, start_date')
       .single()
@@ -174,6 +180,7 @@ test.describe.serial('coverage display regressions', () => {
     const shiftsInsert = await supabase.from('shifts').insert([
       {
         cycle_id: publishedCycleInsert.data.id,
+        site_id: 'default',
         user_id: lead.id,
         date: underDate,
         shift_type: 'day',
@@ -183,6 +190,7 @@ test.describe.serial('coverage display regressions', () => {
       },
       {
         cycle_id: publishedCycleInsert.data.id,
+        site_id: 'default',
         user_id: therapist.id,
         date: underDate,
         shift_type: 'day',
@@ -192,6 +200,7 @@ test.describe.serial('coverage display regressions', () => {
       },
       {
         cycle_id: publishedCycleInsert.data.id,
+        site_id: 'default',
         user_id: lead.id,
         date: healthyDate,
         shift_type: 'day',
@@ -201,6 +210,7 @@ test.describe.serial('coverage display regressions', () => {
       },
       {
         cycle_id: publishedCycleInsert.data.id,
+        site_id: 'default',
         user_id: therapist.id,
         date: healthyDate,
         shift_type: 'day',
@@ -210,6 +220,7 @@ test.describe.serial('coverage display regressions', () => {
       },
       {
         cycle_id: publishedCycleInsert.data.id,
+        site_id: 'default',
         user_id: secondTherapist.id,
         date: healthyDate,
         shift_type: 'day',
@@ -219,6 +230,7 @@ test.describe.serial('coverage display regressions', () => {
       },
       {
         cycle_id: publishedCycleInsert.data.id,
+        site_id: 'default',
         user_id: nightLead.id,
         date: nightDate,
         shift_type: 'night',
@@ -228,6 +240,7 @@ test.describe.serial('coverage display regressions', () => {
       },
       ...[lead, therapist, secondTherapist, ...extraTherapists].map((row, index) => ({
         cycle_id: publishedCycleInsert.data.id,
+        site_id: 'default',
         user_id: row.id,
         date: overDate,
         shift_type: 'day' as const,
@@ -313,9 +326,10 @@ test.describe.serial('coverage display regressions', () => {
     await dayPanel.click()
     const drawer = page.getByTestId('coverage-shift-editor-dialog')
     await expect(drawer).toBeVisible()
-    await expect(drawer.getByText('Your status')).toBeVisible()
-    await expect(drawer.getByText('You are not scheduled')).toBeVisible()
-    await expect(drawer.getByText('No assignment for you on this Day shift.')).toBeVisible()
+    await expect(
+      drawer.getByText('Read-only Team Schedule: review staffing and operational status.')
+    ).toBeVisible()
+    await expect(drawer.getByText('Your status')).toHaveCount(0)
     await expect(drawer.getByText('Manager-only actions')).toHaveCount(0)
   })
 
@@ -374,9 +388,18 @@ test.describe.serial('coverage display regressions', () => {
     await expect(underBadge).toContainText('2/3-5')
     await expect(underBadge).toHaveClass(/error-text/)
     await expect(healthyBadge).toContainText('3/3-5')
-    await expect(healthyBadge).toHaveClass(/success-text/)
+    await expect(healthyBadge).toHaveClass(/warning-text/)
     await expect(overBadge).toContainText('6/3-5')
     await expect(overBadge).toHaveClass(/warning-text/)
+
+    await page
+      .locator(`[data-testid="coverage-day-panel-${ctx!.publishedCycle.healthyDate}"]:visible`)
+      .first()
+      .click()
+    const drawer = page.getByTestId('coverage-shift-editor-dialog')
+    await expect(drawer).toBeVisible()
+    await expect(drawer.getByText('Minimum staffed')).toBeVisible()
+    await expect(drawer.getByText('3 / 4 active')).toBeVisible()
   })
 
   test('manager coverage keeps the draft grid interactive while showing the empty-draft prompt', async ({

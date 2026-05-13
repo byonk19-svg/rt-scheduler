@@ -20,8 +20,10 @@ describe('ShiftEditorDialog layout', () => {
 
   it('uses explicit staffing-edit wording and a detail-drawer description', () => {
     expect(shiftEditorSource).toContain(
-      'Review daily staffing, operational notes, and edit actions for this shift.'
+      'Review daily staffing, operational status, and permitted actions for this shift.'
     )
+    expect(shiftEditorSource).toContain('COVERAGE_STAFFING_RULE_LABEL')
+    expect(shiftEditorSource).toContain('Lead operational tools: update live statuses')
     expect(shiftEditorSource).toContain('Operational notes')
     expect(shiftEditorSource).toContain('Past date')
     expect(shiftEditorSource).toContain('Lottery decision available')

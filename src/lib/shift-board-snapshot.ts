@@ -10,6 +10,11 @@ import {
 } from '@/lib/request-workflow'
 import { buildDateRange, dateKeyFromDate } from '@/lib/schedule-helpers'
 import { canUserSeeShiftPost } from '@/lib/shift-post-visibility'
+import {
+  countsAsActiveWorkingStatus,
+  evaluateStaffingSafety,
+  toStaffingSafetyStatus,
+} from '@/lib/staffing-safety'
 
 export type ShiftBoardTab = 'open' | 'history'
 export type ShiftBoardRequestType = 'swap' | 'pickup'
@@ -176,10 +181,6 @@ function formatRelativeTime(value: string): string {
   return rtf.format(Math.round(seconds / 86400), 'day')
 }
 
-function countsTowardCoverage(status: ShiftBoardShiftStatus): boolean {
-  return status === 'scheduled'
-}
-
 export async function loadShiftBoardSnapshot({
   supabase,
   tab,
@@ -273,9 +274,6 @@ export async function loadShiftBoardSnapshot({
         supabase,
         coverageRows.map((row) => row.id)
       )
-      const hasActiveOperationalCode = (shiftId: string): boolean =>
-        activeOperationalCodes.has(shiftId)
-
       for (const row of coverageRows) {
         const key = `${row.date}:${row.shift_type}`
         const bucket = bySlot.get(key) ?? []
@@ -283,8 +281,11 @@ export async function loadShiftBoardSnapshot({
         bySlot.set(key, bucket)
 
         if (row.user_id) {
-          if (row.status !== 'scheduled') continue
-          if (hasActiveOperationalCode(row.id)) continue
+          const safetyStatus = toStaffingSafetyStatus({
+            assignmentStatus: activeOperationalCodes.get(row.id) ?? null,
+            shiftStatus: row.status,
+          })
+          if (!countsAsActiveWorkingStatus(safetyStatus)) continue
           let userMap = scheduledByDate.get(row.date)
           if (!userMap) {
             userMap = new Map()
@@ -299,14 +300,21 @@ export async function loadShiftBoardSnapshot({
       for (const date of buildDateRange(activeCycle.start_date, activeCycle.end_date)) {
         for (const shiftType of ['day', 'night'] as const) {
           const slotRows = bySlot.get(`${date}:${shiftType}`) ?? []
-          const activeRows = slotRows.filter(
-            (row) => countsTowardCoverage(row.status) && !hasActiveOperationalCode(row.id)
+          const safety = evaluateStaffingSafety(
+            slotRows
+              .filter((row) => Boolean(row.user_id))
+              .map((row) => ({
+                id: row.id,
+                role: row.role,
+                status: toStaffingSafetyStatus({
+                  assignmentStatus: activeOperationalCodes.get(row.id) ?? null,
+                  shiftStatus: row.status,
+                }),
+              }))
           )
-          const assignedCount = activeRows.length
-          const leadCount = activeRows.filter((row) => row.role === 'lead').length
 
-          if (assignedCount === 0) unfilled += 1
-          if (leadCount === 0) missingLead += 1
+          if (safety.activeWorkingCount === 0) unfilled += 1
+          if (safety.missingLead) missingLead += 1
         }
       }
     }
@@ -364,7 +372,12 @@ export async function loadShiftBoardSnapshot({
     )
 
     for (const row of rows) {
-      if (!row.user_id || row.status !== 'scheduled' || activeOperationalCodes.has(row.id)) continue
+      if (!row.user_id) continue
+      const safetyStatus = toStaffingSafetyStatus({
+        assignmentStatus: activeOperationalCodes.get(row.id) ?? null,
+        shiftStatus: row.status,
+      })
+      if (!countsAsActiveWorkingStatus(safetyStatus)) continue
       const key = `${row.cycle_id}:${row.date}`
       let userMap = scheduledByCycleDate.get(key)
       if (!userMap) {

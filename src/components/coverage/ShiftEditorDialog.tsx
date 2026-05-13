@@ -10,12 +10,21 @@ import {
 } from '@/components/coverage/AssignmentStatusPopover'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { ActiveOperationalDetail } from '@/lib/operational-codes'
-import { countActive, type DayItem, type ShiftItem, type ShiftTab, type UiStatus } from '@/lib/coverage/selectors'
+import {
+  COVERAGE_OPERATIONAL_STATUS_RULE_LABEL,
+  COVERAGE_STAFFING_RULE_LABEL,
+  getCoverageHealth,
+  type DayItem,
+  type ShiftItem,
+  type ShiftTab,
+  type UiStatus,
+} from '@/lib/coverage/selectors'
 import { getCoverageStatusLabel } from '@/lib/coverage/status-ui'
 import {
   getDefaultWeeklyLimitForEmploymentType,
   sanitizeWeeklyLimit,
 } from '@/lib/scheduling-constants'
+import { STAFFING_TARGET, type StaffingSafetyTone } from '@/lib/staffing-safety'
 import { cn } from '@/lib/utils'
 
 type TherapistOption = {
@@ -81,26 +90,6 @@ function formatLeftEarlyTime(value: string | null): string | null {
     hour: 'numeric',
     minute: '2-digit',
   })
-}
-
-function coverageState(selectedDay: SelectedDay | null, activeCount: number): {
-  label: string
-  tone: 'success' | 'warning' | 'critical'
-} {
-  if (!selectedDay) return { label: 'Not available', tone: 'warning' }
-  if (selectedDay.constraintBlocked) return { label: 'No eligible therapists', tone: 'critical' }
-  if (!selectedDay.leadShift && activeCount === 0) return { label: 'Unassigned', tone: 'critical' }
-  if (!selectedDay.leadShift) return { label: 'Missing lead', tone: 'critical' }
-
-  const gapCount = Math.max(4 - activeCount, 0)
-  if (gapCount > 0) {
-    return {
-      label: `${gapCount} ${gapCount === 1 ? 'gap' : 'gaps'}`,
-      tone: 'warning',
-    }
-  }
-
-  return { label: 'Fully staffed', tone: 'success' }
 }
 
 function InlineStatusChip({ status }: { status: UiStatus }) {
@@ -185,13 +174,22 @@ function PanelHeader({
   activeCount,
   assignedCount,
   coverageBadge,
+  canEdit,
+  canUpdateAssignmentStatus,
 }: {
   selectedDay: SelectedDay
   activeCount: number
   assignedCount: number
-  coverageBadge: ReturnType<typeof coverageState>
+  coverageBadge: { label: string; tone: StaffingSafetyTone }
+  canEdit: boolean
+  canUpdateAssignmentStatus: boolean
 }) {
-  const progress = Math.min((activeCount / 4) * 100, 100)
+  const progress = Math.min((activeCount / STAFFING_TARGET) * 100, 100)
+  const permissionLabel = canEdit
+    ? 'Manager editing workspace: assign lead/staff and update live statuses.'
+    : canUpdateAssignmentStatus
+      ? 'Lead operational tools: update live statuses; manager assignment and publish controls are unavailable.'
+      : 'Read-only Team Schedule: review staffing and operational status.'
 
   return (
     <DialogHeader className="sticky top-0 z-10 gap-2 border-b border-border bg-background px-5 pb-3 pt-4 text-left">
@@ -201,25 +199,30 @@ function PanelHeader({
             {formatDrawerDate(selectedDay.isoDate)} - {selectedDay.shiftType} shift
           </DialogTitle>
           <DialogDescription className="sr-only">
-            Review daily staffing, operational notes, and edit actions for this shift.
+            Review daily staffing, operational status, and permitted actions for this shift.
           </DialogDescription>
           <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
             <div
               className="h-1.5 w-28 overflow-hidden rounded-full bg-muted"
-              aria-label={`${activeCount} of 4 active`}
+              aria-label={`${activeCount} of ${STAFFING_TARGET} active`}
             >
               <div className="h-full rounded-full bg-primary" style={{ width: `${progress}%` }} />
             </div>
             <span className="tabular-nums">
-              {activeCount} / 4 active
+              {activeCount} / {STAFFING_TARGET} active
             </span>
             <span className="text-muted-foreground/70">({assignedCount} assigned)</span>
+          </div>
+          <div className="mt-2 space-y-0.5 text-[11px] leading-5 text-muted-foreground">
+            <p>{COVERAGE_STAFFING_RULE_LABEL}</p>
+            <p>{COVERAGE_OPERATIONAL_STATUS_RULE_LABEL}</p>
+            <p className="font-medium text-foreground">{permissionLabel}</p>
           </div>
         </div>
         <span
           className={cn(
             'rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]',
-            coverageBadge.tone === 'success' &&
+            coverageBadge.tone === 'healthy' &&
               'border-[var(--success-border)] bg-[var(--success-subtle)] text-[var(--success-text)]',
             coverageBadge.tone === 'warning' &&
               'border-[var(--warning-border)] bg-[var(--warning-subtle)] text-[var(--warning-text)]',
@@ -250,10 +253,10 @@ function PastDateBar({
   let message: string | null = null
 
   if (!coverageCycleId) {
-    message = 'Read-only: no active schedule cycle is available for this shift.'
+    message = 'Read-only: no active Schedule Block is available for this shift.'
   } else if (!canEdit) {
     message = canUpdateAssignmentStatus
-      ? 'Read-only staffing: operational status updates are still available.'
+      ? 'Lead mode: staffing assignments are read-only, but operational status updates are available.'
       : 'Read-only schedule: staffing and operational updates are unavailable.'
   } else if (isPastDate) {
     message = 'Past date: staffing edits will be logged as post-publish changes.'
@@ -850,12 +853,16 @@ export function ShiftEditorDialog({
 
   const hasLead = Boolean(selectedDay?.leadShift)
   const assignedCount = dayAssignments.length
-  const activeCount = selectedDay ? countActive(selectedDay) : 0
-  const coverageBadge = coverageState(selectedDay, activeCount)
+  const coverageHealth = selectedDay ? getCoverageHealth(selectedDay) : null
+  const activeCount = coverageHealth?.activeCount ?? 0
+  const coverageBadge = {
+    label: coverageHealth?.statusLabel ?? 'Not available',
+    tone: coverageHealth?.tone ?? 'warning',
+  } satisfies { label: string; tone: StaffingSafetyTone }
   const hasLotteryStatus = operationalEntries.some(
     ({ shift }) => shift.status === 'cancelled' || shift.status === 'oncall'
   )
-  const showLotteryLink = assignedCount > 4 || hasLotteryStatus
+  const showLotteryLink = canUpdateAssignmentStatus && (assignedCount > 4 || hasLotteryStatus)
   const lotteryHref = selectedDay
     ? `/lottery?date=${selectedDay.isoDate}&shift=${selectedDay.shiftType.toLowerCase()}`
     : '/lottery'
@@ -926,6 +933,8 @@ export function ShiftEditorDialog({
               activeCount={activeCount}
               assignedCount={assignedCount}
               coverageBadge={coverageBadge}
+              canEdit={canEdit}
+              canUpdateAssignmentStatus={canUpdateAssignmentStatus}
             />
             <PastDateBar
               canEdit={canEdit}

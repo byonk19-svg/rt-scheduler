@@ -1,6 +1,7 @@
 import { coverageSlotKey, weeklyCountKey } from '@/lib/schedule-helpers'
 import type { ShiftRole, ShiftStatus } from '@/app/schedule/types'
 import { MAX_WORK_DAYS_PER_WEEK } from '@/lib/scheduling-constants'
+import { countsAsActiveWorkingStatus, toStaffingSafetyStatus } from '@/lib/staffing-safety'
 
 type PublishWeeklyInput = {
   therapistIds: string[]
@@ -164,12 +165,12 @@ export function summarizeShiftSlotViolations({
     for (const shiftType of ['day', 'night'] as const) {
       const slotKey = coverageSlotKey(date, shiftType)
       const slotAssignments = assignmentsBySlot.get(slotKey) ?? []
-      const activeAssignments = slotAssignments.filter(
-        (assignment) => assignment.status === 'scheduled'
+      const activeAssignments = slotAssignments.filter((assignment) =>
+        countsAsActiveWorkingStatus(toStaffingSafetyStatus({ shiftStatus: assignment.status }))
       )
       const activeCoverage = activeAssignments.length
-      const leadAssignments = slotAssignments.filter((assignment) => assignment.role === 'lead')
-      const hasEligibleCoverage = activeAssignments.some((assignment) => assignment.isLeadEligible)
+      const leadAssignments = activeAssignments.filter((assignment) => assignment.role === 'lead')
+      const hasEligibleLead = leadAssignments.some((assignment) => assignment.isLeadEligible)
       const leadName = leadAssignments[0]?.therapistName ?? null
 
       const reasons: ShiftSlotValidationIssue['reasons'] = []
@@ -181,7 +182,7 @@ export function summarizeShiftSlotViolations({
         overCoverage += 1
         reasons.push('over_coverage')
       }
-      if (leadAssignments.length === 0 || !hasEligibleCoverage) {
+      if (leadAssignments.length === 0 || !hasEligibleLead) {
         missingLead += 1
         reasons.push('missing_lead')
       }

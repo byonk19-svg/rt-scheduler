@@ -48,8 +48,8 @@ import {
   unassignCoverageShiftViaApi,
 } from '@/lib/coverage/mutations'
 import {
-  countActive,
   flatten,
+  getCoverageHealth,
   toUiStatus,
   type DayItem,
   type ShiftItem,
@@ -586,10 +586,9 @@ export function CoverageClientPage({
   const coverageSummary = useMemo(() => {
     const missingLeadDays = days.filter((day) => !day.leadShift).length
     const unassignedDays = days.filter((day) => flatten(day).length === 0).length
-    const priorityGapDays = days.filter(
-      (day) => day.constraintBlocked || !day.leadShift || countActive(day) < 3
-    ).length
-    const staffedDays = days.filter((day) => day.leadShift && countActive(day) >= 4).length
+    const healthByDay = days.map(getCoverageHealth)
+    const priorityGapDays = healthByDay.filter((health) => health.tone !== 'healthy').length
+    const staffedDays = healthByDay.filter((health) => health.tone === 'healthy').length
 
     return {
       missingLeadDays,

@@ -5,6 +5,7 @@ import { memo, useMemo } from 'react'
 import { AssignmentStatusPopover } from '@/components/coverage/AssignmentStatusPopover'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { DayItem, ShiftItem, ShiftTab, UiStatus } from '@/lib/coverage/selectors'
+import { getCoverageHealth } from '@/lib/coverage/selectors'
 import { formatDayNumber, formatWeekdayShort } from '@/lib/schedule-helpers'
 import { cn } from '@/lib/utils'
 
@@ -212,9 +213,7 @@ function MobileRosterDayCards({
         const prnAssignments = buildAssignmentsForDay(day, prnRows)
         const leadAssignment = regularAssignments.find((assignment) => assignment.isLead)
         const supportingAssignments = regularAssignments.filter((assignment) => !assignment.isLead)
-        const activeCount = [...regularAssignments, ...prnAssignments].filter(
-          (assignment) => assignment.shift.status === 'active'
-        ).length
+        const activeCount = day ? getCoverageHealth(day).activeCount : 0
 
         return (
           <article

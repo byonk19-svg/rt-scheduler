@@ -99,39 +99,61 @@ describe('CalendarGrid roster helpers', () => {
   })
 
   it('uses quiet healthy copy and explicit gap copy for board tiles', () => {
-    expect(resolveDayBoardStatus(makeDay(), 4)).toEqual({
+    expect(resolveDayBoardStatus(makeDay({ staffShifts: [
+      makeShift({ id: 'staff-1' }),
+      makeShift({ id: 'staff-2' }),
+      makeShift({ id: 'staff-3' }),
+    ] }))).toEqual({
       tone: 'healthy',
       label: 'Fully staffed',
     })
 
-    expect(resolveDayBoardStatus(makeDay(), 2)).toEqual({
+    expect(resolveDayBoardStatus(makeDay({ staffShifts: [makeShift({ id: 'staff-1' })] }))).toEqual({
       tone: 'critical',
       label: 'Understaffed',
     })
   })
 
-  it('marks minimum-to-maximum staffing as healthy', () => {
-    expect(resolveDayBoardStatus(makeDay(), 3)).toEqual({
-      tone: 'healthy',
-      label: 'Fully staffed',
+  it('marks minimum staffing as warning and target-to-maximum staffing as healthy', () => {
+    expect(resolveDayBoardStatus(makeDay({ staffShifts: [
+      makeShift({ id: 'staff-1' }),
+      makeShift({ id: 'staff-2' }),
+    ] }))).toEqual({
+      tone: 'warning',
+      label: 'Minimum staffed',
     })
-    expect(resolveDayBoardStatus(makeDay(), 5)).toEqual({
+    expect(resolveDayBoardStatus(makeDay({ staffShifts: [
+      makeShift({ id: 'staff-1' }),
+      makeShift({ id: 'staff-2' }),
+      makeShift({ id: 'staff-3' }),
+      makeShift({ id: 'staff-4' }),
+    ] }))).toEqual({
       tone: 'healthy',
       label: 'Fully staffed',
     })
   })
 
   it('marks over-capacity staffing as warning', () => {
-    expect(resolveDayBoardStatus(makeDay(), 6)).toEqual({
+    expect(resolveDayBoardStatus(makeDay({ staffShifts: [
+      makeShift({ id: 'staff-1' }),
+      makeShift({ id: 'staff-2' }),
+      makeShift({ id: 'staff-3' }),
+      makeShift({ id: 'staff-4' }),
+      makeShift({ id: 'staff-5' }),
+    ] }))).toEqual({
       tone: 'warning',
       label: 'Overstaffed',
     })
   })
 
   it('keeps missing lead as critical even when staff count is otherwise acceptable', () => {
-    expect(resolveDayBoardStatus(makeDay({ leadShift: null }), 3)).toEqual({
+    expect(resolveDayBoardStatus(makeDay({ leadShift: null, staffShifts: [
+      makeShift({ id: 'staff-1' }),
+      makeShift({ id: 'staff-2' }),
+      makeShift({ id: 'staff-3' }),
+    ] }))).toEqual({
       tone: 'critical',
-      label: 'Unassigned',
+      label: 'Missing lead',
     })
   })
 })

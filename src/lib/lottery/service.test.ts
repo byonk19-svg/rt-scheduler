@@ -27,9 +27,9 @@ describe('buildAvailableDates', () => {
 })
 
 describe('applyLotteryDecision', () => {
-  it('does not allow leads to apply lottery decisions', async () => {
+  it('does not allow therapists to apply lottery decisions', async () => {
     const result = await applyLotteryDecision({
-      actor: { ...actor, userId: 'lead-1', role: 'lead' },
+      actor: { ...actor, userId: 'therapist-1', role: 'therapist' },
       authClient: {
         rpc: vi.fn(),
       },
@@ -42,7 +42,7 @@ describe('applyLotteryDecision', () => {
 
     expect(result).toEqual({
       ok: false,
-      error: 'Only managers can apply Lottery results.',
+      error: 'Only managers or leads can apply Lottery results.',
     })
   })
 
@@ -62,7 +62,7 @@ describe('applyLotteryDecision', () => {
 
     const result = await applyLotteryDecision(
       {
-        actor,
+        actor: { ...actor, userId: 'lead-1', role: 'lead' },
         authClient: {
           rpc: vi.fn(),
         },
@@ -145,9 +145,9 @@ describe('moveLotteryListEntry', () => {
     ])
   }
 
-  it('does not allow leads to edit the lottery list', async () => {
+  it('does not allow therapists to edit the lottery list', async () => {
     const result = await moveLotteryListEntry({
-      actor: { ...actor, userId: 'lead-1', role: 'lead' },
+      actor: { ...actor, userId: 'therapist-1', role: 'therapist' },
       entryId: 'entry-1',
       shiftType: 'day',
       direction: 'down',
@@ -155,7 +155,7 @@ describe('moveLotteryListEntry', () => {
 
     expect(result).toEqual({
       ok: false,
-      error: 'Only managers can edit the Lottery list.',
+      error: 'Only managers or leads can edit the Lottery list.',
     })
   })
 

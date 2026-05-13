@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 
 import type { DayItem } from '@/lib/coverage/selectors'
-import { countActive } from '@/lib/coverage/selectors'
+import { getCoverageHealth } from '@/lib/coverage/selectors'
 import {
   MAX_SHIFT_COVERAGE_PER_DAY,
   MIN_SHIFT_COVERAGE_PER_DAY,
@@ -104,31 +104,8 @@ export function resolveSwipeDirection(
   return null
 }
 
-export function resolveDayBoardStatus(day: DayItem, activeCount: number): DayBoardStatus {
-  if (day.constraintBlocked) {
-    return { tone: 'critical', label: 'Unassigned' }
-  }
-
-  if (!day.leadShift && activeCount === 0) {
-    return { tone: 'critical', label: 'Unassigned' }
-  }
-
-  if (!day.leadShift) {
-    return { tone: 'critical', label: 'Unassigned' }
-  }
-
-  if (activeCount < MIN_SHIFT_COVERAGE_PER_DAY) {
-    return {
-      tone: 'critical',
-      label: 'Understaffed',
-    }
-  }
-
-  if (activeCount > MAX_SHIFT_COVERAGE_PER_DAY) {
-    return { tone: 'warning', label: 'Overstaffed' }
-  }
-
-  return { tone: 'healthy', label: 'Fully staffed' }
+export function resolveDayBoardStatus(day: DayItem, health = getCoverageHealth(day)): DayBoardStatus {
+  return { tone: health.tone, label: health.statusLabel }
 }
 
 export function buildStaffDisplayLines(
@@ -220,8 +197,9 @@ export function CalendarGrid({
   )
 
   function renderDayCard(day: DayItem, absoluteIndex: number) {
-    const activeCount = countActive(day)
-    const dayStatus = resolveDayBoardStatus(day, activeCount)
+    const health = getCoverageHealth(day)
+    const activeCount = health.activeCount
+    const dayStatus = resolveDayBoardStatus(day, health)
     const staffDisplay = buildStaffDisplayLines(day.staffShifts.map((shift) => shift.name))
     const dayTone = toneClasses(dayStatus.tone)
 

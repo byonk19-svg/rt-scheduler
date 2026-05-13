@@ -1,4 +1,5 @@
 import type { ShiftRole, ShiftStatus } from '@/app/schedule/types'
+import { countsAsActiveWorkingStatus, toStaffingSafetyStatus } from '@/lib/staffing-safety'
 
 type CalendarCellShift = {
   id: string
@@ -16,10 +17,6 @@ type CalendarCellSummary = {
   hiddenCount: number
 }
 
-function countsTowardCoverage(status: ShiftStatus): boolean {
-  return status === 'scheduled'
-}
-
 export function summarizeCalendarCell(
   shifts: CalendarCellShift[],
   maxVisible = 3
@@ -30,7 +27,9 @@ export function summarizeCalendarCell(
   })
 
   const lead = sorted.find((shift) => shift.role === 'lead') ?? null
-  const coverageCount = sorted.filter((shift) => countsTowardCoverage(shift.status)).length
+  const coverageCount = sorted.filter((shift) =>
+    countsAsActiveWorkingStatus(toStaffingSafetyStatus({ shiftStatus: shift.status }))
+  ).length
   const visibleShifts = sorted.slice(0, maxVisible)
   const hiddenCount = Math.max(sorted.length - maxVisible, 0)
 

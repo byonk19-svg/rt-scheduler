@@ -1,4 +1,5 @@
 import type { AssignmentStatus } from '@/lib/shift-types'
+import { affectsLotteryHistoryStatus } from '@/lib/staffing-safety'
 
 export type LotteryStatusReconciliation = {
   invalidatePreviousHistory: boolean
@@ -15,7 +16,7 @@ type DeriveLotteryStatusReconciliationArgs = {
 }
 
 export function isLotteryAffectingStatus(status: AssignmentStatus): boolean {
-  return status === 'on_call' || status === 'cancelled'
+  return affectsLotteryHistoryStatus(status)
 }
 
 export function deriveLotteryStatusReconciliation({
