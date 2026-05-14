@@ -1034,6 +1034,7 @@ function RequestCard({
     scheduledOnDate.size > 0
       ? therapists.filter((t) => {
           if (t.id === req.postedById) return false
+          if (t.id === req.swapWithId) return true
           if (!req.shiftType) return scheduledOnDate.has(t.id)
           return scheduledOnDate.get(t.id) === req.shiftType
         })

@@ -69,6 +69,28 @@ test.describe.serial('preliminary pencil marks', () => {
     })
     createdUserIds.push(therapist.id)
 
+    const dayLead = await createE2EUser(supabase, {
+      email: `${randomString('pencil-day-lead')}@example.com`,
+      password: `Lead!${Math.random().toString(16).slice(2, 10)}`,
+      fullName: 'Pencil Mark Day Lead',
+      role: 'lead',
+      employmentType: 'full_time',
+      shiftType: 'day',
+      isLeadEligible: true,
+    })
+    createdUserIds.push(dayLead.id)
+
+    const nightLead = await createE2EUser(supabase, {
+      email: `${randomString('pencil-night-lead')}@example.com`,
+      password: `Lead!${Math.random().toString(16).slice(2, 10)}`,
+      fullName: 'Pencil Mark Night Lead',
+      role: 'lead',
+      employmentType: 'full_time',
+      shiftType: 'night',
+      isLeadEligible: true,
+    })
+    createdUserIds.push(nightLead.id)
+
     const cycle = await createScheduleCycle(supabase, {
       label: `Pencil Marks ${randomString('cycle')}`,
       startDate: addDays(new Date(), 21),
@@ -95,6 +117,36 @@ test.describe.serial('preliminary pencil marks', () => {
 
     if (shift.error || !shift.data) {
       throw new Error(shift.error?.message ?? 'Could not seed pencil mark shift.')
+    }
+
+    const leadCoverage = await supabase.from('shifts').insert(
+      Array.from({ length: 42 }, (_, index) => {
+        const date = formatDateKey(addDays(start, index))
+        return [
+          {
+            cycle_id: cycle.id,
+            user_id: dayLead.id,
+            date,
+            shift_type: 'day',
+            status: 'scheduled',
+            assignment_status: 'scheduled',
+            role: 'lead',
+          },
+          {
+            cycle_id: cycle.id,
+            user_id: nightLead.id,
+            date,
+            shift_type: 'night',
+            status: 'scheduled',
+            assignment_status: 'scheduled',
+            role: 'lead',
+          },
+        ]
+      }).flat()
+    )
+
+    if (leadCoverage.error) {
+      throw new Error(leadCoverage.error.message)
     }
 
     const snapshot = await supabase
@@ -235,6 +287,7 @@ test.describe.serial('preliminary pencil marks', () => {
           .eq('cycle_id', ctx!.cycleId)
           .eq('date', ctx!.replacementDate)
           .eq('shift_type', 'day')
+          .eq('role', 'staff')
           .maybeSingle()
         if (newShift.error) throw new Error(newShift.error.message)
         return newShift.data?.user_id ?? null

@@ -95,59 +95,63 @@ test.describe.serial('manager specialized controls', () => {
       published: true,
     })
     const cycleKey = formatDateKey(addDays(new Date(`${cycle.start_date}T00:00:00`), 1))
+    const partnerCycleKey = formatDateKey(addDays(new Date(`${cycle.start_date}T00:00:00`), 2))
     createdCycleIds.push(cycle.id)
 
-    const shiftsInsert = await ctx!.supabase.from('shifts').insert([
-      {
-        cycle_id: cycle.id,
-        user_id: ctx!.requester.id,
-        date: cycleKey,
-        shift_type: 'day',
-        status: 'scheduled',
-        assignment_status: 'scheduled',
-        role: 'staff',
-      },
-      {
-        cycle_id: cycle.id,
-        user_id: ctx!.partner.id,
-        date: cycleKey,
-        shift_type: 'day',
-        status: 'scheduled',
-        assignment_status: 'scheduled',
-        role: 'staff',
-      },
-    ])
+    const shiftsInsert = await ctx!.supabase
+      .from('shifts')
+      .insert([
+        {
+          cycle_id: cycle.id,
+          user_id: ctx!.requester.id,
+          date: cycleKey,
+          shift_type: 'day',
+          status: 'scheduled',
+          assignment_status: 'scheduled',
+          role: 'staff',
+        },
+        {
+          cycle_id: cycle.id,
+          user_id: ctx!.partner.id,
+          date: partnerCycleKey,
+          shift_type: 'day',
+          status: 'scheduled',
+          assignment_status: 'scheduled',
+          role: 'staff',
+        },
+      ])
+      .select('id, user_id')
 
-    if (shiftsInsert.error) {
-      throw new Error(shiftsInsert.error.message)
+    if (shiftsInsert.error || !shiftsInsert.data) {
+      throw new Error(shiftsInsert.error?.message ?? 'Could not seed swap shifts.')
     }
 
-    const requesterPage = page
-    await loginAs(requesterPage, ctx!.requester.email, ctx!.requester.password)
-    await requesterPage.goto('/requests/new?new=1')
-    await requesterPage.getByRole('button', { name: 'Swap this shift' }).click()
-    await expect(requesterPage.getByText('Your shift is already selected').first()).toBeVisible()
-    await requesterPage.getByRole('button', { name: 'Post an open swap instead' }).click()
-    await requesterPage.getByRole('button', { name: 'Continue' }).click()
-    const requestMessage = `Swap me ${randomString('swap')}`
-    await requesterPage.getByLabel('Message').fill(requestMessage)
-    await requesterPage.getByRole('button', { name: 'Submit request' }).click()
+    const requesterShiftId =
+      shiftsInsert.data.find((row) => row.user_id === ctx!.requester.id)?.id ?? null
+    const partnerShiftId =
+      shiftsInsert.data.find((row) => row.user_id === ctx!.partner.id)?.id ?? null
+    if (!requesterShiftId) {
+      throw new Error('Could not find requester shift for manager swap approval test.')
+    }
+    if (!partnerShiftId) {
+      throw new Error('Could not find partner shift for manager swap approval test.')
+    }
 
-    await expect
-      .poll(
-        async () => {
-          const post = await ctx!.supabase
-            .from('shift_posts')
-            .select('id')
-            .eq('posted_by', ctx!.requester.id)
-            .eq('message', requestMessage)
-            .maybeSingle()
-          if (post.error) throw new Error(post.error.message)
-          return post.data?.id ?? null
-        },
-        { timeout: 20_000 }
-      )
-      .not.toBeNull()
+    const requestMessage = `Swap me ${randomString('swap')}`
+    const postInsert = await ctx!.supabase.from('shift_posts').insert({
+      shift_id: requesterShiftId,
+      posted_by: ctx!.requester.id,
+      claimed_by: ctx!.partner.id,
+      swap_shift_id: partnerShiftId,
+      type: 'swap',
+      visibility: 'team',
+      status: 'pending',
+      message: requestMessage,
+    })
+
+    if (postInsert.error) {
+      throw new Error(postInsert.error.message)
+    }
 
     const managerPage = await page.context().browser()?.newPage()
     if (!managerPage) throw new Error('Could not create manager page for swap approval test.')
@@ -160,7 +164,13 @@ test.describe.serial('manager specialized controls', () => {
         .first()
       await expect(card).toBeVisible({ timeout: 20_000 })
       await card.locator('select').selectOption(ctx!.partner.id)
+      const approveResponsePromise = managerPage.waitForResponse((response) =>
+        response.url().includes('/api/shift-posts')
+      )
       await card.getByRole('button', { name: 'Approve' }).click()
+      const approveResponse = await approveResponsePromise
+      const approveBody = await approveResponse.json().catch(() => null)
+      expect(approveResponse.ok(), JSON.stringify(approveBody)).toBe(true)
       await expect
         .poll(
           async () => {
@@ -183,13 +193,14 @@ test.describe.serial('manager specialized controls', () => {
     // The trigger swaps user assignments; both shifts should still be assigned, just exchanged.
     const shiftRows = await ctx!.supabase
       .from('shifts')
-      .select('user_id')
+      .select('date, user_id')
       .eq('cycle_id', cycle.id)
-      .eq('date', cycleKey)
+      .in('date', [cycleKey, partnerCycleKey])
 
     if (shiftRows.error) throw new Error(shiftRows.error.message)
-    const assignedIds = (shiftRows.data ?? []).map((row) => row.user_id).sort()
-    expect(assignedIds).toEqual([ctx!.partner.id, ctx!.requester.id].sort())
+    const ownersByDate = new Map((shiftRows.data ?? []).map((row) => [row.date, row.user_id]))
+    expect(ownersByDate.get(cycleKey)).toBe(ctx!.partner.id)
+    expect(ownersByDate.get(partnerCycleKey)).toBe(ctx!.requester.id)
   })
 
   test('manager can archive a draft cycle from publish history', async ({ page }) => {

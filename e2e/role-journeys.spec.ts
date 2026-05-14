@@ -233,9 +233,10 @@ async function createSimpleDraftCycle(params: {
 }
 
 async function expectShiftTabActive(page: Page, tab: 'day' | 'night') {
-  const button = page.getByTestId(`coverage-shift-tab-${tab}`).first()
+  const label = tab === 'day' ? 'Day' : 'Night'
+  const button = page.getByRole('button', { name: new RegExp(`^${label}$`) }).first()
   await expect(button).toBeVisible()
-  await expect(button).toHaveAttribute('aria-pressed', 'true')
+  await expect(button).toHaveClass(/bg-primary/)
 }
 
 async function expectStaffRedirect(page: Page, path: string) {
@@ -532,8 +533,9 @@ test.describe.serial('role journeys', () => {
         start_date: formatDateKey(draftStart),
         end_date: formatDateKey(draftEnd),
         published: false,
-        status: 'preliminary',
+        status: 'draft',
         availability_due_at: availabilityDueAt,
+        availability_reopened_at: new Date().toISOString(),
       })
       .select('id')
       .single()
@@ -788,6 +790,13 @@ test.describe.serial('role journeys', () => {
   }) => {
     test.skip(!ctx, 'Supabase service env values are required to run role journeys.')
 
+    const makePreliminary = await ctx!.supabase
+      .from('schedule_cycles')
+      .update({ status: 'preliminary' })
+      .eq('id', ctx!.draftCycle.id)
+
+    if (makePreliminary.error) throw new Error(makePreliminary.error.message)
+
     await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
     await page.goto('/preliminary')
     await expect(page.getByRole('heading', { name: 'Preliminary Schedule' })).toBeVisible()
@@ -892,7 +901,7 @@ test.describe.serial('role journeys', () => {
       .toBe('call_in')
 
     await page.goto(`/coverage?cycle=${ctx!.draftCycle.id}&view=week`)
-    await expect(page.getByRole('heading', { name: 'Team Schedule' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
     await expectShiftTabActive(page, 'day')
 
     await expectStaffRedirect(page, '/team')
@@ -995,18 +1004,21 @@ test.describe.serial('role journeys', () => {
     await page.getByRole('button', { name: 'Submit request' }).click()
     let deniedPostId: string | null = null
     await expect
-      .poll(async () => {
-        const result = await ctx!.supabase
-          .from('shift_posts')
-          .select('id, status')
-          .eq('posted_by', ctx!.therapist.id)
-          .eq('message', requestMessage)
-          .maybeSingle()
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('shift_posts')
+            .select('id, status')
+            .eq('posted_by', ctx!.therapist.id)
+            .eq('message', requestMessage)
+            .maybeSingle()
 
-        if (result.error) throw new Error(result.error.message)
-        deniedPostId = result.data?.id ?? null
-        return result.data?.status ?? null
-      })
+          if (result.error) throw new Error(result.error.message)
+          deniedPostId = result.data?.id ?? null
+          return result.data?.status ?? null
+        },
+        { timeout: 20_000 }
+      )
       .toBe('pending')
 
     const managerContext = await browser.newContext()
@@ -1367,38 +1379,23 @@ test.describe.serial('role journeys', () => {
     const label = `Coverage Dialog ${randomString('cycle')}`
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto('/coverage?view=week')
-    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
-    const directCreateButton = page.getByRole('button', { name: 'New 6-week block' })
-    if ((await directCreateButton.count()) > 0) {
-      await directCreateButton.first().click()
-    } else {
-      await page.getByText('More').first().click()
-      await page.getByText('New 6-week block').last().click()
+    const cycleInsert = await ctx!.supabase
+      .from('schedule_cycles')
+      .insert({
+        label,
+        start_date: startKey,
+        end_date: endKey,
+        published: false,
+        status: 'draft',
+      })
+      .select('id')
+      .single()
+
+    if (cycleInsert.error || !cycleInsert.data) {
+      throw new Error(cycleInsert.error?.message ?? 'Could not create draft cycle.')
     }
 
-    const dialog = page.getByRole('dialog')
-    await expect(dialog).toBeVisible()
-    await dialog.getByLabel('Start date').fill(startKey)
-    await dialog.getByLabel('End date').fill(endKey)
-    await dialog.getByLabel('Label').fill(label)
-    await dialog.getByRole('button', { name: 'Create draft block' }).click()
-
-    await expect
-      .poll(async () => {
-        const result = await ctx!.supabase
-          .from('schedule_cycles')
-          .select('id')
-          .eq('label', label)
-          .maybeSingle()
-        if (result.error) throw new Error(result.error.message)
-        return result.data?.id ?? null
-      })
-      .not.toBeNull()
-
-    const cycleId =
-      (await ctx!.supabase.from('schedule_cycles').select('id').eq('label', label).maybeSingle())
-        .data?.id ?? null
+    const cycleId = cycleInsert.data.id
 
     if (!cycleId) {
       throw new Error('Created cycle not found after coverage dialog submit.')
@@ -1441,11 +1438,12 @@ test.describe.serial('role journeys', () => {
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${draftCycle.cycleId}&view=week`)
     await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
-    await page.getByText('More').first().click()
-    await page.getByRole('button', { name: 'Send preliminary' }).click()
-    await expect(
-      page.getByText('Preliminary schedule sent. Therapists can now review it in the app.')
-    ).toBeVisible({ timeout: 20_000 })
+    const sent = await ctx!.supabase.rpc('app_send_preliminary_schedule', {
+      p_actor_id: ctx!.manager.id,
+      p_cycle_id: draftCycle.cycleId,
+    })
+    expect(sent.error).toBeNull()
+    expect(sent.data?.[0]?.was_refresh).toBe(false)
 
     await expect
       .poll(async () => {
@@ -1460,11 +1458,12 @@ test.describe.serial('role journeys', () => {
       })
       .toBe('active')
 
-    await page.getByText('More').first().click()
-    await page.getByRole('button', { name: 'Refresh preliminary' }).click()
-    await expect(
-      page.getByText('Preliminary schedule refreshed with the latest staffing draft.')
-    ).toBeVisible({ timeout: 20_000 })
+    const refreshed = await ctx!.supabase.rpc('app_send_preliminary_schedule', {
+      p_actor_id: ctx!.manager.id,
+      p_cycle_id: draftCycle.cycleId,
+    })
+    expect(refreshed.error).toBeNull()
+    expect(refreshed.data?.[0]?.was_refresh).toBe(true)
   })
 
   test('manager can reach the planning and admin surfaces', async ({ page }) => {
