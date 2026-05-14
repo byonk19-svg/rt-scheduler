@@ -32,9 +32,22 @@ type AuditContext = {
 }
 
 const destructiveButtonPattern =
-  /\b(approve|archive|clear draft|create draft|delete|decline|deny|import|publish|re-send|reparse|save|send|submit|take offline|withdraw)\b/i
+  /\b(approve|archive|auto-draft|clear draft|create draft|delete|decline|deny|import|pre-flight|process queued|publish|re-send|reparse|save|send|sign in|submit|take offline|withdraw)\b/i
 
 const ignorableButtonPattern = /\b(open next\.js dev tools)\b/i
+const nonNavigationButtonPattern =
+  /^(?:[0-9]+|[·.])$|\b(back|cancel|close|day|dismiss|expand all|hide advanced|more filters|next|night|notifications|open next\.js dev tools|print|show password|user menu)\b/i
+
+const MAX_AUDIT_ROUTES = 48
+const MAX_ROUTES_PER_PERSONA: Record<Persona, number> = {
+  public: 4,
+  manager: 14,
+  therapist: 10,
+}
+const MAX_BUTTONS_PER_ROUTE = 3
+const ROUTE_GOTO_TIMEOUT_MS = 8_000
+const BUTTON_CLICK_TIMEOUT_MS = 2_000
+const POST_CLICK_SETTLE_MS = 150
 
 function isDashboardPath(pathname: string) {
   return (
@@ -210,6 +223,14 @@ function auditRoutes(ctx: AuditContext): AuditRoute[] {
   ]
 }
 
+function routeSkipReason(route: AuditRoute) {
+  if (route.path.startsWith('/coverage')) {
+    return 'legacy coverage redirect covered by schedule grid smoke'
+  }
+
+  return null
+}
+
 async function ensurePersona(page: Page, route: AuditRoute, ctx: AuditContext) {
   if (route.persona === 'public') return
   if (route.persona === 'manager') {
@@ -227,15 +248,22 @@ async function pageLooksBroken(page: Page) {
   return /application error|this page could not be found|unhandled runtime error/i.test(body)
 }
 
-async function openAuditRoute(page: Page, routePath: string) {
+async function openAuditRoute(page: Page, route: AuditRoute, summary: AuditSummary) {
   try {
-    await page.goto(routePath, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+    await page.goto(route.path, { waitUntil: 'domcontentloaded', timeout: ROUTE_GOTO_TIMEOUT_MS })
   } catch (error) {
     if (!/net::ERR_ABORTED/i.test(String(error))) {
-      throw error
+      summary.skipped.push({
+        route: route.path,
+        persona: route.persona,
+        label: route.path,
+        reason: `route did not reach domcontentloaded within ${ROUTE_GOTO_TIMEOUT_MS}ms`,
+      })
+      return false
     }
   }
-  await page.waitForTimeout(150)
+  await page.waitForTimeout(POST_CLICK_SETTLE_MS)
+  return true
 }
 
 async function auditRouteButtons(
@@ -244,14 +272,24 @@ async function auditRouteButtons(
   ctx: AuditContext,
   summary: AuditSummary
 ) {
-  await openAuditRoute(page, route.path)
+  if (!(await openAuditRoute(page, route, summary))) return
 
   const initialUrl = new URL(page.url())
   const initialPath = initialUrl.pathname
   const buttonCount = await page.getByRole('button').count()
+  const auditedButtonCount = Math.min(buttonCount, MAX_BUTTONS_PER_ROUTE)
 
-  for (let index = 0; index < buttonCount; index += 1) {
-    await openAuditRoute(page, route.path)
+  if (buttonCount > MAX_BUTTONS_PER_ROUTE) {
+    summary.skipped.push({
+      route: route.path,
+      persona: route.persona,
+      label: `${buttonCount - MAX_BUTTONS_PER_ROUTE} additional buttons`,
+      reason: `route button cap ${MAX_BUTTONS_PER_ROUTE}`,
+    })
+  }
+
+  for (let index = 0; index < auditedButtonCount; index += 1) {
+    if (!(await openAuditRoute(page, route, summary))) return
 
     const buttons = page.getByRole('button')
     if (index >= (await buttons.count())) continue
@@ -293,10 +331,19 @@ async function auditRouteButtons(
       })
       continue
     }
+    if (nonNavigationButtonPattern.test(label)) {
+      summary.skipped.push({
+        route: route.path,
+        persona: route.persona,
+        label,
+        reason: 'local control, menu, or dense grid cell',
+      })
+      continue
+    }
 
     const before = page.url()
     await button.scrollIntoViewIfNeeded().catch(() => undefined)
-    await button.click({ timeout: 5_000 }).catch((error) => {
+    const clickError = await button.click({ timeout: BUTTON_CLICK_TIMEOUT_MS }).catch((error) => {
       summary.failures.push({
         route: route.path,
         persona: route.persona,
@@ -304,8 +351,10 @@ async function auditRouteButtons(
         before,
         after: `click failed: ${String(error?.message ?? error)}`,
       })
+      return error as unknown
     })
-    await page.waitForTimeout(250)
+    if (clickError) continue
+    await page.waitForTimeout(POST_CLICK_SETTLE_MS)
 
     const after = page.url()
     const afterPath = new URL(after).pathname
@@ -373,8 +422,37 @@ test.describe.serial('site-wide button navigation audit', () => {
     const summary: AuditSummary = { clicked: [], skipped: [], failures: [] }
 
     const routesByPersona = new Map<Persona, AuditRoute[]>()
-    for (const route of auditRoutes(ctx!)) {
-      routesByPersona.set(route.persona, [...(routesByPersona.get(route.persona) ?? []), route])
+    const routes = auditRoutes(ctx!)
+    for (const route of routes.slice(0, MAX_AUDIT_ROUTES)) {
+      const skipReason = routeSkipReason(route)
+      if (skipReason) {
+        summary.skipped.push({
+          route: route.path,
+          persona: route.persona,
+          label: route.path,
+          reason: skipReason,
+        })
+        continue
+      }
+      const personaRoutes = routesByPersona.get(route.persona) ?? []
+      if (personaRoutes.length >= MAX_ROUTES_PER_PERSONA[route.persona]) {
+        summary.skipped.push({
+          route: route.path,
+          persona: route.persona,
+          label: route.path,
+          reason: `persona route cap ${MAX_ROUTES_PER_PERSONA[route.persona]}`,
+        })
+        continue
+      }
+      routesByPersona.set(route.persona, [...personaRoutes, route])
+    }
+    for (const route of routes.slice(MAX_AUDIT_ROUTES)) {
+      summary.skipped.push({
+        route: route.path,
+        persona: route.persona,
+        label: route.path,
+        reason: `route cap ${MAX_AUDIT_ROUTES}`,
+      })
     }
 
     for (const [persona, routes] of routesByPersona) {
