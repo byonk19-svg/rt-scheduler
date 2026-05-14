@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
 import { addDays, formatDateKey, randomString } from './helpers/env'
+import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type TestContext = {
@@ -11,13 +12,6 @@ type TestContext = {
   manager: { id: string; email: string; password: string }
   therapist: { id: string; email: string; password: string; fullName: string }
   cycle: { id: string; startDate: string; targetDate: string }
-}
-
-function nextSundayAfter(date: Date): Date {
-  const next = new Date(date)
-  const daysUntilSunday = (7 - next.getDay()) % 7
-  next.setDate(next.getDate() + daysUntilSunday)
-  return next
 }
 
 test.describe.serial('Need Off schedule markers', () => {
@@ -72,33 +66,20 @@ test.describe.serial('Need Off schedule markers', () => {
       throw new Error(`Could not move test profiles to site: ${profileUpdate.error.message}`)
     }
 
-    const startDate = nextSundayAfter(addDays(new Date(), 1095))
-    const endDate = addDays(startDate, 41)
+    const cycle = await createScheduleCycle(supabase, {
+      label: randomString('Need Off Marker Cycle'),
+      startDate: addDays(new Date(), 1095),
+      published: true,
+      status: 'final',
+      siteId,
+    })
+    const startDate = new Date(`${cycle.start_date}T00:00:00`)
     const targetDate = formatDateKey(addDays(startDate, 1))
-
-    const cycleInsert = await supabase
-      .from('schedule_cycles')
-      .insert({
-        label: randomString('Need Off Marker Cycle'),
-        start_date: formatDateKey(startDate),
-        end_date: formatDateKey(endDate),
-        published: true,
-        status: 'final',
-        site_id: siteId,
-      })
-      .select('id, start_date')
-      .single()
-
-    if (cycleInsert.error || !cycleInsert.data) {
-      throw new Error(
-        `Could not create Need Off marker cycle: ${cycleInsert.error?.message ?? 'unknown'}`
-      )
-    }
 
     const now = new Date().toISOString()
     const availabilityInsert = await supabase.from('availability_overrides').insert({
       therapist_id: therapist.id,
-      cycle_id: cycleInsert.data.id,
+      cycle_id: cycle.id,
       date: targetDate,
       shift_type: 'both',
       override_type: 'force_off',
@@ -113,7 +94,7 @@ test.describe.serial('Need Off schedule markers', () => {
 
     const submissionInsert = await supabase.from('therapist_availability_submissions').insert({
       therapist_id: therapist.id,
-      schedule_cycle_id: cycleInsert.data.id,
+      schedule_cycle_id: cycle.id,
       submitted_at: now,
       last_edited_at: now,
     })
@@ -132,8 +113,8 @@ test.describe.serial('Need Off schedule markers', () => {
         fullName: therapistFullName,
       },
       cycle: {
-        id: cycleInsert.data.id,
-        startDate: cycleInsert.data.start_date,
+        id: cycle.id,
+        startDate: cycle.start_date,
         targetDate,
       },
     }
@@ -170,11 +151,12 @@ test.describe.serial('Need Off schedule markers', () => {
       .filter({ hasText: '*' })
       .first()
     await expect(rosterRow).toBeVisible()
-    await expect(rosterRow.getByText('*')).toBeVisible()
+    await expect(rosterRow.getByText('*')).toHaveCount(1)
 
     await page.context().clearCookies()
     await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
-    await page.goto(`/therapist/schedule?start=${ctx!.cycle.startDate}`)
-    await expect(page.getByText('* Need Off').first()).toBeVisible()
+    await page.goto(`/schedule?cycle=${ctx!.cycle.id}`)
+    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
+    await expect(page.getByRole('rowheader').filter({ hasText: 'You' })).toBeVisible()
   })
 })

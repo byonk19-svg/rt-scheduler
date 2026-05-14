@@ -44,7 +44,7 @@ test.describe.serial('lottery workflow surface', () => {
     await expect(page.getByRole('heading', { name: 'Manager Dashboard' })).toBeVisible()
 
     await page.goto('/coverage', { waitUntil: 'domcontentloaded' })
-    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
     await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {})
 
     const scheduleNav = page.getByRole('navigation', { name: 'Schedule section navigation' })
@@ -59,7 +59,7 @@ test.describe.serial('lottery workflow surface', () => {
     await expect(page.getByRole('heading', { name: 'Lottery Decision Center' })).toBeVisible()
     await expect(
       page.getByText(
-        'Review the live Team Schedule shift, volunteers, and recommendation before applying a staff reduction.'
+        'Review the live Schedule shift, volunteers, and recommendation before applying a staff reduction.'
       )
     ).toBeVisible()
 

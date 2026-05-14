@@ -5,6 +5,14 @@ import { expect, test } from '@playwright/test'
 import { loginAs } from './helpers/auth'
 import { createServiceRoleClientOrNull } from './helpers/supabase'
 
+function commandOutput(error: unknown): string {
+  if (!error || typeof error !== 'object') return ''
+  const maybeOutput = error as { stdout?: Buffer; stderr?: Buffer; message?: string }
+  return [maybeOutput.message, maybeOutput.stdout?.toString(), maybeOutput.stderr?.toString()]
+    .filter(Boolean)
+    .join('\n')
+}
+
 function reseedPaperScheduleDemo() {
   execFileSync(
     process.execPath,
@@ -26,7 +34,18 @@ test.describe.serial('paper schedule demo seed', () => {
       return
     }
 
-    reseedPaperScheduleDemo()
+    try {
+      reseedPaperScheduleDemo()
+    } catch (error) {
+      if (commandOutput(error).includes('SEED_DEMO_SCHEDULE_PROJECT_REFS')) {
+        test.skip(
+          true,
+          'Demo paper schedule seed requires an explicit dev/test Supabase project allowlist.'
+        )
+        return
+      }
+      throw error
+    }
 
     const { data: cycle, error: cycleError } = await supabase
       .from('schedule_cycles')

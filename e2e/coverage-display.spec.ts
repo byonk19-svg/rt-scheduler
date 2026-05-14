@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
 import { addDays, formatDateKey, randomString } from './helpers/env'
+import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type TestContext = {
@@ -131,52 +132,29 @@ test.describe.serial('coverage display regressions', () => {
       ...extraTherapists.map((row) => row.id)
     )
 
-    const cycleStart = addDays(new Date(), -1)
-    const cycleEnd = addDays(cycleStart, 41)
+    const publishedCycle = await createScheduleCycle(supabase, {
+      label: `Coverage Display Published ${randomString('cycle')}`,
+      startDate: new Date(),
+      align: 'on-or-before',
+      published: true,
+    })
+    const emptyDraftCycle = await createScheduleCycle(supabase, {
+      label: `Coverage Display Draft ${randomString('cycle')}`,
+      startDate: addDays(new Date(`${publishedCycle.end_date}T00:00:00`), 1),
+      published: false,
+    })
+
+    const cycleStart = new Date(`${publishedCycle.start_date}T00:00:00`)
     const underDate = formatDateKey(cycleStart)
     const healthyDate = formatDateKey(addDays(cycleStart, 1))
     const overDate = formatDateKey(addDays(cycleStart, 2))
     const nightDate = healthyDate
 
-    const publishedCycleInsert = await supabase
-      .from('schedule_cycles')
-      .insert({
-        label: `Coverage Display Published ${randomString('cycle')}`,
-        start_date: formatDateKey(cycleStart),
-        end_date: formatDateKey(cycleEnd),
-        published: true,
-      })
-      .select('id')
-      .single()
-
-    if (publishedCycleInsert.error || !publishedCycleInsert.data) {
-      throw new Error(
-        `Could not create published cycle: ${publishedCycleInsert.error?.message ?? 'unknown error'}`
-      )
-    }
-
-    const emptyDraftCycleInsert = await supabase
-      .from('schedule_cycles')
-      .insert({
-        label: `Coverage Display Draft ${randomString('cycle')}`,
-        start_date: formatDateKey(cycleStart),
-        end_date: formatDateKey(cycleEnd),
-        published: false,
-      })
-      .select('id, start_date')
-      .single()
-
-    if (emptyDraftCycleInsert.error || !emptyDraftCycleInsert.data) {
-      throw new Error(
-        `Could not create draft cycle: ${emptyDraftCycleInsert.error?.message ?? 'unknown error'}`
-      )
-    }
-
-    createdCycleIds.push(publishedCycleInsert.data.id, emptyDraftCycleInsert.data.id)
+    createdCycleIds.push(publishedCycle.id, emptyDraftCycle.id)
 
     const shiftsInsert = await supabase.from('shifts').insert([
       {
-        cycle_id: publishedCycleInsert.data.id,
+        cycle_id: publishedCycle.id,
         user_id: lead.id,
         date: underDate,
         shift_type: 'day',
@@ -185,7 +163,7 @@ test.describe.serial('coverage display regressions', () => {
         assignment_status: 'scheduled',
       },
       {
-        cycle_id: publishedCycleInsert.data.id,
+        cycle_id: publishedCycle.id,
         user_id: therapist.id,
         date: underDate,
         shift_type: 'day',
@@ -194,7 +172,7 @@ test.describe.serial('coverage display regressions', () => {
         assignment_status: 'scheduled',
       },
       {
-        cycle_id: publishedCycleInsert.data.id,
+        cycle_id: publishedCycle.id,
         user_id: lead.id,
         date: healthyDate,
         shift_type: 'day',
@@ -203,7 +181,7 @@ test.describe.serial('coverage display regressions', () => {
         assignment_status: 'scheduled',
       },
       {
-        cycle_id: publishedCycleInsert.data.id,
+        cycle_id: publishedCycle.id,
         user_id: therapist.id,
         date: healthyDate,
         shift_type: 'day',
@@ -212,7 +190,7 @@ test.describe.serial('coverage display regressions', () => {
         assignment_status: 'scheduled',
       },
       {
-        cycle_id: publishedCycleInsert.data.id,
+        cycle_id: publishedCycle.id,
         user_id: secondTherapist.id,
         date: healthyDate,
         shift_type: 'day',
@@ -221,7 +199,7 @@ test.describe.serial('coverage display regressions', () => {
         assignment_status: 'scheduled',
       },
       {
-        cycle_id: publishedCycleInsert.data.id,
+        cycle_id: publishedCycle.id,
         user_id: nightLead.id,
         date: nightDate,
         shift_type: 'night',
@@ -230,7 +208,7 @@ test.describe.serial('coverage display regressions', () => {
         assignment_status: 'scheduled',
       },
       ...[lead, therapist, secondTherapist, ...extraTherapists].map((row, index) => ({
-        cycle_id: publishedCycleInsert.data.id,
+        cycle_id: publishedCycle.id,
         user_id: row.id,
         date: overDate,
         shift_type: 'day' as const,
@@ -258,9 +236,9 @@ test.describe.serial('coverage display regressions', () => {
         password: leadPassword,
       },
       publishedCycle: {
-        id: publishedCycleInsert.data.id,
-        startDate: formatDateKey(cycleStart),
-        endDate: formatDateKey(cycleEnd),
+        id: publishedCycle.id,
+        startDate: publishedCycle.start_date,
+        endDate: publishedCycle.end_date,
         targetDate: healthyDate,
         underDate,
         healthyDate,
@@ -268,15 +246,11 @@ test.describe.serial('coverage display regressions', () => {
         nightDate,
       },
       emptyDraftCycle: {
-        id: emptyDraftCycleInsert.data.id,
-        startDate: emptyDraftCycleInsert.data.start_date,
+        id: emptyDraftCycle.id,
+        startDate: emptyDraftCycle.start_date,
       },
-      expectedNames: [
-        leadName.split(' ')[0]!,
-        therapistName.split(' ')[0]!,
-        secondTherapistName.split(' ')[0]!,
-      ],
-      nightLeadName: nightLeadName.split(' ')[0]!,
+      expectedNames: [leadName, therapistName, secondTherapistName],
+      nightLeadName,
     }
   })
 
@@ -291,108 +265,62 @@ test.describe.serial('coverage display regressions', () => {
     }
   })
 
-  test('staff coverage shows real therapist names for a published cycle', async ({ page }) => {
+  test('staff schedule shows the signed-in staff row for a published cycle', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await loginAs(page, ctx!.staffViewer.email, ctx!.staffViewer.password)
     await page.goto(`/coverage?cycle=${ctx!.publishedCycle.id}`)
 
-    await expect(page.getByRole('heading', { name: 'Team Schedule' })).toBeVisible()
-    await expect(
-      page.getByText(
-        'Read-only Team Schedule. Use My Shifts for your own shifts and Future Availability for the next Schedule Block.'
-      )
-    ).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Block board' })).toHaveAttribute(
-      'aria-pressed',
-      'true'
+    await expect(page).toHaveURL(/\/schedule/)
+    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
+    await expect(page.locator('p').filter({ hasText: 'Read-only for staff' })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: 'Schedule Block' })).toHaveValue(
+      ctx!.publishedCycle.id
     )
 
-    const dayPanel = page.locator(
-      `[data-testid="coverage-day-panel-${ctx!.publishedCycle.targetDate}"]:visible`
-    )
-    await expect(dayPanel).toBeVisible({ timeout: 15_000 })
-    await expect(dayPanel.getByText(/Lead:/)).toBeVisible()
-    for (const name of ctx!.expectedNames) {
-      await expect(dayPanel.getByText(name, { exact: false })).toBeVisible()
-    }
-    await expect(dayPanel.getByText('Unknown')).toHaveCount(0)
-
-    await dayPanel.click()
-    const drawer = page.getByTestId('coverage-shift-editor-dialog')
-    await expect(drawer).toBeVisible()
-    await expect(drawer.getByText('Your status')).toBeVisible()
-    await expect(drawer.getByText('You are not scheduled')).toBeVisible()
-    await expect(drawer.getByText('No assignment for you on this Day shift.')).toBeVisible()
-    await expect(drawer.getByRole('heading', { name: 'Team Schedule details' })).toBeVisible()
-    await expect(drawer.getByText('Manager-only actions')).toHaveCount(0)
-    await expect(drawer.getByText('Lottery decision available')).toHaveCount(0)
+    await expect(page.getByRole('rowheader').filter({ hasText: 'You' })).toBeVisible()
+    await expect(page.getByText('Unknown')).toHaveCount(0)
   })
 
-  test('lead selected-day drawer stays framed as Team Schedule without manager staffing actions', async ({
-    page,
-  }) => {
+  test('lead schedule stays read-only without manager staffing actions', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await loginAs(page, ctx!.leadViewer.email, ctx!.leadViewer.password)
     await page.goto(`/coverage?cycle=${ctx!.publishedCycle.id}&view=week&shift=day`)
 
-    await expect(page.getByRole('heading', { name: 'Team Schedule' })).toBeVisible()
-
-    const dayPanel = page.locator(
-      `[data-testid="coverage-day-panel-${ctx!.publishedCycle.targetDate}"]:visible`
-    )
-    await expect(dayPanel).toBeVisible({ timeout: 15_000 })
-    await dayPanel.click()
-
-    const drawer = page.getByTestId('coverage-shift-editor-dialog')
-    await expect(drawer).toBeVisible()
-    await expect(drawer.getByRole('heading', { name: 'Team Schedule details' })).toBeVisible()
-    await expect(drawer.getByText('Staffing edits stay in Coverage for managers.')).toBeVisible()
-    await expect(drawer.getByTestId(/^coverage-drawer-status-/).first()).toBeVisible()
-    await expect(drawer.getByText('Manager-only actions')).toHaveCount(0)
-    await expect(drawer.getByText('Lottery decision available')).toHaveCount(0)
+    await expect(page).toHaveURL(/\/schedule/)
+    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Auto-draft' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Publish' })).toHaveCount(0)
+    await expect(page.getByRole('table')).toBeVisible()
   })
 
-  test('manager calendar renders the full cycle and keeps day/night cells independent', async ({
+  test('manager schedule renders the full cycle and keeps day/night controls independent', async ({
     page,
   }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.publishedCycle.id}&view=week&shift=day`)
-    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
 
-    const visibleDayPanels = page.locator('[data-testid^="coverage-day-panel-"]:visible')
-    await expect(visibleDayPanels).toHaveCount(42, { timeout: 15_000 })
+    await expect(page.getByRole('columnheader')).toHaveCount(44, { timeout: 15_000 })
     await expect(
-      page.locator(`[data-testid="coverage-day-panel-${ctx!.publishedCycle.startDate}"]:visible`)
-    ).toBeVisible()
-    await expect(
-      page.locator(`[data-testid="coverage-day-panel-${ctx!.publishedCycle.endDate}"]:visible`)
+      page.getByRole('rowheader').filter({ hasText: ctx!.expectedNames[0] })
     ).toBeVisible()
 
-    const dayPanel = page.locator(
-      `[data-testid="coverage-day-panel-${ctx!.publishedCycle.targetDate}"]:visible`
-    )
-    await expect(dayPanel.getByText(ctx!.expectedNames[0], { exact: false })).toBeVisible()
-
-    await page.getByTestId('coverage-shift-tab-night').click()
-    await expect(visibleDayPanels).toHaveCount(42, { timeout: 15_000 })
-
-    const nightPanel = page.locator(
-      `[data-testid="coverage-day-panel-${ctx!.publishedCycle.nightDate}"]:visible`
-    )
-    await expect(nightPanel.getByText(ctx!.nightLeadName, { exact: false })).toBeVisible()
-    await expect(nightPanel.getByText(ctx!.expectedNames[0], { exact: false })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Night' }).click()
+    await expect(page.getByRole('columnheader')).toHaveCount(44, { timeout: 15_000 })
+    await expect(page.getByRole('rowheader').filter({ hasText: ctx!.nightLeadName })).toBeVisible()
   })
 
   test('manager calendar headcount badge uses coverage min/max thresholds', async ({ page }) => {
+    test.skip(true, 'Legacy calendar headcount badges were replaced by the unified schedule grid.')
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.publishedCycle.id}&view=week&shift=day`)
-    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
 
     const underBadge = page
       .locator(`[data-testid="coverage-headcount-badge-${ctx!.publishedCycle.underDate}"]:visible`)
@@ -422,25 +350,13 @@ test.describe.serial('coverage display regressions', () => {
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.emptyDraftCycle.id}`)
 
-    await expect(page.getByText('No shifts assigned yet', { exact: true })).toBeVisible()
-    await expect(
-      page.getByText('No shifts assigned yet. Run Auto-draft or click a day to assign manually.')
-    ).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Assign manually' })).toBeVisible()
-
-    const dayCellButton = page.locator(
-      `[data-testid="coverage-day-cell-button-${ctx!.emptyDraftCycle.startDate}"]:visible`
+    await expect(page).toHaveURL(/\/schedule/)
+    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: 'Schedule Block' })).toHaveValue(
+      ctx!.emptyDraftCycle.id
     )
-    await expect(dayCellButton).toBeVisible()
-    await dayCellButton.click({ position: { x: 18, y: 18 } })
-    const drawer = page.getByTestId('coverage-shift-editor-dialog')
-    await expect(drawer).toBeVisible()
-    await expect(drawer.getByText('Coverage shift editor')).toBeVisible()
-    await expect(
-      drawer.getByText(
-        'Manager staffing changes and post-publish guardrails for this selected shift.'
-      )
-    ).toBeVisible()
-    await expect(drawer.getByText('Your status')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Auto-draft' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Pre-flight' })).toBeVisible()
+    await expect(page.getByRole('table')).toBeVisible()
   })
 })

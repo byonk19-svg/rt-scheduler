@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { addDays, formatDateKey, getEnv, randomString } from './helpers/env'
+import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type LotteryWorkflowCtx = {
@@ -113,25 +114,16 @@ test.describe.serial('lottery workflow', () => {
     })
     createdUserIds.push(charlieUser.id)
 
-    const shiftDate = formatDateKey(addDays(new Date(), 75 + Math.floor(Math.random() * 20)))
-    const cycleInsert = await supabase
-      .from('schedule_cycles')
-      .insert({
-        label: `Lottery Workflow ${randomString('cycle')}`,
-        start_date: shiftDate,
-        end_date: shiftDate,
-        published: true,
-      })
-      .select('id')
-      .single()
-
-    if (cycleInsert.error || !cycleInsert.data) {
-      throw new Error(cycleInsert.error?.message ?? 'Could not create lottery workflow cycle.')
-    }
+    const cycle = await createScheduleCycle(supabase, {
+      label: `Lottery Workflow ${randomString('cycle')}`,
+      startDate: addDays(new Date(), 75 + Math.floor(Math.random() * 20)),
+      published: true,
+    })
+    const shiftDate = formatDateKey(addDays(new Date(`${cycle.start_date}T00:00:00`), 2))
 
     const shiftsInsert = await supabase.from('shifts').insert([
       {
-        cycle_id: cycleInsert.data.id,
+        cycle_id: cycle.id,
         site_id: 'default',
         user_id: alphaUser.id,
         date: shiftDate,
@@ -141,7 +133,7 @@ test.describe.serial('lottery workflow', () => {
         role: 'staff',
       },
       {
-        cycle_id: cycleInsert.data.id,
+        cycle_id: cycle.id,
         site_id: 'default',
         user_id: bravoUser.id,
         date: shiftDate,
@@ -151,7 +143,7 @@ test.describe.serial('lottery workflow', () => {
         role: 'staff',
       },
       {
-        cycle_id: cycleInsert.data.id,
+        cycle_id: cycle.id,
         site_id: 'default',
         user_id: charlieUser.id,
         date: shiftDate,
@@ -192,7 +184,7 @@ test.describe.serial('lottery workflow', () => {
     ctx = {
       supabase,
       shiftDate,
-      cycleId: cycleInsert.data.id,
+      cycleId: cycle.id,
       manager: { id: manager.id, email: managerEmail, password: managerPassword },
       alpha: { id: alphaUser.id, fullName: 'Alpha Requester' },
       bravo: { id: bravoUser.id, fullName: 'Bravo Worker' },

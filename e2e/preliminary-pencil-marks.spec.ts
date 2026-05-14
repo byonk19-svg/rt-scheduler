@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
 import { addDays, formatDateKey, randomString } from './helpers/env'
+import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type PencilCtx = {
@@ -68,30 +69,20 @@ test.describe.serial('preliminary pencil marks', () => {
     })
     createdUserIds.push(therapist.id)
 
-    const start = addDays(new Date(), 21)
-    const assignedDate = formatDateKey(start)
-    const replacementDate = formatDateKey(addDays(start, 1))
-
-    const cycle = await supabase
-      .from('schedule_cycles')
-      .insert({
-        label: `Pencil Marks ${randomString('cycle')}`,
-        start_date: assignedDate,
-        end_date: replacementDate,
-        published: false,
-        status: 'preliminary',
-      })
-      .select('id')
-      .single()
-
-    if (cycle.error || !cycle.data) {
-      throw new Error(cycle.error?.message ?? 'Could not seed pencil mark cycle.')
-    }
+    const cycle = await createScheduleCycle(supabase, {
+      label: `Pencil Marks ${randomString('cycle')}`,
+      startDate: addDays(new Date(), 21),
+      published: false,
+      status: 'preliminary',
+    })
+    const start = new Date(`${cycle.start_date}T00:00:00`)
+    const assignedDate = formatDateKey(addDays(start, 1))
+    const replacementDate = formatDateKey(addDays(start, 2))
 
     const shift = await supabase
       .from('shifts')
       .insert({
-        cycle_id: cycle.data.id,
+        cycle_id: cycle.id,
         user_id: therapist.id,
         date: assignedDate,
         shift_type: 'day',
@@ -109,7 +100,7 @@ test.describe.serial('preliminary pencil marks', () => {
     const snapshot = await supabase
       .from('preliminary_snapshots')
       .insert({
-        cycle_id: cycle.data.id,
+        cycle_id: cycle.id,
         created_by: manager.id,
         sent_at: new Date().toISOString(),
         status: 'active',
@@ -134,7 +125,7 @@ test.describe.serial('preliminary pencil marks', () => {
       supabase,
       manager: { id: manager.id, email: managerEmail, password: managerPassword },
       therapist: { id: therapist.id, email: therapistEmail, password: therapistPassword },
-      cycleId: cycle.data.id,
+      cycleId: cycle.id,
       snapshotId: snapshot.data.id,
       assignedShiftId: shift.data.id,
       assignedDate,

@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { addDays, formatDateKey, randomString } from './helpers/env'
 import { loginAsAndGoTo } from './helpers/auth'
+import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type StaffOnboardingContext = {
@@ -42,22 +43,11 @@ test.describe.serial('staff onboarding gate', () => {
     })
     createdUserIds.push(therapist.id)
 
-    const cycleStart = addDays(new Date(), 21)
-    const cycleEnd = addDays(cycleStart, 13)
-    const cycleInsert = await supabase
-      .from('schedule_cycles')
-      .insert({
-        label: `Onboarding Availability ${randomString('cycle')}`,
-        start_date: formatDateKey(cycleStart),
-        end_date: formatDateKey(cycleEnd),
-        published: false,
-      })
-      .select('id')
-      .single()
-
-    if (cycleInsert.error || !cycleInsert.data) {
-      throw new Error(cycleInsert.error?.message ?? 'Could not create onboarding cycle.')
-    }
+    const cycle = await createScheduleCycle(supabase, {
+      label: `Onboarding Availability ${randomString('cycle')}`,
+      startDate: addDays(new Date(), 21),
+      published: false,
+    })
 
     const { error: profileUpdateError } = await supabase
       .from('profiles')
@@ -86,7 +76,7 @@ test.describe.serial('staff onboarding gate', () => {
         password: therapistPassword,
         firstName,
       },
-      cycleId: cycleInsert.data.id,
+      cycleId: cycle.id,
     }
   })
 

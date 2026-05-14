@@ -2,7 +2,8 @@ import { expect, test } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
-import { addDays, formatDateKey, randomString } from './helpers/env'
+import { addDays, randomString } from './helpers/env'
+import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type ProactiveRiskCtx = {
@@ -36,22 +37,13 @@ test.describe.serial('coverage proactive risk warning', () => {
     })
     createdUserIds.push(manager.id)
 
-    const cycleDate = formatDateKey(addDays(new Date(), 28))
-    const cycleInsert = await supabase
-      .from('schedule_cycles')
-      .insert({
-        label: `Coverage Risk ${randomString('cycle')}`,
-        start_date: cycleDate,
-        end_date: cycleDate,
-        published: false,
-      })
-      .select('id')
-      .single()
-
-    if (cycleInsert.error || !cycleInsert.data) {
-      throw new Error(cycleInsert.error?.message ?? 'Could not create proactive-risk cycle.')
-    }
-    createdCycleIds.push(cycleInsert.data.id)
+    const cycle = await createScheduleCycle(supabase, {
+      label: `Coverage Risk ${randomString('cycle')}`,
+      startDate: addDays(new Date(), 28),
+      published: false,
+    })
+    const cycleDate = cycle.start_date
+    createdCycleIds.push(cycle.id)
 
     const therapistResult = await supabase
       .from('profiles')
@@ -65,11 +57,12 @@ test.describe.serial('coverage proactive risk warning', () => {
     }
 
     const overrideRows = (therapistResult.data ?? []).map((row) => ({
-      cycle_id: cycleInsert.data.id,
+      cycle_id: cycle.id,
       therapist_id: row.id,
       date: cycleDate,
       shift_type: 'both' as const,
       override_type: 'force_off' as const,
+      intent: 'manager_block' as const,
       created_by: manager.id,
       source: 'manager' as const,
       note: 'e2e proactive-risk coverage guard',
@@ -85,7 +78,7 @@ test.describe.serial('coverage proactive risk warning', () => {
     ctx = {
       supabase,
       manager: { id: manager.id, email: managerEmail, password: managerPassword },
-      cycleId: cycleInsert.data.id,
+      cycleId: cycle.id,
       cycleDate,
     }
   })
@@ -112,14 +105,12 @@ test.describe.serial('coverage proactive risk warning', () => {
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycleId}&view=week`)
-    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
 
-    await expect(page.getByText('Coverage risk before Auto-draft').first()).toBeVisible()
-    await expect(page.getByText(/projected to miss/i).first()).toBeVisible()
-
-    await page.getByRole('button', { name: 'Review pre-flight' }).click()
-    await expect(page.getByRole('dialog')).toBeVisible()
-    await expect(page.getByText('Draft pre-flight report')).toBeVisible()
-    await expect(page.getByText('Checking constraints...')).toBeVisible()
+    await page.getByRole('button', { name: 'Pre-flight' }).click()
+    await expect(page.getByText('Pre-flight summary')).toBeVisible()
+    await expect(page.getByText(/unfilled assignments/)).toBeVisible()
+    await expect(page.getByText(/missing lead slots/)).toBeVisible()
+    await expect(page.getByText(/need-to-work misses/)).toBeVisible()
   })
 })

@@ -2,7 +2,8 @@ import { expect, test } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
-import { addDays, formatDateKey, randomString } from './helpers/env'
+import { addDays, randomString } from './helpers/env'
+import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type StaffDashboardCtx = {
@@ -34,24 +35,14 @@ test.describe.serial('staff dashboard smoke', () => {
     })
     createdUserId = therapist.id
 
-    const cycleStart = addDays(new Date(), 14)
-    const cycleInsert = await supabase
-      .from('schedule_cycles')
-      .insert({
-        label: `Dashboard Smoke ${randomString('cycle')}`,
-        start_date: formatDateKey(cycleStart),
-        end_date: formatDateKey(addDays(cycleStart, 41)),
-        published: false,
-        availability_due_at: addDays(new Date(), 1).toISOString(),
-      })
-      .select('id')
-      .single()
+    const cycle = await createScheduleCycle(supabase, {
+      label: `Dashboard Smoke ${randomString('cycle')}`,
+      startDate: addDays(new Date(), 14),
+      published: false,
+      availabilityDueAt: addDays(new Date(), 1).toISOString(),
+    })
 
-    if (cycleInsert.error || !cycleInsert.data) {
-      throw new Error(cycleInsert.error?.message ?? 'Could not create dashboard cycle.')
-    }
-
-    createdCycleId = cycleInsert.data.id
+    createdCycleId = cycle.id
     ctx = {
       supabase,
       therapist: {
@@ -59,7 +50,7 @@ test.describe.serial('staff dashboard smoke', () => {
         email: therapistEmail,
         password: therapistPassword,
       },
-      cycleId: cycleInsert.data.id,
+      cycleId: cycle.id,
     }
   })
 
@@ -97,10 +88,10 @@ test.describe.serial('staff dashboard smoke', () => {
       /tell us when you can work|finish and send your availability|availability is past due|availability sent|review preliminary schedule|final schedule ready|schedule closed/i
     )
 
-    const primaryLinks = nextStepCard.locator('a').filter({ hasNotText: 'View my shifts' })
+    const primaryLinks = nextStepCard.locator('a').filter({ hasNotText: 'View schedule' })
     await expect(primaryLinks.first()).toBeVisible()
     await expect(page.getByText('Need something else?')).toBeVisible()
-    await expect(page.getByRole('link', { name: 'View my shifts' }).first()).toBeVisible()
+    await expect(page.getByRole('link', { name: 'View schedule' }).first()).toBeVisible()
     await expect(page.getByRole('link', { name: 'Shift Swaps & Pickups' }).first()).toBeVisible()
     await expect(page.getByRole('link', { name: 'View history' }).first()).toBeVisible()
   })

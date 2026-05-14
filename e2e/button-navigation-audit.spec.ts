@@ -5,7 +5,8 @@ import { expect, test, type Page } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
-import { addDays, formatDateKey, randomString } from './helpers/env'
+import { addDays, randomString } from './helpers/env'
+import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type Persona = 'public' | 'manager' | 'therapist'
@@ -50,24 +51,10 @@ function normalizeButtonLabel(text: string | null, ariaLabel: string | null) {
 
 async function createCycle(supabase: SupabaseClient, published: boolean) {
   const startDate = addDays(new Date(), published ? 3 : 30)
-  const endDate = addDays(startDate, 13)
   const label = `Button Audit ${published ? 'Published' : 'Draft'} ${randomString('cycle')}`
-  const result = await supabase
-    .from('schedule_cycles')
-    .insert({
-      label,
-      start_date: formatDateKey(startDate),
-      end_date: formatDateKey(endDate),
-      published,
-    })
-    .select('id')
-    .single()
+  const result = await createScheduleCycle(supabase, { label, startDate, published })
 
-  if (result.error || !result.data) {
-    throw new Error(result.error?.message ?? 'Could not create audit cycle.')
-  }
-
-  return { id: result.data.id, startDate: formatDateKey(startDate), label }
+  return { id: result.id, startDate: result.start_date, label }
 }
 
 async function seedAuditContext(supabase: SupabaseClient): Promise<AuditContext> {

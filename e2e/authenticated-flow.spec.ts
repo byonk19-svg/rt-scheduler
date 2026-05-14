@@ -1,20 +1,36 @@
 import { expect, test } from '@playwright/test'
 
-const email = process.env.E2E_USER_EMAIL
-const password = process.env.E2E_USER_PASSWORD
+import { randomString } from './helpers/env'
+import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 test('authenticated user can login and sign out', async ({ page }) => {
-  test.skip(!email || !password, 'Set E2E_USER_EMAIL and E2E_USER_PASSWORD to run auth flow test.')
+  const supabase = createServiceRoleClientOrNull()
+  test.skip(!supabase, 'Supabase service env values are required to run auth flow test.')
 
-  await page.goto('/login')
-  await page.getByLabel(/^Email address$/).fill(email!)
-  await page.getByLabel(/^Password$/).fill(password!)
-  await page.getByRole('button', { name: 'Sign In' }).click()
+  const email = `${randomString('auth-flow')}@example.com`
+  const password = `Auth!${Math.random().toString(16).slice(2, 10)}`
+  const user = await createE2EUser(supabase!, {
+    email,
+    password,
+    fullName: 'Auth Flow Manager',
+    role: 'manager',
+    employmentType: 'full_time',
+    shiftType: 'day',
+    isLeadEligible: true,
+  })
 
-  await expect(page).toHaveURL(/\/dashboard/, { timeout: 30_000 })
-  const logoutButton = page.getByRole('button', { name: 'Log out' })
-  await expect(logoutButton).toBeVisible({ timeout: 30_000 })
+  try {
+    await page.goto('/login')
+    await page.getByLabel(/^Email address$/).fill(email)
+    await page.getByLabel(/^Password$/).fill(password)
+    await page.getByRole('button', { name: 'Sign In' }).click()
 
-  await page.goto('/auth/signout?next=/login', { waitUntil: 'domcontentloaded' })
-  await expect(page).toHaveURL(/\/login/, { timeout: 30_000 })
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 30_000 })
+    await expect(page.getByRole('button', { name: 'User menu' })).toBeVisible({ timeout: 30_000 })
+
+    await page.goto('/auth/signout?next=/login', { waitUntil: 'domcontentloaded' })
+    await expect(page).toHaveURL(/\/login/, { timeout: 30_000 })
+  } finally {
+    await supabase!.auth.admin.deleteUser(user.id).catch(() => undefined)
+  }
 })

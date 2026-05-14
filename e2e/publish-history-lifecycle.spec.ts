@@ -16,7 +16,7 @@ function nextSundayAfter(date: Date, minimumDaysAhead: number) {
   return addDays(next, (7 - day) % 7)
 }
 
-async function submitPublishForm(page: Page, buttonName: string) {
+async function submitPublishForm(page: Page, buttonName: string | RegExp) {
   const button = page.getByRole('button', { name: buttonName }).first()
   await expect(button).toBeVisible({ timeout: 30_000 })
   await button.click()
@@ -402,7 +402,7 @@ test.describe.serial('publish history lifecycle', () => {
     await expect(cycleRow).toBeVisible()
     await cycleRow.getByRole('button', { name: 'Republish' }).click()
 
-    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible({ timeout: 30_000 })
 
     const cyclePublished = async () => {
       const cycle = await ctx!.supabase
@@ -416,7 +416,7 @@ test.describe.serial('publish history lifecycle', () => {
     }
 
     if ((await cyclePublished()) !== 'final:true') {
-      await submitPublishForm(page, 'Publish with weekly override')
+      await submitPublishForm(page, /Publish/)
     }
 
     if ((await cyclePublished()) !== 'final:true') {

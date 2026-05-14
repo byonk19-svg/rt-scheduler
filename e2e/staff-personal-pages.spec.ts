@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
 import { addDays, formatDateKey, randomString } from './helpers/env'
+import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type StaffPagesCtx = {
@@ -50,26 +51,18 @@ test.describe.serial('staff personal schedule pages', () => {
 
     createdUserIds.push(therapist.id, partner.id)
 
-    const shiftDate = formatDateKey(addDays(new Date(), 7))
-    const cycleInsert = await supabase
-      .from('schedule_cycles')
-      .insert({
-        label: `Staff Personal Pages ${randomString('cycle')}`,
-        start_date: shiftDate,
-        end_date: formatDateKey(addDays(new Date(`${shiftDate}T00:00:00`), 41)),
-        published: true,
-      })
-      .select('id')
-      .single()
-    if (cycleInsert.error || !cycleInsert.data) {
-      throw new Error(cycleInsert.error?.message ?? 'Could not create staff pages cycle.')
-    }
-    createdCycleIds.push(cycleInsert.data.id)
+    const cycle = await createScheduleCycle(supabase, {
+      label: `Staff Personal Pages ${randomString('cycle')}`,
+      startDate: addDays(new Date(), 7),
+      published: true,
+    })
+    const shiftDate = formatDateKey(addDays(new Date(`${cycle.start_date}T00:00:00`), 1))
+    createdCycleIds.push(cycle.id)
 
     const shiftInsert = await supabase
       .from('shifts')
       .insert({
-        cycle_id: cycleInsert.data.id,
+        cycle_id: cycle.id,
         user_id: therapist.id,
         date: shiftDate,
         shift_type: 'day',
@@ -102,7 +95,7 @@ test.describe.serial('staff personal schedule pages', () => {
       supabase,
       therapist: { id: therapist.id, email: therapistEmail, password: therapistPassword },
       partner: { id: partner.id, fullName: partnerFullName },
-      cycleId: cycleInsert.data.id,
+      cycleId: cycle.id,
       shiftDate,
       historyMessage,
     }
@@ -121,18 +114,15 @@ test.describe.serial('staff personal schedule pages', () => {
     }
   })
 
-  test('therapist My Schedule and History render seeded live data', async ({ page }) => {
+  test('therapist Schedule and History render seeded live data', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run staff pages e2e.')
 
     await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
 
-    await page.goto('/staff/my-schedule')
-    await expect(page.getByRole('heading', { name: 'My Shifts' })).toBeVisible()
-    await expect(
-      page.getByText("Your published schedule and who you're working with.")
-    ).toBeVisible()
-    await expect(page.getByText('day', { exact: true }).first()).toBeVisible()
-    await expect(page.getByText(/1 shift - 12h total/i)).toBeVisible()
+    await page.goto(`/schedule?cycle=${ctx!.cycleId}`)
+    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: 'Schedule Block' })).toHaveValue(ctx!.cycleId)
+    await expect(page.getByRole('rowheader').filter({ hasText: 'You' })).toBeVisible()
 
     await page.goto('/staff/history')
     await expect(page.getByRole('heading', { name: 'Shift Swaps & Pickups History' })).toBeVisible()

@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
 import { addDays, formatDateKey, randomString } from './helpers/env'
+import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type ManagerCtx = {
@@ -88,27 +89,17 @@ test.describe.serial('manager specialized controls', () => {
   test('manager can assign a swap partner and approve the swap path', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run manager-specialized e2e.')
 
-    const cycleDate = addDays(new Date(), 16)
-    const cycleKey = formatDateKey(cycleDate)
-    const cycleInsert = await ctx!.supabase
-      .from('schedule_cycles')
-      .insert({
-        label: `Swap Cycle ${randomString('cycle')}`,
-        start_date: cycleKey,
-        end_date: cycleKey,
-        published: true,
-      })
-      .select('id')
-      .single()
-
-    if (cycleInsert.error || !cycleInsert.data) {
-      throw new Error(cycleInsert.error?.message ?? 'Could not create swap cycle.')
-    }
-    createdCycleIds.push(cycleInsert.data.id)
+    const cycle = await createScheduleCycle(ctx!.supabase, {
+      label: `Swap Cycle ${randomString('cycle')}`,
+      startDate: addDays(new Date(), 16),
+      published: true,
+    })
+    const cycleKey = formatDateKey(addDays(new Date(`${cycle.start_date}T00:00:00`), 1))
+    createdCycleIds.push(cycle.id)
 
     const shiftsInsert = await ctx!.supabase.from('shifts').insert([
       {
-        cycle_id: cycleInsert.data.id,
+        cycle_id: cycle.id,
         user_id: ctx!.requester.id,
         date: cycleKey,
         shift_type: 'day',
@@ -117,7 +108,7 @@ test.describe.serial('manager specialized controls', () => {
         role: 'staff',
       },
       {
-        cycle_id: cycleInsert.data.id,
+        cycle_id: cycle.id,
         user_id: ctx!.partner.id,
         date: cycleKey,
         shift_type: 'day',
@@ -193,7 +184,7 @@ test.describe.serial('manager specialized controls', () => {
     const shiftRows = await ctx!.supabase
       .from('shifts')
       .select('user_id')
-      .eq('cycle_id', cycleInsert.data.id)
+      .eq('cycle_id', cycle.id)
       .eq('date', cycleKey)
 
     if (shiftRows.error) throw new Error(shiftRows.error.message)
@@ -204,24 +195,13 @@ test.describe.serial('manager specialized controls', () => {
   test('manager can archive a draft cycle from publish history', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run manager-specialized e2e.')
 
-    const cycleDate = addDays(new Date(), 50)
-    const cycleKey = formatDateKey(cycleDate)
     const label = `Archive Cycle ${randomString('cycle')}`
-    const cycleInsert = await ctx!.supabase
-      .from('schedule_cycles')
-      .insert({
-        label,
-        start_date: cycleKey,
-        end_date: formatDateKey(addDays(cycleDate, 6)),
-        published: false,
-      })
-      .select('id')
-      .single()
-
-    if (cycleInsert.error || !cycleInsert.data) {
-      throw new Error(cycleInsert.error?.message ?? 'Could not create archive cycle.')
-    }
-    createdCycleIds.push(cycleInsert.data.id)
+    const cycle = await createScheduleCycle(ctx!.supabase, {
+      label,
+      startDate: addDays(new Date(), 50),
+      published: false,
+    })
+    createdCycleIds.push(cycle.id)
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto('/publish')
@@ -235,13 +215,13 @@ test.describe.serial('manager specialized controls', () => {
     await expect
       .poll(
         async () => {
-          const cycle = await ctx!.supabase
+          const archivedCycle = await ctx!.supabase
             .from('schedule_cycles')
             .select('archived_at')
-            .eq('id', cycleInsert.data.id)
+            .eq('id', cycle.id)
             .maybeSingle()
-          if (cycle.error) throw new Error(cycle.error.message)
-          return Boolean(cycle.data?.archived_at)
+          if (archivedCycle.error) throw new Error(archivedCycle.error.message)
+          return Boolean(archivedCycle.data?.archived_at)
         },
         { timeout: 20_000 }
       )

@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
 import { addDays, formatDateKey, randomString } from './helpers/env'
+import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 function formatDateLabelE2E(iso: string): string {
@@ -41,24 +42,13 @@ test.describe.serial('therapist recurring pattern flow', () => {
     })
     createdUserIds.push(therapist.id)
 
-    const cycleStartDate = addDays(new Date(), 14)
-    const cycleStart = formatDateKey(cycleStartDate)
-    const cycleEnd = formatDateKey(addDays(cycleStartDate, 13))
-    const cycleInsert = await supabase
-      .from('schedule_cycles')
-      .insert({
-        label: `Pattern Flow ${randomString('cycle')}`,
-        start_date: cycleStart,
-        end_date: cycleEnd,
-        published: false,
-      })
-      .select('id')
-      .single()
-
-    if (cycleInsert.error || !cycleInsert.data) {
-      throw new Error(cycleInsert.error?.message ?? 'cycle insert failed')
-    }
-    createdCycleId = cycleInsert.data.id
+    const cycle = await createScheduleCycle(supabase, {
+      label: `Pattern Flow ${randomString('cycle')}`,
+      startDate: addDays(new Date(), 14),
+      published: false,
+    })
+    const cycleStart = cycle.start_date
+    createdCycleId = cycle.id
 
     ctx = {
       supabase,
@@ -67,7 +57,7 @@ test.describe.serial('therapist recurring pattern flow', () => {
         email: therapistEmail,
         password: therapistPassword,
       },
-      cycleId: cycleInsert.data.id,
+      cycleId: cycle.id,
       cycleStart,
       offDate: formatDateKey(addDays(new Date(`${cycleStart}T12:00:00`), 5)),
     }
@@ -115,7 +105,7 @@ test.describe.serial('therapist recurring pattern flow', () => {
     await offDayButton.click()
     await expect(page.getByRole('heading', { name: 'Selected day' })).toBeVisible()
     await page
-      .getByRole('button', { name: /^Can work$/ })
+      .getByRole('button', { name: /^Need to Work$/ })
       .last()
       .click()
 

@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
 import { addDays, formatDateKey, randomString } from './helpers/env'
+import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type TestUser = { id: string; email: string; password: string; name: string }
@@ -20,12 +21,6 @@ type ManagerScheduleCtx = {
 
 function cellTestId(userId: string, isoDate: string) {
   return `cell-${userId}-${isoDate}`
-}
-
-function nextSunday(from = new Date()): Date {
-  const start = new Date(from)
-  start.setDate(start.getDate() + ((7 - start.getDay()) % 7))
-  return start
 }
 
 test.describe.serial('unified schedule grid route', () => {
@@ -126,45 +121,25 @@ test.describe.serial('unified schedule grid route', () => {
     })
     createdUserIds.push(lead.id)
 
-    const draftStart = nextSunday(addDays(new Date(), 3))
-    const draftEnd = addDays(draftStart, 41)
-    const liveStart = addDays(draftEnd, 1)
-    const liveEnd = addDays(liveStart, 41)
-
     const draftLabel = `Grid Draft ${randomString('draft')}`
     const liveLabel = `Grid Live ${randomString('live')}`
-    const draftInsert = await supabase
-      .from('schedule_cycles')
-      .insert({
-        label: draftLabel,
-        start_date: formatDateKey(draftStart),
-        end_date: formatDateKey(draftEnd),
-        published: false,
-        site_id: siteId,
-      })
-      .select('id')
-      .single()
-    if (draftInsert.error || !draftInsert.data) {
-      throw new Error(draftInsert.error?.message ?? 'Could not create draft cycle.')
-    }
+    const draftCycle = await createScheduleCycle(supabase, {
+      label: draftLabel,
+      startDate: addDays(new Date(), 3),
+      published: false,
+      siteId,
+    })
+    const liveCycle = await createScheduleCycle(supabase, {
+      label: liveLabel,
+      startDate: addDays(new Date(`${draftCycle.end_date}T00:00:00`), 1),
+      published: true,
+      siteId,
+    })
 
-    const liveInsert = await supabase
-      .from('schedule_cycles')
-      .insert({
-        label: liveLabel,
-        start_date: formatDateKey(liveStart),
-        end_date: formatDateKey(liveEnd),
-        published: true,
-        site_id: siteId,
-      })
-      .select('id')
-      .single()
-    if (liveInsert.error || !liveInsert.data) {
-      throw new Error(liveInsert.error?.message ?? 'Could not create live cycle.')
-    }
+    createdCycleIds.push(draftCycle.id, liveCycle.id)
 
-    createdCycleIds.push(draftInsert.data.id, liveInsert.data.id)
-
+    const draftStart = new Date(`${draftCycle.start_date}T00:00:00`)
+    const liveStart = new Date(`${liveCycle.start_date}T00:00:00`)
     const draftDay1 = formatDateKey(draftStart)
     const draftDay2 = formatDateKey(addDays(draftStart, 1))
     const draftDay3 = formatDateKey(addDays(draftStart, 2))
@@ -174,7 +149,7 @@ test.describe.serial('unified schedule grid route', () => {
     const overrideInsert = await supabase.from('availability_overrides').insert([
       {
         therapist_id: dayCore.id,
-        cycle_id: draftInsert.data.id,
+        cycle_id: draftCycle.id,
         date: draftDay2,
         shift_type: 'day',
         override_type: 'force_off',
@@ -185,7 +160,7 @@ test.describe.serial('unified schedule grid route', () => {
       },
       {
         therapist_id: nightCore.id,
-        cycle_id: draftInsert.data.id,
+        cycle_id: draftCycle.id,
         date: draftDay3,
         shift_type: 'night',
         override_type: 'force_off',
@@ -201,7 +176,7 @@ test.describe.serial('unified schedule grid route', () => {
 
     const shiftsInsert = await supabase.from('shifts').insert([
       {
-        cycle_id: draftInsert.data.id,
+        cycle_id: draftCycle.id,
         user_id: dayCore.id,
         date: draftDay1,
         shift_type: 'day',
@@ -211,7 +186,7 @@ test.describe.serial('unified schedule grid route', () => {
         role: 'staff',
       },
       {
-        cycle_id: draftInsert.data.id,
+        cycle_id: draftCycle.id,
         user_id: dayPrn.id,
         date: draftDay2,
         shift_type: 'day',
@@ -221,7 +196,7 @@ test.describe.serial('unified schedule grid route', () => {
         role: 'staff',
       },
       {
-        cycle_id: draftInsert.data.id,
+        cycle_id: draftCycle.id,
         user_id: nightCore.id,
         date: draftDay1,
         shift_type: 'night',
@@ -231,7 +206,7 @@ test.describe.serial('unified schedule grid route', () => {
         role: 'staff',
       },
       {
-        cycle_id: liveInsert.data.id,
+        cycle_id: liveCycle.id,
         user_id: dayCore.id,
         date: liveDay1,
         shift_type: 'day',
@@ -241,7 +216,7 @@ test.describe.serial('unified schedule grid route', () => {
         role: 'staff',
       },
       {
-        cycle_id: liveInsert.data.id,
+        cycle_id: liveCycle.id,
         user_id: nightCore.id,
         date: liveDay2,
         shift_type: 'night',
@@ -263,8 +238,8 @@ test.describe.serial('unified schedule grid route', () => {
         password: managerPassword,
         name: managerName,
       },
-      draftCycle: { id: draftInsert.data.id, label: draftLabel, day1: draftDay1, day2: draftDay2 },
-      liveCycle: { id: liveInsert.data.id, label: liveLabel, day1: liveDay1, day2: liveDay2 },
+      draftCycle: { id: draftCycle.id, label: draftLabel, day1: draftDay1, day2: draftDay2 },
+      liveCycle: { id: liveCycle.id, label: liveLabel, day1: liveDay1, day2: liveDay2 },
       dayCore: {
         id: dayCore.id,
         email: dayCoreEmail,

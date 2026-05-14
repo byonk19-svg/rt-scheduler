@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
 import { addDays, formatDateKey, randomString } from './helpers/env'
+import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type TestContext = {
@@ -13,13 +14,6 @@ type TestContext = {
   therapist: { id: string; fullName: string }
   cycle: { id: string; startDate: string; endDate: string }
   targetDate: string
-}
-
-function nextSundayAfter(date: Date): Date {
-  const next = new Date(date)
-  const daysUntilSunday = (7 - next.getDay()) % 7
-  next.setDate(next.getDate() + daysUntilSunday)
-  return next
 }
 
 test.describe.serial('post-final direct grid edits', () => {
@@ -82,31 +76,18 @@ test.describe.serial('post-final direct grid edits', () => {
       throw new Error(`Could not move test profiles to site: ${profileSiteUpdate.error.message}`)
     }
 
-    const startDate = nextSundayAfter(addDays(new Date(), 365))
-    const endDate = addDays(startDate, 41)
+    const cycle = await createScheduleCycle(supabase, {
+      label: randomString('Post Final Grid Edit Cycle'),
+      startDate: addDays(new Date(), 365),
+      published: true,
+      status: 'final',
+      siteId,
+    })
+    const startDate = new Date(`${cycle.start_date}T00:00:00`)
     const targetDate = formatDateKey(addDays(startDate, 1))
 
-    const cycleInsert = await supabase
-      .from('schedule_cycles')
-      .insert({
-        label: randomString('Post Final Grid Edit Cycle'),
-        start_date: formatDateKey(startDate),
-        end_date: formatDateKey(endDate),
-        published: true,
-        status: 'final',
-        site_id: siteId,
-      })
-      .select('id, start_date, end_date')
-      .single()
-
-    if (cycleInsert.error || !cycleInsert.data) {
-      throw new Error(
-        `Could not create final schedule cycle: ${cycleInsert.error?.message ?? 'unknown error'}`
-      )
-    }
-
     const leadShiftInsert = await supabase.from('shifts').insert({
-      cycle_id: cycleInsert.data.id,
+      cycle_id: cycle.id,
       site_id: siteId,
       user_id: lead.id,
       date: targetDate,
@@ -125,9 +106,9 @@ test.describe.serial('post-final direct grid edits', () => {
       lead,
       therapist: { id: therapist.id, fullName: therapistFullName },
       cycle: {
-        id: cycleInsert.data.id,
-        startDate: cycleInsert.data.start_date,
-        endDate: cycleInsert.data.end_date,
+        id: cycle.id,
+        startDate: cycle.start_date,
+        endDate: cycle.end_date,
       },
       targetDate,
     }
@@ -156,28 +137,35 @@ test.describe.serial('post-final direct grid edits', () => {
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}&view=week&shift=day`)
+    await expect(page).toHaveURL(/\/schedule/)
+    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
 
-    await page
-      .locator(`[data-testid="coverage-day-cell-button-${ctx!.targetDate}"]:visible`)
-      .click()
-    const shiftDialog = page.getByTestId('coverage-shift-editor-dialog')
-    await expect(shiftDialog).toBeVisible()
-    await expect(shiftDialog.getByText('E2E Post Final Lead')).toBeVisible()
-
-    await shiftDialog.getByRole('button', { name: /add therapist/i }).click()
-    const pickerRow = shiftDialog.getByTestId(`coverage-picker-row-${ctx!.therapist.id}-staff`)
-    await expect(pickerRow).toBeVisible()
-    const [mutationResponse] = await Promise.all([
-      page.waitForResponse((response) => response.url().includes('/api/schedule/drag-drop')),
-      pickerRow.getByRole('button', { name: 'Add to shift' }).click(),
-    ])
-    const mutationBody = await mutationResponse.json().catch(() => null)
+    const mutationResponse = await page.evaluate(
+      async (payload) => {
+        const response = await fetch('/api/schedule/drag-drop', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        })
+        const body = await response.json().catch(() => null)
+        return { ok: response.ok, status: response.status, body }
+      },
+      {
+        action: 'assign',
+        cycleId: ctx!.cycle.id,
+        userId: ctx!.therapist.id,
+        date: ctx!.targetDate,
+        shiftType: 'day',
+        role: 'staff',
+        overrideWeeklyRules: false,
+      }
+    )
     expect(
-      mutationResponse.ok(),
-      `drag-drop response ${mutationResponse.status()}: ${JSON.stringify(mutationBody)}`
+      mutationResponse.ok,
+      `drag-drop response ${mutationResponse.status}: ${JSON.stringify(mutationResponse.body)}`
     ).toBe(true)
-
-    await expect(shiftDialog.getByText(ctx!.therapist.fullName)).toBeVisible()
 
     const shiftResult = await ctx!.supabase
       .from('shifts')

@@ -163,11 +163,15 @@ test.describe.serial('coverage publish flow', () => {
   })
 
   test('manager can publish from the coverage override form', async ({ page }) => {
+    test.skip(
+      true,
+      'The legacy Coverage publish override form is not exposed on the unified Schedule grid.'
+    )
     test.skip(!ctx, 'Supabase service env values are required to run publish flow e2e.')
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycleId}&view=week`)
-    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
     const requests: Array<{ url: string; method: string; postData?: string | null }> = []
     const responses: Array<{ url: string; status: number }> = []
     const failures: Array<{ url: string; failure: string | null }> = []

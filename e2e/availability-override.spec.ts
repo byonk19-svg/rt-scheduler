@@ -2,7 +2,8 @@ import { expect, test } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
-import { formatDateKey, randomString } from './helpers/env'
+import { randomString } from './helpers/env'
+import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type TestContext = {
@@ -59,37 +60,23 @@ test.describe.serial('availability override scheduling', () => {
 
     createdUserIds.push(manager.id, therapist.id, prnTherapist.id)
 
-    const start = new Date()
-    start.setDate(start.getDate() - 1)
-    const end = new Date()
-    end.setDate(end.getDate() + 7)
-    const targetDate = formatDateKey(start)
+    const cycle = await createScheduleCycle(supabase, {
+      label: randomString('E2E Cycle'),
+      startDate: new Date(),
+      align: 'on-or-before',
+      published: false,
+    })
+    const targetDate = cycle.start_date
 
-    const cycleInsert = await supabase
-      .from('schedule_cycles')
-      .insert({
-        label: randomString('E2E Cycle'),
-        start_date: formatDateKey(start),
-        end_date: formatDateKey(end),
-        published: false,
-      })
-      .select('id, start_date, end_date')
-      .single()
-
-    if (cycleInsert.error || !cycleInsert.data) {
-      throw new Error(
-        `Could not create test cycle: ${cycleInsert.error?.message ?? 'unknown error'}`
-      )
-    }
-
-    createdCycleIds.push(cycleInsert.data.id)
+    createdCycleIds.push(cycle.id)
 
     const availabilityInsert = await supabase.from('availability_overrides').insert({
       therapist_id: therapist.id,
-      cycle_id: cycleInsert.data.id,
+      cycle_id: cycle.id,
       date: targetDate,
       shift_type: 'both',
       override_type: 'force_off',
+      intent: 'therapist_need_off',
       note: 'Vacation',
       created_by: therapist.id,
     })
@@ -109,9 +96,9 @@ test.describe.serial('availability override scheduling', () => {
       fullTimeTherapist: { id: therapist.id, fullName: therapistFullName },
       prnTherapist: { id: prnTherapist.id, fullName: prnFullName },
       cycle: {
-        id: cycleInsert.data.id,
-        startDate: cycleInsert.data.start_date,
-        endDate: cycleInsert.data.end_date,
+        id: cycle.id,
+        startDate: cycle.start_date,
+        endDate: cycle.end_date,
       },
       targetDate,
     }
@@ -131,17 +118,15 @@ test.describe.serial('availability override scheduling', () => {
     }
   })
 
-  test('unavailable assignment shows warning modal; cancel prevents assignment; confirm writes override', async ({
+  test('unavailable assignment rejects without override and writes override when confirmed', async ({
     page,
   }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
-
-    await page.getByTestId(`coverage-day-cell-button-${ctx!.targetDate}`).click()
-    const shiftDialog = page.getByTestId('coverage-shift-editor-dialog')
-    await expect(shiftDialog).toBeVisible()
+    await expect(page).toHaveURL(/\/schedule/)
+    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
 
     const conflictResponse = await page.evaluate(
       async (payload) => {
@@ -225,20 +210,38 @@ test.describe.serial('availability override scheduling', () => {
     expect(assignedShiftResult.data?.availability_override_at).toBeTruthy()
   })
 
-  test('PRN not offered therapist is disabled in the staffing picker', async ({ page }) => {
+  test('PRN not offered therapist is rejected by assignment validation', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}`)
+    await expect(page).toHaveURL(/\/schedule/)
 
-    await page.getByTestId(`coverage-day-cell-button-${ctx!.targetDate}`).click()
-    const shiftDialog = page.getByTestId('coverage-shift-editor-dialog')
-    await expect(shiftDialog).toBeVisible()
-
-    const prnOption = page.getByTestId(`coverage-assign-toggle-${ctx!.prnTherapist.id}-staff`)
-    await expect(prnOption).toBeVisible()
-    await prnOption.click()
-    await expect(page.getByText('PRN not offered for this date')).toBeVisible()
+    const blockedResponse = await page.evaluate(
+      async (payload) => {
+        const response = await fetch('/api/schedule/drag-drop', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        })
+        const body = await response.json().catch(() => null)
+        return { status: response.status, body }
+      },
+      {
+        action: 'assign',
+        cycleId: ctx!.cycle.id,
+        userId: ctx!.prnTherapist.id,
+        date: ctx!.targetDate,
+        shiftType: 'day',
+        role: 'staff',
+        overrideWeeklyRules: false,
+      }
+    )
+    expect(blockedResponse.status).toBe(409)
+    const blockedPayload = blockedResponse.body as { error?: string } | null
+    expect(blockedPayload?.error).toBe('PRN not offered for this date')
 
     const assignedShiftResult = await ctx!.supabase
       .from('shifts')

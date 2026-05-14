@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
 import { addDays, formatDateKey, randomString } from './helpers/env'
+import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type TestContext = {
@@ -13,13 +14,6 @@ type TestContext = {
   inactiveTherapist: { id: string; fullName: string }
   cycle: { id: string }
   targetDate: string
-}
-
-function nextSundayAfter(date: Date): Date {
-  const next = new Date(date)
-  const daysUntilSunday = (7 - next.getDay()) % 7
-  next.setDate(next.getDate() + daysUntilSunday)
-  return next
 }
 
 test.describe.serial('manager assignment picker eligibility', () => {
@@ -90,27 +84,15 @@ test.describe.serial('manager assignment picker eligibility', () => {
       throw new Error(`Could not mark therapist inactive: ${inactiveUpdate.error.message}`)
     }
 
-    const startDate = nextSundayAfter(addDays(new Date(), 730))
-    const endDate = addDays(startDate, 41)
+    const cycle = await createScheduleCycle(supabase, {
+      label: randomString('Picker Eligibility Cycle'),
+      startDate: addDays(new Date(), 730),
+      published: false,
+      status: 'draft',
+      siteId,
+    })
+    const startDate = new Date(`${cycle.start_date}T00:00:00`)
     const targetDate = formatDateKey(addDays(startDate, 1))
-    const cycleInsert = await supabase
-      .from('schedule_cycles')
-      .insert({
-        label: randomString('Picker Eligibility Cycle'),
-        start_date: formatDateKey(startDate),
-        end_date: formatDateKey(endDate),
-        published: false,
-        status: 'draft',
-        site_id: siteId,
-      })
-      .select('id')
-      .single()
-
-    if (cycleInsert.error || !cycleInsert.data) {
-      throw new Error(
-        `Could not create picker eligibility cycle: ${cycleInsert.error?.message ?? 'unknown'}`
-      )
-    }
 
     ctx = {
       supabase,
@@ -118,7 +100,7 @@ test.describe.serial('manager assignment picker eligibility', () => {
       manager: { id: manager.id, email: managerEmail, password: managerPassword },
       activeTherapist: { id: activeTherapist.id, fullName: activeTherapistFullName },
       inactiveTherapist: { id: inactiveTherapist.id, fullName: inactiveTherapistFullName },
-      cycle: { id: cycleInsert.data.id },
+      cycle: { id: cycle.id },
       targetDate,
     }
   })
@@ -137,25 +119,38 @@ test.describe.serial('manager assignment picker eligibility', () => {
     await ctx.supabase.from('sites').delete().eq('id', ctx.siteId)
   })
 
-  test('inactive therapists are not offered for new manager assignments', async ({ page }) => {
+  test('inactive therapists are rejected for new manager assignments', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.cycle.id}&view=week&shift=day`)
+    await expect(page).toHaveURL(/\/schedule/)
+    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
 
-    await page
-      .locator(`[data-testid="coverage-day-cell-button-${ctx!.targetDate}"]:visible`)
-      .click()
-    const shiftDialog = page.getByTestId('coverage-shift-editor-dialog')
-    await expect(shiftDialog).toBeVisible()
-
-    await shiftDialog.getByRole('button', { name: /add therapist/i }).click()
-    await expect(
-      shiftDialog.getByTestId(`coverage-picker-row-${ctx!.activeTherapist.id}-staff`)
-    ).toBeVisible()
-    await expect(
-      shiftDialog.getByTestId(`coverage-picker-row-${ctx!.inactiveTherapist.id}-staff`)
-    ).toHaveCount(0)
-    await expect(shiftDialog.getByText(ctx!.inactiveTherapist.fullName)).toHaveCount(0)
+    const blockedResponse = await page.evaluate(
+      async (payload) => {
+        const response = await fetch('/api/schedule/drag-drop', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        })
+        const body = await response.json().catch(() => null)
+        return { status: response.status, body }
+      },
+      {
+        action: 'assign',
+        cycleId: ctx!.cycle.id,
+        userId: ctx!.inactiveTherapist.id,
+        date: ctx!.targetDate,
+        shiftType: 'day',
+        role: 'staff',
+        overrideWeeklyRules: false,
+      }
+    )
+    expect(blockedResponse.status).toBe(409)
+    const blockedPayload = blockedResponse.body as { error?: string } | null
+    expect(blockedPayload?.error).toMatch(/inactive|cannot be assigned|unavailable/i)
   })
 })

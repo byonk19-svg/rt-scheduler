@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
 import { addDays, formatDateKey, randomString } from './helpers/env'
+import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type LotteryFlowCtx = {
@@ -15,11 +16,6 @@ type LotteryFlowCtx = {
   therapistB: { id: string; name: string }
   therapistC: { id: string; name: string }
   therapistD: { id: string; name: string }
-}
-
-function nextSundayAfter(daysAhead: number): Date {
-  const target = addDays(new Date(), daysAhead)
-  return addDays(target, (7 - target.getDay()) % 7)
 }
 
 test.describe.serial('lottery operational flow', () => {
@@ -88,29 +84,21 @@ test.describe.serial('lottery operational flow', () => {
     })
     createdUserIds.push(therapistA.id, therapistB.id, therapistC.id, therapistD.id)
 
-    const cycleStart = nextSundayAfter(30 + Math.floor(Math.random() * 45))
+    const cycle = await createScheduleCycle(supabase, {
+      siteId,
+      label: `Lottery Ops ${randomString('cycle')}`,
+      startDate: addDays(new Date(), 30 + Math.floor(Math.random() * 45)),
+      published: true,
+      status: 'final',
+    })
+    const cycleStart = new Date(`${cycle.start_date}T00:00:00`)
     const shiftDate = formatDateKey(addDays(cycleStart, 2))
-    const cycleInsert = await supabase
-      .from('schedule_cycles')
-      .insert({
-        site_id: siteId,
-        label: `Lottery Ops ${randomString('cycle')}`,
-        start_date: formatDateKey(cycleStart),
-        end_date: formatDateKey(addDays(cycleStart, 41)),
-        published: true,
-      })
-      .select('id')
-      .single()
-
-    if (cycleInsert.error || !cycleInsert.data) {
-      throw new Error(cycleInsert.error?.message ?? 'Could not create lottery test cycle.')
-    }
-    createdCycleIds.push(cycleInsert.data.id)
+    createdCycleIds.push(cycle.id)
 
     const shiftInsert = await supabase.from('shifts').insert([
       {
         site_id: siteId,
-        cycle_id: cycleInsert.data.id,
+        cycle_id: cycle.id,
         user_id: therapistA.id,
         date: shiftDate,
         shift_type: 'day',
@@ -120,7 +108,7 @@ test.describe.serial('lottery operational flow', () => {
       },
       {
         site_id: siteId,
-        cycle_id: cycleInsert.data.id,
+        cycle_id: cycle.id,
         user_id: therapistB.id,
         date: shiftDate,
         shift_type: 'day',
@@ -130,7 +118,7 @@ test.describe.serial('lottery operational flow', () => {
       },
       {
         site_id: siteId,
-        cycle_id: cycleInsert.data.id,
+        cycle_id: cycle.id,
         user_id: therapistC.id,
         date: shiftDate,
         shift_type: 'day',
@@ -140,7 +128,7 @@ test.describe.serial('lottery operational flow', () => {
       },
       {
         site_id: siteId,
-        cycle_id: cycleInsert.data.id,
+        cycle_id: cycle.id,
         user_id: therapistD.id,
         date: shiftDate,
         shift_type: 'day',
@@ -197,7 +185,7 @@ test.describe.serial('lottery operational flow', () => {
       supabase,
       siteId,
       manager: { id: manager.id, email: managerEmail, password: managerPassword },
-      cycleId: cycleInsert.data.id,
+      cycleId: cycle.id,
       shiftDate,
       therapistA: { id: therapistA.id, name: 'Lottery Therapist A' },
       therapistB: { id: therapistB.id, name: 'Lottery Therapist B' },

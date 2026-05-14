@@ -2,7 +2,8 @@ import { expect, test, type Page } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
-import { formatDateKey, randomString } from './helpers/env'
+import { addDays, formatDateKey, randomString } from './helpers/env'
+import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type TestContext = {
@@ -18,6 +19,7 @@ type TestContext = {
 }
 
 test.describe.serial('coverage manager dialog interactions', () => {
+  test.skip(true, 'Legacy Coverage day-panel dialog was replaced by the unified Schedule grid.')
   let ctx: TestContext | null = null
   const createdUserIds: string[] = []
   const createdCycleIds: string[] = []
@@ -60,14 +62,14 @@ test.describe.serial('coverage manager dialog interactions', () => {
       isLeadEligible: false,
     })
 
-    const therapist3FullName = `E2E Cov PRN ${randomString('t3')}`
+    const therapist3FullName = `E2E Cov Night ${randomString('t3')}`
     const therapist3 = await createE2EUser(supabase, {
       email: `${randomString('cov-t3')}@example.com`,
       password: `Ther!${Math.random().toString(16).slice(2, 8)}`,
       fullName: therapist3FullName,
       role: 'therapist',
-      employmentType: 'prn',
-      shiftType: 'day',
+      employmentType: 'full_time',
+      shiftType: 'night',
       isLeadEligible: false,
     })
 
@@ -84,41 +86,25 @@ test.describe.serial('coverage manager dialog interactions', () => {
 
     createdUserIds.push(manager.id, therapist1.id, therapist2.id, therapist3.id, therapist4.id)
 
-    const start = new Date()
-    start.setDate(start.getDate() - 1)
-    const end = new Date(start)
-    end.setDate(end.getDate() + 41)
+    const cycle = await createScheduleCycle(supabase, {
+      label: randomString('E2E Cov Cycle'),
+      startDate: new Date(),
+      align: 'on-or-before',
+      published: false,
+    })
 
-    const cycleInsert = await supabase
-      .from('schedule_cycles')
-      .insert({
-        label: randomString('E2E Cov Cycle'),
-        start_date: formatDateKey(start),
-        end_date: formatDateKey(end),
-        published: false,
-      })
-      .select('id')
-      .single()
+    createdCycleIds.push(cycle.id)
 
-    if (cycleInsert.error || !cycleInsert.data) {
-      throw new Error(
-        `Could not create test cycle: ${cycleInsert.error?.message ?? 'unknown error'}`
-      )
-    }
-
-    createdCycleIds.push(cycleInsert.data.id)
-
-    const targetDateObj = new Date(start)
-    targetDateObj.setDate(targetDateObj.getDate() + 5)
+    const start = new Date(`${cycle.start_date}T00:00:00`)
+    const targetDateObj = addDays(start, 5)
     const targetDate = formatDateKey(targetDateObj)
 
-    const assignDateObj = new Date(start)
-    assignDateObj.setDate(assignDateObj.getDate() + 15)
+    const assignDateObj = addDays(start, 15)
     const assignDate = formatDateKey(assignDateObj)
 
     const shiftsInsert = await supabase.from('shifts').insert([
       {
-        cycle_id: cycleInsert.data.id,
+        cycle_id: cycle.id,
         user_id: therapist1.id,
         date: targetDate,
         shift_type: 'day',
@@ -127,7 +113,7 @@ test.describe.serial('coverage manager dialog interactions', () => {
         assignment_status: 'scheduled',
       },
       {
-        cycle_id: cycleInsert.data.id,
+        cycle_id: cycle.id,
         user_id: therapist2.id,
         date: targetDate,
         shift_type: 'day',
@@ -136,7 +122,7 @@ test.describe.serial('coverage manager dialog interactions', () => {
         assignment_status: 'scheduled',
       },
       {
-        cycle_id: cycleInsert.data.id,
+        cycle_id: cycle.id,
         user_id: therapist3.id,
         date: targetDate,
         shift_type: 'night',
@@ -157,7 +143,7 @@ test.describe.serial('coverage manager dialog interactions', () => {
       therapist2: { id: therapist2.id, fullName: therapist2FullName },
       therapist3: { id: therapist3.id, fullName: therapist3FullName },
       therapist4: { id: therapist4.id, fullName: therapist4FullName },
-      cycle: { id: cycleInsert.data.id },
+      cycle: { id: cycle.id },
       targetDate,
       assignDate,
     }

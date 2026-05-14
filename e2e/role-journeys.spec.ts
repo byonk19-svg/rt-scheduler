@@ -1368,7 +1368,7 @@ test.describe.serial('role journeys', () => {
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto('/coverage?view=week')
-    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
     const directCreateButton = page.getByRole('button', { name: 'New 6-week block' })
     if ((await directCreateButton.count()) > 0) {
       await directCreateButton.first().click()
@@ -1440,7 +1440,7 @@ test.describe.serial('role journeys', () => {
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${draftCycle.cycleId}&view=week`)
-    await expect(page.getByRole('heading', { name: 'Coverage' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
     await page.getByText('More').first().click()
     await page.getByRole('button', { name: 'Send preliminary' }).click()
     await expect(
