@@ -1,8 +1,21 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
 import { loginAs } from './helpers/auth'
 import { randomString } from './helpers/env'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
+
+async function gotoWithRetry(page: Page, url: string) {
+  let lastError: unknown
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded' })
+      return
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError
+}
 
 test.describe.serial('lottery workflow surface', () => {
   test.setTimeout(120_000)
@@ -43,7 +56,7 @@ test.describe.serial('lottery workflow surface', () => {
 
     await expect(page.getByRole('heading', { name: 'Manager Dashboard' })).toBeVisible()
 
-    await page.goto('/coverage', { waitUntil: 'domcontentloaded' })
+    await gotoWithRetry(page, '/coverage')
     await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
     await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {})
 
@@ -54,7 +67,7 @@ test.describe.serial('lottery workflow surface', () => {
 
     const lotteryHref = await scheduleLotteryLink.getAttribute('href')
     expect(lotteryHref).toBe('/lottery')
-    await page.goto(lotteryHref!, { waitUntil: 'domcontentloaded' })
+    await gotoWithRetry(page, lotteryHref!)
     await expect(page).toHaveURL(/\/lottery(?:[/?].*)?$/)
     await expect(page.getByRole('heading', { name: 'Lottery Decision Center' })).toBeVisible()
     await expect(

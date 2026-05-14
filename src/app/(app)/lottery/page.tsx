@@ -12,6 +12,7 @@ export const metadata: Metadata = {
 type LotterySearchParams = {
   date?: string | string[]
   shift?: string | string[]
+  keepToWork?: string | string[]
 }
 
 function firstParam(value: string | string[] | undefined): string | undefined {
@@ -39,10 +40,14 @@ export default async function LotteryPage({
   }
 
   const params = (await searchParams) ?? {}
+  const keepToWorkRaw = firstParam(params.keepToWork)
+  const keepToWork =
+    keepToWorkRaw == null || keepToWorkRaw.trim() === '' ? null : Number(keepToWorkRaw)
   const snapshot = await loadLotterySnapshot({
     actor,
     shiftDate: firstParam(params.date) ?? null,
     shiftType: firstParam(params.shift) === 'night' ? 'night' : 'day',
+    keepToWork: Number.isFinite(keepToWork) ? Math.trunc(keepToWork as number) : null,
   })
 
   return <LotteryClientPage initialSnapshot={snapshot} />

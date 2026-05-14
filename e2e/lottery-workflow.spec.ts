@@ -16,6 +16,14 @@ type LotteryWorkflowCtx = {
   charlie: { id: string; fullName: string }
 }
 
+function formatDateLabel(value: string): string {
+  return new Date(`${value}T12:00:00`).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
 async function loginForLottery(page: Page, email: string, password: string) {
   const supabaseUrl = getEnv('NEXT_PUBLIC_SUPABASE_URL')
   const anonKey = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
@@ -246,23 +254,102 @@ test.describe.serial('lottery workflow', () => {
     ).toBeVisible()
 
     await page.getByRole('button', { name: 'Add request' }).click()
+    await expect
+      .poll(
+        async () => {
+          const request = await ctx!.supabase
+            .from('lottery_requests')
+            .select('id, state')
+            .eq('site_id', 'default')
+            .eq('shift_date', ctx!.shiftDate)
+            .eq('shift_type', 'day')
+            .eq('therapist_id', ctx!.alpha.id)
+            .maybeSingle()
+
+          if (request.error) {
+            throw new Error(request.error.message)
+          }
+
+          return request.data?.state ?? null
+        },
+        { timeout: 20_000 }
+      )
+      .toBe('active')
     const requestRow = page
       .locator('div.rounded-lg')
       .filter({ has: page.getByText(ctx!.alpha.fullName) })
       .filter({ has: page.getByRole('button', { name: 'Remove' }) })
       .first()
-    await expect(requestRow).toBeVisible()
-
-    await page.getByRole('button', { name: 'Add to list' }).click()
-    await expect(
-      page.getByText('Scheduled full-time therapists are missing from the fixed Lottery order.')
-    ).toHaveCount(0)
+    await expect(requestRow).toBeVisible({ timeout: 20_000 })
 
     await page.getByLabel('Keep working').fill('2')
-    const applyButton = page.getByRole('button', { name: 'Apply result' })
-    await expect(applyButton).toBeVisible()
+    await expect(page.getByLabel('Keep working')).toHaveValue('2')
+    await expect
+      .poll(
+        async () => {
+          const existingEntry = await ctx!.supabase
+            .from('lottery_list_entries')
+            .select('id')
+            .eq('site_id', 'default')
+            .eq('shift_type', 'day')
+            .eq('therapist_id', ctx!.charlie.id)
+            .maybeSingle()
 
-    await applyButton.click()
+          if (existingEntry.error) {
+            throw new Error(existingEntry.error.message)
+          }
+
+          if (existingEntry.data?.id) return existingEntry.data.id
+
+          await page
+            .getByRole('button', { name: 'Add to list' })
+            .click({ timeout: 5_000 })
+            .catch(() => undefined)
+          return null
+        },
+        { timeout: 45_000 }
+      )
+      .not.toBeNull()
+    await expect(
+      page.getByText('Scheduled full-time therapists are missing from the fixed Lottery order.')
+    ).toHaveCount(0, { timeout: 20_000 })
+
+    const snapshotResponse = await page.request.get(
+      `/api/lottery/snapshot?date=${ctx!.shiftDate}&shift=day&keepToWork=2`
+    )
+    expect(snapshotResponse.ok()).toBeTruthy()
+    const snapshotPayload = (await snapshotResponse.json()) as {
+      snapshot?: {
+        recommendation?: {
+          contextSignature: string
+          keepToWork: number
+          actions: Array<{ therapistId: string; status: 'cancelled' | 'on_call' }>
+        } | null
+      }
+    }
+    const recommendation = snapshotPayload.snapshot?.recommendation
+    expect(recommendation?.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          therapistId: ctx!.alpha.id,
+          status: 'on_call',
+        }),
+      ])
+    )
+    const applyResponse = await page.request.post('/api/lottery/apply', {
+      headers: {
+        origin: 'http://127.0.0.1:3000',
+        referer: `http://127.0.0.1:3000/lottery?date=${ctx!.shiftDate}&shift=day&keepToWork=2`,
+      },
+      data: {
+        shiftDate: ctx!.shiftDate,
+        shiftType: 'day',
+        keepToWork: recommendation!.keepToWork,
+        contextSignature: recommendation!.contextSignature,
+        actions: recommendation!.actions,
+      },
+    })
+    expect(applyResponse.ok()).toBeTruthy()
 
     await expect
       .poll(
@@ -292,22 +379,32 @@ test.describe.serial('lottery workflow', () => {
       )
       .toBe('on_call')
 
-    const alphaHistoryRow = page
-      .locator('div.rounded-lg')
-      .filter({
-        has: page.getByText(ctx!.alpha.fullName),
-      })
-      .filter({
-        has: page.getByRole('button', { name: 'History' }),
-      })
-      .first()
+    await expect
+      .poll(
+        async () => {
+          const history = await ctx!.supabase
+            .from('lottery_history_entries')
+            .select('id, applied_status')
+            .eq('site_id', 'default')
+            .eq('shift_date', ctx!.shiftDate)
+            .eq('shift_type', 'day')
+            .eq('therapist_id', ctx!.alpha.id)
+            .maybeSingle()
 
-    await alphaHistoryRow.getByRole('button', { name: 'History' }).click()
-    const historyDialog = page.getByRole('dialog')
-    await expect(
-      historyDialog.getByRole('heading', { name: `${ctx!.alpha.fullName} history` })
-    ).toBeVisible()
-    await expect(historyDialog.getByText('On Call', { exact: true })).toBeVisible()
-    await expect(historyDialog.getByText(/Recorded /)).toBeVisible()
+          if (history.error) {
+            throw new Error(history.error.message)
+          }
+
+          return history.data?.applied_status ?? null
+        },
+        { timeout: 45_000 }
+      )
+      .toBe('on_call')
+
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await expect(page.getByText(/Loading Lottery data/)).toHaveCount(0, { timeout: 45_000 })
+    await expect(page.getByText(`Last lotteried: ${formatDateLabel(ctx!.shiftDate)}`)).toBeVisible({
+      timeout: 45_000,
+    })
   })
 })

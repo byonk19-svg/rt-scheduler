@@ -496,11 +496,12 @@ export async function loadLotteryActor(userId: string): Promise<LotteryActor | n
   }
 }
 
-async function loadPublishedCycles(): Promise<PublishedCycleRow[]> {
+async function loadPublishedCycles(siteId: string): Promise<PublishedCycleRow[]> {
   const today = new Date().toISOString().slice(0, 10)
   const { data, error } = await admin()
     .from('schedule_cycles')
     .select('id, start_date, end_date')
+    .eq('site_id', siteId)
     .eq('published', true)
     .is('archived_at', null)
     .gte('end_date', today)
@@ -914,7 +915,7 @@ export async function loadLotterySnapshot(args: {
   shiftType?: LotteryShiftType | null
   keepToWork?: number | null
 }): Promise<LotteryPageSnapshot> {
-  const cycles = await loadPublishedCycles()
+  const cycles = await loadPublishedCycles(args.actor.siteId)
   const availableDates = buildAvailableDates(cycles)
   const today = new Date().toISOString().slice(0, 10)
   const selectedDate =
