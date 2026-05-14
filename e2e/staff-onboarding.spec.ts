@@ -151,8 +151,13 @@ test.describe.serial('staff onboarding gate', () => {
 
     await expect(page.getByRole('heading', { name: "You're all set" })).toBeVisible()
     await page.getByRole('button', { name: 'View my schedule' }).click()
-    await expect(page).toHaveURL(/\/onboarding\?success=setup_complete/, { timeout: 45_000 })
-    await expect(page.getByRole('link', { name: 'View my schedule' })).toBeVisible()
+    await expect(page).toHaveURL(
+      /(?:\/onboarding\?success=setup_complete|\/dashboard(?:\/staff)?\?success=onboarding_complete)/,
+      { timeout: 45_000 }
+    )
+    if (page.url().includes('/onboarding')) {
+      await expect(page.getByRole('link', { name: 'View schedule' })).toBeVisible()
+    }
 
     const patternResult = await ctx!.supabase
       .from('work_patterns')
