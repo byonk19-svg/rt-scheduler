@@ -55,6 +55,7 @@ shots/
 
 # local screen capture and generated artifact dumps
 /artifacts/
+output/server/
 
 # local agent/tooling state
 .agents/
