@@ -212,6 +212,7 @@ export function ScheduleGrid({
         availableCycles={initialDataset.availableCycles}
         isPublished={initialDataset.isPublished}
         shiftTab={shiftTab}
+        isPending={isPending}
         canManageCoverage={initialDataset.canManageCoverage}
         onCycleChange={handleCycleChange}
         onShiftTabChange={handleShiftTabChange}

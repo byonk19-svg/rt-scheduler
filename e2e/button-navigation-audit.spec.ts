@@ -32,7 +32,7 @@ type AuditContext = {
 }
 
 const destructiveButtonPattern =
-  /\b(approve|archive|auto-draft|clear draft|create draft|delete|decline|deny|import|pre-flight|process queued|publish|re-send|reparse|save|send|sign in|submit|take offline|withdraw)\b/i
+  /\b(approve|archive|auto-draft|clear draft|create draft|delete|decline|deny|import|pre-flight|process queued|publish|republish|re-send|reparse|save|send|sign in|submit|take offline|withdraw)\b/i
 
 const ignorableButtonPattern = /\b(open next\.js dev tools)\b/i
 const nonNavigationButtonPattern =

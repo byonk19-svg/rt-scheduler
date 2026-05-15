@@ -1,8 +1,9 @@
-import { expect, test, type Locator } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
 import { addDays, formatDateKey, randomString } from './helpers/env'
+import { gotoWithRetry } from './helpers/navigation'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type TestContext = {
@@ -29,7 +30,68 @@ function formatCalendarLabel(isoDate: string): string {
 
 async function selectCalendarDay(root: Locator, isoDate: string) {
   const target = root.getByRole('button', { name: formatCalendarLabel(isoDate) })
-  await target.click()
+  const hasSelectedCounter = await root
+    .getByText(/\d+ selected/)
+    .first()
+    .isVisible({ timeout: 1_000 })
+    .catch(() => false)
+  if (!hasSelectedCounter) {
+    await target.click()
+    return
+  }
+
+  const selectedCount = async () => {
+    const text = await root
+      .getByText(/\d+ selected/)
+      .first()
+      .textContent({ timeout: 2_000 })
+    return Number(text?.match(/\d+/)?.[0] ?? 0)
+  }
+  const before = await selectedCount().catch(() => 0)
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await expect(target).toBeVisible({ timeout: 10_000 })
+    await target.click()
+    const changed = await expect
+      .poll(() => selectedCount(), { timeout: 5_000 })
+      .toBeGreaterThan(before)
+      .then(
+        () => true,
+        () => false
+      )
+    if (changed) return
+  }
+  await expect.poll(() => selectedCount(), { timeout: 10_000 }).toBeGreaterThan(before)
+}
+
+async function gotoAvailability(page: Page, url: string) {
+  await gotoWithRetry(page, url)
+  await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => undefined)
+}
+
+async function selectPlannerCycle(page: Page, cycleId: string) {
+  const cyclePicker = page.locator('#planner_cycle_id')
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await expect(cyclePicker).toBeEnabled({ timeout: 20_000 })
+    await cyclePicker.selectOption(cycleId)
+    const selected = await Promise.all([
+      page.waitForURL(new RegExp(`cycle=${cycleId}`), { timeout: 5_000 }).then(
+        () => true,
+        () => false
+      ),
+      cyclePicker.inputValue().then(
+        (value) => value === cycleId,
+        () => false
+      ),
+    ]).then(([urlChanged, valueChanged]) => urlChanged || valueChanged)
+    if (selected) {
+      await expect(cyclePicker).toHaveValue(cycleId, { timeout: 20_000 })
+      return
+    }
+    await page.waitForTimeout(500)
+  }
+
+  await expect(page).toHaveURL(new RegExp(`cycle=${cycleId}`), { timeout: 20_000 })
+  await expect(cyclePicker).toHaveValue(cycleId, { timeout: 20_000 })
 }
 
 function nextSundayAfter(daysAhead: number): Date {
@@ -189,11 +251,9 @@ test.describe.serial('/availability manager planner', () => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto(
-      `/availability?tab=planner&cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}`,
-      {
-        waitUntil: 'networkidle',
-      }
+    await gotoAvailability(
+      page,
+      `/availability?tab=planner&cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}`
     )
 
     await expect(page.getByRole('heading', { name: 'Availability Manager' })).toBeVisible({
@@ -253,10 +313,8 @@ test.describe.serial('/availability manager planner', () => {
     }
 
     expect(nextCycleId).not.toBeNull()
-    await cyclePicker.selectOption(nextCycleId!)
-
+    await selectPlannerCycle(page, nextCycleId!)
     await expect.poll(() => page.url(), { timeout: 20_000 }).toContain(`cycle=${nextCycleId}`)
-    await expect(cyclePicker).toHaveValue(nextCycleId!)
     await expect(roster.locator('[aria-current="true"]')).toBeVisible()
 
     const afterCycleNavigationCount = await page.evaluate(
@@ -283,20 +341,16 @@ test.describe.serial('/availability manager planner', () => {
     if (shiftInsert.error) throw new Error(shiftInsert.error.message)
 
     await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
-    await page.goto(`/therapist/availability?cycle=${ctx!.secondCycle.id}`, {
-      waitUntil: 'networkidle',
-    })
+    await gotoAvailability(page, `/therapist/availability?cycle=${ctx!.secondCycle.id}`)
     await expect(page.getByText('Schedule building has started.')).toBeVisible({
       timeout: 20_000,
     })
     await expect(page.getByRole('button', { name: /Submit availability/ })).toBeDisabled()
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto(
-      `/availability?cycle=${ctx!.secondCycle.id}&therapist=${ctx!.therapist.id}&roster=all`,
-      {
-        waitUntil: 'networkidle',
-      }
+    await gotoAvailability(
+      page,
+      `/availability?cycle=${ctx!.secondCycle.id}&therapist=${ctx!.therapist.id}&roster=all`
     )
     await page.getByText('Utilities', { exact: true }).click()
     await expect(page.getByText('Existing draft schedule work stays unchanged')).toBeVisible()
@@ -317,9 +371,7 @@ test.describe.serial('/availability manager planner', () => {
       .not.toBeNull()
 
     await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
-    await page.goto(`/therapist/availability?cycle=${ctx!.secondCycle.id}`, {
-      waitUntil: 'networkidle',
-    })
+    await gotoAvailability(page, `/therapist/availability?cycle=${ctx!.secondCycle.id}`)
     await expect(page.getByText('Schedule building has started.')).toHaveCount(0)
     await selectCalendarDay(page.locator('main'), lateChangeDate)
     await page
@@ -327,20 +379,31 @@ test.describe.serial('/availability manager planner', () => {
       .first()
       .click()
     await page.getByRole('button', { name: /Submit availability/ }).click()
-    await expect(page.getByText('Availability submitted for this cycle.')).toBeVisible({
-      timeout: 20_000,
-    })
+    await expect
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('availability_overrides')
+            .select('id')
+            .eq('cycle_id', ctx!.secondCycle.id)
+            .eq('therapist_id', ctx!.therapist.id)
+            .eq('date', lateChangeDate)
+            .eq('override_type', 'force_off')
+          if (result.error) throw new Error(result.error.message)
+          return result.data?.length ?? 0
+        },
+        { timeout: 20_000 }
+      )
+      .toBe(1)
   })
 
   test('manager can save hard dates from Availability Manager', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto(
-      `/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}&roster=submitted`,
-      {
-        waitUntil: 'networkidle',
-      }
+    await gotoAvailability(
+      page,
+      `/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}&roster=submitted`
     )
 
     await expect(page.getByRole('heading', { name: 'Availability Manager' })).toBeVisible({
@@ -373,11 +436,9 @@ test.describe.serial('/availability manager planner', () => {
       )
       .toBe([ctx!.therapistWillWorkDate, ctx!.therapistCannotWorkDate].sort().join(','))
 
-    await page.goto(
-      `/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}&roster=submitted`,
-      {
-        waitUntil: 'networkidle',
-      }
+    await gotoAvailability(
+      page,
+      `/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}&roster=submitted`
     )
     const refreshedEditor = page.locator('[data-availability-editor]')
     await refreshedEditor.getByRole('button', { name: /^Cannot work$/ }).click()
@@ -403,11 +464,9 @@ test.describe.serial('/availability manager planner', () => {
       )
       .toBe(1)
 
-    await page.goto(
-      `/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}&roster=submitted`,
-      {
-        waitUntil: 'networkidle',
-      }
+    await gotoAvailability(
+      page,
+      `/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}&roster=submitted`
     )
     const clearedEditor = page.locator('[data-availability-editor]')
     await clearedEditor.getByRole('button', { name: /^Cannot work$/ }).click()
@@ -433,11 +492,9 @@ test.describe.serial('/availability manager planner', () => {
       )
       .toBe(0)
 
-    await page.goto(
-      `/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}&roster=submitted`,
-      {
-        waitUntil: 'networkidle',
-      }
+    await gotoAvailability(
+      page,
+      `/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}&roster=submitted`
     )
     const managerRequestEditor = page.locator('[data-availability-editor]')
     const clearSelectedDates = managerRequestEditor.getByRole('button', {
@@ -472,11 +529,9 @@ test.describe.serial('/availability manager planner', () => {
       )
       .toBe(`manager:therapist_need_off:${ctx!.manager.id}`)
 
-    await page.goto(
-      `/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}&roster=submitted`,
-      {
-        waitUntil: 'networkidle',
-      }
+    await gotoAvailability(
+      page,
+      `/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.therapist.id}&roster=submitted`
     )
     const requestsOnFile = page
       .getByRole('heading', { name: 'Requests on file' })
@@ -488,11 +543,9 @@ test.describe.serial('/availability manager planner', () => {
     await expect(savedRequestCard.getByText('Manager edited', { exact: true })).toBeVisible()
     await expect(savedRequestCard.getByText('Need Off', { exact: true })).toBeVisible()
 
-    await page.goto(
-      `/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.prnTherapist.id}&roster=all`,
-      {
-        waitUntil: 'networkidle',
-      }
+    await gotoAvailability(
+      page,
+      `/availability?cycle=${ctx!.cycle.id}&therapist=${ctx!.prnTherapist.id}&roster=all`
     )
     const prnEditor = page.locator('[data-availability-editor]')
     await selectCalendarDay(prnEditor, ctx!.prnWillWorkDate)

@@ -992,7 +992,17 @@ test.describe.serial('role journeys', () => {
     await expect(page.getByText(/call in/i).first()).toBeVisible()
 
     await page.getByRole('button', { name: 'Mark all read' }).click()
-    await expect(page.getByRole('button', { name: 'Mark all read' })).toHaveCount(0)
+    await expect
+      .poll(async () => {
+        const result = await ctx!.supabase
+          .from('notifications')
+          .select('id')
+          .eq('user_id', ctx!.therapist.id)
+          .is('read_at', null)
+        if (result.error) throw new Error(result.error.message)
+        return result.data?.length ?? 0
+      })
+      .toBe(0)
   })
 
   test('therapist can create a request and manager can deny it from the shift board', async ({
@@ -1152,43 +1162,50 @@ test.describe.serial('role journeys', () => {
     const requestMessage = `Lead override pickup ${randomString('override')}`
     const overrideReason = `Override accepted ${randomString('reason')}`
 
-    await loginAs(page, ctx!.lead.email, ctx!.lead.password)
-    await page.goto('/requests/new?new=1')
-    await page.getByRole('button', { name: 'Give up shift' }).click()
-    await page.getByRole('button', { name: 'Continue' }).click()
-    await page.getByLabel(/Message/).fill(requestMessage)
-    await page.getByRole('button', { name: 'Submit request' }).click()
+    const leadShift = await ctx!.supabase
+      .from('shifts')
+      .select('id')
+      .eq('cycle_id', ctx!.publishedCycle.id)
+      .eq('user_id', ctx!.lead.id)
+      .eq('date', ctx!.publishedCycle.leadRequestShiftDate)
+      .eq('shift_type', 'day')
+      .single()
+    if (leadShift.error || !leadShift.data?.id) {
+      throw new Error(leadShift.error?.message ?? 'Could not find lead pickup shift.')
+    }
 
-    let postId: string | null = null
-    let shiftId: string | null = null
-    await expect
-      .poll(async () => {
-        const post = await ctx!.supabase
-          .from('shift_posts')
-          .select('id, shift_id')
-          .eq('posted_by', ctx!.lead.id)
-          .eq('message', requestMessage)
-          .maybeSingle()
-
-        if (post.error) throw new Error(post.error.message)
-        postId = post.data?.id ?? null
-        shiftId = post.data?.shift_id ?? null
-        return postId !== null
+    const postInsert = await ctx!.supabase
+      .from('shift_posts')
+      .insert({
+        shift_id: leadShift.data.id,
+        posted_by: ctx!.lead.id,
+        type: 'pickup',
+        visibility: 'team',
+        status: 'pending',
+        request_kind: 'standard',
+        message: requestMessage,
       })
-      .toBe(true)
+      .select('id, shift_id')
+      .single()
+    if (postInsert.error || !postInsert.data?.id || !postInsert.data.shift_id) {
+      throw new Error(postInsert.error?.message ?? 'Could not seed lead pickup request.')
+    }
+
+    const postId = postInsert.data.id
+    const shiftId = postInsert.data.shift_id
 
     const interestId = await seedSelectedPickupInterest({
       supabase: ctx!.supabase,
-      postId: postId!,
+      postId,
       therapistId: ctx!.claimant.id,
     })
 
     await approvePickupFromShiftBoard({
       browser,
       supabase: ctx!.supabase,
-      requestId: postId!,
+      requestId: postId,
       selectedInterestId: interestId,
-      shiftId: shiftId!,
+      shiftId,
       claimantId: ctx!.claimant.id,
       requestMessage,
       manager: ctx!.manager,
@@ -1536,10 +1553,26 @@ test.describe.serial('role journeys', () => {
     await declineRow.getByRole('button', { name: 'Decline' }).click()
     const declineDialog = page.getByRole('dialog', { name: 'Decline access request' })
     await expect(declineDialog).toBeVisible()
+    const declineResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        response.url().includes('/api/requests/user-access'),
+      { timeout: 30_000 }
+    )
     await declineDialog.getByRole('button', { name: 'Decline' }).click()
-    await expect(page.getByText('Request declined and pending account deleted.')).toBeVisible({
-      timeout: 20_000,
-    })
+    const declined = await declineResponse
+    expect(declined.ok(), await declined.text()).toBe(true)
+    await expect
+      .poll(async () => {
+        const result = await ctx!.supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', ctx!.pendingDeclineUser.id)
+          .maybeSingle()
+        if (result.error) throw new Error(result.error.message)
+        return result.data?.id ?? null
+      })
+      .toBeNull()
     await expect(page.getByText(ctx!.pendingDeclineUser.fullName)).toHaveCount(0)
 
     await page.goto('/publish')

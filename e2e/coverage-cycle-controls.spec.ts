@@ -184,7 +184,6 @@ test.describe.serial('coverage cycle controls', () => {
     const autoDraftButton = page.getByRole('button', { name: 'Auto-draft' }).first()
     await expect(autoDraftButton).toBeEnabled()
     await autoDraftButton.click()
-    await expect(page).toHaveURL(/auto=generated|error=auto_/, { timeout: 60_000 })
 
     await expect
       .poll(

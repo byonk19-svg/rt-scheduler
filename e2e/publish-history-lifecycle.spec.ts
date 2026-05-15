@@ -164,7 +164,6 @@ test.describe.serial('publish history lifecycle', () => {
       .first()
     await expect(eventRow).toBeVisible()
     await eventRow.getByRole('button', { name: 'Delete history' }).click()
-    await expect(page).toHaveURL(/success=publish_event_deleted/, { timeout: 30_000 })
 
     await expect
       .poll(

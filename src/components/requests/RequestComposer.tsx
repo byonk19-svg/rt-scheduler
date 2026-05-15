@@ -109,7 +109,7 @@ export function RequestComposer({
   onSwapWithChange,
 }: RequestComposerProps) {
   const isSwap = requestType === 'swap'
-  const isDirectSwap = isSwap && requestVisibility === 'direct'
+  const isDirectSwap = isSwap && swapPath === 'direct'
   const isTeamSuggestedSwap = isSwap && swapPath === 'team_suggested'
   const isOpenTeamSwap = isSwap && swapPath === 'team_open'
   const showsTeammateStep =

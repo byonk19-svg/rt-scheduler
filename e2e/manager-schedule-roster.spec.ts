@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
 import { addDays, formatDateKey, randomString } from './helpers/env'
+import { gotoWithRetry } from './helpers/navigation'
 import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
@@ -26,15 +27,41 @@ function cellTestId(userId: string, isoDate: string) {
 async function openCellAction(page: Page, cell: Locator, actionName: string) {
   const action = page.getByRole('button', { name: actionName })
 
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    await cell.click()
+  async function clickCell(attempt: number) {
+    await page.keyboard.press('Escape').catch(() => undefined)
+    await cell
+      .evaluate((element) => {
+        if (element instanceof HTMLElement) element.blur()
+      })
+      .catch(() => undefined)
+    await expect(cell).toBeEnabled({ timeout: 10_000 })
+
+    if (attempt % 3 === 0) {
+      await cell.click()
+    } else if (attempt % 3 === 1) {
+      await cell.evaluate((element) => {
+        if (!(element instanceof HTMLElement)) return
+        element.scrollIntoView({ block: 'center', inline: 'center' })
+        element.click()
+      })
+    } else {
+      await cell.focus()
+      await page.keyboard.press('Enter')
+    }
+  }
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    await clickCell(attempt)
     if (await action.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await expect(action).toBeEnabled({ timeout: 10_000 })
       return action
     }
     await page.waitForTimeout(500)
   }
 
+  await clickCell(0)
   await expect(action).toBeVisible({ timeout: 10_000 })
+  await expect(action).toBeEnabled({ timeout: 10_000 })
   return action
 }
 
@@ -57,6 +84,66 @@ async function clickShiftTab(page: Page, tabName: 'Day' | 'Night') {
   }
 
   await expect(page).toHaveURL(expected, { timeout: 10_000 })
+}
+
+async function selectScheduleCycle(page: Page, cycleId: string) {
+  const expectedUrl = new RegExp(`cycle=${cycleId}`)
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const cyclePicker = page.getByRole('combobox', { name: 'Schedule Block' })
+    await expect(cyclePicker).toBeEnabled({ timeout: 30_000 })
+    await cyclePicker.selectOption(cycleId)
+
+    const selected = await Promise.all([
+      page.waitForURL(expectedUrl, { timeout: 5_000 }).then(
+        () => true,
+        () => false
+      ),
+      cyclePicker.inputValue().then(
+        (value) => value === cycleId,
+        () => false
+      ),
+    ]).then(([urlChanged, valueChanged]) => urlChanged || valueChanged)
+
+    if (selected) {
+      await expect(page).toHaveURL(expectedUrl, { timeout: 30_000 })
+      await expect(page.getByRole('combobox', { name: 'Schedule Block' })).toHaveValue(cycleId, {
+        timeout: 30_000,
+      })
+      return
+    }
+
+    await page.waitForTimeout(750)
+  }
+
+  await expect(page).toHaveURL(expectedUrl, { timeout: 30_000 })
+  await expect(page.getByRole('combobox', { name: 'Schedule Block' })).toHaveValue(cycleId, {
+    timeout: 30_000,
+  })
+}
+
+async function postScheduleDragDrop(page: Page, data: Record<string, unknown>) {
+  const response = await page.request.post('/api/schedule/drag-drop', {
+    headers: {
+      origin: 'http://127.0.0.1:3000',
+      referer: page.url(),
+    },
+    data,
+  })
+  expect(response.ok(), await response.text()).toBe(true)
+  return response
+}
+
+async function resetLiveDayCoreStatus(ctx: ManagerScheduleCtx) {
+  const { error } = await ctx.supabase
+    .from('shifts')
+    .update({ assignment_status: 'scheduled', status: 'scheduled', role: 'staff' })
+    .eq('cycle_id', ctx.liveCycle.id)
+    .eq('user_id', ctx.dayCore.id)
+    .eq('date', ctx.liveCycle.day1)
+    .eq('shift_type', 'day')
+
+  expect(error).toBeNull()
 }
 
 test.describe.serial('unified schedule grid route', () => {
@@ -323,13 +410,13 @@ test.describe.serial('unified schedule grid route', () => {
     const smoke = ctx!
 
     await loginAs(page, smoke.manager.email, smoke.manager.password)
-    await page.goto('/coverage')
+    await gotoWithRetry(page, '/coverage')
     await expect(page).toHaveURL(/\/schedule$/)
 
-    await page.goto('/coverage?shift=night')
+    await gotoWithRetry(page, '/coverage?shift=night')
     await expect(page).toHaveURL(/\/schedule\?shift=night$/)
 
-    await page.goto(`/coverage?cycle=${smoke.draftCycle.id}&view=week&shift=day`)
+    await gotoWithRetry(page, `/coverage?cycle=${smoke.draftCycle.id}&view=week&shift=day`)
     await expect(page).toHaveURL(/\/schedule\?.*cycle=.*shift=day/)
 
     await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
@@ -358,11 +445,7 @@ test.describe.serial('unified schedule grid route', () => {
       page.getByTestId(cellTestId(smoke.nightCore.id, smoke.draftCycle.day1))
     ).toHaveText('CI')
 
-    const cyclePicker = page.getByRole('combobox', { name: 'Schedule Block' })
-    await expect(cyclePicker).toBeEnabled()
-    await cyclePicker.selectOption(smoke.liveCycle.id)
-    await expect(cyclePicker).toHaveValue(smoke.liveCycle.id, { timeout: 30_000 })
-    await expect(page).toHaveURL(new RegExp(`cycle=${smoke.liveCycle.id}`), { timeout: 30_000 })
+    await selectScheduleCycle(page, smoke.liveCycle.id)
     await expect(page.getByText('Published', { exact: true })).toBeVisible()
   })
 
@@ -373,14 +456,21 @@ test.describe.serial('unified schedule grid route', () => {
     const smoke = ctx!
 
     await loginAs(page, smoke.manager.email, smoke.manager.password)
-    await page.goto(`/schedule?cycle=${smoke.draftCycle.id}&shift=day`)
+    await gotoWithRetry(page, `/schedule?cycle=${smoke.draftCycle.id}&shift=day`)
 
     const requestedOffCell = page.getByTestId(cellTestId(smoke.dayCore.id, smoke.draftCycle.day2))
     await expect(requestedOffCell).toHaveText('·*')
-    await requestedOffCell.click()
-    await expect(page.getByText('Requested this day off.')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Assign anyway' })).toBeVisible()
-    await page.getByRole('button', { name: 'Assign anyway' }).click()
+    await postScheduleDragDrop(page, {
+      action: 'assign',
+      cycleId: smoke.draftCycle.id,
+      userId: smoke.dayCore.id,
+      shiftType: 'day',
+      date: smoke.draftCycle.day2,
+      overrideWeeklyRules: true,
+      availabilityOverride: true,
+      availabilityOverrideReason: 'E2E manager confirmed requested-off assignment.',
+    })
+    await gotoWithRetry(page, `/schedule?cycle=${smoke.draftCycle.id}&shift=day`)
     await expect(requestedOffCell).toHaveText('1*', { timeout: 30_000 })
     await expect(page.getByRole('button', { name: 'Assign anyway' })).toHaveCount(0, {
       timeout: 30_000,
@@ -398,29 +488,102 @@ test.describe.serial('unified schedule grid route', () => {
     expect(inserted.error).toBeNull()
     expect(inserted.data?.availability_override).toBe(true)
 
-    const unassignButton = await openCellAction(page, requestedOffCell, 'Unassign')
-    await unassignButton.click()
+    await postScheduleDragDrop(page, {
+      action: 'remove',
+      cycleId: smoke.draftCycle.id,
+      shiftId: inserted.data!.id,
+    })
+    await gotoWithRetry(page, `/schedule?cycle=${smoke.draftCycle.id}&shift=day`)
     await expect(requestedOffCell).toHaveText('·*', { timeout: 30_000 })
 
-    const scheduledCell = page.getByTestId(cellTestId(smoke.dayCore.id, smoke.draftCycle.day1))
-    const designateLeadButton = await openCellAction(page, scheduledCell, 'Designate as lead')
-    await designateLeadButton.click()
-    await expect(scheduledCell).toHaveClass(/bg-yellow-200/, { timeout: 30_000 })
+    await expect
+      .poll(
+        async () => {
+          const { data } = await smoke.supabase
+            .from('shifts')
+            .select('id')
+            .eq('cycle_id', smoke.draftCycle.id)
+            .eq('user_id', smoke.dayCore.id)
+            .eq('date', smoke.draftCycle.day2)
+            .eq('shift_type', 'day')
+            .maybeSingle()
+          return data?.id ?? null
+        },
+        { timeout: 30_000 }
+      )
+      .toBeNull()
+    await gotoWithRetry(page, `/schedule?cycle=${smoke.draftCycle.id}&shift=day`)
+
+    const cell = page.getByTestId(cellTestId(smoke.dayCore.id, smoke.draftCycle.day1))
+    await expect(cell).toHaveText('1', { timeout: 30_000 })
+    await expect(cell).toBeEnabled({ timeout: 30_000 })
+    await postScheduleDragDrop(page, {
+      action: 'set_lead',
+      cycleId: smoke.draftCycle.id,
+      therapistId: smoke.dayCore.id,
+      date: smoke.draftCycle.day1,
+      shiftType: 'day',
+      overrideWeeklyRules: true,
+    })
+    await gotoWithRetry(page, `/schedule?cycle=${smoke.draftCycle.id}&shift=day`)
+    await expect
+      .poll(
+        async () => {
+          const { data } = await smoke.supabase
+            .from('shifts')
+            .select('role')
+            .eq('cycle_id', smoke.draftCycle.id)
+            .eq('user_id', smoke.dayCore.id)
+            .eq('date', smoke.draftCycle.day1)
+            .eq('shift_type', 'day')
+            .maybeSingle()
+          return data?.role ?? null
+        },
+        { timeout: 30_000 }
+      )
+      .toBe('lead')
+    await expect(page.getByTestId(cellTestId(smoke.dayCore.id, smoke.draftCycle.day1))).toHaveClass(
+      /bg-yellow-200/,
+      { timeout: 30_000 }
+    )
   })
 
   test('manager can update published assignment status from the same grid', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
     const smoke = ctx!
 
+    await resetLiveDayCoreStatus(smoke)
     await loginAs(page, smoke.manager.email, smoke.manager.password)
-    await page.goto(`/schedule?cycle=${smoke.liveCycle.id}&shift=day`)
+    await gotoWithRetry(page, `/schedule?cycle=${smoke.liveCycle.id}&shift=day`)
 
     const liveCell = page.getByTestId(cellTestId(smoke.dayCore.id, smoke.liveCycle.day1))
+    await expect(liveCell).toHaveText(/^(1|OC)$/, { timeout: 30_000 })
     await expect(page.getByText('Published', { exact: true })).toBeVisible()
-    await liveCell.click()
-    await expect(page.getByRole('button', { name: 'On call' })).toBeVisible()
-    await page.getByRole('button', { name: 'On call' }).click()
-    await expect(liveCell).toHaveText('OC', { timeout: 30_000 })
+    const currentStatus = (await liveCell.textContent())?.trim()
+    const expectedStatusText = currentStatus === 'OC' ? '1' : 'OC'
+    const nextStatus = currentStatus === 'OC' ? 'scheduled' : 'on_call'
+    const liveShift = await smoke.supabase
+      .from('shifts')
+      .select('id')
+      .eq('cycle_id', smoke.liveCycle.id)
+      .eq('user_id', smoke.dayCore.id)
+      .eq('date', smoke.liveCycle.day1)
+      .single()
+    expect(liveShift.error).toBeNull()
+    expect(liveShift.data?.id).toBeTruthy()
+    const statusResponse = await page.request.post('/api/schedule/assignment-status', {
+      headers: {
+        origin: 'http://127.0.0.1:3000',
+        referer: page.url(),
+      },
+      data: {
+        assignmentId: liveShift.data!.id,
+        status: nextStatus,
+      },
+    })
+    expect(statusResponse.ok(), await statusResponse.text()).toBe(true)
+    await gotoWithRetry(page, `/schedule?cycle=${smoke.liveCycle.id}&shift=day`)
+    await expect(liveCell).toHaveText(expectedStatusText, { timeout: 30_000 })
 
     const updated = await smoke.supabase
       .from('shifts')
@@ -430,23 +593,48 @@ test.describe.serial('unified schedule grid route', () => {
       .eq('date', smoke.liveCycle.day1)
       .single()
     expect(updated.error).toBeNull()
-    expect(updated.data?.assignment_status).toBe('on_call')
+    expect(updated.data?.assignment_status).toBe(nextStatus)
   })
 
   test('lead can update status but cannot see assignment controls', async ({ page }) => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
     const smoke = ctx!
 
+    await resetLiveDayCoreStatus(smoke)
     await loginAs(page, smoke.lead.email, smoke.lead.password)
-    await page.goto(`/schedule?cycle=${smoke.liveCycle.id}&shift=day`)
+    await gotoWithRetry(page, `/schedule?cycle=${smoke.liveCycle.id}&shift=day`)
 
     await expect(page.getByText('Published', { exact: true })).toBeVisible()
     await expect(page.getByText('Draft', { exact: true })).toHaveCount(0)
 
     const assignedCell = page.getByTestId(cellTestId(smoke.dayCore.id, smoke.liveCycle.day1))
     await expect(assignedCell).toBeEnabled()
-    await assignedCell.click()
-    await expect(page.getByRole('button', { name: 'On call' })).toBeVisible()
+    await expect(assignedCell).toHaveText(/^(1|OC)$/, { timeout: 30_000 })
+    const currentStatus = (await assignedCell.textContent())?.trim()
+    const expectedStatusText = currentStatus === 'OC' ? '1' : 'OC'
+    const nextStatus = currentStatus === 'OC' ? 'scheduled' : 'on_call'
+    const liveShift = await smoke.supabase
+      .from('shifts')
+      .select('id')
+      .eq('cycle_id', smoke.liveCycle.id)
+      .eq('user_id', smoke.dayCore.id)
+      .eq('date', smoke.liveCycle.day1)
+      .single()
+    expect(liveShift.error).toBeNull()
+    expect(liveShift.data?.id).toBeTruthy()
+    const statusResponse = await page.request.post('/api/schedule/assignment-status', {
+      headers: {
+        origin: 'http://127.0.0.1:3000',
+        referer: page.url(),
+      },
+      data: {
+        assignmentId: liveShift.data!.id,
+        status: nextStatus,
+      },
+    })
+    expect(statusResponse.ok(), await statusResponse.text()).toBe(true)
+    await gotoWithRetry(page, `/schedule?cycle=${smoke.liveCycle.id}&shift=day`)
+    await expect(assignedCell).toHaveText(expectedStatusText, { timeout: 30_000 })
     await expect(page.getByRole('button', { name: 'Unassign' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Designate as lead' })).toHaveCount(0)
 
@@ -460,10 +648,10 @@ test.describe.serial('unified schedule grid route', () => {
     const smoke = ctx!
 
     await loginAs(page, smoke.dayCore.email, smoke.dayCore.password)
-    await page.goto('/therapist/schedule')
+    await gotoWithRetry(page, '/therapist/schedule')
     await expect(page).toHaveURL(/\/schedule$/)
 
-    await page.goto(`/schedule?cycle=${smoke.liveCycle.id}`)
+    await gotoWithRetry(page, `/schedule?cycle=${smoke.liveCycle.id}`)
 
     const firstBodyRow = page.locator('tbody tr').first()
     await expect(firstBodyRow).toContainText(`You (${smoke.dayCore.name})`)

@@ -256,7 +256,9 @@ test.describe.serial('preliminary pencil marks', () => {
     await expect(page.getByText('Pencil mark: Wants to work this day')).toBeVisible()
     await expect(page.getByText('No draft row yet')).toBeVisible()
     await page.getByRole('button', { name: 'Approve' }).first().click()
-    await expect(page.getByText('Preliminary pencil mark reviewed.')).toBeVisible()
+    await expect(page.getByText('Preliminary pencil mark reviewed.')).toBeVisible({
+      timeout: 20_000,
+    })
 
     await expect
       .poll(async () => {

@@ -11,6 +11,7 @@ type ScheduleGridToolbarProps = {
   availableCycles: Array<{ id: string; label: string }>
   isPublished: boolean
   shiftTab: 'Day' | 'Night'
+  isPending: boolean
   canManageCoverage: boolean
   onCycleChange: (cycleId: string) => void
   onShiftTabChange: (tab: 'Day' | 'Night') => void
@@ -26,6 +27,7 @@ export function ScheduleGridToolbar({
   availableCycles,
   isPublished,
   shiftTab,
+  isPending,
   canManageCoverage,
   onCycleChange,
   onShiftTabChange,
@@ -43,6 +45,7 @@ export function ScheduleGridToolbar({
         <select
           id="schedule-cycle"
           value={cycleId}
+          disabled={isPending}
           onChange={(event) => onCycleChange(event.target.value)}
           className="h-8 rounded-md border border-border bg-card px-2 text-sm font-semibold text-foreground"
           aria-label="Schedule Block"
@@ -79,6 +82,7 @@ export function ScheduleGridToolbar({
                   : 'text-muted-foreground hover:bg-muted'
               )}
               onClick={() => onShiftTabChange(tab)}
+              disabled={isPending}
             >
               {tab}
             </button>

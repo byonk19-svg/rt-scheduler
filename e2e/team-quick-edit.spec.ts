@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
@@ -11,6 +11,33 @@ type TestContext = {
   manager: { id: string; email: string; password: string }
   therapist: { id: string; fullName: string }
   secondaryTherapist: { id: string; fullName: string }
+}
+
+async function openQuickEdit(page: Page, profileId: string, profileName: string) {
+  const dialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await page.goto(`/team?edit_profile=${profileId}&_e2e=${Date.now()}`, {
+      waitUntil: 'load',
+    })
+    if (await dialog.isVisible({ timeout: 10_000 }).catch(() => false)) {
+      return dialog
+    }
+  }
+
+  await gotoWithRetry(page, '/team')
+  await page.getByLabel('Search').fill(profileName)
+  const profileCard = page.getByRole('button').filter({ hasText: profileName }).first()
+  await expect(profileCard).toBeVisible({ timeout: 20_000 })
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await profileCard.click()
+    if (await dialog.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      return dialog
+    }
+    await page.waitForTimeout(750)
+  }
+  await expect(dialog).toBeVisible({ timeout: 30_000 })
+  return dialog
 }
 
 test.describe.serial('/team quick edit modal', () => {
@@ -86,9 +113,7 @@ test.describe.serial('/team quick edit modal', () => {
     await expect(page.getByRole('heading', { name: 'Managers' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Day shift therapists' })).toBeVisible()
 
-    await gotoWithRetry(page, `/team?edit_profile=${ctx!.therapist.id}`)
-
-    const dialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
+    const dialog = await openQuickEdit(page, ctx!.therapist.id, ctx!.therapist.fullName)
     await expect(dialog).toBeVisible({ timeout: 30_000 })
     await expect(dialog.getByText('Coverage lead')).toHaveCount(0)
 
@@ -123,8 +148,7 @@ test.describe.serial('/team quick edit modal', () => {
     await expect(updatedCard).toContainText('Part-time')
     await expect(updatedCard).toContainText('Return May 12, 2026')
 
-    await gotoWithRetry(page, `/team?edit_profile=${ctx!.therapist.id}`)
-    const inactiveDialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
+    const inactiveDialog = await openQuickEdit(page, ctx!.therapist.id, updatedName)
     await expect(inactiveDialog).toBeVisible({ timeout: 30_000 })
     await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => undefined)
     await inactiveDialog.getByLabel('Active').uncheck()
@@ -147,14 +171,19 @@ test.describe.serial('/team quick edit modal', () => {
       )
       .toBe(false)
 
-    await gotoWithRetry(page, `/team?edit_profile=${ctx!.therapist.id}`)
-    const archiveDialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
+    const archiveDialog = await openQuickEdit(page, ctx!.therapist.id, updatedName)
     await expect(archiveDialog).toBeVisible({ timeout: 30_000 })
     await expect(archiveDialog.getByText('No app access while inactive.')).toBeVisible()
     await expect(
       archiveDialog.getByText('This updates automatically from the selected role.')
     ).toHaveCount(0)
-    await archiveDialog.getByRole('button', { name: 'Archive employee' }).click()
+    const archiveButton = archiveDialog.getByRole('button', { name: 'Archive employee' })
+    await expect(archiveButton).toBeEnabled()
+    const archiveRedirect = page
+      .waitForURL(/\/team\?success=profile_archived/, { timeout: 20_000 })
+      .catch(() => null)
+    await archiveButton.click()
+    await archiveRedirect
 
     await expect
       .poll(

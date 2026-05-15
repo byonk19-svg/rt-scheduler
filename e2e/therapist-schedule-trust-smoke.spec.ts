@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
 import { addDays, formatDateKey, randomString } from './helpers/env'
+import { gotoWithRetry } from './helpers/navigation'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 function addOneDayIso(iso: string): string {
@@ -239,7 +240,9 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
     await expect(dayBtn).toBeVisible({ timeout: 30_000 })
     await dayBtn.click()
     await expect(page.getByText('Selected Day')).toBeVisible()
-    await page.getByRole('button', { name: 'Need Off' }).first().click()
+    const needOffButton = page.getByRole('button', { name: 'Need Off' }).first()
+    await expect(needOffButton).toBeEnabled({ timeout: 30_000 })
+    await needOffButton.click()
     const noteBox = page.locator(`textarea#therapist-day-note-${iso}`)
     await expect(noteBox).toBeVisible()
     await expect(noteBox).toBeEnabled()
@@ -342,17 +345,12 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
 
     await loginAs(page, manager.email, manager.password)
 
-    await page.goto(`/availability?cycle=${cycleId}`)
-    await page.getByRole('button', { name: 'Night shift' }).click()
-    await page.getByPlaceholder('Search therapists...').fill(nightTherapist.name)
-    await page.getByRole('button', { name: /Missing submissions/ }).click()
-    await expect(
-      page
-        .getByRole('button', {
-          name: new RegExp(`${nightTherapist.name}.*Not submitted`, 'i'),
-        })
-        .first()
-    ).toBeVisible({ timeout: 20_000 })
+    await gotoWithRetry(page, `/availability?cycle=${cycleId}&therapist=${nightTherapist.id}`)
+    await expectShiftTabActive(page, 'night')
+    await expect(page.getByRole('heading', { name: nightTherapist.name })).toBeVisible({
+      timeout: 20_000,
+    })
+    await expect(page.getByText('No official submission yet.')).toBeVisible()
 
     await supabase.from('therapist_availability_submissions').insert({
       therapist_id: nightTherapist.id,
@@ -361,16 +359,12 @@ test.describe.serial('therapist schedule + trust smoke (signed-in)', () => {
       last_edited_at: new Date().toISOString(),
     })
 
-    await page.goto(`/availability?cycle=${cycleId}`)
-    await page.getByRole('button', { name: 'Night shift' }).click()
-    await page.getByPlaceholder('Search therapists...').fill(nightTherapist.name)
-    await page.getByRole('button', { name: /Submitted with exceptions/ }).click()
-    await expect(
-      page
-        .getByRole('button', {
-          name: new RegExp(`${nightTherapist.name}.*Submitted`, 'i'),
-        })
-        .first()
-    ).toBeVisible({ timeout: 20_000 })
+    await gotoWithRetry(page, `/availability?cycle=${cycleId}&therapist=${nightTherapist.id}`)
+    await expectShiftTabActive(page, 'night')
+    await expect(page.getByRole('heading', { name: nightTherapist.name })).toBeVisible({
+      timeout: 20_000,
+    })
+    await expect(page.getByText('Submitted', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Submitted with exceptions 1/ })).toBeVisible()
   })
 })

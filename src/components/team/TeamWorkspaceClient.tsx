@@ -117,6 +117,7 @@ function TeamWorkspaceClient({
           className="space-y-3"
         >
           <TeamDirectory
+            key={initialEditProfileId ?? 'directory'}
             summary={summary}
             profiles={profiles}
             workPatterns={workPatterns}

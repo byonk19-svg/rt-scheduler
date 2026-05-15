@@ -241,9 +241,9 @@ function SwapRequestPageContent() {
     }
     if (showsTeammateStep && !swapWith) {
       setError(
-        requestVisibility === 'direct'
-          ? 'Choose the teammate you want to ask.'
-          : 'Choose the teammate you want to suggest for this team swap.'
+        requestType === 'swap' && swapPath !== 'direct'
+          ? 'Choose the teammate you want to suggest for this team swap.'
+          : 'Choose the teammate you want to ask.'
       )
       return
     }
@@ -252,11 +252,13 @@ function SwapRequestPageContent() {
     setError(null)
 
     try {
+      const effectiveVisibility: RequestVisibility =
+        requestType === 'swap' ? (swapPath === 'direct' ? 'direct' : 'team') : requestVisibility
       await mutateShiftPost({
         action: 'create_request',
         shiftId: selectedShift,
         requestType,
-        visibility: requestVisibility,
+        visibility: effectiveVisibility,
         teammateId: swapWith,
         message: message.trim() || defaultRequestMessage(requestType),
       })

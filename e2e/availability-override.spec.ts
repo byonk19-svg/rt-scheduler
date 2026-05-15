@@ -128,19 +128,12 @@ test.describe.serial('availability override scheduling', () => {
     await expect(page).toHaveURL(/\/schedule/)
     await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
 
-    const conflictResponse = await page.evaluate(
-      async (payload) => {
-        const response = await fetch('/api/schedule/drag-drop', {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        })
-        const body = await response.json().catch(() => null)
-        return { status: response.status, body }
+    const conflictApiResponse = await page.request.post('/api/schedule/drag-drop', {
+      headers: {
+        origin: 'http://127.0.0.1:3000',
+        referer: page.url(),
       },
-      {
+      data: {
         action: 'assign',
         cycleId: ctx!.cycle.id,
         userId: ctx!.fullTimeTherapist.id,
@@ -148,8 +141,12 @@ test.describe.serial('availability override scheduling', () => {
         shiftType: 'day',
         role: 'staff',
         overrideWeeklyRules: false,
-      }
-    )
+      },
+    })
+    const conflictResponse = {
+      status: conflictApiResponse.status(),
+      body: await conflictApiResponse.json().catch(() => null),
+    }
     expect(conflictResponse.status).toBe(409)
     const conflictPayload = conflictResponse.body as { code?: string } | null
     expect(conflictPayload?.code).toBe('availability_conflict')
@@ -164,19 +161,12 @@ test.describe.serial('availability override scheduling', () => {
     expect(noShiftResult.error).toBeNull()
     expect(noShiftResult.data ?? []).toHaveLength(0)
 
-    const overrideResponse = await page.evaluate(
-      async (payload) => {
-        const response = await fetch('/api/schedule/drag-drop', {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        })
-        const body = await response.json().catch(() => null)
-        return { status: response.status, body }
+    const overrideApiResponse = await page.request.post('/api/schedule/drag-drop', {
+      headers: {
+        origin: 'http://127.0.0.1:3000',
+        referer: page.url(),
       },
-      {
+      data: {
         action: 'assign',
         cycleId: ctx!.cycle.id,
         userId: ctx!.fullTimeTherapist.id,
@@ -186,8 +176,12 @@ test.describe.serial('availability override scheduling', () => {
         overrideWeeklyRules: false,
         availabilityOverride: true,
         availabilityOverrideReason: 'Coverage emergency',
-      }
-    )
+      },
+    })
+    const overrideResponse = {
+      status: overrideApiResponse.status(),
+      body: await overrideApiResponse.json().catch(() => null),
+    }
     expect(overrideResponse.status).toBe(200)
     const overridePayload = overrideResponse.body as { message?: string } | null
     expect(overridePayload?.message).toBe('Shift assigned.')

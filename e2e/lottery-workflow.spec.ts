@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { addDays, formatDateKey, getEnv, randomString } from './helpers/env'
+import { gotoWithRetry } from './helpers/navigation'
 import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
@@ -246,14 +247,19 @@ test.describe.serial('lottery workflow', () => {
     test.skip(!ctx, 'Supabase service env values are required to run lottery e2e.')
 
     await loginForLottery(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto(`/lottery?date=${ctx!.shiftDate}&shift=day`)
+    await gotoWithRetry(page, `/lottery?date=${ctx!.shiftDate}&shift=day`)
 
     await expect(page.getByRole('heading', { name: 'Lottery' }).first()).toBeVisible()
     await expect(
       page.locator('span').filter({ hasText: ctx!.charlie.fullName }).first()
     ).toBeVisible()
 
-    await page.getByRole('button', { name: 'Add request' }).click()
+    const alphaRow = page
+      .locator('div.rounded-lg')
+      .filter({ has: page.getByText(ctx!.alpha.fullName) })
+      .filter({ has: page.getByRole('button', { name: 'Add request' }) })
+      .first()
+    await expect(alphaRow).toBeVisible({ timeout: 20_000 })
     await expect
       .poll(
         async () => {
@@ -270,9 +276,35 @@ test.describe.serial('lottery workflow', () => {
             throw new Error(request.error.message)
           }
 
-          return request.data?.state ?? null
+          if (request.data?.state) return request.data.state
+
+          const responsePromise = page
+            .waitForResponse(
+              (response) =>
+                response.request().method() === 'POST' &&
+                response.url().includes('/api/lottery/request'),
+              { timeout: 5_000 }
+            )
+            .catch(() => null)
+          const addButton = page
+            .locator('div.rounded-lg')
+            .filter({ has: page.getByText(ctx!.alpha.fullName) })
+            .filter({ has: page.getByRole('button', { name: 'Add request' }) })
+            .first()
+            .getByRole('button', { name: 'Add request' })
+          const clicked = await addButton
+            .click({ timeout: 5_000 })
+            .then(() => true)
+            .catch(() => false)
+          const response = await responsePromise
+          if (!clicked && request.data?.state) return request.data.state
+          if (response && !response.ok()) {
+            const body = await response.text().catch(() => '')
+            throw new Error(`Lottery request POST failed: ${response.status()} ${body}`)
+          }
+          return null
         },
-        { timeout: 20_000 }
+        { timeout: 30_000 }
       )
       .toBe('active')
     const requestRow = page
@@ -401,7 +433,7 @@ test.describe.serial('lottery workflow', () => {
       )
       .toBe('on_call')
 
-    await page.reload({ waitUntil: 'domcontentloaded' })
+    await gotoWithRetry(page, page.url())
     await expect(page.getByText(/Loading Lottery data/)).toHaveCount(0, { timeout: 45_000 })
     await expect(page.getByText(`Last lotteried: ${formatDateLabel(ctx!.shiftDate)}`)).toBeVisible({
       timeout: 45_000,
