@@ -11,6 +11,7 @@ type CycleRow = {
   start_date: string
   end_date: string
   published: boolean
+  site_id: string | null
 }
 
 export async function POST(request: Request) {
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
 
   const { data: cycle, error: cycleError } = await supabase
     .from('schedule_cycles')
-    .select('id, start_date, end_date, published')
+    .select('id, start_date, end_date, published, site_id')
     .eq('id', cycleId)
     .maybeSingle()
 
@@ -61,6 +62,7 @@ export async function POST(request: Request) {
       id: cycleId,
       start_date: cycleRow.start_date,
       end_date: cycleRow.end_date,
+      site_id: cycleRow.site_id,
     },
     therapistScope: 'active-non-fmla',
   })

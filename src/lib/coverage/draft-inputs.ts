@@ -78,6 +78,7 @@ type DraftInputCycle = {
   id: string
   start_date: string
   end_date: string
+  site_id?: string | null
 }
 
 export type DraftTherapistScope = 'all-schedule-candidates' | 'active-non-fmla'
@@ -184,14 +185,7 @@ export async function loadDraftInputsForCycle(
 
   const loadedTherapistsResult =
     therapistRows == null
-      ? await applyTherapistScope(
-          client
-            .from('profiles')
-            .select(DRAFT_THERAPIST_COLUMNS)
-            .in('role', ['therapist', 'lead'])
-            .order('full_name', { ascending: true }),
-          options.therapistScope ?? 'all-schedule-candidates'
-        )
+      ? await loadTherapistsForDraft(client, cycle.site_id, options.therapistScope)
       : { data: therapistRows, error: null }
 
   if (loadedTherapistsResult.error) {
@@ -277,4 +271,22 @@ export async function loadDraftInputsForCycle(
 function applyTherapistScope(query: DraftInputFilterBuilder, scope: DraftTherapistScope) {
   if (scope !== 'active-non-fmla') return query
   return query.eq('is_active', true).eq('on_fmla', false)
+}
+
+function loadTherapistsForDraft(
+  client: DraftInputSupabaseClient,
+  siteId: string | null | undefined,
+  scope: DraftTherapistScope | undefined
+) {
+  const query = client
+    .from('profiles')
+    .select(DRAFT_THERAPIST_COLUMNS)
+    .in('role', ['therapist', 'lead'])
+    .order('full_name', { ascending: true })
+
+  if (siteId) {
+    query.eq('site_id', siteId)
+  }
+
+  return applyTherapistScope(query, scope ?? 'all-schedule-candidates')
 }

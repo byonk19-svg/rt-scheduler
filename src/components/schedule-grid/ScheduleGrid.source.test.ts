@@ -14,10 +14,12 @@ describe('ScheduleGrid source invariants', () => {
     expect(code).not.toContain('shiftType: shiftTabToQueryValue(shiftTab)')
   })
 
-  it('locks cell interactions while a shift or cycle navigation is pending', () => {
+  it('locks cell interactions while a route or mutation transition is pending', () => {
     const code = source()
 
-    expect(code).toContain('const cellsLocked = isPending || isShiftNavigating')
+    expect(code).toContain('const cellsLocked = isPending')
+    expect(code).toContain('startTransition(() => {')
+    expect(code).toContain('router.replace(`${pathname}?${params.toString()}`, { scroll: false })')
     expect(code).toContain('if (cellsLocked) return')
     expect(code).toContain('interactionsDisabled={cellsLocked}')
   })

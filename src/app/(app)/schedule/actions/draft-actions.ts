@@ -50,7 +50,7 @@ export async function generateDraftScheduleAction(formData: FormData) {
 
   const { data: cycle, error: cycleError } = await supabase
     .from('schedule_cycles')
-    .select('id, start_date, end_date, published, status')
+    .select('id, start_date, end_date, published, status, site_id')
     .eq('id', cycleId)
     .maybeSingle()
 
@@ -88,7 +88,12 @@ export async function generateDraftScheduleAction(formData: FormData) {
   }
 
   const draftInputs = await loadDraftInputsForCycle(toDraftInputSupabaseClient(supabase), {
-    cycle: { id: cycleId, start_date: cycle.start_date, end_date: cycle.end_date },
+    cycle: {
+      id: cycleId,
+      start_date: cycle.start_date,
+      end_date: cycle.end_date,
+      site_id: cycle.site_id,
+    },
   })
 
   if (draftInputs.error) {

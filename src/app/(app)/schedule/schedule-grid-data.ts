@@ -34,6 +34,7 @@ type CycleRow = {
   end_date: string
   published: boolean
   status: 'draft' | 'preliminary' | 'final' | 'offline' | 'archived' | null
+  site_id: string | null
 }
 
 type ViewerProfile = {
@@ -160,7 +161,7 @@ export async function loadScheduleGridData(
 
   const cyclesQuery = supabase
     .from('schedule_cycles')
-    .select('id, label, start_date, end_date, published, status')
+    .select('id, label, start_date, end_date, published, status, site_id')
     .is('archived_at', null)
     .order('start_date', { ascending: false })
 
@@ -324,6 +325,7 @@ export async function loadScheduleGridData(
         id: cycleForSummary.id,
         start_date: cycleForSummary.start_date,
         end_date: cycleForSummary.end_date,
+        site_id: cycleForSummary.site_id,
       },
     })
 

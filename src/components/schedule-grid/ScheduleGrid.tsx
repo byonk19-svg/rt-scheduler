@@ -55,13 +55,12 @@ export function ScheduleGrid({
   const [isPending, startTransition] = useTransition()
   const loadedShiftTab = initialDataset.shiftType === 'night' ? 'Night' : 'Day'
   const [shiftTab, setShiftTab] = useState<'Day' | 'Night'>(initialShiftTab)
-  const [isShiftNavigating, setIsShiftNavigating] = useState(false)
   const [activeCellTarget, setActiveCellTarget] = useState<CellTarget | null>(null)
   const [showPreFlight, setShowPreFlight] = useState(false)
   const autoDraftFormRef = useRef<HTMLFormElement | null>(null)
   const publishFormRef = useRef<HTMLFormElement | null>(null)
   const mutator = useMemo(() => createCoverageShiftMutator(), [])
-  const cellsLocked = isPending || isShiftNavigating
+  const cellsLocked = isPending
 
   const handleShiftTabChange = useCallback(
     (tab: 'Day' | 'Night') => {
@@ -70,24 +69,26 @@ export function ScheduleGrid({
         return
       }
       setShiftTab(tab)
-      setIsShiftNavigating(true)
       setActiveCellTarget(null)
       const params = new URLSearchParams(searchParams.toString())
       params.set('shift', shiftTabToQueryValue(tab))
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+      startTransition(() => {
+        router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+      })
     },
-    [loadedShiftTab, pathname, router, searchParams]
+    [loadedShiftTab, pathname, router, searchParams, startTransition]
   )
 
   const handleCycleChange = useCallback(
     (cycleId: string) => {
       const params = new URLSearchParams(searchParams.toString())
       params.set('cycle', cycleId)
-      setIsShiftNavigating(true)
       setActiveCellTarget(null)
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+      startTransition(() => {
+        router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+      })
     },
-    [pathname, router, searchParams]
+    [pathname, router, searchParams, startTransition]
   )
 
   const handleCellClick = useCallback(

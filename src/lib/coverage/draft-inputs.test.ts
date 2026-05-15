@@ -7,6 +7,7 @@ import {
   DRAFT_WEEKLY_SHIFT_COLUMNS,
   DRAFT_WORK_PATTERN_COLUMNS,
   buildDraftTherapists,
+  loadDraftInputsForCycle,
   toDraftExistingShifts,
 } from '@/lib/coverage/draft-inputs'
 
@@ -99,6 +100,92 @@ describe('draft input loader helpers', () => {
         role: 'staff',
         unfilled_reason: null,
       },
+    ])
+  })
+
+  it('loads draft therapists only from the Schedule Block site', async () => {
+    const profiles = [
+      {
+        id: 'site-a-therapist',
+        full_name: 'Site A Therapist',
+        role: 'therapist',
+        shift_type: 'day',
+        is_lead_eligible: false,
+        employment_type: 'full_time',
+        max_work_days_per_week: 3,
+        on_fmla: false,
+        fmla_return_date: null,
+        is_active: true,
+        site_id: 'site-a',
+      },
+      {
+        id: 'site-b-therapist',
+        full_name: 'Site B Therapist',
+        role: 'therapist',
+        shift_type: 'day',
+        is_lead_eligible: false,
+        employment_type: 'full_time',
+        max_work_days_per_week: 3,
+        on_fmla: false,
+        fmla_return_date: null,
+        is_active: true,
+        site_id: 'site-b',
+      },
+    ]
+    const client = {
+      from(table: string) {
+        const filters: Record<string, unknown> = {}
+        const inFilters: Record<string, unknown[]> = {}
+        const builder = {
+          select: () => builder,
+          eq: (column: string, value: unknown) => {
+            filters[column] = value
+            return builder
+          },
+          in: (column: string, values: unknown[]) => {
+            inFilters[column] = values
+            return builder
+          },
+          gte: () => builder,
+          lte: () => builder,
+          order: () => builder,
+          then: (
+            onFulfilled?: (value: { data: unknown[]; error: null }) => unknown,
+            onRejected?: (reason: unknown) => unknown
+          ) => {
+            let rows: unknown[] = []
+            if (table === 'profiles') {
+              let profileRows = profiles
+              if (Array.isArray(inFilters.role)) {
+                profileRows = profileRows.filter((row) => inFilters.role.includes(row.role))
+              }
+              if (typeof filters.site_id === 'string') {
+                profileRows = profileRows.filter((row) => row.site_id === filters.site_id)
+              }
+              rows = profileRows
+            }
+            return Promise.resolve({ data: rows, error: null }).then(onFulfilled, onRejected)
+          },
+        }
+        return builder
+      },
+    }
+
+    const result = await loadDraftInputsForCycle(
+      client as Parameters<typeof loadDraftInputsForCycle>[0],
+      {
+      cycle: {
+        id: 'cycle-1',
+        start_date: '2026-05-03',
+        end_date: '2026-06-13',
+        site_id: 'site-a',
+      },
+      }
+    )
+
+    expect(result.error).toBeNull()
+    expect(result.data?.therapists.map((therapist) => therapist.id)).toEqual([
+      'site-a-therapist',
     ])
   })
 })
