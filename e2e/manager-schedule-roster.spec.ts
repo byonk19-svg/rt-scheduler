@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
@@ -21,6 +21,42 @@ type ManagerScheduleCtx = {
 
 function cellTestId(userId: string, isoDate: string) {
   return `cell-${userId}-${isoDate}`
+}
+
+async function openCellAction(page: Page, cell: Locator, actionName: string) {
+  const action = page.getByRole('button', { name: actionName })
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await cell.click()
+    if (await action.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      return action
+    }
+    await page.waitForTimeout(500)
+  }
+
+  await expect(action).toBeVisible({ timeout: 10_000 })
+  return action
+}
+
+async function clickShiftTab(page: Page, tabName: 'Day' | 'Night') {
+  const button = page.getByRole('button', { name: tabName })
+  const expected = new RegExp(`shift=${tabName.toLowerCase()}`)
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await expect(button).toBeEnabled()
+    await button.click()
+    if (
+      await page.waitForURL(expected, { timeout: 5_000 }).then(
+        () => true,
+        () => false
+      )
+    ) {
+      return
+    }
+    await page.waitForTimeout(500)
+  }
+
+  await expect(page).toHaveURL(expected, { timeout: 10_000 })
 }
 
 test.describe.serial('unified schedule grid route', () => {
@@ -314,16 +350,19 @@ test.describe.serial('unified schedule grid route', () => {
       '·*'
     )
 
-    await page.getByRole('button', { name: 'Night' }).click()
-    await expect(page).toHaveURL(/shift=night/)
+    await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => undefined)
+    await clickShiftTab(page, 'Night')
     await expect(page.getByText(smoke.nightCore.name)).toBeVisible()
     await expect(page.getByText(smoke.dayCore.name)).toHaveCount(0)
     await expect(
       page.getByTestId(cellTestId(smoke.nightCore.id, smoke.draftCycle.day1))
     ).toHaveText('CI')
 
-    await page.getByRole('combobox', { name: 'Schedule Block' }).selectOption(smoke.liveCycle.id)
-    await expect(page).toHaveURL(new RegExp(`cycle=${smoke.liveCycle.id}`))
+    const cyclePicker = page.getByRole('combobox', { name: 'Schedule Block' })
+    await expect(cyclePicker).toBeEnabled()
+    await cyclePicker.selectOption(smoke.liveCycle.id)
+    await expect(cyclePicker).toHaveValue(smoke.liveCycle.id, { timeout: 30_000 })
+    await expect(page).toHaveURL(new RegExp(`cycle=${smoke.liveCycle.id}`), { timeout: 30_000 })
     await expect(page.getByText('Published', { exact: true })).toBeVisible()
   })
 
@@ -343,6 +382,10 @@ test.describe.serial('unified schedule grid route', () => {
     await expect(page.getByRole('button', { name: 'Assign anyway' })).toBeVisible()
     await page.getByRole('button', { name: 'Assign anyway' }).click()
     await expect(requestedOffCell).toHaveText('1*', { timeout: 30_000 })
+    await expect(page.getByRole('button', { name: 'Assign anyway' })).toHaveCount(0, {
+      timeout: 30_000,
+    })
+    await expect(requestedOffCell).toBeEnabled({ timeout: 30_000 })
 
     const inserted = await smoke.supabase
       .from('shifts')
@@ -355,13 +398,13 @@ test.describe.serial('unified schedule grid route', () => {
     expect(inserted.error).toBeNull()
     expect(inserted.data?.availability_override).toBe(true)
 
-    await requestedOffCell.click()
-    await page.getByRole('button', { name: 'Unassign' }).click()
+    const unassignButton = await openCellAction(page, requestedOffCell, 'Unassign')
+    await unassignButton.click()
     await expect(requestedOffCell).toHaveText('·*', { timeout: 30_000 })
 
     const scheduledCell = page.getByTestId(cellTestId(smoke.dayCore.id, smoke.draftCycle.day1))
-    await scheduledCell.click()
-    await page.getByRole('button', { name: 'Designate as lead' }).click()
+    const designateLeadButton = await openCellAction(page, scheduledCell, 'Designate as lead')
+    await designateLeadButton.click()
     await expect(scheduledCell).toHaveClass(/bg-yellow-200/, { timeout: 30_000 })
   })
 

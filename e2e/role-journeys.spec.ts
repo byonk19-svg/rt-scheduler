@@ -3,6 +3,7 @@ import { type SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
 import { addDays, formatDateKey, randomString } from './helpers/env'
+import { gotoWithRetry } from './helpers/navigation'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type RoleJourneysContext = {
@@ -37,6 +38,14 @@ function formatAvailabilityDayLabel(isoDate: string): string {
     day: 'numeric',
     year: 'numeric',
   })
+}
+
+function waitForShiftPostMutation(page: Page) {
+  return page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' && response.url().includes('/api/shift-posts'),
+    { timeout: 30_000 }
+  )
 }
 
 function nextSundayOnOrAfter(date: Date): Date {
@@ -240,7 +249,7 @@ async function expectShiftTabActive(page: Page, tab: 'day' | 'night') {
 }
 
 async function expectStaffRedirect(page: Page, path: string) {
-  await page.goto(path, { waitUntil: 'domcontentloaded' })
+  await gotoWithRetry(page, path)
   await expect(page).toHaveURL(/\/dashboard\/staff(?:[/?].*)?$/, { timeout: 20_000 })
 }
 
@@ -1065,7 +1074,11 @@ test.describe.serial('role journeys', () => {
     await page.getByRole('button', { name: 'Give up shift' }).click()
     await page.getByRole('button', { name: 'Continue' }).click()
     await page.getByLabel(/Message/).fill(requestMessage)
+    const createResponsePromise = waitForShiftPostMutation(page)
     await page.getByRole('button', { name: 'Submit request' }).click()
+    const createResponse = await createResponsePromise
+    const createBody = await createResponse.json().catch(() => null)
+    expect(createResponse.ok(), JSON.stringify(createBody)).toBe(true)
 
     let postId: string | null = null
     let shiftId: string | null = null

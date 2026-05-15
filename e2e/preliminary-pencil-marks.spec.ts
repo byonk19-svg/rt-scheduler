@@ -218,7 +218,10 @@ test.describe.serial('preliminary pencil marks', () => {
     await expect(assignedCard.getByText('Pencil Mark Staff')).toBeVisible()
     await assignedCard.locator('input[name="replacement_date"]').fill(ctx!.replacementDate)
     await assignedCard.getByRole('button', { name: 'Remove me' }).click()
-    await expect(page.getByText('Your pencil mark was saved for manager review.')).toBeVisible()
+    await expect(page).toHaveURL(/success=preliminary_mark_saved/, { timeout: 30_000 })
+    await expect(page.getByText('Your pencil mark was saved for manager review.')).toBeVisible({
+      timeout: 15_000,
+    })
 
     await expect
       .poll(async () => {

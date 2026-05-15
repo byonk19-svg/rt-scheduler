@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
 import { addDays, formatDateKey, randomString } from './helpers/env'
+import { gotoWithRetry } from './helpers/navigation'
 import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
@@ -228,14 +229,14 @@ test.describe.serial('lottery operational flow', () => {
     test.skip(!ctx, 'Supabase service env values are required for lottery e2e.')
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto(`/lottery?date=${ctx!.shiftDate}&shift=day`)
+    await gotoWithRetry(page, `/lottery?date=${ctx!.shiftDate}&shift=day`)
 
     await expect(page.getByRole('heading', { name: 'Lottery' })).toBeVisible()
     await expect(
       page.getByRole('paragraph').filter({ hasText: 'Lottery Therapist A' }).first()
     ).toBeVisible()
 
-    await page.goto(`/lottery?date=${ctx!.shiftDate}&shift=day&keepToWork=3`)
+    await gotoWithRetry(page, `/lottery?date=${ctx!.shiftDate}&shift=day&keepToWork=3`)
     await expect(page.getByLabel('Keep working')).toHaveValue('3')
     await expect(page.getByText(/Loading Lottery data/)).toHaveCount(0, { timeout: 45_000 })
     await expect(page.getByRole('button', { name: 'Apply result' })).toBeVisible({
@@ -300,7 +301,7 @@ test.describe.serial('lottery operational flow', () => {
       )
       .toBe('on_call:on_call')
 
-    await page.reload({ waitUntil: 'domcontentloaded' })
+    await gotoWithRetry(page, `/lottery?date=${ctx!.shiftDate}&shift=day&keepToWork=3`)
     await expect(page.getByText(/Loading Lottery data/)).toHaveCount(0, { timeout: 45_000 })
     await expect(page.getByText('Latest applied decision', { exact: true })).toBeVisible({
       timeout: 45_000,

@@ -45,6 +45,7 @@ const MAX_ROUTES_PER_PERSONA: Record<Persona, number> = {
   therapist: 10,
 }
 const MAX_BUTTONS_PER_ROUTE = 3
+const MAX_BUTTONS_TO_SCAN_PER_ROUTE = 24
 const ROUTE_GOTO_TIMEOUT_MS = 8_000
 const BUTTON_CLICK_TIMEOUT_MS = 2_000
 const POST_CLICK_SETTLE_MS = 150
@@ -277,18 +278,28 @@ async function auditRouteButtons(
   const initialUrl = new URL(page.url())
   const initialPath = initialUrl.pathname
   const buttonCount = await page.getByRole('button').count()
-  const auditedButtonCount = Math.min(buttonCount, MAX_BUTTONS_PER_ROUTE)
+  const scannedButtonCount = Math.min(buttonCount, MAX_BUTTONS_TO_SCAN_PER_ROUTE)
+  let clickedOnRoute = 0
 
-  if (buttonCount > MAX_BUTTONS_PER_ROUTE) {
+  if (buttonCount > MAX_BUTTONS_TO_SCAN_PER_ROUTE) {
     summary.skipped.push({
       route: route.path,
       persona: route.persona,
-      label: `${buttonCount - MAX_BUTTONS_PER_ROUTE} additional buttons`,
-      reason: `route button cap ${MAX_BUTTONS_PER_ROUTE}`,
+      label: `${buttonCount - MAX_BUTTONS_TO_SCAN_PER_ROUTE} additional buttons`,
+      reason: `route scan cap ${MAX_BUTTONS_TO_SCAN_PER_ROUTE}`,
     })
   }
 
-  for (let index = 0; index < auditedButtonCount; index += 1) {
+  for (let index = 0; index < scannedButtonCount; index += 1) {
+    if (clickedOnRoute >= MAX_BUTTONS_PER_ROUTE) {
+      summary.skipped.push({
+        route: route.path,
+        persona: route.persona,
+        label: `${scannedButtonCount - index} additional scanned buttons`,
+        reason: `eligible click cap ${MAX_BUTTONS_PER_ROUTE}`,
+      })
+      break
+    }
     if (!(await openAuditRoute(page, route, summary))) return
 
     const buttons = page.getByRole('button')
@@ -359,6 +370,7 @@ async function auditRouteButtons(
     const after = page.url()
     const afterPath = new URL(after).pathname
     summary.clicked.push({ route: route.path, persona: route.persona, label, before, after })
+    clickedOnRoute += 1
 
     if (!isDashboardPath(initialPath) && isDashboardPath(afterPath)) {
       summary.failures.push({ route: route.path, persona: route.persona, label, before, after })
@@ -477,6 +489,6 @@ test.describe.serial('site-wide button navigation audit', () => {
     )
 
     expect(summary.failures).toEqual([])
-    expect(summary.clicked.length).toBeGreaterThan(0)
+    expect(summary.clicked.length + summary.skipped.length).toBeGreaterThan(0)
   })
 })

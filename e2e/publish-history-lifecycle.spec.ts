@@ -255,15 +255,20 @@ test.describe.serial('publish history lifecycle', () => {
     await cycleRow.getByRole('button', { name: 'Take offline' }).click()
 
     await expect
-      .poll(async () => {
-        const cycleResult = await ctx!.supabase
-          .from('schedule_cycles')
-          .select('published, status')
-          .eq('id', cycle.id)
-          .maybeSingle()
-        if (cycleResult.error) throw new Error(cycleResult.error.message)
-        return cycleResult.data ? `${cycleResult.data.status}:${cycleResult.data.published}` : null
-      })
+      .poll(
+        async () => {
+          const cycleResult = await ctx!.supabase
+            .from('schedule_cycles')
+            .select('published, status')
+            .eq('id', cycle.id)
+            .maybeSingle()
+          if (cycleResult.error) throw new Error(cycleResult.error.message)
+          return cycleResult.data
+            ? `${cycleResult.data.status}:${cycleResult.data.published}`
+            : null
+        },
+        { timeout: 30_000 }
+      )
       .toBe('offline:false')
 
     await expect

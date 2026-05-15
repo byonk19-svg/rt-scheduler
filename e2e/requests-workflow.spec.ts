@@ -5,6 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
 import { addDays, formatDateKey, randomString } from './helpers/env'
+import { gotoWithRetry } from './helpers/navigation'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
 type RequestsCtx = {
@@ -477,9 +478,7 @@ test.describe.serial('requests workflow', () => {
     await page.getByRole('button', { name: 'Continue' }).click()
     await expect(page.getByText('Request summary').first()).toBeVisible()
     await page.getByLabel('Message').fill(requestMessage)
-    const createResponsePromise = page.waitForResponse((response) =>
-      response.url().includes('/api/shift-posts')
-    )
+    const createResponsePromise = waitForShiftPostMutation(page)
     await page.getByRole('button', { name: 'Submit request' }).click()
     const createResponse = await createResponsePromise
     const createBody = await createResponse.json().catch(() => null)
@@ -499,7 +498,8 @@ test.describe.serial('requests workflow', () => {
       })
       .toBe('pending')
 
-    await expect(page.getByText(requestMessage).first()).toBeVisible()
+    await gotoWithRetry(page, '/requests/new')
+    await expect(page.getByText(requestMessage).first()).toBeVisible({ timeout: 20_000 })
   })
 
   test('direct request recipient can accept from My Requests', async ({ page, browser }) => {
@@ -588,7 +588,11 @@ test.describe.serial('requests workflow', () => {
         .filter({ has: recipientPage.getByText(requestMessage) })
         .first()
       await expect(requestCard).toBeVisible({ timeout: 20_000 })
+      const acceptResponsePromise = waitForShiftPostMutation(recipientPage)
       await requestCard.getByRole('button', { name: 'Accept and send to manager' }).click()
+      const acceptResponse = await acceptResponsePromise
+      const acceptBody = await acceptResponse.json().catch(() => null)
+      expect(acceptResponse.ok(), JSON.stringify(acceptBody)).toBe(true)
 
       await expect
         .poll(async () => {

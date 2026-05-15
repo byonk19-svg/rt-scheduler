@@ -303,6 +303,7 @@ test.describe.serial('coverage display regressions', () => {
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await page.goto(`/coverage?cycle=${ctx!.publishedCycle.id}&view=week&shift=day`)
     await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
+    await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => undefined)
 
     await expect(page.getByRole('columnheader')).toHaveCount(44, { timeout: 15_000 })
     await expect(
@@ -310,6 +311,7 @@ test.describe.serial('coverage display regressions', () => {
     ).toBeVisible()
 
     await page.getByRole('button', { name: 'Night' }).click()
+    await expect(page).toHaveURL(/shift=night/, { timeout: 15_000 })
     await expect(page.getByRole('columnheader')).toHaveCount(44, { timeout: 15_000 })
     await expect(page.getByRole('rowheader').filter({ hasText: ctx!.nightLeadName })).toBeVisible()
   })

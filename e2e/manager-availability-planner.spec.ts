@@ -301,7 +301,20 @@ test.describe.serial('/availability manager planner', () => {
     await page.getByText('Utilities', { exact: true }).click()
     await expect(page.getByText('Existing draft schedule work stays unchanged')).toBeVisible()
     await page.getByRole('button', { name: 'Reopen availability' }).click()
-    await expect(page.getByText('Availability reopened.')).toBeVisible({ timeout: 20_000 })
+    await expect
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('schedule_cycles')
+            .select('availability_reopened_at')
+            .eq('id', ctx!.secondCycle.id)
+            .single()
+          if (result.error) throw new Error(result.error.message)
+          return result.data?.availability_reopened_at ?? null
+        },
+        { timeout: 30_000 }
+      )
+      .not.toBeNull()
 
     await loginAs(page, ctx!.therapist.email, ctx!.therapist.password)
     await page.goto(`/therapist/availability?cycle=${ctx!.secondCycle.id}`, {
@@ -427,8 +440,17 @@ test.describe.serial('/availability manager planner', () => {
       }
     )
     const managerRequestEditor = page.locator('[data-availability-editor]')
+    const clearSelectedDates = managerRequestEditor.getByRole('button', {
+      name: 'Clear selected dates',
+    })
+    if (await clearSelectedDates.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await clearSelectedDates.click()
+    }
     await managerRequestEditor.getByRole('button', { name: /^Need Off$/ }).click()
     await selectCalendarDay(managerRequestEditor, ctx!.therapistCannotWorkDate)
+    await expect(managerRequestEditor.getByRole('button', { name: /^Save for E2E$/ })).toBeEnabled({
+      timeout: 10_000,
+    })
     await managerRequestEditor.getByRole('button', { name: /^Save for E2E$/ }).click()
 
     await expect

@@ -1,21 +1,9 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
 import { loginAs } from './helpers/auth'
 import { randomString } from './helpers/env'
+import { gotoWithRetry } from './helpers/navigation'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
-
-async function gotoWithRetry(page: Page, url: string) {
-  let lastError: unknown
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      await page.goto(url, { waitUntil: 'domcontentloaded' })
-      return
-    } catch (error) {
-      lastError = error
-    }
-  }
-  throw lastError
-}
 
 test.describe.serial('lottery workflow surface', () => {
   test.setTimeout(120_000)

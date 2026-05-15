@@ -181,6 +181,7 @@ describe('lottery page', () => {
         siteId: 'site-1',
         shiftType: 'day',
       },
+      keepToWork: null,
       shiftDate: '2026-05-03',
       shiftType: 'night',
     })

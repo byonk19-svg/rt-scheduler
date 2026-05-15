@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
 import { addDays, randomString } from './helpers/env'
+import { gotoWithRetry } from './helpers/navigation'
 import { createScheduleCycle } from './helpers/schedule-cycles'
 import { createE2EUser, createServiceRoleClientOrNull } from './helpers/supabase'
 
@@ -104,13 +105,17 @@ test.describe.serial('coverage proactive risk warning', () => {
     test.skip(!ctx, 'Supabase service env values are required to run proactive-risk e2e.')
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto(`/coverage?cycle=${ctx!.cycleId}&view=week`)
+    await gotoWithRetry(page, `/coverage?cycle=${ctx!.cycleId}&view=week`)
+    await expect(page).toHaveURL(/\/schedule\?.*cycle=/, { timeout: 15_000 })
     await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible()
+    await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => undefined)
 
     await page.getByRole('button', { name: 'Pre-flight' }).click()
-    await expect(page.getByText('Pre-flight summary')).toBeVisible()
-    await expect(page.getByText(/unfilled assignments/)).toBeVisible()
-    await expect(page.getByText(/missing lead slots/)).toBeVisible()
-    await expect(page.getByText(/need-to-work misses/)).toBeVisible()
+    await expect(page.getByText('Pre-flight summary')).toBeVisible({ timeout: 15_000 })
+    await expect(
+      page.getByText(
+        /\d+ unfilled assignments,\s+\d+ missing lead slots,\s+\d+ need-to-work misses\./
+      )
+    ).toBeVisible({ timeout: 15_000 })
   })
 })
