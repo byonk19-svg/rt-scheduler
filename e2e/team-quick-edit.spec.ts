@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { loginAs } from './helpers/auth'
@@ -11,9 +11,10 @@ type TestContext = {
   manager: { id: string; email: string; password: string }
   therapist: { id: string; fullName: string }
   secondaryTherapist: { id: string; fullName: string }
+  rolePreviewTherapist: { id: string; fullName: string }
 }
 
-async function openQuickEdit(page: Page, profileId: string, profileName: string) {
+async function openQuickEditByDeepLink(page: Page, profileId: string) {
   const dialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -25,12 +26,28 @@ async function openQuickEdit(page: Page, profileId: string, profileName: string)
     }
   }
 
+  await expect(dialog).toBeVisible({ timeout: 30_000 })
+  return dialog
+}
+
+async function openQuickEditFromDirectorySearch(page: Page, profileName: string) {
+  const dialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
+
   await gotoWithRetry(page, '/team')
-  await page.getByLabel('Search').fill(profileName)
+  await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => undefined)
+  const searchInput = page.getByLabel('Search')
+  await expect(searchInput).toBeVisible({ timeout: 20_000 })
+  await searchInput.fill('')
+  await searchInput.pressSequentially(profileName)
+  await expect(searchInput).toHaveValue(profileName)
+  await expect(page.getByText('Filtered view')).toBeVisible({ timeout: 10_000 })
   const profileCard = page.getByRole('button').filter({ hasText: profileName }).first()
   await expect(profileCard).toBeVisible({ timeout: 20_000 })
   for (let attempt = 0; attempt < 4; attempt += 1) {
-    await profileCard.click()
+    await profileCard.scrollIntoViewIfNeeded()
+    await profileCard.click({ timeout: 5_000 }).catch(async () => {
+      await profileCard.evaluate((element: HTMLElement) => element.click())
+    })
     if (await dialog.isVisible({ timeout: 3_000 }).catch(() => false)) {
       return dialog
     }
@@ -40,8 +57,39 @@ async function openQuickEdit(page: Page, profileId: string, profileName: string)
   return dialog
 }
 
+async function expectQuickEditValues(
+  dialog: Locator,
+  expected: {
+    name: string
+    role: 'manager' | 'lead' | 'therapist'
+    shift: 'day' | 'night'
+    employment: 'full_time' | 'part_time' | 'prn'
+    active: boolean
+    onFmla: boolean
+    fmlaReturnDate?: string
+  }
+) {
+  await expect(dialog.getByLabel('Name')).toHaveValue(expected.name)
+  await expect(dialog.getByLabel('Role')).toHaveValue(expected.role)
+  await expect(dialog.getByLabel('Shift')).toHaveValue(expected.shift)
+  await expect(dialog.getByLabel('Employment Type')).toHaveValue(expected.employment)
+
+  if (expected.active) {
+    await expect(dialog.getByLabel('Active')).toBeChecked()
+  } else {
+    await expect(dialog.getByLabel('Active')).not.toBeChecked()
+  }
+
+  if (expected.onFmla) {
+    await expect(dialog.getByLabel('On FMLA')).toBeChecked()
+  } else {
+    await expect(dialog.getByLabel('On FMLA')).not.toBeChecked()
+  }
+  await expect(dialog.getByLabel('FMLA Return Date')).toHaveValue(expected.fmlaReturnDate ?? '')
+}
+
 test.describe.serial('/team quick edit modal', () => {
-  test.setTimeout(90_000)
+  test.setTimeout(180_000)
   let ctx: TestContext | null = null
   const createdUserIds: string[] = []
 
@@ -83,12 +131,27 @@ test.describe.serial('/team quick edit modal', () => {
       isLeadEligible: false,
     })
 
-    createdUserIds.push(manager.id, therapist.id, secondaryTherapist.id)
+    const rolePreviewTherapistFullName = `E2E Team Role Preview ${randomString('ther')}`
+    const rolePreviewTherapist = await createE2EUser(supabase, {
+      email: `${randomString('team-ther3')}@example.com`,
+      password: `Ther!${Math.random().toString(16).slice(2, 8)}`,
+      fullName: rolePreviewTherapistFullName,
+      role: 'therapist',
+      employmentType: 'full_time',
+      shiftType: 'day',
+      isLeadEligible: false,
+    })
+
+    createdUserIds.push(manager.id, therapist.id, secondaryTherapist.id, rolePreviewTherapist.id)
     ctx = {
       supabase,
       manager: { id: manager.id, email: managerEmail, password: managerPassword },
       therapist: { id: therapist.id, fullName: therapistFullName },
       secondaryTherapist: { id: secondaryTherapist.id, fullName: secondaryTherapistFullName },
+      rolePreviewTherapist: {
+        id: rolePreviewTherapist.id,
+        fullName: rolePreviewTherapistFullName,
+      },
     }
   })
 
@@ -105,6 +168,7 @@ test.describe.serial('/team quick edit modal', () => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     const updatedName = `${ctx!.therapist.fullName} Updated`
+    const secondaryUpdatedName = `${ctx!.secondaryTherapist.fullName} Updated`
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
     await gotoWithRetry(page, '/team')
@@ -113,9 +177,17 @@ test.describe.serial('/team quick edit modal', () => {
     await expect(page.getByRole('heading', { name: 'Managers' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Day shift therapists' })).toBeVisible()
 
-    const dialog = await openQuickEdit(page, ctx!.therapist.id, ctx!.therapist.fullName)
+    const dialog = await openQuickEditByDeepLink(page, ctx!.therapist.id)
     await expect(dialog).toBeVisible({ timeout: 30_000 })
     await expect(dialog.getByText('Coverage lead')).toHaveCount(0)
+    await expectQuickEditValues(dialog, {
+      name: ctx!.therapist.fullName,
+      role: 'therapist',
+      shift: 'day',
+      employment: 'full_time',
+      active: true,
+      onFmla: false,
+    })
 
     await dialog.getByLabel('Name').fill(updatedName)
     await dialog.getByLabel('Role').selectOption('lead')
@@ -148,8 +220,17 @@ test.describe.serial('/team quick edit modal', () => {
     await expect(updatedCard).toContainText('Part-time')
     await expect(updatedCard).toContainText('Return May 12, 2026')
 
-    const inactiveDialog = await openQuickEdit(page, ctx!.therapist.id, updatedName)
+    const inactiveDialog = await openQuickEditByDeepLink(page, ctx!.therapist.id)
     await expect(inactiveDialog).toBeVisible({ timeout: 30_000 })
+    await expectQuickEditValues(inactiveDialog, {
+      name: updatedName,
+      role: 'lead',
+      shift: 'night',
+      employment: 'part_time',
+      active: true,
+      onFmla: true,
+      fmlaReturnDate: '2026-05-12',
+    })
     await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => undefined)
     await inactiveDialog.getByLabel('Active').uncheck()
     const saveInactiveButton = inactiveDialog.getByRole('button', { name: 'Save changes' })
@@ -171,8 +252,17 @@ test.describe.serial('/team quick edit modal', () => {
       )
       .toBe(false)
 
-    const archiveDialog = await openQuickEdit(page, ctx!.therapist.id, updatedName)
+    const archiveDialog = await openQuickEditByDeepLink(page, ctx!.therapist.id)
     await expect(archiveDialog).toBeVisible({ timeout: 30_000 })
+    await expectQuickEditValues(archiveDialog, {
+      name: updatedName,
+      role: 'lead',
+      shift: 'night',
+      employment: 'part_time',
+      active: false,
+      onFmla: true,
+      fmlaReturnDate: '2026-05-12',
+    })
     await expect(archiveDialog.getByText('No app access while inactive.')).toBeVisible()
     await expect(
       archiveDialog.getByText('This updates automatically from the selected role.')
@@ -212,6 +302,97 @@ test.describe.serial('/team quick edit modal', () => {
         archived_by: ctx!.manager.id,
       })
     await expect(page.getByRole('button').filter({ hasText: updatedName })).toHaveCount(0)
+
+    const secondaryDialog = await openQuickEditFromDirectorySearch(
+      page,
+      ctx!.secondaryTherapist.fullName
+    )
+    await expect(secondaryDialog).toBeVisible({ timeout: 30_000 })
+    await expectQuickEditValues(secondaryDialog, {
+      name: ctx!.secondaryTherapist.fullName,
+      role: 'therapist',
+      shift: 'day',
+      employment: 'full_time',
+      active: true,
+      onFmla: false,
+    })
+
+    await secondaryDialog.getByLabel('Name').fill(secondaryUpdatedName)
+    await secondaryDialog.getByLabel('Role').selectOption('manager')
+    await secondaryDialog.getByLabel('Shift').selectOption('day')
+    await secondaryDialog.getByLabel('Employment Type').selectOption('prn')
+    await secondaryDialog.getByRole('button', { name: 'Save changes' }).click()
+    await expect(page).toHaveURL(/\/team\?success=profile_saved/, { timeout: 15_000 })
+
+    const secondaryInactiveDialog = await openQuickEditFromDirectorySearch(
+      page,
+      secondaryUpdatedName
+    )
+    await expectQuickEditValues(secondaryInactiveDialog, {
+      name: secondaryUpdatedName,
+      role: 'manager',
+      shift: 'day',
+      employment: 'prn',
+      active: true,
+      onFmla: false,
+    })
+    await secondaryInactiveDialog.getByLabel('Active').uncheck()
+    await secondaryInactiveDialog.getByRole('button', { name: 'Save changes' }).click()
+
+    await expect
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('profiles')
+            .select('is_active')
+            .eq('id', ctx!.secondaryTherapist.id)
+            .single()
+          if (result.error) throw new Error(result.error.message)
+          return result.data?.is_active
+        },
+        { timeout: 30_000 }
+      )
+      .toBe(false)
+
+    const secondaryArchiveDialog = await openQuickEditFromDirectorySearch(
+      page,
+      secondaryUpdatedName
+    )
+    await expectQuickEditValues(secondaryArchiveDialog, {
+      name: secondaryUpdatedName,
+      role: 'manager',
+      shift: 'day',
+      employment: 'prn',
+      active: false,
+      onFmla: false,
+    })
+    const secondaryArchiveRedirect = page
+      .waitForURL(/\/team\?success=profile_archived/, { timeout: 20_000 })
+      .catch(() => null)
+    await secondaryArchiveDialog.getByRole('button', { name: 'Archive employee' }).click()
+    await secondaryArchiveRedirect
+
+    await expect
+      .poll(
+        async () => {
+          const result = await ctx!.supabase
+            .from('profiles')
+            .select('full_name, role, shift_type, employment_type, is_active, archived_at')
+            .eq('id', ctx!.secondaryTherapist.id)
+            .single()
+          if (result.error) throw new Error(result.error.message)
+          return result.data
+        },
+        { timeout: 20_000 }
+      )
+      .toMatchObject({
+        full_name: secondaryUpdatedName,
+        role: 'manager',
+        shift_type: 'day',
+        employment_type: 'prn',
+        is_active: false,
+      })
+    await expect(page.getByRole('button').filter({ hasText: secondaryUpdatedName })).toHaveCount(0)
   })
 
   test('active quick edit keeps archive unavailable and role access checklist updates live', async ({
@@ -220,7 +401,7 @@ test.describe.serial('/team quick edit modal', () => {
     test.skip(!ctx, 'Supabase service env values are required to run seeded e2e tests.')
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto(`/team?edit_profile=${ctx!.secondaryTherapist.id}`)
+    await page.goto(`/team?edit_profile=${ctx!.rolePreviewTherapist.id}`)
 
     const dialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
     await expect(dialog).toBeVisible({ timeout: 10_000 })
@@ -252,7 +433,7 @@ test.describe.serial('/team quick edit modal', () => {
     const returnDate = '2026-06-01'
 
     await loginAs(page, ctx!.manager.email, ctx!.manager.password)
-    await page.goto(`/team?edit_profile=${ctx!.secondaryTherapist.id}`)
+    await page.goto(`/team?edit_profile=${ctx!.rolePreviewTherapist.id}`)
 
     const dialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
     await expect(dialog).toBeVisible({ timeout: 10_000 })
@@ -267,7 +448,7 @@ test.describe.serial('/team quick edit modal', () => {
         const result = await ctx!.supabase
           .from('profiles')
           .select('on_fmla, fmla_return_date')
-          .eq('id', ctx!.secondaryTherapist.id)
+          .eq('id', ctx!.rolePreviewTherapist.id)
           .single()
         if (result.error) throw new Error(result.error.message)
         return result.data
@@ -277,7 +458,7 @@ test.describe.serial('/team quick edit modal', () => {
         fmla_return_date: returnDate,
       })
 
-    await gotoWithRetry(page, `/team?edit_profile=${ctx!.secondaryTherapist.id}`)
+    await gotoWithRetry(page, `/team?edit_profile=${ctx!.rolePreviewTherapist.id}`)
     const updatedDialog = page.getByRole('dialog', { name: 'Quick Edit Team Member' })
     await expect(updatedDialog).toBeVisible({ timeout: 10_000 })
     await page.waitForLoadState('networkidle', { timeout: 30_000 }).catch(() => undefined)
@@ -292,7 +473,7 @@ test.describe.serial('/team quick edit modal', () => {
           const result = await ctx!.supabase
             .from('profiles')
             .select('on_fmla, fmla_return_date')
-            .eq('id', ctx!.secondaryTherapist.id)
+            .eq('id', ctx!.rolePreviewTherapist.id)
             .single()
           if (result.error) throw new Error(result.error.message)
           return result.data

@@ -382,9 +382,9 @@ export function TeamDirectory({
     )
   }, [savedSectionOpenState])
 
-  function openEditor(profileId: string) {
+  function resetEditorForProfile(profileId: string) {
     const profile = profiles.find((item) => item.id === profileId)
-    if (!profile) return
+    if (!profile) return false
     const pattern = workPatterns[profileId] ?? null
     setEditProfileId(profileId)
     setDraftRole((profile.role as EditableRole | null) ?? 'therapist')
@@ -395,6 +395,11 @@ export function TeamDirectory({
     setNeverDays(pattern?.offs_dow ?? [])
     setWorksDowMode(pattern?.works_dow_mode ?? 'hard')
     setWeekendRotation(pattern?.weekend_rotation ?? 'none')
+    return true
+  }
+
+  function openEditor(profileId: string) {
+    resetEditorForProfile(profileId)
   }
 
   function toggleDay(value: number) {

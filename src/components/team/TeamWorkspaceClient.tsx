@@ -49,6 +49,7 @@ function TeamWorkspaceClient({
   deleteEmployeeRosterEntryAction,
 }: TeamWorkspaceClientProps) {
   const [activeTab, setActiveTab] = useState<TeamWorkspaceTab>(initialTab)
+  const directoryEditorKey = `directory-editor-${initialEditProfileId ?? 'closed'}`
 
   useEffect(() => {
     setActiveTab(initialTab)
@@ -117,7 +118,7 @@ function TeamWorkspaceClient({
           className="space-y-3"
         >
           <TeamDirectory
-            key={initialEditProfileId ?? 'directory'}
+            key={directoryEditorKey}
             summary={summary}
             profiles={profiles}
             workPatterns={workPatterns}
