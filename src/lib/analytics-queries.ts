@@ -20,7 +20,7 @@ type CycleWithShiftsRow = {
 }
 
 type SubmissionRow = {
-  cycle_id: string
+  schedule_cycle_id: string
   therapist_id: string
   submitted_at: string
 }
@@ -63,7 +63,12 @@ type ActiveTherapistCountQuery = {
       column: string,
       values: string[]
     ) => {
-      eq: (column: string, value: boolean) => Promise<{ count: number | null }>
+      eq: (
+        column: string,
+        value: boolean
+      ) => {
+        is: (column: string, value: null) => Promise<{ count: number | null }>
+      }
     }
   }
 }
@@ -146,17 +151,18 @@ export async function getSubmissionCompliance(supabase: SupabaseClientLike) {
     .select('id', { count: 'exact' })
     .in('role', ['therapist', 'lead'])
     .eq('is_active', true)
+    .is('archived_at', null)
 
   const totalActive = activeCountResult.count ?? 0
 
   const submissionResult = await (
     supabase.from('therapist_availability_submissions') as unknown as SubmissionQuery
   )
-    .select('cycle_id, therapist_id, submitted_at')
-    .order('cycle_id')
+    .select('schedule_cycle_id, therapist_id, submitted_at')
+    .order('schedule_cycle_id')
 
   const submissions = submissionResult.data ?? []
-  const cycleIds = [...new Set(submissions.map((row) => row.cycle_id))]
+  const cycleIds = [...new Set(submissions.map((row) => row.schedule_cycle_id))]
 
   const cycleLabelsResult =
     cycleIds.length > 0
@@ -169,9 +175,9 @@ export async function getSubmissionCompliance(supabase: SupabaseClientLike) {
 
   const submittedByCycleId = new Map<string, Set<string>>()
   for (const row of submissions) {
-    const submittedSet = submittedByCycleId.get(row.cycle_id) ?? new Set<string>()
+    const submittedSet = submittedByCycleId.get(row.schedule_cycle_id) ?? new Set<string>()
     submittedSet.add(row.therapist_id)
-    submittedByCycleId.set(row.cycle_id, submittedSet)
+    submittedByCycleId.set(row.schedule_cycle_id, submittedSet)
   }
 
   return [...submittedByCycleId.entries()].map(([cycleId, therapistIds]) => ({

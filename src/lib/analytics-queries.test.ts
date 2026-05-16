@@ -55,25 +55,45 @@ describe('analytics queries', () => {
   })
 
   it('groups distinct therapist submissions per cycle against total active staff', async () => {
+    let selectedSubmissionColumns = ''
+    let orderedSubmissionColumn = ''
     const supabase = buildSupabaseMock({
       profiles: () => ({
         select: () => ({
           in: () => ({
-            eq: async () => ({
-              count: 4,
+            eq: () => ({
+              is: async () => ({
+                count: 4,
+              }),
             }),
           }),
         }),
       }),
       therapist_availability_submissions: () => ({
-        select: () => ({
-          order: async () => ({
-            data: [
-              { cycle_id: 'cycle-1', therapist_id: 'a', submitted_at: '2026-04-01T00:00:00Z' },
-              { cycle_id: 'cycle-1', therapist_id: 'b', submitted_at: '2026-04-01T00:00:00Z' },
-              { cycle_id: 'cycle-1', therapist_id: 'b', submitted_at: '2026-04-02T00:00:00Z' },
-            ],
-          }),
+        select: (columns: string) => ({
+          order: async (column: string) => {
+            selectedSubmissionColumns = columns
+            orderedSubmissionColumn = column
+            return {
+              data: [
+                {
+                  schedule_cycle_id: 'cycle-1',
+                  therapist_id: 'a',
+                  submitted_at: '2026-04-01T00:00:00Z',
+                },
+                {
+                  schedule_cycle_id: 'cycle-1',
+                  therapist_id: 'b',
+                  submitted_at: '2026-04-01T00:00:00Z',
+                },
+                {
+                  schedule_cycle_id: 'cycle-1',
+                  therapist_id: 'b',
+                  submitted_at: '2026-04-02T00:00:00Z',
+                },
+              ],
+            }
+          },
         }),
       }),
       schedule_cycles: () => ({
@@ -94,6 +114,8 @@ describe('analytics queries', () => {
         compliancePercent: 50,
       },
     ])
+    expect(selectedSubmissionColumns).toBe('schedule_cycle_id, therapist_id, submitted_at')
+    expect(orderedSubmissionColumn).toBe('schedule_cycle_id')
   })
 
   it('marks force-on overrides as missed when no matching shift exists', async () => {

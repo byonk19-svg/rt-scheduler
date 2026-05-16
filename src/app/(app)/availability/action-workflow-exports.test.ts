@@ -36,4 +36,17 @@ describe('availability workflow action exports', () => {
     expect(actionsFile).toContain('./manager-request-action-impl')
     expect(actionsFile).toContain('./email-intake-action-impl')
   })
+
+  it('keeps manager reminders scoped to active, unarchived staff who have not submitted', () => {
+    const reminderAction = readFileSync(
+      resolve(process.cwd(), 'src/app/(app)/availability/manager-reminder-action-impl.ts'),
+      'utf8'
+    )
+
+    expect(reminderAction).toContain(".from('profiles')")
+    expect(reminderAction).toContain(".eq('is_active', true)")
+    expect(reminderAction).toContain(".is('archived_at', null)")
+    expect(reminderAction).toContain(".from('therapist_availability_submissions')")
+    expect(reminderAction).toContain(".eq('schedule_cycle_id', cycleId)")
+  })
 })

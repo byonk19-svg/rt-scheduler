@@ -66,6 +66,8 @@ export type ShiftBoardProfileLookupRow = {
   role?: string | null
   is_lead_eligible?: boolean | null
   employment_type?: string | null
+  is_active?: boolean | null
+  archived_at?: string | null
 }
 
 type CycleRow = {
@@ -218,13 +220,14 @@ export async function loadShiftBoardSnapshot({
     await Promise.all([
       supabase
         .from('profiles')
-        .select('id, full_name, is_lead_eligible')
+        .select('id, full_name, is_lead_eligible, archived_at')
         .in('role', ['therapist', 'lead'])
         .eq('is_active', true)
+        .is('archived_at', null)
         .order('full_name'),
       supabase
         .from('profiles')
-        .select('id, full_name, role, employment_type')
+        .select('id, full_name, role, employment_type, is_active, archived_at')
         .eq('id', user.id)
         .maybeSingle(),
       supabase
@@ -240,6 +243,10 @@ export async function loadShiftBoardSnapshot({
     ])
 
   const profile = (profileResult.data ?? null) as ShiftBoardProfileLookupRow | null
+  if (!profile || profile.is_active === false || profile.archived_at) {
+    return { unauthorized: true }
+  }
+
   const role = toUiRole(profile?.role)
   const therapists = (therapistsResult.data ?? []) as ShiftBoardProfileLookupRow[]
 

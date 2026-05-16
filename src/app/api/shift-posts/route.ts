@@ -143,6 +143,10 @@ async function getActorProfile(userId: string): Promise<ProfileRow | null> {
   return (data ?? null) as ProfileRow | null
 }
 
+function isActiveShiftPostActor(profile: ProfileRow | null): boolean {
+  return Boolean(parseRole(profile?.role)) && profile?.is_active !== false && !profile?.archived_at
+}
+
 async function resolveSameCycleSwapShiftId(params: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   admin: any
@@ -237,6 +241,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 })
   }
   const action = payload.action
+  const actorProfile = await getActorProfile(user.id)
+
+  if (!isActiveShiftPostActor(actorProfile)) {
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  }
 
   const admin = createAdminClient()
 
@@ -394,7 +403,6 @@ export async function POST(request: Request) {
     }
 
     if (shiftPostCommandRequiresManager(action)) {
-      const actorProfile = await getActorProfile(user.id)
       if (
         !can(parseRole(actorProfile?.role), 'review_shift_posts', {
           isActive: actorProfile?.is_active !== false,

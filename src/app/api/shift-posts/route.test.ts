@@ -187,7 +187,7 @@ describe('shift-post mutation API', () => {
     })
   })
 
-  it('returns pickup-interest eligibility failures as client-visible validation errors', async () => {
+  it('blocks inactive actors before shift-post workflow mutations', async () => {
     const rpcMock = vi.fn(async () => ({
       data: null,
       error: { message: 'Pickup claimant is not eligible for this request.' },
@@ -207,11 +207,33 @@ describe('shift-post mutation API', () => {
       })
     )
 
-    expect(response.status).toBe(400)
-    expect(rpcMock).toHaveBeenCalledWith('app_express_shift_post_interest', {
-      p_actor_id: 'therapist-1',
-      p_post_id: 'post-1',
+    expect(response.status).toBe(403)
+    expect(rpcMock).not.toHaveBeenCalled()
+  })
+
+  it('blocks archived actors before shift-post workflow mutations', async () => {
+    const rpcMock = vi.fn()
+
+    createClientMock.mockResolvedValue(
+      makeServerClient({
+        userId: 'therapist-1',
+        role: 'therapist',
+        archivedAt: '2026-05-01T12:00:00.000Z',
+      })
+    )
+    createAdminClientMock.mockReturnValue({
+      rpc: rpcMock,
     })
+
+    const response = await POST(
+      makeRequest({
+        action: 'express_interest',
+        requestId: 'post-1',
+      })
+    )
+
+    expect(response.status).toBe(403)
+    expect(rpcMock).not.toHaveBeenCalled()
   })
 
   it('blocks review actions for non-managers before calling the review function', async () => {

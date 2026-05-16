@@ -40,6 +40,7 @@ export async function sendAvailabilityRemindersAction(
     .select('id, full_name, email, notification_email_enabled, on_fmla')
     .in('role', ['therapist', 'lead'])
     .eq('is_active', true)
+    .is('archived_at', null)
     .eq('on_fmla', false)
 
   if (profileError) {

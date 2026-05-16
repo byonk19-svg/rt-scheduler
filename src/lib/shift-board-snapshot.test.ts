@@ -20,9 +20,25 @@ type ShiftPostFixture = {
 function makeSupabaseMock({
   posts,
   pendingPosts = posts.filter((post) => post.status === 'pending'),
+  profile = {
+    id: 'therapist-1',
+    full_name: 'Barbara C.',
+    role: 'therapist',
+    employment_type: 'full_time',
+    is_active: true,
+    archived_at: null,
+  },
 }: {
   posts: ShiftPostFixture[]
   pendingPosts?: ShiftPostFixture[]
+  profile?: {
+    id: string
+    full_name: string
+    role: string
+    employment_type: string
+    is_active: boolean | null
+    archived_at: string | null
+  } | null
 }) {
   return {
     auth: {
@@ -40,16 +56,14 @@ function makeSupabaseMock({
           eq() {
             return builder
           },
+          is() {
+            return builder
+          },
           order() {
             return Promise.resolve({ data: [], error: null })
           },
           maybeSingle: async () => ({
-            data: {
-              id: 'therapist-1',
-              full_name: 'Barbara C.',
-              role: 'therapist',
-              employment_type: 'full_time',
-            },
+            data: profile,
             error: null,
           }),
         }
@@ -182,6 +196,25 @@ describe('loadShiftBoardSnapshot', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  it('blocks inactive actors from the request board snapshot', async () => {
+    const snapshot = await loadShiftBoardSnapshot({
+      supabase: makeSupabaseMock({
+        posts: [],
+        profile: {
+          id: 'therapist-1',
+          full_name: 'Barbara C.',
+          role: 'therapist',
+          employment_type: 'full_time',
+          is_active: false,
+          archived_at: null,
+        },
+      }),
+      tab: 'open',
+    })
+
+    expect(snapshot).toEqual({ unauthorized: true })
   })
 
   it('hides direct requests from unrelated therapists on the shared board', async () => {
