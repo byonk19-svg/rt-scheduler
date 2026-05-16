@@ -12,9 +12,9 @@ import { getAuthenticatedUserWithRole } from './_actions/shared'
 export async function sendAvailabilityRemindersAction(
   cycleId: string
 ): Promise<{ sent: number; skipped: number; failed: number; error?: string }> {
-  const { supabase, role } = await getAuthenticatedUserWithRole()
+  const { supabase, role, permissionContext } = await getAuthenticatedUserWithRole()
 
-  if (!can(role, 'access_manager_ui')) {
+  if (!can(role, 'access_manager_ui', permissionContext)) {
     return { sent: 0, skipped: 0, failed: 0, error: 'unauthorized' }
   }
 

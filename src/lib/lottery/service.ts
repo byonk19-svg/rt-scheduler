@@ -138,6 +138,8 @@ type ProfileActorRow = {
   role: string | null
   site_id: string | null
   shift_type: LotteryShiftType | null
+  is_active: boolean | null
+  archived_at: string | null
 }
 
 type PublishedCycleRow = {
@@ -475,7 +477,7 @@ function buildContextSignature(args: {
 export async function loadLotteryActor(userId: string): Promise<LotteryActor | null> {
   const { data, error } = await admin()
     .from('profiles')
-    .select('id, full_name, role, site_id, shift_type')
+    .select('id, full_name, role, site_id, shift_type, is_active, archived_at')
     .eq('id', userId)
     .maybeSingle()
 
@@ -485,6 +487,7 @@ export async function loadLotteryActor(userId: string): Promise<LotteryActor | n
   }
 
   const profile = data as ProfileActorRow
+  if (profile.is_active === false || profile.archived_at) return null
   if (!profile.site_id) return null
 
   return {

@@ -20,7 +20,7 @@ import { PrintMenuItem } from '@/components/print-menu-item'
 import { Button } from '@/components/ui/button'
 import { can } from '@/lib/auth/can'
 import { formatHumanCycleRange } from '@/lib/calendar-utils'
-import { toUiRole } from '@/lib/auth/roles'
+import { parseRole } from '@/lib/auth/roles'
 import { createClient } from '@/lib/supabase/server'
 import { cn } from '@/lib/utils'
 
@@ -204,12 +204,16 @@ export default async function AvailabilityIntakePage({
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, is_active, archived_at')
     .eq('id', user.id)
     .maybeSingle()
 
-  const role = toUiRole(profile?.role)
-  if (!can(role, 'access_manager_ui')) {
+  if (
+    !can(parseRole(profile?.role), 'access_manager_ui', {
+      isActive: profile?.is_active !== false,
+      archivedAt: profile?.archived_at ?? null,
+    })
+  ) {
     redirect(`/therapist/availability${toSearchString(params)}`)
   }
 

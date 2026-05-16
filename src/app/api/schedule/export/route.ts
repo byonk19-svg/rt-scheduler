@@ -52,11 +52,16 @@ export async function GET(request: Request) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, is_active, archived_at')
     .eq('id', user.id)
     .maybeSingle()
 
-  if (!can(parseRole(profile?.role), 'export_all_availability')) {
+  if (
+    !can(parseRole(profile?.role), 'export_all_availability', {
+      isActive: profile?.is_active !== false,
+      archivedAt: profile?.archived_at ?? null,
+    })
+  ) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

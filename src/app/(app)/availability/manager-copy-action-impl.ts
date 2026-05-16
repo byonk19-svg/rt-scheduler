@@ -13,9 +13,9 @@ import {
 } from './_actions/shared'
 
 export async function copyAvailabilityFromPreviousCycleAction(formData: FormData) {
-  const { supabase, user, role } = await getAuthenticatedUserWithRole()
+  const { supabase, user, role, permissionContext } = await getAuthenticatedUserWithRole()
 
-  if (!can(role, 'access_manager_ui')) {
+  if (!can(role, 'access_manager_ui', permissionContext)) {
     redirect('/availability')
   }
 

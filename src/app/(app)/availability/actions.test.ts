@@ -56,6 +56,8 @@ import {
 type TestContext = {
   userId?: string | null
   role?: string | null
+  isActive?: boolean
+  archivedAt?: string | null
   therapistSubmissionExists?: boolean
   draftShiftCount?: number
 }
@@ -183,8 +185,15 @@ function createSupabaseMock(context: TestContext = {}) {
           }
         },
         maybeSingle: async () => {
-          if (table === 'profiles' && selected === 'role') {
-            return { data: { role: context.role }, error: null }
+          if (table === 'profiles' && selected.includes('role')) {
+            return {
+              data: {
+                role: context.role,
+                is_active: context.isActive ?? true,
+                archived_at: context.archivedAt ?? null,
+              },
+              error: null,
+            }
           }
           if (table === 'schedule_cycles') {
             return {
@@ -495,6 +504,22 @@ describe('availability actions', () => {
         intent: 'manager_force',
       },
     ])
+  })
+
+  it('blocks inactive managers before manager planner mutations', async () => {
+    const supabase = createSupabaseMock({
+      userId: 'manager-1',
+      role: 'manager',
+      isActive: false,
+    })
+    createClientMock.mockResolvedValue(supabase)
+
+    await expect(saveManagerPlannerDatesAction(makeManagerPlannerFormData())).rejects.toThrow(
+      'REDIRECT:/availability'
+    )
+
+    expect(supabase.state.upsertPayloads).toHaveLength(0)
+    expect(supabase.state.deletes).toHaveLength(0)
   })
 
   it('lets a manager lock and reopen the availability window with attribution', async () => {

@@ -18,6 +18,8 @@ export const metadata: Metadata = {
 
 type ManagerProfileRow = {
   role: string | null
+  is_active: boolean | null
+  archived_at: string | null
 }
 
 type NotificationRow = {
@@ -142,7 +144,11 @@ export default async function ManagerDashboardPage() {
     latestUnreadResult,
     recentActivityResult,
   ] = await Promise.all([
-    supabase.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+    supabase
+      .from('profiles')
+      .select('role, is_active, archived_at')
+      .eq('id', user.id)
+      .maybeSingle(),
     supabase
       .from('schedule_cycles')
       .select('id, label, start_date, end_date, published, archived_at')
@@ -194,7 +200,12 @@ export default async function ManagerDashboardPage() {
   }
 
   const profile = (profileResult.data ?? null) as ManagerProfileRow | null
-  if (!can(resolveUserRole(profile?.role), 'access_manager_ui')) {
+  if (
+    !can(resolveUserRole(profile?.role), 'access_manager_ui', {
+      isActive: profile?.is_active !== false,
+      archivedAt: profile?.archived_at ?? null,
+    })
+  ) {
     redirect('/dashboard/staff')
   }
 

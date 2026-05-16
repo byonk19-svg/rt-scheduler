@@ -3,7 +3,6 @@
 import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/can'
-import { parseRole } from '@/lib/auth/roles'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
   buildAvailabilityUrl,
@@ -16,8 +15,8 @@ function getCycleId(formData: FormData) {
 }
 
 async function requireManager() {
-  const { user, role } = await getAuthenticatedUserWithRole()
-  if (!can(parseRole(role), 'access_manager_ui')) {
+  const { user, role, permissionContext } = await getAuthenticatedUserWithRole()
+  if (!can(role, 'access_manager_ui', permissionContext)) {
     redirect('/dashboard/staff')
   }
   return user

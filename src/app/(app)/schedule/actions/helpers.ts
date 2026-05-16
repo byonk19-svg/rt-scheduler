@@ -16,9 +16,12 @@ export async function getRoleForUser(userId: string) {
   const supabase = await createClient()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, is_active, archived_at')
     .eq('id', userId)
     .maybeSingle()
+
+  if (profile?.is_active === false || profile?.archived_at) return null
+
   return parseRole(profile?.role)
 }
 

@@ -5,6 +5,17 @@ import { createClient } from '@/lib/supabase/server'
 
 export type AvailabilityOverrideType = 'force_off' | 'force_on'
 export type AvailabilityShiftType = 'day' | 'night' | 'both'
+export type AuthenticatedActionUser = {
+  supabase: Awaited<ReturnType<typeof createClient>>
+  user: NonNullable<
+    Awaited<ReturnType<Awaited<ReturnType<typeof createClient>>['auth']['getUser']>>['data']['user']
+  >
+  role: string | null
+  permissionContext: {
+    isActive: boolean
+    archivedAt: string | null
+  }
+}
 
 export function revalidateTherapistAvailabilitySurfaces() {
   revalidatePath('/availability')
@@ -34,7 +45,7 @@ export function buildEmailIntakeAvailabilityUrl(params?: Record<string, string |
   return buildAvailabilityUrl({ ...params, tab: 'intake' })
 }
 
-export async function getAuthenticatedUserWithRole() {
+export async function getAuthenticatedUserWithRole(): Promise<AuthenticatedActionUser> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -46,7 +57,7 @@ export async function getAuthenticatedUserWithRole() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, is_active, archived_at')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -54,5 +65,9 @@ export async function getAuthenticatedUserWithRole() {
     supabase,
     user,
     role: profile?.role ?? null,
+    permissionContext: {
+      isActive: profile?.is_active !== false,
+      archivedAt: profile?.archived_at ?? null,
+    },
   }
 }

@@ -39,11 +39,14 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, is_active, archived_at')
     .eq('id', user.id)
     .maybeSingle()
 
-  const isManager = can(parseRole(profile?.role), 'export_all_availability')
+  const isManager = can(parseRole(profile?.role), 'export_all_availability', {
+    isActive: profile?.is_active !== false,
+    archivedAt: profile?.archived_at ?? null,
+  })
 
   let query = supabase
     .from('availability_overrides')

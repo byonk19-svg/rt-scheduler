@@ -23,10 +23,15 @@ export default async function RequestsPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, is_active, archived_at')
     .eq('id', user.id)
     .maybeSingle()
-  if (!can(parseRole(profile?.role), 'access_manager_ui')) {
+  if (
+    !can(parseRole(profile?.role), 'access_manager_ui', {
+      isActive: profile?.is_active !== false,
+      archivedAt: profile?.archived_at ?? null,
+    })
+  ) {
     redirect('/requests/new')
   }
 

@@ -240,11 +240,16 @@ export default async function TeamPage({
 
   const { data: profileData } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, is_active, archived_at')
     .eq('id', authData.user.id)
     .maybeSingle()
 
-  if (!can(parseRole(profileData?.role), 'access_manager_ui')) {
+  if (
+    !can(parseRole(profileData?.role), 'access_manager_ui', {
+      isActive: profileData?.is_active !== false,
+      archivedAt: profileData?.archived_at ?? null,
+    })
+  ) {
     redirect('/dashboard/staff')
   }
 

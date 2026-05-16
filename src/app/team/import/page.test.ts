@@ -12,6 +12,7 @@ describe('team import page source contract', () => {
 
     expect(source).toContain('ImportWizard')
     expect(source).toContain("redirect('/dashboard/staff')")
-    expect(source).toContain("can(parseRole(profileData?.role), 'access_manager_ui')")
+    expect(source).toContain("select('role, is_active, archived_at')")
+    expect(source).toContain("can(parseRole(profileData?.role), 'access_manager_ui', {")
   })
 })

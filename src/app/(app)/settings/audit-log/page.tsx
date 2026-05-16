@@ -136,11 +136,16 @@ export default async function AuditLogPage({
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, is_active, archived_at')
     .eq('id', user.id)
     .maybeSingle()
 
-  if (!can(parseRole(profile?.role), 'view_audit_log')) {
+  if (
+    !can(parseRole(profile?.role), 'view_audit_log', {
+      isActive: profile?.is_active !== false,
+      archivedAt: profile?.archived_at ?? null,
+    })
+  ) {
     redirect('/dashboard/staff')
   }
 
