@@ -88,6 +88,13 @@ describe('AppShell mobile menu', () => {
     expect(appShellSource).toContain('isCoveragePage || isSchedulePage || isAvailabilityPage')
   })
 
+  it('lets the schedule page own compact workflow context instead of stacking the global strip', () => {
+    expect(appShellSource).toContain(
+      'const showWorkflowContextStrip = Boolean(workflowContext) && !isSchedulePage'
+    )
+    expect(appShellSource).toContain('showWorkflowContextStrip && workflowContext ?')
+  })
+
   it('does not keep a second fixed shell bar under the main header', () => {
     expect(appShellSource).not.toContain('app-shell-chrome-secondary fixed top-14')
   })

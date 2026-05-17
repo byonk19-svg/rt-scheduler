@@ -290,14 +290,15 @@ function getAvailabilityFeedback(params?: AvailabilityPageSearchParams): {
   if (error === 'copy_no_source') {
     return {
       message:
-        'Nothing to copy — this therapist has no saved dates in the previous schedule block.',
+        'Nothing to copy - this therapist has no saved dates in the previous Schedule Block.',
       variant: 'error',
     }
   }
 
   if (error === 'copy_nothing_new') {
     return {
-      message: 'All dates from the previous block are already planned for this Schedule Block.',
+      message:
+        'All dates from the previous Schedule Block are already planned for this Schedule Block.',
       variant: 'error',
     }
   }

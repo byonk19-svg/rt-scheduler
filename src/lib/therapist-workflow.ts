@@ -324,7 +324,7 @@ export function resolveTherapistWorkflow(params: {
         publishedSchedule.cycle.start_date,
         publishedSchedule.cycle.end_date
       ),
-      cycleReason: 'This is the current published schedule available to therapists.',
+      cycleReason: 'This is the current published Schedule Block available to therapists.',
       primaryAction: {
         href: `/schedule?cycle=${publishedSchedule.cycle.id}`,
         label: 'View schedule',

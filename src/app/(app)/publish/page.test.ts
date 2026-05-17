@@ -168,13 +168,13 @@ describe('PublishHistoryPage', () => {
 
     const html = renderToStaticMarkup(await PublishHistoryPage({}))
 
-    expect(html).toContain('Schedule blocks')
+    expect(html).toContain('Schedule Blocks')
     expect(html).toContain('Publish email log')
     expect(html).toContain('Take offline')
     expect(html).not.toContain('Clear &amp; restart')
-    expect(html).toContain('Archive block')
+    expect(html).toContain('Archive Schedule Block')
     expect(html).toContain('Delete history')
-    expect(html).toContain('Open block')
+    expect(html).toContain('Open Schedule Block')
     expect(html).toContain('No longer live')
     expect(html).toContain('Live cycle')
     expect(html).toContain('Old cycle')
@@ -194,7 +194,7 @@ describe('PublishHistoryPage', () => {
       })
     )
 
-    expect(html).toContain('Schedule block taken offline')
+    expect(html).toContain('Schedule Block taken offline')
     expect(html).toContain('Assignments were preserved')
   })
 

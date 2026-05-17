@@ -372,7 +372,7 @@ export function getWorkflowContext(args: {
     if (pathname === '/availability') {
       return {
         workflow: 'Availability',
-        context: 'Team exceptions for the block',
+        context: 'Team exceptions for the Schedule Block',
         state: 'Missing, submitted, manager edited',
         permission: 'Manager managed after lock',
       }
@@ -408,7 +408,7 @@ export function getWorkflowContext(args: {
     if (pathname === '/publish' || pathname.startsWith('/publish/')) {
       return {
         workflow: 'Publish',
-        context: 'Schedule Block history',
+        context: 'Schedule Block - history',
         state: 'Queued, published, offline',
         permission: 'Manager controlled',
       }
@@ -463,7 +463,7 @@ export function getWorkflowContext(args: {
   if (pathname === '/therapist/availability' || pathname === '/availability') {
     return {
       workflow: 'Availability',
-      context: 'Need Off and Need to Work',
+      context: 'Need Off / Need to Work',
       state: 'Editable while the window is open',
       permission: 'Your exceptions',
     }

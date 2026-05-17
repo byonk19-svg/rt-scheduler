@@ -10,8 +10,8 @@ function makeDataset(overrides: Partial<GridDataset> = {}): GridDataset {
     cycleId: 'c1',
     shiftType: 'day',
     availableCycles: [{ id: 'c1', label: 'May 4 - May 5, 2026' }],
-    cycleDates: ['2026-05-04', '2026-05-05'],
-    cycleDateRangeLabel: 'May 4 - May 5, 2026',
+    cycleDates: ['2026-05-03', '2026-05-04', '2026-05-05'],
+    cycleDateRangeLabel: 'May 3 - May 5, 2026',
     isPublished: false,
     therapistRows: [
       {
@@ -27,6 +27,12 @@ function makeDataset(overrides: Partial<GridDataset> = {}): GridDataset {
             hasNeedsOff: false,
             isIneligible: false,
           },
+          '2026-05-03': {
+            shiftId: null,
+            status: 'off',
+            hasNeedsOff: false,
+            isIneligible: false,
+          },
           '2026-05-05': {
             shiftId: null,
             status: 'off',
@@ -36,7 +42,7 @@ function makeDataset(overrides: Partial<GridDataset> = {}): GridDataset {
         },
       },
     ],
-    dailyTotals: { '2026-05-04': 1, '2026-05-05': 0 },
+    dailyTotals: { '2026-05-03': 0, '2026-05-04': 1, '2026-05-05': 0 },
     viewerUserId: 'mgr1',
     viewerRole: 'manager',
     canManageCoverage: true,
@@ -65,6 +71,7 @@ describe('ScheduleGridTable', () => {
 
     expect(html).toContain('data-testid="cell-u1-2026-05-04"')
     expect(html).toContain('bg-yellow-200')
+    expect(html).toContain('border-yellow-300')
     expect(html).toContain('1')
   })
 
@@ -103,6 +110,30 @@ describe('ScheduleGridTable', () => {
     expect(html).toContain('No day-shift therapists found for this Schedule Block.')
     expect(html).toContain('Switch shifts or check Team roster settings')
     expect(html).not.toContain('<table')
+  })
+
+  it('keeps date headers and totals sticky for scanning the 42-day grid', () => {
+    const html = renderTable(makeDataset())
+
+    expect(html).toContain('sticky left-0 top-0')
+    expect(html).toContain('sticky top-0')
+    expect(html).toContain('sticky bottom-0')
+    expect(html).toContain('sticky right-0')
+  })
+
+  it('uses compact column widths so all 6 weeks can fit on desktop', () => {
+    const html = renderTable(makeDataset())
+
+    expect(html).toContain('min-w-[118px]')
+    expect(html).toContain('min-w-5')
+    expect(html).toContain('min-w-8')
+  })
+
+  it('marks Sunday week boundaries without changing date order', () => {
+    const html = renderTable(makeDataset())
+
+    expect(html).toContain('border-l-2 border-l-foreground/35')
+    expect(html.indexOf('>S</span>')).toBeLessThan(html.indexOf('>M</span>'))
   })
 
   it('lets managers assign empty cells on published schedules', () => {
